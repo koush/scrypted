@@ -5,23 +5,35 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name"        : "Scrypted Debugger",
-            "type"        : "duk",
+            "name"        : "Scrypted Debugger (qjs)",
+            "type"        : "quickjs",
             "request"     : "attach",
-            "stopOnEntry" : false,
             "address"     : "${config:scrypted.debugHost}",
             "port"        : 9091,
-            "localRoot"   : "${workspaceRoot}",
+            "localRoot"   : "/Volumes/Dev/Scrypted/quack-polyfill/quack-polyfill-java/src/js/dist",
+            "mode"         : "connect",
 
             "preLaunchTask": "scrypted: deploy+debug",
 
             // required due to webpack and transpiling
-            "sourceMaps"  : true,
-            "outDir"      : "${workspaceRoot}/out",
-
-            // uncomment to debug the Duktape Debugger
-            // "debugLog"    : true,
-            // "debugServer": 4711,
+            "sourceMaps"  : {
+                "${workspaceRoot}/out/main.quickjs.js.map": "",
+            }
+            // ,"trace": true
         },
+        {
+            "name": "Scrypted Debugger",
+            "address": "${config:scrypted.debugHost}",
+            "port": 9091,
+            "request": "attach",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "scrypted: deploy+debug",
+            "sourceMaps": true,
+            "localRoot": "${workspaceFolder}/out",
+            "remoteRoot": "/plugin/",
+            "type": "pwa-node"
+        }
     ]
 }

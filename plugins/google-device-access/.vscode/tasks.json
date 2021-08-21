@@ -14,7 +14,7 @@
                 "showReuseMessage": true,
                 "clear": false
             },
-            "command": "npm --silent run scrypted-vscode-launch ${config:scrypted.debugHost}",
+            "command": "npm run scrypted-vscode-launch ${config:scrypted.debugHost}",
         },
     ]
 }

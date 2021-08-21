@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name"        : "Scrypted Debugger",
+            "name"        : "Scrypted Debugger (qjs)",
             "type"        : "quickjs",
             "request"     : "attach",
             "address"     : "${config:scrypted.debugHost}",
@@ -21,5 +21,19 @@
             }
             // ,"trace": true
         },
+        {
+            "name": "Scrypted Debugger",
+            "address": "${config:scrypted.debugHost}",
+            "port": 9091,
+            "request": "attach",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "scrypted: deploy+debug",
+            "sourceMaps": true,
+            "localRoot": "${workspaceFolder}/out",
+            "remoteRoot": "/plugin/",
+            "type": "pwa-node"
+        }
     ]
 }
