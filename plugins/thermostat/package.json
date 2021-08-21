@@ -1,0 +1,45 @@
+{
+   "name": "@scrypted/thermostat",
+   "version": "0.0.18",
+   "description": "Create a virtual thermostat from a temperature sensor and smart plug connected to heater or AC unit.",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "thermostat",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "variables": {
+         "sensor": [
+            "Thermometer",
+            "Humidity"
+         ],
+         "heater": "OnOff",
+         "cooler": "OnOff"
+      },
+      "name": "Virtual Thermostat",
+      "interfaces": [
+         "TemperatureSetting"
+      ],
+      "events": [
+         "TemperatureSetting"
+      ],
+      "type": "Device"
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "dependencies": {}
+}

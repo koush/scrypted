@@ -1,0 +1,37 @@
+{
+   "name": "@scrypted/twilio",
+   "version": "0.0.13",
+   "description": "Notify phone numbers using Twilio",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "twilio",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "Twilio Notifier",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "dependencies": {
+      "axios": "^0.18.0",
+      "qs": "^6.6.0"
+   }
+}

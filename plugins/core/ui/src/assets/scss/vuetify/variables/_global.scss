@@ -1,0 +1,77 @@
+// Global border radius
+$border-radius-root: 6px;
+
+// Spacing
+$spacer: 8px;
+
+$grid-breakpoints: (
+  'xs': 0,
+  'sm': 600px,
+  'md': 960px,
+  'lg': 1280px - 16px,
+  'xl': 1920px - 16px
+);
+
+$display-breakpoints: (
+  'print-only': 'only print',
+  'screen-only': 'only screen',
+  'xs-only': 'only screen and (max-width: #{map-get($grid-breakpoints, 'sm') - 1})',
+  'sm-only': 'only screen and (min-width: #{map-get($grid-breakpoints, 'sm')}) and (max-width: #{map-get($grid-breakpoints, 'md') - 1})',
+  'sm-and-down': 'only screen and (max-width: #{map-get($grid-breakpoints, 'md') - 1})',
+  'sm-and-up': 'only screen and (min-width: #{map-get($grid-breakpoints, 'sm')})',
+  'md-only': 'only screen and (min-width: #{map-get($grid-breakpoints, 'md')}) and (max-width: #{map-get($grid-breakpoints, 'lg') - 1})',
+  'md-and-down': 'only screen and (max-width: #{map-get($grid-breakpoints, 'lg') - 1})',
+  'md-and-up': 'only screen and (min-width: #{map-get($grid-breakpoints, 'md')})',
+  'lg-only': 'only screen and (min-width: #{map-get($grid-breakpoints, 'lg')}) and (max-width: #{map-get($grid-breakpoints, 'xl') - 1})',
+  'lg-and-down': 'only screen and (max-width: #{map-get($grid-breakpoints, 'xl') - 1})',
+  'lg-and-up': 'only screen and (min-width: #{map-get($grid-breakpoints, 'lg')})',
+  'xl-only': 'only screen and (min-width: #{map-get($grid-breakpoints, 'xl')})'
+);
+
+// Transitions
+$transition: (
+  'fast-out-slow-in': cubic-bezier(0.4, 0, 0.2, 1),
+  'linear-out-slow-in': cubic-bezier(0, 0, 0.2, 1),
+  'fast-out-linear-in': cubic-bezier(0.4, 0, 1, 1),
+  'ease-in-out': cubic-bezier(0.4, 0, 0.6, 1),
+  'fast-in-fast-out': cubic-bezier(0.25, 0.8, 0.25, 1),
+  'swing': cubic-bezier(0.25, 0.8, 0.5, 1)
+);
+
+// Inputs and labels
+$label-font-size: 14px;
+$input-font-size: 14px;
+$input-top-spacing: 16px;
+$text-field-active-label-height: 12px;
+
+// Button
+$btn-font-weight: 700;
+$btn-text-transform: none;
+$btn-letter-spacing: normal;
+$fab-icon-sizes: ();
+$fab-icon-sizes: (
+  'x-small': 18,
+  'small': 22,
+  'default': 22,
+  'large': 24,
+  'x-large': 28
+);
+
+// List
+$list-item-dense-title-font-size: 0.875rem;
+$list-item-dense-title-font-weight: 600;
+
+// Table
+$data-table-expanded-content-box-shadow: inset 0px 4px 10px -5px rgba(50, 50, 50, 0.1), inset 0px -4px 6px -5px rgba(50, 50, 50, 0.1);
+
+// Tabs
+$tab-font-weight: 700;
+
+// Toolbar
+$toolbar-transition:
+  0.2s map-get($transition, 'fast-out-slow-in') transform,
+  0.2s map-get($transition, 'fast-out-slow-in') left,
+  0.2s map-get($transition, 'fast-out-slow-in') right,
+  280ms map-get($transition, 'fast-out-slow-in') box-shadow,
+  0.25s map-get($transition, 'fast-out-slow-in') max-width,
+  0.25s map-get($transition, 'fast-out-slow-in') width;

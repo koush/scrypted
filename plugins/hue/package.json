@@ -1,0 +1,38 @@
+{
+   "name": "@scrypted/hue",
+   "version": "1.2.11",
+   "description": "A Philips Hue plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "hue",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "Hue Bridge",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/node": "^16.7.1",
+      "webpack-merge": "^4.2.1"
+   },
+   "dependencies": {
+      "node-hue-api": "^4.0.9"
+   }
+}

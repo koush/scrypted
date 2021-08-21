@@ -1,0 +1,67 @@
+$utilities: (
+  "position": (
+    responsive: true,
+    print: true,
+    property: position,
+    class: position,
+    values: relative absolute fixed static sticky
+  ),
+  "height": (
+    responsive: true,
+    property: height,
+    class: h,
+    values: (
+      full: 100%,
+      half: 50%,
+      auto: auto,
+      screen: 100vh
+    )
+  ),
+  "width": (
+    responsive: true,
+    property: width,
+    class: w,
+    values: (
+      full: 100%,
+      half: 50%,
+      auto: auto,
+      screen: 100vw,
+      '1-12': 8.333333%,
+      '2-12': 16.666667%,
+      '3-12': 25%,
+      '4-12': 33.333333%,
+      '5-12': 41.666667%,
+      '6-12': 50%,
+      '7-12': 58.333333%,
+      '8-12': 66.666667%,
+      '9-12': 75%,
+      '10-12': 83.333333%,
+      '11-12': 91.666667%
+    )
+  ),
+  "min-height": (
+    responsive: true,
+    property: min-height,
+    class: min-h,
+    values: (
+      0: 0,
+      full: 100%,
+      screen: 100vh
+    )
+  ),
+  "min-width": (
+    responsive: true,
+    property: min-width,
+    class: min-w,
+    values: (
+      0: 0,
+      full: 100%,
+      screen: 100vw
+    )
+  ),
+  "cursor": (
+    property: cursor,
+    class: cursor,
+    values: auto default pointer wait text move not-allowed
+  )
+);

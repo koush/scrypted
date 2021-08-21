@@ -1,0 +1,50 @@
+$back-base: #111b27;
+$text-base: #e5eaed;
+
+$theme-dark-colors: (
+  '0': #000000,
+  '1': darken($back-base, 7.5%),
+  '2': darken($back-base, 5%),
+  '3': darken($back-base, 2.5%),
+  '4': $back-base,
+  '6': lighten($back-base, 2.5%),
+  '8': lighten($back-base, 5%),
+  '12': lighten($back-base, 7.5%),
+  '16': lighten($back-base, 10%),
+  '24': lighten($back-base, 12.5%),
+);
+
+$material-dark: (
+  'app-bar': map-get($theme-dark-colors, '1'),
+  'background': map-get($theme-dark-colors, '4'),
+  'bottom-navigation': map-get($theme-dark-colors, '1'),
+  'surface': map-get($theme-dark-colors, '4'),
+  'calendar': (
+    'background-color': map-get($theme-dark-colors, '5'),
+    'outside-background-color': map-get($theme-dark-colors, '2'),
+    'line-color': map-get($theme-dark-colors, '6'),
+    'interval-color': map-get($theme-dark-colors, '12'),
+    'interval-line-color': map-get($theme-dark-colors, '8')
+    ),
+  'cards': map-get($theme-dark-colors, '1'),
+  'text': (
+    'theme': $text-base,
+    'primary': lighten($text-base, 2.5%)
+  ),
+  'icons': (
+    'active': $text-base
+  ),
+  'inputs': (
+    'box': $text-base
+  ),
+  'navigation-drawer': map-get($theme-dark-colors, '1'),
+  'skeleton': linear-gradient(90deg, transparent, rgba(255, 255, 255, .05), transparent),
+  'table': (
+    'active': #192328,
+    'hover': #354553,
+    'group': #354553
+  ),
+  'toolbar': map-get($theme-dark-colors, '4'),
+  'fg-color': $text-base,
+  'text-color': $text-base
+);

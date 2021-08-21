@@ -1,0 +1,40 @@
+.header-card::before {
+  margin-top: 20px;
+  display: block;
+  content: "";
+}
+.header-card>*:nth-child(1) {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  color: white;
+  width: 90%;
+  margin-top: -20px;
+  margin-left: 5%;
+  position: absolute;
+  padding-top: 10px;
+}
+.header-card>*:nth-child(2)::before {
+  padding-top: 40px;
+  display: block;
+  content: "";
+}
+.purple-gradient {
+  background: linear-gradient(60deg, #ab47bc, #8e24aa);
+}
+.red-gradient {
+  background: linear-gradient(60deg, #ef5350, #e53935);
+}
+.orange-gradient {
+  background: linear-gradient(60deg, #ffa726, #fb8c00);
+}
+.green-gradient {
+  background: linear-gradient(60deg, #66bb6a, #43a047);
+}
+.blue-gradient {
+  background: linear-gradient(60deg,#546E7A,#78909C);
+}
+.small-header {
+  padding: 4px 4px 4px 8px;
+}

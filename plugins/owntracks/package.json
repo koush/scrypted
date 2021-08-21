@@ -1,0 +1,39 @@
+{
+   "name": "@scrypted/owntracks",
+   "version": "0.0.15",
+   "description": "Owntracks Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "Owntracks Plugin",
+      "singleInstance": true,
+      "type": "DeviceProvider",
+      "interfaces": [
+         "PushHandler",
+         "Settings",
+         "DeviceProvider",
+         "PasswordStore"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "dependencies": {
+      "basic-auth": "^2.0.1"
+   }
+}

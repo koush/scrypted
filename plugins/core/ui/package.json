@@ -1,0 +1,79 @@
+{
+  "name": "ui",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build --dest ../fs/dist",
+    "lint": "vue-cli-service lint"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^5.15.4",
+    "@fortawesome/fontawesome-svg-core": "^1.2.34",
+    "@fortawesome/free-brands-svg-icons": "^5.15.2",
+    "@fortawesome/free-regular-svg-icons": "^5.15.2",
+    "@fortawesome/free-solid-svg-icons": "^5.15.2",
+    "@fortawesome/vue-fontawesome": "^0.1.10",
+    "@radial-color-picker/vue-color-picker": "^2.3.0",
+    "@scrypted/client": "file:../client",
+    "@scrypted/sdk": "file:../../../sdk",
+    "apexcharts": "^3.25.0",
+    "axios": "^0.19.2",
+    "core-js": "^2.6.12",
+    "engine.io-client": "^3.5.1",
+    "feather-icons": "^4.28.0",
+    "lodash": "^4.17.21",
+    "md5": "^2.3.0",
+    "query-string": "^6.14.1",
+    "register-service-worker": "^1.7.2",
+    "semver": "^6.3.0",
+    "vue": "^2.6.12",
+    "vue-apexcharts": "^1.6.0",
+    "vue-async-computed": "^3.9.0",
+    "vue-click-outside": "^1.1.0",
+    "vue-clipboard2": "^0.3.1",
+    "vue-feather": "^1.1.1",
+    "vue-linkify": "^1.0.1",
+    "vue-router": "^3.5.1",
+    "vue-script2": "^2.1.0",
+    "vue-slider-component": "^3.2.11",
+    "vue-swatches": "^1.0.4",
+    "vue2-google-maps": "^0.10.7",
+    "vuetify": "^2.5.8",
+    "vuex": "^3.6.2"
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-class-properties": "^7.13.0",
+    "@babel/plugin-proposal-optional-chaining": "^7.13.8",
+    "@babel/plugin-transform-modules-commonjs": "^7.13.8",
+    "@babel/plugin-transform-typescript": "^7.13.0",
+    "@babel/preset-typescript": "^7.13.0",
+    "@types/lodash": "^4.14.172",
+    "@typescript-eslint/eslint-plugin": "^4.17.0",
+    "@typescript-eslint/parser": "^4.17.0",
+    "@vue/cli-plugin-babel": "^3.12.1",
+    "@vue/cli-plugin-pwa": "^3.12.1",
+    "@vue/cli-service": "^3.12.1",
+    "babel-eslint": "^10.1.0",
+    "babel-plugin-transform-imports": "^2.0.0",
+    "eslint": "^7.21.0",
+    "eslint-plugin-vue": "^7.7.0",
+    "sass": "^1.32.12",
+    "sass-loader": "^10.2.0",
+    "source-map-loader": "^0.2.4",
+    "stylus": "^0.54.8",
+    "stylus-loader": "^3.0.1",
+    "typescript": "^4.2.3",
+    "vue-cli-plugin-vuetify": "^2.4.2",
+    "vue-template-compiler": "^2.6.12",
+    "vuetify-loader": "^1.7.2"
+  },
+  "postcss": {
+    "plugins": {
+      "autoprefixer": {}
+    }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions"
+  ]
+}

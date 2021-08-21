@@ -1,0 +1,107 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "autoAttachChildProcesses": false,
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Launch Program",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "npm: build",
+            "program": "${workspaceFolder}/out/scrypted-main.js",
+            "runtimeArgs": [
+                "--expose-gc",
+                "--nolazy",
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "DEBUG": "/scrypted/*",
+            }
+        },
+        {
+            "autoAttachChildProcesses": false,
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Launch Program TS Node",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/src/scrypted-main.ts",
+            "runtimeArgs": [
+                "--expose-gc",
+                "--nolazy",
+                "-r",
+                "ts-node/register"
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "DEBUG": "/scrypted/*",
+            }
+        },
+        {
+            // "autoAttachChildProcesses": false,
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Launch Test Program",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/src/test.ts",
+            "runtimeArgs": [
+                "--expose-gc",
+                "--nolazy",
+                "-r",
+                "ts-node/register"
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ],
+            "env": {
+                "DEBUG": "/scrypted/*",
+            }
+        },
+        {
+            "type": "pwa-node",
+            "request": "launch",
+            "name": "Launch Tests",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/test/test-main.ts",
+            "runtimeArgs": [
+                "--expose-gc",
+                "--nolazy",
+                "-r",
+                "ts-node/register"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/**/*.js"
+            ]
+        }
+    ]
+}

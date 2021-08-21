@@ -1,0 +1,39 @@
+{
+   "name": "@scrypted/prebuffer-mixin",
+   "version": "0.1.23",
+   "description": "Prebuffer mixin for VideoCamera devices.",
+   "author": "Scrypted",
+   "license": "Apache-2.0",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "VideoCamera Prebuffer Mixin",
+      "singleInstance": true,
+      "type": "API",
+      "interfaces": [
+         "MixinProvider",
+         "Settings"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/common": "file:../../common",
+      "memoize-one": "^5.1.1"
+   },
+   "devDependencies": {
+      "@types/node": "^14.17.11"
+   }
+}
