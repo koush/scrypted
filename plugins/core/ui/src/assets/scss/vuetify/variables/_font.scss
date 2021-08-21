@@ -1,0 +1,45 @@
+$body-font-family: 'Quicksand', sans-serif;
+$font-size-root: 15px;
+$line-height-root: 1.5;
+
+$font-weights: (
+  'thin': 300,
+  'light': 300,
+  'regular': 400,
+  'medium': 500,
+  'bold': 600,
+  'black': 700
+);
+
+$heading-font-family: $body-font-family;
+
+$headings: (
+  'h6': (
+    'size': 1.16rem,
+    'weight': 800,
+    'line-height': 2rem,
+    'letter-spacing': .0125em,
+    'font-family': $heading-font-family
+  ),
+  'subtitle-1': (
+    'size': 1rem,
+    'weight': 600,
+    'line-height': 1.75rem,
+    'letter-spacing': .009375em,
+    'font-family': $body-font-family
+  ),
+  'caption': (
+    'size': .75rem,
+    'weight': 400,
+    'letter-spacing': .0333333333em,
+    'line-height': 1.25rem,
+    'font-family': $body-font-family
+  ),
+  'overline': (
+    'size': .625rem,
+    'weight': 400,
+    'letter-spacing': .1666666667em,
+    'line-height': 1rem,
+    'font-family': $body-font-family
+  )
+);

@@ -1,0 +1,823 @@
+<!doctype html>
+<html class="default no-js">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>hap-nodejs</title>
+	<meta name="description" content="Documentation for hap-nodejs">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="assets/css/main.css">
+	<script async src="assets/js/search.js" id="search-script"></script>
+</head>
+<body>
+<header>
+	<div class="tsd-page-toolbar">
+		<div class="container">
+			<div class="table-wrap">
+				<div class="table-cell" id="tsd-search" data-index="assets/js/search.json" data-base=".">
+					<div class="field">
+						<label for="tsd-search-field" class="tsd-widget search no-caption">Search</label>
+						<input id="tsd-search-field" type="text" />
+					</div>
+					<ul class="results">
+						<li class="state loading">Preparing search index...</li>
+						<li class="state failure">The search index is not available</li>
+					</ul>
+					<a href="index.html" class="title">hap-nodejs</a>
+				</div>
+				<div class="table-cell" id="tsd-widgets">
+					<div id="tsd-filter">
+						<a href="#" class="tsd-widget options no-caption" data-toggle="options">Options</a>
+						<div class="tsd-filter-group">
+							<div class="tsd-select" id="tsd-filter-visibility">
+								<span class="tsd-select-label">All</span>
+								<ul class="tsd-select-list">
+									<li data-value="public">Public</li>
+									<li data-value="protected">Public/Protected</li>
+									<li data-value="private" class="selected">All</li>
+								</ul>
+							</div>
+							<input type="checkbox" id="tsd-filter-inherited" checked />
+							<label class="tsd-widget" for="tsd-filter-inherited">Inherited</label>
+						</div>
+					</div>
+					<a href="#" class="tsd-widget menu no-caption" data-toggle="menu">Menu</a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="tsd-page-title">
+		<div class="container">
+			<h1>hap-nodejs</h1>
+		</div>
+	</div>
+</header>
+<div class="container container-main">
+	<div class="row">
+		<div class="col-8 col-content">
+			<div class="tsd-panel tsd-typography">
+				<span align="center">
+					# HAP-NodeJS
+					<a href="https://www.npmjs.com/package/hap-nodejs"><img title="npm version" src="https://badgen.net/npm/v/hap-nodejs" ></a>
+					<a href="https://www.npmjs.com/package/hap-nodejs/v/beta"><img title="npm version beta" src="https://badgen.net/npm/v/hap-nodejs/beta" ></a>
+					<a href="https://www.npmjs.com/package/hap-nodejs"><img title="npm downloads" src="https://badgen.net/npm/dt/hap-nodejs" ></a>
+					<a href="https://github.com/KhaosT/HAP-NodeJS/actions?query=workflow%3A%22Node-CI%22"><img title="node ci" src="https://github.com/homebridge/HAP-NodeJS/workflows/Node-CI/badge.svg" ></a>
+				</span>
+				<p>HAP-NodeJS is an implementation of the HomeKit Accessory Server as specified in the HomeKit Accessory Protocol (HAP),
+				which is defined by Apple as part of the HomeKit Framework.</p>
+				<p>HAP-NodeJS is intended to be used as a library to easily create your own HomeKit Accessory on a Raspberry Pi,
+					Intel Edison, or any other platform that can run Node.js :)<br>If you are searching for a pluggable HomeKit bridge with over a thousand community driven plugins to bring HomeKit
+					support to devices which do not support HomeKit out of the box, you may want to look at the
+				<a href="https://github.com/homebridge/homebridge">homebridge</a> project (which also uses HAP-NodeJS internally).</p>
+				<p>The implementation tries to follow the HAP specification as close as it can, but may differ in some cases.
+				HAP-NodeJS is not an Apple certified HAP implementation, as this is only available to members of the MFi program.</p>
+				<a href="#getting-started" id="getting-started" style="color: inherit; text-decoration: none;">
+					<h2>Getting started</h2>
+				</a>
+				<p>You may start by having a look at our <a href="https://github.com/homebridge/HAP-NodeJS/wiki">Wiki</a>, especially have a look at the
+				<a href="https://github.com/homebridge/HAP-NodeJS/wiki/HomeKit-Terminology">Important HomeKit Terminology</a> used in this project.</p>
+				<p>There is also a pretty detailed guide on <a href="https://github.com/homebridge/HAP-NodeJS/wiki/Using-HAP-NodeJS-as-a-library">how to start developing with HAP-NodeJS</a>.
+					Or you may just have a look at our <a href="https://github.com/homebridge/HAP-NodeJS-examples">examples</a> repository
+				(or some of the old <a href="https://github.com/homebridge/HAP-NodeJS/tree/master/src/accessories">accessory examples</a>).</p>
+				<p>The documentation (WIP) can be found <a href="https://developers.homebridge.io/HAP-NodeJS/modules.html">here</a>.</p>
+				<p>See the FAQ on how to enable <a href="https://github.com/homebridge/HAP-NodeJS/wiki/FAQ#debug-mode">debug output</a> for HAP-NodeJS.</p>
+				<p>If you wish to do a contribution please read through our <a href="https://github.com/homebridge/HAP-NodeJS/blob/master/CONTRIBUTING.md">CONTRIBUTING</a> guide.</p>
+				<a href="#projects-based-on-hap-nodejs" id="projects-based-on-hap-nodejs" style="color: inherit; text-decoration: none;">
+					<h2>Projects based on HAP-NodeJS</h2>
+				</a>
+				<ul>
+					<li><a href="https://github.com/homebridge/homebridge">Homebridge</a> - HomeKit support for the impatient - Pluggable HomeKit Bridge.<br>  Plugins available for  e.g. Pilight, Telldus TDtool, Savant, Netatmo, Open Pixel Control, HomeWizard, Fritz!Box,
+					LG WebOS TV, Home Assistant, HomeMatic and many more.</li>
+					<li><a href="https://github.com/htreu/OpenHAB-HomeKit-Bridge">OpenHAB-HomeKit-Bridge</a> - OpenHAB HomeKit Bridge bridges openHAB items to
+					Apples HomeKit Accessory Protocol.</li>
+					<li><a href="https://github.com/hobbyquaker/homekit2mqtt">homekit2mqtt</a> - HomeKit to MQTT bridge.</li>
+					<li><a href="https://github.com/michbeck100/pimatic-hap">pimatic-hap</a> - Pimatic homekit bridge.</li>
+					<li><a href="https://github.com/NRCHKB/node-red-contrib-homekit-bridged">node-red-contrib-homekit</a> - Node-RED nodes to simulate Apple HomeKit devices.</li>
+					<li><a href="https://github.com/ioBroker/ioBroker.homekit2">ioBroker.homekit</a> - connect ioBroker to HomeKit.</li>
+					<li><a href="https://github.com/Appyx/AccessoryServer">AccessoryServer</a> - HomeKit integration for IR/RF/IP-devices</li>
+				</ul>
+				<a href="#notes" id="notes" style="color: inherit; text-decoration: none;">
+					<h2>Notes</h2>
+				</a>
+				<p>Special thanks to <a href="https://twitter.com/pieceofsummer">Alex Skalozub</a>, who reverse-engineeredthe server side HAP.
+					<del>You can find his research <a href="https://gist.github.com/pieceofsummer/13272bf76ac1d6b58a30">here</a>.</del>
+				(Sadly, on Nov 4, Apple sent the <a href="https://github.com/github/dmca/blob/master/2014/2014-11-04-Apple.md">DMCA</a> request to Github to remove the research.)</p>
+				<p><a href="http://instagram.com/p/t4cPlcDksQ/">There</a> is a video demo running this project on Intel Edison.</p>
+				<p>If you are interested in HAP over BTLE, you might want to check <a href="https://gist.github.com/KhaosT/6ff09ba71d306d4c1079">this</a>.</p>
+				<!-- links -->
+			</div>
+		</div>
+		<div class="col-4 col-menu menu-sticky-wrap menu-highlight">
+			<nav class="tsd-navigation primary">
+				<ul>
+					<li class=" ">
+						<a href="modules.html">Exports</a>
+					</li>
+				</ul>
+			</nav>
+			<nav class="tsd-navigation secondary menu-sticky">
+				<ul class="before-current">
+					<li class=" tsd-kind-enum">
+						<a href="enums/access.html" class="tsd-kind-icon">Access</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/accesscontrolevent.html" class="tsd-kind-icon">Access<wbr>Control<wbr>Event</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/accesslevel.html" class="tsd-kind-icon">Access<wbr>Level</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/accessoryeventtypes.html" class="tsd-kind-icon">Accessory<wbr>Event<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/adaptivelightingcontrollerevents.html" class="tsd-kind-icon">Adaptive<wbr>Lighting<wbr>Controller<wbr>Events</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/adaptivelightingcontrollermode.html" class="tsd-kind-icon">Adaptive<wbr>Lighting<wbr>Controller<wbr>Mode</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/audiobitrate.html" class="tsd-kind-icon">Audio<wbr>Bitrate</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/audiocodectypes.html" class="tsd-kind-icon">Audio<wbr>Codec<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/audiosamplerate.html" class="tsd-kind-icon">Audio<wbr>Samplerate</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/audiostreamingcodectype.html" class="tsd-kind-icon">Audio<wbr>Streaming<wbr>Codec<wbr>Type</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/audiostreamingsamplerate.html" class="tsd-kind-icon">Audio<wbr>Streaming<wbr>Samplerate</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/buttonstate.html" class="tsd-kind-icon">Button<wbr>State</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/buttontype.html" class="tsd-kind-icon">Button<wbr>Type</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/cameracontrollerevents.html" class="tsd-kind-icon">Camera<wbr>Controller<wbr>Events</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/categories.html" class="tsd-kind-icon">Categories</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/changereason.html" class="tsd-kind-icon">Change<wbr>Reason</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/characteristiceventtypes.html" class="tsd-kind-icon">Characteristic<wbr>Event<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/characteristicwarningtype.html" class="tsd-kind-icon">Characteristic<wbr>Warning<wbr>Type</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/dataformattags.html" class="tsd-kind-icon">Data<wbr>Format<wbr>Tags</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/datasendclosereason.html" class="tsd-kind-icon">Data<wbr>Send<wbr>Close<wbr>Reason</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/datastreamconnectionevent.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Connection<wbr>Event</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/datastreamserverevent.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Server<wbr>Event</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/datastreamstatus.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Status</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/defaultcontrollertype.html" class="tsd-kind-icon">Default<wbr>Controller<wbr>Type</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/formats.html" class="tsd-kind-icon">Formats</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/h264level.html" class="tsd-kind-icon">H264<wbr>Level</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/h264profile.html" class="tsd-kind-icon">H264<wbr>Profile</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/haphttpcode.html" class="tsd-kind-icon">HAPHTTPCode</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/happairinghttpcode.html" class="tsd-kind-icon">HAPPairingHTTPCode</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/hapservereventtypes.html" class="tsd-kind-icon">HAPServer<wbr>Event<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/hapstatus.html" class="tsd-kind-icon">HAPStatus</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/hdsstatus.html" class="tsd-kind-icon">HDSStatus</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/mdnsadvertiser.html" class="tsd-kind-icon">MDNSAdvertiser</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/perms.html" class="tsd-kind-icon">Perms</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/protocols.html" class="tsd-kind-icon">Protocols</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/remotecontrollerevents.html" class="tsd-kind-icon">Remote<wbr>Controller<wbr>Events</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/srtpcryptosuites.html" class="tsd-kind-icon">SRTPCrypto<wbr>Suites</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/serviceeventtypes.html" class="tsd-kind-icon">Service<wbr>Event<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/siriaudiosessionevents.html" class="tsd-kind-icon">Siri<wbr>Audio<wbr>Session<wbr>Events</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/streamrequesttypes.html" class="tsd-kind-icon">Stream<wbr>Request<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/tlverrorcode.html" class="tsd-kind-icon">TLVError<wbr>Code</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/targetcategory.html" class="tsd-kind-icon">Target<wbr>Category</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/targetupdates.html" class="tsd-kind-icon">Target<wbr>Updates</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/topics.html" class="tsd-kind-icon">Topics</a>
+					</li>
+					<li class=" tsd-kind-enum">
+						<a href="enums/units.html" class="tsd-kind-icon">Units</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/accesscontrolmanagement.html" class="tsd-kind-icon">Access<wbr>Control<wbr>Management</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/accessory.html" class="tsd-kind-icon">Accessory</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/adaptivelightingcontroller.html" class="tsd-kind-icon">Adaptive<wbr>Lighting<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/bridge.html" class="tsd-kind-icon">Bridge</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/cameracontroller.html" class="tsd-kind-icon">Camera<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/characteristic.html" class="tsd-kind-icon">Characteristic</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/colorutils.html" class="tsd-kind-icon">Color<wbr>Utils</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/datastreamconnection.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Connection</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/datastreammanagement.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Management</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/datastreamparser.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Parser</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/datastreamreader.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Reader</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/datastreamserver.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Server</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/datastreamwriter.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Writer</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/doorbellcontroller.html" class="tsd-kind-icon">Doorbell<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/float32.html" class="tsd-kind-icon">Float32</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/float64.html" class="tsd-kind-icon">Float64</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/hapserver.html" class="tsd-kind-icon">HAPServer</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/hapstorage.html" class="tsd-kind-icon">HAPStorage</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/hapstatuserror.html" class="tsd-kind-icon">Hap<wbr>Status<wbr>Error</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/homekitremotecontroller.html" class="tsd-kind-icon">Home<wbr>Kit<wbr>Remote<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/int16.html" class="tsd-kind-icon">Int16</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/int32.html" class="tsd-kind-icon">Int32</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/int64.html" class="tsd-kind-icon">Int64</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/int8.html" class="tsd-kind-icon">Int8</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/legacycamerasourceadapter.html" class="tsd-kind-icon">Legacy<wbr>Camera<wbr>Source<wbr>Adapter</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/rtpstreammanagement.html" class="tsd-kind-icon">RTPStream<wbr>Management</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/remotecontroller.html" class="tsd-kind-icon">Remote<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/secondssince2001.html" class="tsd-kind-icon">Seconds<wbr>Since2001</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/service.html" class="tsd-kind-icon">Service</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/siriaudiosession.html" class="tsd-kind-icon">Siri<wbr>Audio<wbr>Session</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/streamcontroller.html" class="tsd-kind-icon">Stream<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-class">
+						<a href="classes/uuid.html" class="tsd-kind-icon">UUID</a>
+					</li>
+					<li class=" tsd-kind-class tsd-has-type-parameter">
+						<a href="classes/valuewrapper.html" class="tsd-kind-icon">Value<wbr>Wrapper</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/activeadaptivelightingtransition.html" class="tsd-kind-icon">Active<wbr>Adaptive<wbr>Lighting<wbr>Transition</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/adaptivelightingoptions.html" class="tsd-kind-icon">Adaptive<wbr>Lighting<wbr>Options</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/adaptivelightingtransitioncurveentry.html" class="tsd-kind-icon">Adaptive<wbr>Lighting<wbr>Transition<wbr>Curve<wbr>Entry</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/adaptivelightingtransitionpoint.html" class="tsd-kind-icon">Adaptive<wbr>Lighting<wbr>Transition<wbr>Point</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/brightnessadjustmentmultiplierrange.html" class="tsd-kind-icon">Brightness<wbr>Adjustment<wbr>Multiplier<wbr>Range</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/cameracontrolleroptions.html" class="tsd-kind-icon">Camera<wbr>Controller<wbr>Options</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/camerastreamingdelegate.html" class="tsd-kind-icon">Camera<wbr>Streaming<wbr>Delegate</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/characteristicoperationcontext.html" class="tsd-kind-icon">Characteristic<wbr>Operation<wbr>Context</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/characteristicprops.html" class="tsd-kind-icon">Characteristic<wbr>Props</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/characteristicwarning.html" class="tsd-kind-icon">Characteristic<wbr>Warning</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-has-type-parameter">
+						<a href="interfaces/controller.html" class="tsd-kind-icon">Controller</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/controllerconstructor.html" class="tsd-kind-icon">Controller<wbr>Constructor</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/controllercontext.html" class="tsd-kind-icon">Controller<wbr>Context</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/controllerservicemap.html" class="tsd-kind-icon">Controller<wbr>Service<wbr>Map</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/datastreamprotocolhandler.html" class="tsd-kind-icon">Data<wbr>Stream<wbr>Protocol<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/legacycamerasource.html" class="tsd-kind-icon">Legacy<wbr>Camera<wbr>Source</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/proxiedsourceresponse.html" class="tsd-kind-icon">Proxied<wbr>Source<wbr>Response</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/publishinfo.html" class="tsd-kind-icon">Publish<wbr>Info</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/rtpproxyoptions.html" class="tsd-kind-icon">RTPProxy<wbr>Options</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-has-type-parameter">
+						<a href="interfaces/serializablecontroller.html" class="tsd-kind-icon">Serializable<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/serviceconfigurationchange.html" class="tsd-kind-icon">Service<wbr>Configuration<wbr>Change</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/siriaudiostreamproducer.html" class="tsd-kind-icon">Siri<wbr>Audio<wbr>Stream<wbr>Producer</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/siriaudiostreamproducerconstructor.html" class="tsd-kind-icon">Siri<wbr>Audio<wbr>Stream<wbr>Producer<wbr>Constructor</a>
+					</li>
+					<li class=" tsd-kind-interface">
+						<a href="interfaces/sourceresponse.html" class="tsd-kind-icon">Source<wbr>Response</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#accessoriescallback" class="tsd-kind-icon">Accessories<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#accessorycharacteristicchange" class="tsd-kind-icon">Accessory<wbr>Characteristic<wbr>Change</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#addpairingcallback" class="tsd-kind-icon">Add<wbr>Pairing<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#additionalauthorizationhandler" class="tsd-kind-icon">Additional<wbr>Authorization<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#address" class="tsd-kind-icon">Address</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#audiocodec" class="tsd-kind-icon">Audio<wbr>Codec</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#audiocodecconfiguration" class="tsd-kind-icon">Audio<wbr>Codec<wbr>Configuration</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#audiocodecparameters" class="tsd-kind-icon">Audio<wbr>Codec<wbr>Parameters</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#audioframe" class="tsd-kind-icon">Audio<wbr>Frame</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#audioinfo" class="tsd-kind-icon">Audio<wbr>Info</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#audiostreamingcodec" class="tsd-kind-icon">Audio<wbr>Streaming<wbr>Codec</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#audiostreamingoptions" class="tsd-kind-icon">Audio<wbr>Streaming<wbr>Options</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#buttonconfiguration" class="tsd-kind-icon">Button<wbr>Configuration</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#callback" class="tsd-kind-icon">Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#camera" class="tsd-kind-icon">Camera</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#camerastreamingoptions" class="tsd-kind-icon">Camera<wbr>Streaming<wbr>Options</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#characteristicchange" class="tsd-kind-icon">Characteristic<wbr>Change</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#characteristicevents" class="tsd-kind-icon">Characteristic<wbr>Events</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#characteristicgetcallback" class="tsd-kind-icon">Characteristic<wbr>Get<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#characteristicgethandler" class="tsd-kind-icon">Characteristic<wbr>Get<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#characteristicsetcallback" class="tsd-kind-icon">Characteristic<wbr>Set<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#characteristicsethandler" class="tsd-kind-icon">Characteristic<wbr>Set<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#characteristicvalue" class="tsd-kind-icon">Characteristic<wbr>Value</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#controlleridentifier" class="tsd-kind-icon">Controller<wbr>Identifier</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#controllertype" class="tsd-kind-icon">Controller<wbr>Type</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#errorhandler" class="tsd-kind-icon">Error<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#eventaccessory" class="tsd-kind-icon">Event<wbr>Accessory</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#eventhandler" class="tsd-kind-icon">Event<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#eventservice" class="tsd-kind-icon">Event<wbr>Service</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#framehandler" class="tsd-kind-icon">Frame<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#globaleventhandler" class="tsd-kind-icon">Global<wbr>Event<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#globalrequesthandler" class="tsd-kind-icon">Global<wbr>Request<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#h264codecparameters" class="tsd-kind-icon">H264<wbr>Codec<wbr>Parameters</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#haphttperror" class="tsd-kind-icon">HAPHttp<wbr>Error</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#happincode" class="tsd-kind-icon">HAPPincode</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#ipaddress" class="tsd-kind-icon">IPAddress</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#ipv4address" class="tsd-kind-icon">IPv4<wbr>Address</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#ipv6address" class="tsd-kind-icon">IPv6<wbr>Address</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#identificationcallback" class="tsd-kind-icon">Identification<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#identifycallback" class="tsd-kind-icon">Identify<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#interfacename" class="tsd-kind-icon">Interface<wbr>Name</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#listpairingscallback" class="tsd-kind-icon">List<wbr>Pairings<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#macaddress" class="tsd-kind-icon">Mac<wbr>Address</a>
+					</li>
+					<li class=" tsd-kind-type-alias tsd-has-type-parameter">
+						<a href="modules.html#nodecallback" class="tsd-kind-icon">Node<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias tsd-has-type-parameter">
+						<a href="modules.html#nullable" class="tsd-kind-icon">Nullable</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#paircallback" class="tsd-kind-icon">Pair<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias tsd-has-type-parameter">
+						<a href="modules.html#pairingscallback" class="tsd-kind-icon">Pairings<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#preparesessioncallback" class="tsd-kind-icon">Prepare<wbr>Session<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#preparestreamcallback" class="tsd-kind-icon">Prepare<wbr>Stream<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#preparestreamrequest" class="tsd-kind-icon">Prepare<wbr>Stream<wbr>Request</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#preparestreamresponse" class="tsd-kind-icon">Prepare<wbr>Stream<wbr>Response</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#prepareddatastreamsession" class="tsd-kind-icon">Prepared<wbr>Data<wbr>Stream<wbr>Session</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#preparedstreamrequestcallback" class="tsd-kind-icon">Prepared<wbr>Stream<wbr>Request<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#preparedstreamresponse" class="tsd-kind-icon">Prepared<wbr>Stream<wbr>Response</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#primitivetypes" class="tsd-kind-icon">Primitive<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#rtptime" class="tsd-kind-icon">RTPTime</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#readcharacteristicscallback" class="tsd-kind-icon">Read<wbr>Characteristics<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#reconfigurestreamrequest" class="tsd-kind-icon">Reconfigure<wbr>Stream<wbr>Request</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#reconfiguredvideoinfo" class="tsd-kind-icon">Reconfigured<wbr>Video<wbr>Info</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#removepairingcallback" class="tsd-kind-icon">Remove<wbr>Pairing<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#requesthandler" class="tsd-kind-icon">Request<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#resolution" class="tsd-kind-icon">Resolution</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#resourcerequestcallback" class="tsd-kind-icon">Resource<wbr>Request<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#responsehandler" class="tsd-kind-icon">Response<wbr>Handler</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#serializedservicemap" class="tsd-kind-icon">Serialized<wbr>Service<wbr>Map</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#servicecharacteristicchange" class="tsd-kind-icon">Service<wbr>Characteristic<wbr>Change</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#serviceid" class="tsd-kind-icon">Service<wbr>Id</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#sessionidentifier" class="tsd-kind-icon">Session<wbr>Identifier</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#snapshotrequest" class="tsd-kind-icon">Snapshot<wbr>Request</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#snapshotrequestcallback" class="tsd-kind-icon">Snapshot<wbr>Request<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#source" class="tsd-kind-icon">Source</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#startstreamrequest" class="tsd-kind-icon">Start<wbr>Stream<wbr>Request</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#statechangedelegate" class="tsd-kind-icon">State<wbr>Change<wbr>Delegate</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#stopstreamrequest" class="tsd-kind-icon">Stop<wbr>Stream<wbr>Request</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#streamaudioparams" class="tsd-kind-icon">Stream<wbr>Audio<wbr>Params</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#streamcontrolleroptions" class="tsd-kind-icon">Stream<wbr>Controller<wbr>Options</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#streamrequest" class="tsd-kind-icon">Stream<wbr>Request</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#streamrequestcallback" class="tsd-kind-icon">Stream<wbr>Request<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#streamsessionidentifier" class="tsd-kind-icon">Stream<wbr>Session<wbr>Identifier</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#streamvideoparams" class="tsd-kind-icon">Stream<wbr>Video<wbr>Params</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#streamingrequest" class="tsd-kind-icon">Streaming<wbr>Request</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#supportedbuttonconfiguration" class="tsd-kind-icon">Supported<wbr>Button<wbr>Configuration</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#supportedconfiguration" class="tsd-kind-icon">Supported<wbr>Configuration</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#tlvencodable" class="tsd-kind-icon">TLVEncodable</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#targetconfiguration" class="tsd-kind-icon">Target<wbr>Configuration</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#videocodec" class="tsd-kind-icon">Video<wbr>Codec</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#videoinfo" class="tsd-kind-icon">Video<wbr>Info</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#videostreamingoptions" class="tsd-kind-icon">Video<wbr>Streaming<wbr>Options</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#voidcallback" class="tsd-kind-icon">Void<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-type-alias tsd-has-type-parameter">
+						<a href="modules.html#withuuid" class="tsd-kind-icon">WithUUID</a>
+					</li>
+					<li class=" tsd-kind-type-alias">
+						<a href="modules.html#writecharacteristicscallback" class="tsd-kind-icon">Write<wbr>Characteristics<wbr>Callback</a>
+					</li>
+					<li class=" tsd-kind-variable">
+						<a href="modules.html#accessoryloader" class="tsd-kind-icon">Accessory<wbr>Loader</a>
+					</li>
+					<li class=" tsd-kind-variable">
+						<a href="modules.html#codes" class="tsd-kind-icon">Codes</a>
+					</li>
+					<li class=" tsd-kind-variable">
+						<a href="modules.html#legacytypes" class="tsd-kind-icon">Legacy<wbr>Types</a>
+					</li>
+					<li class=" tsd-kind-variable">
+						<a href="modules.html#status" class="tsd-kind-icon">Status</a>
+					</li>
+					<li class=" tsd-kind-variable">
+						<a href="modules.html#uuid" class="tsd-kind-icon">uuid</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#isknownhapstatuserror" class="tsd-kind-icon">Is<wbr>KnownHAPStatus<wbr>Error</a>
+					</li>
+					<li class=" tsd-kind-function tsd-has-type-parameter">
+						<a href="modules.html#clone" class="tsd-kind-icon">clone</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#decode" class="tsd-kind-icon">decode</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#decodelist" class="tsd-kind-icon">decode<wbr>List</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#decodewithlists" class="tsd-kind-icon">decode<wbr>With<wbr>Lists</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#encode" class="tsd-kind-icon">encode</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#epochmillisfrommillissince2001_01_01" class="tsd-kind-icon">epoch<wbr>Millis<wbr>From<wbr>Millis<wbr>Since2001_<wbr>01_<wbr>01</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#epochmillisfrommillissince2001_01_01buffer" class="tsd-kind-icon">epoch<wbr>Millis<wbr>From<wbr>Millis<wbr>Since2001_<wbr>01_<wbr>01<wbr>Buffer</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#init" class="tsd-kind-icon">init</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#isserializablecontroller" class="tsd-kind-icon">is<wbr>Serializable<wbr>Controller</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#loaddirectory" class="tsd-kind-icon">load<wbr>Directory</a>
+					</li>
+					<li class=" tsd-kind-function tsd-has-type-parameter">
+						<a href="modules.html#once" class="tsd-kind-icon">once</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#parseaccessoryjson" class="tsd-kind-icon">parse<wbr>AccessoryJSON</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#parsecharacteristicjson" class="tsd-kind-icon">parse<wbr>CharacteristicJSON</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#parseservicejson" class="tsd-kind-icon">parse<wbr>ServiceJSON</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#readuint16" class="tsd-kind-icon">readUInt16</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#readuint32" class="tsd-kind-icon">readUInt32</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#readuint64" class="tsd-kind-icon">readUInt64</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#readuint64be" class="tsd-kind-icon">readUInt64BE</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#readvariableuintle" class="tsd-kind-icon">read<wbr>VariableUIntLE</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#writefloat32le" class="tsd-kind-icon">write<wbr>Float32LE</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#writeuint16" class="tsd-kind-icon">writeUInt16</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#writeuint32" class="tsd-kind-icon">writeUInt32</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#writeuint64" class="tsd-kind-icon">writeUInt64</a>
+					</li>
+					<li class=" tsd-kind-function">
+						<a href="modules.html#writevariableuintle" class="tsd-kind-icon">write<wbr>VariableUIntLE</a>
+					</li>
+				</ul>
+			</nav>
+		</div>
+	</div>
+</div>
+<footer>
+	<div class="container">
+		<h2>Legend</h2>
+		<div class="tsd-legend-group">
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-interface"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-interface"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-interface"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static method</span></li>
+			</ul>
+		</div>
+	</div>
+</footer>
+<div class="overlay"></div>
+<script src="assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "commonjs",
+    "downlevelIteration": true,
+    "importHelpers": true,
+    "lib": [
+      "es2015",
+      "es2016",
+      "es2017",
+      "es2018"
+    ],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "preserveConstEnums": true // do not remove this option!
+  },
+  "include": [
+    "src/"
+  ],
+  "exclude": [
+    "**/*.spec.ts"
+  ]
+}

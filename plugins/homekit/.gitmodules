@@ -1,0 +1,3 @@
+[submodule "HAP-NodeJS"]
+	path = HAP-NodeJS
+	url = git@github.com:koush/HAP-NodeJS.git

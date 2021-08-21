@@ -1,0 +1,2030 @@
+<!doctype html>
+<html class="default no-js">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Service | hap-nodejs</title>
+	<meta name="description" content="Documentation for hap-nodejs">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="../assets/css/main.css">
+	<script async src="../assets/js/search.js" id="search-script"></script>
+</head>
+<body>
+<header>
+	<div class="tsd-page-toolbar">
+		<div class="container">
+			<div class="table-wrap">
+				<div class="table-cell" id="tsd-search" data-index="../assets/js/search.json" data-base="..">
+					<div class="field">
+						<label for="tsd-search-field" class="tsd-widget search no-caption">Search</label>
+						<input id="tsd-search-field" type="text" />
+					</div>
+					<ul class="results">
+						<li class="state loading">Preparing search index...</li>
+						<li class="state failure">The search index is not available</li>
+					</ul>
+					<a href="../index.html" class="title">hap-nodejs</a>
+				</div>
+				<div class="table-cell" id="tsd-widgets">
+					<div id="tsd-filter">
+						<a href="#" class="tsd-widget options no-caption" data-toggle="options">Options</a>
+						<div class="tsd-filter-group">
+							<div class="tsd-select" id="tsd-filter-visibility">
+								<span class="tsd-select-label">All</span>
+								<ul class="tsd-select-list">
+									<li data-value="public">Public</li>
+									<li data-value="protected">Public/Protected</li>
+									<li data-value="private" class="selected">All</li>
+								</ul>
+							</div>
+							<input type="checkbox" id="tsd-filter-inherited" checked />
+							<label class="tsd-widget" for="tsd-filter-inherited">Inherited</label>
+						</div>
+					</div>
+					<a href="#" class="tsd-widget menu no-caption" data-toggle="menu">Menu</a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="tsd-page-title">
+		<div class="container">
+			<ul class="tsd-breadcrumb">
+				<li>
+					<a href="../modules.html">hap-nodejs</a>
+				</li>
+				<li>
+					<a href="service.html">Service</a>
+				</li>
+			</ul>
+			<h1>Class Service</h1>
+		</div>
+	</div>
+</header>
+<div class="container container-main">
+	<div class="row">
+		<div class="col-8 col-content">
+			<section class="tsd-panel tsd-comment">
+				<div class="tsd-comment tsd-typography">
+					<div class="lead">
+						<p>Service represents a set of grouped values necessary to provide a logical function. For instance, a
+							&quot;Door Lock Mechanism&quot; service might contain two values, one for the &quot;desired lock state&quot; and one for the
+							&quot;current lock state&quot;. A particular Service is distinguished from others by its &quot;type&quot;, which is a UUID.
+							HomeKit provides a set of known Service UUIDs defined in HomeKit.ts along with a corresponding
+							concrete subclass that you can instantiate directly to setup the necessary values. These natively-supported
+						Services are expected to contain a particular set of Characteristics.</p>
+					</div>
+					<p>Unlike Characteristics, where you cannot have two Characteristics with the same UUID in the same Service,
+						you can actually have multiple Services with the same UUID in a single Accessory. For instance, imagine
+						a Garage Door Opener with both a &quot;security light&quot; and a &quot;backlight&quot; for the display. Each light could be
+						a &quot;Lightbulb&quot; Service with the same UUID. To account for this situation, we define an extra &quot;subtype&quot;
+						property on Service, that can be a string or other string-convertible object that uniquely identifies the
+						Service among its peers in an Accessory. For instance, you might have <code>service1.subtype = &#39;security_light&#39;</code>
+					for one and <code>service2.subtype = &#39;backlight&#39;</code> for the other.</p>
+					<p>You can also define custom Services by providing your own UUID for the type that you generate yourself.
+						Custom Services can contain an arbitrary set of Characteristics, but Siri will likely not be able to
+					work with these.</p>
+				</div>
+			</section>
+			<section class="tsd-panel tsd-hierarchy">
+				<h3>Hierarchy</h3>
+				<ul class="tsd-hierarchy">
+					<li>
+						<span class="tsd-signature-type">EventEmitter</span>
+						<ul class="tsd-hierarchy">
+							<li>
+								<span class="target">Service</span>
+							</li>
+						</ul>
+					</li>
+				</ul>
+			</section>
+			<section class="tsd-panel-group tsd-index-group">
+				<h2>Index</h2>
+				<section class="tsd-panel tsd-index-panel">
+					<div class="tsd-index-content">
+						<section class="tsd-index-section ">
+							<h3>Constructors</h3>
+							<ul class="tsd-index-list">
+								<li class="tsd-kind-constructor tsd-parent-kind-class"><a href="service.html#constructor" class="tsd-kind-icon">constructor</a></li>
+							</ul>
+						</section>
+						<section class="tsd-index-section ">
+							<h3>Properties</h3>
+							<ul class="tsd-index-list">
+								<li class="tsd-kind-property tsd-parent-kind-class"><a href="service.html#uuid" class="tsd-kind-icon">UUID</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class"><a href="service.html#characteristics" class="tsd-kind-icon">characteristics</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class"><a href="service.html#displayname" class="tsd-kind-icon">display<wbr>Name</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class"><a href="service.html#iid" class="tsd-kind-icon">iid</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class"><a href="service.html#name" class="tsd-kind-icon">name</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class"><a href="service.html#optionalcharacteristics" class="tsd-kind-icon">optional<wbr>Characteristics</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class"><a href="service.html#subtype" class="tsd-kind-icon">subtype</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#accesscontrol" class="tsd-kind-icon">Access<wbr>Control</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#accessoryinformation" class="tsd-kind-icon">Accessory<wbr>Information</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#accessoryruntimeinformation" class="tsd-kind-icon">Accessory<wbr>Runtime<wbr>Information</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#airpurifier" class="tsd-kind-icon">Air<wbr>Purifier</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#airqualitysensor" class="tsd-kind-icon">Air<wbr>Quality<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#audiostreammanagement" class="tsd-kind-icon">Audio<wbr>Stream<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#battery" class="tsd-kind-icon">Battery</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#batteryservice" class="tsd-kind-icon">Battery<wbr>Service</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#bridgeconfiguration" class="tsd-kind-icon">Bridge<wbr>Configuration</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#bridgingstate" class="tsd-kind-icon">Bridging<wbr>State</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#cameracontrol" class="tsd-kind-icon">Camera<wbr>Control</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#cameraeventrecordingmanagement" class="tsd-kind-icon">Camera<wbr>Event<wbr>Recording<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#cameraoperatingmode" class="tsd-kind-icon">Camera<wbr>Operating<wbr>Mode</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#camerartpstreammanagement" class="tsd-kind-icon">CameraRTPStream<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#camerarecordingmanagement" class="tsd-kind-icon">Camera<wbr>Recording<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#carbondioxidesensor" class="tsd-kind-icon">Carbon<wbr>Dioxide<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#carbonmonoxidesensor" class="tsd-kind-icon">Carbon<wbr>Monoxide<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#cloudrelay" class="tsd-kind-icon">Cloud<wbr>Relay</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#contactsensor" class="tsd-kind-icon">Contact<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#datastreamtransportmanagement" class="tsd-kind-icon">Data<wbr>Stream<wbr>Transport<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#diagnostics" class="tsd-kind-icon">Diagnostics</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#door" class="tsd-kind-icon">Door</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#doorbell" class="tsd-kind-icon">Doorbell</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#fan" class="tsd-kind-icon">Fan</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#fanv2" class="tsd-kind-icon">Fanv2</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#faucet" class="tsd-kind-icon">Faucet</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#filtermaintenance" class="tsd-kind-icon">Filter<wbr>Maintenance</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#garagedooropener" class="tsd-kind-icon">Garage<wbr>Door<wbr>Opener</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#heatercooler" class="tsd-kind-icon">Heater<wbr>Cooler</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#humidifierdehumidifier" class="tsd-kind-icon">Humidifier<wbr>Dehumidifier</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#humiditysensor" class="tsd-kind-icon">Humidity<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#inputsource" class="tsd-kind-icon">Input<wbr>Source</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#irrigationsystem" class="tsd-kind-icon">Irrigation<wbr>System</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#leaksensor" class="tsd-kind-icon">Leak<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#lightsensor" class="tsd-kind-icon">Light<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#lightbulb" class="tsd-kind-icon">Lightbulb</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#lockmanagement" class="tsd-kind-icon">Lock<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#lockmechanism" class="tsd-kind-icon">Lock<wbr>Mechanism</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#microphone" class="tsd-kind-icon">Microphone</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#motionsensor" class="tsd-kind-icon">Motion<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#occupancysensor" class="tsd-kind-icon">Occupancy<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#outlet" class="tsd-kind-icon">Outlet</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#pairing" class="tsd-kind-icon">Pairing</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#powermanagement" class="tsd-kind-icon">Power<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#protocolinformation" class="tsd-kind-icon">Protocol<wbr>Information</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#relay" class="tsd-kind-icon">Relay</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#securitysystem" class="tsd-kind-icon">Security<wbr>System</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#servicelabel" class="tsd-kind-icon">Service<wbr>Label</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#siri" class="tsd-kind-icon">Siri</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#slat" class="tsd-kind-icon">Slat</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#slats" class="tsd-kind-icon">Slats</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#smartspeaker" class="tsd-kind-icon">Smart<wbr>Speaker</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#smokesensor" class="tsd-kind-icon">Smoke<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#speaker" class="tsd-kind-icon">Speaker</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#statefulprogrammableswitch" class="tsd-kind-icon">Stateful<wbr>Programmable<wbr>Switch</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#statelessprogrammableswitch" class="tsd-kind-icon">Stateless<wbr>Programmable<wbr>Switch</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#switch" class="tsd-kind-icon">Switch</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#targetcontrol" class="tsd-kind-icon">Target<wbr>Control</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#targetcontrolmanagement" class="tsd-kind-icon">Target<wbr>Control<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#television" class="tsd-kind-icon">Television</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#televisionspeaker" class="tsd-kind-icon">Television<wbr>Speaker</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#temperaturesensor" class="tsd-kind-icon">Temperature<wbr>Sensor</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#thermostat" class="tsd-kind-icon">Thermostat</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#threadtransport" class="tsd-kind-icon">Thread<wbr>Transport</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#timeinformation" class="tsd-kind-icon">Time<wbr>Information</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#transfertransportmanagement" class="tsd-kind-icon">Transfer<wbr>Transport<wbr>Management</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#tunnel" class="tsd-kind-icon">Tunnel</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#tunneledbtleaccessoryservice" class="tsd-kind-icon">TunneledBTLEAccessory<wbr>Service</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#valve" class="tsd-kind-icon">Valve</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#wifirouter" class="tsd-kind-icon">Wi<wbr>FiRouter</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#wifisatellite" class="tsd-kind-icon">Wi<wbr>FiSatellite</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#wifitransport" class="tsd-kind-icon">Wi<wbr>FiTransport</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#window" class="tsd-kind-icon">Window</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><a href="service.html#windowcovering" class="tsd-kind-icon">Window<wbr>Covering</a></li>
+							</ul>
+						</section>
+						<section class="tsd-index-section ">
+							<h3>Methods</h3>
+							<ul class="tsd-index-list">
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#addcharacteristic" class="tsd-kind-icon">add<wbr>Characteristic</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#addlinkedservice" class="tsd-kind-icon">add<wbr>Linked<wbr>Service</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#addoptionalcharacteristic" class="tsd-kind-icon">add<wbr>Optional<wbr>Characteristic</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#emit" class="tsd-kind-icon">emit</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#getcharacteristic" class="tsd-kind-icon">get<wbr>Characteristic</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#getserviceid" class="tsd-kind-icon">get<wbr>Service<wbr>Id</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#on" class="tsd-kind-icon">on</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#removecharacteristic" class="tsd-kind-icon">remove<wbr>Characteristic</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#removelinkedservice" class="tsd-kind-icon">remove<wbr>Linked<wbr>Service</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter"><a href="service.html#setcharacteristic" class="tsd-kind-icon">set<wbr>Characteristic</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#sethiddenservice" class="tsd-kind-icon">set<wbr>Hidden<wbr>Service</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="service.html#setprimaryservice" class="tsd-kind-icon">set<wbr>Primary<wbr>Service</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter"><a href="service.html#testcharacteristic" class="tsd-kind-icon">test<wbr>Characteristic</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter"><a href="service.html#updatecharacteristic" class="tsd-kind-icon">update<wbr>Characteristic</a></li>
+							</ul>
+						</section>
+					</div>
+				</section>
+			</section>
+			<section class="tsd-panel-group tsd-member-group ">
+				<h2>Constructors</h2>
+				<section class="tsd-panel tsd-member tsd-kind-constructor tsd-parent-kind-class">
+					<a name="constructor" class="tsd-anchor"></a>
+					<h3>constructor</h3>
+					<ul class="tsd-signatures tsd-kind-constructor tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">new <wbr>Service<span class="tsd-signature-symbol">(</span>displayName<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">string</span>, UUID<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, subtype<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L285">lib/Service.ts:285</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>displayName: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> = &quot;&quot;</span></h5>
+								</li>
+								<li>
+									<h5>UUID: <span class="tsd-signature-type">string</span></h5>
+								</li>
+								<li>
+									<h5><span class="tsd-flag ts-flagOptional">Optional</span> subtype: <span class="tsd-signature-type">string</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h4>
+						</li>
+					</ul>
+				</section>
+			</section>
+			<section class="tsd-panel-group tsd-member-group ">
+				<h2>Properties</h2>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class">
+					<a name="uuid" class="tsd-anchor"></a>
+					<h3>UUID</h3>
+					<div class="tsd-signature tsd-kind-icon">UUID<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L268">lib/Service.ts:268</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class">
+					<a name="characteristics" class="tsd-anchor"></a>
+					<h3>characteristics</h3>
+					<div class="tsd-signature tsd-kind-icon">characteristics<span class="tsd-signature-symbol">:</span> <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> = ...</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L272">lib/Service.ts:272</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class">
+					<a name="displayname" class="tsd-anchor"></a>
+					<h3>display<wbr>Name</h3>
+					<div class="tsd-signature tsd-kind-icon">display<wbr>Name<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L267">lib/Service.ts:267</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class">
+					<a name="iid" class="tsd-anchor"></a>
+					<h3>iid</h3>
+					<div class="tsd-signature tsd-kind-icon">iid<span class="tsd-signature-symbol">:</span> <a href="../modules.html#nullable" class="tsd-signature-type" data-tsd-kind="Type alias">Nullable</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol"> = null</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L270">lib/Service.ts:270</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class">
+					<a name="name" class="tsd-anchor"></a>
+					<h3>name</h3>
+					<div class="tsd-signature tsd-kind-icon">name<span class="tsd-signature-symbol">:</span> <a href="../modules.html#nullable" class="tsd-signature-type" data-tsd-kind="Type alias">Nullable</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol"> = null</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L271">lib/Service.ts:271</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class">
+					<a name="optionalcharacteristics" class="tsd-anchor"></a>
+					<h3>optional<wbr>Characteristics</h3>
+					<div class="tsd-signature tsd-kind-icon">optional<wbr>Characteristics<span class="tsd-signature-symbol">:</span> <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> = ...</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L273">lib/Service.ts:273</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class">
+					<a name="subtype" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> subtype</h3>
+					<div class="tsd-signature tsd-kind-icon">subtype<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L269">lib/Service.ts:269</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="accesscontrol" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Access<wbr>Control</h3>
+					<div class="tsd-signature tsd-kind-icon">Access<wbr>Control<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">AccessControl</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L163">lib/Service.ts:163</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="accessoryinformation" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Accessory<wbr>Information</h3>
+					<div class="tsd-signature tsd-kind-icon">Accessory<wbr>Information<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">AccessoryInformation</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L164">lib/Service.ts:164</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="accessoryruntimeinformation" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Accessory<wbr>Runtime<wbr>Information</h3>
+					<div class="tsd-signature tsd-kind-icon">Accessory<wbr>Runtime<wbr>Information<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">AccessoryRuntimeInformation</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L165">lib/Service.ts:165</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="airpurifier" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Air<wbr>Purifier</h3>
+					<div class="tsd-signature tsd-kind-icon">Air<wbr>Purifier<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">AirPurifier</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L166">lib/Service.ts:166</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="airqualitysensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Air<wbr>Quality<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Air<wbr>Quality<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">AirQualitySensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L167">lib/Service.ts:167</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="audiostreammanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Audio<wbr>Stream<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Audio<wbr>Stream<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">AudioStreamManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L168">lib/Service.ts:168</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="battery" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Battery</h3>
+					<div class="tsd-signature tsd-kind-icon">Battery<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Battery</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L169">lib/Service.ts:169</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="batteryservice" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Battery<wbr>Service</h3>
+					<div class="tsd-signature tsd-kind-icon">Battery<wbr>Service<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Battery</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L173">lib/Service.ts:173</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Please use <a href="service.html#battery">Service.Battery</a>.</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="bridgeconfiguration" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Bridge<wbr>Configuration</h3>
+					<div class="tsd-signature tsd-kind-icon">Bridge<wbr>Configuration<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">BridgeConfiguration</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L177">lib/Service.ts:177</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Removed and not used anymore</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="bridgingstate" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Bridging<wbr>State</h3>
+					<div class="tsd-signature tsd-kind-icon">Bridging<wbr>State<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">BridgingState</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L181">lib/Service.ts:181</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Removed and not used anymore</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="cameracontrol" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Camera<wbr>Control</h3>
+					<div class="tsd-signature tsd-kind-icon">Camera<wbr>Control<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CameraControl</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L185">lib/Service.ts:185</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>This service has no usage anymore and will be ignored by iOS</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="cameraeventrecordingmanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Camera<wbr>Event<wbr>Recording<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Camera<wbr>Event<wbr>Recording<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CameraRecordingManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L189">lib/Service.ts:189</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Please use <a href="service.html#camerarecordingmanagement">Service.CameraRecordingManagement</a>.</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="cameraoperatingmode" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Camera<wbr>Operating<wbr>Mode</h3>
+					<div class="tsd-signature tsd-kind-icon">Camera<wbr>Operating<wbr>Mode<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CameraOperatingMode</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L190">lib/Service.ts:190</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="camerartpstreammanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> CameraRTPStream<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">CameraRTPStream<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CameraRTPStreamManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L192">lib/Service.ts:192</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="camerarecordingmanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Camera<wbr>Recording<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Camera<wbr>Recording<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CameraRecordingManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L191">lib/Service.ts:191</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="carbondioxidesensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Carbon<wbr>Dioxide<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Carbon<wbr>Dioxide<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CarbonDioxideSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L193">lib/Service.ts:193</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="carbonmonoxidesensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Carbon<wbr>Monoxide<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Carbon<wbr>Monoxide<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CarbonMonoxideSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L194">lib/Service.ts:194</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="cloudrelay" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Cloud<wbr>Relay</h3>
+					<div class="tsd-signature tsd-kind-icon">Cloud<wbr>Relay<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CloudRelay</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L195">lib/Service.ts:195</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="contactsensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Contact<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Contact<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">ContactSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L196">lib/Service.ts:196</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="datastreamtransportmanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Data<wbr>Stream<wbr>Transport<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Data<wbr>Stream<wbr>Transport<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">DataStreamTransportManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L197">lib/Service.ts:197</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="diagnostics" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Diagnostics</h3>
+					<div class="tsd-signature tsd-kind-icon">Diagnostics<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Diagnostics</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L198">lib/Service.ts:198</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="door" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Door</h3>
+					<div class="tsd-signature tsd-kind-icon">Door<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Door</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L199">lib/Service.ts:199</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="doorbell" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Doorbell</h3>
+					<div class="tsd-signature tsd-kind-icon">Doorbell<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Doorbell</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L200">lib/Service.ts:200</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="fan" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Fan</h3>
+					<div class="tsd-signature tsd-kind-icon">Fan<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Fan</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L201">lib/Service.ts:201</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="fanv2" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Fanv2</h3>
+					<div class="tsd-signature tsd-kind-icon">Fanv2<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Fanv2</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L202">lib/Service.ts:202</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="faucet" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Faucet</h3>
+					<div class="tsd-signature tsd-kind-icon">Faucet<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Faucet</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L203">lib/Service.ts:203</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="filtermaintenance" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Filter<wbr>Maintenance</h3>
+					<div class="tsd-signature tsd-kind-icon">Filter<wbr>Maintenance<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">FilterMaintenance</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L204">lib/Service.ts:204</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="garagedooropener" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Garage<wbr>Door<wbr>Opener</h3>
+					<div class="tsd-signature tsd-kind-icon">Garage<wbr>Door<wbr>Opener<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">GarageDoorOpener</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L205">lib/Service.ts:205</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="heatercooler" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Heater<wbr>Cooler</h3>
+					<div class="tsd-signature tsd-kind-icon">Heater<wbr>Cooler<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">HeaterCooler</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L206">lib/Service.ts:206</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="humidifierdehumidifier" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Humidifier<wbr>Dehumidifier</h3>
+					<div class="tsd-signature tsd-kind-icon">Humidifier<wbr>Dehumidifier<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">HumidifierDehumidifier</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L207">lib/Service.ts:207</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="humiditysensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Humidity<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Humidity<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">HumiditySensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L208">lib/Service.ts:208</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="inputsource" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Input<wbr>Source</h3>
+					<div class="tsd-signature tsd-kind-icon">Input<wbr>Source<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">InputSource</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L209">lib/Service.ts:209</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="irrigationsystem" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Irrigation<wbr>System</h3>
+					<div class="tsd-signature tsd-kind-icon">Irrigation<wbr>System<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">IrrigationSystem</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L210">lib/Service.ts:210</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="leaksensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Leak<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Leak<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">LeakSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L211">lib/Service.ts:211</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="lightsensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Light<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Light<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">LightSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L213">lib/Service.ts:213</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="lightbulb" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Lightbulb</h3>
+					<div class="tsd-signature tsd-kind-icon">Lightbulb<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Lightbulb</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L212">lib/Service.ts:212</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="lockmanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Lock<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Lock<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">LockManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L214">lib/Service.ts:214</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="lockmechanism" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Lock<wbr>Mechanism</h3>
+					<div class="tsd-signature tsd-kind-icon">Lock<wbr>Mechanism<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">LockMechanism</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L215">lib/Service.ts:215</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="microphone" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Microphone</h3>
+					<div class="tsd-signature tsd-kind-icon">Microphone<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Microphone</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L216">lib/Service.ts:216</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="motionsensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Motion<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Motion<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">MotionSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L217">lib/Service.ts:217</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="occupancysensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Occupancy<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Occupancy<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">OccupancySensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L218">lib/Service.ts:218</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="outlet" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Outlet</h3>
+					<div class="tsd-signature tsd-kind-icon">Outlet<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Outlet</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L219">lib/Service.ts:219</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="pairing" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Pairing</h3>
+					<div class="tsd-signature tsd-kind-icon">Pairing<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Pairing</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L220">lib/Service.ts:220</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="powermanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Power<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Power<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">PowerManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L221">lib/Service.ts:221</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="protocolinformation" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Protocol<wbr>Information</h3>
+					<div class="tsd-signature tsd-kind-icon">Protocol<wbr>Information<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">ProtocolInformation</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L222">lib/Service.ts:222</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="relay" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Relay</h3>
+					<div class="tsd-signature tsd-kind-icon">Relay<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">CloudRelay</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L226">lib/Service.ts:226</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Please use <a href="service.html#cloudrelay">Service.CloudRelay</a>.</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="securitysystem" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Security<wbr>System</h3>
+					<div class="tsd-signature tsd-kind-icon">Security<wbr>System<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">SecuritySystem</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L227">lib/Service.ts:227</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="servicelabel" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Service<wbr>Label</h3>
+					<div class="tsd-signature tsd-kind-icon">Service<wbr>Label<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">ServiceLabel</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L228">lib/Service.ts:228</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="siri" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Siri</h3>
+					<div class="tsd-signature tsd-kind-icon">Siri<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Siri</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L229">lib/Service.ts:229</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="slat" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Slat</h3>
+					<div class="tsd-signature tsd-kind-icon">Slat<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Slats</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L233">lib/Service.ts:233</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Please use <a href="service.html#slats">Service.Slats</a>.</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="slats" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Slats</h3>
+					<div class="tsd-signature tsd-kind-icon">Slats<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Slats</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L234">lib/Service.ts:234</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="smartspeaker" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Smart<wbr>Speaker</h3>
+					<div class="tsd-signature tsd-kind-icon">Smart<wbr>Speaker<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">SmartSpeaker</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L235">lib/Service.ts:235</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="smokesensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Smoke<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Smoke<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">SmokeSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L236">lib/Service.ts:236</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="speaker" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Speaker</h3>
+					<div class="tsd-signature tsd-kind-icon">Speaker<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Speaker</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L237">lib/Service.ts:237</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="statefulprogrammableswitch" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Stateful<wbr>Programmable<wbr>Switch</h3>
+					<div class="tsd-signature tsd-kind-icon">Stateful<wbr>Programmable<wbr>Switch<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">StatefulProgrammableSwitch</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L238">lib/Service.ts:238</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="statelessprogrammableswitch" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Stateless<wbr>Programmable<wbr>Switch</h3>
+					<div class="tsd-signature tsd-kind-icon">Stateless<wbr>Programmable<wbr>Switch<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">StatelessProgrammableSwitch</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L239">lib/Service.ts:239</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="switch" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Switch</h3>
+					<div class="tsd-signature tsd-kind-icon">Switch<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Switch</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L240">lib/Service.ts:240</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="targetcontrol" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Target<wbr>Control</h3>
+					<div class="tsd-signature tsd-kind-icon">Target<wbr>Control<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">TargetControl</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L241">lib/Service.ts:241</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="targetcontrolmanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Target<wbr>Control<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Target<wbr>Control<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">TargetControlManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L242">lib/Service.ts:242</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="television" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Television</h3>
+					<div class="tsd-signature tsd-kind-icon">Television<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Television</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L243">lib/Service.ts:243</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="televisionspeaker" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Television<wbr>Speaker</h3>
+					<div class="tsd-signature tsd-kind-icon">Television<wbr>Speaker<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">TelevisionSpeaker</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L244">lib/Service.ts:244</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="temperaturesensor" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Temperature<wbr>Sensor</h3>
+					<div class="tsd-signature tsd-kind-icon">Temperature<wbr>Sensor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">TemperatureSensor</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L245">lib/Service.ts:245</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="thermostat" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Thermostat</h3>
+					<div class="tsd-signature tsd-kind-icon">Thermostat<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Thermostat</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L246">lib/Service.ts:246</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="threadtransport" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Thread<wbr>Transport</h3>
+					<div class="tsd-signature tsd-kind-icon">Thread<wbr>Transport<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">ThreadTransport</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L247">lib/Service.ts:247</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="timeinformation" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Time<wbr>Information</h3>
+					<div class="tsd-signature tsd-kind-icon">Time<wbr>Information<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">TimeInformation</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L251">lib/Service.ts:251</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Removed and not used anymore</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="transfertransportmanagement" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Transfer<wbr>Transport<wbr>Management</h3>
+					<div class="tsd-signature tsd-kind-icon">Transfer<wbr>Transport<wbr>Management<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">TransferTransportManagement</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L252">lib/Service.ts:252</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="tunnel" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Tunnel</h3>
+					<div class="tsd-signature tsd-kind-icon">Tunnel<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Tunnel</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L253">lib/Service.ts:253</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="tunneledbtleaccessoryservice" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> TunneledBTLEAccessory<wbr>Service</h3>
+					<div class="tsd-signature tsd-kind-icon">TunneledBTLEAccessory<wbr>Service<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Tunnel</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L257">lib/Service.ts:257</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<dl class="tsd-comment-tags">
+							<dt>deprecated</dt>
+							<dd><p>Please use <a href="service.html#tunnel">Service.Tunnel</a>.</p>
+							</dd>
+						</dl>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="valve" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Valve</h3>
+					<div class="tsd-signature tsd-kind-icon">Valve<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Valve</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L258">lib/Service.ts:258</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="wifirouter" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Wi<wbr>FiRouter</h3>
+					<div class="tsd-signature tsd-kind-icon">Wi<wbr>FiRouter<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">WiFiRouter</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L259">lib/Service.ts:259</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="wifisatellite" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Wi<wbr>FiSatellite</h3>
+					<div class="tsd-signature tsd-kind-icon">Wi<wbr>FiSatellite<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">WiFiSatellite</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L260">lib/Service.ts:260</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="wifitransport" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Wi<wbr>FiTransport</h3>
+					<div class="tsd-signature tsd-kind-icon">Wi<wbr>FiTransport<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">WiFiTransport</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L261">lib/Service.ts:261</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="window" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Window</h3>
+					<div class="tsd-signature tsd-kind-icon">Window<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">Window</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L262">lib/Service.ts:262</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-static">
+					<a name="windowcovering" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Window<wbr>Covering</h3>
+					<div class="tsd-signature tsd-kind-icon">Window<wbr>Covering<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">typeof </span><span class="tsd-signature-type">WindowCovering</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L263">lib/Service.ts:263</a></li>
+						</ul>
+					</aside>
+				</section>
+			</section>
+			<section class="tsd-panel-group tsd-member-group ">
+				<h2>Methods</h2>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="addcharacteristic" class="tsd-anchor"></a>
+					<h3>add<wbr>Characteristic</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">add<wbr>Characteristic<span class="tsd-signature-symbol">(</span>input<span class="tsd-signature-symbol">: </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></li>
+						<li class="tsd-signature tsd-kind-icon">add<wbr>Characteristic<span class="tsd-signature-symbol">(</span>input<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a>, <span class="tsd-signature-symbol">...</span>constructorArgs<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L318">lib/Service.ts:318</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>input: <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L319">lib/Service.ts:319</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>input: <span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h5>
+									<ul class="tsd-parameters">
+										<li class="tsd-parameter-signature">
+											<ul class="tsd-signatures tsd-kind-constructor">
+												<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></li>
+											</ul>
+											<ul class="tsd-descriptions">
+												<li class="tsd-description">
+													<h4 class="tsd-parameters-title">Parameters</h4>
+													<ul class="tsd-parameters">
+														<li>
+															<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+														</li>
+													</ul>
+													<h4 class="tsd-returns-title">Returns <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h4>
+												</li>
+											</ul>
+										</li>
+									</ul>
+								</li>
+								<li>
+									<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>constructorArgs: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="addlinkedservice" class="tsd-anchor"></a>
+					<h3>add<wbr>Linked<wbr>Service</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">add<wbr>Linked<wbr>Service<span class="tsd-signature-symbol">(</span>service<span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L378">lib/Service.ts:378</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Adds a new link to the specified service. The service MUST be already added to
+									the SAME accessory.</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>service: <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>The service this service should link to</p>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="addoptionalcharacteristic" class="tsd-anchor"></a>
+					<h3>add<wbr>Optional<wbr>Characteristic</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">add<wbr>Optional<wbr>Characteristic<span class="tsd-signature-symbol">(</span>characteristic<span class="tsd-signature-symbol">: </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L469">lib/Service.ts:469</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>characteristic: <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">)</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="emit" class="tsd-anchor"></a>
+					<h3>emit</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">emit<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;characteristic-change&quot;</span>, change<span class="tsd-signature-symbol">: </span><a href="../modules.html#servicecharacteristicchange" class="tsd-signature-type" data-tsd-kind="Type alias">ServiceCharacteristicChange</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span></li>
+						<li class="tsd-signature tsd-kind-icon">emit<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;service-configurationChange&quot;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span></li>
+						<li class="tsd-signature tsd-kind-icon">emit<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;characteristic-warning&quot;</span>, warning<span class="tsd-signature-symbol">: </span><a href="../interfaces/characteristicwarning.html" class="tsd-signature-type" data-tsd-kind="Interface">CharacteristicWarning</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L133">lib/Service.ts:133</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;characteristic-change&quot;</span></h5>
+								</li>
+								<li>
+									<h5>change: <a href="../modules.html#servicecharacteristicchange" class="tsd-signature-type" data-tsd-kind="Type alias">ServiceCharacteristicChange</a></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L134">lib/Service.ts:134</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;service-configurationChange&quot;</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L135">lib/Service.ts:135</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;characteristic-warning&quot;</span></h5>
+								</li>
+								<li>
+									<h5>warning: <a href="../interfaces/characteristicwarning.html" class="tsd-signature-type" data-tsd-kind="Interface">CharacteristicWarning</a></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getcharacteristic" class="tsd-anchor"></a>
+					<h3>get<wbr>Characteristic</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Characteristic<span class="tsd-signature-symbol">(</span>constructor<span class="tsd-signature-symbol">: </span><a href="../modules.html#withuuid" class="tsd-signature-type" data-tsd-kind="Type alias">WithUUID</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></li>
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Characteristic<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><a href="../modules.html#withuuid" class="tsd-signature-type" data-tsd-kind="Type alias">WithUUID</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L411">lib/Service.ts:411</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>constructor: <a href="../modules.html#withuuid" class="tsd-signature-type" data-tsd-kind="Type alias">WithUUID</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">&gt;</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L414">lib/Service.ts:414</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>name: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><a href="../modules.html#withuuid" class="tsd-signature-type" data-tsd-kind="Type alias">WithUUID</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">&gt;</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getserviceid" class="tsd-anchor"></a>
+					<h3>get<wbr>Service<wbr>Id</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Service<wbr>Id<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L314">lib/Service.ts:314</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Returns an id which uniquely identifies an service on the associated accessory.
+										The serviceId is a concatenation of the UUID for the service (defined by HAP) and the subtype (could be empty)
+									which is programmatically defined by the programmer.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4>
+							<p>the serviceId</p>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="on" class="tsd-anchor"></a>
+					<h3>on</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">on<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;characteristic-change&quot;</span>, listener<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span>change<span class="tsd-signature-symbol">: </span><a href="../modules.html#servicecharacteristicchange" class="tsd-signature-type" data-tsd-kind="Type alias">ServiceCharacteristicChange</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></li>
+						<li class="tsd-signature tsd-kind-icon">on<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;service-configurationChange&quot;</span>, listener<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></li>
+						<li class="tsd-signature tsd-kind-icon">on<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;characteristic-warning&quot;</span>, listener<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span>warning<span class="tsd-signature-symbol">: </span><a href="../interfaces/characteristicwarning.html" class="tsd-signature-type" data-tsd-kind="Interface">CharacteristicWarning</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L129">lib/Service.ts:129</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;characteristic-change&quot;</span></h5>
+								</li>
+								<li>
+									<h5>listener: <span class="tsd-signature-symbol">(</span>change<span class="tsd-signature-symbol">: </span><a href="../modules.html#servicecharacteristicchange" class="tsd-signature-type" data-tsd-kind="Type alias">ServiceCharacteristicChange</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span></h5>
+									<ul class="tsd-parameters">
+										<li class="tsd-parameter-signature">
+											<ul class="tsd-signatures tsd-kind-type-literal">
+												<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">(</span>change<span class="tsd-signature-symbol">: </span><a href="../modules.html#servicecharacteristicchange" class="tsd-signature-type" data-tsd-kind="Type alias">ServiceCharacteristicChange</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+											</ul>
+											<ul class="tsd-descriptions">
+												<li class="tsd-description">
+													<h4 class="tsd-parameters-title">Parameters</h4>
+													<ul class="tsd-parameters">
+														<li>
+															<h5>change: <a href="../modules.html#servicecharacteristicchange" class="tsd-signature-type" data-tsd-kind="Type alias">ServiceCharacteristicChange</a></h5>
+														</li>
+													</ul>
+													<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+												</li>
+											</ul>
+										</li>
+									</ul>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L130">lib/Service.ts:130</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;service-configurationChange&quot;</span></h5>
+								</li>
+								<li>
+									<h5>listener: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span></h5>
+									<ul class="tsd-parameters">
+										<li class="tsd-parameter-signature">
+											<ul class="tsd-signatures tsd-kind-type-literal">
+												<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+											</ul>
+											<ul class="tsd-descriptions">
+												<li class="tsd-description">
+													<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+												</li>
+											</ul>
+										</li>
+									</ul>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L131">lib/Service.ts:131</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;characteristic-warning&quot;</span></h5>
+								</li>
+								<li>
+									<h5>listener: <span class="tsd-signature-symbol">(</span>warning<span class="tsd-signature-symbol">: </span><a href="../interfaces/characteristicwarning.html" class="tsd-signature-type" data-tsd-kind="Interface">CharacteristicWarning</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span></h5>
+									<ul class="tsd-parameters">
+										<li class="tsd-parameter-signature">
+											<ul class="tsd-signatures tsd-kind-type-literal">
+												<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">(</span>warning<span class="tsd-signature-symbol">: </span><a href="../interfaces/characteristicwarning.html" class="tsd-signature-type" data-tsd-kind="Interface">CharacteristicWarning</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+											</ul>
+											<ul class="tsd-descriptions">
+												<li class="tsd-description">
+													<h4 class="tsd-parameters-title">Parameters</h4>
+													<ul class="tsd-parameters">
+														<li>
+															<h5>warning: <a href="../interfaces/characteristicwarning.html" class="tsd-signature-type" data-tsd-kind="Interface">CharacteristicWarning</a></h5>
+														</li>
+													</ul>
+													<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+												</li>
+											</ul>
+										</li>
+									</ul>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="removecharacteristic" class="tsd-anchor"></a>
+					<h3>remove<wbr>Characteristic</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">remove<wbr>Characteristic<span class="tsd-signature-symbol">(</span>characteristic<span class="tsd-signature-symbol">: </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L400">lib/Service.ts:400</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>characteristic: <a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="removelinkedservice" class="tsd-anchor"></a>
+					<h3>remove<wbr>Linked<wbr>Service</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">remove<wbr>Linked<wbr>Service<span class="tsd-signature-symbol">(</span>service<span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L391">lib/Service.ts:391</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Removes a link to the specified service which was previously added with <a href="service.html#addlinkedservice">addLinkedService</a></p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>service: <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>Previously linked service</p>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+					<a name="setcharacteristic" class="tsd-anchor"></a>
+					<h3>set<wbr>Characteristic</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+						<li class="tsd-signature tsd-kind-icon">set<wbr>Characteristic&lt;T&gt;<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">T</span>, value<span class="tsd-signature-symbol">: </span><a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol"> | </span><a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">{}</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L458">lib/Service.ts:458</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-type-parameters-title">Type parameters</h4>
+							<ul class="tsd-type-parameters">
+								<li>
+									<h4>T<span class="tsd-signature-symbol">: </span><a href="../modules.html#withuuid" class="tsd-signature-type" data-tsd-kind="Type alias">WithUUID</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">&gt;</span></h4>
+								</li>
+							</ul>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>name: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">T</span></h5>
+								</li>
+								<li>
+									<h5>value: <a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol"> | </span><a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">{}</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="sethiddenservice" class="tsd-anchor"></a>
+					<h3>set<wbr>Hidden<wbr>Service</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">set<wbr>Hidden<wbr>Service<span class="tsd-signature-symbol">(</span>isHidden<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L367">lib/Service.ts:367</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Marks the service as hidden</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>isHidden: <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = true</span></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>optional boolean (default true) if the service should be marked hidden</p>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="setprimaryservice" class="tsd-anchor"></a>
+					<h3>set<wbr>Primary<wbr>Service</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">set<wbr>Primary<wbr>Service<span class="tsd-signature-symbol">(</span>isPrimary<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L357">lib/Service.ts:357</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Sets this service as the new primary service.
+										Any currently active primary service will be reset to be not primary.
+										This will happen immediately, if the service was already added to an accessory, or later
+									when the service gets added to an accessory.</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>isPrimary: <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = true</span></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>optional boolean (default true) if the service should be the primary service</p>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+					<a name="testcharacteristic" class="tsd-anchor"></a>
+					<h3>test<wbr>Characteristic</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+						<li class="tsd-signature tsd-kind-icon">test<wbr>Characteristic&lt;T&gt;<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">T</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L446">lib/Service.ts:446</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-type-parameters-title">Type parameters</h4>
+							<ul class="tsd-type-parameters">
+								<li>
+									<h4>T<span class="tsd-signature-symbol">: </span><a href="../modules.html#withuuid" class="tsd-signature-type" data-tsd-kind="Type alias">WithUUID</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">typeof </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">&gt;</span></h4>
+								</li>
+							</ul>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>name: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">T</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+					<a name="updatecharacteristic" class="tsd-anchor"></a>
+					<h3>update<wbr>Characteristic</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+						<li class="tsd-signature tsd-kind-icon">update<wbr>Characteristic&lt;T&gt;<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">T</span>, value<span class="tsd-signature-symbol">: </span><a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol"> | </span><a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">{}</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/Service.ts#L464">lib/Service.ts:464</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-type-parameters-title">Type parameters</h4>
+							<ul class="tsd-type-parameters">
+								<li>
+									<h4>T<span class="tsd-signature-symbol">: </span><a href="../modules.html#withuuid" class="tsd-signature-type" data-tsd-kind="Type alias">WithUUID</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">new </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><a href="characteristic.html" class="tsd-signature-type" data-tsd-kind="Class">Characteristic</a><span class="tsd-signature-symbol">&gt;</span></h4>
+								</li>
+							</ul>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>name: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">T</span></h5>
+								</li>
+								<li>
+									<h5>value: <a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol"> | </span><a href="../modules.html#primitivetypes" class="tsd-signature-type" data-tsd-kind="Type alias">PrimitiveTypes</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">{}</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="service.html" class="tsd-signature-type" data-tsd-kind="Class">Service</a></h4>
+						</li>
+					</ul>
+				</section>
+			</section>
+		</div>
+		<div class="col-4 col-menu menu-sticky-wrap menu-highlight">
+			<nav class="tsd-navigation primary">
+				<ul>
+					<li class=" ">
+						<a href="../modules.html">Exports</a>
+					</li>
+				</ul>
+			</nav>
+			<nav class="tsd-navigation secondary menu-sticky">
+				<ul class="before-current">
+				</ul>
+				<ul class="current">
+					<li class="current tsd-kind-class">
+						<a href="service.html" class="tsd-kind-icon">Service</a>
+						<ul>
+							<li class=" tsd-kind-constructor tsd-parent-kind-class">
+								<a href="service.html#constructor" class="tsd-kind-icon">constructor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class">
+								<a href="service.html#uuid" class="tsd-kind-icon">UUID</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class">
+								<a href="service.html#characteristics" class="tsd-kind-icon">characteristics</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class">
+								<a href="service.html#displayname" class="tsd-kind-icon">display<wbr>Name</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class">
+								<a href="service.html#iid" class="tsd-kind-icon">iid</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class">
+								<a href="service.html#name" class="tsd-kind-icon">name</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class">
+								<a href="service.html#optionalcharacteristics" class="tsd-kind-icon">optional<wbr>Characteristics</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class">
+								<a href="service.html#subtype" class="tsd-kind-icon">subtype</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#accesscontrol" class="tsd-kind-icon">Access<wbr>Control</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#accessoryinformation" class="tsd-kind-icon">Accessory<wbr>Information</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#accessoryruntimeinformation" class="tsd-kind-icon">Accessory<wbr>Runtime<wbr>Information</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#airpurifier" class="tsd-kind-icon">Air<wbr>Purifier</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#airqualitysensor" class="tsd-kind-icon">Air<wbr>Quality<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#audiostreammanagement" class="tsd-kind-icon">Audio<wbr>Stream<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#battery" class="tsd-kind-icon">Battery</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#batteryservice" class="tsd-kind-icon">Battery<wbr>Service</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#bridgeconfiguration" class="tsd-kind-icon">Bridge<wbr>Configuration</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#bridgingstate" class="tsd-kind-icon">Bridging<wbr>State</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#cameracontrol" class="tsd-kind-icon">Camera<wbr>Control</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#cameraeventrecordingmanagement" class="tsd-kind-icon">Camera<wbr>Event<wbr>Recording<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#cameraoperatingmode" class="tsd-kind-icon">Camera<wbr>Operating<wbr>Mode</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#camerartpstreammanagement" class="tsd-kind-icon">CameraRTPStream<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#camerarecordingmanagement" class="tsd-kind-icon">Camera<wbr>Recording<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#carbondioxidesensor" class="tsd-kind-icon">Carbon<wbr>Dioxide<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#carbonmonoxidesensor" class="tsd-kind-icon">Carbon<wbr>Monoxide<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#cloudrelay" class="tsd-kind-icon">Cloud<wbr>Relay</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#contactsensor" class="tsd-kind-icon">Contact<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#datastreamtransportmanagement" class="tsd-kind-icon">Data<wbr>Stream<wbr>Transport<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#diagnostics" class="tsd-kind-icon">Diagnostics</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#door" class="tsd-kind-icon">Door</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#doorbell" class="tsd-kind-icon">Doorbell</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#fan" class="tsd-kind-icon">Fan</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#fanv2" class="tsd-kind-icon">Fanv2</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#faucet" class="tsd-kind-icon">Faucet</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#filtermaintenance" class="tsd-kind-icon">Filter<wbr>Maintenance</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#garagedooropener" class="tsd-kind-icon">Garage<wbr>Door<wbr>Opener</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#heatercooler" class="tsd-kind-icon">Heater<wbr>Cooler</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#humidifierdehumidifier" class="tsd-kind-icon">Humidifier<wbr>Dehumidifier</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#humiditysensor" class="tsd-kind-icon">Humidity<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#inputsource" class="tsd-kind-icon">Input<wbr>Source</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#irrigationsystem" class="tsd-kind-icon">Irrigation<wbr>System</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#leaksensor" class="tsd-kind-icon">Leak<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#lightsensor" class="tsd-kind-icon">Light<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#lightbulb" class="tsd-kind-icon">Lightbulb</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#lockmanagement" class="tsd-kind-icon">Lock<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#lockmechanism" class="tsd-kind-icon">Lock<wbr>Mechanism</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#microphone" class="tsd-kind-icon">Microphone</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#motionsensor" class="tsd-kind-icon">Motion<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#occupancysensor" class="tsd-kind-icon">Occupancy<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#outlet" class="tsd-kind-icon">Outlet</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#pairing" class="tsd-kind-icon">Pairing</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#powermanagement" class="tsd-kind-icon">Power<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#protocolinformation" class="tsd-kind-icon">Protocol<wbr>Information</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#relay" class="tsd-kind-icon">Relay</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#securitysystem" class="tsd-kind-icon">Security<wbr>System</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#servicelabel" class="tsd-kind-icon">Service<wbr>Label</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#siri" class="tsd-kind-icon">Siri</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#slat" class="tsd-kind-icon">Slat</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#slats" class="tsd-kind-icon">Slats</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#smartspeaker" class="tsd-kind-icon">Smart<wbr>Speaker</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#smokesensor" class="tsd-kind-icon">Smoke<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#speaker" class="tsd-kind-icon">Speaker</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#statefulprogrammableswitch" class="tsd-kind-icon">Stateful<wbr>Programmable<wbr>Switch</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#statelessprogrammableswitch" class="tsd-kind-icon">Stateless<wbr>Programmable<wbr>Switch</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#switch" class="tsd-kind-icon">Switch</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#targetcontrol" class="tsd-kind-icon">Target<wbr>Control</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#targetcontrolmanagement" class="tsd-kind-icon">Target<wbr>Control<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#television" class="tsd-kind-icon">Television</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#televisionspeaker" class="tsd-kind-icon">Television<wbr>Speaker</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#temperaturesensor" class="tsd-kind-icon">Temperature<wbr>Sensor</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#thermostat" class="tsd-kind-icon">Thermostat</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#threadtransport" class="tsd-kind-icon">Thread<wbr>Transport</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#timeinformation" class="tsd-kind-icon">Time<wbr>Information</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#transfertransportmanagement" class="tsd-kind-icon">Transfer<wbr>Transport<wbr>Management</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#tunnel" class="tsd-kind-icon">Tunnel</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#tunneledbtleaccessoryservice" class="tsd-kind-icon">TunneledBTLEAccessory<wbr>Service</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#valve" class="tsd-kind-icon">Valve</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#wifirouter" class="tsd-kind-icon">Wi<wbr>FiRouter</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#wifisatellite" class="tsd-kind-icon">Wi<wbr>FiSatellite</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#wifitransport" class="tsd-kind-icon">Wi<wbr>FiTransport</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#window" class="tsd-kind-icon">Window</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-class tsd-is-static">
+								<a href="service.html#windowcovering" class="tsd-kind-icon">Window<wbr>Covering</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#addcharacteristic" class="tsd-kind-icon">add<wbr>Characteristic</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#addlinkedservice" class="tsd-kind-icon">add<wbr>Linked<wbr>Service</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#addoptionalcharacteristic" class="tsd-kind-icon">add<wbr>Optional<wbr>Characteristic</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#emit" class="tsd-kind-icon">emit</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#getcharacteristic" class="tsd-kind-icon">get<wbr>Characteristic</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#getserviceid" class="tsd-kind-icon">get<wbr>Service<wbr>Id</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#on" class="tsd-kind-icon">on</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#removecharacteristic" class="tsd-kind-icon">remove<wbr>Characteristic</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#removelinkedservice" class="tsd-kind-icon">remove<wbr>Linked<wbr>Service</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+								<a href="service.html#setcharacteristic" class="tsd-kind-icon">set<wbr>Characteristic</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#sethiddenservice" class="tsd-kind-icon">set<wbr>Hidden<wbr>Service</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="service.html#setprimaryservice" class="tsd-kind-icon">set<wbr>Primary<wbr>Service</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+								<a href="service.html#testcharacteristic" class="tsd-kind-icon">test<wbr>Characteristic</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class tsd-has-type-parameter">
+								<a href="service.html#updatecharacteristic" class="tsd-kind-icon">update<wbr>Characteristic</a>
+							</li>
+						</ul>
+					</li>
+				</ul>
+				<ul class="after-current">
+				</ul>
+			</nav>
+		</div>
+	</div>
+</div>
+<footer>
+	<div class="container">
+		<h2>Legend</h2>
+		<div class="tsd-legend-group">
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-interface"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-interface"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-interface"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static method</span></li>
+			</ul>
+		</div>
+	</div>
+</footer>
+<div class="overlay"></div>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

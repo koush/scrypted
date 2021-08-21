@@ -1,0 +1,36 @@
+{
+   "name": "@scrypted/myq",
+   "version": "0.1.15",
+   "description": "A MyQ Garage plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "myq",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "MyQ Garage Controller",
+      "singleInstance": true,
+      "type": "Device",
+      "interfaces": [
+         "DeviceProvider"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk":"file:../../sdk"
+   },
+   "dependencies": {
+      "axios": "^0.19.2",
+      "myq-api": "^2.0.2"
+   }
+}

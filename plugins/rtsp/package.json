@@ -1,0 +1,35 @@
+{
+   "name": "@scrypted/rtsp",
+   "version": "0.0.8",
+   "description": "RTSP Cameras and Streams Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "RTSP Camera Controller",
+      "type": "Device",
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk":"file:../../sdk"
+   },
+   "dependencies": {
+      "axios": "^0.18.1",
+      "url-parse": "^1.4.7"
+   }
+}

@@ -1,0 +1,37 @@
+{
+   "name": "@scrypted/notifier-mixin",
+   "version": "0.1.14",
+   "description": "Send notifications to smart speakers and smart displays using text to speech and text to image.",
+   "author": "Scrypted",
+   "license": "Apache-2.0",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "notifier",
+      "notification",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "Notifications for Smart TVs and Speakers (Text to Speech)",
+      "singleInstance": true,
+      "type": "Device",
+      "interfaces": [
+         "MixinProvider"
+      ]
+   },
+   "dependencies": {
+      "@scrypted/sdk":"file:../../sdk",
+      "memoize-one": "^5.1.1"
+   },
+   "devDependencies": {
+      "@types/node": "^14.14.37"
+   }
+}

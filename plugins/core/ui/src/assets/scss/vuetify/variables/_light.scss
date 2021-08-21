@@ -1,0 +1,39 @@
+$material-light: (
+  'status-bar': (
+    'regular': map-get($blue-grey, 'lighten-2')
+  ),
+  'app-bar': #ffffff,
+  'background': #f2f5f8,
+  'surface': #f2f5f8,
+  'calendar': (
+    'line-color': map-get($blue-grey, 'lighten-2'),
+    'interval-color': map-get($blue-grey, 'darken-3'),
+    'interval-line-color': map-get($blue-grey, 'lighten-2')
+  ),
+  'dividers': rgba(map-get($shades, 'black'), 0.05),
+  'text': (
+    'link-hover': map-get($blue-grey, 'darken-3')
+  ),
+  'icons': (
+    'active': rgba(map-get($shades, 'black'), 0.7),
+    'inactive': rgba(map-get($shades, 'black'), 0.38)
+  ),
+  'selection-controls': (
+    'thumb': (
+      'disabled': map-get($blue-grey, 'lighten-5')
+    )
+  ),
+  'tabs': rgba(0, 0, 0, 0.7),
+  'table': (
+    'active': map-get($grey, 'lighten-4'),
+    'hover': #fff,
+    'group': map-get($grey, 'lighten-4')
+  ),
+  'picker': (
+    'body': map-get($shades, 'white'),
+    'clock': map-get($blue-grey, 'lighten-2'),
+    'indeterminateTime': map-get($blue-grey, 'lighten-1'),
+    'title': map-get($blue-grey, 'lighten-2')
+  ),
+  'active-icon-percent': 0.7
+);

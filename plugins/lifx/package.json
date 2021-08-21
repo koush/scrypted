@@ -1,0 +1,37 @@
+{
+   "name": "@scrypted/lifx",
+   "version": "0.2.12",
+   "description": "A Lifx plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "lifx",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "LIFX Controller",
+      "singleInstance": true,
+      "type": "Device",
+      "interfaces": [
+         "DeviceProvider"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk":"file:../../sdk"
+   },
+   "dependencies": {
+      "axios": "^0.18.0",
+      "node-lifx": "github:koush/node-lifx",
+      "terser": "^3.14.1"
+   }
+}

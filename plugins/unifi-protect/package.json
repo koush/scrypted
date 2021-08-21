@@ -1,0 +1,39 @@
+{
+   "name": "@scrypted/unifi-protect",
+   "version": "0.0.7",
+   "description": "Unifi Protect Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "Unifi Protect Controller",
+      "type": "Device",
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ],
+      "rejectUnauthorized": false
+   },
+   "devDependencies": {
+      "@scrypted/sdk":"file:../../sdk",
+      "@types/lodash": "^4.14.158"
+   },
+   "dependencies": {
+      "axios": "^0.18.1",
+      "lodash.throttle": "^4.1.1",
+      "url-parse": "^1.4.7",
+      "wrtc": "^0.4.1"
+   }
+}

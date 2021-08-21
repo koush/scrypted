@@ -1,0 +1,39 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        // {
+        //     "name"        : "Scrypted Debugger",
+        //     "type"        : "quickjs",
+        //     "request"     : "attach",
+        //     "address"     : "${config:scrypted.debugHost}",
+        //     "port"        : 9091,
+        //     "localRoot"   : "/Volumes/Dev/Scrypted/quack-polyfill/quack-polyfill-java/src/js/dist",
+        //     "mode"         : "connect",
+
+        //     "preLaunchTask": "scrypted: deploy+debug",
+
+        //     // required due to webpack and transpiling
+        //     "sourceMaps"  : {
+        //         "${workspaceRoot}/out/main.quickjs.js.map": "",
+        //     }
+        //     // ,"trace": true
+        // },
+        {
+            "name": "Scrypted Debugger",
+            "address": "${config:scrypted.debugHost}",
+            "port": 9091,
+            "request": "attach",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "preLaunchTask": "scrypted: deploy+debug",
+            "sourceMaps": true,
+            "localRoot": "${workspaceFolder}/out",
+            "remoteRoot": "/plugin/",
+            "type": "pwa-node"
+        }
+    ]
+}

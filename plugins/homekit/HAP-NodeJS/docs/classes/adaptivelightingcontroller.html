@@ -1,0 +1,664 @@
+<!doctype html>
+<html class="default no-js">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>AdaptiveLightingController | hap-nodejs</title>
+	<meta name="description" content="Documentation for hap-nodejs">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="../assets/css/main.css">
+	<script async src="../assets/js/search.js" id="search-script"></script>
+</head>
+<body>
+<header>
+	<div class="tsd-page-toolbar">
+		<div class="container">
+			<div class="table-wrap">
+				<div class="table-cell" id="tsd-search" data-index="../assets/js/search.json" data-base="..">
+					<div class="field">
+						<label for="tsd-search-field" class="tsd-widget search no-caption">Search</label>
+						<input id="tsd-search-field" type="text" />
+					</div>
+					<ul class="results">
+						<li class="state loading">Preparing search index...</li>
+						<li class="state failure">The search index is not available</li>
+					</ul>
+					<a href="../index.html" class="title">hap-nodejs</a>
+				</div>
+				<div class="table-cell" id="tsd-widgets">
+					<div id="tsd-filter">
+						<a href="#" class="tsd-widget options no-caption" data-toggle="options">Options</a>
+						<div class="tsd-filter-group">
+							<div class="tsd-select" id="tsd-filter-visibility">
+								<span class="tsd-select-label">All</span>
+								<ul class="tsd-select-list">
+									<li data-value="public">Public</li>
+									<li data-value="protected">Public/Protected</li>
+									<li data-value="private" class="selected">All</li>
+								</ul>
+							</div>
+							<input type="checkbox" id="tsd-filter-inherited" checked />
+							<label class="tsd-widget" for="tsd-filter-inherited">Inherited</label>
+						</div>
+					</div>
+					<a href="#" class="tsd-widget menu no-caption" data-toggle="menu">Menu</a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="tsd-page-title">
+		<div class="container">
+			<ul class="tsd-breadcrumb">
+				<li>
+					<a href="../modules.html">hap-nodejs</a>
+				</li>
+				<li>
+					<a href="adaptivelightingcontroller.html">AdaptiveLightingController</a>
+				</li>
+			</ul>
+			<h1>Class AdaptiveLightingController</h1>
+		</div>
+	</div>
+</header>
+<div class="container container-main">
+	<div class="row">
+		<div class="col-8 col-content">
+			<section class="tsd-panel tsd-comment">
+				<div class="tsd-comment tsd-typography">
+					<div class="lead">
+						<p>This class allows adding Adaptive Lighting support to Lightbulb services.
+							The Lightbulb service MUST have the <a href="characteristic.html#colortemperature">Characteristic.ColorTemperature</a> characteristic AND
+							the <a href="characteristic.html#brightness">Characteristic.Brightness</a> characteristic added.
+							The light may also expose <a href="characteristic.html#hue">Characteristic.Hue</a> and <a href="characteristic.html#saturation">Characteristic.Saturation</a> characteristics
+						(though additional work is required to keep them in sync with the color temperature characteristic. see below)</p>
+					</div>
+					<p>How Adaptive Lighting works:
+						When enabling AdaptiveLighting the iDevice will send a transition schedule for the next 24 hours.
+						This schedule will be renewed all 24 hours by a HomeHub in your home
+						(updating the schedule according to your current day/night situation).
+						Once enabled the lightbulb will execute the provided transitions. The color temperature value set is always
+						dependent on the current brightness value. Meaning brighter light will be colder and darker light will be warmer.
+						HomeKit considers Adaptive Lighting to be disabled as soon a write happens to either the
+						Hue/Saturation or the ColorTemperature characteristics.
+					The AdaptiveLighting state must persist across reboots.</p>
+					<p>The AdaptiveLightingController can be operated in two modes: <a href="../enums/adaptivelightingcontrollermode.html#automatic">AdaptiveLightingControllerMode.AUTOMATIC</a> and
+						<a href="../enums/adaptivelightingcontrollermode.html#manual">AdaptiveLightingControllerMode.MANUAL</a> with AUTOMATIC being the default.
+						The goal would be that the color transition is done DIRECTLY on the light itself, thus not creating any
+						additional/heavy traffic on the network.
+					So if your light hardware/API supports transitions please go the extra mile and use MANUAL mode.</p>
+					<p>Below is an overview what you need to or consider when enabling AdaptiveLighting (categorized by mode).
+					The <a href="../enums/adaptivelightingcontrollermode.html">AdaptiveLightingControllerMode</a> can be defined with the second constructor argument.</p>
+					<p><b>AUTOMATIC (Default mode):</b></p>
+					<p> This is the easiest mode to setup and needs less to no work form your side for AdaptiveLighting to work.
+						The AdaptiveLightingController will go through setup procedure with HomeKit and automatically update
+						the color temperature characteristic base on the current transition schedule.
+						It is also adjusting the color temperature when a write to the brightness characteristic happens.
+						Additionally it will also handle turning off AdaptiveLighting, when it detects a write happening to the
+						ColorTemperature, Hue or Saturation characteristic (though it can only detect writes coming from HomeKit and
+					can&#39;t detect changes done to the physical devices directly! See below).</p>
+					<p> So what do you need to consider in automatic mode:</p>
+					<ul>
+						<li>Brightness and ColorTemperature characteristics MUST be set up. Hue and Saturation may be added for color support.</li>
+						<li>Color temperature will be updated all 60 seconds by calling the SET handler of the ColorTemperature characteristic.
+						So every transition behaves like a regular write to the ColorTemperature characteristic.</li>
+						<li>Every transition step is dependent on the current brightness value. Try to keep the internal cache updated
+							as the controller won&#39;t call the GET handler every 60 seconds.
+							(The cached brightness value is updated on SET/GET operations or by manually calling <a href="characteristic.html#updatevalue">Characteristic.updateValue</a>
+						on the brightness characteristic).</li>
+						<li>Detecting changes on the lightbulb side:
+							Any manual change to ColorTemperature or Hue/Saturation is considered as a signal to turn AdaptiveLighting off.
+							In order to notify the AdaptiveLightingController of such an event happening OUTSIDE of HomeKit
+						you must call <a href="adaptivelightingcontroller.html#disableadaptivelighting">disableAdaptiveLighting</a> manually!</li>
+						<li>Be aware that even when the light is turned off the transition will continue to call the SET handler
+						of the ColorTemperature characteristic.</li>
+						<li>When using Hue/Saturation:
+							When using Hue/Saturation in combination with the ColorTemperature characteristic you need to update the
+							respective other in a particular way depending if being in &quot;color mode&quot; or &quot;color temperature mode&quot;.
+							When a write happens to Hue/Saturation characteristic in is advised to set the internal value of the
+							ColorTemperature to the minimal (NOT RAISING a event).
+							When a write happens to the ColorTemperature characteristic just MUST convert to a proper representation
+							in hue and saturation values, with RAISING a event.
+							As noted above you MUST NOT call the <a href="characteristic.html#setvalue">Characteristic.setValue</a> method for this, as this will be considered
+							a write to the characteristic and will turn off AdaptiveLighting. Instead you should use
+							<a href="characteristic.html#updatevalue">Characteristic.updateValue</a> for this.
+							You can and SHOULD use the supplied utility method <a href="colorutils.html#colortemperaturetohueandsaturation">ColorUtils.colorTemperatureToHueAndSaturation</a>
+						for converting mired to hue and saturation values.</li>
+					</ul>
+					<p><b>MANUAL mode:</b></p>
+					<p> Manual mode is recommended for any accessories which support transitions natively on the devices end.
+						Like for example ZigBee lights which support sending transitions directly to the lightbulb which
+						then get executed ON the lightbulb itself reducing unnecessary network traffic.
+						Here is a quick overview what you have to consider to successfully implement AdaptiveLighting support.
+						The AdaptiveLightingController will also in manual mode do all of the setup procedure.
+						It will also save the transition schedule to disk to keep AdaptiveLighting enabled across reboots.
+						The &quot;only&quot; thing you have to do yourself is handling the actual transitions, check that event notifications
+						are only sent in the defined interval threshold, adjust the color temperature when brightness is changed
+					and signal that Adaptive Lighting should be disabled if ColorTemperature, Hue or Saturation is changed manually.</p>
+					<p> First step is to setup up a event handler for the <a href="../enums/adaptivelightingcontrollerevents.html#update">AdaptiveLightingControllerEvents.UPDATE</a>, which is called
+						when AdaptiveLighting is enabled, the HomeHub updates the schedule for the next 24 hours or AdaptiveLighting
+						is restored from disk on startup.
+						In the event handler you can get the current schedule via <a href="adaptivelightingcontroller.html#getadaptivelightingtransitioncurve">AdaptiveLightingController.getAdaptiveLightingTransitionCurve</a>,
+						retrieve current intervals like <a href="adaptivelightingcontroller.html#getadaptivelightingupdateinterval">AdaptiveLightingController.getAdaptiveLightingUpdateInterval</a> or
+						<a href="adaptivelightingcontroller.html#getadaptivelightingnotifyintervalthreshold">AdaptiveLightingController.getAdaptiveLightingNotifyIntervalThreshold</a> and get the date in epoch millis
+						when the current transition curve started using <a href="adaptivelightingcontroller.html#getadaptivelightingstarttimeoftransition">AdaptiveLightingController.getAdaptiveLightingStartTimeOfTransition</a>.
+						Additionally <a href="adaptivelightingcontroller.html#getadaptivelightingbrightnessmultiplierrange">AdaptiveLightingController.getAdaptiveLightingBrightnessMultiplierRange</a> can be used
+						to get the valid range for the brightness value to calculate the brightness adjustment factor.
+						The method <a href="adaptivelightingcontroller.html#isadaptivelightingactive">AdaptiveLightingController.isAdaptiveLightingActive</a> can be used to check if AdaptiveLighting is enabled.
+						Besides actually running the transition (see <a href="../interfaces/adaptivelightingtransitioncurveentry.html">AdaptiveLightingTransitionCurveEntry</a>) you must
+						correctly update the color temperature when the brightness of the lightbulb changes (see <a href="../interfaces/adaptivelightingtransitioncurveentry.html#brightnessadjustmentfactor">AdaptiveLightingTransitionCurveEntry.brightnessAdjustmentFactor</a>),
+						and signal when AdaptiveLighting got disabled by calling <a href="adaptivelightingcontroller.html#disableadaptivelighting">AdaptiveLightingController.disableAdaptiveLighting</a>
+						when ColorTemperature, Hue or Saturation where changed manually.
+						Lastly you should set up a event handler for the <a href="../enums/adaptivelightingcontrollerevents.html#disabled">AdaptiveLightingControllerEvents.DISABLED</a> event.
+						In yet unknown circumstances HomeKit may also send a dedicated disable command via the control point characteristic.
+					Be prepared to handle that.</p>
+				</div>
+			</section>
+			<section class="tsd-panel tsd-hierarchy">
+				<h3>Hierarchy</h3>
+				<ul class="tsd-hierarchy">
+					<li>
+						<span class="tsd-signature-type">EventEmitter</span>
+						<ul class="tsd-hierarchy">
+							<li>
+								<span class="target">AdaptiveLightingController</span>
+							</li>
+						</ul>
+					</li>
+				</ul>
+			</section>
+			<section class="tsd-panel">
+				<h3>Implements</h3>
+				<ul class="tsd-hierarchy">
+					<li><a href="../interfaces/serializablecontroller.html" class="tsd-signature-type" data-tsd-kind="Interface">SerializableController</a><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/controllerservicemap.html" class="tsd-signature-type" data-tsd-kind="Interface">ControllerServiceMap</a><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">SerializedAdaptiveLightingControllerState</span><span class="tsd-signature-symbol">&gt;</span></li>
+				</ul>
+			</section>
+			<section class="tsd-panel-group tsd-index-group">
+				<h2>Index</h2>
+				<section class="tsd-panel tsd-index-panel">
+					<div class="tsd-index-content">
+						<section class="tsd-index-section ">
+							<h3>Constructors</h3>
+							<ul class="tsd-index-list">
+								<li class="tsd-kind-constructor tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#constructor" class="tsd-kind-icon">constructor</a></li>
+							</ul>
+						</section>
+						<section class="tsd-index-section ">
+							<h3>Methods</h3>
+							<ul class="tsd-index-list">
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#disableadaptivelighting" class="tsd-kind-icon">disable<wbr>Adaptive<wbr>Lighting</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#emit" class="tsd-kind-icon">emit</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#getadaptivelightingbrightnessmultiplierrange" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Brightness<wbr>Multiplier<wbr>Range</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#getadaptivelightingnotifyintervalthreshold" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Notify<wbr>Interval<wbr>Threshold</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#getadaptivelightingstarttimeoftransition" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Start<wbr>Time<wbr>OfTransition</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#getadaptivelightingtimeoffset" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Time<wbr>Offset</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#getadaptivelightingtransitioncurve" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Curve</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#getadaptivelightingupdateinterval" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Update<wbr>Interval</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#getcurrentadaptivelightingtransitionpoint" class="tsd-kind-icon">get<wbr>Current<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Point</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#isadaptivelightingactive" class="tsd-kind-icon">is<wbr>Adaptive<wbr>Lighting<wbr>Active</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class"><a href="adaptivelightingcontroller.html#on" class="tsd-kind-icon">on</a></li>
+							</ul>
+						</section>
+					</div>
+				</section>
+			</section>
+			<section class="tsd-panel-group tsd-member-group ">
+				<h2>Constructors</h2>
+				<section class="tsd-panel tsd-member tsd-kind-constructor tsd-parent-kind-class">
+					<a name="constructor" class="tsd-anchor"></a>
+					<h3>constructor</h3>
+					<ul class="tsd-signatures tsd-kind-constructor tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">new <wbr>Adaptive<wbr>Lighting<wbr>Controller<span class="tsd-signature-symbol">(</span>service<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Lightbulb</span>, options<span class="tsd-signature-symbol">?: </span><a href="../interfaces/adaptivelightingoptions.html" class="tsd-signature-type" data-tsd-kind="Interface">AdaptiveLightingOptions</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="adaptivelightingcontroller.html" class="tsd-signature-type" data-tsd-kind="Class">AdaptiveLightingController</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L443">lib/controller/AdaptiveLightingController.ts:443</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Creates a new instance of the AdaptiveLightingController.
+									Refer to the <a href="adaptivelightingcontroller.html">AdaptiveLightingController</a> documentation on how to use it.</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>service: <span class="tsd-signature-type">Lightbulb</span></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>The lightbulb to which Adaptive Lighting support should be added.</p>
+									</div>
+								</li>
+								<li>
+									<h5><span class="tsd-flag ts-flagOptional">Optional</span> options: <a href="../interfaces/adaptivelightingoptions.html" class="tsd-signature-type" data-tsd-kind="Interface">AdaptiveLightingOptions</a></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>Optional options to define the operating mode (automatic vs manual).</p>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="adaptivelightingcontroller.html" class="tsd-signature-type" data-tsd-kind="Class">AdaptiveLightingController</a></h4>
+						</li>
+					</ul>
+				</section>
+			</section>
+			<section class="tsd-panel-group tsd-member-group ">
+				<h2>Methods</h2>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="disableadaptivelighting" class="tsd-anchor"></a>
+					<h3>disable<wbr>Adaptive<wbr>Lighting</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">disable<wbr>Adaptive<wbr>Lighting<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L488">lib/controller/AdaptiveLightingController.ts:488</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>This method can be called to manually disable the current active Adaptive Lighting transition.
+										When using <a href="../enums/adaptivelightingcontrollermode.html#automatic">AdaptiveLightingControllerMode.AUTOMATIC</a> you won&#39;t need to call this method.
+										In <a href="../enums/adaptivelightingcontrollermode.html#manual">AdaptiveLightingControllerMode.MANUAL</a> you must call this method when Adaptive Lighting should be disabled.
+										This is the case when the user manually changes the value of Hue, Saturation or ColorTemperature characteristics
+									(or if any of those values is changed by physical interaction with the lightbulb).</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="emit" class="tsd-anchor"></a>
+					<h3>emit</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">emit<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;update&quot;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span></li>
+						<li class="tsd-signature tsd-kind-icon">emit<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;disable&quot;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L311">lib/controller/AdaptiveLightingController.ts:311</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;update&quot;</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L312">lib/controller/AdaptiveLightingController.ts:312</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;disable&quot;</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getadaptivelightingbrightnessmultiplierrange" class="tsd-anchor"></a>
+					<h3>get<wbr>Adaptive<wbr>Lighting<wbr>Brightness<wbr>Multiplier<wbr>Range</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Brightness<wbr>Multiplier<wbr>Range<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="../interfaces/brightnessadjustmentmultiplierrange.html" class="tsd-signature-type" data-tsd-kind="Interface">BrightnessAdjustmentMultiplierRange</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L562">lib/controller/AdaptiveLightingController.ts:562</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-returns-title">Returns <a href="../interfaces/brightnessadjustmentmultiplierrange.html" class="tsd-signature-type" data-tsd-kind="Interface">BrightnessAdjustmentMultiplierRange</a></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getadaptivelightingnotifyintervalthreshold" class="tsd-anchor"></a>
+					<h3>get<wbr>Adaptive<wbr>Lighting<wbr>Notify<wbr>Interval<wbr>Threshold</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Notify<wbr>Interval<wbr>Threshold<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L590">lib/controller/AdaptiveLightingController.ts:590</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Returns the minimum interval threshold (in milliseconds) a accessory may notify HomeKit controllers about a new
+										color temperature value via event notifications (what happens when you call <a href="characteristic.html#updatevalue">Characteristic.updateValue</a>).
+									Meaning the accessory should only send event notifications to subscribed HomeKit controllers at the specified interval.</p>
+								</div>
+								<p>Typically this evaluates to 600000 milliseconds (10 minutes).</p>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getadaptivelightingstarttimeoftransition" class="tsd-anchor"></a>
+					<h3>get<wbr>Adaptive<wbr>Lighting<wbr>Start<wbr>Time<wbr>OfTransition</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Start<wbr>Time<wbr>OfTransition<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L533">lib/controller/AdaptiveLightingController.ts:533</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Returns the time where the current transition curve was started in epoch time millis.
+										A transition curves is active for 24 hours typically and is renewed every 24 hours by a HomeHub.
+									Additionally see <a href="adaptivelightingcontroller.html#getadaptivelightingtimeoffset">getAdaptiveLightingTimeOffset</a>.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getadaptivelightingtimeoffset" class="tsd-anchor"></a>
+					<h3>get<wbr>Adaptive<wbr>Lighting<wbr>Time<wbr>Offset</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Time<wbr>Offset<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L548">lib/controller/AdaptiveLightingController.ts:548</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>It is not necessarily given, that we have the same time (or rather the correct time) as the HomeKit controller
+										who set up the transition schedule.
+										Thus we record the delta between our current time and the the time send with the setup request.
+										<code>timeOffset</code> is defined as <code>Date.now() - getAdaptiveLightingStartTimeOfTransition();</code>.
+										So in the case were we actually have a correct local time, it most likely will be positive (due to network latency).
+									But of course it can also be negative.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getadaptivelightingtransitioncurve" class="tsd-anchor"></a>
+					<h3>get<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Curve</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Curve<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="../interfaces/adaptivelightingtransitioncurveentry.html" class="tsd-signature-type" data-tsd-kind="Interface">AdaptiveLightingTransitionCurveEntry</a><span class="tsd-signature-symbol">[]</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L555">lib/controller/AdaptiveLightingController.ts:555</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-returns-title">Returns <a href="../interfaces/adaptivelightingtransitioncurveentry.html" class="tsd-signature-type" data-tsd-kind="Interface">AdaptiveLightingTransitionCurveEntry</a><span class="tsd-signature-symbol">[]</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getadaptivelightingupdateinterval" class="tsd-anchor"></a>
+					<h3>get<wbr>Adaptive<wbr>Lighting<wbr>Update<wbr>Interval</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Update<wbr>Interval<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L576">lib/controller/AdaptiveLightingController.ts:576</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>This method returns the interval (in milliseconds) in which the light should update its internal color temperature
+										(aka changes it physical color).
+									A lightbulb should ideally change this also when turned of in oder to have a smooth transition when turning the light on.</p>
+								</div>
+								<p>Typically this evaluates to 60000 milliseconds (60 seconds).</p>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="getcurrentadaptivelightingtransitionpoint" class="tsd-anchor"></a>
+					<h3>get<wbr>Current<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Point</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">get<wbr>Current<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Point<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="../interfaces/adaptivelightingtransitionpoint.html" class="tsd-signature-type" data-tsd-kind="Interface">AdaptiveLightingTransitionPoint</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L699">lib/controller/AdaptiveLightingController.ts:699</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Retrieve the <a href="../interfaces/adaptivelightingtransitionpoint.html">AdaptiveLightingTransitionPoint</a> for the current timestamp.
+									Returns undefined if the current transition schedule reached its end.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="../interfaces/adaptivelightingtransitionpoint.html" class="tsd-signature-type" data-tsd-kind="Interface">AdaptiveLightingTransitionPoint</a></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="isadaptivelightingactive" class="tsd-anchor"></a>
+					<h3>is<wbr>Adaptive<wbr>Lighting<wbr>Active</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">is<wbr>Adaptive<wbr>Lighting<wbr>Active<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L477">lib/controller/AdaptiveLightingController.ts:477</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Returns if a Adaptive Lighting transition is currently active.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class">
+					<a name="on" class="tsd-anchor"></a>
+					<h3>on</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+						<li class="tsd-signature tsd-kind-icon">on<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;update&quot;</span>, listener<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="adaptivelightingcontroller.html" class="tsd-signature-type" data-tsd-kind="Class">AdaptiveLightingController</a></li>
+						<li class="tsd-signature tsd-kind-icon">on<span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;disable&quot;</span>, listener<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="adaptivelightingcontroller.html" class="tsd-signature-type" data-tsd-kind="Class">AdaptiveLightingController</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L302">lib/controller/AdaptiveLightingController.ts:302</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>See <a href="../enums/adaptivelightingcontrollerevents.html#update">AdaptiveLightingControllerEvents.UPDATE</a></p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;update&quot;</span></h5>
+								</li>
+								<li>
+									<h5>listener: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span></h5>
+									<div class="tsd-comment tsd-typography">
+									</div>
+									<ul class="tsd-parameters">
+										<li class="tsd-parameter-signature">
+											<ul class="tsd-signatures tsd-kind-type-literal">
+												<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+											</ul>
+											<ul class="tsd-descriptions">
+												<li class="tsd-description">
+													<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+												</li>
+											</ul>
+										</li>
+									</ul>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="adaptivelightingcontroller.html" class="tsd-signature-type" data-tsd-kind="Class">AdaptiveLightingController</a></h4>
+						</li>
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/controller/AdaptiveLightingController.ts#L309">lib/controller/AdaptiveLightingController.ts:309</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>See <a href="../enums/adaptivelightingcontrollerevents.html#disabled">AdaptiveLightingControllerEvents.DISABLED</a></p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>event: <span class="tsd-signature-type">&quot;disable&quot;</span></h5>
+								</li>
+								<li>
+									<h5>listener: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span></h5>
+									<div class="tsd-comment tsd-typography">
+									</div>
+									<ul class="tsd-parameters">
+										<li class="tsd-parameter-signature">
+											<ul class="tsd-signatures tsd-kind-type-literal">
+												<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+											</ul>
+											<ul class="tsd-descriptions">
+												<li class="tsd-description">
+													<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+												</li>
+											</ul>
+										</li>
+									</ul>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="adaptivelightingcontroller.html" class="tsd-signature-type" data-tsd-kind="Class">AdaptiveLightingController</a></h4>
+						</li>
+					</ul>
+				</section>
+			</section>
+		</div>
+		<div class="col-4 col-menu menu-sticky-wrap menu-highlight">
+			<nav class="tsd-navigation primary">
+				<ul>
+					<li class=" ">
+						<a href="../modules.html">Exports</a>
+					</li>
+				</ul>
+			</nav>
+			<nav class="tsd-navigation secondary menu-sticky">
+				<ul class="before-current">
+				</ul>
+				<ul class="current">
+					<li class="current tsd-kind-class">
+						<a href="adaptivelightingcontroller.html" class="tsd-kind-icon">Adaptive<wbr>Lighting<wbr>Controller</a>
+						<ul>
+							<li class=" tsd-kind-constructor tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#constructor" class="tsd-kind-icon">constructor</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#disableadaptivelighting" class="tsd-kind-icon">disable<wbr>Adaptive<wbr>Lighting</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#emit" class="tsd-kind-icon">emit</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#getadaptivelightingbrightnessmultiplierrange" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Brightness<wbr>Multiplier<wbr>Range</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#getadaptivelightingnotifyintervalthreshold" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Notify<wbr>Interval<wbr>Threshold</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#getadaptivelightingstarttimeoftransition" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Start<wbr>Time<wbr>OfTransition</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#getadaptivelightingtimeoffset" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Time<wbr>Offset</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#getadaptivelightingtransitioncurve" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Curve</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#getadaptivelightingupdateinterval" class="tsd-kind-icon">get<wbr>Adaptive<wbr>Lighting<wbr>Update<wbr>Interval</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#getcurrentadaptivelightingtransitionpoint" class="tsd-kind-icon">get<wbr>Current<wbr>Adaptive<wbr>Lighting<wbr>Transition<wbr>Point</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#isadaptivelightingactive" class="tsd-kind-icon">is<wbr>Adaptive<wbr>Lighting<wbr>Active</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class">
+								<a href="adaptivelightingcontroller.html#on" class="tsd-kind-icon">on</a>
+							</li>
+						</ul>
+					</li>
+				</ul>
+				<ul class="after-current">
+				</ul>
+			</nav>
+		</div>
+	</div>
+</div>
+<footer>
+	<div class="container">
+		<h2>Legend</h2>
+		<div class="tsd-legend-group">
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-interface"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-interface"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-interface"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static method</span></li>
+			</ul>
+		</div>
+	</div>
+</footer>
+<div class="overlay"></div>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,331 @@
+<!doctype html>
+<html class="default no-js">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>HAPServerEventTypes | hap-nodejs</title>
+	<meta name="description" content="Documentation for hap-nodejs">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="../assets/css/main.css">
+	<script async src="../assets/js/search.js" id="search-script"></script>
+</head>
+<body>
+<header>
+	<div class="tsd-page-toolbar">
+		<div class="container">
+			<div class="table-wrap">
+				<div class="table-cell" id="tsd-search" data-index="../assets/js/search.json" data-base="..">
+					<div class="field">
+						<label for="tsd-search-field" class="tsd-widget search no-caption">Search</label>
+						<input id="tsd-search-field" type="text" />
+					</div>
+					<ul class="results">
+						<li class="state loading">Preparing search index...</li>
+						<li class="state failure">The search index is not available</li>
+					</ul>
+					<a href="../index.html" class="title">hap-nodejs</a>
+				</div>
+				<div class="table-cell" id="tsd-widgets">
+					<div id="tsd-filter">
+						<a href="#" class="tsd-widget options no-caption" data-toggle="options">Options</a>
+						<div class="tsd-filter-group">
+							<div class="tsd-select" id="tsd-filter-visibility">
+								<span class="tsd-select-label">All</span>
+								<ul class="tsd-select-list">
+									<li data-value="public">Public</li>
+									<li data-value="protected">Public/Protected</li>
+									<li data-value="private" class="selected">All</li>
+								</ul>
+							</div>
+							<input type="checkbox" id="tsd-filter-inherited" checked />
+							<label class="tsd-widget" for="tsd-filter-inherited">Inherited</label>
+						</div>
+					</div>
+					<a href="#" class="tsd-widget menu no-caption" data-toggle="menu">Menu</a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="tsd-page-title">
+		<div class="container">
+			<ul class="tsd-breadcrumb">
+				<li>
+					<a href="../modules.html">hap-nodejs</a>
+				</li>
+				<li>
+					<a href="hapservereventtypes.html">HAPServerEventTypes</a>
+				</li>
+			</ul>
+			<h1>Enumeration HAPServerEventTypes</h1>
+		</div>
+	</div>
+</header>
+<div class="container container-main">
+	<div class="row">
+		<div class="col-8 col-content">
+			<section class="tsd-panel-group tsd-index-group">
+				<h2>Index</h2>
+				<section class="tsd-panel tsd-index-panel">
+					<div class="tsd-index-content">
+						<section class="tsd-index-section ">
+							<h3>Enumeration members</h3>
+							<ul class="tsd-index-list">
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#accessories" class="tsd-kind-icon">ACCESSORIES</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#add_pairing" class="tsd-kind-icon">ADD_<wbr>PAIRING</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#connection_closed" class="tsd-kind-icon">CONNECTION_<wbr>CLOSED</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#get_characteristics" class="tsd-kind-icon">GET_<wbr>CHARACTERISTICS</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#identify" class="tsd-kind-icon">IDENTIFY</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#listening" class="tsd-kind-icon">LISTENING</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#list_pairings" class="tsd-kind-icon">LIST_<wbr>PAIRINGS</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#pair" class="tsd-kind-icon">PAIR</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#remove_pairing" class="tsd-kind-icon">REMOVE_<wbr>PAIRING</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#request_resource" class="tsd-kind-icon">REQUEST_<wbr>RESOURCE</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="hapservereventtypes.html#set_characteristics" class="tsd-kind-icon">SET_<wbr>CHARACTERISTICS</a></li>
+							</ul>
+						</section>
+					</div>
+				</section>
+			</section>
+			<section class="tsd-panel-group tsd-member-group ">
+				<h2>Enumeration members</h2>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="accessories" class="tsd-anchor"></a>
+					<h3>ACCESSORIES</h3>
+					<div class="tsd-signature tsd-kind-icon">ACCESSORIES<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;accessories&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L219">lib/HAPServer.ts:219</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>This event is emitted when a client requests the complete representation of Accessory data for
+								this Accessory (for instance, what services, characteristics, etc. are supported) and any bridged
+								Accessories in the case of a Bridge Accessory. The listener must call the provided callback function
+							when the accessory data is ready. We will automatically JSON.stringify the data.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="add_pairing" class="tsd-anchor"></a>
+					<h3>ADD_<wbr>PAIRING</h3>
+					<div class="tsd-signature tsd-kind-icon">ADD_<wbr>PAIRING<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;add-pairing&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L204">lib/HAPServer.ts:204</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="connection_closed" class="tsd-anchor"></a>
+					<h3>CONNECTION_<wbr>CLOSED</h3>
+					<div class="tsd-signature tsd-kind-icon">CONNECTION_<wbr>CLOSED<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;connection-closed&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L235">lib/HAPServer.ts:235</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="get_characteristics" class="tsd-anchor"></a>
+					<h3>GET_<wbr>CHARACTERISTICS</h3>
+					<div class="tsd-signature tsd-kind-icon">GET_<wbr>CHARACTERISTICS<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;get-characteristics&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L226">lib/HAPServer.ts:226</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>This event is emitted when a client wishes to retrieve the current value of one or more characteristics.
+								The listener must call the provided callback function when the values are ready. iOS clients can typically
+								wait up to 10 seconds for this call to return. We will automatically JSON.stringify the data (which must
+							be an array) and wrap it in an object with a top-level &quot;characteristics&quot; property.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="identify" class="tsd-anchor"></a>
+					<h3>IDENTIFY</h3>
+					<div class="tsd-signature tsd-kind-icon">IDENTIFY<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;identify&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L203">lib/HAPServer.ts:203</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Emitted when a client wishes for this server to identify itself before pairing. You must call the
+							callback to respond to the client with success.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="listening" class="tsd-anchor"></a>
+					<h3>LISTENING</h3>
+					<div class="tsd-signature tsd-kind-icon">LISTENING<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;listening&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L198">lib/HAPServer.ts:198</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Emitted when the server is fully set up and ready to receive connections.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="list_pairings" class="tsd-anchor"></a>
+					<h3>LIST_<wbr>PAIRINGS</h3>
+					<div class="tsd-signature tsd-kind-icon">LIST_<wbr>PAIRINGS<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;list-pairings&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L206">lib/HAPServer.ts:206</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="pair" class="tsd-anchor"></a>
+					<h3>PAIR</h3>
+					<div class="tsd-signature tsd-kind-icon">PAIR<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;pair&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L212">lib/HAPServer.ts:212</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>This event is emitted when a client completes the &quot;pairing&quot; process and exchanges encryption keys.
+								Note that this does not mean the &quot;Add Accessory&quot; process in iOS has completed.
+							You must call the callback to complete the process.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="remove_pairing" class="tsd-anchor"></a>
+					<h3>REMOVE_<wbr>PAIRING</h3>
+					<div class="tsd-signature tsd-kind-icon">REMOVE_<wbr>PAIRING<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;remove-pairing&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L205">lib/HAPServer.ts:205</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="request_resource" class="tsd-anchor"></a>
+					<h3>REQUEST_<wbr>RESOURCE</h3>
+					<div class="tsd-signature tsd-kind-icon">REQUEST_<wbr>RESOURCE<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;request-resource&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L234">lib/HAPServer.ts:234</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
+					<a name="set_characteristics" class="tsd-anchor"></a>
+					<h3>SET_<wbr>CHARACTERISTICS</h3>
+					<div class="tsd-signature tsd-kind-icon">SET_<wbr>CHARACTERISTICS<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;set-characteristics&quot;</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/homebridge/HAP-NodeJS/blob/95a2490/src/lib/HAPServer.ts#L233">lib/HAPServer.ts:233</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>This event is emitted when a client wishes to set the current value of one or more characteristics and/or
+								subscribe to one or more events. The &#39;events&#39; param is an initially-empty object, associated with the current
+								connection, on which you may store event registration keys for later processing. The listener must call
+							the provided callback when the request has been processed.</p>
+						</div>
+					</div>
+				</section>
+			</section>
+		</div>
+		<div class="col-4 col-menu menu-sticky-wrap menu-highlight">
+			<nav class="tsd-navigation primary">
+				<ul>
+					<li class=" ">
+						<a href="../modules.html">Exports</a>
+					</li>
+				</ul>
+			</nav>
+			<nav class="tsd-navigation secondary menu-sticky">
+				<ul class="before-current">
+				</ul>
+				<ul class="current">
+					<li class="current tsd-kind-enum">
+						<a href="hapservereventtypes.html" class="tsd-kind-icon">HAPServer<wbr>Event<wbr>Types</a>
+						<ul>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#accessories" class="tsd-kind-icon">ACCESSORIES</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#add_pairing" class="tsd-kind-icon">ADD_<wbr>PAIRING</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#connection_closed" class="tsd-kind-icon">CONNECTION_<wbr>CLOSED</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#get_characteristics" class="tsd-kind-icon">GET_<wbr>CHARACTERISTICS</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#identify" class="tsd-kind-icon">IDENTIFY</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#listening" class="tsd-kind-icon">LISTENING</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#list_pairings" class="tsd-kind-icon">LIST_<wbr>PAIRINGS</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#pair" class="tsd-kind-icon">PAIR</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#remove_pairing" class="tsd-kind-icon">REMOVE_<wbr>PAIRING</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#request_resource" class="tsd-kind-icon">REQUEST_<wbr>RESOURCE</a>
+							</li>
+							<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
+								<a href="hapservereventtypes.html#set_characteristics" class="tsd-kind-icon">SET_<wbr>CHARACTERISTICS</a>
+							</li>
+						</ul>
+					</li>
+				</ul>
+				<ul class="after-current">
+				</ul>
+			</nav>
+		</div>
+	</div>
+</div>
+<footer>
+	<div class="container">
+		<h2>Legend</h2>
+		<div class="tsd-legend-group">
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-interface"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-interface"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-interface"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class"><span class="tsd-kind-icon">Constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class"><span class="tsd-kind-icon">Property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class"><span class="tsd-kind-icon">Method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited constructor</span></li>
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><span class="tsd-kind-icon">Inherited method</span></li>
+			</ul>
+			<ul class="tsd-legend">
+				<li class="tsd-kind-property tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static property</span></li>
+				<li class="tsd-kind-method tsd-parent-kind-class tsd-is-static"><span class="tsd-kind-icon">Static method</span></li>
+			</ul>
+		</div>
+	</div>
+</footer>
+<div class="overlay"></div>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>
