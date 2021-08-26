@@ -18,7 +18,6 @@
         "node",
         "webpack-env",
         "vuetify",
-        "w3c-web-usb",
         "dom-webcodecs",
       ],
       "lib": [
