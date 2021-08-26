@@ -16,23 +16,36 @@ interface Prebuffer {
   time: number;
 }
 
-class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera {
+class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
   prebufferSession: Promise<FFMpegFragmentedMP4Session>;
-  prebufferDurationMs: number;
   prebuffer: Prebuffer[] = [];
   ftyp: MP4Atom;
   moov: MP4Atom;
   events = new EventEmitter();
   released = false;
 
-  constructor(mixinDevice: ScryptedDevice & VideoCamera, deviceState: any, prebufferDuration: number) {
-    super(mixinDevice, deviceState);
-
-    this.prebufferDurationMs = prebufferDuration;
+  constructor(mixinDevice: ScryptedDevice & VideoCamera, deviceState: any, nativeId: string|undefined) {
+    super(mixinDevice, deviceState, nativeId);
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
     log.i(`${this.name} prebuffer session starting in 10 seconds`);
     setTimeout(() => this.ensurePrebufferSession(), 10000);
+  }
+
+  async getSettings(): Promise<Setting[]> {
+    return [
+      {
+        group: 'HomeKit Settings',
+        title: 'Prebuffer Size',
+        description: 'Duration of the prebuffer in milliseconds.',
+        type: 'number',
+        key: PREBUFFER_DURATION_MS,
+        value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
+      }
+    ];
+  }
+  async putSetting(key: string, value: string | number | boolean): Promise<void> {
+    this.storage.setItem(key, value.toString());
   }
 
   ensurePrebufferSession() {
@@ -68,6 +81,8 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
   }
 
   async startSession(session: FFMpegFragmentedMP4Session) {
+    const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
+
     for await (const atom of session.generator) {
       const now = Date.now();
       if (!this.ftyp) {
@@ -84,7 +99,7 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
       }
 
 
-      while (this.prebuffer.length && this.prebuffer[0].time < now - this.prebufferDurationMs) {
+      while (this.prebuffer.length && this.prebuffer[0].time < now - prebufferDurationMs) {
         this.prebuffer.shift();
       }
 
@@ -162,7 +177,7 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
       first = {};
       ret.push(first);
     }
-    first.prebuffer = this.prebufferDurationMs;
+    first.prebuffer = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
     return ret;
   }
 
@@ -177,30 +192,15 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
   }
 }
 
-class PrebufferProvider extends ScryptedDeviceBase implements MixinProvider, Settings {
+class PrebufferProvider extends ScryptedDeviceBase implements MixinProvider {
   canMixin(type: ScryptedDeviceType, interfaces: string[]): string[] {
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
-    return [ScryptedInterface.VideoCamera];
+    return [ScryptedInterface.VideoCamera, ScryptedInterface.Settings];
   }
 
   getMixin(device: ScryptedDevice, deviceState: any) {
-    return new PrebufferMixin(device as ScryptedDevice & VideoCamera, deviceState, parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration);
-  }
-
-  async getSettings(): Promise<Setting[]> {
-    return [
-      {
-        title: 'Prebuffer Size',
-        description: 'Duration of the prebuffer in milliseconds.',
-        type: 'number',
-        key: PREBUFFER_DURATION_MS,
-        value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
-      }
-    ]
-  }
-  async putSetting(key: string, value: string | number | boolean) {
-    this.storage.setItem(key, value.toString());
+    return new PrebufferMixin(device as ScryptedDevice & VideoCamera, deviceState, this.nativeId);
   }
 }
 

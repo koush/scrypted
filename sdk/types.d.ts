@@ -3,7 +3,6 @@
  * DeviceState is returned by DeviceManager.getDeviceState, and allows getting/setting of a device provided by a DeviceProvider.
  */
 export interface DeviceState {
-  component?: string;
   id?: string;
   interfaces?: string[];
   metadata?: any;
@@ -69,7 +68,6 @@ export interface ScryptedDevice {
 
   setType(type: ScryptedDeviceType): Promise<void>;
 
-  component?: string;
   id?: string;
   interfaces?: string[];
   metadata?: any;
@@ -679,6 +677,13 @@ export interface DeviceManager {
   getDeviceStorage(): Storage;
 
   /**
+   * Get the storage for a mixin.
+   * @param id The id of the device being mixined.
+   * @param nativeId The nativeId of the MixinProvider.
+   */
+  getMixinStorage(id: string, nativeId?: string): Storage;
+
+  /**
    * Get the per device Storage object.
    */
   getDeviceStorage(nativeId: string): Storage;
@@ -942,6 +947,7 @@ export interface Setting {
   key?: string;
   placeholder?: string;
   readonly?: boolean;
+  group?: string;
   title?: string;
   type?: string;
   value?: string;
@@ -998,7 +1004,6 @@ export enum ScryptedInterface {
 }
 
 export enum ScryptedInterfaceProperty {
-    component = "component",
     id = "id",
     interfaces = "interfaces",
     metadata = "metadata",
@@ -1083,6 +1088,9 @@ export {
 }
 
 export interface ScryptedStatic {
+    /**
+     * @deprecated
+     */
     log?: Logger,
     scriptSettings?: Settings,
 

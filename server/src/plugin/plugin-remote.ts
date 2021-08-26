@@ -153,6 +153,9 @@ class DeviceManagerImpl implements DeviceManager {
     getDeviceStorage(nativeId?: any): StorageImpl {
         return new StorageImpl(this, nativeId);
     }
+    getMixinStorage(id: string, nativeId?: string) {
+        return new StorageImpl(this, nativeId, `mixin:${id}:`);
+    }
     getNativeIds(): string[] {
         return Array.from(this.nativeIds.keys());
     }
@@ -192,14 +195,14 @@ class PushManagerImpl implements PushManager {
 }
 
 class StorageImpl implements Storage {
-    nativeId: string;
     api: PluginAPI;
-    deviceManager: DeviceManagerImpl;
 
-    constructor(deviceManager: DeviceManagerImpl, nativeId: string) {
+    constructor(public deviceManager: DeviceManagerImpl, public nativeId: string, public prefix?: string) {
         this.deviceManager = deviceManager;
         this.api = deviceManager.api;
         this.nativeId = nativeId;
+        if (!this.prefix)
+            this.prefix = '';
     }
 
     get storage(): { [key: string]: any } {
@@ -207,26 +210,35 @@ class StorageImpl implements Storage {
     }
 
     get length(): number {
-        return Object.keys(this.storage).length;
+        return Object.keys(this.storage).filter(key => key.startsWith(this.prefix)).length;
     }
 
     clear(): void {
-        this.deviceManager.nativeIds.get(this.nativeId).storage = {};
+        if (!this.prefix) {
+            this.deviceManager.nativeIds.get(this.nativeId).storage = {};
+        }
+        else {
+            const storage = this.storage;
+            Object.keys(this.storage).filter(key => key.startsWith(this.prefix)).forEach(key => delete storage[key]);
+        }
         this.api.setStorage(this.nativeId, this.storage);
     }
 
     getItem(key: string): string {
-        return this.storage[key];
+        return this.storage[this.prefix + key];
     }
     key(index: number): string {
-        return Object.keys(this.storage)[index];
+        if (!this.prefix) {
+            return Object.keys(this.storage)[index];
+        }
+        return Object.keys(this.storage).filter(key => key.startsWith(this.prefix))[index].substring(this.prefix.length);
     }
     removeItem(key: string): void {
-        delete this.storage[key];
+        delete this.storage[this.prefix + key];
         this.api.setStorage(this.nativeId, this.storage);
     }
     setItem(key: string, value: string): void {
-        this.storage[key] = value;
+        this.storage[this.prefix + key] = value;
         this.api.setStorage(this.nativeId, this.storage);
     }
 }

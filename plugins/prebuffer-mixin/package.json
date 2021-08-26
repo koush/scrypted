@@ -24,8 +24,7 @@
       "singleInstance": true,
       "type": "API",
       "interfaces": [
-         "MixinProvider",
-         "Settings"
+         "MixinProvider"
       ]
    },
    "dependencies": {

@@ -115,7 +115,6 @@ module.exports.ScryptedInterfaceDescriptors = {
   ScryptedDevice: {
       name: "ScryptedDevice",
       properties: [
-        "component",
         "id",
         "interfaces",
         "metadata",
@@ -549,7 +548,6 @@ module.exports.ScryptedInterfaceDescriptors = {
 }
 
 module.exports.ScryptedInterfaceProperty = {
-    component: "component",
     id: "id",
     interfaces: "interfaces",
     metadata: "metadata",

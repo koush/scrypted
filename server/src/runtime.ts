@@ -515,7 +515,6 @@ export class ScryptedRuntime {
         setState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);
         setState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
         setState(pluginDevice, ScryptedInterfaceProperty.metadata, device.metadata);
-        setState(pluginDevice, ScryptedInterfaceProperty.component, null);
         setState(pluginDevice, ScryptedInterfaceProperty.providerId, provider?._id);
         setState(pluginDevice, ScryptedInterfaceProperty.providedName, providedName);
         setState(pluginDevice, ScryptedInterfaceProperty.providedType, providedType);

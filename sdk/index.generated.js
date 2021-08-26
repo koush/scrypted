@@ -31,9 +31,17 @@ class ScryptedDeviceBase {
 
 
 class MixinDeviceBase {
-    constructor(mixinDevice, deviceState) {
+    constructor(mixinDevice, deviceState, providerNativeId) {
         this.mixinDevice = mixinDevice;
         this._deviceState = deviceState;
+        this.providerNativeId = providerNativeId;
+    }
+
+    get storage() {
+        if (!this._storage) {
+            this._storage = deviceManager.getMixinStorage(this.providerNativeId);
+        }
+        return this._storage;
     }
 
     _lazyLoadDeviceState() {
@@ -58,7 +66,7 @@ function _createSetState(state) {
     };
 }
 
-var fields = ["component","id","interfaces","metadata","name","providedInterfaces","providedName","providedRoom","providedType","providerId","room","type","on","brightness","colorTemperature","rgb","hsv","running","paused","docked","temperature","temperatureUnit","humidity","thermostatAvailableModes","thermostatMode","thermostatSetpoint","thermostatSetpointHigh","thermostatSetpointLow","lockState","entryOpen","batteryLevel","online","updateAvailable","fromMimeType","toMimeType","binaryState","intrusionDetected","powerDetected","motionDetected","occupied","flooded","ultraviolet","luminance","position",
+var fields = ["id","interfaces","metadata","name","providedInterfaces","providedName","providedRoom","providedType","providerId","room","type","on","brightness","colorTemperature","rgb","hsv","running","paused","docked","temperature","temperatureUnit","humidity","thermostatAvailableModes","thermostatMode","thermostatSetpoint","thermostatSetpointHigh","thermostatSetpointLow","lockState","entryOpen","batteryLevel","online","updateAvailable","fromMimeType","toMimeType","binaryState","intrusionDetected","powerDetected","motionDetected","occupied","flooded","ultraviolet","luminance","position",
 ];
 for (var field of fields) {
     Object.defineProperty(ScryptedDeviceBase.prototype, field, {

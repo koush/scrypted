@@ -4,9 +4,12 @@ import { ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceS
 export class ScryptedDeviceBase implements DeviceState {
   constructor(nativeId?: string);
   nativeId: string;
+  /**
+   * @deprecated
+   */
   log: Logger;
+  console: Console;
   storage: Storage;
-  component?: string;
   id?: string;
   interfaces?: string[];
   metadata?: any;
@@ -60,9 +63,10 @@ export class ScryptedDeviceBase implements DeviceState {
 
 
 export class MixinDeviceBase<T> implements DeviceState {
-  constructor(mixinDevice: T, deviceState: any);
+  constructor(mixinDevice: T, deviceState: any, providerNativeId: string);
   mixinDevice: ScryptedDevice & T;
-  component?: string;
+  console: Console;
+  storage: Storage;
   id?: string;
   interfaces?: string[];
   metadata?: any;
