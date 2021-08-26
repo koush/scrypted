@@ -1,30 +1,11 @@
 import { ScryptedRuntime } from "./runtime";
 import { EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, SystemDeviceState } from "@scrypted/sdk/types";
-import { PluginDevice, RefreshSymbol } from "./plugin/plugin-device";
+import { RefreshSymbol } from "./plugin/plugin-device";
 import throttle from 'lodash/throttle';
 import { sleep } from "./sleep";
 import { EventListenerRegisterImpl, EventRegistry } from "./event-registry";
-
-export const allInterfaceMethods: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.methods));
-export const allInterfaceProperties: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.properties));
-export const deviceMethods: any[] = ['listen', 'setName', 'setRoom', 'setType'];
-
-export const propertyInterfaces: { [property: string]: ScryptedInterface } = {};
-for (const descriptor of Object.values(ScryptedInterfaceDescriptors)) {
-    for (const property of descriptor.properties) {
-        propertyInterfaces[property] = descriptor.name as ScryptedInterface;
-    }
-}
-
-export function isValidInterfaceMethod(interfaces: string[], method: string) {
-    const availableMethods: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).filter((e: any) => interfaces.includes(e.name)).map((type: any) => type.methods));
-    return availableMethods.includes(method);
-}
-
-export function isValidInterfaceProperty(interfaces: string[], property: string): boolean {
-    const availableProperties: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).filter((e: any) => interfaces.includes(e.name)).map((type: any) => type.properties));
-    return availableProperties.includes(property);
-}
+import { PluginDevice } from "./db-types";
+import { allInterfaceProperties, propertyInterfaces } from "./plugin/descriptor";
 
 export class ScryptedStateManager extends EventRegistry {
     scrypted: ScryptedRuntime;

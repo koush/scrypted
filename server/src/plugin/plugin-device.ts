@@ -1,46 +1,12 @@
 import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty } from "@scrypted/sdk/types";
 import { ScryptedRuntime } from "../runtime";
-import { ScryptedDocument } from "../db-types";
-import { SystemDeviceState, MixinProvider } from "@scrypted/sdk/types";
+import { PluginDevice } from "../db-types";
+import { MixinProvider } from "@scrypted/sdk/types";
 import { handleFunctionInvocations } from "../rpc";
 import { getState } from "../state";
 import { getProvidedTypeOrDefault } from "../infer-defaults";
 import { hasSameElements } from "../collection";
-import { textChangeRangeIsUnchanged } from "typescript";
-
-export const allInterfaceMethods: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.methods));
-export const allInterfaceProperties: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.properties));
-export const deviceMethods: any[] = ['listen', 'setName', 'setRoom', 'setType'];
-
-const methodInterfaces: { [method: string]: string } = {};
-for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
-    for (const method of desc.methods) {
-        methodInterfaces[method] = desc.name;
-    }
-}
-
-export function isValidInterfaceMethod(interfaces: string[], method: string) {
-    const availableMethods: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).filter((e: any) => interfaces.includes(e.name)).map((type: any) => type.methods));
-    return availableMethods.includes(method) || ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice].methods.includes(method);
-}
-
-export function isValidInterfaceProperty(interfaces: string[], property: string): boolean {
-    const availableProperties: any[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).filter((e: any) => interfaces.includes(e.name)).map((type: any) => type.properties));
-    return availableProperties.includes(property);
-}
-
-export class PluginDevice extends ScryptedDocument {
-    constructor(id?: string) {
-        super();
-        this._id = id;
-    }
-    nativeId?: string;
-    pluginId: string;
-    state: { [property: string]: SystemDeviceState };
-    stateVersion: number;
-    storage: { [key: string]: string };
-    mixins: string[];
-}
+import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
 
 interface MixinTable {
     interfaces: string[];

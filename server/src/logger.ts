@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { ScryptedRuntime } from './runtime';
 import crypto from 'crypto';
 import { ScryptedAlert } from './db-types';
+import { PluginLogger } from './plugin/plugin-api';
 
 export function makeAlertId(path: string, msg: string): string {
     return crypto.createHash('sha256').update(path).update(msg).digest('base64');
@@ -15,7 +16,7 @@ export interface LogEntry {
     path: string;
 }
 
-export class Logger extends EventEmitter {
+export class Logger extends EventEmitter implements PluginLogger {
     logs: LogEntry[] = [];
     children: { [id: string]: Logger } = {};
     path: string;
@@ -29,7 +30,7 @@ export class Logger extends EventEmitter {
         this.title = title;
     }
 
-    log(level: string, message: string) {
+    async log(level: string, message: string) {
         const timestamp = Date.now();
         const entry = {
             timestamp,

@@ -1,8 +1,8 @@
 import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger } from "@scrypted/sdk/types";
 import { PluginAPI } from "./plugin-api";
 import { handleFunctionInvocations } from '../rpc';
-import { allInterfaceProperties, isValidInterfaceMethod } from './plugin-device';
 import { EventRegistry } from "../event-registry";
+import { allInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
 
 
 function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {

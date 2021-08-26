@@ -3,8 +3,7 @@ import { Volume } from 'memfs';
 import path from 'path';
 import { DeviceManager, Logger, Device, DeviceManifest, DeviceState, EventDetails, EventListenerOptions, EventListenerRegister, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types'
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from '../server-settings';
-import { PluginAPI, PluginRemote } from './plugin-api';
-import { Logger as ScryptedLogger } from '../logger';
+import { PluginAPI, PluginLogger, PluginRemote } from './plugin-api';
 import { SystemManagerImpl } from './system';
 import { RpcPeer } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
@@ -12,16 +11,16 @@ import { BufferSerializer } from './buffer-serializer';
 class DeviceLogger implements Logger {
     nativeId: string;
     api: PluginAPI;
-    logger: Promise<ScryptedLogger>;
+    logger: Promise<PluginLogger>;
 
     constructor(api: PluginAPI, nativeId: string) {
         this.api = api;
         this.nativeId = nativeId;
     }
 
-    async ensureLogger(): Promise<ScryptedLogger> {
+    async ensureLogger(): Promise<PluginLogger> {
         if (!this.logger)
-            this.logger = this.api.getLogger(this.nativeId) as Promise<ScryptedLogger>;
+            this.logger = this.api.getLogger(this.nativeId);
         return await this.logger;
     }
 

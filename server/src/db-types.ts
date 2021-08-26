@@ -1,4 +1,5 @@
 import { LevelDocument } from "./level";
+import { SystemDeviceState } from "@scrypted/sdk/types";
 
 export class ScryptedDocument implements LevelDocument {
     _id?: string;
@@ -25,4 +26,17 @@ export class ScryptedAlert extends ScryptedDocument {
     title: string;
     path: string;
     message: string;
+}
+
+export class PluginDevice extends ScryptedDocument {
+    constructor(id?: string) {
+        super();
+        this._id = id;
+    }
+    nativeId?: string;
+    pluginId: string;
+    state: { [property: string]: SystemDeviceState };
+    stateVersion: number;
+    storage: { [key: string]: string };
+    mixins: string[];
 }
