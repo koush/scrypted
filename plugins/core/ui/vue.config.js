@@ -14,6 +14,61 @@ const proxyOpts = {
 };
 
 module.exports = {
+  productionSourceMap: false,
+
+  // https://cli.vuejs.org/config/#css-extract
+  css: {
+    extract: { ignoreOrder: true },
+    loaderOptions: {
+      sass: {
+        additionalData: '@import \'~@/assets/scss/vuetify/variables\''
+      },
+      scss: {
+        additionalData: '@import \'~@/assets/scss/vuetify/variables\';'
+      }
+    }
+  },
+
+  
+  parallel: false,
+
+  chainWebpack: config => {
+    config.module.rule('vue').uses.delete('cache-loader');
+    config.module.rule('js').uses.delete('cache-loader');
+    config.module.rule('ts').uses.delete('cache-loader');
+    config.module.rule('tsx').uses.delete('cache-loader');
+
+    config.module
+      .rule('worker-loader')
+      .test(/\.worker\.js$/)
+      .use('worker-loader')
+      .loader('worker-loader')
+      .end()
+  },
+
+
+  configureWebpack: {
+    output: {
+      crossOriginLoading: 'anonymous',
+    },
+
+    module: {
+      rules: [
+        {
+          test: /\.(wasm\.asset)$/i,
+          use: [
+            {
+              loader: 'file-loader',
+              options: {
+                name: '[contenthash].wasm'
+              }
+            },
+          ],
+        },
+      ]
+    },
+  },
+
   pwa: {
     themeColor: '#424242',
     msTileColor: '#9c27b0',
@@ -24,29 +79,7 @@ module.exports = {
     }
   },
   publicPath: process.env.NODE_ENV === 'production' ? '/endpoint/@scrypted/core/public' : '/',
-  configureWebpack: {
-    resolve: {
-      extensions: ['.js', '.ts', '.vue'],
-    },
-    module: {
-      rules: [
-        {
-          test: /\.(ts|js)?$/,
-          use: ["source-map-loader"],
-          enforce: "pre"
-        },
-        {
-          test: /\.(ts|js)x?$/,
-          // unsure if this is correct... need to transpile node modules at times.
-          exclude: /(node_modules|bower_components)/,
-          use: {
-            loader: 'babel-loader',
-          }
-        }
-      ]
-    },
-  },
-  chainWebpack: config => config.resolve.symlinks(false),
+
   runtimeCompiler: true,
   devServer: {
     port: 8081,

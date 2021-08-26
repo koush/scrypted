@@ -72,12 +72,12 @@ export default {
             category: "Components"
           },
           { id: "log", name: "Live Log", icon: "list", category: "Utilities" },
-          {
-            id: "settings",
-            name: "Settings",
-            icon: "fa-cog",
-            category: "Utilities"
-          }
+          // {
+          //   id: "settings",
+          //   name: "Settings",
+          //   icon: "fa-cog",
+          //   category: "Utilities"
+          // }
         ];
       }
     }

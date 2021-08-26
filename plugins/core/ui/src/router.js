@@ -8,8 +8,6 @@ import ScriptComponent from "./components/script/ScriptComponent.vue";
 import InstallPlugin from "./components/script/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";
 import SettingsComponent from "./components/builtin/SettingsComponent.vue";
-import Zwave from "./components/zwave/Zwave.vue";
-import Dashboard from "./components/dashboard/Dashboard.vue";
 
 let router = new VueRouter({
     routes: [

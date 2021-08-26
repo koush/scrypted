@@ -230,7 +230,7 @@ class CardComponentSettings implements SettingsInterface {
     this.cardComponent = cardComponent;
   }
 
-  getSettings(): Setting[] {
+  async getSettings(): Promise<Setting[]> {
     var settings = cloneDeep(
       getCardComponentSettings().get(this.cardComponent.component)
     );
@@ -244,7 +244,7 @@ class CardComponentSettings implements SettingsInterface {
     }
     return settings;
   }
-  putSetting(key: string, value: string): void {
+  async putSetting(key: string, value: string) {
     var settings = cloneDeep(
       getCardComponentSettings().get(this.cardComponent.component)
     );

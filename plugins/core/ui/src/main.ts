@@ -7,13 +7,12 @@ import './plugins/maps';
 import './plugins/async-computed';
 import App from './App.vue'
 import './registerServiceWorker'
-import linkify from 'vue-linkify'
 
 // STYLES
 // Main Theme SCSS
 import './assets/scss/theme.scss'
 
-Vue.directive('linkified', linkify)
+Vue.directive('linkified', require('vue-linkify'))
 
 Vue.config.productionTip = false
 

@@ -76,14 +76,14 @@ Vue.use(Vue => {
                             const id = eventSource.id;
 
                             // ensure the property is reactive
-                            if (eventDetails.eventInterface == "ScryptedDevice") {
+                            if (eventDetails.eventInterface === "ScryptedDevice") {
                                 Vue.set(systemState, id, systemState[id]);
                                 if (isValidDevice(id)) {
                                     store.commit("addDevice", id);
                                 }
                                 return;
                             }
-                        } else if (eventDetails.eventInterface == "Logger") {
+                        } else if (eventDetails.eventInterface === "Logger") {
                             const alerts = await scrypted.systemManager.getComponent('alerts');
                             const ret = await alerts.getAlerts();
                             store.commit("setAlerts", ret);
