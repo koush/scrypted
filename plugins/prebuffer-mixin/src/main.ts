@@ -35,8 +35,7 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
   async getSettings(): Promise<Setting[]> {
     return [
       {
-        group: 'HomeKit Settings',
-        title: 'Prebuffer Size',
+        title: 'Prebuffer Duration',
         description: 'Duration of the prebuffer in milliseconds.',
         type: 'number',
         key: PREBUFFER_DURATION_MS,

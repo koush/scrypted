@@ -331,6 +331,16 @@
 
     <v-flex xs12 md6 lg6>
       <v-layout row wrap>
+        <v-flex xs12 v-for="iface in noCardInterfaces" :key="iface">
+          <v-flex v-if="name != null">
+            <component
+              :value="deviceState"
+              :device="device"
+              :is="iface"
+            ></component>
+          </v-flex>
+        </v-flex>
+
         <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
           <v-flex v-if="name != null">
             <v-card>
@@ -415,6 +425,10 @@ const cardHeaderInterfaces = [
 
 const cardUnderInterfaces = [ScryptedInterface.DeviceProvider];
 
+const noCardInterfaces = [
+  ScryptedInterface.Settings,
+]
+
 const cardInterfaces = [
   ScryptedInterface.Brightness,
   ScryptedInterface.ColorSettingTemperature,
@@ -426,7 +440,6 @@ const cardInterfaces = [
   ScryptedInterface.TemperatureSetting,
   ScryptedInterface.PasswordStore,
   ScryptedInterface.PositionSensor,
-  ScryptedInterface.Settings,
 ];
 
 const cardActionInterfaces = [
@@ -714,6 +727,7 @@ export default {
     cardButtonInterfaces: filterInterfaces(cardButtonInterfaces),
     cardActionInterfaces: filterInterfaces(cardActionInterfaces),
     cardInterfaces: filterInterfaces(cardInterfaces),
+    noCardInterfaces: filterInterfaces(noCardInterfaces),
     cardUnderInterfaces: filterInterfaces(cardUnderInterfaces),
     cardHeaderInterfaces: filterInterfaces(cardHeaderInterfaces),
     inferredTypes() {
