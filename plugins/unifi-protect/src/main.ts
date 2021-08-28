@@ -118,7 +118,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
         const camera = payload as any;
 
-        if (rtsp.storage.getItem('lastMotion') != camera.lastMotion) {
+        if (camera.lastMotion && rtsp.storage.getItem('lastMotion') != camera.lastMotion) {
             rtsp.storage.setItem('lastMotion', camera.lastMotion.toString());
             rtsp.motionDetected = true;
             rtsp.resetActivityTimeout();
