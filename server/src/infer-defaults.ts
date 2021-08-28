@@ -1,5 +1,5 @@
 import { ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from "@scrypted/sdk/types";
-import { PluginDevice } from "./plugin/plugin-device";
+import { PluginDevice } from "./db-types";
 import { getState } from "./state";
 
 const inferenceTable: {[iface: string]: ScryptedDeviceType[]} = {};

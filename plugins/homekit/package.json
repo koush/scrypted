@@ -16,7 +16,8 @@
       "name": "HomeKit",
       "type": "DeviceProvider",
       "interfaces": [
-         "MixinProvider"
+         "MixinProvider",
+         "Settings"
       ]
    },
    "dependencies": {
