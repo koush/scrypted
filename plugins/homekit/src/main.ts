@@ -1,4 +1,4 @@
-import sdk, { MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType } from '@scrypted/sdk';
+import sdk, { Settings, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, Setting } from '@scrypted/sdk';
 import { Bridge, Categories, HAPStorage } from './hap';
 import os from 'os';
 import { supportedTypes } from './common';
@@ -50,11 +50,23 @@ const uuid = localStorage.getItem('uuid');
 
 const includeToken = 4;
 
-class HomeKit extends ScryptedDeviceBase implements MixinProvider {
+class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
     bridge = new Bridge('Scrypted', uuid);
     constructor() {
         super();
         this.start();
+    }
+    async getSettings(): Promise<Setting[]> {
+        return [
+            {
+                title: "Pairing Code",
+                readonly: true,
+                value: "123-45-678",
+            }
+        ]
+    }
+
+    async putSetting(key: string, value: string | number | boolean): Promise<void> {
     }
 
     async start() {

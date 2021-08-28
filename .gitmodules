@@ -4,3 +4,6 @@
 [submodule "plugins/unifi-protect/src/unifi-protect"]
 	path = plugins/unifi-protect/src/unifi-protect
 	url = git@github.com:koush/unifi-protect.git
+[submodule "plugins/myq/src/myq"]
+	path = plugins/myq/src/myq
+	url = git@github.com:koush/myq.git
