@@ -41,7 +41,7 @@
                 class="orange-gradient subtitle-1 font-weight-light"
               >
                 {{ name || "No Device Name" }}
-                <v-layout row justify-end align-center>
+                <v-layout row justify-end align-center v-if="cardHeaderInterfaces.length">
                   <component
                     :value="deviceState"
                     :device="device"
@@ -52,7 +52,7 @@
                 </v-layout>
               </v-card-title>
 
-              <v-flex>
+              <v-flex v-if="cardButtonInterfaces.length">
                 <v-layout align-center justify-center>
                   <component
                     v-for="iface in cardButtonInterfaces"

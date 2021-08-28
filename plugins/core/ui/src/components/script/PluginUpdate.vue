@@ -1,7 +1,10 @@
 <template>
   <div>
+    <div v-if="updating">
+      Updating...
+    </div>
     <div
-      v-if="!updateAvailable"
+      v-else-if="!updateAvailable"
       class="body-2 font-weight-light"
     >{{ device.npmPackageVersion }}</div>
     <v-btn
@@ -30,14 +33,17 @@ export default {
   },
   data() {
     return {
+      updating: false,
       updateAvailable: false
     };
   },
   methods: {
     doInstall() {
-      installNpm(this.device.pluginId).then(id =>
-        this.$router.push(getDeviceViewPath(id))
-      );
+      this.updating = true;
+      installNpm(this.device.pluginId).then(id => {
+        this.updateAvailable = false;
+      })
+      .finally(() => this.updating = false);
     }
   }
 };

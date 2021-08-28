@@ -21,9 +21,8 @@
           ></component>
 
           <v-card-actions>
-            <v-spacer></v-spacer>
             <v-btn
-              outlined
+              text
               color="orange"
               v-for="(cardButton, buttonIndex) in card.buttons"
               :key="buttonIndex"
