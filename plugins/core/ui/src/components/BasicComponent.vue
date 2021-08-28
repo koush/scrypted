@@ -1,79 +1,77 @@
 <template>
   <div>
     <v-layout wrap v-if="!loading">
-      <v-flex v-for="(card, cardIndex) in cards" :key="cardIndex" xs12 md6>
-        <v-flex>
-          <v-card v-if="!card.hide" raised class="header-card">
-            <v-card-title
-              class="orange-gradient subtitle-1 text--white font-weight-light"
-              >{{ card.title }}</v-card-title
-            >
-
-            <v-card-text>{{ card.description }}</v-card-text>
-            <component
-              v-if="card.body"
-              :is="card.body"
-              v-model="card.value"
-            ></component>
-
-            <v-card-actions>
-              <v-spacer></v-spacer>
-              <v-btn
-                outlined
-                color="orange"
-                v-for="(cardButton, buttonIndex) in card.buttons"
-                :key="buttonIndex"
-                @click="cardButton.click && cardButton.click(card.value)"
-                >{{ cardButton.title }}</v-btn
-              >
-            </v-card-actions>
-          </v-card>
-        </v-flex>
-      </v-flex>
-      <v-flex xs12>
-        <v-layout row wrap>
-          <v-flex
-            xs12
-            md6
-            v-for="deviceGroup in deviceGroups"
-            :key="deviceGroup.name"
+      <v-flex
+        v-for="(card, cardIndex) in cards"
+        :key="cardIndex"
+        xs12
+        :md6="deviceGroups.length > 1"
+      >
+        <v-card v-if="!card.hide" raised class="header-card">
+          <v-card-title
+            class="orange-gradient subtitle-1 text--white font-weight-light"
+            >{{ card.title }}</v-card-title
           >
-            <v-flex>
-              <v-card raised class="header-card">
-                <v-card-title
-                  class="red-gradient subtitle-1 text--white font-weight-light"
-                  >{{ deviceGroup.name }}</v-card-title
-                >
-                <DeviceTable
-                  :hideType="deviceGroup.hideType"
-                  :deviceGroup="deviceGroup"
-                  :getOwnerColumn="getOwnerColumn"
-                  :getOwnerLink="getOwnerLink"
-                  v-bind="deviceGroup.tableProps"
-                >
-                  <template
-                    v-slot:extra-column-0="device"
-                    v-if="deviceGroup.extraColumn0"
-                  >
-                    <component
-                      :is="deviceGroup.extraColumn0"
-                      v-bind="device"
-                    ></component>
-                  </template>
-                  <template
-                    v-slot:extra-column-1="device"
-                    v-if="deviceGroup.extraColumn1"
-                  >
-                    <component
-                      :is="deviceGroup.extraColumn1"
-                      v-bind="device"
-                    ></component>
-                  </template>
-                </DeviceTable>
-              </v-card>
-            </v-flex>
-          </v-flex>
-        </v-layout>
+
+          <v-card-text>{{ card.description }}</v-card-text>
+          <component
+            v-if="card.body"
+            :is="card.body"
+            v-model="card.value"
+          ></component>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn
+              outlined
+              color="orange"
+              v-for="(cardButton, buttonIndex) in card.buttons"
+              :key="buttonIndex"
+              @click="cardButton.click && cardButton.click(card.value)"
+              >{{ cardButton.title }}</v-btn
+            >
+          </v-card-actions>
+        </v-card>
+      </v-flex>
+
+      <v-flex
+        xs12
+        :md6="deviceGroups.length > 1"
+        v-for="deviceGroup in deviceGroups"
+        :key="deviceGroup.name"
+      >
+        <v-card raised class="header-card">
+          <v-card-title
+            class="red-gradient subtitle-1 text--white font-weight-light"
+            >{{ deviceGroup.name }}</v-card-title
+          >
+          <DeviceTable
+            :hideType="deviceGroup.hideType"
+            :deviceGroup="deviceGroup"
+            :getOwnerColumn="getOwnerColumn"
+            :getOwnerLink="getOwnerLink"
+            v-bind="deviceGroup.tableProps"
+          >
+            <template
+              v-slot:extra-column-0="device"
+              v-if="deviceGroup.extraColumn0"
+            >
+              <component
+                :is="deviceGroup.extraColumn0"
+                v-bind="device"
+              ></component>
+            </template>
+            <template
+              v-slot:extra-column-1="device"
+              v-if="deviceGroup.extraColumn1"
+            >
+              <component
+                :is="deviceGroup.extraColumn1"
+                v-bind="device"
+              ></component>
+            </template>
+          </DeviceTable>
+        </v-card>
       </v-flex>
       <component v-if="footer" :is="footer" />
     </v-layout>
