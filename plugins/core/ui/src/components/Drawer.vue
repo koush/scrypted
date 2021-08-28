@@ -95,13 +95,13 @@ export default {
       actives: {},
       // components: [],
       builtinComponents: [
-        // {
-        //   id: "dashboard",
-        //   name: "Dashboard",
-        //   icon: "fa-sliders-h",
-        //   path: "/",
-        //   active: false
-        // },
+        {
+          id: "dashboard",
+          name: "Dashboard",
+          icon: "fa-tachometer-alt",
+          path: "/",
+          active: false
+        },
         {
           id: "devices",
           name: "Devices",

@@ -1,24 +1,31 @@
 <template>
   <v-list-item ripple :to="getDeviceViewPath(deviceId)">
     <v-list-item-icon>
-      <font-awesome-icon
+      <v-icon
+        x-small
         class="mt-1"
         size="sm"
-        :icon="locked ? 'lock' : 'lock-open'"
         :color="locked ? '#a9afbb' : 'orange'"
-      />
+        >{{ locked ? "fa-lock" : "fa-lock-open" }}</v-icon
+      >
     </v-list-item-icon>
     <v-list-item-content>
-      <v-list-item-title class="font-weight-light">{{ name || device.name }}</v-list-item-title>
+      <v-list-item-title class="font-weight-light">{{
+        name || device.name
+      }}</v-list-item-title>
     </v-list-item-content>
     <v-list-item-action>
-      <v-btn icon x-small @click.prevent="locked = false">
-        <v-icon :color="device.lockState === 'Locked' ? undefined : 'orange'">lock_open</v-icon>
+      <v-btn icon small @click.prevent="locked = false">
+        <v-icon small :color="device.lockState === 'Locked' ? undefined : 'orange'"
+          >lock_open</v-icon
+        >
       </v-btn>
     </v-list-item-action>
     <v-list-item-action>
-      <v-btn icon x-small @click.prevent="locked = true">
-        <v-icon :color="device.lockState === 'Locked' ? 'green' : undefined">lock</v-icon>
+      <v-btn icon small @click.prevent="locked = true">
+        <v-icon small :color="device.lockState === 'Locked' ? 'green' : undefined"
+          >lock</v-icon
+        >
       </v-btn>
     </v-list-item-action>
   </v-list-item>
@@ -33,7 +40,7 @@ export default {
   mixins: [DashboardBase],
   props: ["name", "deviceId"],
   methods: {
-    getDeviceViewPath
+    getDeviceViewPath,
   },
   computed: {
     locked: {
@@ -49,8 +56,8 @@ export default {
         } else {
           device.unlock();
         }
-      }
-    }
-  }
+      },
+    },
+  },
 };
 </script>

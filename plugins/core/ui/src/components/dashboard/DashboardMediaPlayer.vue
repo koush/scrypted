@@ -14,29 +14,29 @@
     <v-list-item ripple :to="getDeviceViewPath(deviceId)">
       <v-list-item-icon>
         <v-icon
-          small
+          x-small
           :color="device.paused ? 'blue' : device.running ? 'green' : '#a9afbb'"
-        >{{ device.paused ? 'pause-circle' : device.running ? 'play-circle' : 'volume-off' }}</v-icon>
+        >{{ typeToIcon(device.type) }}</v-icon>
       </v-list-item-icon>
       <v-list-item-content>
         <v-list-item-title class="font-weight-light">{{ name || device.name }}</v-list-item-title>
       </v-list-item-content>
       <v-list-item-action class="mx-0 mt-0 mb-0">
         <span v-if="device.running">
-          <v-btn icon x-small @click.prevent="device.skipPrevious()">
+          <v-btn icon small @click.prevent="device.skipPrevious()">
             <v-icon color="#a9afbb">skip_previous</v-icon>
           </v-btn>
-          <v-btn icon x-small @click.prevent="device.paused ? device.start() : device.pause()">
+          <v-btn icon small @click.prevent="device.paused ? device.start() : device.pause()">
             <v-icon color="blue">{{ device.paused ? 'play_arrow' : 'pause' }}</v-icon>
           </v-btn>
-          <v-btn icon x-small @click.prevent="device.stop()">
+          <v-btn icon small @click.prevent="device.stop()">
             <v-icon color="red">stop</v-icon>
           </v-btn>
-          <v-btn icon x-small @click.prevent="device.skipNext()">
+          <v-btn icon small @click.prevent="device.skipNext()">
             <v-icon color="#a9afbb">skip_next</v-icon>
           </v-btn>
         </span>
-        <v-btn v-else icon x-small @click.prevent="device.stop()">
+        <v-btn v-else icon small @click.prevent="device.stop()">
           <v-icon color="#a9afbb">stop</v-icon>
         </v-btn>
       </v-list-item-action>
@@ -47,7 +47,7 @@
 import DashboardBase from "./DashboardBase";
 import { ScryptedInterface } from "@scrypted/sdk/types";
 import colors from "vuetify/es5/util/colors";
-import { getDeviceViewPath } from "../helpers";
+import { getDeviceViewPath, typeToIcon } from "../helpers";
 
 export default {
   name: "DashboardMediaPlayer",
@@ -86,7 +86,8 @@ export default {
     this.$once("destroyed", () => clearInterval(this.ticker));
   },
   methods: {
-    getDeviceViewPath
+    getDeviceViewPath,
+    typeToIcon,
   },
   computed: {
     albumArt() {

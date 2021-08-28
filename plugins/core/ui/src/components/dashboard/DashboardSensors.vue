@@ -1,7 +1,9 @@
 <template>
   <v-card-text class="text-md-center font-weight-light body-2 less-padding white--text">
     <span v-if="temperature !== undefined">
-      <font-awesome-icon size="sm" icon="thermometer-three-quarters" color="white" />
+      <v-icon x-small color="white">
+        thermometer-three-quarters
+      </v-icon>
       {{ temperature }}°
     </span>
     <span v-if="humidity !== undefined">

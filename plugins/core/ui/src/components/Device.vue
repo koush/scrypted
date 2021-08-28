@@ -13,19 +13,18 @@
                 xs12
                 md6
                 lg6
+                outlined
+                text
                 color="primary"
-                dark
                 icon="mdi-vuetify"
                 border="left"
-                prominent
               >
                 <template v-slot:prepend>
-                  <font-awesome-icon
+                  <v-icon
                     class="white--text mr-3"
                     size="sm"
-                    :icon="getAlertIcon(alert)"
                     color="#a9afbb"
-                  />
+                  >{{ getAlertIcon(alert) }}</v-icon>
                 </template>
                 <div class="caption">{{ alert.title }}</div>
                 <div
@@ -36,7 +35,7 @@
               </v-alert>
             </div>
 
-            <v-card raised class="header-card">
+            <v-card raised >
               <v-card-title
                 class="orange-gradient subtitle-1 font-weight-light"
               >
@@ -167,7 +166,7 @@
 
         <v-flex xs12 v-if="!ownerDevice && pluginData">
           <v-flex>
-            <v-card raised class="header-card">
+            <v-card raised >
               <v-card-title
                 class="green-gradient subtitle-1 text--white font-weight-light"
               >
@@ -219,7 +218,7 @@
 
         <v-flex xs12 v-if="ownerDevice && pluginData">
           <v-flex>
-            <v-card raised class="header-card">
+            <v-card raised >
               <v-card-title
                 class="green-gradient subtitle-1 text--white font-weight-light"
               >
@@ -246,7 +245,7 @@
 
         <v-flex xs12 v-if="availableMixins.length">
           <v-flex>
-            <v-card raised class="header-card">
+            <v-card raised >
               <v-card-title
                 class="green-gradient subtitle-1 text--white font-weight-light"
               >
@@ -284,7 +283,7 @@
 
         <v-flex xs12 v-if="showStorage">
           <v-flex>
-            <v-card raised class="header-card">
+            <v-card raised >
               <v-card-title
                 class="green-gradient subtitle-1 text--white font-weight-light"
                 >Storage</v-card-title
@@ -309,7 +308,7 @@
           <v-flex>
             <v-card
               raised
-              class="header-card"
+              
               v-for="iface in cardUnderInterfaces"
               :key="iface"
             >

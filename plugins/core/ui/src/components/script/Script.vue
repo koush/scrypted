@@ -3,7 +3,7 @@
     <v-card
       v-if="managedDevices.devices.length"
       raised
-      class="header-card"
+      
       style="margin-bottom: 60px"
     >
       <v-card-title
@@ -15,7 +15,7 @@
       <DeviceGroup :deviceGroup="managedDevices"></DeviceGroup>
     </v-card>
 
-    <v-card raised class="header-card">
+    <v-card raised >
       <v-card-title
         class="red-gradient subtitle-1 text--white  font-weight-light"
       >{{ script.npmPackage ? "Plugin Management" : "Edit Script" }}</v-card-title>
@@ -171,7 +171,7 @@
       </v-card-actions>
     </v-card>
 
-    <v-card raised class="header-card" v-if="showStorage" style="margin-top: 60px">
+    <v-card raised  v-if="showStorage" style="margin-top: 60px">
       <v-card-title
         class="green-gradient subtitle-1 text--white  font-weight-light"
       >Script Storage</v-card-title>

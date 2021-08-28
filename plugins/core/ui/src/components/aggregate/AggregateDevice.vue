@@ -1,6 +1,6 @@
 <template>
   <v-flex>
-    <v-card raised class="header-card" style="margin-bottom: 60px">
+    <v-card raised  style="margin-bottom: 60px">
       <v-card-title
         class="green-gradient subtitle-1 text--white font-weight-light"
       >

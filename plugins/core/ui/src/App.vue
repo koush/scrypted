@@ -46,7 +46,7 @@
             @click="doAlert(alert)"
           >
             <v-list-item-icon>
-              <font-awesome-icon size="sm" :icon="getAlertIcon(alert)" style="color: #a9afbb;" />
+              <v-icon x-small style="color: #a9afbb;">{{ getAlertIcon(alert) }}</v-icon>
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title class="caption">{{ alert.title }}</v-list-item-title>
@@ -62,7 +62,7 @@
           </v-list-item>
           <v-list-item v-else class="font-weight-light" @click="clearAlerts">
             <v-list-item-icon>
-              <font-awesome-icon size="sm" icon="trash" style="color: #a9afbb;" />
+              <v-icon x-small style="color: #a9afbb;">fa-trash</v-icon>
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title class="caption">Clear All Alerts</v-list-item-title>
@@ -87,7 +87,7 @@
             @click="menuItem.click"
           >
             <v-list-item-icon v-if="menuItem.icon">
-              <font-awesome-icon size="sm" :icon="menuItem.icon" style="color: #a9afbb;" />
+              <v-icon x-small style="color: #a9afbb;">{{ menuItem.icon }}</v-icon>
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title class="caption">{{ menuItem.title }}</v-list-item-title>

@@ -1,10 +1,14 @@
 <template>
   <v-list-item ripple @click="showDevices()">
     <v-list-item-icon>
-      <v-icon small :color="on ? 'orange' : '#a9afbb'">{{ typeToIcon(type) }}</v-icon>
+      <v-icon x-small :color="on ? 'orange' : '#a9afbb'">{{
+        typeToIcon(type)
+      }}</v-icon>
     </v-list-item-icon>
     <v-list-item-content>
-      <v-list-item-title class="font-weight-light">{{ name }}</v-list-item-title>
+      <v-list-item-title class="font-weight-light">{{
+        name
+      }}</v-list-item-title>
     </v-list-item-content>
 
     <v-list-item-action>
@@ -15,12 +19,9 @@
       <v-container fluid>
         <v-card v-click-outside="maybeHideDialog" dark color="purple" raised>
           <v-card-title>
-            <font-awesome-icon
-              size="sm"
-              :icon="typeToIcon(type)"
-              color="white"
-              style="margin-right: 20px"
-            />
+            <v-icon x-small color="white" style="margin-right: 20px">
+              {{ typeToIcon(type) }}
+            </v-icon>
             <span class="title font-weight-light">{{ name }}</span>
           </v-card-title>
 
@@ -70,15 +71,15 @@ export default {
   mixins: [DashboardBase],
   components: {
     VueSlider,
-    DashboardPopupToggle
+    DashboardPopupToggle,
   },
   directives: {
-    ClickOutside
+    ClickOutside,
   },
   data() {
     return {
       showLightsDialog: false,
-      watchClickOutside: false
+      watchClickOutside: false,
     };
   },
   methods: {
@@ -97,19 +98,19 @@ export default {
         this.watchClickOutside = true;
       }, 300);
     },
-    debounceSetBrightness: throttle(function(self) {
+    debounceSetBrightness: throttle(function (self) {
       self.deviceIds
-        .map(id => self.getDevice(id))
-        .filter(device =>
+        .map((id) => self.getDevice(id))
+        .filter((device) =>
           device.interfaces.includes(ScryptedInterface.Brightness)
         )
-        .forEach(device => device.setBrightness(self._debouncedBrightness));
-    }, 500)
+        .forEach((device) => device.setBrightness(self._debouncedBrightness));
+    }, 500),
   },
   computed: {
     brightness: {
       get() {
-        const brightnessDevices = this.devices.filter(device =>
+        const brightnessDevices = this.devices.filter((device) =>
           device.interfaces.includes(ScryptedInterface.Brightness)
         );
         if (!brightnessDevices.length) {
@@ -124,17 +125,19 @@ export default {
       set(value) {
         this._debouncedBrightness = value;
         this.debounceSetBrightness(this);
-      }
+      },
     },
     on: {
       get() {
         return this.devices.reduce((on, device) => on || device.on, false);
       },
       set(value) {
-        this.devices.forEach(device => device[value ? "turnOn" : "turnOff"]());
-      }
-    }
-  }
+        this.devices.forEach((device) =>
+          device[value ? "turnOn" : "turnOff"]()
+        );
+      },
+    },
+  },
 };
 </script>
 <style>

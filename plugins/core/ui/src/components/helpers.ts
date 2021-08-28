@@ -2,30 +2,30 @@ import { ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk/types";
 
 export function typeToIcon(type) {
     switch (type) {
-        case ScryptedDeviceType.Camera: return "video";
-        case ScryptedDeviceType.Doorbell: return "bell";
-        case ScryptedDeviceType.Fan: return "angle-double-right";
-        case ScryptedDeviceType.Light: return "lightbulb";
-        case ScryptedDeviceType.Switch: return "toggle-on";
-        case ScryptedDeviceType.Outlet: return "plug";
-        case ScryptedDeviceType.Sensor: return "exclamation-triangle";
-        case ScryptedDeviceType.Scene: return "sun";
-        case ScryptedDeviceType.Program: return "code";
-        case ScryptedDeviceType.Automation: return "bolt";
-        case ScryptedDeviceType.Event: return "exclamation";
-        case ScryptedDeviceType.Vacuum: return "trash";
-        case ScryptedDeviceType.Notifier: return "bell";
-        case ScryptedDeviceType.Lock: return "unlock-alt";
-        case ScryptedDeviceType.Thermostat: return "thermometer-three-quarters";
-        case ScryptedDeviceType.PasswordControl: return "key";
-        case ScryptedDeviceType.Display: return "tv";
-        case ScryptedDeviceType.Speaker: return "volume-up";
-        case ScryptedDeviceType.Entry: return "warehouse";
-        case ScryptedDeviceType.Garage: return "warehouse";
-        case ScryptedDeviceType.API: return "cloud";
-        case ScryptedDeviceType.DataSource: return "chart-area";
-        case ScryptedDeviceType.DeviceProvider: return "server";
-        case ScryptedDeviceType.Unknown: return "question-circle";
+        case ScryptedDeviceType.Camera: return "fa-video";
+        case ScryptedDeviceType.Doorbell: return "fa-bell";
+        case ScryptedDeviceType.Fan: return "fa-fan";
+        case ScryptedDeviceType.Light: return "fa-lightbulb";
+        case ScryptedDeviceType.Switch: return "fa-toggle-on";
+        case ScryptedDeviceType.Outlet: return "fa-plug";
+        case ScryptedDeviceType.Sensor: return "fa-exclamation-triangle";
+        case ScryptedDeviceType.Scene: return "fa-sun";
+        case ScryptedDeviceType.Program: return "fa-code";
+        case ScryptedDeviceType.Automation: return "fa-bolt";
+        case ScryptedDeviceType.Event: return "fa-exclamation";
+        case ScryptedDeviceType.Vacuum: return "fa-trash";
+        case ScryptedDeviceType.Notifier: return "fa-bell";
+        case ScryptedDeviceType.Lock: return "fa-unlock-alt";
+        case ScryptedDeviceType.Thermostat: return "fa-thermometer-three-quarters";
+        case ScryptedDeviceType.PasswordControl: return "fa-key";
+        case ScryptedDeviceType.Display: return "fa-tv";
+        case ScryptedDeviceType.Speaker: return "fa-volume-up";
+        case ScryptedDeviceType.Entry: return "fa-warehouse";
+        case ScryptedDeviceType.Garage: return "fa-warehouse";
+        case ScryptedDeviceType.API: return "fa-cloud";
+        case ScryptedDeviceType.DataSource: return "fa-chart-area";
+        case ScryptedDeviceType.DeviceProvider: return "fa-server";
+        case ScryptedDeviceType.Unknown: return "fa-question-circle";
 
     }
     return "toggle-on";
@@ -71,10 +71,10 @@ export function getAlertIcon(alert) {
         const id = alert.path.replace(device, '');
         const d = this.$scrypted.systemManager.getDeviceById(id);
         if (!d)
-            return 'question';
+            return 'fa-question';
         return typeToIcon(d.type);
     }
-    return 'bell';
+    return 'fa-bell';
 }
 
 export function hasFixedPhysicalLocation(type: ScryptedDeviceType, interfaces?: ScryptedInterface[]): boolean {

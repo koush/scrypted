@@ -1,6 +1,6 @@
 <template>
   <v-flex>
-    <v-card raised class="header-card" style="margin-bottom: 60px">
+    <v-card raised  style="margin-bottom: 60px">
       <v-card-title class="green-gradient subtitle-1 text--white font-weight-light">
         <font-awesome-icon size="sm" icon="database" />
         <span class="title font-weight-light">&nbsp;&nbsp;Managed Device</span>
@@ -17,7 +17,7 @@
       </v-card-actions>
     </v-card>
 
-    <v-card v-if="showStorage" raised class="header-card" style="margin-bottom: 60px">
+    <v-card v-if="showStorage" raised  style="margin-bottom: 60px">
       <v-card-title class="green-gradient subtitle-1 text--white font-weight-light">Script Storage</v-card-title>
       <v-flex>
         <Storage v-model="device.configuration" @input="onChange"></Storage>

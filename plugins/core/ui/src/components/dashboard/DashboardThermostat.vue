@@ -1,7 +1,7 @@
 <template>
   <v-list-item ripple :to="getDeviceViewPath(deviceId)">
     <v-list-item-icon>
-      <v-icon small :color="color">{{ icon }}</v-icon>
+      <v-icon x-small :color="color">{{ icon }}</v-icon>
     </v-list-item-icon>
     <v-list-item-content>
       <v-list-item-title class="font-weight-light">{{ name || device.name }}</v-list-item-title>
@@ -30,13 +30,13 @@ export default {
     icon() {
       switch (this.device.thermostatMode) {
         case ThermostatMode.Heat:
-          return "fire-alt";
+          return "fa-fire-alt";
         case ThermostatMode.Cool:
-          return "snowflake";
+          return "fa-snowflake";
         case ThermostatMode.Eco:
-          return "leaf";
+          return "fa-leaf";
       }
-      return "thermometer-three-quarters";
+      return "fa-thermometer-three-quarters";
     },
     color() {
       if (this.device.thermostatMode === ThermostatMode.Off) {

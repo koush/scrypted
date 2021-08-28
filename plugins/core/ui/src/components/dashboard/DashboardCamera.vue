@@ -42,7 +42,7 @@ export default {
     return {
       pc: null,
       video: false,
-      src: undefined,
+      src: 'images/cameraloading.jpg',
       overlay: false,
       dialog: false,
     };

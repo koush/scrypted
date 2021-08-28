@@ -70,6 +70,7 @@ import {
   faTv,
   faVolumeUp,
   faQuestionCircle,
+  faFan,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -145,7 +146,9 @@ const icons =[
   faKey,
   faTv,
   faVolumeUp,
-  faQuestionCircle];
+  faQuestionCircle,
+  faFan,
+];
 
 for (var icon in icons) {
   library.add(icons[icon])

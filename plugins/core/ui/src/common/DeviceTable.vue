@@ -13,7 +13,7 @@
     <tbody v-if="deviceGroup.devices.length">
       <tr v-for="device in deviceGroup.devices" :key="device.id">
         <td>
-          <font-awesome-icon size="sm" :icon="typeToIcon(device.type)" color="#a9afbb" />
+          <v-icon x-small color="#a9afbb">{{ typeToIcon(device.type) }}</v-icon>
         </td>
         <td class="body-2 font-weight-light">
           <a link :href="'#' + getDeviceViewPath(device.id)">{{ device.name }}</a>

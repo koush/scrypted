@@ -20,7 +20,9 @@
           :search="search"
         >
           <template v-slot:[`item.icon`]="{ item }">
-            <font-awesome-icon size="sm" :icon="typeToIcon(item.type)" :color="colors.blue.base" />
+            <v-icon x-small :color="colors.blue.base">
+              {{ typeToIcon(item.type) }}
+            </v-icon>
           </template>
           <template v-slot:[`item.name`]="{ item }">
             <a link :href="'#' + getDeviceViewPath(item.id)">{{ item.name }}</a>

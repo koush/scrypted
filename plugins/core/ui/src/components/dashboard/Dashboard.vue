@@ -53,7 +53,7 @@
       <div v-if="!cardColumns"></div>
       <v-flex v-else-if="isEmpty" xs12 md6 lg4>
         <v-flex>
-          <v-card raised class="header-card">
+          <v-card raised >
             <v-card-title
               class="red-gradient subtitle-1 text--white font-weight-light"
             >No Devices Found</v-card-title>
@@ -77,7 +77,7 @@
         :key="index"
       >
         <v-flex v-for="(card, cardIndex) in cardColumn" :key="cardIndex">
-          <v-card raised class="header-card" v-if="!card.state.hidden || editCardMode">
+          <v-card raised  v-if="!card.state.hidden || editCardMode">
             <v-card-title :class="card.color" class="subtitle-1 font-weight-light">
               <v-text-field
                 hide-details
@@ -209,7 +209,7 @@ import DashboardSensors from "./DashboardSensors.vue";
 import DashboardMediaPlayer from "./DashboardMediaPlayer.vue";
 import DashboardBase from "./DashboardBase";
 import DashboardAddComponent from "./DashboardAddComponent.vue";
-import "../header-card.css";
+// import "../header-card.css";
 import Vue from "vue";
 import Settings from "../../interfaces/Settings.vue";
 import cloneDeep from "lodash/cloneDeep";
@@ -287,7 +287,7 @@ export default {
     var menu: Menu[] = [
       {
         title: "Edit Layout",
-        icon: "edit",
+        icon: "fa-edit",
         click: () => {
           this.editMode = true;
           this.editCards = true;
@@ -295,14 +295,14 @@ export default {
       },
       {
         title: "Save Layout",
-        icon: "save",
+        icon: "fa-save",
         click: () => {
           this.saveLayout();
         }
       },
       {
         title: "Auto Layout",
-        icon: "magic",
+        icon: "fa-bell",
         click: async () => {
           await this.getCardLayout(true);
         }

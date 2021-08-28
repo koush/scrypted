@@ -7,7 +7,7 @@
         xs12
         :md6="deviceGroups.length > 1"
       >
-        <v-card v-if="!card.hide" raised class="header-card">
+        <v-card v-if="!card.hide" raised >
           <v-card-title
             class="orange-gradient subtitle-1 text--white font-weight-light"
             >{{ card.title }}</v-card-title
@@ -39,7 +39,7 @@
         v-for="deviceGroup in deviceGroups"
         :key="deviceGroup.name"
       >
-        <v-card raised class="header-card">
+        <v-card raised >
           <v-card-title
             class="red-gradient subtitle-1 text--white font-weight-light"
             >{{ deviceGroup.name }}</v-card-title

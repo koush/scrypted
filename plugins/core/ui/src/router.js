@@ -8,6 +8,7 @@ import ScriptComponent from "./components/script/ScriptComponent.vue";
 import InstallPlugin from "./components/script/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";
 import SettingsComponent from "./components/builtin/SettingsComponent.vue";
+import Dashboard from "./components/dashboard/Dashboard.vue";
 
 let router = new VueRouter({
     routes: [
@@ -15,14 +16,14 @@ let router = new VueRouter({
         path: "/device",
         component: Devices
       },
-      {
-        path: "/",
-        component: Devices
-      },
       // {
       //   path: "/",
-      //   component: Dashboard
+      //   component: Devices
       // },
+      {
+        path: "/",
+        component: Dashboard
+      },
       {
         path: "/component/automation",
         component: AutomationComponent
