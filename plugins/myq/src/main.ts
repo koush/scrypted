@@ -1,152 +1,116 @@
 // webpack polyfill 'usage' does not seem to work on modules.
 // include directly.
-import MyQ from 'myq-api';
-import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff } from '@scrypted/sdk';
+import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting } from '@scrypted/sdk';
 const { log } = sdk;
+import { myQApi, myQDevice } from './myq/src';
+import throttle from 'lodash/throttle';
 
-const {deviceManager} = sdk;
-const username = localStorage.getItem('username');
-const password = localStorage.getItem('password');
+const { deviceManager } = sdk;
 
-function alertAndThrow(msg) {
-  log.a(msg);
-  throw new Error(msg);
-}
-
-if (!username) {
-  alertAndThrow('The "username" Script Setting values is missing.');
-}
-
-if (!password) {
-  alertAndThrow('The "password" Script Setting values is missing.');
-}
-
-class GarageController extends ScryptedDeviceBase implements DeviceProvider {
-  devices: object = {};
-  account: MyQ;
+class GarageController extends ScryptedDeviceBase implements DeviceProvider, Settings {
+  devices = new Map<string, GarageDoor>();
+  account: myQApi;
   loginTokenTime: number;
+  start: Promise<void>;
+  throttleRefresh = throttle(async () => {
+    await this.discoverDevices(0);
+    await this.updateStates();
+  }, 60000, {
+    leading: true,
+  });
 
   constructor() {
     super();
-    this.ensureLogin()
-    .then(() => {
-      var devices = [];
-      var payload = {
-          devices,
-      };
-      return this.account.getDevices([3, 7, 17])
-      .then((result) => {
-        if (!result) {
-          log.e('Unable to query MyQ service. Are your "username" and "password" correct?');
-          return;
-        }
-  
-        log.i(`device query: ${JSON.stringify(result)}`);
-        if (!result) {
-          log.e('Unable to query MyQ service. Are your "username" and "password" correct?');
-          return;
-        }
-        result = result.devices;
-        for (var r of result) {
-          if (r.state.door_state) {
-            var info: Device = {
-              name: r.name,
-              nativeId: r.serial_number,
-              interfaces: ['Entry', 'Refresh'],
-              type: ScryptedDeviceType.Entry,
-            }
-            this.devices[info.nativeId] = new GarageDoor(this, info);
-          }
-          else {
-            continue;
-          }
-  
-          devices.push(info);
-        }
-  
-        deviceManager.onDevicesChanged(payload);
-      });
-    });
+    this.start = this.discoverDevices(0);
+    this.start.then(() => this.updateStates());
   }
 
-  ensureLogin() {
-    // 30 minute token it seems
-    if (this.account && this.loginTokenTime > Date.now() - 29 * 60 * 1000) {
-      return Promise.resolve(this.account);
-    }
-  
-    var account = new MyQ();
-    
-    return account.login(username, password)
-    .then((result) => {
-      if (result.code !== 'OK') {
-        throw new Error(JSON.stringify(result));
+  async getSettings(): Promise<Setting[]> {
+    return [
+      {
+        title: 'Email',
+        value: localStorage.getItem('email'),
+      },
+      {
+        title: 'Password',
+        value: localStorage.getItem('password'),
       }
-      log.i(`login result: ${JSON.stringify(result)}`);
-      this.account = account;
-      this.loginTokenTime = Date.now();
-  
-      return this.account;
-    })
-    .catch((err) => {
-      log.e('Error logging in. Are the "username" and/or "password" script configuration values correct?\n' + err);
-      throw err;
-    });
+    ];
+  }
+  async putSetting(key: string, value: string | number | boolean) {
+    localStorage.setItem(key, value.toString());
   }
 
-  getDevice(nativeId) {
+  async getDevice(nativeId: string) {
+    await this.start;
+    if (!this.devices[nativeId])
+      this.devices[nativeId] = new GarageDoor(this, this.account.devices.find(d => d.serial_number === nativeId)!);
     return this.devices[nativeId];
   }
-  discoverDevices(duration: number): void {
-    throw new Error("Method not implemented.");
+  async discoverDevices(duration: number) {
+    if (this.account) {
+      return;
+    }
+
+    const email = localStorage.getItem('email');
+    const password = localStorage.getItem('password');
+    if (!email || !password) {
+      throw new Error('Not logged in.');
+    }
+
+    this.account = new myQApi(console.log.bind(console), console, email, password);
+    await this.account.refreshDevices();
+    
+    const devices: Device[] = [];
+    for (const device of this.account.devices) {
+      if (device.device_type !== 'wifigaragedooropener')
+        continue;
+
+      devices.push({
+        name: device.name,
+        nativeId: device.serial_number,
+        interfaces: ['Entry', 'Refresh'],
+        type: ScryptedDeviceType.Entry,
+      });
+    }
+
+    await deviceManager.onDevicesChanged({
+      devices,
+    });
+  }
+
+  async updateStates() {
+    for (const device of this.account.devices) {
+      if (device.device_type !== 'wifigaragedooropener')
+        continue;
+
+      const d = await this.getDevice(device.serial_number) as GarageDoor;
+      d.entryOpen = device.state.door_state !== 'closed';
+    }
   }
 }
 
 class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh {
   controller: GarageController;
-  info: Device;
 
-  constructor(controller, info: Device) {
-    super(info.nativeId)
+  constructor(controller: GarageController, public device: myQDevice) {
+    super(device.serial_number)
     this.controller = controller;
-    this.info = info;
     this.refresh();
   }
 
-  doorStateCommand(state) {
-    this.controller.ensureLogin()
-    .then(() => this.controller.account.setDoorState(this.info.nativeId, state))
-    .then((result) => {
-      log.i(JSON.stringify(result));
-    })
-    .catch((err) => {
-      log.e('garage door command failed: ' + err);
-    })
-    .then(() => this.refresh());
-
-    setTimeout(() => this.refresh(), 60000);
+  async closeEntry() {
+    this.controller.account.execute(this.device, 'close');
   }
-  
-  closeEntry(): void {
-    this.doorStateCommand(MyQ.actions.door.CLOSE);
-  }
-  openEntry(): void {
-    this.doorStateCommand(MyQ.actions.door.OPEN);
+  async openEntry() {
+    this.controller.account.execute(this.device, 'open');
   }
   async getRefreshFrequency() {
     return 60;
   }
-  refresh() {
-    this.controller.ensureLogin()
-    .then(() => this.controller.account.getDoorState(this.info.nativeId))
-    .then((result) => {
-      log.i(`Refresh: ${JSON.stringify(result)}`);
-      this.entryOpen = result.deviceState !== 'closed';
-    })
-    .catch((err) => {
-      log.e(`error getting door state: ${err}`);
-    });
-  }  
+  async refresh() {
+    this.controller.throttleRefresh();
+  }
 }
 
 class GarageLight extends ScryptedDeviceBase implements OnOff, Refresh {
@@ -160,37 +124,13 @@ class GarageLight extends ScryptedDeviceBase implements OnOff, Refresh {
     this.refresh();
   }
 
-  lightStateCommand(state) {
-    this.controller.ensureLogin()
-    .then(() => this.controller.account.setLightState(this.info.nativeId, state))
-    .then((result) => {
-      log.i(JSON.stringify(result));
-    })
-    .catch((err) => {
-      log.e('light command failed: ' + err);
-    })
-    .then(() => this.refresh());
-
-    setTimeout(() => this.refresh(), 60000);
+  async turnOn() {
+    // this.lightStateCommand(1);
   }
-  turnOn() {
-    this.lightStateCommand(1);
+  async turnOff() {
+    // this.lightStateCommand(0);
   }
-  turnOff() {
-    this.lightStateCommand(0);
-  }
-  refresh() {
-    this.controller.ensureLogin()
-    .then(() => this.controller.account.getLightState(this.info.nativeId))
-    .then((result) => {
-      log.i(`Refresh: ${JSON.stringify(result)}`);
-      if (result.lightState !== undefined) {
-        this.on = result.lightState !== 0;
-      }
-    })
-    .catch((err) => {
-      log.e(`error getting light state: ${err}`);
-    });
+  async refresh() {
   };
   async getRefreshFrequency() {
     return 60;

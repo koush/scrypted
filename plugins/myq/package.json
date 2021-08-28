@@ -29,10 +29,15 @@
       ]
    },
    "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk"
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/node-fetch": "^2.5.12"
    },
    "dependencies": {
       "axios": "^0.19.2",
-      "myq-api": "^2.0.2"
+      "lodash": "^4.17.21",
+      "myq": "file:/",
+      "node-fetch": "^3.0.0-beta.10",
+      "node-html-parser": "^4.1.3",
+      "pkce-challenge": "^2.2.0"
    }
 }
