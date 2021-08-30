@@ -76,7 +76,7 @@
         v-for="(cardColumn, index) in cardColumns"
         :key="index"
       >
-        <v-flex v-for="(card, cardIndex) in cardColumn" :key="cardIndex">
+        <div v-for="(card, cardIndex) in cardColumn" :key="cardIndex" class="pb-4">
           <v-card raised  v-if="!card.state.hidden || editCardMode">
             <v-card-title :class="card.color" class="subtitle-1 font-weight-light">
               <v-text-field
@@ -193,7 +193,7 @@
               @input="addCardComponent(index, cardIndex, $event)"
             ></DashboardAddComponent>
           </v-card>
-        </v-flex>
+        </div>
       </v-flex>
     </v-layout>
   </div>
