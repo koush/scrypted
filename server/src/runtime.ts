@@ -541,16 +541,22 @@ export class ScryptedRuntime {
             setState(pluginDevice, ScryptedInterfaceProperty.room, getProvidedRoomOrDefault(pluginDevice));
         // pluginDevice.state.model = device.model;
 
-        const ret = this.datastore.upsert(pluginDevice);
-
-        // the descriptor events should happen after everything is set, as it's an atomic operation.
-        this.stateManager.updateDescriptor(pluginDevice);
-        this.stateManager.notifyInterfaceEvent(pluginDevice, ScryptedInterface.ScryptedDevice, undefined);
+        const ret = this.notifyPluginDeviceDescriptorChanged(pluginDevice);
 
         if (newDevice) {
             const logger = this.getDeviceLogger(pluginDevice);
             logger.log('a', 'New Device Added.');
         }
+
+        return ret;
+    }
+
+    notifyPluginDeviceDescriptorChanged(pluginDevice: PluginDevice) {
+        const ret = this.datastore.upsert(pluginDevice);
+
+        // the descriptor events should happen after everything is set, as it's an atomic operation.
+        this.stateManager.updateDescriptor(pluginDevice);
+        this.stateManager.notifyInterfaceEvent(pluginDevice, ScryptedInterface.ScryptedDevice, undefined);
 
         return ret;
     }
