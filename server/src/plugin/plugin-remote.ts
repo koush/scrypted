@@ -7,13 +7,16 @@ import { PluginAPI, PluginLogger, PluginRemote } from './plugin-api';
 import { SystemManagerImpl } from './system';
 import { RpcPeer } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
+import { Console } from 'console';
+import { EventEmitter, PassThrough } from 'stream';
+import { Writable } from 'node:stream';
 
 class DeviceLogger implements Logger {
     nativeId: string;
     api: PluginAPI;
     logger: Promise<PluginLogger>;
 
-    constructor(api: PluginAPI, nativeId: string) {
+    constructor(api: PluginAPI, nativeId: string, public console: any) {
         this.api = api;
         this.nativeId = nativeId;
     }
@@ -25,7 +28,7 @@ class DeviceLogger implements Logger {
     }
 
     async log(level: string, message: string) {
-        console.log(message);
+        this.console.log(message);
         (await this.ensureLogger()).log(level, message);
     }
 
@@ -135,12 +138,12 @@ class DeviceManagerImpl implements DeviceManager {
     nativeIds = new Map<string, DeviceManagerDevice>();
     systemManager: SystemManagerImpl;
 
-    constructor(systemManager: SystemManagerImpl) {
+    constructor(systemManager: SystemManagerImpl, public events?: EventEmitter, public getDeviceConsole?: (nativeId?: string) => Console) {
         this.systemManager = systemManager;
     }
 
     getDeviceLogger(nativeId?: string): Logger {
-        return new DeviceLogger(this.api, nativeId);
+        return new DeviceLogger(this.api, nativeId, this.getDeviceConsole?.(nativeId) || console);
     }
 
     getDeviceState(nativeId?: any): DeviceState {
@@ -169,27 +172,6 @@ class DeviceManagerImpl implements DeviceManager {
     }
     async onDevicesChanged(devices: DeviceManifest) {
         return this.api.onDevicesChanged(devices);
-    }
-}
-
-
-class PushManagerImpl implements PushManager {
-    getSubscription(): Promise<PushSubscription> {
-        throw new Error('Method not implemented.');
-    }
-    permissionState(options?: PushSubscriptionOptionsInit): Promise<PushPermissionState> {
-        throw new Error('Method not implemented.');
-    }
-    subscribe(options?: PushSubscriptionOptionsInit): Promise<PushSubscription> {
-        throw new Error('Method not implemented.');
-    }
-
-    getRegistrationId(): string {
-        return 'no-registration-id-fix-this';
-    }
-
-    getSenderId(): string {
-        return 'no-sender-id-fix-this';
     }
 }
 
@@ -297,19 +279,25 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
     return ret;
 }
 
-export async function attachPluginRemote(peer: RpcPeer, createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>): Promise<ScryptedStatic> {
+export interface PluginRemoteAttachOptions {
+    createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
+    getServicePort?: (name: string) => Promise<number>;
+    getDeviceConsole?: (nativeId?: string) => Console;
+    events?: EventEmitter;
+}
+
+export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
+    const { createMediaManager, getServicePort, events, getDeviceConsole } = options || {};
+
     peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
 
-    let done: any;
-    const retPromise = new Promise<ScryptedStatic>((resolve, reject) => {
-        done = resolve;
-    });
+    let done: (scrypted: ScryptedStatic) => void;
+    const retPromise = new Promise<ScryptedStatic>(resolve => done = resolve);
 
     peer.params.getRemote = async (api: PluginAPI, pluginId: string) => {
         const systemManager = new SystemManagerImpl();
-        const deviceManager = new DeviceManagerImpl(systemManager);
+        const deviceManager = new DeviceManagerImpl(systemManager, events, getDeviceConsole);
         const endpointManager = new EndpointManagerImpl();
-        const pushManager = new PushManagerImpl();
         const ioSockets: { [id: string]: WebSocketCallbacks } = {};
         const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager);
 
@@ -336,6 +324,7 @@ export async function attachPluginRemote(peer: RpcPeer, createMediaManager?: (sy
         const localStorage = new StorageImpl(deviceManager, undefined);
 
         const remote: PluginRemote = {
+            getServicePort,
             createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>) {
                 const handler = new DeviceStateProxyHandler(deviceManager, id, setState);
                 return new Proxy(handler, handler);
@@ -378,7 +367,7 @@ export async function attachPluginRemote(peer: RpcPeer, createMediaManager?: (sy
                 }
             },
 
-            async notify(id: string, eventTime: number, eventInterface: string, property: string, value: SystemDeviceState|any, changed?: boolean) {
+            async notify(id: string, eventTime: number, eventInterface: string, property: string, value: SystemDeviceState | any, changed?: boolean) {
                 if (property) {
                     const state = systemManager.state?.[id];
                     if (!state) {
@@ -416,7 +405,7 @@ export async function attachPluginRemote(peer: RpcPeer, createMediaManager?: (sy
                     volume.writeFileSync(name, entry.getData());
                 }
 
-                const params = {
+                const params: any = {
                     // legacy
                     android: {},
 
@@ -429,7 +418,7 @@ export async function attachPluginRemote(peer: RpcPeer, createMediaManager?: (sy
                                 error,
                                 end
                             };
-    
+
                             connect(undefined, {
                                 close: () => api.ioClose(id),
                             }, (message: string) => api.ioSend(id, message));
@@ -442,7 +431,7 @@ export async function attachPluginRemote(peer: RpcPeer, createMediaManager?: (sy
                                 error,
                                 end
                             };
-    
+
                             connect(undefined, {
                                 close: () => api.ioClose(id),
                             }, (message: string) => api.ioSend(id, message));
@@ -463,18 +452,24 @@ export async function attachPluginRemote(peer: RpcPeer, createMediaManager?: (sy
                         const module = require(name);
                         return module;
                     },
-                    pushManager,
                     deviceManager,
                     systemManager,
                     mediaManager,
                     endpointManager,
                     log,
                     localStorage,
-                    zwaveManager: null as any,
+                    pluginHostAPI: api,
+                };
+
+                if (getDeviceConsole) {
+                    params.console = getDeviceConsole(undefined);
                 }
+
+                events?.emit('params', params);
 
                 try {
                     peer.evalLocal(script, '/plugin/main.nodejs.js', params);
+                    events?.emit('plugin', exports.default);
                     return exports.default;
                 }
                 catch (e) {

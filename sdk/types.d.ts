@@ -1,4 +1,3 @@
-
 /**
  * DeviceState is returned by DeviceManager.getDeviceState, and allows getting/setting of a device provided by a DeviceProvider.
  */
@@ -662,14 +661,14 @@ export interface DeviceManager {
   getDeviceLogger(nativeId: string): Logger;
 
   /**
-   * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
+   * Get the console for the device given a native id.
    */
-  getDeviceState(): DeviceState;
+  getDeviceConsole?(nativeId?: string): Console;
 
   /**
    * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
    */
-  getDeviceState(nativeId: string): DeviceState;
+  getDeviceState(nativeId?: string): DeviceState;
 
   /**
    * Get the per script Storage object.
@@ -837,22 +836,6 @@ export interface SystemManager {
 
 }
 /**
- * Android provides limited access to the Android system, to send Intents to other applications, such as Tasker. See Android SDK documentation for more information.
- */
-export interface Android {
-  /**
-   * Create a new Intent. Use one of the send methods to send broadcasts, start activities, or start services.
-   */
-  newIntent(): Intent;
-
-  sendBroadcast(intent: Intent): Promise<void>;
-
-  startActivity(intent: Intent): Promise<void>;
-
-  startService(intent: Intent): Promise<void>;
-
-}
-/**
  * MixinProviders can add and intercept interfaces to other devices to add or augment their behavior.
  */
 export interface MixinProvider {
@@ -996,7 +979,6 @@ export enum ScryptedInterface {
   MediaSource = "MediaSource",
   MessagingEndpoint = "MessagingEndpoint",
   OauthClient = "OauthClient",
-  Android = "Android",
   MixinProvider = "MixinProvider",
   HttpRequestHandler = "HttpRequestHandler",
   EngineIOHandler = "EngineIOHandler",
@@ -1066,16 +1048,6 @@ export enum ScryptedMimeTypes {
   RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',
 }
 
-// export interface ZwaveManagerDevice extends ZwaveManager, ScryptedDevice {
-// }
-
-/**
- * Android Intent.
- * See: https://developer.android.com/reference/android/content/Intent
- */
-interface Intent {
-}
-
 export interface ScryptedInterfaceDescriptor {
     name: string;
     properties: ScryptedInterfaceProperty[];
@@ -1092,14 +1064,13 @@ export interface ScryptedStatic {
      * @deprecated
      */
     log?: Logger,
-    scriptSettings?: Settings,
 
-    android?: Android,
     deviceManager?: DeviceManager,
     endpointManager?: EndpointManager,
     mediaManager?: MediaManager,
     systemManager: SystemManager,
-    // zwaveManager?: ZwaveManagerDevice,
+
+    pluginHostAPI?: any;
 }
 
 

@@ -16,6 +16,7 @@ import fs from 'fs';
 import { sendJSON } from './http-helpers';
 import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
+import net from 'net';
 
 const indexHtml = fs.readFileSync('dist/index.html').toString();
 
@@ -132,8 +133,29 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     async discoverDevices(duration: number) {
     }
 
+    async checkService(request: HttpRequest, ws: WebSocket, name: string): Promise<boolean> {
+        const check = `/endpoint/@scrypted/core/engine.io/${name}/`;
+        if (!request.url.startsWith(check))
+            return false;
+        const deviceId = request.url.substr(check.length).split('/')[0];
+        const plugins = await systemManager.getComponent('plugins');
+        const { nativeId, pluginId } = await plugins.getDeviceInfo(deviceId);
+        const port = await plugins.getRemoteServicePort(pluginId, name);
+        const socket = net.connect(port);
+        socket.on('data', data => ws.send(data));
+        socket.resume();
+        socket.write(nativeId?.toString() || 'undefined');
+        ws.onclose = () => socket.destroy();
+        ws.onmessage = message => socket.write(message.data);
+        return true;
+    }
+
     async onConnection(request: HttpRequest, webSocketUrl: string): Promise<void> {
         const ws = new WebSocket(webSocketUrl);
+
+        if (await this.checkService(request, ws, 'console') || await this.checkService(request, ws, 'repl')) {
+            return;
+        }
 
         if (request.isPublicEndpoint) {
             ws.close();

@@ -8,7 +8,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import cluster from 'cluster';
 import net from 'net';
-import { startPluginCluster } from './plugin/plugin-host';
+import { startPluginClusterWorker as startPluginRemoteClusterWorker } from './plugin/plugin-host';
 import { ScryptedRuntime } from './runtime';
 import level from './level';
 import { Plugin, ScryptedUser, Settings } from './db-types';
@@ -28,7 +28,7 @@ process.on('unhandledRejection', error => {
 
 
 if (!cluster.isMaster) {
-    startPluginCluster();
+    startPluginRemoteClusterWorker();
 }
 else {
     let workerInspectPort: number = undefined;

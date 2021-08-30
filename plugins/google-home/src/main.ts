@@ -83,7 +83,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         this.plugins = systemManager.getComponent('plugins');
 
         this.localEndpoint = new http.Server((req, res) => {
-            this.log.i('got request');
+            this.console.log('got request');
             res.writeHead(404);
             res.end();
         });
@@ -91,7 +91,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
         endpointManager.getInsecurePublicLocalEndpoint().then(endpoint => {
             const url = new URL(endpoint);
-            this.log.i(endpoint);
+            this.console.log(endpoint);
             const ad = mdns.createAdvertisement(mdns.tcp('scrypted-gh'), parseInt(url.port));
             ad.start();
         });
@@ -237,7 +237,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             for (const queryDevice of input.payload.devices) {
                 const device = systemManager.getDeviceById(queryDevice.id);
                 if (!device) {
-                    this.log.e(`query for missing device ${queryDevice.id}`);
+                    this.console.error(`query for missing device ${queryDevice.id}`);
                     ret.payload.devices[queryDevice.id] = {
                         online: false,
                     };
@@ -247,7 +247,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 const { type } = device;
                 const supportedType = supportedTypes[type];
                 if (!supportedType) {
-                    this.log.e(`query for unsupported type ${type}`);
+                    this.console.error(`query for unsupported type ${type}`);
                     ret.payload.devices[queryDevice.id] = {
                         online: false,
                     };
@@ -264,7 +264,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                     }, status);
                 }
                 catch (e) {
-                    this.log.e(`query failure for ${device.name}`);
+                    this.console.error(`query failure for ${device.name}`);
                     ret.payload.devices[queryDevice.id] = {
                         status: 'ERROR',
                         online: false,
@@ -289,6 +289,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 for (const commandDevice of command.devices) {
                     const device = systemManager.getDeviceById(commandDevice.id);
                     if (!device) {
+                        this.log.e(`execute failed, device not found ${JSON.stringify(commandDevice)}`);
                         const error: SmartHomeV1ExecuteResponseCommands = {
                             ids: [commandDevice.id],
                             status: 'ERROR',
@@ -298,9 +299,12 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                         continue;
                     }
 
+                    this.log.i(`executing command on ${device.name}`);
+
                     for (const execution of command.execution) {
                         const commandHandler = commandHandlers[execution.command]
                         if (!commandHandler) {
+                            this.log.e(`execute failed, command not supported ${JSON.stringify(execution)}`);
                             const error: SmartHomeV1ExecuteResponseCommands = {
                                 ids: [commandDevice.id],
                                 status: 'ERROR',
@@ -315,6 +319,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                             ret.payload.commands.push(result);
                         }
                         catch (e) {
+                            this.log.e(`execution failed ${e}`);
                             const error: SmartHomeV1ExecuteResponseCommands = {
                                 ids: [commandDevice.id],
                                 status: 'ERROR',
@@ -375,12 +380,12 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         if (!Object.keys(report.payload.devices.states).length)
             return;
 
-        this.log.i('reporting state:');
-        this.log.i(JSON.stringify(report, undefined, 2));
+        this.console.log('reporting state:');
+        this.console.log(JSON.stringify(report, undefined, 2));
         if (this.app.jwt) {
             const result = await this.app.reportState(report);
-            this.log.i('report state result:')
-            this.log.i(result);
+            this.console.log('report state result:')
+            this.console.log(result);
             return;
         }
 
@@ -397,8 +402,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 Authorization: `Bearer ${token_info}`
             },
         });
-        this.log.i('report state result:');
-        this.log.i(JSON.stringify(response.data));
+        this.console.log('report state result:');
+        this.console.log(JSON.stringify(response.data));
     }
 
     async requestSync() {
@@ -420,8 +425,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 Authorization: `Bearer ${token_info}`
             }
         });
-        this.log.i('request sync result:');
-        this.log.i(JSON.stringify(response.data));
+        this.console.log('request sync result:');
+        this.console.log(JSON.stringify(response.data));
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
@@ -432,19 +437,19 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             return;
         }
 
-        this.log.i(request.body);
+        this.console.log(request.body);
         const body = JSON.parse(request.body);
         try {
             const result = await this.app.handler(body, request.headers as Headers);
             const res = JSON.stringify(result.body);
-            this.log.i(res);
+            this.console.log(res);
             response.send(res, {
                 headers: result.headers,
                 code: result.status,
             });
         }
         catch (e) {
-            this.log.e(`request error ${e}`);
+            this.console.error(`request error ${e}`);
             response.send(e.message, {
                 code: 500,
             });

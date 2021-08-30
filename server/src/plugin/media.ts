@@ -7,8 +7,7 @@ import { once } from 'events';
 import fs from 'fs';
 import tmp from 'tmp';
 import net from 'net';
-import { sleep } from "../sleep";
-import { AddressInfo } from "ws";
+import { listenZeroCluster } from "./cluster-helper";
 
 const wrtc = require('wrtc');
 Object.assign(global, wrtc);
@@ -22,18 +21,6 @@ interface RTCSession {
 
 const rtcSessions: { [id: string]: RTCSession } = {};
 
-async function listenZeroCluster(server: net.Server) {
-    while (true) {
-        const port = 10000 + Math.round(Math.random() * 30000);
-        server.listen(port);
-        try {
-            await once(server, 'listening');
-            return (server.address() as AddressInfo).port;
-        }
-        catch (e) {
-        }
-    }
-}
 
 function addBuiltins(converters: BufferConverter[]) {
     converters.push({

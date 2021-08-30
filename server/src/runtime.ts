@@ -170,9 +170,23 @@ export class ScryptedRuntime {
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
         handler: (req: Request, res: Response, endpointRequest: HttpRequest, pluginHost: PluginHost, pluginDevice: PluginDevice) => void) {
 
+        const isUpgrade = !!(req as any).upgradeHead;
+
+        const end = (code: number, message: string) => {
+            if (isUpgrade) {
+                const socket = res.socket;
+                socket.write(`HTTP/1.1 ${code} ${message}\r\n` +
+                    '\r\n');
+                socket.destroy();
+            }
+            else {
+                res.status(code);
+                res.send(message);
+            }
+        };
+
         if (!isPublicEndpoint && !res.locals.username) {
-            res.status(401);
-            res.send('Not logged in');
+            end(401, 'Not Authorized');
             return;
         }
 
@@ -192,17 +206,17 @@ export class ScryptedRuntime {
         }
 
         const pluginDevice = this.findPluginDevice(endpoint) ?? this.findPluginDeviceById(endpoint);
-        if (!pluginHost || !pluginDevice) {
-            if (req.headers.connection?.toLowerCase() === 'upgrade' && (req.headers.upgrade?.toLowerCase() !== 'websocket' || !pluginDevice?.state.interfaces.value.includes(ScryptedInterface.EngineIOHandler))) {
-                const socket = res.socket;
-                socket.write('HTTP/1.1 404 Not Found\r\n' +
-                    '\r\n');
-                socket.destroy();
+
+        // check if upgrade requests can be handled. must be websocket.
+        if (isUpgrade) {
+            if (req.headers.upgrade?.toLowerCase() !== 'websocket' || !pluginDevice?.state.interfaces.value.includes(ScryptedInterface.EngineIOHandler)) {
+                end(404, 'Not Found');
                 return;
             }
-            else if (!pluginDevice?.state.interfaces.value.includes(ScryptedInterface.HttpRequestHandler)) {
-                res.status(404);
-                res.send()
+        }
+        else {
+            if (!pluginDevice?.state.interfaces.value.includes(ScryptedInterface.HttpRequestHandler)) {
+                end(404, 'Not Found');
                 return;
             }
         }
@@ -300,7 +314,7 @@ export class ScryptedRuntime {
             endpointRequest,
             pluginDevice,
         };
-        if (req.headers.upgrade)
+        if ((req as any).upgradeHead)
             pluginHost.io.handleUpgrade(req, res.socket, (req as any).upgradeHead)
         else
             pluginHost.io.handleRequest(req, res);

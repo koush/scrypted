@@ -75,4 +75,8 @@ export class PluginComponent {
             id: this.scrypted.findPluginDevice(pluginId),
         }
     }
+
+    async getRemoteServicePort(pluginId: string, name: string): Promise<number> {
+        return this.scrypted.plugins[pluginId].remote.getServicePort(name);
+    }
 }

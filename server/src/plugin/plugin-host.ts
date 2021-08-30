@@ -1,7 +1,7 @@
 import cluster from 'cluster';
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, MediaManager, SystemDeviceState } from '@scrypted/sdk/types'
+import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, MediaManager, SystemDeviceState, ScryptedStatic } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
@@ -10,7 +10,14 @@ import { PluginAPI, PluginRemote } from './plugin-api';
 import { Logger } from '../logger';
 import { MediaManagerImpl } from './media';
 import { getState } from '../state';
-import WebSocket from 'ws';
+import WebSocket, { EventEmitter } from 'ws';
+import { listenZeroCluster } from './cluster-helper';
+import { Server } from 'net';
+import repl, { REPLServer } from 'repl';
+import { once } from 'events';
+import { PassThrough } from 'stream';
+import { Console } from 'console'
+import util from 'util';
 
 export class PluginHost {
     worker: cluster.Worker;
@@ -58,6 +65,10 @@ export class PluginHost {
 
         if (true) {
             this.worker = cluster.fork();
+            this.worker.process.stdout.on('data', data => {
+                process.stdout.write(data);
+            });
+            this.worker.process.stderr.on('data', data => process.stderr.write(data));
 
             let connected = true;
             this.worker.on('disconnect', () => {
@@ -107,7 +118,9 @@ export class PluginHost {
                 }
             });
 
-            attachPluginRemote(remote, async (systemManager) => new MediaManagerImpl(systemManager));
+            attachPluginRemote(remote, {
+                createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager),
+            });
         }
 
 
@@ -151,6 +164,7 @@ export class PluginHost {
                 const device = scrypted.findPluginDevice(plugin._id, nativeId);
                 return self.scrypted.getDeviceLogger(device);
             }
+
             getComponent(id: string): Promise<any> {
                 return self.scrypted.getComponent(id);
             }
@@ -283,7 +297,149 @@ export class PluginHost {
     }
 }
 
-export async function startPluginCluster() {
+async function createConsoleServer(events: EventEmitter): Promise<number> {
+    const outputs = new Map<string, Buffer[]>();
+    const appendOutput = (data: Buffer, nativeId: string) => {
+        if (!nativeId)
+            nativeId = undefined;
+        let buffers = outputs.get(nativeId);
+        if (!buffers) {
+            buffers = [];
+            outputs.set(nativeId, buffers);
+        }
+        buffers.push(data);
+    };
+    events.on('stdout', appendOutput);
+    events.on('stderr', appendOutput);
+
+    const server = new Server(async (socket) => {
+        let [filter] = await once(socket, 'data');
+        filter = filter.toString().trim();
+        if (filter === 'undefined')
+            filter = undefined;
+
+        const buffers = outputs.get(filter);
+        if (buffers) {
+            const concat = Buffer.concat(buffers);
+            outputs.set(filter, [concat]);
+            socket.write(concat);
+        }
+
+        const cb = (data: Buffer, nativeId: string) => {
+            if (nativeId !== filter)
+                return;
+            socket.write(data);
+        };
+        events.on('stdout', cb)
+        events.on('stderr', cb)
+
+        const cleanup = () => {
+            events.removeListener('stdout', cb);
+            events.removeListener('stderr', cb);
+        };
+
+        socket.on('close', cleanup);
+        socket.on('error', cleanup);
+        socket.on('end', cleanup);
+    });
+    return listenZeroCluster(server);
+}
+
+async function createREPLServer(events: EventEmitter): Promise<number> {
+    const [[scrypted], [params], [plugin]] = await Promise.all([once(events, 'scrypted'), once(events, 'params'), once(events, 'plugin')]);
+    const { deviceManager, systemManager } = scrypted;
+    const server = new Server(async (socket) => {
+        let [filter] = await once(socket, 'data');
+        filter = filter.toString().trim();
+        if (filter === 'undefined')
+            filter = undefined;
+
+        const chain: string[] = [];
+        const nativeIds: Map<string, any> = deviceManager.nativeIds;
+        const reversed = new Map<string, string>();
+        for (const nativeId of nativeIds.keys()) {
+            reversed.set(nativeIds.get(nativeId).id, nativeId);
+        }
+
+        while (filter) {
+            const { id } = nativeIds.get(filter);
+            const d = await systemManager.getDeviceById(id);
+            chain.push(filter);
+            filter = reversed.get(d.providerId);
+        }
+
+        chain.reverse();
+        let device = plugin;
+        for (const c of chain) {
+            device = await device.getDevice(c);
+        }
+
+        const r = repl.start({
+            terminal: true,
+            input: socket,
+            output: socket,
+            // writer(this: REPLServer, obj: any) {
+            //     const ret = util.inspect(obj, {
+            //         colors: true,
+            //     });
+            //     return ret;//.replaceAll('\n', '\r\n');
+            // },
+            preview: false,
+        });
+
+        const ctx = Object.assign(params, {
+            device
+        });
+        delete ctx.console;
+        Object.assign(r.context, ctx);
+
+        const cleanup = () => {
+            r.close();
+        };
+
+        socket.on('close', cleanup);
+        socket.on('error', cleanup);
+        socket.on('end', cleanup);
+    });
+    return listenZeroCluster(server);
+}
+
+export function startPluginClusterWorker() {
+    const events = new EventEmitter();
+
+    const getDeviceConsole = (nativeId?: string) => {
+        const stdout = new PassThrough();
+        const stderr = new PassThrough();
+
+        stdout.on('data', data => events.emit('stdout', data, nativeId));
+        stderr.on('data', data => this.events.emit('stderr', data, nativeId));
+
+        const ret = new Console(stdout, stderr);
+
+        const methods = [
+            'log', 'warn',
+            'dir', 'time',
+            'timeEnd', 'timeLog',
+            'trace', 'assert',
+            'clear', 'count',
+            'countReset', 'group',
+            'groupEnd', 'table',
+            'debug', 'info',
+            'dirxml', 'error',
+            'groupCollapsed',
+        ];
+
+        for (const m of methods) {
+            const old = (ret as any)[m].bind(ret);
+            (ret as any)[m] = (...args: any[]) => {
+                (console as any)[m](...args);
+                old(...args);
+            }
+        }
+
+        return ret;
+    }
+
     const peer = new RpcPeer((message, reject) => process.send(message, undefined, {
         swallowErrors: !reject,
     }, e => {
@@ -291,16 +447,34 @@ export async function startPluginCluster() {
             reject(e);
     }));
     process.on('message', message => peer.handleMessage(message as RpcMessage));
-    const scrypted = await attachPluginRemote(peer, async (systemManager) => new MediaManagerImpl(systemManager));
-    process.on('uncaughtException', e => {
-        scrypted.log.e('uncaughtException');
-        scrypted.log.e(e.toString());
-        scrypted.log.e(e.stack);
-    });
-    process.on('unhandledRejection', e => {
-        scrypted.log.e('unhandledRejection');
-        scrypted.log.e(e.toString());
-    });
+
+    const consolePort = createConsoleServer(events);
+    const replPort = createREPLServer(events);
+
+    attachPluginRemote(peer, {
+        createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager),
+        events,
+        getDeviceConsole,
+        async getServicePort(name) {
+            if (name === 'repl')
+                return replPort;
+            if (name === 'console')
+                return consolePort;
+            throw new Error(`unknown service ${name}`);
+        }
+    }).then(scrypted => {
+        events.emit('scrypted', scrypted);
+
+        process.on('uncaughtException', e => {
+            scrypted.log.e('uncaughtException');
+            scrypted.log.e(e.toString());
+            scrypted.log.e(e.stack);
+        });
+        process.on('unhandledRejection', e => {
+            scrypted.log.e('unhandledRejection');
+            scrypted.log.e(e.toString());
+        });
+    })
 }
 
 class LazyRemote implements PluginRemote {
@@ -330,5 +504,10 @@ class LazyRemote implements PluginRemote {
     }
     async createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): Promise<any> {
         return (await this.init).createDeviceState(id, setState);
+    }
+
+    async getServicePort(name: string): Promise<number> {
+        return (await this.init).getServicePort(name);
+
     }
 }

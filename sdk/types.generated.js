@@ -104,7 +104,6 @@ module.exports.ScryptedInterface = {
   MediaSource: "MediaSource",
   MessagingEndpoint: "MessagingEndpoint",
   OauthClient: "OauthClient",
-  Android: "Android",
   MixinProvider: "MixinProvider",
   HttpRequestHandler: "HttpRequestHandler",
   EngineIOHandler: "EngineIOHandler",
@@ -499,17 +498,6 @@ module.exports.ScryptedInterfaceDescriptors = {
       methods: [
         "getOauthUrl",
         "onOauthCallback",
-      ]
-  },
-  Android: {
-      name: "Android",
-      properties: [
-      ],
-      methods: [
-        "newIntent",
-        "sendBroadcast",
-        "startActivity",
-        "startService",
       ]
   },
   MixinProvider: {

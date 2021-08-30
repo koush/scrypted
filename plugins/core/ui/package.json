@@ -40,7 +40,8 @@
     "vue2-google-maps": "^0.10.7",
     "vuetify": "^2.5.8",
     "vuex": "^3.6.2",
-    "xterm": "^4.13.0"
+    "xterm": "^4.13.0",
+    "xterm-addon-fit": "^0.5.0"
   },
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.13.0",
@@ -51,6 +52,8 @@
     "@babel/preset-typescript": "^7.13.0",
     "@types/blob-stream": "^0.1.30",
     "@types/dom-webcodecs": "^0.1.0",
+    "@types/engine.io": "^3.1.7",
+    "@types/engine.io-client": "^3.1.5",
     "@types/lodash": "^4.14.172",
     "@types/mkdirp": "^1.0.1",
     "@types/node": "^16.0.0",
