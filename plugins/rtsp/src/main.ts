@@ -1,18 +1,19 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, VideoStreamOptions } from "@scrypted/sdk";
 const { log, deviceManager, mediaManager } = sdk;
-var Url = require('url-parse');
 
 class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
 
     constructor(nativeId: string) {
         super(nativeId);
     }
+    async getVideoStreamOptions(): Promise<void | VideoStreamOptions[]> {
+    }
     async getVideoStream(): Promise<MediaObject> {
         var u = this.storage.getItem("url");
         if (u == null) {
             return null;
         }
-        const url = new Url(u);
+        const url = new URL(u);
         url.username = this.storage.getItem("username")
         url.password = this.storage.getItem("password");
 
@@ -59,23 +60,6 @@ class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
 }
 
 class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
-    constructor() {
-        super();
-        const deviceIds = deviceManager.getNativeIds();
-        for (const nativeId of deviceIds) {
-            if (nativeId) {
-                deviceManager.onDeviceDiscovered({
-                    nativeId,
-                    interfaces: ["VideoCamera", "Settings"],
-                    type: ScryptedDeviceType.Camera,
-                });
-            }
-        }
-    }
-
-    getSetting(key: string): string | number {
-        return null;
-    }
     async getSettings(): Promise<Setting[]> {
         return [
             {
@@ -86,7 +70,7 @@ class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
         ]
     }
     async putSetting(key: string, value: string | number) {
-            // generate a random id
+        // generate a random id
         var nativeId = Math.random().toString();
         var name = value.toString();
 
