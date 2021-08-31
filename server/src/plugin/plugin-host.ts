@@ -380,6 +380,8 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
         });
         delete ctx.console;
         delete ctx.window;
+        delete ctx.WebSocket;
+        delete ctx.pluginHostAPI;
 
         const replVariables = Object.keys(ctx).filter(key => key !== 'require');
 
