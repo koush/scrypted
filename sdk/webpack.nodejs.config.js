@@ -79,7 +79,6 @@ module.exports = {
             Long: "long",
 
             // browser provide plugin polyfills
-            _websocket: path.resolve(__dirname, 'polyfill/websocket.js'),
             wrtc: path.resolve(__dirname, 'polyfill/nodejs/wrtc'),
             mdns: path.resolve(__dirname, 'polyfill/nodejs/mdns'),
             serialport: path.resolve(__dirname, 'polyfill/nodejs/serialport'),
@@ -96,9 +95,6 @@ module.exports = {
     plugins: [
         new webpack.DefinePlugin({
             'process.env.SSDP_COV': false,
-        }),
-        new webpack.ProvidePlugin({
-            WebSocket: '_websocket'
         }),
     ],
 

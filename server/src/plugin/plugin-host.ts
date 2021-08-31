@@ -379,8 +379,11 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
             device
         });
         delete ctx.console;
+        delete ctx.window;
 
-        const welcome = `JavaScript REPL variables:\n${Object.keys(ctx).map(key => '  ' + key).join('\n')}\n\n`;
+        const replVariables = Object.keys(ctx).filter(key => key !== 'require');
+
+        const welcome = `JavaScript REPL variables:\n${replVariables.map(key => '  ' + key).join('\n')}\n\n`;
         socket.write(welcome);
 
         const r = repl.start({

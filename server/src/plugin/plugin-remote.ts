@@ -10,6 +10,7 @@ import { BufferSerializer } from './buffer-serializer';
 import { Console } from 'console';
 import { EventEmitter, PassThrough } from 'stream';
 import { Writable } from 'node:stream';
+import { createWebSocketClass } from './plugin-remote-websocket';
 
 class DeviceLogger implements Logger {
     nativeId: string;
@@ -405,42 +406,39 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     volume.writeFileSync(name, entry.getData());
                 }
 
+                function websocketConnect(url: string, protocols: any, connect: any, end: any, error: any, data: any) {
+                    if (url.startsWith('io://')) {
+                        const id = url.substring('io://'.length);
+
+                        ioSockets[id] = {
+                            data,
+                            error,
+                            end
+                        };
+
+                        connect(undefined, {
+                            close: () => api.ioClose(id),
+                        }, (message: string) => api.ioSend(id, message));
+                    }
+                    else if (url.startsWith('ws://')) {
+                        const id = url.substring('ws://'.length);
+
+                        ioSockets[id] = {
+                            data,
+                            error,
+                            end
+                        };
+
+                        connect(undefined, {
+                            close: () => api.ioClose(id),
+                        }, (message: string) => api.ioSend(id, message));
+                    }
+                    else {
+                        throw new Error('unsupported websocket');
+                    }
+                }
+
                 const params: any = {
-                    // legacy
-                    android: {},
-
-                    __websocketConnect(url: string, protocols: any, connect: any, end: any, error: any, data: any) {
-                        if (url.startsWith('io://')) {
-                            const id = url.substring('io://'.length);
-
-                            ioSockets[id] = {
-                                data,
-                                error,
-                                end
-                            };
-
-                            connect(undefined, {
-                                close: () => api.ioClose(id),
-                            }, (message: string) => api.ioSend(id, message));
-                        }
-                        else if (url.startsWith('ws://')) {
-                            const id = url.substring('ws://'.length);
-
-                            ioSockets[id] = {
-                                data,
-                                error,
-                                end
-                            };
-
-                            connect(undefined, {
-                                close: () => api.ioClose(id),
-                            }, (message: string) => api.ioSend(id, message));
-                        }
-                        else {
-                            throw new Error('unsupported websocket');
-                        }
-                    },
-
                     window,
                     require: (name: string) => {
                         if (name === 'fs' && !packageJson.scrypted.realfs) {
@@ -459,6 +457,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     log,
                     localStorage,
                     pluginHostAPI: api,
+                    WebSocket: createWebSocketClass(websocketConnect),
                 };
 
                 if (getDeviceConsole) {

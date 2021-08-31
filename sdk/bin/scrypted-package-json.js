@@ -3,6 +3,8 @@ const fs = require('fs');
 
 const pkg = JSON.parse(fs.readFileSync('package.json'));
 pkg.scripts = {
+    // alias
+    "build": "scrypted-webpack",
     "prepublishOnly": "NODE_ENV=production scrypted-webpack",
     "prescrypted-vscode-launch": "scrypted-webpack",
     "scrypted-vscode-launch": "scrypted-deploy-debug",
