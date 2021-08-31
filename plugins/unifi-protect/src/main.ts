@@ -79,10 +79,6 @@ class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
     }
 }
 
-function protectLog(message, ...parameters: unknown[]) {
-
-}
-
 class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvider {
     authorization: string | undefined;
     accessKey: string | undefined;
@@ -166,7 +162,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         }
 
         if (!this.api) {
-            this.api = new ProtectApi(protectLog, console, ip, username, password);
+            this.api = new ProtectApi(console.log.bind(console), console, ip, username, password);
         }
 
         try {
@@ -245,7 +241,6 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         return this.storage.getItem(key);
     }
     async getSettings(): Promise<Setting[]> {
-        this.log.i('getting settings');
         return [
             {
                 key: 'ip',

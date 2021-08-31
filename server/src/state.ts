@@ -231,6 +231,10 @@ interface RefreshThrottle {
     tailRefresh: boolean;
 }
 
+function isSameValue(value1: any, value2: any) {
+    return value1 === value2 || JSON.stringify(value1) === JSON.stringify(value2);
+}
+
 export function setState(pluginDevice: PluginDevice, property: string, value: any): boolean {
     if (pluginDevice.stateVersion !== 1 || !pluginDevice.state) {
         pluginDevice.stateVersion = 1;
@@ -240,7 +244,7 @@ export function setState(pluginDevice: PluginDevice, property: string, value: an
         pluginDevice.state[property] = {};
     const state = pluginDevice.state[property];
     const now = Date.now();
-    const changed = value !== state.value
+    const changed = isSameValue(value, state.value);
     if (changed)
         state.stateTime = now;
     state.value = value;
