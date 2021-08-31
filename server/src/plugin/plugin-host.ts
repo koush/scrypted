@@ -28,7 +28,9 @@ export class PluginHost {
     console: Promise<Console>;
     remote: PluginRemote;
     zip: AdmZip;
-    io = io();
+    io = io(undefined, {
+        pingTimeout: 120000,
+    });
     ws: { [id: string]: WebSocket } = {};
     api: PluginAPI;
     pluginName: string;

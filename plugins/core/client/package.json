@@ -25,10 +25,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@scrypted/sdk":"file:../../../sdk",
-    "@types/engine.io-client": "^3.1.2",
+    "@scrypted/sdk": "file:../../../sdk",
     "@types/lodash.clonedeep": "^4.5.6",
-    "engine.io-client": "^3.3.2",
+    "engine.io-client": "^5.2.0",
     "lodash.clonedeep": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/engine.io-client": "^3.1.5"
   }
 }
