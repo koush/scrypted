@@ -374,6 +374,15 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
             device = await device.getDevice(c);
         }
 
+
+        const ctx = Object.assign(params, {
+            device
+        });
+        delete ctx.console;
+
+        const welcome = `JavaScript REPL variables:\n${Object.keys(ctx).map(key => '  ' + key).join('\n')}\n\n`;
+        socket.write(welcome);
+
         const r = repl.start({
             terminal: true,
             input: socket,
@@ -387,10 +396,6 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
             preview: false,
         });
 
-        const ctx = Object.assign(params, {
-            device
-        });
-        delete ctx.console;
         Object.assign(r.context, ctx);
 
         const cleanup = () => {
