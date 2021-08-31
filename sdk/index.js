@@ -1,8 +1,7 @@
 var sdk = require('./index.generated.js');
 try {
     sdk = Object.assign(sdk, {
-        log,
-    
+        log: deviceManager.getDeviceLogger(undefined),
         deviceManager,
         endpointManager,
         mediaManager,
