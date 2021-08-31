@@ -6,6 +6,7 @@ import { getHash, getNodeHash, getInstanceHash } from "./Types";
 import debounce from "lodash/debounce";
 import { Driver, Endpoint, ZWaveController, ZWaveNode, CommandClass } from "zwave-js";
 import { ValueID, CommandClasses } from "@zwave-js/core"
+import { randomBytes } from "crypto";
 
 const { log, deviceManager } = sdk;
 
@@ -42,12 +43,24 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
 
     constructor() {
         super();
+
+        this.startDriver();
+    }
+
+    startDriver() {
         let networkKey: Buffer | undefined;
-        const b64Key = this.storage.getItem('network-key') || "ZFVDFQW/shbed7609Wkqww==";
-        if (b64Key)
+        let b64Key = this.storage.getItem('networkKey');
+        if (b64Key) {
             networkKey = Buffer.from(b64Key, 'base64');
-        // ZFVDFQW/shbed7609Wkqww==
-        const driver = new Driver("/dev/tty.usbmodem14501", {
+        }
+        else {
+            networkKey = randomBytes(16);
+            b64Key = networkKey.toString('base64');
+            this.storage.setItem('networKey', b64Key);
+            this.log.a('No Network Key was present, so a random one was generated. You can change the Network Key in Settings.')
+        }
+        
+        const driver = new Driver(this.storage.getItem('serialPort'), {
             networkKey
         });
         this.driver = driver;
@@ -83,14 +96,16 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 }
     
                 this.controller.on('node added', node => {
+                    this.console.log('node added', node.nodeId);
                     bindNode(node);
                     rebuildNode(node);
                 })
-                this.controller.on('node removed', () => {
-    
+                this.controller.on('node removed', node => {
+                    this.console.log('node removed', node?.nodeId);
                 })
     
                 driver.controller.nodes.forEach(node => {
+                    this.console.log('node loaded', node.nodeId);
                     bindNode(node);
                     rebuildNode(node);
                 });
@@ -98,21 +113,37 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 resolve();
             });
 
-            // Start the driver. To await this method, put this line into an async method
-            driver.start();
+            driver.start().catch(reject);
+        });
+
+        this.driverReady.catch(e => {
+            log.a(`Zwave Driver startup error. Verify the Z-Wave USB stick is plugged in and the Serial Port setting is correct.`);
+            this.console.error('zwave driver start error', e);
         });
     }
+
     async getSettings(): Promise<Setting[]> {
         return [
             {
                 title: 'Network Key',
-                value: this.storage.getItem('network-key'),
-                description: 'The Base64 Network Security Key',
+                key: 'networkKey',
+                value: this.storage.getItem('networkKey'),
+                description: 'The 16 byte Base64 encoded Network Security Key',
+            },
+            {
+                title: 'Serial Port',
+                key: 'serialPort',
+                value: this.storage.getItem('serialPort'),
+                description: 'Serial Port path or COM Port name',
             }
         ]
     }
     async putSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem('network-key', value as string);
+        this.storage.setItem(key, value as string);
+
+        await this.driver?.destroy();
+        this.driver = undefined;
+        this.startDriver();
     }
 
     async discoverDevices(duration: number) {
