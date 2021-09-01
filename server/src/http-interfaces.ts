@@ -10,9 +10,9 @@ export function createResponseInterface(res: Response, plugin: PluginHost): Http
         send(body: Buffer): void;
         send(body: Buffer, options: HttpResponseOptions): void;
         send(body: any, options?: any) {
-            if (options.code)
+            if (options?.code)
                 res.status(options.code);
-            if (options.headers) {
+            if (options?.headers) {
                 for (const header of Object.keys(options.headers)) {
                     res.setHeader(header, (options.headers as any)[header]);
                 }
