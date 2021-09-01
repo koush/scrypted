@@ -138,14 +138,15 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
             return null;
         }
 
-        if (type === ScryptedDeviceType.Camera) {
+        if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell)
+            && interfaces.includes(ScryptedInterface.VideoCamera)) {
             return [ScryptedInterface.Settings];
         }
         return [];
     }
     getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
         if ((mixinDeviceState.type === ScryptedDeviceType.Camera || mixinDeviceState.type === ScryptedDeviceType.Doorbell)
-            && mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
+            && mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera)) {
             return new CameraMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
         }
         return mixinDevice;

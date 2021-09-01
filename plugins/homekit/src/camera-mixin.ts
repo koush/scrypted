@@ -1,15 +1,20 @@
-import { MixinDeviceBase, VideoCamera, Settings, Setting, ScryptedInterface } from "@scrypted/sdk";
+import { VideoCamera, Settings, Setting, ScryptedInterface } from "@scrypted/sdk";
+import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 
-export class CameraMixin extends MixinDeviceBase<VideoCamera & Settings> implements Settings {
+export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings> implements Settings {
     constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
-        super(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, providerNativeId);
+        super(mixinDevice, mixinDeviceState, {
+            providerNativeId,
+            mixinDeviceInterfaces,
+            group: "HomeKit Settings",
+            groupKey: "homekit",
+        });
     }
 
-    async getSettings(): Promise<Setting[]> {
-        const settings = this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings) ?
-            await this.mixinDevice.getSettings() : [];
+    async getMixinSettings(): Promise<Setting[]> {
+        const settings: Setting[] = [];
+
         settings.push({
-            group: 'HomeKit Settings',
             title: 'Transcode Streaming',
             type: 'boolean',
             key: 'transcodeStreaming',
@@ -19,7 +24,6 @@ export class CameraMixin extends MixinDeviceBase<VideoCamera & Settings> impleme
 
         if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
             settings.push({
-                group: 'HomeKit Settings',
                 title: 'Transcode Recording',
                 key: 'transcodeRecording',
                 type: 'boolean',
@@ -30,7 +34,8 @@ export class CameraMixin extends MixinDeviceBase<VideoCamera & Settings> impleme
 
         return settings;
     }
-    async putSetting(key: string, value: string | number | boolean) {
+
+    async putMixinSetting(key: string, value: string | number | boolean) {
         this.storage.setItem(key, value.toString());
     }
 }

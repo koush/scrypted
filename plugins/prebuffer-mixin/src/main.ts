@@ -5,6 +5,7 @@ import { FFMpegFragmentedMP4Session, MP4Atom, startFFMPegFragmetedMP4Session } f
 import { Server } from 'net';
 import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
 import EventEmitter from 'events';
+import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 
 const { mediaManager, log } = sdk;
 
@@ -16,7 +17,7 @@ interface Prebuffer {
   time: number;
 }
 
-class PrebufferMixin extends MixinDeviceBase<VideoCamera & Settings> implements VideoCamera, Settings {
+class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
   prebufferSession: Promise<FFMpegFragmentedMP4Session>;
   prebuffer: Prebuffer[] = [];
   ftyp: MP4Atom;
@@ -25,16 +26,20 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera & Settings> implements 
   released = false;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
-    super(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, providerNativeId);
+    super(mixinDevice, mixinDeviceState, {
+      providerNativeId,
+      mixinDeviceInterfaces,
+      group: "Prebuffer Settings",
+      groupKey: "prebuffer",
+    });
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
     log.i(`${this.name} prebuffer session starting in 10 seconds`);
     setTimeout(() => this.ensurePrebufferSession(), 10000);
   }
 
-  async getSettings(): Promise<Setting[]> {
-    const settings = this.interfaces.includes(ScryptedInterface.Settings) ?
-    await this.mixinDevice.getSettings() : [];
+  async getMixinSettings(): Promise<Setting[]> {
+    const settings: Setting[] = [];
 
     settings.push(
       {
@@ -47,7 +52,8 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera & Settings> implements 
     );
     return settings;
   }
-  async putSetting(key: string, value: string | number | boolean): Promise<void> {
+
+  async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
     this.storage.setItem(key, value.toString());
   }
 
