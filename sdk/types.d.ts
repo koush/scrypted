@@ -46,6 +46,7 @@ export interface DeviceState {
   intrusionDetected?: boolean;
   powerDetected?: boolean;
   motionDetected?: boolean;
+  audioDetected?: boolean;
   occupied?: boolean;
   flooded?: boolean;
   ultraviolet?: number;
@@ -515,6 +516,7 @@ export interface PowerSensor {
   powerDetected?: boolean;
 }
 export interface AudioSensor {
+  audioDetected?: boolean;
 }
 export interface MotionSensor {
   motionDetected?: boolean;
@@ -1024,6 +1026,7 @@ export enum ScryptedInterfaceProperty {
     intrusionDetected = "intrusionDetected",
     powerDetected = "powerDetected",
     motionDetected = "motionDetected",
+    audioDetected = "audioDetected",
     occupied = "occupied",
     flooded = "flooded",
     ultraviolet = "ultraviolet",

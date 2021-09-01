@@ -424,6 +424,7 @@ module.exports.ScryptedInterfaceDescriptors = {
   AudioSensor: {
       name: "AudioSensor",
       properties: [
+        "audioDetected",
       ],
       methods: [
       ]
@@ -535,51 +536,8 @@ module.exports.ScryptedInterfaceDescriptors = {
   },
 }
 
-module.exports.ScryptedInterfaceProperty = {
-    id: "id",
-    interfaces: "interfaces",
-    metadata: "metadata",
-    name: "name",
-    providedInterfaces: "providedInterfaces",
-    providedName: "providedName",
-    providedRoom: "providedRoom",
-    providedType: "providedType",
-    providerId: "providerId",
-    room: "room",
-    type: "type",
-    on: "on",
-    brightness: "brightness",
-    colorTemperature: "colorTemperature",
-    rgb: "rgb",
-    hsv: "hsv",
-    running: "running",
-    paused: "paused",
-    docked: "docked",
-    thermostatAvailableModes: "thermostatAvailableModes",
-    thermostatMode: "thermostatMode",
-    thermostatSetpoint: "thermostatSetpoint",
-    thermostatSetpointHigh: "thermostatSetpointHigh",
-    thermostatSetpointLow: "thermostatSetpointLow",
-    temperature: "temperature",
-    temperatureUnit: "temperatureUnit",
-    humidity: "humidity",
-    lockState: "lockState",
-    entryOpen: "entryOpen",
-    batteryLevel: "batteryLevel",
-    online: "online",
-    updateAvailable: "updateAvailable",
-    fromMimeType: "fromMimeType",
-    toMimeType: "toMimeType",
-    binaryState: "binaryState",
-    intrusionDetected: "intrusionDetected",
-    powerDetected: "powerDetected",
-    motionDetected: "motionDetected",
-    occupied: "occupied",
-    flooded: "flooded",
-    ultraviolet: "ultraviolet",
-    luminance: "luminance",
-    position: "position",
-}
+module.exports.ScryptedInterfaceProperty = {}
+Object.values(module.exports.ScryptedInterfaceDescriptors).map(s => s.properties).flat().forEach(s => module.exports.ScryptedInterfaceProperty[s] = s);
 
 module.exports.ScryptedMimeTypes = {
   AcceptUrlParameter: 'accept-url',

@@ -1,5 +1,4 @@
-const { Console } = require('console');
-const { PassThrough } = require('stream');
+const types = require('./types.generated.js');
 
 class ScryptedDeviceBase {
     constructor(nativeId) {
@@ -40,7 +39,6 @@ class ScryptedDeviceBase {
     }
 }
 
-
 class MixinDeviceBase {
     constructor(mixinDevice, deviceState, providerNativeId) {
         this.mixinDevice = mixinDevice;
@@ -77,9 +75,7 @@ class MixinDeviceBase {
         };
     }
 
-    var fields = ["id", "interfaces", "metadata", "name", "providedInterfaces", "providedName", "providedRoom", "providedType", "providerId", "room", "type", "on", "brightness", "colorTemperature", "rgb", "hsv", "running", "paused", "docked", "temperature", "temperatureUnit", "humidity", "thermostatAvailableModes", "thermostatMode", "thermostatSetpoint", "thermostatSetpointHigh", "thermostatSetpointLow", "lockState", "entryOpen", "batteryLevel", "online", "updateAvailable", "fromMimeType", "toMimeType", "binaryState", "intrusionDetected", "powerDetected", "motionDetected", "occupied", "flooded", "ultraviolet", "luminance", "position",
-    ];
-    for (var field of fields) {
+    for (var field of Object.values(types.ScryptedInterfaceProperty)) {
         Object.defineProperty(ScryptedDeviceBase.prototype, field, {
             set: _createSetState(field),
             get: _createGetState(field),
@@ -97,7 +93,6 @@ const sdk = {
     MixinDeviceBase,
 }
 
-const types = require('./types.generated.js');
 Object.assign(sdk, types);
 
 module.exports = sdk;

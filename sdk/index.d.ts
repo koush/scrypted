@@ -54,6 +54,7 @@ export class ScryptedDeviceBase implements DeviceState {
   intrusionDetected?: boolean;
   powerDetected?: boolean;
   motionDetected?: boolean;
+  audioDetected?: boolean;
   occupied?: boolean;
   flooded?: boolean;
   ultraviolet?: number;
@@ -111,6 +112,7 @@ export class MixinDeviceBase<T> implements DeviceState {
   intrusionDetected?: boolean;
   powerDetected?: boolean;
   motionDetected?: boolean;
+  audioDetected?: boolean;
   occupied?: boolean;
   flooded?: boolean;
   ultraviolet?: number;
