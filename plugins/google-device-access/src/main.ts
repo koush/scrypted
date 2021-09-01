@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HumiditySensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk';
+import sdk, { Camera, DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, VideoStreamOptions } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -6,7 +6,7 @@ import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
 
-const { deviceManager } = sdk;
+const { deviceManager, mediaManager, endpointManager } = sdk;
 
 let clientId = localStorage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com';
 let clientSecret = localStorage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg';
@@ -57,6 +57,40 @@ function toNestMode(mode: ThermostatMode): string {
     }
 }
 
+class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor {
+    constructor(public provider: GoogleSmartDeviceAccess, public device: any) {
+        super(device.name.split('/').pop());
+        this.provider = provider;
+        this.device = device;
+    }
+
+    async getVideoStream(options?: VideoStreamOptions): Promise<MediaObject> {
+        const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
+            command: "sdm.devices.commands.CameraLiveStream.GenerateRtspStream",
+            params: {}
+        });
+
+        const u = result.data.results.streamUrls.rtspUrl;
+
+        return mediaManager.createFFmpegMediaObject({
+            inputArguments: [
+                "-rtsp_transport",
+                "tcp",
+                "-i",
+                u.toString(),
+                '-analyzeduration', '15000000',
+                '-probesize', '100000000',
+                "-reorder_queue_size",
+                "1024",
+                "-max_delay",
+                "20000000",
+            ]
+        })
+    }
+    async getVideoStreamOptions(): Promise<void | VideoStreamOptions[]> {
+    }
+}
+
 class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Settings, Refresh {
     device: any;
     provider: GoogleSmartDeviceAccess;
@@ -66,7 +100,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         const params = this.executeParams;
         this.executeParams = {};
         return this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
-            command : "sdm.devices.commands.ThermostatMode.SetMode",
+            command: "sdm.devices.commands.ThermostatMode.SetMode",
             params,
         });
     }, 6000)
@@ -170,17 +204,66 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
     }
 }
 
-class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient, DeviceProvider, Settings {
+class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient, DeviceProvider, Settings, HttpRequestHandler {
     token: ClientOAuth2.Token;
     devices = new Map<string, any>();
     refreshThrottled = throttle(async () => {
         const response = await this.authGet('/devices');
+        this.console.log('refresh headers', response.headers);
+        this.console.log('refersh data', response.data);
+        const userId = response.headers['user-id'];
+        if (userId && this.storage.getItem('userId') !== userId) {
+            try {
+                await axios.post(`https://scrypted-gda-server.uw.r.appspot.com/register/${userId}`, {
+                    endpoint: await endpointManager.getPublicCloudEndpoint(),
+                });
+                this.storage.setItem('userId', userId);
+            }
+            catch (e) {
+                this.console.error('register error', e);
+            }
+        }
         return response.data;
-    }, refreshFrequency * 10000);
+    }, refreshFrequency * 1000);
 
     constructor() {
         super();
         this.discoverDevices(0).catch(() => { });
+    }
+
+    async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        const payload = JSON.parse(Buffer.from(JSON.parse(request.body).message.data, 'base64').toString());
+        this.console.log(payload);
+
+        const traits = payload.resourceUpdate?.traits;
+        const events = payload.resourceUpdate?.events;
+
+        const nativeId = payload.resourceUpdate.name.split('/').pop();
+        const device = this.devices.get(nativeId);
+        if (device ) {
+            if (traits) {
+                Object.assign(device.traits, traits);
+                if (device.type === 'sdm.devices.types.THERMOSTAT') {
+                    new NestThermostat(this, device);
+                }
+                else if (device.type === 'sdm.devices.types.CAMERA') {
+                    new NestCamera(this, device);
+                }
+            }
+
+            if (events) {
+                if (device.type === 'sdm.devices.types.CAMERA') {
+                    if (events['sdm.devices.events.CameraMotion.Motion']) {
+                        const camera = new NestCamera(this, device);
+                        camera.motionDetected = true;
+                        setTimeout(() => camera.motionDetected = false, 30000);
+                    }
+                }
+            }
+        }
+
+
+        response.send('ok');
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -257,16 +340,19 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         this.discoverDevices(0).catch(() => { });
     }
 
-    async authGet(path: string): Promise<any> {
+    async authGet(path: string) {
         await this.loadToken();
         return axios(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${projectId}${path}`, {
+            // validateStatus() {
+            //     return true;
+            // },
             headers: {
                 Authorization: `Bearer ${this.token.accessToken}`
             }
         });
     }
 
-    async authPost(path: string, data: any): Promise<any> {
+    async authPost(path: string, data: any) {
         await this.loadToken();
         return axios.post(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${projectId}${path}`, data, {
             headers: {
@@ -283,6 +369,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 break;
             }
             catch (e) {
+                await new Promise(resolve => setTimeout(resolve, refreshFrequency * 1000));
                 console.error(e);
             }
         }
@@ -307,7 +394,21 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                         ScryptedInterface.TemperatureSetting,
                         ScryptedInterface.HumiditySensor,
                         ScryptedInterface.Thermometer,
-                        ScryptedInterface.Settings]
+                        ScryptedInterface.Settings,
+                    ]
+                })
+            }
+            else if (device.type === 'sdm.devices.types.CAMERA') {
+                this.devices.set(nativeId, device);
+
+                deviceManifest.devices.push({
+                    name: device.traits?.['sdm.devices.traits.Info']?.customName || device.parentRelations?.[0]?.displayName,
+                    nativeId: nativeId,
+                    type: ScryptedDeviceType.Camera,
+                    interfaces: [
+                        ScryptedInterface.VideoCamera,
+                        ScryptedInterface.MotionSensor,
+                    ]
                 })
             }
         }
@@ -321,6 +422,9 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             return;
         if (device.type === 'sdm.devices.types.THERMOSTAT') {
             return new NestThermostat(this, device);
+        }
+        else if (device.type === 'sdm.devices.types.CAMERA') {
+            return new NestCamera(this, device);
         }
     }
 }
