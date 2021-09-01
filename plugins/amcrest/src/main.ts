@@ -16,14 +16,18 @@ class AmcrestCamera extends ScryptedDeviceBase implements VideoCamera, Camera, S
         while (true) {
             try {
                 this.motionDetected = false;
+                this.audioDetected = false;
 
                 const api = new AmcrestCameraClient(this.storage.getItem('ip'), this.storage.getItem('username'), this.storage.getItem('password'));
-                for await (const event of api.listenForMotionEvents()) {
+                for await (const event of api.listenEvents()) {
                     if (event === AmcrestEvent.MotionStart)
                         this.motionDetected = true;
-                    else if (event === AmcrestEvent.MotionStop) {
+                    else if (event === AmcrestEvent.MotionStop)
                         this.motionDetected = false;
-                    }
+                    else if (event === AmcrestEvent.AudioStart)
+                        this.audioDetected = true;
+                    else if (event === AmcrestEvent.AudioStop)
+                        this.audioDetected = false;
                 }
             }
             catch (e) {
@@ -116,6 +120,7 @@ class AmcrestProvider extends ScryptedDeviceBase implements DeviceProvider, Sett
             interfaces: [
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.Camera,
+                ScryptedInterface.AudioSensor,
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.Settings,
             ],

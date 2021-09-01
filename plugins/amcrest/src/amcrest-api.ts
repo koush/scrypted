@@ -5,8 +5,10 @@ import {Form, Part} from 'multiparty';
 import { once } from 'events';
 
 export enum AmcrestEvent {
-    MotionStart = "MotionStart",
-    MotionStop = "MotionStop",
+    MotionStart = "Code=VideoMotion;action=Start",
+    MotionStop = "Code=VideoMotion;action=Stop",
+    AudioStart = "Code=AudioMutation;action=Start",
+    AudioStop = "Code=AudioMutation;action=Stop",
 }
 
 async function readEvent(readable: Readable): Promise<AmcrestEvent|void> {
@@ -16,13 +18,13 @@ async function readEvent(readable: Readable): Promise<AmcrestEvent|void> {
     for await (const buffer of pt) {
         buffers.push(buffer);
         const data = Buffer.concat(buffers).toString();
-        if (data.indexOf('Code=VideoMotion;action=Stop') !== -1) {
-            return AmcrestEvent.MotionStop;
-        }
-        else if (data.indexOf('Code=VideoMotion;action=Start') !== -1) {
-            return AmcrestEvent.MotionStart;
+        for (const event of Object.values(AmcrestEvent)) {
+            if (data.indexOf(event) !== -1) {
+                return event;
+            }
         }
     }
+    console.log('unhandled', Buffer.concat(buffers).toString());
 }
 
 export class AmcrestCameraClient {
@@ -46,11 +48,11 @@ export class AmcrestCameraClient {
         return Buffer.from(response.data);
     }
 
-    async* listenForMotionEvents(): AsyncGenerator<AmcrestEvent> {
+    async* listenEvents(): AsyncGenerator<AmcrestEvent> {
         const response =  await this.digestAuth.request({
             method: "GET",
             responseType: 'stream',
-            url: `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion]`,
+            url: `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion,AudioMutation]`,
         });
 
         const stream = response.data;
