@@ -424,7 +424,7 @@ export function startPluginClusterWorker() {
         const stderr = new PassThrough();
 
         stdout.on('data', data => events.emit('stdout', data, nativeId));
-        stderr.on('data', data => this.events.emit('stderr', data, nativeId));
+        stderr.on('data', data => events.emit('stderr', data, nativeId));
 
         const ret = new Console(stdout, stderr);
 
@@ -520,6 +520,5 @@ class LazyRemote implements PluginRemote {
 
     async getServicePort(name: string): Promise<number> {
         return (await this.init).getServicePort(name);
-
     }
 }

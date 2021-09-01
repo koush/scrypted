@@ -1,8 +1,9 @@
-import sdk, { Settings, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, Setting } from '@scrypted/sdk';
+import sdk, { Settings, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface } from '@scrypted/sdk';
 import { Bridge, Categories, HAPStorage } from './hap';
 import os from 'os';
 import { supportedTypes } from './common';
 import './types'
+import { CameraMixin } from './camera-mixin';
 
 const { systemManager, mediaManager } = sdk;
 
@@ -70,7 +71,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
     }
 
     async start() {
-
         let defaultIncluded: any;
         try {
             defaultIncluded = JSON.parse(this.storage.getItem('defaultIncluded'));
@@ -137,10 +137,18 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
         })) {
             return null;
         }
+
+        if (type === ScryptedDeviceType.Camera) {
+            return [ScryptedInterface.Settings];
+        }
         return [];
     }
-    getMixin(device: ScryptedDevice, deviceState: any) {
-        return device;
+    getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+        if ((mixinDeviceState.type === ScryptedDeviceType.Camera || mixinDeviceState.type === ScryptedDeviceType.Doorbell)
+            && mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
+            return new CameraMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
+        }
+        return mixinDevice;
     }
 }
 

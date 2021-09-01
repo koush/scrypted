@@ -86,7 +86,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                     const host = this.scrypted.getPluginHostForDeviceId(mixinId);
                     const deviceState = await host.remote.createDeviceState(this.id,
                         async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value));
-                    const mixinProxy = await mixin.getMixin(wrappedProxy, deviceState);
+                    const mixinProxy = await mixin.getMixin(wrappedProxy, allInterfaces, deviceState);
                     if (!mixinProxy)
                         throw new Error(`mixin provider ${mixinId} did not return mixin for ${this.id}`);
                     allInterfaces.push(...interfaces);

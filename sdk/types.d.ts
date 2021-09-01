@@ -849,7 +849,7 @@ export interface MixinProvider {
   /**
    * Create a mixin that can be applied to the supplied device.
    */
-  getMixin(device: ScryptedDevice, deviceState: any): any;
+  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }): any;
 
 }
 /**

@@ -16,7 +16,7 @@ interface Prebuffer {
   time: number;
 }
 
-class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
+class PrebufferMixin extends MixinDeviceBase<VideoCamera & Settings> implements VideoCamera, Settings {
   prebufferSession: Promise<FFMpegFragmentedMP4Session>;
   prebuffer: Prebuffer[] = [];
   ftyp: MP4Atom;
@@ -24,8 +24,8 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
   events = new EventEmitter();
   released = false;
 
-  constructor(mixinDevice: ScryptedDevice & VideoCamera, deviceState: any, nativeId: string|undefined) {
-    super(mixinDevice, deviceState, nativeId);
+  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
+    super(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, providerNativeId);
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
     log.i(`${this.name} prebuffer session starting in 10 seconds`);
@@ -33,7 +33,10 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
   }
 
   async getSettings(): Promise<Setting[]> {
-    return [
+    const settings = this.interfaces.includes(ScryptedInterface.Settings) ?
+    await this.mixinDevice.getSettings() : [];
+
+    settings.push(
       {
         title: 'Prebuffer Duration',
         description: 'Duration of the prebuffer in milliseconds.',
@@ -41,7 +44,8 @@ class PrebufferMixin extends MixinDeviceBase<VideoCamera> implements VideoCamera
         key: PREBUFFER_DURATION_MS,
         value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
       }
-    ];
+    );
+    return settings;
   }
   async putSetting(key: string, value: string | number | boolean): Promise<void> {
     this.storage.setItem(key, value.toString());
@@ -198,8 +202,8 @@ class PrebufferProvider extends ScryptedDeviceBase implements MixinProvider {
     return [ScryptedInterface.VideoCamera, ScryptedInterface.Settings];
   }
 
-  getMixin(device: ScryptedDevice, deviceState: any) {
-    return new PrebufferMixin(device as ScryptedDevice & VideoCamera, deviceState, this.nativeId);
+  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+    return new PrebufferMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
   }
 }
 

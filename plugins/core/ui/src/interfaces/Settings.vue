@@ -1,7 +1,10 @@
 <template>
   <div>
     <v-card
-      v-for="[key, settingsGroup] of Object.entries(settingsGroups)"
+      v-for="([key, settingsGroup], index) of Object.entries(settingsGroups)"
+      :class="
+        index === Object.entries(settingsGroups).length - 1 ? undefined : 'mb-6'
+      "
       :key="key"
     >
       <v-card-title
@@ -9,18 +12,14 @@
         >{{ key }}</v-card-title
       >
       <v-flex xs12>
-        <v-layout>
-          <v-flex xs12>
-            <v-form>
-              <Setting
-                :device="device"
-                v-for="setting in settingsGroup"
-                :key="setting.key"
-                v-model="setting.value"
-              ></Setting>
-            </v-form>
-          </v-flex>
-        </v-layout>
+        <v-form>
+          <Setting
+            :device="device"
+            v-for="setting in settingsGroup"
+            :key="setting.key"
+            v-model="setting.value"
+          ></Setting>
+        </v-form>
       </v-flex>
     </v-card>
   </div>
@@ -51,22 +50,22 @@ export default {
     settingsGroups() {
       const ret = {};
       for (const setting of this.settings) {
-        const group = setting.value.group || 'Settings';
+        const group = setting.value.group || "Settings";
         if (!ret[group]) {
           ret[group] = [];
         }
         ret[group].push(setting);
       }
       return ret;
-    }
+    },
   },
   methods: {
     async refresh() {
       const blub = this.rpc().getSettings();
       var settings = await blub;
-      this.settings = this.settings = settings.map(setting => ({
+      this.settings = this.settings = settings.map((setting) => ({
         key: setting.key,
-        value: setting
+        value: setting,
       }));
     },
   },

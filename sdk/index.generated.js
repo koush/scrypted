@@ -40,15 +40,17 @@ class ScryptedDeviceBase {
 }
 
 class MixinDeviceBase {
-    constructor(mixinDevice, deviceState, providerNativeId) {
+    constructor(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, providerNativeId) {
         this.mixinDevice = mixinDevice;
-        this._deviceState = deviceState;
+        this.mixinDevice = mixinDevice;
+        this.mixinDeviceInterfaces = mixinDeviceInterfaces;
+        this._deviceState = mixinDeviceState;
         this.providerNativeId = providerNativeId;
     }
 
     get storage() {
         if (!this._storage) {
-            this._storage = deviceManager.getMixinStorage(this.providerNativeId);
+            this._storage = deviceManager.getMixinStorage(this.id, this.providerNativeId);
         }
         return this._storage;
     }

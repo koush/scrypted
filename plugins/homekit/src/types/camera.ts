@@ -15,7 +15,7 @@ import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue,
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioRecordingSamplerateValues, CameraRecordingConfiguration, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 
-const { log, mediaManager } = sdk;
+const { log, mediaManager, deviceManager } = sdk;
 
 async function getPort(): Promise<{ socket: dgram.Socket, port: number }> {
     const socket = dgram.createSocket('udp4');
@@ -53,14 +53,26 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     const level = configuration.videoCodec.level === H264Level.LEVEL4_0 ? '4.0'
         : configuration.videoCodec.level === H264Level.LEVEL3_2 ? '3.2' : '3.1';
 
-    const videoArgs: string[] = [
-        '-profile:v', profile,
-        '-level:v', level,
-        '-b:v', `${configuration.videoCodec.bitrate}k`,
-        '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
-        '-r', configuration.videoCodec.resolution[2].toString(),
-        '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
-    ];
+
+    const storage = deviceManager.getMixinStorage(device.id);
+    const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
+
+    let videoArgs: string[];
+    if (transcodeRecording) {
+        videoArgs = [
+            '-profile:v', profile,
+            '-level:v', level,
+            '-b:v', `${configuration.videoCodec.bitrate}k`,
+            '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
+            '-r', configuration.videoCodec.resolution[2].toString(),
+            '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
+        ];
+    }
+    else {
+        videoArgs = [
+            '-vcodec', 'copy',
+        ];
+    }
 
     log.i(`${device.name} motion recording starting`);
     const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs);
@@ -230,20 +242,31 @@ addSupportedType({
                     args.push(...ffmpegInput.inputArguments);
                     args.push(
                         "-an", '-sn', '-dn',
+                    );
 
-                        "-vcodec", "copy",
+                    const storage = deviceManager.getMixinStorage(device.id);
+                    const transcodeStreaming = storage.getItem('transcodeStreaming') === 'true';
 
-                        // "-vcodec", "libx264",
-                        // '-pix_fmt', 'yuvj420p',
-                        // "-profile:v", "high",
-                        // '-color_range', 'mpeg',
-                        // "-bf", "0",
-                        // "-b:v", request.video.max_bit_rate.toString() + "k",
-                        // "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
-                        // "-maxrate", request.video.max_bit_rate.toString() + "k",
-                        // "-filter:v", "fps=fps=" + request.video.fps.toString(),
+                    if (transcodeStreaming) {
+                        args.push(
+                            "-vcodec", "libx264",
+                            '-pix_fmt', 'yuvj420p',
+                            "-profile:v", "high",
+                            '-color_range', 'mpeg',
+                            "-bf", "0",
+                            "-b:v", request.video.max_bit_rate.toString() + "k",
+                            "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
+                            "-maxrate", request.video.max_bit_rate.toString() + "k",
+                            "-filter:v", "fps=fps=" + request.video.fps.toString(),
+                        )
+                    }
+                    else {
+                        args.push(
+                            "-vcodec", "copy",
+                        );
+                    }
 
-
+                    args.push(
                         "-payload_type", (request as StartStreamRequest).video.pt.toString(),
                         "-ssrc", session.videossrc.toString(),
                         "-f", "rtp",
