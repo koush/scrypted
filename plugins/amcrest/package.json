@@ -1,0 +1,42 @@
+{
+   "name": "@scrypted/amcrest",
+   "version": "0.0.16",
+   "description": "Amcrest Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "amcrest"
+   ],
+   "scrypted": {
+      "name": "Amcrest Camera Controller",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/multiparty": "^0.0.33",
+      "@types/node": "^16.7.10"
+   },
+   "dependencies": {
+      "@mhoc/axios-digest-auth": "^0.7.0",
+      "axios": "^0.21.1",
+      "multiparty": "^4.2.2",
+      "url-parse": "^1.4.7"
+   }
+}
