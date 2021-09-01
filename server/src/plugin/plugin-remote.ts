@@ -117,7 +117,9 @@ class DeviceStateProxyHandler implements ProxyHandler<any> {
 
     set?(target: any, p: PropertyKey, value: any, receiver: any) {
         if (p === 'id')
-            throw new Error("can not change id");
+            throw new Error("id is read only");
+        if (p === 'interfaces')
+            throw new Error("interfaces is a read only post-mixin computed property, use providedInterfaces");
         const now = Date.now();
         this.deviceManager.systemManager.state[this.id][p as string] = {
             lastEventTime: now,

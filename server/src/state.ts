@@ -244,7 +244,7 @@ export function setState(pluginDevice: PluginDevice, property: string, value: an
         pluginDevice.state[property] = {};
     const state = pluginDevice.state[property];
     const now = Date.now();
-    const changed = isSameValue(value, state.value);
+    const changed = !isSameValue(value, state.value);
     if (changed)
         state.stateTime = now;
     state.value = value;
