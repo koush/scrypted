@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/notifier-mixin",
-   "version": "0.1.22",
+   "version": "0.1.23",
    "description": "Send notifications to smart speakers and smart displays using text to speech and text to image.",
    "author": "Scrypted",
    "license": "Apache-2.0",
