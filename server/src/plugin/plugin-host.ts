@@ -34,8 +34,10 @@ export class PluginHost {
     ws: { [id: string]: WebSocket } = {};
     api: PluginAPI;
     pluginName: string;
+    listener: EventListenerRegister;
 
     kill() {
+        this.listener.removeListener();
         this.api.kill();
         this.worker.process.kill();
         this.io.close();
@@ -66,38 +68,7 @@ export class PluginHost {
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(plugin._id));
 
         if (true) {
-            this.worker = cluster.fork();
-            this.worker.process.stdout.on('data', data => {
-                process.stdout.write(data);
-            });
-            this.worker.process.stderr.on('data', data => process.stderr.write(data));
-
-            let connected = true;
-            this.worker.on('disconnect', () => {
-                connected = false;
-                logger.log('e', `${this.pluginName} disconnected`);
-            });
-            this.worker.on('exit', async (code, signal) => {
-                connected = false;
-                logger.log('e', `${this.pluginName} exited ${code} ${signal}`);
-            });
-            this.worker.on('error', e => {
-                connected = false;
-                logger.log('e', `${this.pluginName} error ${e}`);
-            });
-            this.worker.on('message', message => this.peer.handleMessage(message));
-
-            this.peer = new RpcPeer((message, reject) => {
-                if (connected) {
-                    this.worker.send(message, undefined, e => {
-                        if (e && reject)
-                            reject(e);
-                    });
-                }
-                else if (reject) {
-                    reject(new Error('peer'));
-                }
-            });
+            this.startPluginClusterHost(logger);
         }
         else {
             const remote = new RpcPeer((message, reject) => {
@@ -296,7 +267,54 @@ export class PluginHost {
 
         this.module = init.then(({ module }) => module);
         this.remote = new LazyRemote(init.then(({ remote }) => remote));
+
+        this.listener = scrypted.stateManager.listen((id, eventDetails, eventData) => {
+            if (eventDetails.property) {
+                const device = scrypted.findPluginDeviceById(id);
+                this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, device.state[eventDetails.property], eventDetails.changed);
+            }
+            else {
+                this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed);
+            }
+        });
     }
+
+    startPluginClusterHost(logger: Logger) {
+        this.worker = cluster.fork();
+
+        this.worker.process.stdout.on('data', data => {
+            process.stdout.write(data);
+        });
+        this.worker.process.stderr.on('data', data => process.stderr.write(data));
+
+        let connected = true;
+        this.worker.on('disconnect', () => {
+            connected = false;
+            logger.log('e', `${this.pluginName} disconnected`);
+        });
+        this.worker.on('exit', async (code, signal) => {
+            connected = false;
+            logger.log('e', `${this.pluginName} exited ${code} ${signal}`);
+        });
+        this.worker.on('error', e => {
+            connected = false;
+            logger.log('e', `${this.pluginName} error ${e}`);
+        });
+        this.worker.on('message', message => this.peer.handleMessage(message));
+
+        this.peer = new RpcPeer((message, reject) => {
+            if (connected) {
+                this.worker.send(message, undefined, e => {
+                    if (e && reject)
+                        reject(e);
+                });
+            }
+            else if (reject) {
+                reject(new Error('peer'));
+            }
+        });
+    }
+
 }
 
 async function createConsoleServer(events: EventEmitter): Promise<number> {
@@ -491,34 +509,55 @@ export function startPluginClusterWorker() {
 
 class LazyRemote implements PluginRemote {
     init: Promise<PluginRemote>;
+    remote: PluginRemote;
 
     constructor(init: Promise<PluginRemote>) {
-        this.init = init;
+        this.init = (async() => {
+            this.remote = await init;
+            return this. remote;
+        })();
     }
 
     async loadZip(packageJson: any, zipData: Buffer): Promise<any> {
-        return (await this.init).loadZip(packageJson, zipData);
+        if (!this.remote)
+            await this.init;
+
+        return this.remote.loadZip(packageJson, zipData);
     }
     async setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState; }; }): Promise<void> {
-        return (await this.init).setSystemState(state);
+        if (!this.remote)
+            await this.init;
+        return this.remote.setSystemState(state);
     }
     async setNativeId(nativeId: string, id: string, storage: { [key: string]: any; }): Promise<void> {
-        return (await this.init).setNativeId(nativeId, id, storage);
+        if (!this.remote)
+            await this.init;
+        return this.remote.setNativeId(nativeId, id, storage);
     }
     async updateDescriptor(id: string, state: { [property: string]: SystemDeviceState; }): Promise<void> {
-        return (await this.init).updateDescriptor(id, state);
+        if (!this.remote)
+            await this.init;
+        return this.remote.updateDescriptor(id, state);
     }
     async notify(id: string, eventTime: number, eventInterface: string, property: string, propertyState: SystemDeviceState, changed?: boolean): Promise<void> {
-        return (await this.init).notify(id, eventTime, eventInterface, property, propertyState, changed);
+        if (!this.remote)
+            await this.init;
+        return this.remote.notify(id, eventTime, eventInterface, property, propertyState, changed);
     }
     async ioEvent(id: string, event: string, message?: any): Promise<void> {
-        return (await this.init).ioEvent(id, event, message);
+        if (!this.remote)
+            await this.init;
+        return this.remote.ioEvent(id, event, message);
     }
     async createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): Promise<any> {
-        return (await this.init).createDeviceState(id, setState);
+        if (!this.remote)
+            await this.init;
+        return this.remote.createDeviceState(id, setState);
     }
 
     async getServicePort(name: string): Promise<number> {
-        return (await this.init).getServicePort(name);
+        if (!this.remote)
+            await this.init;
+        return this.remote.getServicePort(name);
     }
 }

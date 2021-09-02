@@ -54,6 +54,10 @@ export class EventRegistry {
             property,
         };
 
+        for (const event of this.systemListeners) {
+            event(id, eventDetails, value);
+        }
+
         const events = this.listeners[`${id}#${eventInterface}`];
         if (events) {
             for (const event of events) {
@@ -66,10 +70,6 @@ export class EventRegistry {
             for (const event of allEvents) {
                 event(eventDetails, value);
             }
-        }
-
-        for (const event of this.systemListeners) {
-            event(id, eventDetails, value);
         }
 
         return true;

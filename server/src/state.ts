@@ -69,10 +69,6 @@ export class ScryptedStateManager extends EventRegistry {
         const eventTime = device?.state?.[property]?.lastEventTime;
         const eventInterface = propertyInterfaces[property];
 
-        for (const plugin of Object.values(this.scrypted.plugins)) {
-            plugin.remote.notify(device._id, eventTime, eventInterface, property, device.state[property], changed);
-        }
-
         if (this.notify(device?._id, eventTime, eventInterface, property, value, changed) && device) {
             this.scrypted.getDeviceLogger(device).log('i', `state change: ${property} ${value}`);
         }
@@ -94,9 +90,6 @@ export class ScryptedStateManager extends EventRegistry {
 
     notifyInterfaceEvent(device: PluginDevice, eventInterface: ScryptedInterface, value: any) {
         const eventTime = Date.now();
-        for (const plugin of Object.values(this.scrypted.plugins)) {
-            plugin.remote.notify(device?._id, eventTime, eventInterface, undefined, value, true);
-        }
 
         this.notify(device?._id, eventTime, eventInterface, undefined, value, true);
     }
