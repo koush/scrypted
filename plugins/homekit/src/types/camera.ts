@@ -1,5 +1,5 @@
 
-import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk'
+import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor } from '@scrypted/sdk'
 import { addSupportedType, DummyDevice, listenCharacteristic } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SnapshotRequest, SnapshotRequestCallback, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
@@ -30,7 +30,7 @@ async function getPort(): Promise<{ socket: dgram.Socket, port: number }> {
 const iframeIntervalSeconds = 4;
 const numberPrebufferSegments = 1;
 
-async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor,
+async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration): AsyncGenerator<Buffer, void, unknown> {
     const media = await device.getVideoStream({
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
@@ -108,7 +108,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor) {
+    getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor) {
         interface Session {
             request: PrepareStreamRequest;
             videossrc: number;
@@ -306,10 +306,10 @@ addSupportedType({
                     console.log(args);
 
                     const cp = child_process.spawn('ffmpeg', args, {
-                        // stdio: 'ignore',
+                        stdio: 'ignore',
                     });
-                    cp.stdout.on('data', data => console.log(data.toString()));
-                    cp.stderr.on('data', data => console.error(data.toString()));
+                    // cp.stdout.on('data', data => console.log(data.toString()));
+                    // cp.stderr.on('data', data => console.error(data.toString()));
 
                     session.cp = cp;
                 }
@@ -359,7 +359,11 @@ addSupportedType({
 
         const accessory = makeAccessory(device);
 
-        if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
+        const storage = deviceManager.getMixinStorage(device.id);
+        const detectAudio = storage.getItem('detectAudio') === 'true';
+        const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
+
+        if (device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
                 handleFragmentsRequests(configuration): AsyncGenerator<Buffer, void, unknown> {
                     return handleFragmentsRequests(device, configuration)
@@ -422,13 +426,31 @@ addSupportedType({
         accessory.configureController(controller);
 
         if (controller.motionService) {
+            const motionDetected = needAudioMotionService ? 
+                () => device.audioDetected || device.motionDetected :
+                () => !!device.motionDetected;
+
             const service = controller.motionService;
             service.getCharacteristic(Characteristic.MotionDetected)
                 .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                    callback(null, !!device.motionDetected);
+                    callback(null, motionDetected());
                 });
 
-            listenCharacteristic(device, ScryptedInterface.MotionSensor, service, Characteristic.MotionDetected, true);
+                device.listen({
+                    event: ScryptedInterface.MotionSensor,
+                    watch: false,
+                }, (eventSource, eventDetails, data) => {
+                    service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
+                });
+
+                if (needAudioMotionService) {
+                    device.listen({
+                        event: ScryptedInterface.AudioSensor,
+                        watch: false,
+                    }, (eventSource, eventDetails, data) => {
+                        service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
+                    });
+                }
         }
 
         return accessory;
