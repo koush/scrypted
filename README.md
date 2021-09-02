@@ -1,3 +1,17 @@
+# Scrypted Home Automation
+
+Supported Platforms:
+
+ * Google Home
+ * Apple HomeKit
+ * Amazon Alexa
+
+Supported accessories: 
+ * https://github.com/koush/scrypted/tree/main/plugins
+
+## Installation
+
+
 ```sh
 git clone https://github.com/koush/scrypted.git
 cd scrypted/server
