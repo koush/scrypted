@@ -36,6 +36,7 @@
             <v-card-title class="orange-gradient subtitle-1 font-weight-light">
               {{ name || "No Device Name" }}
               <v-layout
+                mr-1
                 row
                 justify-end
                 align-center
@@ -321,25 +322,26 @@
     <v-flex xs12 md6 lg6>
       <v-layout row wrap>
         <v-flex xs12 v-for="iface in noCardInterfaces" :key="iface">
-            <component v-if="name != null"
+          <component
+            v-if="name != null"
+            :value="deviceState"
+            :device="device"
+            :is="iface"
+          ></component>
+        </v-flex>
+
+        <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
+          <v-card v-if="name != null">
+            <v-card-title
+              class="red-gradient white--text subtitle-1 font-weight-light"
+              >{{ iface }}</v-card-title
+            >
+            <component
               :value="deviceState"
               :device="device"
               :is="iface"
             ></component>
-        </v-flex>
-
-        <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
-            <v-card  v-if="name != null">
-              <v-card-title
-                class="red-gradient white--text subtitle-1 font-weight-light"
-                >{{ iface }}</v-card-title
-              >
-              <component
-                :value="deviceState"
-                :device="device"
-                :is="iface"
-              ></component>
-            </v-card>
+          </v-card>
         </v-flex>
 
         <v-flex v-if="showLogs" ref="logsEl">
@@ -386,6 +388,8 @@ import VideoCamera from "../interfaces/VideoCamera.vue";
 import Thermometer from "../interfaces/sensors/Thermometer.vue";
 import HumiditySensor from "../interfaces/sensors/HumiditySensor.vue";
 import EntrySensor from "../interfaces/sensors/EntrySensor.vue";
+import MotionSensor from "../interfaces/sensors/MotionSensor.vue";
+import AudioSensor from "../interfaces/sensors/AudioSensor.vue";
 import OccupancySensor from "../interfaces/sensors/OccupancySensor.vue";
 import Settings from "../interfaces/Settings.vue";
 import StartStop from "../interfaces/StartStop.vue";
@@ -408,6 +412,8 @@ import Vue from "vue";
 const cardHeaderInterfaces = [
   ScryptedInterface.OccupancySensor,
   ScryptedInterface.EntrySensor,
+  ScryptedInterface.MotionSensor,
+  ScryptedInterface.AudioSensor,
   ScryptedInterface.HumiditySensor,
   ScryptedInterface.Thermometer,
   ScryptedInterface.Battery,
@@ -489,6 +495,8 @@ export default {
     Thermometer,
     HumiditySensor,
     EntrySensor,
+    MotionSensor,
+    AudioSensor,
     OccupancySensor,
 
     OauthClient,

@@ -1,7 +1,7 @@
 <template>
   <span>
-    <font-awesome-icon class="white--text mr-2 ml-2" size="sm" :icon="batteryIcon" color="#a9afbb" />
-    <span class="caption mr-2">{{ lazyValue.batteryLevel }}%</span>
+    <font-awesome-icon class="white--text mr-1 mr-1" size="sm" :icon="batteryIcon" color="#a9afbb" />
+    <span class="caption mr-1">{{ lazyValue.batteryLevel }}%</span>
   </span>
 </template>
 

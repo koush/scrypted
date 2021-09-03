@@ -1,14 +1,10 @@
 <script>
 import BasicComponent from "../BasicComponent.vue";
 import PluginUpdate from "./PluginUpdate.vue";
-import Stats from "./Stats.vue";
 import PluginPid from "./PluginPid.vue";
 
 export default {
   mixins: [BasicComponent],
-  components: {
-    Stats,
-  },
   methods: {
     getOwnerColumn(device) {
       return device.pluginId;
@@ -20,7 +16,6 @@ export default {
   data() {
     var self = this;
     return {
-      // footer: "Stats",
       cards: [
         {
           body: null,
@@ -38,22 +33,6 @@ export default {
             "Integrate your existing smart home devices and services.",
           title: "Install Plugin",
         },
-        // {
-        //   body: null,
-        //   buttons: [
-        //     {
-        //       method: "POST",
-        //       path: "new",
-        //       title: "Create Script",
-        //       click() {
-        //         self.newDevice();
-        //       },
-        //     },
-        //   ],
-        //   description:
-        //     "Write custom scripts to automate events or add new devices.",
-        //   title: "Create New Script",
-        // },
       ],
       resettable: true,
       component: {

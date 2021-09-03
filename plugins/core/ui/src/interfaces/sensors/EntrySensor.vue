@@ -4,7 +4,7 @@
       <font-awesome-icon
         v-on="on"
         v-if="lazyValue.entryOpen"
-        class="white--text mr-2 ml-2"
+        class="white--text mr-1 mr-1"
         size="sm"
         icon="door-open"
         color="#a9afbb"
@@ -12,7 +12,7 @@
       <font-awesome-icon
         v-on="on"
         v-else
-        class="white--text mr-2 ml-2"
+        class="white--text mr-1 mr-1"
         size="sm"
         icon="door-closed"
         color="#a9afbb"

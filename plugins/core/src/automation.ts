@@ -49,7 +49,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
 
                     let device: any;
                     if (id === 'javascript') {
-                        device = new Javascript(systemManager, eventSource, eventDetails, eventData);
+                        device = new Javascript(systemManager, eventSource, eventDetails, eventData, this.log);
                     }
                     else {
                         device = systemManager.getDeviceById(id);
