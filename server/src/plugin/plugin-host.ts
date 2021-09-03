@@ -18,6 +18,7 @@ import { once } from 'events';
 import { PassThrough } from 'stream';
 import { Console } from 'console'
 import util from 'util';
+import { sleep } from '../sleep';
 
 export class PluginHost {
     worker: cluster.Worker;
@@ -246,6 +247,7 @@ export class PluginHost {
                 try {
                     await waitDebug;
                     console.info('debugger attached.');
+                    await sleep(1000);
                 }
                 catch (e) {
                     console.error('debugger failed', e);
