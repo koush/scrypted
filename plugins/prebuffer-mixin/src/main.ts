@@ -34,7 +34,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     });
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
-    log.i(`${this.name} prebuffer session starting in 10 seconds`);
+    console.log(`${this.name} prebuffer session starting in 10 seconds`);
     setTimeout(() => this.ensurePrebufferSession(), 10000);
   }
 
@@ -60,7 +60,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   ensurePrebufferSession() {
     if (this.prebufferSession || this.released)
       return;
-    log.i(`${this.name} prebuffer session started`);
+    console.log(`${this.name} prebuffer session started`);
     this.prebufferSession = this.startPrebufferSession();
   }
 
@@ -80,7 +80,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs);
     const { cp, socket } = session;
     const cleanup = () => {
-      log.i(`${this.name} prebuffer session exited`);
+      console.log(`${this.name} prebuffer session exited`);
       this.prebufferSession = undefined;
       cp.kill();
       socket.destroy();
@@ -121,14 +121,14 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       return this.mixinDevice.getVideoStream(options);
     }
 
-    log.i(`${this.name} prebuffer request started`);
+    console.log(this.name, 'prebuffer request started');
 
     this.ensurePrebufferSession();
     const server = new Server(socket => {
       server.close();
 
       const writeAtom = (atom: MP4Atom) => {
-        // log.i(`atom ${atom.type} ${atom.length}`);
+        // console.log(`atom ${atom.type} ${atom.length}`);
         socket.write(Buffer.concat([atom.header, atom.data]));
       };
 
@@ -153,7 +153,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
       this.events.on('atom', writeAtom);
       const cleanup = () => {
-        log.i(`${this.name} prebuffer request ended`);
+        console.log(this.name, 'prebuffer request ended');
         this.events.removeListener('atom', writeAtom);
         socket.removeAllListeners();
       }
@@ -191,10 +191,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   release() {
-    log.i(`${this.name} prebuffer releasing if started`);
+    console.log(this.name, 'prebuffer releasing if started');
     this.released = true;
     this.prebufferSession?.then(start => {
-      log.i(`${this.name} prebuffer released`);
+      console.log(this.name, 'prebuffer released');
       start.cp.kill();
       start.socket.destroy();
     });
