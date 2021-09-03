@@ -40,7 +40,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
                 key: 'detectAudio',
                 type: 'boolean',
                 value: (this.storage.getItem('detectAudio') === 'true').toString(),
-                description: 'Send audio activity to HomeKit as motion events to trigger camera notifications and recordings.',
+                description: 'Trigger HomeKit Secure Video recording on audio activity.',
             });
         }
 
