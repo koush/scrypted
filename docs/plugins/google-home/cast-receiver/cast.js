@@ -19,10 +19,15 @@ document.addEventListener("DOMContentLoaded", function (event) {
     const eioUrl = loadRequestData.media.entity || loadRequestData.media.contentId;
     const token = loadRequestData.credentials ?? loadRequestData.media.customData.token;
     const url = new URL(eioUrl)
-    const endpointPath = url.pathname + url.search;
+    const endpointPath = url.pathname;
+    const query = {}
+    for (const [k, v] of new URLSearchParams(url.search)) {
+      query[k] = v;
+    }
 
     const options = {
       path: endpointPath,
+      query,
     };
 
     const socket = eio(`wss://${url.host}`, options);
