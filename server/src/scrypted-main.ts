@@ -228,6 +228,11 @@ else {
             });
         });
 
+        app.get('/logout', (req, res) => {
+            res.clearCookie('login_user_token');
+            res.send({});
+        });
+
         app.post('/login', async (req, res) => {
             const hasLogin = await db.getCount(ScryptedUser) > 0;
 
