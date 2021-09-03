@@ -32,20 +32,34 @@ const numberPrebufferSegments = 1;
 
 async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration): AsyncGenerator<Buffer, void, unknown> {
+
+    console.log('fragment session starting', configuration);
     const media = await device.getVideoStream({
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
     });
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
-    const audioArgs: string[] = [
-        '-acodec', 'libfdk_aac',
-        ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
-            ['-profile:a', 'aac_low'] :
-            ['-profile:a', 'aac_eld']),
-        '-ar', `${AudioRecordingSamplerateValues[configuration.audioCodec.samplerate]}k`,
-        '-b:a', `${configuration.audioCodec.bitrate}k`,
-        '-ac', `${configuration.audioCodec.audioChannels}`
-    ];
+
+    const storage = deviceManager.getMixinStorage(device.id);
+    const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
+
+    let audioArgs: string[];
+    if (transcodeRecording) {
+        audioArgs = [
+            '-acodec', 'libfdk_aac',
+            ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
+                ['-profile:a', 'aac_low'] :
+                ['-profile:a', 'aac_eld']),
+            '-ar', `${AudioRecordingSamplerateValues[configuration.audioCodec.samplerate]}k`,
+            '-b:a', `${configuration.audioCodec.bitrate}k`,
+            '-ac', `${configuration.audioCodec.audioChannels}`
+        ];
+    }
+    else {
+        audioArgs = [
+            '-acodec', 'copy'
+        ];
+    }
 
     const profile = configuration.videoCodec.profile === H264Profile.HIGH ? 'high'
         : configuration.videoCodec.profile === H264Profile.MAIN ? 'main' : 'baseline';
@@ -53,9 +67,6 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     const level = configuration.videoCodec.level === H264Level.LEVEL4_0 ? '4.0'
         : configuration.videoCodec.level === H264Level.LEVEL3_2 ? '3.2' : '3.1';
 
-
-    const storage = deviceManager.getMixinStorage(device.id);
-    const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
 
     let videoArgs: string[];
     if (transcodeRecording) {
@@ -71,6 +82,8 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     else {
         videoArgs = [
             '-vcodec', 'copy',
+            // should this be behind a flag?
+            '-frag_duration', `${configuration.mediaContainerConfiguration.fragmentLength * 1000}`,
         ];
     }
 
