@@ -444,7 +444,6 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
         ScryptedInterface.StartStop,
         ScryptedInterface.Pause,
         ScryptedInterface.EngineIOHandler,
-        ScryptedInterface.HttpRequestHandler,
       ];
 
       var device: Device = {

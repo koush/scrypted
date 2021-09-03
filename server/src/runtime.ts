@@ -170,7 +170,7 @@ export class ScryptedRuntime {
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
         handler: (req: Request, res: Response, endpointRequest: HttpRequest, pluginHost: PluginHost, pluginDevice: PluginDevice) => void) {
 
-        const isUpgrade = !!(req as any).upgradeHead;
+        const isUpgrade = req.headers.connection?.toLowerCase() === 'upgrade';
 
         const end = (code: number, message: string) => {
             if (isUpgrade) {
@@ -237,7 +237,11 @@ export class ScryptedRuntime {
             username: res.locals.username,
         };
 
-        if (!isEngineIOEndpoint && req.headers.connection?.toLowerCase() === 'upgrade') {
+        if (isEngineIOEndpoint && !isUpgrade && isPublicEndpoint) {
+            res.header("Access-Control-Allow-Origin", '*');
+        }
+
+        if (!isEngineIOEndpoint && isUpgrade) {
             this.wss.handleUpgrade(req, req.socket, (req as any).upgradeHead, ws => {
                 try {
                     const handler = this.getDevice<EngineIOHandler>(pluginDevice._id);
@@ -275,7 +279,6 @@ export class ScryptedRuntime {
             });
         }
         else {
-
             handler(req, res, httpRequest, pluginHost, pluginDevice);
         }
     }
