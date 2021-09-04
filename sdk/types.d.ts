@@ -326,11 +326,15 @@ export interface VideoStreamOptions {
    prebuffer?: number;
 
    video?: {
+    name?: string;
     codec?: string;
     width?: number;
     height?: number;
     bitrate?: number;
+    minBitrate?: number;
+    maxBitrate?: number;
     fps?: number;
+    idrIntervalMillis: number;
   }
 
   audio?: {
