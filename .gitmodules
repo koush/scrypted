@@ -7,3 +7,6 @@
 [submodule "plugins/myq/src/myq"]
 	path = plugins/myq/src/myq
 	url = git@github.com:koush/myq.git
+[submodule "plugins/neato/node-botvac"]
+	path = plugins/neato/node-botvac
+	url = git@github.com:koush/node-botvac

@@ -32,9 +32,6 @@ class HAPLocalStorage {
 
 (HAPStorage as any).INSTANCE.localStore = new HAPLocalStorage();
 
-const mac = (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
-    .flat().map(([iface, entry]) => entry).find(i => i.family == 'IPv4').mac;
-
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -51,23 +48,38 @@ const uuid = localStorage.getItem('uuid');
 
 const includeToken = 4;
 
+
 class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
     bridge = new Bridge('Scrypted', uuid);
+
     constructor() {
         super();
         this.start();
     }
+
+    getUsername() {
+        return this.storage.getItem("mac") || (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
+        .flat().map(([iface, entry]) => entry).find(i => i.family == 'IPv4').mac;
+    }
+
     async getSettings(): Promise<Setting[]> {
         return [
             {
                 title: "Pairing Code",
+                key: "pairingCode",
                 readonly: true,
                 value: "123-45-678",
+            },
+            {
+                title: "Username Override",
+                value: this.getUsername(),
+                key: "mac",
             }
         ]
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
+        this.storage.setItem(key, value.toString());
     }
 
     async start() {
@@ -123,7 +135,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
         this.storage.setItem('defaultIncluded', JSON.stringify(defaultIncluded));
 
         this.bridge.publish({
-            username: mac,
+            username: this.getUsername(),
             pincode: '123-45-678',
             port: Math.round(Math.random() * 30000 + 10000),
         }, true);

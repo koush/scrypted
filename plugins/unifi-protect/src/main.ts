@@ -4,7 +4,7 @@ import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate } from "./unifi-
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings {
+class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor {
     protect: UnifiProtect;
     activityTimeout: NodeJS.Timeout;
 
@@ -38,10 +38,12 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
     async getVideoStream(): Promise<MediaObject> {
-        var u = this.metadata.rtsp;
-        if (u == null) {
-            return null;
-        }
+        const camera = this.protect.api.Cameras.find(camera => camera.id === this.nativeId);
+        const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled);
+        const rtspChannel = rtspChannels[0];
+
+        const { rtspAlias } = rtspChannel;
+        const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
 
         return mediaManager.createFFmpegMediaObject({
             inputArguments: [
@@ -77,23 +79,6 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         });
 
         return video;
-    }
-    getSetting(key: string): string | number {
-        return this.storage.getItem(key);
-    }
-    async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'ffmpeg',
-                title: 'Force FFMPEG',
-                value: this.getSetting('ffmpeg')?.toString(),
-                description: "Use ffmpeg instead of built in RTSP decoder.",
-                type: 'Boolean',
-            }
-        ];
-    }
-    async putSetting(key: string, value: string | number) {
-        this.storage.setItem(key, value.toString());
     }
 }
 
@@ -188,7 +173,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
             await this.api.refreshDevices();
             this.api.eventListener?.on('message', this.listener);
             this.api.eventListener?.on('close', async () => {
-                this.log.e('Event Listener closed. Reconnecting in 10 seconds.');
+                this.console.error('Event Listener closed. Reconnecting in 10 seconds.');
                 await new Promise(resolve => setTimeout(resolve, 10000));
                 this.discoverDevices(0);
             })
@@ -196,7 +181,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
             const devices: Device[] = [];
 
             if (!this.api.Cameras) {
-                this.log.e('Cameras failed to load. Retrying in 10 seconds.');
+                this.console.error('Cameras failed to load. Retrying in 10 seconds.');
                 setTimeout(() => {
                     this.discoverDevices(0);
                 }, 10000);
@@ -217,28 +202,15 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     camera = await this.api.updateChannels(camera);
                 }
 
-                const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled)
-                if (!rtspChannels.length) {
-                    log.a(`RTSP is not enabled on the Unifi Camera: ${camera.name}`);
-                    continue;
-                }
-                const rtspChannel = rtspChannels[0];
-
-                const { rtspAlias } = rtspChannel;
-
                 const d = {
                     name: camera.name,
                     nativeId: camera.id,
                     interfaces: [
-                        // ScryptedInterface.Settings,
                         ScryptedInterface.Camera,
                         ScryptedInterface.VideoCamera,
                         ScryptedInterface.MotionSensor,
                     ],
                     type: ScryptedDeviceType.Camera,
-                    metadata: {
-                        rtsp: `rtsp://${ip}:7447/${rtspAlias}`
-                    }
                 };
                 if (camera.featureFlags.hasChime) {
                     d.interfaces.push(ScryptedInterface.BinarySensor);

@@ -36,6 +36,6 @@
    "dependencies": {
       "axios": "^0.19.2",
       "crypto-js": "^3.1.9-1",
-      "node-botvac": "github:koush/node-botvac#9aee6fb4e6963a38a94d77d9c43b85e83e8c90a7"
+      "node-botvac": "file:./node-botvac"
    }
 }
