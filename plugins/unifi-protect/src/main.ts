@@ -1,10 +1,10 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, VideoStreamOptions } from "@scrypted/sdk";
 import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate } from "./unifi-protect/src/protect-api-updates";
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings {
+class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings {
     protect: UnifiProtect;
     activityTimeout: NodeJS.Timeout;
 
@@ -58,7 +58,25 @@ class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
             ]
         });
     }
-    async getVideoStreamOptions() {
+    async getVideoStreamOptions(): Promise<VideoStreamOptions[] | void> {
+        const camera = this.protect.api.Cameras.find(camera => camera.id === this.nativeId);
+        const video: VideoStreamOptions[] = camera.channels.map(channel => {
+            return {
+                video: {
+                    name: channel.name,
+                    codec: 'h264',
+                    width: channel.width,
+                    height: channel.height,
+                    bitrate: channel.maxBitrate,
+                    minBitrate: channel.minBitrate,
+                    maxBitrate: channel.maxBitrate,
+                    fps: channel.fps,
+                    idrIntervalMillis: channel.idrInterval * 1000,
+                }
+            }
+        });
+
+        return video;
     }
     getSetting(key: string): string | number {
         return this.storage.getItem(key);
@@ -82,7 +100,7 @@ class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
 class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvider {
     authorization: string | undefined;
     accessKey: string | undefined;
-    cameras: Map<string, RtspCamera> = new Map();
+    cameras: Map<string, UnifiCamera> = new Map();
     api: ProtectApi;
     startup: Promise<void>;
 
@@ -136,7 +154,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     constructor() {
         super();
 
-        this.startup  =this.discoverDevices(0)
+        this.startup = this.discoverDevices(0)
     }
 
     async discoverDevices(duration: number) {
@@ -185,7 +203,20 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 return;
             }
 
-            for (const camera of this.api.Cameras) {
+            for (let camera of this.api.Cameras) {
+                let needUpdate = false;
+                for (const channel of camera.channels) {
+                    if (channel.idrInterval !== 4 || !channel.isRtspEnabled) {
+                        channel.idrInterval = 4;
+                        channel.isRtspEnabled = true;
+                        needUpdate = true;
+                    }
+                }
+
+                if (needUpdate) {
+                    camera = await this.api.enableRtsp(camera);
+                }
+
                 const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled)
                 if (!rtspChannels.length) {
                     log.a(`RTSP is not enabled on the Unifi Camera: ${camera.name}`);
@@ -232,7 +263,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         await this.startup;
         if (this.cameras.has(nativeId))
             return this.cameras.get(nativeId);
-        const ret = new RtspCamera(this, nativeId);
+        const ret = new UnifiCamera(this, nativeId);
         this.cameras.set(nativeId, ret);
         return ret;
     }
