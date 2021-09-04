@@ -127,7 +127,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         if (nativeId?.startsWith('automation:'))
             return this.automations.get(nativeId);
         if (nativeId?.startsWith('aggregate:'))
-            return createAggregateDevice(nativeId);
+            return this.aggregate.get(nativeId);
     }
 
     async discoverDevices(duration: number) {

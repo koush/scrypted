@@ -1,5 +1,4 @@
 <template>
-  <v-flex>
     <v-card raised  style="margin-bottom: 60px">
       <v-card-title
         class="green-gradient subtitle-1 text--white font-weight-light"
@@ -14,23 +13,20 @@
               <InterfaceMultiselect
                 @input="onChange"
                 v-model="device.deviceInterfaces"
-                name="Interfaces"
+                name="Selected Device Interfaces"
               ></InterfaceMultiselect>
-              <InterfaceMultiselect
+              <!-- <InterfaceMultiselect
                 @input="onChange"
                 v-model="device.deviceEvents"
                 name="Events"
-              ></InterfaceMultiselect>
+              ></InterfaceMultiselect> -->
             </v-flex>
           </v-layout>
         </v-container>
       </v-form>
     </v-card>
-  </v-flex>
 </template>
 <script>
-import cloneDeep from "lodash/cloneDeep";
-
 import InterfaceMultiselect from "./InterfaceMultiselect.vue";
 
 export default {
@@ -44,7 +40,6 @@ export default {
       device = JSON.parse(this.value);
     } catch (e) {
       device = {
-        deviceEvents: [],
         deviceInterfaces: [],
       };
     }
@@ -56,13 +51,6 @@ export default {
   methods: {
     onChange() {
       this.$emit("input", JSON.stringify(this.device));
-    },
-  },
-  computed: {
-    mappedInterfaces: {
-      get: function () {
-        return this.mapThem();
-      },
     },
   },
 };

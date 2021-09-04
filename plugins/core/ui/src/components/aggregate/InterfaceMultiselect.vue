@@ -5,7 +5,7 @@
     :options="mappedInterfaces"
     :multiple="true"
     @input="onInput"
-    :hint="`<a href='https://developer.scrypted.app/#${name.toLowerCase()}'>${name}</a>`"
+    :hint="`<a href='https://developer.scrypted.app/#interfaces'>Interfaces</a>`"
   ></Select2>
 </template>
 <script>
@@ -16,6 +16,7 @@ export default {
   props: {
     name: String,
     value: Array,
+    filter: Function,
   },
   mixins: [CustomValue],
   components: {
@@ -33,6 +34,7 @@ export default {
     },
     mapThem: function () {
       const ret = [];
+      const filter = this.filter || (() => true);
       for (const id of Object.keys(
         this.$scrypted.systemManager.getSystemState()
       )) {
@@ -41,7 +43,7 @@ export default {
           device.interfaces.map((iface) => ({
             id: `${device.id}#${iface}`,
             text: `${device.name} (${iface})`,
-          }))
+          })).filter(filter)
         );
       }
 
