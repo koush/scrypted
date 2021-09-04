@@ -214,7 +214,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 }
 
                 if (needUpdate) {
-                    camera = await this.api.enableRtsp(camera);
+                    camera = await this.api.updateChannels(camera);
                 }
 
                 const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled)

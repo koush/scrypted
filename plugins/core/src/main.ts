@@ -322,7 +322,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             params: {},
         }, request);
         normalizedRequest.url = normalizedRequest.url.replace(normalizedRequest.rootPath, '');
-        if (normalizedRequest.url == '/') {
+        if (normalizedRequest.url == '/' || normalizedRequest.url == '/?') {
             normalizedRequest.url = '/index.html';
         }
 
