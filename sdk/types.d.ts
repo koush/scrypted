@@ -60,7 +60,7 @@ export interface ScryptedDevice {
   /**
    * Subscribe to events from a specific interface on a device, such as 'OnOff' or 'Brightness'.
    */
-  listen(event: ScryptedInterface|string|EventListenerOptions, callback: (eventSource: ScryptedDevice|null, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister;
+  listen(event: ScryptedInterface|string|EventListenerOptions, callback: EventListener): EventListenerRegister;
 
   setName(name: string): Promise<void>;
 
@@ -98,7 +98,7 @@ export interface EventListener {
   /**
    * This device type can be hooked by Automation actions to handle events. The event source, event details (interface, time, property), and event data are all passed to the listener as arguments.
    */
-  onEvent(eventSource: ScryptedDevice|null, eventDetails: EventDetails, eventData: any): Promise<void>;
+  (eventSource: ScryptedDevice|undefined, eventDetails: EventDetails, eventData: any): void;
 
 }
 export interface EventDetails {
@@ -828,12 +828,12 @@ export interface SystemManager {
   /**
    * Passively (without polling) listen to property changed events.
    */
-  listen(EventListener: (eventSource: ScryptedDevice|null, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister;
+  listen(EventListener: EventListener): EventListenerRegister;
 
   /**
    * Subscribe to events from a specific interface on a device id, such as 'OnOff' or 'Brightness'. This is a convenience method for ScryptedDevice.listen.
    */
-  listenDevice(id: string, event: ScryptedInterface|string|EventListenerOptions, callback: (eventSource: ScryptedDevice|null, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister;
+  listenDevice(id: string, event: ScryptedInterface|string|EventListenerOptions, callback: EventListener): EventListenerRegister;
 
   /**
    * Remove a device from Scrypted. Plugins should use DeviceManager.onDevicesChanged or DeviceManager.onDeviceRemoved to remove their own devices

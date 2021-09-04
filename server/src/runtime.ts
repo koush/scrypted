@@ -525,8 +525,10 @@ export class ScryptedRuntime {
         const providedInterfaces = device.interfaces || [];
         // assure final mixin resolved interface list has at least all the
         // interfaces from the provided. the actual list will resolve lazily.
-        let mixinInterfaces = providedInterfaces.slice();
-        mixinInterfaces.push(...getState(pluginDevice, ScryptedInterfaceProperty.interfaces) || []);
+        let mixinInterfaces: string[] = [];
+        if (pluginDevice.mixins?.length)
+            mixinInterfaces.push(...getState(pluginDevice, ScryptedInterfaceProperty.interfaces) || []);
+        mixinInterfaces.push(...providedInterfaces.slice());
         mixinInterfaces = [...new Set(mixinInterfaces)];
 
         setState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);

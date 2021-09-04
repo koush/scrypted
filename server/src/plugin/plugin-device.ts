@@ -80,6 +80,8 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                     const interfaces = await (mixin.canMixin(type, allInterfaces) as any) as ScryptedInterface[];
                     if (!interfaces) {
                         console.warn(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
+                        pluginDevice.mixins = pluginDevice.mixins.filter(mid => mid == mixinId);
+                        this.scrypted.datastore.upsert(pluginDevice);
                         continue;
                     }
 
