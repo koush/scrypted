@@ -17,32 +17,44 @@ export interface FFMpegRebroadcastSession {
     server: Server;
     cp: ChildProcess;
     ffmpegInput: FFMpegInput;
+    kill(): void;
+    isActive(): boolean;
+    resetActivityTimer(): void;
+    events: EventEmitter;
 }
 
 export interface FFMpegRebroadcastOptions {
-    vcodec: string;
-    acodec: string;
+    vcodec: string[];
+    acodec: string[];
 }
 
 export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options: FFMpegRebroadcastOptions): Promise<FFMpegRebroadcastSession> {
     return new Promise(async (resolve) => {
         let clients = 0;
         let timeout: any;
-        const startTimeout = () => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                cp?.kill();
-                server?.close();
-                rebroadcast?.close();
-            }, 30000);
-        }
-        startTimeout();
-
+        let isActive = true;
         const events = new EventEmitter();
 
+        function kill() {
+            if (isActive) {
+                events.emit('killed');
+            }
+            isActive = false;
+            cp?.kill();
+            server?.close();
+            rebroadcast?.close();
+        }
+
+        function resetActivityTimer() {
+            clearTimeout(timeout);
+            timeout = setTimeout(kill, 30000);
+        }
+
+        resetActivityTimer();
+
         const rebroadcast = createServer(socket => {
-            console.log('rebroadcast client');
             clients++;
+            console.log('rebroadcast client', clients);
 
             clearTimeout(timeout)
 
@@ -54,7 +66,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
                 events.removeListener('data', data);
                 clients--;
                 if (clients === 0) {
-                    startTimeout();
+                    resetActivityTimer();
                 }
             }
 
@@ -78,6 +90,10 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
             })();
 
             resolve({
+                events,
+                resetActivityTimer,
+                isActive() { return isActive },
+                kill,
                 server: rebroadcast,
                 cp,
                 ffmpegInput: {
@@ -97,8 +113,8 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
         args.push(
             '-f', 'mpegts',
-            '-vcodec', options.vcodec,
-            ...(options.acodec ? ['-acodec', options.acodec] : ['-an']),
+            ...(options.vcodec || []),
+            ...(options.acodec || []),
             `tcp://127.0.0.1:${serverPort}`
         );
 
