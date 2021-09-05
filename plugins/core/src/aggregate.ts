@@ -112,6 +112,7 @@ function createVideoCamera(devices: VideoCamera[]): VideoCamera {
             // can this be raw frames?
             vcodec: ['-vcodec', 'libx264'],
             acodec: undefined,
+            timeout: 30000,
         });
 
         return ret;

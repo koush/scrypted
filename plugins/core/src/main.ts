@@ -168,6 +168,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         peer.params.userStorage = userStorage;
 
         class PluginAPIImpl implements PluginAPI {
+            deliverPush(endpoint: string, request: HttpRequest): Promise<void> {
+                return endpointManager.deliverPush(endpoint, request);
+            }
             async getMediaManager(): Promise<MediaManager> {
                 return mediaManager;
             }

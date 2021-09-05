@@ -4,7 +4,7 @@ import { ChildProcess } from 'child_process';
 import { FFMpegInput } from '@scrypted/sdk/types';
 import { listenZeroCluster } from './listen-cluster';
 import { readLength } from './read-length';
-import { EventEmitter } from 'events';
+import { EventEmitter, once } from 'events';
 
 export interface MP4Atom {
     header: Buffer;
@@ -26,6 +26,7 @@ export interface FFMpegRebroadcastSession {
 export interface FFMpegRebroadcastOptions {
     vcodec: string[];
     acodec: string[];
+    timeout?: number;
 }
 
 export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options: FFMpegRebroadcastOptions): Promise<FFMpegRebroadcastSession> {
@@ -46,8 +47,10 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         }
 
         function resetActivityTimer() {
+            if (!options.timeout)
+                return;
             clearTimeout(timeout);
-            timeout = setTimeout(kill, 30000);
+            timeout = setTimeout(kill, options.timeout);
         }
 
         resetActivityTimer();
@@ -83,9 +86,27 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
             server.close();
 
             (async() => {
+                let pending: Buffer[] = [];
+                let pendingSize = 0;
                 while (true) {
-                    const data = await readLength(socket, 188);
-                    events.emit('data', data);
+                    const data: Buffer = socket.read();
+                    if (!data) {
+                        await once(socket, 'readable');
+                        continue;
+                    }
+                    pending.push(data);
+                    pendingSize += data.length;
+                    if (pendingSize < 188)
+                        continue;
+
+                    const concat = Buffer.concat(pending);
+
+                    const remaining = concat.length % 188;
+                    const left = concat.slice(0, concat.length - remaining);
+                    const right = concat.slice(concat.length - remaining);
+                    pending = [right];
+                    pendingSize = right.length;
+                    events.emit('data', left);
                 }
             })();
 
@@ -98,10 +119,8 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
                 cp,
                 ffmpegInput: {
                     inputArguments: [
-                        '-f',
-                        'mpegts',
-                        '-i',
-                        `tcp://127.0.0.1:${rebroadcastPort}`
+                        '-f', 'mpegts',
+                        '-i', `tcp://127.0.0.1:${rebroadcastPort}`,
                     ]
                 },
             });
@@ -121,10 +140,9 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         console.log(args);
 
         const cp = child_process.spawn('ffmpeg', args, {
-            // stdio: 'ignore',
+            stdio: 'ignore',
         });
-        cp.stdout.on('data', data => console.log(data.toString()));
-        cp.stderr.on('data', data => console.error(data.toString()));
-
+        // cp.stdout.on('data', data => console.log(data.toString()));
+        // cp.stderr.on('data', data => console.error(data.toString()));
     });
 }
