@@ -1,6 +1,6 @@
 // webpack polyfill 'usage' does not seem to work on modules.
 // include directly.
-import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting } from '@scrypted/sdk';
+import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface } from '@scrypted/sdk';
 const { log } = sdk;
 import { myQApi, myQDevice } from './myq/src';
 import throttle from 'lodash/throttle';
@@ -69,8 +69,8 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
       devices.push({
         name: device.name,
         nativeId: device.serial_number,
-        interfaces: ['Entry', 'Refresh'],
-        type: ScryptedDeviceType.Entry,
+        interfaces: [ScryptedInterface.Entry, ScryptedInterface.EntrySensor, ScryptedInterface.Refresh],
+        type: ScryptedDeviceType.Garage,
       });
     }
 
@@ -90,7 +90,7 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
   }
 }
 
-class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh {
+class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh, EntrySensor {
   controller: GarageController;
 
   constructor(controller: GarageController, public device: myQDevice) {
