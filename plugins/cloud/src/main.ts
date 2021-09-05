@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BufferConverter, OauthClient, ScryptedDeviceBase, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
+import { BufferConverter, DeviceProvider, HttpRequest, OauthClient, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
 import qs from 'query-string';
 import { GcmRtcManager, GcmRtcConnection } from './legacy';
 import { Duplex } from 'stream';
@@ -8,10 +8,10 @@ import tls from 'tls';
 import HttpProxy from 'http-proxy';
 import { Server, createServer } from 'http';
 import Url from 'url';
-import {once} from 'events';
-import sdk from '@scrypted/sdk';
+import sdk from "@scrypted/sdk";
+import { once } from 'events';
 
-const {deviceManager} = sdk;
+const {deviceManager, endpointManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
 
@@ -33,7 +33,7 @@ export async function createDefaultRtcManager(): Promise<GcmRtcManager> {
     return manager;
 }
 
-async function whitelist(localUrl: string, ttl: number): Promise<Buffer|string> {
+async function whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer | string> {
     const local = Url.parse(localUrl);
     const token_info = localStorage.getItem('token_info');
     const q = qs.stringify({
@@ -46,20 +46,36 @@ async function whitelist(localUrl: string, ttl: number): Promise<Buffer|string> 
         },
     })
 
-    const {userToken, userTokenSignature} = scope.data;
+    const { userToken, userTokenSignature } = scope.data;
     const tokens = qs.stringify({
         user_token: userToken,
         user_token_signature: userTokenSignature
     })
 
-    const url = `https://home.scrypted.app${local.path}?${tokens}`;
+    const url = `${baseUrl}${local.path}?${tokens}`;
     return url;
 }
 
-class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter {
+class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
+    constructor() {
+        super('push');
+
+        this.fromMimeType = ScryptedMimeTypes.PushEndpoint;
+        this.toMimeType = ScryptedMimeTypes.Url;
+    }
+
+
+    async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer | string> {
+        const url = `http://localhost/push/${data}`;
+        return whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, 'https://home.scrypted.app/_punch/cloudmessage');
+    }
+}
+
+class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider {
     manager: GcmRtcManager;
     server: Server;
     proxy: HttpProxy;
+    push: ScryptedPush;
 
     constructor() {
         super();
@@ -68,10 +84,27 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.fromMimeType = `${ScryptedMimeTypes.LocalUrl};${ScryptedMimeTypes.AcceptUrlParameter}=true`;
         this.toMimeType = ScryptedMimeTypes.Url;
+
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Cloud Push Endpoint',
+                    nativeId: 'push',
+                    interfaces: [ScryptedInterface.BufferConverter],
+                },
+            );
+            this.push = new ScryptedPush();
+        })();
     }
 
-    async convert(data: Buffer|string, fromMimeType: string): Promise<Buffer|string> {
-        return whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000);
+    async discoverDevices(duration: number) {
+    }
+    getDevice(nativeId: string) {
+        return this.push;
+    }
+
+    async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer | string> {
+        return whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, 'https://home.scrypted.app');
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -134,7 +167,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         // this.server = net.createServer(conn => console.log('connectionz')) as any;
-        
+
         // listen(0) does not work in a cluster!!!
         // https://nodejs.org/api/cluster.html#cluster_how_it_works
         // server.listen(0) Normally, this will cause servers to listen on a random port.
@@ -142,7 +175,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         // do listen(0). In essence, the port is random the first time, but predictable thereafter.
         // To listen on a unique port, generate a port number based on the cluster worker ID.
         this.server.listen(10081 + Math.round(Math.random() * 10000), '127.0.0.1');
-        
+
         await once(this.server, 'listening');
         const port = (this.server.address() as any).port;
 
@@ -150,9 +183,24 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             target: `https://localhost:9443`,
             secure: false,
         });
-        this.proxy.on('error', () => {})
+        this.proxy.on('error', () => { })
 
         this.manager = await createDefaultRtcManager();
+        this.manager.on('unhandled', message => {
+            if (message.type !== 'cloudmessage')
+                return;
+            try {
+                const payload = JSON.parse(message.request) as HttpRequest;
+                if (!payload.rootPath?.startsWith('/push/'))
+                    return;
+                const endpoint = payload.rootPath.replace('/push/', '');
+                payload.rootPath = '/';
+                endpointManager.deliverPush(endpoint, payload)
+            }
+            catch (e) {
+                this.console.error('cloudmessage error', e);
+            }
+        });
         this.manager.listen("http://localhost", (conn: GcmRtcConnection) => {
             conn.on('socket', async (command: string, socket: Duplex) => {
                 let local: any;
@@ -177,14 +225,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 socket.pipe(local).pipe(socket);
             });
         })
-        
-        const token_info = localStorage.getItem('token_info');
-        if (token_info) {
-            const q = qs.stringify({
-                fcm_registration_id: this.manager.registrationId,
-                sender_id: DEFAULT_SENDER_ID,
-            })
-        }
     }
 }
 

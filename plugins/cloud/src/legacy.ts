@@ -500,7 +500,9 @@ export class GcmRtcManager extends EventEmitter {
         self.onMessage(notification.notification.data);
       }
       catch (e) {
-        console.error('unhandled message', notification.notification.data, e);
+        if (!self.emit('unhandled', notification.notification.data, e)) {
+          console.error('unhandled message', notification.notification.data, e);
+        }
       }
       // console.log(notification)
     });
