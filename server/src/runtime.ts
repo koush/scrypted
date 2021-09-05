@@ -1,7 +1,7 @@
 import { Level } from './level';
 import { PluginHost } from './plugin/plugin-host';
 import cluster from 'cluster';
-import { Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types';
+import { Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { Plugin, PluginDevice, ScryptedAlert } from './db-types';
 import { getState, ScryptedStateManager, setState } from './state';
@@ -167,6 +167,40 @@ export class ScryptedRuntime {
         }
     }
 
+    async getPluginForEndpoint(endpoint: string) {
+        let pluginHost = this.plugins[endpoint] ?? this.getPluginHostForDeviceId(endpoint);
+        if (!pluginHost && endpoint === '@scrypted/core') {
+            try {
+                pluginHost = await this.installNpm('@scrypted/core');
+            }
+            catch (e) {
+                console.error('@scrypted/core auto install failed', e);
+            }
+        }
+
+        const pluginDevice = this.findPluginDevice(endpoint) ?? this.findPluginDeviceById(endpoint);
+
+        return {
+            pluginHost,
+            pluginDevice,
+        };
+    }
+
+    async deliverPush(endpoint: string, request: HttpRequest) {
+        const { pluginHost, pluginDevice } = await this.getPluginForEndpoint(endpoint);
+        if (!pluginDevice) {
+            console.error('plugin device missing for', endpoint);
+            return;
+        }
+
+        if (!pluginDevice?.state.interfaces.value.includes(ScryptedInterface.PushHandler)) {
+            return;
+        }
+
+        const handler = this.getDevice<PushHandler>(pluginDevice._id);
+        return handler.onPush(request);
+    }
+
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
         handler: (req: Request, res: Response, endpointRequest: HttpRequest, pluginHost: PluginHost, pluginDevice: PluginDevice) => void) {
 
@@ -195,17 +229,7 @@ export class ScryptedRuntime {
         if (owner)
             endpoint = `@${owner}/${endpoint}`;
 
-        let pluginHost = this.plugins[endpoint] ?? this.getPluginHostForDeviceId(endpoint);
-        if (!pluginHost && endpoint === '@scrypted/core') {
-            try {
-                pluginHost = await this.installNpm('@scrypted/core');
-            }
-            catch (e) {
-                console.error('@scrypted/core auto install failed', e);
-            }
-        }
-
-        const pluginDevice = this.findPluginDevice(endpoint) ?? this.findPluginDeviceById(endpoint);
+        const { pluginHost, pluginDevice } = await this.getPluginForEndpoint(endpoint);
 
         // check if upgrade requests can be handled. must be websocket.
         if (isUpgrade) {

@@ -1,4 +1,4 @@
-import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaObject, SystemDeviceState, MediaManager } from '@scrypted/sdk/types'
+import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaObject, SystemDeviceState, MediaManager, HttpRequest } from '@scrypted/sdk/types'
 
 export interface PluginLogger {
     log(level: string, message: string): Promise<void>;
@@ -23,6 +23,8 @@ export interface PluginAPI {
 
     ioClose(id: string): Promise<void>;
     ioSend(id: string, message: string): Promise<void>;
+
+    deliverPush(endpoint: string, request: HttpRequest): Promise<void>;
 
     getLogger(nativeId: string): Promise<PluginLogger>;
 

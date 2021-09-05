@@ -1,7 +1,7 @@
 import cluster from 'cluster';
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, MediaManager, SystemDeviceState, ScryptedStatic } from '@scrypted/sdk/types'
+import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, MediaManager, SystemDeviceState, ScryptedStatic, HttpRequest } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
@@ -132,6 +132,10 @@ export class PluginHost {
         class PluginAPIImpl implements PluginAPI {
             getMediaManager(): Promise<MediaManager> {
                 return null;
+            }
+
+            async deliverPush(endpoint: string, httpRequest: HttpRequest) {
+                return scrypted.deliverPush(endpoint, httpRequest);
             }
 
             async getLogger(nativeId: string): Promise<Logger> {

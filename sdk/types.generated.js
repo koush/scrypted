@@ -544,6 +544,7 @@ module.exports.ScryptedMimeTypes = {
   Url: 'text/x-uri',
   InsecureLocalUrl: 'text/x-insecure-local-uri',
   LocalUrl: 'text/x-local-uri',
+  PushEndpoint: 'text/x-push-endpoint',
   FFmpegInput: 'x-scrypted/x-ffmpeg-input',
   RTCAVOffer: 'x-scrypted/x-rtc-av-offer',
   RTCAVAnswer: 'x-scrypted/x-rtc-av-answer',

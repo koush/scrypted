@@ -795,6 +795,11 @@ export interface EndpointManager {
    */
   getPublicPushEndpoint(nativeId: string): Promise<string>;
 
+  /**
+   * Deliver a push notification to the system.
+   */
+  deliverPush(endpoint: string, request: HttpRequest): Promise<void>;
+
 }
 /**
  * SystemManager is used by scripts to query device state and access devices.
@@ -1050,6 +1055,7 @@ export enum ScryptedMimeTypes {
   Url = 'text/x-uri',
   InsecureLocalUrl = 'text/x-insecure-local-uri',
   LocalUrl = 'text/x-local-uri',
+  PushEndpoint = 'text/x-push-endpoint',
   FFmpegInput = 'x-scrypted/x-ffmpeg-input',
   RTCAVOffer = 'x-scrypted/x-rtc-av-offer',
   RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',

@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import { Volume } from 'memfs';
 import path from 'path';
-import { DeviceManager, Logger, Device, DeviceManifest, DeviceState, EventDetails, EventListenerOptions, EventListenerRegister, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types'
+import { DeviceManager, Logger, Device, DeviceManifest, DeviceState, EventDetails, EventListenerOptions, EventListenerRegister, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from '../server-settings';
 import { PluginAPI, PluginLogger, PluginRemote } from './plugin-api';
 import { SystemManagerImpl } from './system';
@@ -91,8 +91,12 @@ class EndpointManagerImpl implements EndpointManager {
     async getPublicLocalEndpoint(nativeId?: string): Promise<string> {
         return `https://${getIpAddress()}:${SCRYPTED_SECURE_PORT}/endpoint/${this.getEndpoint(nativeId)}/public/`;
     }
-    getPublicPushEndpoint(nativeId?: string): Promise<string> {
-        throw new Error('Method not implemented.');
+    async getPublicPushEndpoint(nativeId?: string): Promise<string> {
+        const mo = this.mediaManager.createMediaObject(Buffer.from(this.getEndpoint(nativeId)), ScryptedMimeTypes.PushEndpoint);
+        return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.PushEndpoint);
+    }
+    async deliverPush(endpoint: string, request: HttpRequest) {
+        return this.api.deliverPush(endpoint, request);
     }
 }
 
