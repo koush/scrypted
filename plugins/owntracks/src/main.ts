@@ -15,10 +15,10 @@ class OwntracksRegion extends ScryptedDeviceBase implements OccupancySensor, Set
         return null;
     }
     // create settings that correspond to allowed usernames in this region
-    getSettings(): Setting[] {
-        var ret: Setting[] = [];
-        for (var i = 0; i < this.storage.length; i++) {
-            var key = this.storage.key(i);
+    async getSettings(): Promise<Setting[]> {
+        const ret: Setting[] = [];
+        for (let i = 0; i < this.storage.length; i++) {
+            const key = this.storage.key(i);
             ret.push({
                 key,
                 value: key,
@@ -35,7 +35,7 @@ class OwntracksRegion extends ScryptedDeviceBase implements OccupancySensor, Set
         return ret;
     }
     // create/rename users
-    putSetting(key: string, value: string | number | boolean): void {
+    async putSetting(key: string, value: string | number | boolean) {
         if (key == 'new-user') {
             this.storage.setItem(value as string, false.toString());
             return;
@@ -49,8 +49,8 @@ class OwntracksRegion extends ScryptedDeviceBase implements OccupancySensor, Set
     // look at the user status for every user, and send the correct event.
     // todo: timestamp? purge old users?
     sendOccupancyEvent() {
-        for (var i = 0; i < this.storage.length; i++) {
-            var key = this.storage.key(i);
+        for (let i = 0; i < this.storage.length; i++) {
+            const key = this.storage.key(i);
             if (this.storage.getItem(key) === 'true') {
                 this.occupied = true;
                 return;
@@ -77,7 +77,7 @@ class Owntracks extends ScryptedDeviceBase implements PushHandler, Settings, Dev
     // owntracks will call the endpoint with a password, so set up a simple password store
     // that can be accessed via the scrypted web ui. this allows revocation of passwords,
     // and denial of unauthorized users that may have the owntracks private http endpoint.
-    getPasswords(): string[] {
+    async getPasswords(): Promise<string[]> {
         try {
             return JSON.parse(localStorage.getItem('passwords')) || [];
         }
@@ -85,35 +85,45 @@ class Owntracks extends ScryptedDeviceBase implements PushHandler, Settings, Dev
             return [];
         }
     }
+
+    get passwords(): string[] {
+        try {
+            return JSON.parse(localStorage.getItem('passwords')) || [];
+        }
+        catch (e) {
+            return [];
+        }
+    }
+
     savePasswords(passwords: string[]) {
-        var uniques = {};
+        const uniques = {};
         passwords.map(password => uniques[password] = true);
         passwords = Object.keys(uniques);
         localStorage.setItem('passwords', JSON.stringify(passwords));
     }
-    addPassword(password: string): void {
-        var passwords = this.getPasswords();
+    async addPassword(password: string) {
+        const passwords = this.passwords;
         passwords.push(password)
         this.savePasswords(passwords);
     }
-    removePassword(password: string): void {
-        var passwords = this.getPasswords();
+    async removePassword(password: string) {
+        const passwords = this.passwords;
         passwords.filter(entry => entry != password);
         this.savePasswords(passwords);
     }
-    checkPassword(password: string): boolean {
-        return this.getPasswords().includes(password);
+    async checkPassword(password: string): Promise<boolean> {
+        return this.passwords.includes(password);
     }
 
-    discoverDevices(duration: number): void {
+    async discoverDevices(duration: number) {
     }
-    getDevice(nativeId: string): object {
+    getDevice(nativeId: string) {
         return new OwntracksRegion(nativeId);
     }
     getSetting(key: string): string | number | boolean {
         return null;
     }
-    getSettings(): Setting[] {
+    async getSettings(): Promise<Setting[]> {
         // create a settings menu that shows the private http endpoint, and allows creation of new regions.
         return [
             {
@@ -130,7 +140,7 @@ class Owntracks extends ScryptedDeviceBase implements PushHandler, Settings, Dev
             },
         ];
     }
-    putSetting(key: string, value: string | number | boolean): void {
+    async putSetting(key: string, value: string | number | boolean) {
         // creat the named region from the setting.
         deviceManager.onDeviceDiscovered({
             name: value.toString(),
@@ -142,9 +152,9 @@ class Owntracks extends ScryptedDeviceBase implements PushHandler, Settings, Dev
     getEndpoint(): string {
         return "@scrypted/owntracks";
     }
-    onPush(request: HttpRequest): void {
-        var user = auth.parse(request.headers['authorization']);
-        if (!this.getPasswords().includes(user.pass)) {
+    async onPush(request: HttpRequest) {
+        const user = auth.parse(request.headers['authorization']);
+        if (!this.passwords.includes(user.pass)) {
             return;
         }
         const body = JSON.parse(request.body);
@@ -166,7 +176,7 @@ class Owntracks extends ScryptedDeviceBase implements PushHandler, Settings, Dev
         }
 
         // find all regions this user belongs to, and update them.
-        for (var nativeId of deviceManager.getNativeIds()) {
+        for (const nativeId of deviceManager.getNativeIds()) {
             let region = new OwntracksRegion(nativeId);
             let value = region.storage.getItem(user.name);
             if (value !== null) {
