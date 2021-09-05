@@ -321,15 +321,6 @@
 
     <v-flex xs12 md6 lg6>
       <v-layout row wrap>
-        <v-flex xs12 v-for="iface in noCardInterfaces" :key="iface">
-          <component
-            v-if="name != null"
-            :value="deviceState"
-            :device="device"
-            :is="iface"
-          ></component>
-        </v-flex>
-
         <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
           <v-card v-if="name != null">
             <v-card-title
@@ -342,6 +333,15 @@
               :is="iface"
             ></component>
           </v-card>
+        </v-flex>
+
+        <v-flex xs12 v-for="iface in noCardInterfaces" :key="iface">
+          <component
+            v-if="name != null"
+            :value="deviceState"
+            :device="device"
+            :is="iface"
+          ></component>
         </v-flex>
 
         <v-flex v-if="showLogs" ref="logsEl">

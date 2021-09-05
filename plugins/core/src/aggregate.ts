@@ -1,6 +1,6 @@
 import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera, VideoStreamOptions } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
-import { startRebroadcastSession } from "../../../common/src/ffmpeg-rebroadcast";
+import { FFMpegRebroadcastSession, startRebroadcastSession } from "../../../common/src/ffmpeg-rebroadcast";
 const { systemManager, mediaManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
@@ -39,77 +39,99 @@ aggregators.set(ScryptedInterface.Lock,
 
 
 function createVideoCamera(devices: VideoCamera[]): VideoCamera {
+    let sessionPromise: Promise<FFMpegRebroadcastSession>
+
+    async function getVideoStreamWrapped(options) {
+        if (sessionPromise) {
+            console.error('session already active?');
+        }
+
+        const args = await Promise.allSettled(devices.map(async (device) => {
+            const mo = await device.getVideoStream();
+            const buffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
+            const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
+            return ffmpegInput;
+        }));
+
+        const inputs = args.map(arg => (arg as PromiseFulfilledResult<FFMpegInput>).value).filter(input => !!input);
+
+        if (!inputs.length)
+            throw new Error('no inputs');
+
+        let dim = 1;
+        while (dim * dim < inputs.length) {
+            dim++;
+        }
+
+        const w = 1920 / dim;
+        const h = 1080 / dim;
+
+        const filter = [
+            'nullsrc=size=1920x1080 [base];'
+        ];
+
+        const filteredInput: FFMpegInput = {
+            inputArguments: [],
+        };
+
+        for (let i = 0; i < inputs.length; i++) {
+            filteredInput.inputArguments.push(...inputs[i].inputArguments);
+            filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
+        }
+        for (let i = inputs.length; i < dim * dim; i++) {
+            filteredInput.inputArguments.push(
+                '-f', 'lavfi', '-i', `color=black:s=${w}x${h}`,
+            );
+            filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
+        }
+
+        filteredInput.inputArguments.push(
+            '-f', 'lavfi', '-i', 'anullsrc',
+        )
+
+        let prev = 'base';
+        let curx = 0;
+        let cury = 0;
+        for (let i = 0; i < dim * dim - 1; i++) {
+            let cur = `tmp${i}`;
+            cury = Math.floor(i / dim) * h;
+            filter.push(`[${prev}][pos${i}] overlay=shortest=1:x=${curx % 1920}:y=${cury % 1080} [${cur}];`);
+            prev = cur;
+            curx += w;
+        }
+
+        let i = dim * dim - 1;
+        filter.push(`[${prev}][pos${i}] overlay=shortest=1:x=${curx % 1920}:y=${cury % 1080}`);
+
+        filteredInput.inputArguments.push(
+            '-filter_complex',
+            filter.join(' '),
+        );
+
+        const ret = startRebroadcastSession(filteredInput, {
+            // can this be raw frames?
+            vcodec: ['-vcodec', 'libx264'],
+            acodec: undefined,
+        });
+
+        return ret;
+    };
+
     return {
         async getVideoStreamOptions() {
         },
+
         async getVideoStream(options) {
             if (devices.length === 1)
                 return devices[0].getVideoStream(options);
 
-            const args = await Promise.allSettled(devices.map(async (device) => {
-                const mo = await device.getVideoStream();
-                const buffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
-                const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
-                return ffmpegInput;
-            }));
-
-            const inputs = args.map(arg => (arg as PromiseFulfilledResult<FFMpegInput>).value).filter(input => !!input);
-
-            if (!inputs.length)
-                throw new Error('no inputs');
-
-            let dim = 1;
-            while (dim * dim < inputs.length) {
-                dim++;
+            if (!sessionPromise) {
+                sessionPromise = getVideoStreamWrapped(options);
+                const session = await sessionPromise;
+                session.events.on('killed', () => sessionPromise = undefined);
             }
 
-            const w = 1920 / dim;
-            const h = 1080 / dim;
-
-            const filter = [
-                'nullsrc=size=1920x1080 [base];'
-            ];
-
-            const filteredInput: FFMpegInput = {
-                inputArguments: [],
-            };
-
-            for (let i = 0; i < inputs.length; i++) {
-                filteredInput.inputArguments.push(...inputs[i].inputArguments);
-                filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
-            }
-            for (let i = inputs.length; i < dim * dim; i++) {
-                filteredInput.inputArguments.push(
-                    '-f', 'lavfi', '-i', `color=black:s=${w}x${h}`,
-                );
-                filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
-            }
-
-            let prev = 'base';
-            let curx = 0;
-            let cury = 0;
-            for (let i = 0; i < dim * dim - 1; i++) {
-                let cur = `tmp${i}`;
-                cury = Math.floor(i / dim) * h;
-                filter.push(`[${prev}][pos${i}] overlay=shortest=1:x=${curx % 1920}:y=${cury % 1080} [${cur}];`);
-                prev = cur;
-                curx += w;
-            }
-
-            let i = dim * dim - 1;
-            filter.push(`[${prev}][pos${i}] overlay=shortest=1:x=${curx % 1920}:y=${cury % 1080}`);
-
-
-            filteredInput.inputArguments.push(
-                '-filter_complex',
-                filter.join(' '),
-            );
-
-            const ret = await startRebroadcastSession(filteredInput, {
-                vcodec: 'libx264',
-                acodec: undefined,
-            });
-            return mediaManager.createFFmpegMediaObject(ret.ffmpegInput);
+            return mediaManager.createFFmpegMediaObject((await sessionPromise).ffmpegInput);
         }
     }
 }
