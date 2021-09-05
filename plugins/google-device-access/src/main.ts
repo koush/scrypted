@@ -76,14 +76,14 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
-                "-i",
-                u.toString(),
                 '-analyzeduration', '15000000',
                 '-probesize', '100000000',
                 "-reorder_queue_size",
                 "1024",
                 "-max_delay",
                 "20000000",
+                "-i",
+                u.toString(),
             ]
         })
     }

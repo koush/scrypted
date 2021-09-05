@@ -85,10 +85,6 @@ function createVideoCamera(devices: VideoCamera[]): VideoCamera {
                 filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
             }
 
-            filteredInput.inputArguments.push(
-                '-f', 'lavfi', '-i', 'anullsrc',
-            )
-
             let prev = 'base';
             let curx = 0;
             let cury = 0;
@@ -109,9 +105,10 @@ function createVideoCamera(devices: VideoCamera[]): VideoCamera {
                 filter.join(' '),
             );
 
-            // return mediaManager.createFFmpegMediaObject(ret);
-
-            const ret = await startRebroadcastSession(filteredInput);
+            const ret = await startRebroadcastSession(filteredInput, {
+                vcodec: 'libx264',
+                acodec: undefined,
+            });
             return mediaManager.createFFmpegMediaObject(ret.ffmpegInput);
         }
     }

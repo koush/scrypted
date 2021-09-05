@@ -19,14 +19,14 @@ class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
 
         return mediaManager.createFFmpegMediaObject({
             inputArguments: [
-                "-i",
-                url.toString(),
                 '-analyzeduration', '15000000',
                 '-probesize', '100000000',
                 "-reorder_queue_size",
                 "1024",
                 "-max_delay",
                 "20000000",
+                "-i",
+                url.toString(),
             ]
         });
     }

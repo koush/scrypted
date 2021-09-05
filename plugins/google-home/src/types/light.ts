@@ -24,10 +24,14 @@ addSupportedType({
                 ret.attributes['colorModel'] = 'rgb';
 
             if (device.interfaces.includes(ScryptedInterface.ColorSettingTemperature)) {
-                ret.attributes.colorTemperatureRange = {
-                    temperatureMinK: await device.getTemperatureMinK(),
-                    temperatureMaxK: await device.getTemperatureMaxK(),
-                };
+                try {
+                    ret.attributes.colorTemperatureRange = {
+                        temperatureMinK: await device.getTemperatureMinK(),
+                        temperatureMaxK: await device.getTemperatureMaxK(),
+                    };
+                }
+                catch (e) {
+                }
             }
         }
         return ret;
