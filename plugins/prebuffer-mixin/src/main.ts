@@ -1,29 +1,40 @@
 
-import { MixinProvider, ScryptedDevice, MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, VideoStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, VideoStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { FFMpegFragmentedMP4Session, MP4Atom, startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
-import { Server } from 'net';
+import { createServer, Server } from 'net';
 import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
 import EventEmitter from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
+import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { MP4Atom, parseFragmentedMP4 } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 
-const { mediaManager, log } = sdk;
+const { mediaManager } = sdk;
 
 const defaultPrebufferDuration = 15000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
+const SEND_KEYFRAME = 'sendKeyframe';
 
-interface Prebuffer {
+interface PrebufferMpegTs {
+  buffer: Buffer;
+  time: number;
+}
+
+interface PrebufferFmp4 {
   atom: MP4Atom;
   time: number;
 }
 
+
 class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
-  prebufferSession: Promise<FFMpegFragmentedMP4Session>;
-  prebuffer: Prebuffer[] = [];
-  ftyp: MP4Atom;
-  moov: MP4Atom;
+  prebufferSession: Promise<FFMpegRebroadcastSession>;
+  prebufferMpegTs: PrebufferMpegTs[] = [];
+  prebufferFmp4: PrebufferFmp4[] = [];
   events = new EventEmitter();
   released = false;
+  ftyp: MP4Atom;
+  moov: MP4Atom;
+  idrInterval = 0;
+  prevIdr = 0;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
     super(mixinDevice, mixinDeviceState, {
@@ -48,7 +59,21 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         type: 'number',
         key: PREBUFFER_DURATION_MS,
         value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
-      }
+      },
+      {
+        title: 'Detected Keyframe Interval',
+        description: "Currently detected keyframe. This value may vary based on the stream behavior.",
+        readonly: true,
+        key: 'detectedIdr',
+        value: this.idrInterval.toString(),
+      },
+      {
+        title: 'Start at Previous Keyframe',
+        description: 'Start live streams from the previous key frame. Improves startup time.',
+        type: 'boolean',
+        key: SEND_KEYFRAME,
+        value: (!!this.storage.getItem(SEND_KEYFRAME)).toString(),
+      },
     );
     return settings;
   }
@@ -65,98 +90,164 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   async startPrebufferSession() {
+    this.prebufferMpegTs = [];
+    const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await this.mixinDevice.getVideoStream(), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-    const audioArgs = [
+    const acodec = [
       '-acodec',
       'copy',
     ];
 
-    const videoArgs = [
+    const vcodec = [
       '-vcodec',
       'copy',
-      '-force_key_frames', `expr:gte(t,n_forced*1})`,
     ];
 
-    const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs);
-    const { cp, socket } = session;
-    const cleanup = () => {
-      console.log(`${this.name} prebuffer session exited`);
+    const fmp4OutputServer = createServer(async (socket) => {
+      fmp4OutputServer.close();
+      const parser = parseFragmentedMP4(socket);
+      for await (const atom of parser) {
+        const now = Date.now();
+        if (!this.ftyp) {
+          this.ftyp = atom;
+        }
+        else if (!this.moov) {
+          this.moov = atom;
+        }
+        else {
+          if (atom.type === 'mdat') {
+            if (this.prevIdr)
+              this.idrInterval = now - this.prevIdr;
+            this.prevIdr = now;
+          }
+
+          this.prebufferFmp4.push({
+            atom,
+            time: now,
+          });
+        }
+
+        while (this.prebufferFmp4.length && this.prebufferFmp4[0].time < now - prebufferDurationMs) {
+          this.prebufferFmp4.shift();
+        }
+
+        this.events.emit('atom', atom);
+      }
+    });
+    const fmp4Port = await listenZeroCluster(fmp4OutputServer);
+
+    const additionalOutputs = [
+      '-f', 'mp4',
+      ...acodec,
+      ...vcodec,
+      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+      `tcp://127.0.0.1:${fmp4Port}`
+    ];
+
+    const session = await startRebroadcastSession(ffmpegInput, {
+      additionalOutputs,
+      vcodec,
+      acodec,
+    });
+    session.events.on('killed', () => {
+      fmp4OutputServer.close();
       this.prebufferSession = undefined;
-      cp.kill();
-      socket.destroy();
-    };
-    this.startSession(session).finally(cleanup);
+    });
+    session.events.on('data', (data: Buffer) => {
+      const now = Date.now();
+      this.prebufferMpegTs.push({
+        time: now,
+        buffer: data,
+      });
+
+      while (this.prebufferMpegTs.length && this.prebufferMpegTs[0].time < now - prebufferDurationMs) {
+        this.prebufferMpegTs.shift();
+      }
+
+      this.events.emit('mpegts-data', data);
+    });
     return session;
   }
 
-  async startSession(session: FFMpegFragmentedMP4Session) {
-    const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
-
-    for await (const atom of session.generator) {
-      const now = Date.now();
-      if (!this.ftyp) {
-        this.ftyp = atom;
-      }
-      else if (!this.moov) {
-        this.moov = atom;
-      }
-      else {
-        this.prebuffer.push({
-          atom,
-          time: now,
-        });
-      }
-
-
-      while (this.prebuffer.length && this.prebuffer[0].time < now - prebufferDurationMs) {
-        this.prebuffer.shift();
-      }
-
-      this.events.emit('atom', atom);
-    }
-  }
-
   async getVideoStream(options?: VideoStreamOptions): Promise<MediaObject> {
-    if (!options || !options.prebuffer) {
-      return this.mixinDevice.getVideoStream(options);
+    this.ensurePrebufferSession();
+
+    const sendKeyframe = !!this.storage.getItem(SEND_KEYFRAME);
+
+    if (!options?.prebuffer && !sendKeyframe) {
+      const session = await this.prebufferSession;
+      const mo = mediaManager.createFFmpegMediaObject(session.ffmpegInput);
+      return mo;
     }
+
+    const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? (this.idrInterval || 4000) + 1000 : 0);
 
     console.log(this.name, 'prebuffer request started');
 
-    this.ensurePrebufferSession();
     const server = new Server(socket => {
       server.close();
 
-      const writeAtom = (atom: MP4Atom) => {
-        // console.log(`atom ${atom.type} ${atom.length}`);
-        socket.write(Buffer.concat([atom.header, atom.data]));
-      };
-
-      if (this.ftyp) {
-        writeAtom(this.ftyp);
-      }
-      if (this.moov) {
-        writeAtom(this.moov);
-      }
-
       const now = Date.now();
-      let needMoof = true;
-      for (const prebuffer of this.prebuffer) {
-        if (prebuffer.time < now - (options?.prebuffer || defaultPrebufferDuration))
-          continue;
-        if (needMoof && prebuffer.atom.type !== 'moof')
-          continue;
-        needMoof = false;
-        // console.log('writing prebuffer atom', prebuffer.atom);
-        writeAtom(prebuffer.atom);
+
+      let cleanup: () => void;
+
+      if (options?.container === 'mp4') {
+        const writeAtom = (atom: MP4Atom) => {
+          socket.write(Buffer.concat([atom.header, atom.data]));
+        };
+
+        if (this.ftyp) {
+          writeAtom(this.ftyp);
+        }
+        if (this.moov) {
+          writeAtom(this.moov);
+        }
+        const now = Date.now();
+        let needMoof = true;
+        for (const prebuffer of this.prebufferFmp4) {
+          if (prebuffer.time < now - requestedPrebuffer)
+            continue;
+          if (needMoof && prebuffer.atom.type !== 'moof')
+            continue;
+          needMoof = false;
+          // console.log('writing prebuffer atom', prebuffer.atom);
+          writeAtom(prebuffer.atom);
+        }
+
+        this.events.on('atom', writeAtom);
+
+        cleanup = () => {
+          console.log(this.name, 'prebuffer request ended');
+          this.events.removeListener('atom', writeAtom);
+          this.events.removeListener('killed', cleanup);
+          socket.removeAllListeners();
+          socket.destroy();
+        }
+
+      }
+      else {
+        const writeData = (data: Buffer) => {
+          // console.log(`atom ${atom.type} ${atom.length}`);
+          socket.write(data);
+        };
+
+        for (const prebuffer of this.prebufferMpegTs) {
+          if (prebuffer.time < now - requestedPrebuffer)
+            continue;
+          writeData(prebuffer.buffer);
+        }
+
+        this.events.on('mpegts-data', writeData);
+        cleanup = () => {
+          console.log(this.name, 'prebuffer request ended');
+          this.events.removeListener('mpegts-data', writeData);
+          this.events.removeListener('killed', cleanup);
+          socket.removeAllListeners();
+          socket.destroy();
+        }
       }
 
-      this.events.on('atom', writeAtom);
-      const cleanup = () => {
-        console.log(this.name, 'prebuffer request ended');
-        this.events.removeListener('atom', writeAtom);
-        socket.removeAllListeners();
-      }
+      this.events.once('killed', cleanup);
       socket.once('end', cleanup);
       socket.once('close', cleanup);
       socket.once('error', cleanup);
@@ -165,16 +256,15 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     setTimeout(() => server.close(), 30000);
 
     const port = await listenZeroCluster(server);
+
     const ffmpegInput: FFMpegInput = {
       inputArguments: [
-        '-f',
-        'mp4',
-        '-i',
-        `tcp://127.0.0.1:${port}`,
+        '-f', options?.container === 'mp4' ? 'mp4' : 'mpegts',
+        '-i', `tcp://127.0.0.1:${port}`,
       ],
     }
 
-    console.log(ffmpegInput.inputArguments[3]);
+    console.log(this.name, 'prebuffer ffmpeg input', ffmpegInput.inputArguments[3]);
     const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
     return mo;
   }
@@ -195,8 +285,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.released = true;
     this.prebufferSession?.then(start => {
       console.log(this.name, 'prebuffer released');
-      start.cp.kill();
-      start.socket.destroy();
+      start.kill();
     });
   }
 }
