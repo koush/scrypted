@@ -36,6 +36,7 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     console.log('fragment session starting', configuration);
     const media = await device.getVideoStream({
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
+        container: 'mp4',
     });
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
@@ -46,6 +47,7 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     let audioArgs: string[];
     if (transcodeRecording) {
         audioArgs = [
+            '-bsf:a', 'aac_adtstoasc',
             '-acodec', 'libfdk_aac',
             ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
                 ['-profile:a', 'aac_low'] :
@@ -57,6 +59,7 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     }
     else {
         audioArgs = [
+            '-bsf:a', 'aac_adtstoasc',
             '-acodec', 'copy'
         ];
     }
@@ -104,7 +107,7 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
                 pending = [];
                 yield fragment;
             }
-            // console.log('mp4 box type', type, length);
+            console.log('mp4 box type', type, length);
         }
     }
     catch (e) {
@@ -290,25 +293,30 @@ addSupportedType({
                     )
 
                     const codec = (request as StartStreamRequest).audio.codec;
-                    if (codec === AudioStreamingCodecType.OPUS || codec === AudioStreamingCodecType.AAC_ELD) {
-                        console.log('acodec', codec);
+                    args.push(
+                        "-vn", '-sn', '-dn',
+                    );
+                    if (false && !transcodeStreaming) {
                         args.push(
-                            "-vn", '-sn', '-dn',
+                            "-acodec", "copy",
+                        );
+                    }
+                    else if (codec === AudioStreamingCodecType.OPUS || codec === AudioStreamingCodecType.AAC_ELD) {
+                        args.push(
                             '-acodec', ...(codec === AudioStreamingCodecType.OPUS ?
                                 ['libopus', '-application', 'lowdelay'] :
                                 ['libfdk_aac', '-profile:a', 'aac_eld']),
                             '-flags', '+global_header',
-                            '-f', 'null',
                             '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
                             '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
                             '-ac', `${(request as StartStreamRequest).audio.channel}`,
                             "-payload_type",
                             (request as StartStreamRequest).audio.pt.toString(),
                             "-ssrc", session.audiossrc.toString(),
-                            "-f", "rtp",
                             "-srtp_out_suite", session.request.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
                             "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                             "-srtp_out_params", audioKey.toString('base64'),
+                            "-f", "rtp",
                             `srtp://${session.request.targetAddress}:${session.request.audio.port}?rtcpport=${session.request.audio.port}&pkt_size=188`
                         )
                     }
