@@ -324,6 +324,7 @@ export interface VideoStreamOptions {
    * Prebuffer time in milliseconds.
    */
    prebuffer?: number;
+   container?: string;
 
    video?: {
     name?: string;

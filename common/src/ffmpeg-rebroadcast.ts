@@ -26,6 +26,7 @@ export interface FFMpegRebroadcastSession {
 export interface FFMpegRebroadcastOptions {
     vcodec: string[];
     acodec: string[];
+    additionalOutputs?: string[];
     timeout?: number;
 }
 
@@ -71,6 +72,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
                 if (clients === 0) {
                     resetActivityTimer();
                 }
+                socket.destroy();
             }
 
             events.on('data', data);
@@ -131,6 +133,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         const args = ffmpegInput.inputArguments.slice();
 
         args.push(
+            ...(options.additionalOutputs || []),
             '-f', 'mpegts',
             ...(options.vcodec || []),
             ...(options.acodec || []),
