@@ -1,6 +1,6 @@
 
-import { Entry, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice, listenCharacteristic } from '../common'
+import { Entry, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
+import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 
@@ -13,18 +13,9 @@ addSupportedType({
         const accessory = makeAccessory(device);
 
         const service = accessory.addService(Service.GarageDoorOpener, device.name);
-        service.getCharacteristic(Characteristic.CurrentDoorState)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED);
-            });
 
-
-        device.listen({
-            event: ScryptedInterface.Entry,
-        }, (eventSource, eventDetails, data) => {
-            service.updateCharacteristic(Characteristic.CurrentDoorState, 
-                !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED);
-        })
+        bindCharacteristic(device, ScryptedInterface.Entry, service, Characteristic.CurrentDoorState,
+            () => !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED);
 
         let targetState = !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED;
         service.getCharacteristic(Characteristic.TargetDoorState)

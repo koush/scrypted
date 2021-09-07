@@ -1,9 +1,6 @@
 
 import { EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
-import { Accessory, Characteristic, Service } from './hap';
-
-const { systemManager } = sdk;
+import { Accessory, Service } from './hap';
 
 export interface DummyDevice {
     interfaces?: string[];
@@ -30,4 +27,13 @@ export function listenCharacteristic(device: ScryptedDevice, event: ScryptedInte
     }, (eventSource, eventDetails, data) => {
         service.updateCharacteristic(characteristic, data);
     })
+}
+
+export function bindCharacteristic(device: ScryptedDevice, event: ScryptedInterface, service: Service, characteristic: any, map: () => any, refresh?: boolean): EventListenerRegister {
+    service.setCharacteristic(characteristic, map());
+
+    return device.listen({
+        event,
+        watch: !refresh,
+    }, () =>  service.updateCharacteristic(characteristic, map()));
 }

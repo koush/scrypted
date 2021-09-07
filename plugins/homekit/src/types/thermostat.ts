@@ -1,6 +1,6 @@
 
 import { HumiditySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice, listenCharacteristic } from '../common'
+import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 
@@ -88,15 +88,8 @@ addSupportedType({
                 device.setThermostatSetpoint(value as number);
             })
 
-        service.getCharacteristic(Characteristic.CurrentTemperature)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, device.temperature);
-            })
-
-        service.getCharacteristic(Characteristic.TemperatureDisplayUnits)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
-            })
+        service.setCharacteristic(Characteristic.TemperatureDisplayUnits,
+            device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
 
         device.listen({
             event: ScryptedInterface.TemperatureSetting,
@@ -111,15 +104,12 @@ addSupportedType({
             service.updateCharacteristic(Characteristic.TemperatureDisplayUnits, device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
         });
 
-        listenCharacteristic(device, ScryptedInterface.Thermometer, service, Characteristic.CurrentTemperature);
+        bindCharacteristic(device, ScryptedInterface.Thermometer, service, Characteristic.CurrentTemperature,
+            () => device.temperature || 0);
 
         if (device.interfaces.includes(ScryptedInterface.HumiditySensor)) {
-            service.getCharacteristic(Characteristic.CurrentRelativeHumidity)
-                .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                    callback(null, device.humidity);
-                });
-
-            listenCharacteristic(device, ScryptedInterface.HumiditySensor, service, Characteristic.CurrentRelativeHumidity);
+            bindCharacteristic(device, ScryptedInterface.HumiditySensor, service, Characteristic.CurrentRelativeHumidity,
+                () => device.humidity || 0);
         }
 
         return accessory;

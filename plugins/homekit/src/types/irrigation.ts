@@ -1,7 +1,7 @@
 
 import { ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice, listenCharacteristic } from '../common'
-import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
+import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
+import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
 
 addSupportedType({
@@ -21,22 +21,14 @@ addSupportedType({
                 else
                     device.stop();
             })
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, !!device.running ? Characteristic.Active.ACTIVE : Characteristic.Active.INACTIVE);
-            });
 
-        listenCharacteristic(device, ScryptedInterface.StartStop, service, Characteristic.Active);
-        listenCharacteristic(device, ScryptedInterface.StartStop, service, Characteristic.InUse);
+        bindCharacteristic(device, ScryptedInterface.StartStop, service, Characteristic.Active,
+            () => !!device.running ? Characteristic.Active.ACTIVE : Characteristic.Active.INACTIVE);
+        bindCharacteristic(device, ScryptedInterface.StartStop, service, Characteristic.InUse,
+            () => !!device.running ? Characteristic.InUse.IN_USE : Characteristic.InUse.NOT_IN_USE);
 
-        service.getCharacteristic(Characteristic.InUse)
-        .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-            callback(null, !!device.running ? Characteristic.InUse.IN_USE : Characteristic.InUse.NOT_IN_USE);
-        });
-
-        service.getCharacteristic(Characteristic.RemainingDuration)
-        .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-            callback(null, 1800);
-        });
+        // todo: fix this.
+        service.setCharacteristic(Characteristic.RemainingDuration, 1800)
 
         return accessory;
     }

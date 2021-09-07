@@ -1,7 +1,7 @@
 
 import { OnOff, ScryptedDevice, ScryptedInterface } from '@scrypted/sdk'
-import { uuid, Accessory, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service, NodeCallback } from '../hap';
-import { DummyDevice, listenCharacteristic } from '../common';
+import { Accessory, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
+import { bindCharacteristic, DummyDevice } from '../common';
 import { makeAccessory } from './common';
 
 export function probe(device: DummyDevice): boolean {
@@ -20,11 +20,8 @@ export function getAccessory(device: ScryptedDevice & OnOff, serviceType: any): 
             else
                 device.turnOff();
         })
-        .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-            callback(null, !!device.on);
-        });
 
-        listenCharacteristic(device, ScryptedInterface.OnOff, service, Characteristic.On);
+    bindCharacteristic(device, ScryptedInterface.OnOff, service, Characteristic.On, () => !!device.on);
 
     return {
         accessory,

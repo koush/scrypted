@@ -4,6 +4,7 @@ import os from 'os';
 import { supportedTypes } from './common';
 import './types'
 import { CameraMixin } from './camera-mixin';
+import { maybeAddBatteryService } from './battery';
 
 const { systemManager, mediaManager } = sdk;
 
@@ -117,13 +118,14 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
             const accessory = supportedType.getAccessory(device);
             if (accessory) {
+                maybeAddBatteryService(device, accessory);
+
                 if (supportedType.noBridge) {
                     accessory.publish({
                         username: '12:34:45:54:24:44',
                         pincode: '123-45-678',
                         port: Math.round(Math.random() * 30000 + 10000),
                         category: Categories.TELEVISION,
-
                     })
                 }
                 else {

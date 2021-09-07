@@ -1,6 +1,6 @@
 
 import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice, listenCharacteristic } from '../common'
+import { addSupportedType, DummyDevice } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SnapshotRequest, SnapshotRequestCallback, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
 
@@ -107,7 +107,7 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
                 pending = [];
                 yield fragment;
             }
-            console.log('mp4 box type', type, length);
+            // console.log('mp4 box type', type, length);
         }
     }
     catch (e) {
