@@ -20,15 +20,6 @@ export function addSupportedType(type: SupportedType) {
     supportedTypes[type.type] = type;
 }
 
-export function listenCharacteristic(device: ScryptedDevice, event: ScryptedInterface, service: Service, characteristic: any, refresh?: boolean): EventListenerRegister {
-    return device.listen({
-        event,
-        watch: !refresh,
-    }, (eventSource, eventDetails, data) => {
-        service.updateCharacteristic(characteristic, data);
-    })
-}
-
 export function bindCharacteristic(device: ScryptedDevice, event: ScryptedInterface, service: Service, characteristic: any, map: () => any, refresh?: boolean): EventListenerRegister {
     service.updateCharacteristic(characteristic, map());
 
