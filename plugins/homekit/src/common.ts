@@ -30,7 +30,7 @@ export function listenCharacteristic(device: ScryptedDevice, event: ScryptedInte
 }
 
 export function bindCharacteristic(device: ScryptedDevice, event: ScryptedInterface, service: Service, characteristic: any, map: () => any, refresh?: boolean): EventListenerRegister {
-    service.setCharacteristic(characteristic, map());
+    service.updateCharacteristic(characteristic, map());
 
     return device.listen({
         event,
