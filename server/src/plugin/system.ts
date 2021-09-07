@@ -98,7 +98,7 @@ export class SystemManagerImpl implements SystemManager {
         return this.state;
     }
 
-    getDeviceById(id: string): ScryptedDevice {
+    getDeviceById(id: string): any {
         if (!this.state[id])
             return;
         let proxy = this.deviceProxies[id];
@@ -107,7 +107,7 @@ export class SystemManagerImpl implements SystemManager {
         return proxy;
     }
 
-    getDeviceByName(name: string): ScryptedDevice {
+    getDeviceByName(name: string): any {
         for (const id of Object.keys(this.state)) {
             const s = this.state[id];
             if (s.name.value === name)

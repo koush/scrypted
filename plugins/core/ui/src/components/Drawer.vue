@@ -54,15 +54,15 @@ export default {
       default() {
         return [
           {
-            id: "automation",
-            name: "Automations",
-            icon: "fa-bolt",
-            category: "Components"
-          },
-          {
             id: "script",
             name: "Plugins",
             icon: "fa-puzzle-piece",
+            category: "Components"
+          },
+          {
+            id: "automation",
+            name: "Automations",
+            icon: "fa-bolt",
             category: "Components"
           },
           {

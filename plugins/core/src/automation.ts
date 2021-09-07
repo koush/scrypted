@@ -38,6 +38,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
             this.log.i('automation is turned off, and will not be scheduled.')
             return;
         }
+        this.log.i('automation is waiting for event trigger.')
 
         try {
             const data = JSON.parse(this.storage.getItem('data'));
@@ -49,7 +50,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
 
                     let device: any;
                     if (id === 'javascript') {
-                        device = new Javascript(systemManager, eventSource, eventDetails, eventData, this.log);
+                        device = new Javascript(systemManager, this, eventSource, eventDetails, eventData, this.log);
                     }
                     else {
                         device = systemManager.getDeviceById(id);

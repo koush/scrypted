@@ -1,5 +1,5 @@
 <template>
-  <v-flex>
+  <div>
     <v-card
       raised
       
@@ -149,12 +149,11 @@
         </v-container>
       </v-form>
     </v-card>
-  </v-flex>
+  </div>
 </template>
 <script>
 import InterfacesPicker from "./InterfacesPicker.vue";
 import EventsPicker from "./EventsPicker.vue";
-import cloneDeep from "lodash/cloneDeep";
 import { ScryptedInterface } from "@scrypted/sdk/types";
 import { actionableEvents, actionableInterfaces } from "./interfaces";
 

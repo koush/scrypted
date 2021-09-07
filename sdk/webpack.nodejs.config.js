@@ -83,6 +83,7 @@ module.exports = {
             mdns: path.resolve(__dirname, 'polyfill/nodejs/mdns'),
             serialport: path.resolve(__dirname, 'polyfill/nodejs/serialport'),
             'zwave-js': path.resolve(__dirname, 'polyfill/nodejs/zwave-js'),
+            typescript: path.resolve(__dirname, 'polyfill/nodejs/typescript'),
         },
 
         extensions: ['.tsx', '.ts', '.js']

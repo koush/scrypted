@@ -23,6 +23,7 @@
     "feather-icons": "^4.28.0",
     "lodash": "^4.17.21",
     "md5": "^2.3.0",
+    "monaco-editor": "^0.27.0",
     "query-string": "^6.14.1",
     "register-service-worker": "^1.7.2",
     "semver": "^6.3.0",
@@ -33,6 +34,7 @@
     "vue-clipboard2": "^0.3.1",
     "vue-feather": "^1.1.1",
     "vue-linkify": "^1.0.1",
+    "vue-monaco": "^1.2.2",
     "vue-router": "^3.5.1",
     "vue-script2": "^2.1.0",
     "vue-slider-component": "^3.2.11",
@@ -73,6 +75,8 @@
     "babel-plugin-transform-imports": "^2.0.0",
     "eslint": "^7.21.0",
     "eslint-plugin-vue": "^7.7.0",
+    "monaco-editor-webpack-plugin": "^4.1.2",
+    "raw-loader": "^4.0.2",
     "sass": "^1.32.12",
     "sass-loader": "^10.2.0",
     "stylus": "^0.54.8",
@@ -80,7 +84,8 @@
     "typescript": "^4.2.3",
     "vue-cli-plugin-vuetify": "^2.4.2",
     "vue-template-compiler": "^2.6.12",
-    "vuetify-loader": "^1.7.2"
+    "vuetify-loader": "^1.7.2",
+    "worker-loader": "^3.0.8"
   },
   "postcss": {
     "plugins": {

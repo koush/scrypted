@@ -814,12 +814,22 @@ export interface SystemManager {
   /**
    * Find a Scrypted device by id.
    */
-  getDeviceById(id: string): ScryptedDevice|null;
+   getDeviceById(id: string): ScryptedDevice;
+
+  /**
+   * Find a Scrypted device by id.
+   */
+   getDeviceById<T>(id: string): ScryptedDevice & T;
 
   /**
    * Find a Scrypted device by name.
    */
-  getDeviceByName(name: string): ScryptedDevice|null;
+   getDeviceByName(name: string): ScryptedDevice;
+
+  /**
+   * Find a Scrypted device by name.
+   */
+   getDeviceByName<T>(name: string): ScryptedDevice & T;
 
   /**
    * Get the current state of a device.
@@ -1068,10 +1078,7 @@ export interface ScryptedInterfaceDescriptor {
     methods: string[];
 }
 
-declare const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
-export {
-    ScryptedInterfaceDescriptors
-}
+export declare const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
 
 export interface ScryptedStatic {
     /**

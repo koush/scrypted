@@ -1,4 +1,5 @@
 const path = require('path');
+const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 
 const scryptedServer = 'https://127.0.0.1:9443';
 
@@ -38,12 +39,12 @@ module.exports = {
     config.module.rule('ts').uses.delete('cache-loader');
     config.module.rule('tsx').uses.delete('cache-loader');
 
-    config.module
-      .rule('worker-loader')
-      .test(/\.worker\.js$/)
-      .use('worker-loader')
-      .loader('worker-loader')
-      .end()
+    // config.module
+    //   .rule('worker-loader')
+    //   .test(/\.worker\.js$/)
+    //   .use('worker-loader')
+    //   .loader('worker-loader')
+    //   .end()
   },
 
 
@@ -51,7 +52,9 @@ module.exports = {
     output: {
       crossOriginLoading: 'anonymous',
     },
-
+    plugins: [
+      new MonacoWebpackPlugin()
+    ],
     module: {
       rules: [
         {
