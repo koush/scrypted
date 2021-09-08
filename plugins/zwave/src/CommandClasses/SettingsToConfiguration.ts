@@ -8,7 +8,7 @@ export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings
 
         const cc = this.instance.commandClasses['Configuration'];
         if (!cc) {
-            throw new Error(`Configuration Command Class not found.`);
+            return this.getZWaveSettings();
         }
         const values = this.instance.getNodeUnsafe().getDefinedValueIDs().filter(value => value.endpoint === this.instance.index && value.commandClass === CommandClasses['Configuration']);
         const node = this.instance.getNodeUnsafe();
@@ -25,9 +25,15 @@ export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings
             setting.value = setting.choices?.[value] || value;
             settings.push(setting);
         }
-        return settings;
+        const ret = await this.getZWaveSettings();
+        ret.push(...settings);
+        return ret;
     }
     async putSetting(key: string, value: any) {
+        if (key.startsWith('zwave:')) {
+            return this.putZWaveSetting(key, value);
+        }
+
         const cc = this.instance.commandClasses['Configuration'];
         const valueId = this._getValueIdOrThrow(key);
         const node = this.instance.getNodeUnsafe();

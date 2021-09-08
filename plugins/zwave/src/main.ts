@@ -214,8 +214,11 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         }
         this.devices[nativeId] = scryptedDevice;
         // Refresh is problematic. Perhaps another method on Online to do a real health check.
-        scryptedDevice.device.interfaces.push('Refresh', 'Online');
-        // scryptedDevice.device.interfaces.push('Online');
+        scryptedDevice.device.interfaces.push(
+            ScryptedInterface.Refresh,
+            ScryptedInterface.Online,
+            ScryptedInterface.Settings,
+        );
         await deviceManager.onDeviceDiscovered(scryptedDevice.device);
         scryptedDevice.updateState();
 

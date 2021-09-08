@@ -277,7 +277,7 @@ export class PluginHost {
         this.listener = scrypted.stateManager.listen((id, eventDetails, eventData) => {
             if (eventDetails.property) {
                 const device = scrypted.findPluginDeviceById(id);
-                this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, device.state[eventDetails.property], eventDetails.changed);
+                this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, device?.state[eventDetails.property], eventDetails.changed);
             }
             else {
                 this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed);

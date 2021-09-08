@@ -1,9 +1,11 @@
-import { ScryptedDeviceBase, Device, Refresh } from "@scrypted/sdk";
-import {getHash} from "../Types";
+import sdk, { ScryptedDeviceBase, Device, Refresh, Setting, Settings } from "@scrypted/sdk";
+import { getHash } from "../Types";
 import { CommandClassInfo, getCommandClassIndex, getCommandClass } from ".";
 import { ZwaveControllerProvider, NodeLiveness } from "../main";
 import { Endpoint, ValueID, ZWaveController, ZWaveNode, ZWaveNodeValueUpdatedArgs } from "zwave-js";
 import { CommandClasses, ValueMetadataNumeric } from "@zwave-js/core"
+
+const { deviceManager } = sdk;
 
 export function containsAny(value: string, ...checks: string[]): boolean {
     for (const check of checks) {
@@ -28,7 +30,7 @@ export class TransientState {
     lockJammed?: boolean;
 }
 
-export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh {
+export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Settings {
     instance: Endpoint;
     device: Device;
     commandClasses: CommandClassInfo[] = [];
@@ -97,6 +99,32 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh {
     updateState() {
         for (var commandClass of this.commandClasses) {
             commandClass.handlerClass.updateState?.(this, commandClass.handlerClass.valueId);
+        }
+    }
+
+    getSettings(): Promise<Setting[]> {
+        return this.getZWaveSettings();
+    }
+
+    putSetting(key: string, value: string | number | boolean): Promise<void> {
+        return this.putZWaveSetting(key, value);
+    }
+    async getZWaveSettings(): Promise<Setting[]> {
+        return [
+            {
+                group: 'Z-Wave Node Management',
+                title: 'Force Remove Node',
+                key: 'zwave:forceRemove',
+                placeholder: `Confirm Node ID to remove: ${this.instance.nodeId}`,
+                value: '',
+            }
+        ];
+    }
+
+    async putZWaveSetting(key: string, value: string | number | boolean): Promise<void> {
+        if (key === 'zwave:forceRemove' && value === this.instance.nodeId.toString()) {
+            this.zwaveController.controller.removeFailedNode(this.instance.nodeId);
+            deviceManager.onDeviceRemoved(this.nativeId);
         }
     }
 }
