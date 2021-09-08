@@ -480,8 +480,11 @@ export interface Program {
   /**
    * Asynchronously run a script given the provided arguments.
    */
-  run(args: any[]): Promise<any>;
+  run(variables?: { [name: string]: any }): Promise<any>;
 
+}
+export interface Javascript {
+  eval(script: string, variables?: { [name: string]: any }): Promise<any>;
 }
 /**
  * SoftwareUpdate provides a way to check for updates and install them. This may be a Scrypted Plugin or device firmware.
@@ -1005,6 +1008,8 @@ export enum ScryptedInterface {
   HttpRequestHandler = "HttpRequestHandler",
   EngineIOHandler = "EngineIOHandler",
   PushHandler = "PushHandler",
+  Program = "Program",
+  Javascript = "Javascript",
 }
 
 export enum ScryptedInterfaceProperty {

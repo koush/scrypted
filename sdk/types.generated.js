@@ -108,6 +108,8 @@ module.exports.ScryptedInterface = {
   HttpRequestHandler: "HttpRequestHandler",
   EngineIOHandler: "EngineIOHandler",
   PushHandler: "PushHandler",
+  Program: "Program",
+  Javascript: "Javascript",
 }
 
 module.exports.ScryptedInterfaceDescriptors = {
@@ -533,6 +535,22 @@ module.exports.ScryptedInterfaceDescriptors = {
       methods: [
         "onPush",
       ]
+  },
+  Program: {
+    name: "Program",
+    properties: [
+    ],
+    methods: [
+      "run",
+    ]
+  },
+  Javascript: {
+    name: "Javascript",
+    properties: [
+    ],
+    methods: [
+      "eval",
+    ]
   },
 }
 
