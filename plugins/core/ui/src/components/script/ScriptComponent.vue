@@ -1,18 +1,8 @@
 <script>
 import BasicComponent from "../BasicComponent.vue";
-import PluginUpdate from "./PluginUpdate.vue";
-import PluginPid from "./PluginPid.vue";
 
 export default {
   mixins: [BasicComponent],
-  methods: {
-    getOwnerColumn(device) {
-      return device.pluginId;
-    },
-    getOwnerLink(device) {
-      return `https://www.npmjs.com/package/${device.pluginId}`;
-    },
-  },
   data() {
     var self = this;
     return {
@@ -21,25 +11,25 @@ export default {
           body: null,
           buttons: [
             {
-              method: "GET",
-              path: "install",
-              title: "Install Plugin",
+              method: "POST",
+              path: "new",
+              title: "New Script",
+              value: "script",
               click() {
-                self.$router.push(`${self.componentViewPath}/install`);
-              },
-            },
+                self.newDevice('script');
+              }
+            }
           ],
           description:
-            "Integrate your existing smart home devices and services.",
-          title: "Install Plugin",
+            "Create reuasble scripts that can run complex actions.",
+          title: "Scripts"
         },
       ],
-      resettable: true,
       component: {
-        icon: "zap",
+        icon: "terminal",
         id: "script",
-        name: "Plugins",
-      },
+        name: "Scripts"
+      }
     };
   },
   asyncComputed: {
@@ -48,72 +38,42 @@ export default {
         const ids = Object.keys(this.$store.state.systemState);
 
         const devices = [];
-        const plugins = await this.$scrypted.systemManager.getComponent("plugins");
+        const plugins = await this.$scrypted.systemManager.getComponent(
+          "plugins"
+        );
         const promises = ids.map(async (id) => {
-            const device = this.$scrypted.systemManager.getDeviceById(id);
-            if (device.id !== device.providerId)
-              return;
-            const {name, type} = device;
-            const pluginId = await plugins.getPluginId(device.id);
-            const packageJson = await plugins.getPackageJson(pluginId);
-            const pid = await plugins.getPluginProcessId(pluginId);
-            const npmPackageVersion = packageJson.version;
-            devices.push({
-              id,
-              name,
-              type,
-              pluginId,
-              npmPackageVersion,
-              pid,
-            })
+          const device = this.$scrypted.systemManager.getDeviceById(id);
+          const { name, type } = device;
+          const pluginId = await plugins.getPluginId(device.id);
+          if (pluginId !== "@scrypted/core") return;
+          const nativeId = await plugins.getNativeId(id);
+          devices.push({
+            id,
+            name,
+            type,
+            nativeId,
+          });
         });
 
         await Promise.allSettled(promises);
 
         return [
           {
-            name: "Plugins",
-            ownerColumn: "Plugin Package",
-            devices,
-            hideType: true,
-            tableProps: {
-              extraColumn0: "Version",
-              // extraColumn1: "PID",
-            },
-            extraColumn0: PluginUpdate,
-            // extraColumn1: PluginPid,
+            name: "Scripts",
+            devices: devices.filter((device) =>
+              device.nativeId?.startsWith("script:")
+            ),
           },
-          // {
-          //   name: "Scripts",
-          //   devices: devices.filter(
-          //     device =>
-          //       !device.metadata.npmPackage && !device.metadata.ownerPlugin
-          //   )
-          // }
         ];
       },
       default: [
         {
-          name: "Plugins",
-          ownerColumn: "Plugin Package",
+          name: "Scripts",
           devices: [],
-          hideType: true,
-          tableProps: {
-            extraColumn0: "Version",
-            // extraColumn1: "PID",
-          },
-          extraColumn0: PluginUpdate,
-          // extraColumn1: PluginPid,
         },
-        // {
-        //   name: "Scripts",
-        //   devices: devices.filter(
-        //     device =>
-        //       !device.metadata.npmPackage && !device.metadata.ownerPlugin
-        //   )
-        // }
       ],
     },
   },
+
 };
 </script>

@@ -11,11 +11,11 @@
         active-class="purple white--text tile"
       >
         <v-list-item-icon>
-            <v-icon small>{{ item.icon }}</v-icon>
+          <v-icon small>{{ item.icon }}</v-icon>
         </v-list-item-icon>
 
         <v-list-item-content>
-          <v-list-item-title >{{ item.name }}</v-list-item-title>
+          <v-list-item-title>{{ item.name }}</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
 
@@ -34,7 +34,7 @@
           </v-list-item-icon>
 
           <v-list-item-content>
-            <v-list-item-title >{{ item.name }}</v-list-item-title>
+            <v-list-item-title>{{ item.name }}</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
         <v-divider></v-divider>
@@ -54,22 +54,28 @@ export default {
       default() {
         return [
           {
-            id: "script",
+            id: "plugin",
             name: "Plugins",
             icon: "fa-puzzle-piece",
-            category: "Components"
+            category: "Components",
           },
           {
             id: "automation",
             name: "Automations",
             icon: "fa-bolt",
-            category: "Components"
+            category: "Components",
           },
           {
             id: "aggregate",
             name: "Device Groups",
             icon: "fa-folder-plus",
-            category: "Components"
+            category: "Components",
+          },
+          {
+            id: "script",
+            name: "Scripts",
+            icon: "fa-terminal",
+            category: "Components",
           },
           { id: "log", name: "Live Log", icon: "list", category: "Utilities" },
           // {
@@ -79,18 +85,18 @@ export default {
           //   category: "Utilities"
           // }
         ];
-      }
-    }
+      },
+    },
   },
   methods: {
     getComponentViewPath,
-    filterComponents: function(category) {
+    filterComponents: function (category) {
       return this.components.filter(
-        component => component.category == category
+        (component) => component.category == category
       );
-    }
+    },
   },
-  data: function() {
+  data: function () {
     return {
       actives: {},
       // components: [],
@@ -100,21 +106,20 @@ export default {
           name: "Dashboard",
           icon: "fa-tachometer-alt",
           path: "/",
-          active: false
+          active: false,
         },
         {
           id: "devices",
           name: "Devices",
           icon: "fa-list",
           path: "/device",
-          active: false
-        }
+          active: false,
+        },
       ],
-      categories: ["Components", "Utilities"]
+      categories: ["Components", "Utilities"],
     };
-  }
+  },
 };
 </script>
 <style scoped>
-
 </style>

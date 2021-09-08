@@ -1,11 +1,12 @@
-import { EventDetails, EventListenerOptions, EventListenerRegister, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface } from "@scrypted/sdk";
+import { EventDetails, EventListenerOptions, EventListenerRegister, Javascript, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
-import { Javascript } from "./builtins/javascript";
+import { AutomationJavascript } from "./builtins/javascript";
 import { Scheduler } from "./builtins/scheduler";
 import { Listen } from "./builtins/listen";
+import { scryptedEval } from "./scrypted-eval";
 const { systemManager } = sdk;
 
-export class Automation extends ScryptedDeviceBase implements OnOff {
+export class Automation extends ScryptedDeviceBase implements OnOff, Javascript {
     registers: EventListenerRegister[] = [];
 
     constructor(nativeId: string) {
@@ -14,6 +15,10 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
         this.bind();
 
         this.on = this.storage.getItem('enabled') !== 'false';
+    }
+
+    async eval(script: string, variables: { [name: string]: any }) {
+        return scryptedEval(this, script, variables);
     }
 
     async turnOff() {
@@ -50,7 +55,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
 
                     let device: any;
                     if (id === 'javascript') {
-                        device = new Javascript(systemManager, this, eventSource, eventDetails, eventData, this.log);
+                        device = new AutomationJavascript(this, eventSource, eventDetails, eventData);
                     }
                     else {
                         device = systemManager.getDeviceById(id);

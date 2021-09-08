@@ -2,7 +2,6 @@
   <div>
     <v-card
       raised
-      
       v-if="device.automationType !== 'Scene'"
       style="margin-bottom: 60px"
     >
@@ -88,7 +87,7 @@
       </v-form>
     </v-card>
 
-    <v-card raised  style="margin-bottom: 60px">
+    <v-card raised style="margin-bottom: 60px">
       <v-card-title
         class="green-gradient subtitle-1 text--white font-weight-light"
       >
@@ -112,6 +111,7 @@
           <v-layout>
             <v-flex xs12>
               <InterfacesPicker
+                :testDevice="testDevice"
                 :name="device.actions.name"
                 :interfaces="contextualInterfaces"
                 v-model="device.actions"
@@ -123,7 +123,7 @@
       </v-form>
     </v-card>
 
-    <v-card raised  v-if="device.automationType === 'Scene'">
+    <v-card raised v-if="device.automationType === 'Scene'">
       <v-card-title
         class="green-gradient subtitle-1 text--white font-weight-light"
       >
@@ -186,21 +186,15 @@ export default {
       device,
     };
   },
-  props: ["value"],
+  props: ["value", "id"],
   components: {
     InterfacesPicker,
     EventsPicker,
   },
   computed: {
-    // mappedEvents: {
-    //   get: function() {
-    //     var ret = {};
-    //     for (var event of this.deviceProps.automationData.events) {
-    //       ret[event.id] = event;
-    //     }
-    //     return ret;
-    //   }
-    // },
+    testDevice() {
+      return this.$scrypted.systemManager.getDeviceById(this.id);
+    },
     availableEvents() {
       const ret = [
         {

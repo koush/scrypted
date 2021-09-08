@@ -5,7 +5,8 @@ import Devices from "./components/Devices.vue";
 import AggregateComponent from "./components/aggregate/AggregateComponent.vue";
 import AutomationComponent from "./components/automation/AutomationComponent.vue";
 import ScriptComponent from "./components/script/ScriptComponent.vue";
-import InstallPlugin from "./components/script/InstallPlugin.vue";
+import PluginComponent from "./components/plugin/PluginComponent.vue";
+import InstallPlugin from "./components/plugin/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";
 import SettingsComponent from "./components/builtin/SettingsComponent.vue";
 import Dashboard from "./components/dashboard/Dashboard.vue";
@@ -29,11 +30,15 @@ let router = new VueRouter({
         component: AutomationComponent
       },
       {
+        path: "/component/plugin",
+        component: PluginComponent
+      },
+      {
         path: "/component/script",
         component: ScriptComponent
       },
       {
-        path: "/component/script/install",
+        path: "/component/plugin/install",
         component: InstallPlugin
       },
       {

@@ -61,7 +61,7 @@
             <v-card-actions>
               <v-spacer></v-spacer>
 
-              <v-btn color="primary" dark text to="/component/script/install">
+              <v-btn color="primary" dark text to="/component/plugin/install">
                 Install Plugins
                 <v-icon right color="primary">cloud_download</v-icon>
               </v-btn>

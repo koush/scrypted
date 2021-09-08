@@ -13,6 +13,7 @@
             ></Select2>
 
             <component
+              :testDevice="testDevice"
               :is="lazyValue.selected.component"
               :properties="lazyValue.selected.properties"
               v-model="lazyValue.model"
@@ -67,7 +68,8 @@ export default {
     unselected: {
       type: Object,
       default: unassigned
-    }
+    },
+    testDevice: Object,
   },
   mixins: [CustomValue],
   components: {

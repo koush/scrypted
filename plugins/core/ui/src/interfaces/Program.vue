@@ -1,6 +1,5 @@
 <template>
     <span>
-          <v-btn text color="primary" @click="onClick">Login</v-btn>
         <v-btn v-if='device' text color="green" @click='run'>Run Program</v-btn>
     </span>
 </template>

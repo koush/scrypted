@@ -17,6 +17,7 @@ import { sendJSON } from './http-helpers';
 import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
+import { Script } from './script';
 
 const indexHtml = fs.readFileSync('dist/index.html').toString();
 
@@ -39,7 +40,16 @@ async function reportAutomation(nativeId: string) {
     const device: Device = {
         nativeId,
         type: ScryptedDeviceType.Automation,
-        interfaces: [ScryptedInterface.OnOff]
+        interfaces: [ScryptedInterface.OnOff, ScryptedInterface.Javascript]
+    }
+    await deviceManager.onDeviceDiscovered(device);
+}
+
+async function reportScript(nativeId: string) {
+    const device: Device = {
+        nativeId,
+        type: ScryptedDeviceType.Program,
+        interfaces: [ScryptedInterface.Javascript, ScryptedInterface.Program]
     }
     await deviceManager.onDeviceDiscovered(device);
 }
@@ -60,6 +70,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     httpsHost: UrlConverter;
     automations = new Map<string, Automation>();
     aggregate = new Map<string, AggregateDevice>();
+    scripts = new Map<string, Script>();
 
     constructor() {
         super();
@@ -94,6 +105,11 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 this.aggregate.set(nativeId, aggregate);
                 reportAggregate(nativeId, aggregate.computeInterfaces());
             }
+            else if (nativeId?.startsWith('script:')) {
+                const script = new Script(nativeId);
+                this.scripts.set(nativeId, script);
+                reportScript(nativeId);
+            }
         }
 
         this.router.post('/api/new/automation', async (req: RoutedHttpRequest, res: HttpResponse) => {
@@ -102,6 +118,17 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             const automation = new Automation(nativeId);
             this.automations.set(nativeId, automation);
             const { id } = automation;
+            sendJSON(res, {
+                id,
+            });
+        });
+
+        this.router.post('/api/new/script', async (req: RoutedHttpRequest, res: HttpResponse) => {
+            const nativeId = `script:${Math.random()}`;
+            await reportScript(nativeId);
+            const script = new Script(nativeId);
+            this.scripts.set(nativeId, script);
+            const { id } = script;
             sendJSON(res, {
                 id,
             });
@@ -128,6 +155,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.automations.get(nativeId);
         if (nativeId?.startsWith('aggregate:'))
             return this.aggregate.get(nativeId);
+        if (nativeId?.startsWith('script:'))
+            return this.scripts.get(nativeId);
     }
 
     async discoverDevices(duration: number) {

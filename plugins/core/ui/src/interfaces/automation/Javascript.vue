@@ -1,15 +1,19 @@
 <template>
   <div>
-    <div style="height: 500px">
+    <v-toolbar dense v-if="testDevice">
+      <v-spacer></v-spacer>
+      <v-tooltip top>
+        <template v-slot:activator="{ on }">
+          <v-btn v-on="on" text depressed @click="eval">
+            <v-icon x-small>fa-play</v-icon>
+          </v-btn>
+        </template>
+        <span>Run</span>
+      </v-tooltip>
+    </v-toolbar>
+    <div style="height: 300px">
       <div ref="container" style="width: 100%; height: 100%"></div>
     </div>
-    <!-- <v-textarea
-      label="Script"
-      v-model="lazyValue.script"
-      outlined
-      auto-grow
-      @input="onChange"
-    ></v-textarea> -->
   </div>
 </template>
 
@@ -33,7 +37,7 @@ monaco.languages.typescript.typescriptDefaults.addExtraLib(
   `${types}
   
   declare global {
-    ${types.replace('export interface', 'interface')}
+    ${types.replace("export interface", "interface")}
 
     const log: Logger;
 
@@ -56,6 +60,7 @@ monaco.languages.typescript.typescriptDefaults.addExtraLib(
 );
 
 export default {
+  props: ["testDevice"],
   mixins: [RPCInterface],
   mounted() {
     monaco.editor.getModels().forEach((model) => model.dispose());
@@ -87,6 +92,9 @@ device.turnOn();
     });
   },
   methods: {
+    eval() {
+      this.testDevice.eval(this.lazyValue.script);
+    },
     onChange: function () {
       this.rpc({
         varargs: true,

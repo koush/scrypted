@@ -395,6 +395,7 @@ import Settings from "../interfaces/Settings.vue";
 import StartStop from "../interfaces/StartStop.vue";
 import Dock from "../interfaces/Dock.vue";
 import Pause from "../interfaces/Pause.vue";
+import Program from "../interfaces/Program.vue";
 import ColorSettingTemperature from "../interfaces/ColorSettingTemperature.vue";
 import Entry from "../interfaces/Entry.vue";
 import HttpRequestHandler from "../interfaces/HttpRequestHandler.vue";
@@ -404,9 +405,11 @@ import TemperatureSetting from "../interfaces/TemperatureSetting.vue";
 import PositionSensor from "../interfaces/sensors/PositionSensor.vue";
 import DeviceProvider from "../interfaces/DeviceProvider.vue";
 import Storage from "../common/Storage.vue";
-import { checkUpdate, installNpm, getNpmPath } from "./script/plugin";
+import { checkUpdate, installNpm, getNpmPath } from "./plugin/plugin";
 import AggregateDevice from "./aggregate/AggregateDevice.vue";
 import Automation from "./automation/Automation.vue";
+import Script from "./script/Script.vue";
+import Javascript from "../interfaces/automation/Javascript.vue";
 import Vue from "vue";
 
 const cardHeaderInterfaces = [
@@ -436,6 +439,7 @@ const cardInterfaces = [
   ScryptedInterface.TemperatureSetting,
   ScryptedInterface.PasswordStore,
   ScryptedInterface.PositionSensor,
+  ScryptedInterface.Program,
 ];
 
 const cardActionInterfaces = [
@@ -463,6 +467,11 @@ function filterInterfaces(interfaces) {
     if (ret.includes(ScryptedInterface.Camera)) {
       ret = ret.filter((iface) => iface !== ScryptedInterface.VideoCamera);
     }
+
+    if (this.pluginData?.nativeId?.startsWith('script:')) {
+      ret = ret.filter(iface => iface !== ScryptedInterface.Program);
+    }
+
     return ret;
   };
 }
@@ -511,6 +520,8 @@ export default {
 
     AggregateDevice,
     Automation,
+    Program,
+    Script,
   },
   data() {
     return this.initialState();
@@ -643,6 +654,9 @@ export default {
           this.deviceComponent = "Automation";
         } else if (pluginData.nativeId?.startsWith("aggregate:")) {
           this.deviceComponent = "AggregateDevice";
+        } else if (pluginData.nativeId?.startsWith("script:")) {
+          this.deviceComponent = "Script";
+          this.showConsole = true;
         }
       }
 
