@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/google-cloud-tts",
-   "version": "0.0.18",
+   "version": "0.0.19",
    "description": "Google Cloud Text to Speech plugin for Scrypted",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",

@@ -657,6 +657,12 @@ export interface MediaManager {
    */
   createMediaObject(data: string|Buffer|Promise<string|Buffer>, mimeType: string): MediaObject;
 
+
+  /**
+   * Get the path to ffmpeg on the host system.
+   */
+  getFFmpegPath(): Promise<string>;
+
 }
 export interface FFMpegInput {
   inputArguments?: string[];

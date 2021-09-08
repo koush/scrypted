@@ -1,10 +1,12 @@
-import { createServer, Socket, Server } from 'net';
+import { createServer, Server } from 'net';
 import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput } from '@scrypted/sdk/types';
 import { listenZeroCluster } from './listen-cluster';
-import { readLength } from './read-length';
 import { EventEmitter, once } from 'events';
+import sdk from "@scrypted/sdk";
+
+const { mediaManager } = sdk;
 
 export interface MP4Atom {
     header: Buffer;
@@ -142,7 +144,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
         console.log(args);
 
-        const cp = child_process.spawn('ffmpeg', args, {
+        const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
             stdio: 'ignore',
         });
         // cp.stdout.on('data', data => console.log(data.toString()));

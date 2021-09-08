@@ -1,7 +1,7 @@
 import cluster from 'cluster';
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, MediaManager, SystemDeviceState, ScryptedStatic, HttpRequest } from '@scrypted/sdk/types'
+import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, MediaManager, SystemDeviceState, HttpRequest } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
@@ -13,11 +13,10 @@ import { getState } from '../state';
 import WebSocket, { EventEmitter } from 'ws';
 import { listenZeroCluster } from './cluster-helper';
 import { Server } from 'net';
-import repl, { REPLServer } from 'repl';
+import repl from 'repl';
 import { once } from 'events';
 import { PassThrough } from 'stream';
 import { Console } from 'console'
-import util from 'util';
 import { sleep } from '../sleep';
 
 export class PluginHost {

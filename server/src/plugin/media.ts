@@ -7,6 +7,7 @@ import { once } from 'events';
 import fs from 'fs';
 import tmp from 'tmp';
 import net from 'net';
+import os from 'os';
 import { listenZeroCluster } from "./cluster-helper";
 
 const wrtc = require('wrtc');
@@ -22,7 +23,7 @@ interface RTCSession {
 const rtcSessions: { [id: string]: RTCSession } = {};
 
 
-function addBuiltins(converters: BufferConverter[]) {
+function addBuiltins(mediaManager: MediaManager, converters: BufferConverter[]) {
     converters.push({
         fromMimeType: ScryptedMimeTypes.Url + ';' + ScryptedMimeTypes.AcceptUrlParameter,
         toMimeType: ScryptedMimeTypes.FFmpegInput,
@@ -48,7 +49,7 @@ function addBuiltins(converters: BufferConverter[]) {
             const tmpfile = tmp.fileSync();
             args.push('-y', "-vf", "select=eq(n\\,1)", "-vframes", "1", '-f', 'singlejpeg', tmpfile.name);
 
-            const cp = child_process.spawn("ffmpeg", args, {
+            const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
                 // stdio: 'ignore',
             });
             cp.stdout.on('data', data => console.log(data.toString()));
@@ -203,7 +204,7 @@ function addBuiltins(converters: BufferConverter[]) {
             args.push('-f', 'rawvideo');
             args.push(`tcp://127.0.0.1:${videoPort}`);
 
-            const cp = child_process.spawn('ffmpeg', args, {
+            const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
                 // stdio: 'ignore',
             });
             cp.on('error', e => console.error('ffmpeg error', e));
@@ -288,11 +289,17 @@ export class MediaManagerImpl implements MediaManager {
         this.systemManager = systemManager;
     }
 
+    async getFFmpegPath(): Promise<string> {
+        if (os.platform() === 'win32')
+            return 'ffmpeg.exe';
+        return 'ffmpeg';
+    }
+
     getConverters(): BufferConverter[] {
         const devices = Object.keys(this.systemManager.getSystemState()).map(id => this.systemManager.getDeviceById(id));
         const converters = Object.values(devices).filter(device => device.interfaces?.includes(ScryptedInterface.BufferConverter))
             .map(device => device as ScryptedDevice & BufferConverter);
-        addBuiltins(converters);
+        addBuiltins(this, converters);
         return converters;
     }
 

@@ -7,9 +7,7 @@ import { PluginAPI, PluginLogger, PluginRemote } from './plugin-api';
 import { SystemManagerImpl } from './system';
 import { RpcPeer } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
-import { Console } from 'console';
-import { EventEmitter, PassThrough } from 'stream';
-import { Writable } from 'node:stream';
+import { EventEmitter } from 'events';
 import { createWebSocketClass } from './plugin-remote-websocket';
 
 class DeviceLogger implements Logger {

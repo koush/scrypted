@@ -411,6 +411,7 @@ import Automation from "./automation/Automation.vue";
 import Script from "./script/Script.vue";
 import Javascript from "../interfaces/automation/Javascript.vue";
 import Vue from "vue";
+import { getDeviceAvailableMixins, setMixin, getDeviceMixins } from "../common/mixin";
 
 const cardHeaderInterfaces = [
   ScryptedInterface.OccupancySensor,
@@ -695,47 +696,20 @@ export default {
       }
     },
     async toggleMixin(mixin) {
-      // mixin.enabled = !mixin.enabled;
-
-      const plugins = await this.$scrypted.systemManager.getComponent(
-        "plugins"
-      );
-      let mixins = await plugins.getMixins(this.device.id);
-      if (mixin.enabled) {
-        mixins.push(mixin.id);
-      } else {
-        mixins = mixins.filter((id) => mixin.id !== id);
-      }
-
-      plugins.setMixins(this.device.id, mixins);
+      await setMixin(this.$scrypted.systemManager, this.device, mixin.id, mixin.enabled);
     },
   },
   asyncComputed: {
     availableMixins: {
       async get() {
-        const plugins = await this.$scrypted.systemManager.getComponent(
-          "plugins"
-        );
-        const mixins = await plugins.getMixins(this.id);
+        const mixins = await getDeviceMixins(this.$scrypted.systemManager, this.device);
+        const availableMixins = await getDeviceAvailableMixins(this.$scrypted.systemManager, this.device);
 
-        const device = this.device;
-        const ret = [];
-        for (const id of Object.keys(this.$store.state.systemState)) {
-          const check = this.$scrypted.systemManager.getDeviceById(id);
-          if (check.interfaces.includes(ScryptedInterface.MixinProvider)) {
-            try {
-              if (await check.canMixin(this.type, device.interfaces)) {
-                ret.push({
-                  id: check.id,
-                  name: check.name,
-                  enabled: mixins.includes(check.id),
-                });
-              }
-            } catch (e) {
-              console.error("mixin check error", id, e);
-            }
-          }
-        }
+        const ret = availableMixins.map(provider => ({
+          id: provider.id,
+          name: provider.name,
+          enabled: mixins.includes(provider.id),
+        }))
 
         return ret;
       },

@@ -326,7 +326,7 @@ addSupportedType({
 
                     console.log(args);
 
-                    const cp = child_process.spawn('ffmpeg', args, {
+                    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
                         stdio: 'ignore',
                     });
                     // cp.stdout.on('data', data => console.log(data.toString()));

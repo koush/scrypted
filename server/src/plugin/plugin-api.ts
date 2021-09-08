@@ -35,6 +35,89 @@ export interface PluginAPI {
     kill(): Promise<void>;
 }
 
+class EventListenerRegisterProxy implements EventListenerRegister {
+    removeListener: () => void;
+
+    constructor(public listeners: Set<EventListenerRegister>, removeListener: () => void) {
+        this.removeListener = () => {
+            listeners.delete(this);
+            removeListener();
+        };
+    }
+}
+
+export class PluginAPIProxy implements PluginAPI {
+    listeners = new Set<EventListenerRegister>();
+
+    constructor(public api: PluginAPI, public mediaManager?: MediaManager) {
+    }
+
+    logListener(listener: EventListenerRegister): EventListenerRegister {
+        return new EventListenerRegisterProxy(this.listeners, () => {
+            this.listeners.delete(listener);
+            listener.removeListener();
+        });
+    }
+
+    setState(nativeId: string, key: string, value: any): Promise<void> {
+        return this.api.setState(nativeId, key, value);
+    }
+    onDevicesChanged(deviceManifest: DeviceManifest): Promise<void> {
+        return this.api.onDevicesChanged(deviceManifest);
+    }
+    onDeviceDiscovered(device: Device): Promise<void> {
+        return this.api.onDeviceDiscovered(device);
+    }
+    onDeviceEvent(nativeId: string, eventInterface: any, eventData?: any): Promise<void> {
+        return this.api.onDeviceEvent(nativeId, eventInterface, eventData);
+    }
+    onDeviceRemoved(nativeId: string): Promise<void> {
+        return this.api.onDeviceRemoved(nativeId);
+    }
+    setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
+        return this.api.setStorage(nativeId, storage);
+    }
+    getDeviceById(id: string): Promise<ScryptedDevice> {
+        return this.api.getDeviceById(id);
+    }
+    setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void> {
+        return this.api.setDeviceProperty(id, property, value);
+    }
+    removeDevice(id: string): Promise<void> {
+        return this.api.removeDevice(id);
+    }
+    async listen(EventListener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
+        return this.logListener(await this.api.listen(EventListener));
+    }
+    async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
+        return this.logListener(await this.api.listenDevice(id, event, callback));
+    }
+    ioClose(id: string): Promise<void> {
+        return this.api.ioClose(id);
+    }
+    ioSend(id: string, message: string): Promise<void> {
+        return this.api.ioSend(id, message);
+    }
+    deliverPush(endpoint: string, request: HttpRequest): Promise<void> {
+        return this.api.deliverPush(endpoint, request);
+    }
+    getLogger(nativeId: string): Promise<PluginLogger> {
+        return this.api.getLogger(nativeId);
+    }
+    getComponent(id: string): Promise<any> {
+        return this.api.getComponent(id);
+    }
+    async getMediaManager(): Promise<MediaManager> {
+        return this.mediaManager;
+    }
+    async kill(): Promise<void> {
+        for (const l of [...this.listeners]) {
+            l.removeListener();
+        }
+        this.listeners.clear();
+    }
+}
+
 export interface PluginRemote {
     loadZip(packageJson: any, zipData: Buffer): Promise<any>;
     setSystemState(state: {[id: string]: {[property: string]: SystemDeviceState}}): Promise<void>;

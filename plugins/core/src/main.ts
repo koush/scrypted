@@ -1,7 +1,7 @@
 // https://developer.scrypted.app/#getting-started
 // package.json contains the metadata (name, interfaces) about this device
 // under the "scrypted" key.
-import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, EventDetails, ScryptedDevice, EventListenerRegister, Device, DeviceManifest, EventListenerOptions, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, MediaManager, ScryptedDeviceType } from '@scrypted/sdk';
+import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, EventListenerRegister, Device, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, ScryptedDeviceType } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
@@ -9,8 +9,7 @@ import Url from 'url-parse';
 import { UserStorage } from './userStorage';
 import { RpcPeer } from '../../../server/src/rpc';
 import { setupPluginRemote } from '../../../server/src/plugin/plugin-remote';
-import { PluginAPI } from '../../../server/src/plugin/plugin-api';
-import { Logger } from '../../../server/src/logger';
+import { PluginAPIProxy } from '../../../server/src/plugin/plugin-api';
 import { UrlConverter } from './converters';
 import fs from 'fs';
 import { sendJSON } from './http-helpers';
@@ -19,21 +18,12 @@ import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { Script } from './script';
 
+const { pluginHostAPI } = sdk;
+
 const indexHtml = fs.readFileSync('dist/index.html').toString();
 
 interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
-}
-
-class DeviceLogger {
-    logger: any;
-    constructor(logger: any) {
-        this.logger = logger;
-    }
-
-    log(level: string, msg: string) {
-        this.logger?.[level]?.(msg);
-    };
 }
 
 async function reportAutomation(nativeId: string) {
@@ -196,77 +186,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         const userStorage = new UserStorage(request.username);
         peer.params.userStorage = userStorage;
 
-        class PluginAPIImpl implements PluginAPI {
-            deliverPush(endpoint: string, request: HttpRequest): Promise<void> {
-                return endpointManager.deliverPush(endpoint, request);
-            }
-            async getMediaManager(): Promise<MediaManager> {
-                return mediaManager;
-            }
-            async getLogger(nativeId: string): Promise<Logger> {
-                const dl = deviceManager.getDeviceLogger(nativeId);
-                const ret = new DeviceLogger(dl);
-                return ret as any;
-            }
-            getComponent(id: string): Promise<any> {
-                return systemManager.getComponent(id);
-            }
-            async setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void> {
-                const device = await this.getDeviceById(id);
-                if (property === ScryptedInterfaceProperty.name)
-                    device.setName(value);
-                else if (property === ScryptedInterfaceProperty.type)
-                    device.setType(value);
-                else if (property === ScryptedInterfaceProperty.room)
-                    device.setRoom(value);
-                else
-                    throw new Error(`Not allowed to set property ${property}`);
-            }
-            async setState(nativeId: string, key: string, value: any) {
-                deviceManager.getDeviceState(nativeId)[key] = value;
-            }
-            async onDevicesChanged(deviceManifest: DeviceManifest) {
-                return deviceManager.onDevicesChanged(deviceManifest);
-            }
-            async onDeviceDiscovered(device: Device) {
-                return deviceManager.onDeviceDiscovered(device);
-            }
-            async onDeviceEvent(nativeId: string, eventInterface: any, eventData?: any) {
-                return deviceManager.onDeviceEvent(nativeId, eventInterface, eventData);
-            }
-            async onDeviceRemoved(nativeId: string) {
-                return deviceManager.onDeviceRemoved(nativeId);
-            }
-            async setStorage(nativeId: string, storage: { [key: string]: any; }) {
-                const ds = deviceManager.getDeviceStorage(nativeId);
-                ds.clear();
-                for (const key of Object.keys(storage)) {
-                    ds.setItem(key, storage[key]);
-                }
-            }
-            async getDeviceById(id: string): Promise<ScryptedDevice> {
-                return systemManager.getDeviceById(id);
-            }
-            async listen(EventListener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
-                return systemManager.listen((eventSource, eventDetails, eventData) => EventListener(eventSource?.id, eventDetails, eventData));
-            }
-            async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
-                return systemManager.listenDevice(id, event, (eventSource, eventDetails, eventData) => callback(eventDetails, eventData));
-            }
-            async ioClose(id: string) {
-                throw new Error('Method not implemented.');
-            }
-            async ioSend(id: string, message: string) {
-                throw new Error('Method not implemented.');
-            }
-            async removeDevice(id: string) {
-                return systemManager.removeDevice(id);
-            }
-            async kill() {
-            }
-        }
-        const api = new PluginAPIImpl();
-
+        
+        const listeners = new Set<EventListenerRegister>();
+        const api = new PluginAPIProxy(pluginHostAPI, mediaManager);
         const remote = await setupPluginRemote(peer, api, null);
         await remote.setSystemState(systemManager.getSystemState());
 

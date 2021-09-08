@@ -5,6 +5,9 @@ import { FFMpegInput } from '@scrypted/sdk/types';
 import { listenZeroCluster } from './listen-cluster';
 import { Readable } from 'stream';
 import { readLength } from './read-length';
+import sdk from "@scrypted/sdk";
+
+const { mediaManager } = sdk;
 
 export interface MP4Atom {
     header: Buffer;
@@ -60,7 +63,7 @@ export async function startFFMPegFragmetedMP4Session(ffmpegInput: FFMpegInput, a
 
         console.log(args);
 
-        const cp = child_process.spawn('ffmpeg', args, {
+        const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
             stdio: 'ignore',
         });
         // cp.stdout.on('data', data => console.log(data.toString()));

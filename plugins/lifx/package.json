@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/lifx",
-   "version": "0.2.21",
+   "version": "0.2.22",
    "description": "A Lifx plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",

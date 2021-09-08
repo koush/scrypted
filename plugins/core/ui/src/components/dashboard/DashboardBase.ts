@@ -20,7 +20,9 @@ export default {
       return device;
     },
     devices() {
-      const devices = this.deviceIds.map(deviceId => this.$scrypted.systemManager.getDeviceById(deviceId));
+      const devices = this.deviceIds
+        .map(deviceId => this.$scrypted.systemManager.getDeviceById(deviceId))
+        .filter(device => !!device);
 
       const listeners = [];
       devices.forEach(device => {
