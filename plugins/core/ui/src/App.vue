@@ -246,32 +246,6 @@ import Vue from "vue";
 import store from "./store";
 import "./client";
 
-const PushConnectionManager = window["pushconnect"].PushConnectionManager;
-var pushConnectionPromise;
-Vue.prototype.$pushconnect = function () {
-  if (pushConnectionPromise) {
-    return pushConnectionPromise;
-  }
-  pushConnectionPromise = PushConnectionManager.start(
-    {},
-    {
-      iceServers: [
-        {
-          urls: ["turn:n0.clockworkmod.com", "turn:n1.clockworkmod.com"],
-          username: "foo",
-          credential: "bar",
-        },
-      ],
-    }
-  ).then((rtcManager) => {
-    // console.log('persistent gcm connection created', rtcManager != null);
-    // console.log(rtcManager.registrationId);
-    return rtcManager;
-  });
-
-  return pushConnectionPromise;
-};
-
 export default {
   name: "App",
   components: {
