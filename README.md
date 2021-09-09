@@ -17,9 +17,20 @@ Supported accessories:
 
 ## Installation
 
+### Linux Prerequisites
+```sh
+sudo apt install libavahi-compat-libdnssd-dev
+```
+
+### Github Clone
 
 ```sh
 git clone https://github.com/koush/scrypted.git
+```
+
+### Run
+
+```sh
 cd scrypted/server
 npm install
 npm run serve
