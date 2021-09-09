@@ -1,4 +1,4 @@
-import sdk, { Settings, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface } from '@scrypted/sdk';
+import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, MixinDeviceBase } from '@scrypted/sdk';
 import { Bridge, Categories, HAPStorage } from './hap';
 import os from 'os';
 import { supportedTypes } from './common';
@@ -6,7 +6,7 @@ import './types'
 import { CameraMixin } from './camera-mixin';
 import { maybeAddBatteryService } from './battery';
 
-const { systemManager, mediaManager } = sdk;
+const { systemManager, deviceManager } = sdk;
 
 HAPStorage.storage();
 class HAPLocalStorage {
@@ -60,7 +60,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
     getUsername() {
         return this.storage.getItem("mac") || (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
-        .flat().map(([iface, entry]) => entry).find(i => i.family == 'IPv4').mac;
+            .flat().map(([iface, entry]) => entry).find(i => i.family == 'IPv4').mac;
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -94,6 +94,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
         const plugins = await systemManager.getComponent('plugins');
 
+        const accessoryIds = new Set<string>();
+
         for (const id of Object.keys(systemManager.getSystemState())) {
             const device = systemManager.getDeviceById(id);
             const supportedType = supportedTypes[device.type];
@@ -101,7 +103,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
                 continue;
 
             try {
-                const mixins: string[] = await plugins.getMixins(device.id);
+                const mixins = (device.mixins || []).slice();
                 if (!mixins.includes(this.id)) {
                     if (defaultIncluded[device.id] === includeToken)
                         continue;
@@ -118,6 +120,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
             const accessory = supportedType.getAccessory(device);
             if (accessory) {
+                accessoryIds.add(id);
+
                 maybeAddBatteryService(device, accessory);
 
                 if (supportedType.noBridge) {
@@ -141,9 +145,26 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
             pincode: '123-45-678',
             port: Math.round(Math.random() * 30000 + 10000),
         }, true);
+
+        systemManager.listen((eventSource, eventDetails, eventData) => {
+            if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
+                return;
+
+            if (!eventDetails.changed)
+                return;
+
+            if (eventDetails.property !== ScryptedInterfaceProperty.id) {
+                if (!accessoryIds.has(eventSource?.id))
+                    return;
+            }
+
+            const device = systemManager.getDeviceById(eventSource?.id);
+            this.log.i(`Accessory descriptor changed: ${device?.name}. Requesting restart.`);
+            deviceManager.requestRestart();
+        });
     }
 
-    canMixin(type: ScryptedDeviceType, interfaces: string[]): string[] {
+    async canMixin(type: ScryptedDeviceType, interfaces: string[]) {
         const supportedType = supportedTypes[type];
         if (!supportedType?.probe({
             interfaces,
@@ -164,6 +185,15 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
             return new CameraMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
         }
         return mixinDevice;
+    }
+
+    async releaseMixin(id: string, mixinDevice: any) {
+        const device = systemManager.getDeviceById(id);
+        if (device.mixins?.includes(this.id)) {
+            return;
+        }
+        this.log.i(`Accessory removed from HomeKit: ${device.name}. Requesting restart.`);
+        deviceManager.requestRestart();
     }
 }
 
