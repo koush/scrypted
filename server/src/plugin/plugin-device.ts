@@ -29,10 +29,10 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         const mixinTable = this.mixinTable;
         this.mixinTable = undefined;
         (async() => {
-            for (const mixinEntry of await mixinTable) {
+            for (const mixinEntry of (await mixinTable || [])) {
                 (async() => {
                     const mixinProvider = this.scrypted.getDevice(mixinEntry.mixinProviderId) as ScryptedDevice & MixinProvider;
-                    mixinProvider.releaseMixin(this.id, await mixinEntry.proxy);
+                    mixinProvider?.releaseMixin(this.id, await mixinEntry.proxy);
                 })().catch(() => {});
             }
         })().catch(() => {});;
@@ -168,7 +168,8 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         if (!iface)
             throw new Error(`unknown method ${method}`);
 
-        for (const mixin of await this.mixinTable) {
+        const mixinTable = await this.mixinTable;
+        for (const mixin of mixinTable) {
 
             if (mixin.interfaces.includes(iface))
                 return (await mixin.proxy)[method](...argArray);
