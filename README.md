@@ -17,8 +17,6 @@ Supported accessories:
 
 # Installation
 
-## Checkout from Source
-
 ## Run on Docker
 
 ```sh
