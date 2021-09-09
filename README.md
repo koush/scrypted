@@ -19,7 +19,7 @@ Supported accessories:
 
 ### Prerequisites
 
-* Node v16
+* Node v16 (older versions seem to have issues with the cluster module)
 * ffmpeg in $PATH/%PATH%
 * Windows is not supported, but may work.
 
