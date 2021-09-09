@@ -23,15 +23,10 @@ Supported accessories:
 * ffmpeg in $PATH/%PATH%
 
 ### Linux Prerequisites
+
 ```sh
 sudo apt install libavahi-compat-libdnssd-dev
 ```
-
-### Windows Prerequisites
-
-
-On Windows you are going to need Apples "Bonjour SDK for Windows". You can download it either from [Apple](https://developer.apple.com/download/more/?=Bonjour%20SDK%20for%20Windows) (registration required) or various unofficial sources. Take your pick. After installing the SDK restart your computer and make sure the `BONJOUR_SDK_HOME` environment variable is set. You'll also need a compiler. Microsoft Visual Studio Express will do. On Windows node >=0.7.9 is required.
-
 
 ### Checkout from Source
 
