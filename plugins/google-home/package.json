@@ -11,6 +11,12 @@
       "scrypted-package-json": "scrypted-package-json",
       "scrypted-webpack": "scrypted-webpack"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "google",
+      "home"
+   ],
    "scrypted": {
       "name": "Google Home",
       "type": "DeviceProvider",
@@ -35,5 +41,5 @@
       "@types/mdns": "^0.0.34",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.13"
+   "version": "0.0.14"
 }

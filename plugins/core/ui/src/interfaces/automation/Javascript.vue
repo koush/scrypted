@@ -1,15 +1,15 @@
 <template>
   <div>
     <v-toolbar dense v-if="testDevice">
-      <v-spacer></v-spacer>
       <v-tooltip top>
         <template v-slot:activator="{ on }">
-          <v-btn v-on="on" text depressed @click="eval">
+          <v-btn v-on="on" text @click="eval">
             <v-icon x-small>fa-play</v-icon>
           </v-btn>
         </template>
         <span>Run</span>
       </v-tooltip>
+      <v-toolbar-title class="ml-2">Script</v-toolbar-title>
     </v-toolbar>
     <div style="height: 300px">
       <div ref="container" style="width: 100%; height: 100%"></div>

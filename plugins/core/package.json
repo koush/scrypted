@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/core",
-   "version": "0.0.71",
+   "version": "0.0.72",
    "description": "Scrypted Core plugin. Provides the UI, websocket, and engine.io APIs.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -15,6 +15,11 @@
       "scrypted-package-json": "scrypted-package-json",
       "scrypted-webpack": "scrypted-webpack"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "core"
+   ],
    "scrypted": {
       "name": "Scrypted Core",
       "type": "DeviceProvider",

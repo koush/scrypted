@@ -72,7 +72,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         description: 'Start live streams from the previous key frame. Improves startup time.',
         type: 'boolean',
         key: SEND_KEYFRAME,
-        value: (!!this.storage.getItem(SEND_KEYFRAME)).toString(),
+        value: (this.storage.getItem(SEND_KEYFRAME) === 'true').toString(),
       },
     );
     return settings;
@@ -291,14 +291,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 }
 
 class PrebufferProvider extends ScryptedDeviceBase implements MixinProvider {
-  canMixin(type: ScryptedDeviceType, interfaces: string[]): string[] {
+  async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
     return [ScryptedInterface.VideoCamera, ScryptedInterface.Settings];
   }
 
-  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+  async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
     return new PrebufferMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
+  }
+  async releaseMixin(id: string, mixinDevice: any) {
+      mixinDevice.release();
   }
 }
 
