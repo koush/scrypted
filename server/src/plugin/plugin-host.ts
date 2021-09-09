@@ -158,12 +158,16 @@ export class PluginHost {
                     console.error('debugger failed', e);
                 }
             }
+
+            const fail = 'Plugin failed to load. Console for more information.';
             try {
                 const module = await remote.loadZip(plugin.packageJson, zipBuffer);
                 logger.log('i', `loaded ${this.pluginName}`);
+                logger.clearAlert(fail)
                 return { module, remote };
             }
             catch (e) {
+                logger.log('a', fail);
                 logger.log('e', `plugin load error ${e}`);
                 console.error('plugin load error', e);
                 throw e;

@@ -452,6 +452,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
                 catch (e) {
                     console.error(e);
+                    throw e;
                 }
             },
         }
