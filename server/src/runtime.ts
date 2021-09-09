@@ -239,7 +239,7 @@ export class ScryptedRuntime {
             }
         }
         else {
-            if (!pluginDevice?.state.interfaces.value.includes(ScryptedInterface.HttpRequestHandler)) {
+            if (!isEngineIOEndpoint && !pluginDevice?.state.interfaces.value.includes(ScryptedInterface.HttpRequestHandler)) {
                 end(404, 'Not Found');
                 return;
             }

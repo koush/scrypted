@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
 
         pc = new RTCPeerConnection(json.configuration);
         const checkConn = () => {
-          pc.onconnectionstatechange = () => console.log(pc.connectionState);
+          console.log(pc.connectionState, pc.iceConnectionState);
           if (pc.iceConnectionState === 'failed' || pc.connectionState === 'failed') {
             window.close();
           }

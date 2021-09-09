@@ -1,7 +1,5 @@
-'use strict';
-
 import util from 'util';
-import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCAVMessage, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
 import mdns from 'mdns';
 import mime from 'mime';
@@ -232,26 +230,45 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     const ws = new WebSocket(webSocketUrl);
 
     ws.onmessage = async (message) => {
-      const token = message.data as string;
+        const token = message.data as string;
 
-      const media = this.tokens.get(token);
-      if (!media) {
-        ws.close();
-        return;
-      }
+        const videoStream = this.tokens.get(token);
+        if (!videoStream) {
+          ws.close();
+          return;
+        }
 
-      const offer = await mediaManager.convertMediaObjectToBuffer(
-        media,
-        ScryptedMimeTypes.RTCAVOffer
-      );
+        const offer: RTCAVMessage = JSON.parse((await mediaManager.convertMediaObjectToBuffer(
+            videoStream,
+            ScryptedMimeTypes.RTCAVOffer
+        )).toString());
 
-      ws.send(offer.toString());
+        ws.send(JSON.stringify(offer));
 
-      const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data));
-      const mo = mediaManager.createMediaObject(Buffer.from(answer as string), ScryptedMimeTypes.RTCAVAnswer);
-      mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
+        const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data)) as string;
+        const mo = mediaManager.createMediaObject(Buffer.from(answer), ScryptedMimeTypes.RTCAVAnswer);
+        const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
+        ws.send(result.toString());
+
+        ws.onmessage = async (message) => {
+            const mo = mediaManager.createMediaObject(Buffer.from(message.data), ScryptedMimeTypes.RTCAVAnswer);
+            const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
+            ws.send(result.toString());
+        }
+
+        const emptyObject = JSON.stringify({
+            description: null,
+            id: offer.id,
+            candidates: [],
+            configuration: null,
+        });
+        while (true ){
+            const mo = mediaManager.createMediaObject(Buffer.from(emptyObject), ScryptedMimeTypes.RTCAVAnswer);
+            const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
+            ws.send(result.toString());
+        }
     }
-  }
+}
 
 
   mediaPlayerPromise: Promise<any>;

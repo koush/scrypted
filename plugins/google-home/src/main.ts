@@ -185,7 +185,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
             ws.send(JSON.stringify(offer));
 
-            const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data));
+            const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data)) as RTCAVMessage;
             const mo = mediaManager.createMediaObject(Buffer.from(answer), ScryptedMimeTypes.RTCAVAnswer);
             const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
             ws.send(result.toString());
