@@ -1,4 +1,4 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinDeviceBase, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinDeviceBase, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands, SmartHomeV1QueryRequest, SmartHomeV1QueryResponse, SmartHomeV1ReportStateRequest, SmartHomeV1SyncRequest, SmartHomeV1SyncResponse } from 'actions-on-google/dist/service/smarthome/api/v1';
 import { smarthome } from 'actions-on-google/dist/service/smarthome';
@@ -44,7 +44,10 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     });
     reportQueue = new Set<string>();
     reportStateThrottled = throttle(() => this.reportState(), 2000);
-    throttleSync = throttle(() => this.requestSync(), 15000);
+    throttleSync = throttle(() => this.requestSync(), 15000, {
+        leading: false,
+        trailing: true,
+    });
     plugins: Promise<any>;
     defaultIncluded: any;
     localEndpoint: http.Server;
@@ -79,6 +82,24 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         systemManager.listen((source, details, data) => {
             if (source)
                 this.queueReportState(source);
+        });
+
+        systemManager.listen((eventSource, eventDetails, eventData) => {
+            if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
+                return;
+
+            if (!eventDetails.changed)
+                return;
+
+            if (eventDetails.property !== ScryptedInterfaceProperty.id) {
+                if (this.storage.getItem(`link-${eventSource?.id}`) !== this.linkTracker) {
+                    return;
+                }
+            }
+
+            const device = systemManager.getDeviceById(eventSource?.id);
+            this.log.i(`Device descriptor changed: ${device?.name}. Requesting sync.`);
+            this.throttleSync();
         });
 
         this.plugins = systemManager.getComponent('plugins');
