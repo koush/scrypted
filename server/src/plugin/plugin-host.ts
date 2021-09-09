@@ -54,7 +54,7 @@ export class PluginHost {
                 continue;
             }
             for (const mixin of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
-                if (this.scrypted.findPluginDeviceById(mixin).pluginId === this.pluginId) {
+                if (this.scrypted.findPluginDeviceById(mixin)?.pluginId === this.pluginId) {
                     device.handler.invalidate();
                 }
             }
