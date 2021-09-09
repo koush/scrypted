@@ -238,7 +238,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         })
 
         ws.onclose = () => {
-            api.kill();
+            api.removeListeners();
         }
     }
 

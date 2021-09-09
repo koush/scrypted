@@ -31,9 +31,7 @@ export class PluginComponent {
         await host?.remote?.setNativeId?.(pluginDevice.nativeId, pluginDevice._id, storage);
     }
     async setMixins(id: string, mixins: string[]) {
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        setState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
-        await this.scrypted.datastore.upsert(pluginDevice);
+        this.scrypted.stateManager.setState(id, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
         const device = this.scrypted.invalidatePluginDevice(id);
         await device.handler.ensureProxy();
     }
@@ -54,7 +52,7 @@ export class PluginComponent {
     }
     async reload(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
-        await this.scrypted.installPlugin(plugin);
+        await this.scrypted.runPlugin(plugin);
     }
     async getPackageJson(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);

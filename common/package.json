@@ -12,6 +12,6 @@
     "@scrypted/sdk": "file:../sdk"
   },
   "devDependencies": {
-    "@types/node": "^16.7.1"
+    "@types/node": "^16.9.0"
   }
 }

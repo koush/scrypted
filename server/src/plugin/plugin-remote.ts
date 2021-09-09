@@ -155,6 +155,10 @@ class DeviceManagerImpl implements DeviceManager {
         this.systemManager = systemManager;
     }
 
+    async requestRestart() {
+        return this.api.requestRestart();
+    }
+
     getDeviceLogger(nativeId?: string): Logger {
         return new DeviceLogger(this.api, nativeId, this.getDeviceConsole?.(nativeId) || console);
     }
@@ -246,43 +250,6 @@ interface WebSocketCallbacks {
 
 export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string): Promise<PluginRemote> {
     peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
-
-    const listen = api.listen.bind(api);
-
-    const registers = new Set<EventListenerRegister>();
-
-    class EventListenerRegisterObserver implements EventListenerRegister {
-        register: EventListenerRegister;
-
-        constructor(register: EventListenerRegister) {
-            this.register = register;
-        }
-
-        removeListener() {
-            registers.delete(this.register);
-            this.register.removeListener();
-        }
-    }
-
-    function manage(register: EventListenerRegister): EventListenerRegister {
-        registers.add(register);
-        return new EventListenerRegisterObserver(register);
-    }
-
-    api.listen = async (EventListener: (id: string, eventDetails: EventDetails, eventData: object) => void) => {
-        return manage(await listen(EventListener));
-    }
-
-    const listenDevice = api.listenDevice.bind(api);
-    api.listenDevice = async (id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> => {
-        return manage(await listenDevice(id, event, callback));
-    }
-
-    api.kill = async () => {
-        for (const register of registers) {
-            register.removeListener();
-        }
-    }
 
     const ret = await peer.eval('return getRemote(api, pluginId)', undefined, {
         api,

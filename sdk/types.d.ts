@@ -727,6 +727,10 @@ export interface DeviceManager {
    */
   onDevicesChanged(devices: DeviceManifest): Promise<void>;
 
+  /**
+   * Restart the plugin. May not happen immediately.
+   */
+  requestRestart(): Promise<void>;
 }
 /**
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
@@ -825,22 +829,22 @@ export interface SystemManager {
   /**
    * Find a Scrypted device by id.
    */
-   getDeviceById(id: string): ScryptedDevice;
+  getDeviceById(id: string): ScryptedDevice;
 
   /**
    * Find a Scrypted device by id.
    */
-   getDeviceById<T>(id: string): ScryptedDevice & T;
+  getDeviceById<T>(id: string): ScryptedDevice & T;
 
   /**
    * Find a Scrypted device by name.
    */
-   getDeviceByName(name: string): ScryptedDevice;
+  getDeviceByName(name: string): ScryptedDevice;
 
   /**
    * Find a Scrypted device by name.
    */
-   getDeviceByName<T>(name: string): ScryptedDevice & T;
+  getDeviceByName<T>(name: string): ScryptedDevice & T;
 
   /**
    * Get the current state of a device.
@@ -880,8 +884,12 @@ export interface MixinProvider {
   /**
    * Create a mixin that can be applied to the supplied device.
    */
-  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }): any;
+  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }): Promise<any>;
 
+  /**
+   * Release a mixin device that was previously returned from getMixin.
+   */
+  releaseMixin(id: string, mixinDevice: any): Promise<void>;
 }
 /**
  * The HttpRequestHandler allows handling of web requests under the endpoint path: /endpoint/npm-package-name/*.

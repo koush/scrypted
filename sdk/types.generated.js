@@ -268,6 +268,7 @@ module.exports.ScryptedInterfaceDescriptors = {
       ],
       methods: [
         "getVideoStream",
+        "getVideoStreamOptions",
       ]
   },
   Lock: {
@@ -511,6 +512,7 @@ module.exports.ScryptedInterfaceDescriptors = {
       methods: [
         "canMixin",
         "getMixin",
+        "releaseMixin",
       ]
   },
   HttpRequestHandler: {

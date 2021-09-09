@@ -18,6 +18,7 @@ import { once } from 'events';
 import { PassThrough } from 'stream';
 import { Console } from 'console'
 import { sleep } from '../sleep';
+import { PluginHostAPI } from './plugin-host-api';
 
 export class PluginHost {
     worker: cluster.Worker;
@@ -32,13 +33,13 @@ export class PluginHost {
         pingTimeout: 120000,
     });
     ws: { [id: string]: WebSocket } = {};
-    api: PluginAPI;
+    api: PluginHostAPI;
     pluginName: string;
     listener: EventListenerRegister;
 
     kill() {
         this.listener.removeListener();
-        this.api.kill();
+        this.api.removeListeners();
         this.worker.process.kill();
         this.io.close();
         for (const s of Object.values(this.ws)) {
@@ -59,6 +60,13 @@ export class PluginHost {
 
     toString() {
         return this.pluginName || 'no plugin name';
+    }
+
+
+    async upsertDevice(upsert: Device) {
+        const pi = await this.scrypted.upsertDevice(this.pluginId, upsert);
+        await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
+        this.scrypted.invalidatePluginDevice(pi._id);
     }
 
     constructor(scrypted: ScryptedRuntime, plugin: Plugin, waitDebug?: Promise<void>) {
@@ -122,113 +130,7 @@ export class PluginHost {
 
         const self = this;
 
-        async function upsertDevice(upsert: Device) {
-            const pi = await scrypted.upsertDevice(self.pluginId, upsert);
-            await self.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
-            scrypted.invalidatePluginDevice(pi._id);
-        }
-
-        class PluginAPIImpl implements PluginAPI {
-            getMediaManager(): Promise<MediaManager> {
-                return null;
-            }
-
-            async deliverPush(endpoint: string, httpRequest: HttpRequest) {
-                return scrypted.deliverPush(endpoint, httpRequest);
-            }
-
-            async getLogger(nativeId: string): Promise<Logger> {
-                const device = scrypted.findPluginDevice(plugin._id, nativeId);
-                return self.scrypted.getDeviceLogger(device);
-            }
-
-            getComponent(id: string): Promise<any> {
-                return self.scrypted.getComponent(id);
-            }
-
-            setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void> {
-                switch (property) {
-                    case ScryptedInterfaceProperty.room:
-                    case ScryptedInterfaceProperty.type:
-                    case ScryptedInterfaceProperty.name:
-                        const device = scrypted.findPluginDeviceById(id);
-                        scrypted.stateManager.setPluginDeviceState(device, property, value);
-                        return;
-                    default:
-                        throw new Error(`Not allowed to set property ${property}`);
-                }
-            }
-
-            async ioClose(id: string) {
-                self.io.clients[id]?.close();
-                self.ws[id]?.close();
-            }
-
-            async ioSend(id: string, message: string) {
-                self.io.clients[id]?.send(message);
-                self.ws[id]?.send(message);
-            }
-
-            async setState(nativeId: string, key: string, value: any) {
-                scrypted.stateManager.setPluginState(self.pluginId, nativeId, key, value);
-            }
-
-            async setStorage(nativeId: string, storage: { [key: string]: string }) {
-                const device = scrypted.findPluginDevice(plugin._id, nativeId)
-                device.storage = storage;
-                scrypted.datastore.upsert(device);
-            }
-
-            async onDevicesChanged(deviceManifest: DeviceManifest) {
-                const existing = scrypted.findPluginDevices(self.pluginId);
-                const newIds = deviceManifest.devices.map(device => device.nativeId);
-                const toRemove = existing.filter(e => e.nativeId && !newIds.includes(e.nativeId));
-
-                for (const remove of toRemove) {
-                    await scrypted.removeDevice(remove);
-                }
-
-                for (const upsert of deviceManifest.devices) {
-                    await upsertDevice(upsert);
-                }
-            }
-
-            async onDeviceDiscovered(device: Device) {
-                await upsertDevice(device);
-            }
-
-            async onDeviceRemoved(nativeId: string) {
-                await scrypted.removeDevice(scrypted.findPluginDevice(plugin._id, nativeId))
-            }
-
-            async onDeviceEvent(nativeId: any, eventInterface: any, eventData?: any) {
-                const plugin = scrypted.findPluginDevice(self.pluginId, nativeId);
-                scrypted.stateManager.notifyInterfaceEvent(plugin, eventInterface, eventData);
-            }
-
-            async getDeviceById<T>(id: string): Promise<T & ScryptedDevice> {
-                return scrypted.getDevice(id);
-            }
-            async listen(EventListener: (id: string, eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
-                return scrypted.stateManager.listen(EventListener);
-            }
-            async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
-                const device = scrypted.findPluginDeviceById(id);
-                if (device) {
-                    const self = scrypted.findPluginDevice(plugin._id);
-                    scrypted.getDeviceLogger(self).log('i', `requested listen ${getState(device, ScryptedInterfaceProperty.name)} ${JSON.stringify(event)}`);
-                }
-                return scrypted.stateManager.listenDevice(id, event, callback);
-            }
-
-            async removeDevice(id: string) {
-                return scrypted.removeDevice(scrypted.findPluginDeviceById(id));
-            }
-
-            async kill() {
-            }
-        }
-        this.api = new PluginAPIImpl();
+        this.api = new PluginHostAPI(scrypted, plugin, this);
 
         this.console = this.peer.eval('return console', undefined, undefined, true) as Promise<Console>;
         const zipBuffer = Buffer.from(plugin.zip, 'base64');

@@ -9,6 +9,7 @@ import { hasSameElements } from "../collection";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
 
 interface MixinTable {
+    mixinProviderId: string;
     interfaces: string[];
     proxy: Promise<any>;
 }
@@ -28,10 +29,10 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         const mixinTable = this.mixinTable;
         this.mixinTable = undefined;
         (async() => {
-            for (const mixin of await mixinTable) {
+            for (const mixinEntry of await mixinTable) {
                 (async() => {
-                    const proxy = await mixin.proxy;
-                    proxy.release();
+                    const mixinProvider = this.scrypted.getDevice(mixinEntry.mixinProviderId) as ScryptedDevice & MixinProvider;
+                    mixinProvider.releaseMixin(this.id, await mixinEntry.proxy);
                 })().catch(() => {});
             }
         })().catch(() => {});;
@@ -65,19 +66,20 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
 
             const mixinTable: MixinTable[] = [];
             mixinTable.unshift({
+                mixinProviderId: undefined,
                 interfaces: allInterfaces.slice(),
                 proxy,
             })
 
             for (const mixinId of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
-                const mixin = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
+                const mixinProvider = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
 
                 const wrappedHandler = new PluginDeviceProxyHandler(this.scrypted, this.id);
                 wrappedHandler.mixinTable = Promise.resolve(mixinTable.slice());
                 const wrappedProxy = new Proxy(wrappedHandler, wrappedHandler);
 
                 try {
-                    const interfaces = await (mixin.canMixin(type, allInterfaces) as any) as ScryptedInterface[];
+                    const interfaces = await (mixinProvider.canMixin(type, allInterfaces) as any) as ScryptedInterface[];
                     if (!interfaces) {
                         console.warn(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
                         const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
@@ -89,13 +91,14 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                     const host = this.scrypted.getPluginHostForDeviceId(mixinId);
                     const deviceState = await host.remote.createDeviceState(this.id,
                         async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value));
-                    const mixinProxy = await mixin.getMixin(wrappedProxy, allInterfaces, deviceState);
+                    const mixinProxy = await mixinProvider.getMixin(wrappedProxy, allInterfaces, deviceState);
                     if (!mixinProxy)
                         throw new Error(`mixin provider ${mixinId} did not return mixin for ${this.id}`);
                     allInterfaces.push(...interfaces);
                     proxy = mixinProxy;
 
                     mixinTable.unshift({
+                        mixinProviderId: mixinId,
                         interfaces,
                         proxy,
                     })

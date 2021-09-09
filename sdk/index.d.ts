@@ -72,6 +72,7 @@ export class MixinDeviceBase<T> implements DeviceState {
   storage: Storage;
   id?: string;
   interfaces?: string[];
+  mixins?: string[];
   metadata?: any;
   name?: string;
   providedInterfaces?: string[];
@@ -120,11 +121,6 @@ export class MixinDeviceBase<T> implements DeviceState {
   ultraviolet?: number;
   luminance?: number;
   position?: Position;
-
-  /**
-   * Called when the mixin has been removed or invalidated.
-   */
-  release(): void;
 }
 
 declare const Scrypted: ScryptedStatic;

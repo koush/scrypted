@@ -30,9 +30,9 @@ export interface PluginAPI {
 
     getComponent(id: string): Promise<any>;
 
-    getMediaManager(): Promise<MediaManager>
+    getMediaManager(): Promise<MediaManager>;
 
-    kill(): Promise<void>;
+    requestRestart(): Promise<void>;
 }
 
 class EventListenerRegisterProxy implements EventListenerRegister {
@@ -46,17 +46,28 @@ class EventListenerRegisterProxy implements EventListenerRegister {
     }
 }
 
-export class PluginAPIProxy implements PluginAPI {
+export class PluginAPIManagedListeners {
     listeners = new Set<EventListenerRegister>();
 
-    constructor(public api: PluginAPI, public mediaManager?: MediaManager) {
-    }
-
-    logListener(listener: EventListenerRegister): EventListenerRegister {
+    manageListener(listener: EventListenerRegister): EventListenerRegister {
+        this.listeners.add(listener);
         return new EventListenerRegisterProxy(this.listeners, () => {
             this.listeners.delete(listener);
             listener.removeListener();
         });
+    }
+
+    removeListeners() {
+        for (const l of [...this.listeners]) {
+            l.removeListener();
+        }
+        this.listeners.clear();
+    }
+}
+
+export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginAPI {
+    constructor(public api: PluginAPI, public mediaManager?: MediaManager) {
+        super();
     }
 
     setState(nativeId: string, key: string, value: any): Promise<void> {
@@ -87,10 +98,10 @@ export class PluginAPIProxy implements PluginAPI {
         return this.api.removeDevice(id);
     }
     async listen(EventListener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
-        return this.logListener(await this.api.listen(EventListener));
+        return this.manageListener(await this.api.listen(EventListener));
     }
     async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
-        return this.logListener(await this.api.listenDevice(id, event, callback));
+        return this.manageListener(await this.api.listenDevice(id, event, callback));
     }
     ioClose(id: string): Promise<void> {
         return this.api.ioClose(id);
@@ -110,11 +121,9 @@ export class PluginAPIProxy implements PluginAPI {
     async getMediaManager(): Promise<MediaManager> {
         return this.mediaManager;
     }
-    async kill(): Promise<void> {
-        for (const l of [...this.listeners]) {
-            l.removeListener();
-        }
-        this.listeners.clear();
+
+    async requestRestart() {
+        return this.api.requestRestart();
     }
 }
 

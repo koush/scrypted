@@ -50,10 +50,10 @@ function addBuiltins(mediaManager: MediaManager, converters: BufferConverter[]) 
             args.push('-y', "-vf", "select=eq(n\\,1)", "-vframes", "1", '-f', 'singlejpeg', tmpfile.name);
 
             const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-                // stdio: 'ignore',
+                stdio: 'ignore',
             });
-            cp.stdout.on('data', data => console.log(data.toString()));
-            cp.stderr.on('data', data => console.error(data.toString()));
+            // cp.stdout.on('data', data => console.log(data.toString()));
+            // cp.stderr.on('data', data => console.error(data.toString()));
             cp.on('error', (code) => {
                 console.error('ffmpeg error code', code);
             })
@@ -205,11 +205,11 @@ function addBuiltins(mediaManager: MediaManager, converters: BufferConverter[]) 
             args.push(`tcp://127.0.0.1:${videoPort}`);
 
             const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-                // stdio: 'ignore',
+                stdio: 'ignore',
             });
             cp.on('error', e => console.error('ffmpeg error', e));
-            cp.stdout.on('data', data => console.log(data.toString()));
-            cp.stderr.on('data', data => console.error(data.toString()));
+            // cp.stdout.on('data', data => console.log(data.toString()));
+            // cp.stderr.on('data', data => console.error(data.toString()));
 
             const resolution = new Promise<Array<string>>(resolve => {
                 cp.stdout.on('data', data => {

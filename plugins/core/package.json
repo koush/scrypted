@@ -33,6 +33,7 @@
       "url-parse": "^1.4.7"
    },
    "devDependencies": {
+      "@types/node": "^16.9.0",
       "@types/url-parse": "^1.4.4"
    }
 }
