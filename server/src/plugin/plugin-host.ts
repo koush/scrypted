@@ -49,6 +49,10 @@ export class PluginHost {
 
         for (const device of Object.values(this.scrypted.devices)) {
             const pluginDevice = this.scrypted.pluginDevices[device.handler.id];
+            if (!pluginDevice) {
+                console.warn('PluginDevice missing?', device.handler.id);
+                continue;
+            }
             for (const mixin of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
                 if (this.scrypted.findPluginDeviceById(mixin).pluginId === this.pluginId) {
                     device.handler.invalidate();
