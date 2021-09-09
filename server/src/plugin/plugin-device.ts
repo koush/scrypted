@@ -30,6 +30,8 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         this.mixinTable = undefined;
         (async() => {
             for (const mixinEntry of (await mixinTable || [])) {
+                if (!mixinEntry.mixinProviderId)
+                    continue;
                 (async() => {
                     const mixinProvider = this.scrypted.getDevice(mixinEntry.mixinProviderId) as ScryptedDevice & MixinProvider;
                     mixinProvider?.releaseMixin(this.id, await mixinEntry.proxy);
