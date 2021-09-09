@@ -5,6 +5,7 @@ import { supportedTypes } from './common';
 import './types'
 import { CameraMixin } from './camera-mixin';
 import { maybeAddBatteryService } from './battery';
+import { randomBytes } from 'crypto';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -60,7 +61,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
     getUsername() {
         return this.storage.getItem("mac") || (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
-            .flat().map(([iface, entry]) => entry).find(i => i.family == 'IPv4').mac;
+            .flat().map(([iface, entry]) => entry).find(i => i && (i.family === 'IPv4' || i.family === 'IPv6'))?.mac;
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -140,6 +141,16 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
         this.storage.setItem('defaultIncluded', JSON.stringify(defaultIncluded));
 
+        let username = this.getUsername();
+        if (!username) {
+            const buffers = [];
+            for (let i = 0; i < 6; i++) {
+                buffers.push(randomBytes(1).toString('hex'));
+            }
+            username = buffers.join(':');
+            this.storage.setItem('username', username);
+        }
+
         this.bridge.publish({
             username: this.getUsername(),
             pincode: '123-45-678',
@@ -160,7 +171,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
             const device = systemManager.getDeviceById(eventSource?.id);
             this.log.i(`Accessory descriptor changed: ${device?.name}. Requesting restart.`);
-            deviceManager.requestRestart();
+            this.console.log('restart event', eventSource?.id, eventDetails.property, eventData);
+            // deviceManager.requestRestart();
         });
     }
 
@@ -193,7 +205,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
             return;
         }
         this.log.i(`Accessory removed from HomeKit: ${device.name}. Requesting restart.`);
-        deviceManager.requestRestart();
+        this.console.log('release mixin', id);
+        // deviceManager.requestRestart();
     }
 }
 
