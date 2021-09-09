@@ -404,7 +404,10 @@ export class ScryptedRuntime {
         const ret = (async () => {
             await once(parse, 'end');
             console.log('npm package files:', Object.keys(files).join(', '));
-            const packageJson = JSON.parse(files['package/package.json'].toString());
+            const packageJsonEntry = files['package/package.json'];
+            if (!packageJsonEntry)
+                throw new Error('package.json not found. are you behind a firewall?');
+            const packageJson = JSON.parse(packageJsonEntry.toString());
             const npmPackage = packageJson.name;
             const plugin = await this.datastore.tryGet(Plugin, npmPackage) || new Plugin();
 
