@@ -39,7 +39,6 @@ sudo docker run --network host -v $(pwd)/server/scrypted.db:/server/scrypted.db 
 ### Prerequisites
 
 * Node v16 (older versions seem to have issues with the cluster module)
-* ffmpeg in $PATH/%PATH%
 * Windows is not supported, but may work.
 
 ### Linux Prerequisites
