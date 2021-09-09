@@ -20,7 +20,6 @@
     "express": "^4.17.1",
     "level": "^6.0.1",
     "lodash": "^4.17.21",
-    "mdns": "^2.7.2",
     "memfs": "^3.2.2",
     "node-dijkstra": "^2.5.0",
     "pem": "^1.14.4",
@@ -43,6 +42,7 @@
   },
   "scripts": {
     "serve": "npm run build && node dist/scrypted-main.js",
+    "ts-serve": "ts-node src/scrypted-main.ts",
     "build": "tsc --outDir dist"
   },
   "author": "",
