@@ -17,6 +17,11 @@ Supported accessories:
 
 ## Installation
 
+### Prerequisites
+
+* Node v16 (or v14)
+* ffmpeg in $PATH/%PATH%
+
 ### Linux Prerequisites
 ```sh
 sudo apt install libavahi-compat-libdnssd-dev
