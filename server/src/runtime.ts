@@ -403,7 +403,7 @@ export class ScryptedRuntime {
 
         const ret = (async () => {
             await once(parse, 'end');
-            console.log('npm pakage files:', files, Object.keys(files).join(','));
+            console.log('npm package files:', Object.keys(files).join(', '));
             const packageJson = JSON.parse(files['package/package.json'].toString());
             const npmPackage = packageJson.name;
             const plugin = await this.datastore.tryGet(Plugin, npmPackage) || new Plugin();
