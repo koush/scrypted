@@ -200,6 +200,10 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
                 if (needUpdate) {
                     camera = await this.api.updateChannels(camera);
+                    if (!camera) {
+                        this.log.a('Unable to enable RTSP and IDR interval on camera. Is this an admin account?');
+                        continue;
+                    }
                 }
 
                 const d = {
@@ -228,6 +232,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         }
         catch (e) {
             this.log.a(`login error: ${e}`);
+            this.console.error('login error', e);
         }
     }
 
