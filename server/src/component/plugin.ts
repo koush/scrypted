@@ -33,7 +33,7 @@ export class PluginComponent {
     async setMixins(id: string, mixins: string[]) {
         this.scrypted.stateManager.setState(id, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
         const device = this.scrypted.invalidatePluginDevice(id);
-        await device.handler.ensureProxy();
+        await device?.handler.ensureProxy();
     }
     async getMixins(id: string) {
         console.warn('legacy use of getMixins, use the mixins property');
