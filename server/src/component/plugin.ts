@@ -1,6 +1,7 @@
 import { ScryptedInterfaceProperty } from "@scrypted/sdk/types";
 import { ScryptedRuntime } from "../runtime";
 import { Plugin } from '../db-types';
+import { getState, setState } from "../state";
 
 export class PluginComponent {
     scrypted: ScryptedRuntime;
@@ -31,14 +32,15 @@ export class PluginComponent {
     }
     async setMixins(id: string, mixins: string[]) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        pluginDevice.mixins = [...new Set(mixins)] || [];
+        setState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
         await this.scrypted.datastore.upsert(pluginDevice);
         const device = this.scrypted.invalidatePluginDevice(id);
         await device.handler.ensureProxy();
     }
     async getMixins(id: string) {
+        console.warn('legacy use of getMixins, use the mixins property');
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        return pluginDevice?.mixins || [];
+        return getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
     }
     async getIdForPluginId(pluginId: string) {
         return this.scrypted.findPluginDevice(pluginId)?._id;
@@ -61,7 +63,7 @@ export class PluginComponent {
     async getDeviceInfo(id: string) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
         return {
-            mixins: pluginDevice.mixins || [],
+            mixins: getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [],
             pluginId: pluginDevice.pluginId,
             storage: pluginDevice.storage,
             nativeId: pluginDevice.nativeId,

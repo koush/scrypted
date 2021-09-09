@@ -38,5 +38,4 @@ export class PluginDevice extends ScryptedDocument {
     state: { [property: string]: SystemDeviceState };
     stateVersion: number;
     storage: { [key: string]: string };
-    mixins: string[];
 }

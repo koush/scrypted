@@ -105,10 +105,7 @@ export class ScryptedStateManager extends EventRegistry {
     getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } } {
         const systemState: { [id: string]: { [property: string]: SystemDeviceState } } = {};
         for (const pluginDevice of Object.values(this.scrypted.pluginDevices)) {
-            if (pluginDevice.stateVersion !== 1)
-                systemState[pluginDevice._id] = {};
-            else
-                systemState[pluginDevice._id] = pluginDevice.state;
+            systemState[pluginDevice._id] = pluginDevice.state;
         }
         return systemState;
     }
@@ -229,10 +226,6 @@ function isSameValue(value1: any, value2: any) {
 }
 
 export function setState(pluginDevice: PluginDevice, property: string, value: any): boolean {
-    if (pluginDevice.stateVersion !== 1 || !pluginDevice.state) {
-        pluginDevice.stateVersion = 1;
-        pluginDevice.state = {};
-    }
     if (!pluginDevice.state[property])
         pluginDevice.state[property] = {};
     const state = pluginDevice.state[property];

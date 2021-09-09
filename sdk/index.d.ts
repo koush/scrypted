@@ -12,6 +12,7 @@ export class ScryptedDeviceBase implements DeviceState {
   storage: Storage;
   id?: string;
   interfaces?: string[];
+  mixins?: string[];
   metadata?: any;
   name?: string;
   providedInterfaces?: string[];

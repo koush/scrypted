@@ -98,6 +98,12 @@ class EndpointManagerImpl implements EndpointManager {
     }
 }
 
+const disallowedScryptedDeviceProperties = new Set<string>([
+    ScryptedInterfaceProperty.id,
+    ScryptedInterfaceProperty.interfaces,
+    ScryptedInterfaceProperty.mixins,
+]);
+
 class DeviceStateProxyHandler implements ProxyHandler<any> {
     deviceManager: DeviceManagerImpl;
     id: string;
@@ -118,9 +124,11 @@ class DeviceStateProxyHandler implements ProxyHandler<any> {
     }
 
     set?(target: any, p: PropertyKey, value: any, receiver: any) {
-        if (p === 'id')
+        if (p === ScryptedInterfaceProperty.id)
             throw new Error("id is read only");
-        if (p === 'interfaces')
+        if (p === ScryptedInterfaceProperty.mixins)
+            throw new Error("mixins is read only");
+        if (p === ScryptedInterfaceProperty.interfaces)
             throw new Error("interfaces is a read only post-mixin computed property, use providedInterfaces");
         const now = Date.now();
         this.deviceManager.systemManager.state[this.id][p as string] = {

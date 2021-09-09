@@ -550,7 +550,8 @@ export class ScryptedRuntime {
         // assure final mixin resolved interface list has at least all the
         // interfaces from the provided. the actual list will resolve lazily.
         let mixinInterfaces: string[] = [];
-        if (pluginDevice.mixins?.length)
+        const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+        if (mixins.length)
             mixinInterfaces.push(...getState(pluginDevice, ScryptedInterfaceProperty.interfaces) || []);
         mixinInterfaces.push(...providedInterfaces.slice());
         mixinInterfaces = [...new Set(mixinInterfaces)];
@@ -590,11 +591,27 @@ export class ScryptedRuntime {
         return ret;
     }
 
+    async migrate(pluginDevice: PluginDevice) {
+        if (pluginDevice.stateVersion !== 2 || !pluginDevice.state) {
+            if (!pluginDevice.state) {
+                pluginDevice.state = {};
+            }
+
+            pluginDevice.stateVersion = 2;
+            // mixins used to be a non-stateful property on PluginDevice.
+            setState(pluginDevice, ScryptedInterfaceProperty.mixins, (pluginDevice as any).mixins);
+            this.datastore.upsert(pluginDevice);
+        }
+    }
+
     async start() {
         for await (const pluginDevice of this.datastore.getAll(PluginDevice)) {
-            this.pluginDevices[pluginDevice._id] = pluginDevice as PluginDevice;
-            if (pluginDevice.mixins?.includes(null)) {
-                pluginDevice.mixins = pluginDevice.mixins.filter(e => e);
+            this.migrate(pluginDevice);
+
+            this.pluginDevices[pluginDevice._id] = pluginDevice;
+            let mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+            if (mixins.includes(null) || mixins.includes(undefined)) {
+                setState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(e => !!e));
                 this.datastore.upsert(pluginDevice);
             }
         }

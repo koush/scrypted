@@ -3,7 +3,7 @@ import { ScryptedRuntime } from "../runtime";
 import { PluginDevice } from "../db-types";
 import { MixinProvider } from "@scrypted/sdk/types";
 import { handleFunctionInvocations } from "../rpc";
-import { getState } from "../state";
+import { getState, setState } from "../state";
 import { getProvidedTypeOrDefault } from "../infer-defaults";
 import { hasSameElements } from "../collection";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
@@ -69,7 +69,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                 proxy,
             })
 
-            for (const mixinId of pluginDevice.mixins || []) {
+            for (const mixinId of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
                 const mixin = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
 
                 const wrappedHandler = new PluginDeviceProxyHandler(this.scrypted, this.id);
@@ -80,7 +80,8 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                     const interfaces = await (mixin.canMixin(type, allInterfaces) as any) as ScryptedInterface[];
                     if (!interfaces) {
                         console.warn(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
-                        pluginDevice.mixins = pluginDevice.mixins.filter(mid => mid == mixinId);
+                        const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+                        setState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
                         this.scrypted.datastore.upsert(pluginDevice);
                         continue;
                     }
