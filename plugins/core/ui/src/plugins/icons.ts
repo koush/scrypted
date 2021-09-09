@@ -71,6 +71,7 @@ import {
   faVolumeUp,
   faQuestionCircle,
   faFan,
+  faFaucet,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -148,6 +149,7 @@ const icons =[
   faVolumeUp,
   faQuestionCircle,
   faFan,
+  faFaucet,
 ];
 
 for (var icon in icons) {

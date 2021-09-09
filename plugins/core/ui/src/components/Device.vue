@@ -404,6 +404,7 @@ import Scene from "../interfaces/Scene.vue";
 import TemperatureSetting from "../interfaces/TemperatureSetting.vue";
 import PositionSensor from "../interfaces/sensors/PositionSensor.vue";
 import DeviceProvider from "../interfaces/DeviceProvider.vue";
+import MixinProvider from "../interfaces/MixinProvider.vue";
 import Storage from "../common/Storage.vue";
 import { checkUpdate, installNpm, getNpmPath } from "./plugin/plugin";
 import AggregateDevice from "./aggregate/AggregateDevice.vue";
@@ -411,7 +412,11 @@ import Automation from "./automation/Automation.vue";
 import Script from "./script/Script.vue";
 import Javascript from "../interfaces/automation/Javascript.vue";
 import Vue from "vue";
-import { getDeviceAvailableMixins, setMixin, getDeviceMixins } from "../common/mixin";
+import {
+  getDeviceAvailableMixins,
+  setMixin,
+  getDeviceMixins,
+} from "../common/mixin";
 
 const cardHeaderInterfaces = [
   ScryptedInterface.OccupancySensor,
@@ -425,7 +430,10 @@ const cardHeaderInterfaces = [
   ScryptedInterface.OnOff,
 ];
 
-const cardUnderInterfaces = [ScryptedInterface.DeviceProvider];
+const cardUnderInterfaces = [
+  ScryptedInterface.DeviceProvider,
+  ScryptedInterface.MixinProvider,
+];
 
 const noCardInterfaces = [ScryptedInterface.Settings];
 
@@ -469,8 +477,8 @@ function filterInterfaces(interfaces) {
       ret = ret.filter((iface) => iface !== ScryptedInterface.VideoCamera);
     }
 
-    if (this.pluginData?.nativeId?.startsWith('script:')) {
-      ret = ret.filter(iface => iface !== ScryptedInterface.Program);
+    if (this.pluginData?.nativeId?.startsWith("script:")) {
+      ret = ret.filter((iface) => iface !== ScryptedInterface.Program);
     }
 
     return ret;
@@ -480,6 +488,7 @@ function filterInterfaces(interfaces) {
 export default {
   components: {
     DeviceProvider,
+    MixinProvider,
 
     StartStop,
     Dock,
@@ -696,20 +705,31 @@ export default {
       }
     },
     async toggleMixin(mixin) {
-      await setMixin(this.$scrypted.systemManager, this.device, mixin.id, mixin.enabled);
+      await setMixin(
+        this.$scrypted.systemManager,
+        this.device,
+        mixin.id,
+        mixin.enabled
+      );
     },
   },
   asyncComputed: {
     availableMixins: {
       async get() {
-        const mixins = await getDeviceMixins(this.$scrypted.systemManager, this.device);
-        const availableMixins = await getDeviceAvailableMixins(this.$scrypted.systemManager, this.device);
+        const mixins = await getDeviceMixins(
+          this.$scrypted.systemManager,
+          this.device
+        );
+        const availableMixins = await getDeviceAvailableMixins(
+          this.$scrypted.systemManager,
+          this.device
+        );
 
-        const ret = availableMixins.map(provider => ({
+        const ret = availableMixins.map((provider) => ({
           id: provider.id,
           name: provider.name,
           enabled: mixins.includes(provider.id),
-        }))
+        }));
 
         return ret;
       },

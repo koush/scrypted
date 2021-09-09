@@ -4,7 +4,7 @@ export async function setMixin(systemManager: SystemManager, device: ScryptedDev
     const plugins = await systemManager.getComponent(
         "plugins"
     );
-    let mixins = await plugins.getMixins(device.id);
+    let mixins = device.mixins.slice();
     if (enabled) {
         mixins.push(mixinId);
     } else {
@@ -35,9 +35,6 @@ export async function getDeviceAvailableMixins(systemManager: SystemManager, dev
 }
 
 export async function getDeviceMixins(systemManager: SystemManager, device: ScryptedDevice) {
-    const plugins = await systemManager.getComponent(
-        "plugins"
-    );
-    const mixins = await plugins.getMixins(device.id);
+    const mixins = (device.mixins || []).slice();
     return mixins;
 }

@@ -26,6 +26,8 @@ export function typeToIcon(type) {
         case ScryptedDeviceType.DataSource: return "fa-chart-area";
         case ScryptedDeviceType.DeviceProvider: return "fa-server";
         case ScryptedDeviceType.Unknown: return "fa-question-circle";
+        case ScryptedDeviceType.Valve: return "fa-faucet";
+        case ScryptedDeviceType.Irrigation: return "fa-faucet";
 
     }
     return "toggle-on";
