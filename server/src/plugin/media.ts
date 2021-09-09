@@ -205,7 +205,7 @@ function addBuiltins(mediaManager: MediaManager, converters: BufferConverter[]) 
             args.push(`tcp://127.0.0.1:${videoPort}`);
 
             const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-                stdio: 'ignore',
+                // stdio: 'ignore',
             });
             cp.on('error', e => console.error('ffmpeg error', e));
             // cp.stdout.on('data', data => console.log(data.toString()));
