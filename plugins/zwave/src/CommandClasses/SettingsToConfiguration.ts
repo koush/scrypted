@@ -25,9 +25,8 @@ export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings
             setting.value = setting.choices?.[value] || value;
             settings.push(setting);
         }
-        const ret = await this.getZWaveSettings();
-        ret.push(...settings);
-        return ret;
+        settings.push(...await this.getZWaveSettings());
+        return settings;
     }
     async putSetting(key: string, value: any) {
         if (key.startsWith('zwave:')) {

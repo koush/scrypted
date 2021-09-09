@@ -1,5 +1,13 @@
 <template>
   <v-layout wrap>
+
+        <v-flex xs12 v-if="showConsole" ref="consoleEl">
+          <ConsoleCard :deviceId="id"></ConsoleCard>
+        </v-flex>
+
+        <v-flex xs12 v-if="showRepl" ref="replEl">
+          <REPLCard :deviceId="id"></REPLCard>
+        </v-flex>
     <v-flex xs12 md6 v-if="name != null">
       <v-layout row wrap>
         <v-flex xs12>
@@ -348,13 +356,6 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex xs12 v-if="showConsole" ref="consoleEl">
-          <ConsoleCard :deviceId="id"></ConsoleCard>
-        </v-flex>
-
-        <v-flex xs12 v-if="showRepl" ref="replEl">
-          <REPLCard :deviceId="id"></REPLCard>
-        </v-flex>
       </v-layout>
     </v-flex>
   </v-layout>

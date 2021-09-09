@@ -31,6 +31,11 @@
           <v-list-item-subtitle>{{ mixin.type }}</v-list-item-subtitle>
         </v-list-item-content>
         
+     
+        <v-list-item-icon>
+          <v-list-item-action><v-btn icon @click.stop="openMixin(mixin)"><v-icon x-small>fa-external-link-alt</v-icon></v-btn></v-list-item-action>
+        </v-list-item-icon>
+        
       </v-list-item>
     </v-list-item-group>
   </div>
@@ -39,6 +44,7 @@
 import RPCInterface from "./RPCInterface.vue";
 import DeviceGroup from "../common/DeviceTable.vue";
 import { setMixin } from '../common/mixin';
+import { typeToIcon, getDeviceViewPath } from "../components/helpers";
 
 export default {
   mixins: [RPCInterface],
@@ -55,7 +61,9 @@ export default {
         mixin.enabled
       );
     },
-    getCurrentMixins() {},
+    openMixin(mixin) {
+        this.$router.push(getDeviceViewPath(mixin.id));
+    }
   },
   computed: {
     currentMixins() {

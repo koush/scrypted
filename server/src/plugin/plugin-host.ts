@@ -408,7 +408,8 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
         delete ctx.WebSocket;
         delete ctx.pluginHostAPI;
 
-        const replVariables = Object.keys(ctx).filter(key => key !== 'require');
+        const replFilter = new Set<string>(['require', 'localStorage'])
+        const replVariables = Object.keys(ctx).filter(key => !replFilter.has(key));
 
         const welcome = `JavaScript REPL variables:\n${replVariables.map(key => '  ' + key).join('\n')}\n\n`;
         socket.write(welcome);
