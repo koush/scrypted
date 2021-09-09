@@ -1,4 +1,4 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinDeviceBase, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands, SmartHomeV1QueryRequest, SmartHomeV1QueryResponse, SmartHomeV1ReportStateRequest, SmartHomeV1SyncRequest, SmartHomeV1SyncResponse } from 'actions-on-google/dist/service/smarthome/api/v1';
 import { smarthome } from 'actions-on-google/dist/service/smarthome';
@@ -16,7 +16,7 @@ import { canAccess } from './commands/camerastream';
 import mdns from 'mdns';
 import {URL} from 'url';
 
-const { systemManager, mediaManager, endpointManager } = sdk;
+const { systemManager, mediaManager, endpointManager, deviceManager } = sdk;
 
 
 function uuidv4() {
@@ -44,6 +44,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     });
     reportQueue = new Set<string>();
     reportStateThrottled = throttle(() => this.reportState(), 2000);
+    throttleSync = throttle(() => this.requestSync(), 15000);
     plugins: Promise<any>;
     defaultIncluded: any;
     localEndpoint: http.Server;
@@ -99,7 +100,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
     async isSyncable(device: ScryptedDevice): Promise<boolean> {
         const plugins = await this.plugins;
-        const mixins = await plugins.getMixins(device.id);
+        const mixins = (device.mixins || []).slice();
         if (mixins.includes(this.id))
             return true;
 
@@ -113,7 +114,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         return true;
     }
 
-    canMixin(type: ScryptedDeviceType, interfaces: string[]): string[] {
+    async canMixin(type: ScryptedDeviceType, interfaces: string[]) {
         const supportedType = supportedTypes[type];
         if (!supportedType?.probe({
             type,
@@ -123,8 +124,24 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         }
         return [];
     }
-    getMixin(device: ScryptedDevice, deviceState: any) {
+
+    async getMixin(device: ScryptedDevice, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+        if (this.storage.getItem(`link-${mixinDeviceState.id}`) !== this.linkTracker) {
+            this.log.i(`New device added to Google Home: ${mixinDeviceState.name}. Requesting sync.`);
+            this.throttleSync();
+        }
+
         return device;
+    }
+
+    async releaseMixin(id: string, mixinDevice: any) {
+        const device = systemManager.getDeviceById(id);
+        if (device.mixins?.includes(this.id)) {
+            return;
+        }
+        this.log.i(`Device removed from Google Home: ${device.name}. Requesting sync.`);
+        this.storage.removeItem(`link-${id}`)
+        this.throttleSync();
     }
 
     async onConnection(request: HttpRequest, webSocketUrl: string) {
