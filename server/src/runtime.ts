@@ -20,6 +20,7 @@ import { Server as WebSocketServer } from "ws";
 import axios from 'axios';
 import tar from 'tar';
 import { once } from 'events';
+import { PassThrough } from 'stream';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -388,18 +389,19 @@ export class ScryptedRuntime {
         const tarball = (await axios(`${registry.versions[latest].dist.tarball}`, {
             responseType: 'arraybuffer'
         })).data;
+        console.log('downloaded tarball', tarball?.length);
         const parse = new (tar.Parse as any)();
         const files: { [name: string]: Buffer } = {};
 
         parse.on('entry', async (entry: tar.ReadEntry) => {
+            console.log('parsing entry', entry.path)
             const chunks: Buffer[] = [];
-            for await (const chunk of (entry as any)) {
-                chunks.push(chunk);
-            }
+            entry.on('data', data => chunks.push(data));
 
-            const buffer = Buffer.concat(chunks);
-            files[entry.path] = buffer;
-
+            entry.on('end', () => {
+                const buffer = Buffer.concat(chunks);
+                files[entry.path] = buffer;
+            })
         });
 
         const ret = (async () => {
@@ -420,8 +422,10 @@ export class ScryptedRuntime {
             return this.installPlugin(plugin);
         })();
 
-        parse.write(Buffer.from(tarball));
-        parse.end();
+        const pt = new PassThrough();
+        pt.write(Buffer.from(tarball));
+        pt.push(null);
+        pt.pipe(parse);
         return ret;
     }
 
