@@ -28,25 +28,10 @@ process.on('unhandledRejection', error => {
     console.warn('unhandled rejection of RPC Result', error);
 });
 
-function checkPrerequisites() {
-    const ffmpeg = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-    const cp = child_process.spawn(ffmpeg, {
-        stdio: 'ignore',
-    })
-    cp.on('error', e => {
-        console.error('#############################################');
-        console.error(`ffmpeg was not found in path!`);
-        console.error('#############################################');
-    })
-}
-
-
 if (!cluster.isMaster) {
     startPluginRemoteClusterWorker();
 }
 else {
-    checkPrerequisites();
-
     let workerInspectPort: number = undefined;
 
     const debugServer = net.createServer(socket => {

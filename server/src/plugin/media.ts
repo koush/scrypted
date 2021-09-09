@@ -9,6 +9,7 @@ import tmp from 'tmp';
 import net from 'net';
 import os from 'os';
 import { listenZeroCluster } from "./cluster-helper";
+import pathToFfmpeg from 'ffmpeg-for-homebridge';
 
 const wrtc = require('wrtc');
 Object.assign(global, wrtc);
@@ -290,9 +291,8 @@ export class MediaManagerImpl implements MediaManager {
     }
 
     async getFFmpegPath(): Promise<string> {
-        if (os.platform() === 'win32')
-            return 'ffmpeg.exe';
-        return 'ffmpeg';
+        const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+        return pathToFfmpeg || defaultPath;
     }
 
     getConverters(): BufferConverter[] {
