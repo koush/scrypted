@@ -19,15 +19,17 @@ Supported accessories:
 
 ### Prerequisites
 
-* Node v16 (or v14)
+* Node v16 (older versions seem to have issues with the cluster module)
 * ffmpeg in $PATH/%PATH%
+* Windows is not supported, but may work.
 
 ### Linux Prerequisites
+
 ```sh
 sudo apt install libavahi-compat-libdnssd-dev
 ```
 
-### Github Clone
+### Checkout from Source
 
 ```sh
 git clone https://github.com/koush/scrypted.git
