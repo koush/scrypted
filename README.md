@@ -20,7 +20,7 @@ Supported accessories:
 ### Prerequisites
 
 * Node v16 (or v14)
-* FFMpeg in your path
+* ffmpeg in $PATH/%PATH%
 
 ### Linux Prerequisites
 ```sh
