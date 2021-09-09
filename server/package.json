@@ -44,7 +44,7 @@
     "@types/ws": "^7.4.7"
   },
   "scripts": {
-    "preserve": "build",
+    "preserve": "npm run build",
     "serve": " node dist/scrypted-main.js",
     "ts-serve": "ts-node src/scrypted-main.ts",
     "build": "tsc --outDir dist"
