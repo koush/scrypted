@@ -21,6 +21,7 @@ Supported accessories:
 
 * Node v16 (or v14)
 * ffmpeg in $PATH/%PATH%
+* Windows is not supported, but may work.
 
 ### Linux Prerequisites
 
