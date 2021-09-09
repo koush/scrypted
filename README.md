@@ -15,7 +15,26 @@ https://discord.gg/DcFzmBHYGq
 Supported accessories: 
  * https://github.com/koush/scrypted/tree/main/plugins
 
-## Installation
+# Installation
+
+## Checkout from Source
+
+## Run on Docker
+
+```sh
+# checkout source
+git clone https://github.com/koush/scrypted.git
+cd scrypted
+```
+
+```sh
+# build image from current checkout
+sudo docker build -t scrypted .
+# run it
+sudo docker run --network host -v $(pwd)/server/scrypted.db:/server/scrypted.db scrypted
+```
+
+## Run Locally for Development
 
 ### Prerequisites
 
@@ -29,13 +48,13 @@ Supported accessories:
 sudo apt install libavahi-compat-libdnssd-dev
 ```
 
-### Checkout from Source
+### Run
 
 ```sh
+# checkout source
 git clone https://github.com/koush/scrypted.git
+cd scrypted
 ```
-
-### Run
 
 ```sh
 cd scrypted/server
