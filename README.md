@@ -19,7 +19,7 @@ Supported accessories:
 
 ### Prerequisites
 
-* Node v16 (or v14)
+* Node v16
 * ffmpeg in $PATH/%PATH%
 * Windows is not supported, but may work.
 
