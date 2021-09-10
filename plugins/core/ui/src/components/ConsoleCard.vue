@@ -34,6 +34,7 @@ export default {
     const term = new Terminal({
       convertEol: true,
       disableStdin: true,
+      scrollback: 10000,
     });
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
