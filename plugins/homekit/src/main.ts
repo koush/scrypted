@@ -93,6 +93,12 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
                 title: "Username Override",
                 value: this.getUsername(),
                 key: "mac",
+            },
+            {
+                title: 'Bridge Address',
+                value: localStorage.getItem('addressOverride'),
+                key: 'addressOverride',
+                description: 'Override the default network address used by the Scrypted bridge. Set this to your wired IP if connected by both wired and wireless.'
             }
         ]
     }

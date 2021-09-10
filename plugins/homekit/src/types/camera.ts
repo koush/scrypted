@@ -202,11 +202,7 @@ addSupportedType({
                 }
                 sessions.set(request.sessionID, session);
 
-                // const addressOverride = (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
-                // .flat().map(([iface, entry]) => entry).find(i => i.family == 'IPv4').address;
-
                 const response: PrepareStreamResponse = {
-                    // addressOverride,
                     video: {
                         srtp_key: request.video.srtp_key,
                         srtp_salt: request.video.srtp_salt,
@@ -220,6 +216,14 @@ addSupportedType({
                         ssrc: audiossrc,
                     }
                 }
+
+                // plugin scope or device scope?
+                const addressOverride = localStorage.getItem('addressOverride');
+                if (addressOverride) {
+                    console.log('using address override', addressOverride);
+                    response.addressOverride = addressOverride;
+                }
+
                 callback(null, response);
             },
             async handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback) {
@@ -454,7 +458,7 @@ addSupportedType({
         accessory.configureController(controller);
 
         if (controller.motionService) {
-            const motionDetected = needAudioMotionService ? 
+            const motionDetected = needAudioMotionService ?
                 () => device.audioDetected || device.motionDetected :
                 () => !!device.motionDetected;
 
@@ -464,21 +468,21 @@ addSupportedType({
                     callback(null, motionDetected());
                 });
 
+            device.listen({
+                event: ScryptedInterface.MotionSensor,
+                watch: false,
+            }, (eventSource, eventDetails, data) => {
+                service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
+            });
+
+            if (needAudioMotionService) {
                 device.listen({
-                    event: ScryptedInterface.MotionSensor,
+                    event: ScryptedInterface.AudioSensor,
                     watch: false,
                 }, (eventSource, eventDetails, data) => {
                     service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
                 });
-
-                if (needAudioMotionService) {
-                    device.listen({
-                        event: ScryptedInterface.AudioSensor,
-                        watch: false,
-                    }, (eventSource, eventDetails, data) => {
-                        service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
-                    });
-                }
+            }
         }
 
         return accessory;

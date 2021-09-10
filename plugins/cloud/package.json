@@ -1,5 +1,6 @@
 {
    "name": "@scrypted/cloud",
+   "description": "Scrypted Cloud plugin which makes your hub accessible at home.scrypted.app",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -11,6 +12,14 @@
       "scrypted-package-json": "scrypted-package-json",
       "scrypted-webpack": "scrypted-webpack"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "google",
+      "assistant",
+      "home",
+      "cloud"
+   ],
    "scrypted": {
       "name": "Scrypted Cloud",
       "type": "API",
@@ -34,5 +43,5 @@
       "@types/debug": "^4.1.5",
       "@types/http-proxy": "^1.17.5"
    },
-   "version": "0.0.13"
+   "version": "0.0.15"
 }

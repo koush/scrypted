@@ -48,7 +48,8 @@
   },
   "scripts": {
     "preserve": "npm run build",
-    "serve": " node dist/scrypted-main.js",
+    "serve": "node dist/scrypted-main.js",
+    "serve-no-build": "node dist/scrypted-main.js",
     "ts-serve": "ts-node src/scrypted-main.ts",
     "build": "tsc --outDir dist"
   },

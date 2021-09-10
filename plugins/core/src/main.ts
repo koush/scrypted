@@ -161,6 +161,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         const { nativeId, pluginId } = await plugins.getDeviceInfo(deviceId);
         const port = await plugins.getRemoteServicePort(pluginId, name);
         const socket = net.connect(port);
+        socket.on('close', () => ws.close());
         socket.on('data', data => ws.send(data));
         socket.resume();
         socket.write(nativeId?.toString() || 'undefined');
@@ -186,8 +187,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         const userStorage = new UserStorage(request.username);
         peer.params.userStorage = userStorage;
 
-        
-        const listeners = new Set<EventListenerRegister>();
         const api = new PluginAPIProxy(pluginHostAPI, mediaManager);
         const remote = await setupPluginRemote(peer, api, null);
         await remote.setSystemState(systemManager.getSystemState());

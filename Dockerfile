@@ -6,4 +6,5 @@ WORKDIR /server
 RUN apt-get -y update
 RUN apt-get -y install libavahi-compat-libdnssd-dev
 RUN npm install
-CMD npm run serve
+RUN npm run build
+CMD npm run serve-no-build

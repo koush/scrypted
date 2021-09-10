@@ -1,9 +1,5 @@
 import {ScryptedDevice, Camera, ScryptedMimeTypes, RTCAVMessage, MediaManager, VideoCamera} from '@scrypted/sdk/types';
 
-async function sleep(ms) {
-    await new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera, getVideo: () => any, createPeerConnection: (configuration: any) => RTCPeerConnection) {
     const videoStream = await device.getVideoStream();
     const offer = await mediaManager.convertMediaObjectToBuffer(
