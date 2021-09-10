@@ -20,6 +20,8 @@ import qs from 'query-string';
 import { RPCResultError } from './rpc';
 import child_process from 'child_process';
 import os from 'os';
+import fs from 'fs';
+import mkdirp from 'mkdirp';
 
 process.on('unhandledRejection', error => {
     if (error?.constructor !== RPCResultError) {
@@ -77,7 +79,14 @@ else {
     }
 
     async function start() {
-        const db = level(path.join(process.cwd(), 'volume', 'scrypted.db'));
+        const volumeDir = path.join(process.cwd(), 'volume');
+        const dbPath = path.join(volumeDir, 'scrypted.db');
+        const oldDbPath = path.join(process.cwd(), 'scrypted.db');
+        if (fs.existsSync(oldDbPath) && !fs.existsSync(dbPath)) {
+            mkdirp.sync(volumeDir);
+            fs.renameSync(oldDbPath, dbPath);
+        }
+        const db = level(dbPath);
         await db.open();
 
         let certSetting = await db.tryGet(Settings, 'certificate') as Settings;
