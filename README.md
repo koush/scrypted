@@ -19,6 +19,8 @@ Supported accessories:
 
 ## Run on Docker
 
+Docker images are published on [Docker Hub](https://hub.docker.com/repository/registry-1.docker.io/koush/scrypted/tags?page=1&ordering=last_updated).
+
 ```sh
 # pull the image
 sudo docker pull koush/scrypted
