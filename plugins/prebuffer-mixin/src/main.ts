@@ -40,7 +40,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     super(mixinDevice, mixinDeviceState, {
       providerNativeId,
       mixinDeviceInterfaces,
-      group: "Prebuffer Settings",
+      group: "Rebroadcast and Prebuffer Settings",
       groupKey: "prebuffer",
     });
 
@@ -62,7 +62,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       },
       {
         title: 'Detected Keyframe Interval',
-        description: "Currently detected keyframe. This value may vary based on the stream behavior.",
+        description: "Currently detected keyframe interval. This value may vary based on the stream behavior.",
         readonly: true,
         key: 'detectedIdr',
         value: this.idrInterval.toString(),

@@ -327,10 +327,10 @@ addSupportedType({
                     console.log(args);
 
                     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-                        stdio: 'ignore',
+                        // stdio: 'ignore',
                     });
-                    // cp.stdout.on('data', data => console.log(data.toString()));
-                    // cp.stderr.on('data', data => console.error(data.toString()));
+                    cp.stdout.on('data', data => console.log(data.toString()));
+                    cp.stderr.on('data', data => console.error(data.toString()));
 
                     session.cp = cp;
                 }
