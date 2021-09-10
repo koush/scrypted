@@ -7,32 +7,46 @@ import throttle from 'lodash/throttle';
 
 const { deviceManager } = sdk;
 
+function isValidGarageDoor(device_type: string) {
+  return device_type === 'wifigaragedooropener' || device_type === 'virtualgaragedooropener';
+}
+
 class GarageController extends ScryptedDeviceBase implements DeviceProvider, Settings {
   devices = new Map<string, GarageDoor>();
   account: myQApi;
   loginTokenTime: number;
   start: Promise<void>;
   throttleRefresh = throttle(async () => {
-    await this.discoverDevices(0);
-    await this.updateStates();
+    try {
+      await this.discoverDevices(0);
+      await this.updateStates();
+    }
+    catch (e) {
+      console.error('refresh failed', e);
+    }
   }, 60000, {
     leading: true,
+    trailing: true,
   });
 
   constructor() {
     super();
     this.start = this.discoverDevices(0);
     this.start.then(() => this.updateStates());
+    this.start.catch(e => console.error('discovery error', e));
   }
 
   async getSettings(): Promise<Setting[]> {
     return [
       {
         title: 'Email',
+        key: 'email',
         value: localStorage.getItem('email'),
       },
       {
         title: 'Password',
+        type: 'password',
+        key: 'password',
         value: localStorage.getItem('password'),
       }
     ];
@@ -45,26 +59,29 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
     await this.start;
     if (!this.devices[nativeId])
       this.devices[nativeId] = new GarageDoor(this, this.account.devices.find(d => d.serial_number === nativeId)!);
+    this.devices[nativeId]?.refresh();
     return this.devices[nativeId];
   }
   async discoverDevices(duration: number) {
-    if (this.account) {
-      return;
+    if (!this.account) {
+      const email = localStorage.getItem('email');
+      const password = localStorage.getItem('password');
+      if (!email || !password) {
+        throw new Error('Not logged in.');
+      }
+  
+      this.account = new myQApi(console.log.bind(console), console, email, password);
     }
 
-    const email = localStorage.getItem('email');
-    const password = localStorage.getItem('password');
-    if (!email || !password) {
-      throw new Error('Not logged in.');
-    }
-
-    this.account = new myQApi(console.log.bind(console), console, email, password);
     await this.account.refreshDevices();
+    console.log(this.account.devices);
     
     const devices: Device[] = [];
     for (const device of this.account.devices) {
-      if (device.device_type !== 'wifigaragedooropener')
+      if (!isValidGarageDoor(device.device_type)) {
+        console.log('ignoring device', device);
         continue;
+      }
 
       devices.push({
         name: device.name,
@@ -81,8 +98,10 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
 
   async updateStates() {
     for (const device of this.account.devices) {
-      if (device.device_type !== 'wifigaragedooropener')
+      if (!isValidGarageDoor(device.device_type)) {
+        console.log('ignoring device', device);
         continue;
+      }
 
       const d = await this.getDevice(device.serial_number) as GarageDoor;
       d.entryOpen = device.state.door_state !== 'closed';
@@ -101,9 +120,11 @@ class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh, EntrySens
 
   async closeEntry() {
     this.controller.account.execute(this.device, 'close');
+    setTimeout(() => this.refresh(), 60000);
   }
   async openEntry() {
     this.controller.account.execute(this.device, 'open');
+    setTimeout(() => this.refresh(), 60000);
   }
   async getRefreshFrequency() {
     return 60;

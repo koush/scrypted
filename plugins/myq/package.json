@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/myq",
-   "version": "0.1.30",
+   "version": "0.1.38",
    "description": "A MyQ Garage plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -25,11 +25,13 @@
       "singleInstance": true,
       "type": "DeviceProvider",
       "interfaces": [
-         "DeviceProvider"
+         "DeviceProvider",
+         "Settings"
       ]
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",
+      "@types/lodash": "^4.14.172",
       "@types/node-fetch": "^2.5.12"
    },
    "dependencies": {
