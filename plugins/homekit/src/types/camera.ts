@@ -155,6 +155,8 @@ addSupportedType({
         const delegate: CameraStreamingDelegate = {
             async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
                 try {
+                    console.log('snapshot request', request);
+
                     if (device.interfaces.includes(ScryptedInterface.Camera)) {
                         const media = await device.takePicture();
                         const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
@@ -221,7 +223,7 @@ addSupportedType({
                 callback(null, response);
             },
             async handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback) {
-                console.log('streaming session started', request);
+                console.log('streaming request', request);
                 if (request.type === StreamRequestTypes.STOP) {
                     killSession(request.sessionID);
                     callback();

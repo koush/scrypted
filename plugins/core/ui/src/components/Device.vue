@@ -451,7 +451,9 @@ const cardUnderInterfaces = [
   ScryptedInterface.MixinProvider,
 ];
 
-const noCardInterfaces = [ScryptedInterface.Settings];
+const noCardInterfaces = [
+  ScryptedInterface.Settings
+];
 
 const cardInterfaces = [
   ScryptedInterface.Brightness,

@@ -112,7 +112,11 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
                     pendingSize = right.length;
                     events.emit('data', left);
                 }
-            })();
+            })()
+            .catch(e => {
+                console.error('rebroadcast source ended', e);
+                kill();
+            });
 
             resolve({
                 events,
@@ -149,5 +153,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         });
         // cp.stdout.on('data', data => console.log(data.toString()));
         // cp.stderr.on('data', data => console.error(data.toString()));
+
+        cp.on('exit', kill);
     });
 }

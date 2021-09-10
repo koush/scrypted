@@ -1,4 +1,4 @@
-import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, MixinDeviceBase } from '@scrypted/sdk';
+import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, MixinDeviceBase, Camera, MediaObject } from '@scrypted/sdk';
 import { Bridge, Categories, HAPStorage } from './hap';
 import os from 'os';
 import { supportedTypes } from './common';
@@ -6,8 +6,9 @@ import './types'
 import { CameraMixin } from './camera-mixin';
 import { maybeAddBatteryService } from './battery';
 import { randomBytes } from 'crypto';
+import qrcode from 'qrcode';
 
-const { systemManager, deviceManager } = sdk;
+const { systemManager, mediaManager } = sdk;
 
 HAPStorage.storage();
 class HAPLocalStorage {
@@ -77,10 +78,16 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
     async getSettings(): Promise<Setting[]> {
         return [
             {
-                title: "Pairing Code",
+                title: "Manual Pairing Code",
                 key: "pairingCode",
                 readonly: true,
                 value: "123-45-678",
+            },
+            {
+                title: "Camera QR Code",
+                key: "qrCode",
+                readonly: true,
+                value: "The Pairing QR Code can be viewed in the 'Console'",
             },
             {
                 title: "Username Override",
@@ -158,6 +165,13 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
             pincode: '123-45-678',
             port: Math.round(Math.random() * 30000 + 10000),
         }, true);
+
+        const code = qrcode.toString(this.bridge.setupURI(), {
+            type: 'terminal',
+        }, (e, qrcode) => {
+            this.console.log('Pairing QR Code:')
+            this.console.log(qrcode);
+        })
 
         systemManager.listen((eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)

@@ -1,7 +1,7 @@
 
 import { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, VideoStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { createServer, Server } from 'net';
+import { createServer, Server, Socket } from 'net';
 import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
 import EventEmitter from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
@@ -103,7 +103,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       'copy',
     ];
 
-    const fmp4OutputServer = createServer(async (socket) => {
+    const fragmentClientHandler = async (socket: Socket) => {
       fmp4OutputServer.close();
       const parser = parseFragmentedMP4(socket);
       for await (const atom of parser) {
@@ -133,6 +133,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
         this.events.emit('atom', atom);
       }
+    }
+
+    const fmp4OutputServer = createServer(socket => {
+      fragmentClientHandler(socket).catch(e => console.log('fragmented mp4 session ended', e));
     });
     const fmp4Port = await listenZeroCluster(fmp4OutputServer);
 
@@ -215,7 +219,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         }
 
         this.events.on('atom', writeAtom);
-
         cleanup = () => {
           console.log(this.name, 'prebuffer request ended');
           this.events.removeListener('atom', writeAtom);
@@ -227,7 +230,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       }
       else {
         const writeData = (data: Buffer) => {
-          // console.log(`atom ${atom.type} ${atom.length}`);
           socket.write(data);
         };
 
@@ -301,7 +303,7 @@ class PrebufferProvider extends ScryptedDeviceBase implements MixinProvider {
     return new PrebufferMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
   }
   async releaseMixin(id: string, mixinDevice: any) {
-      mixinDevice.release();
+    mixinDevice.release();
   }
 }
 

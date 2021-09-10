@@ -27,20 +27,18 @@
       ]
    },
    "dependencies": {
-      "axios": "^0.21.1",
       "hap-nodejs": "file:../HAP-NodeJS",
       "lodash": "^4.17.21",
-      "lodash.debounce": "^4.0.8",
-      "query-string": "^7.0.0",
-      "url-parse": "^1.5.1"
+      "qrcode": "^1.4.4"
    },
    "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk",
       "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
       "@types/debug": "^4.1.5",
       "@types/lodash": "^4.14.168",
       "@types/node": "^14.17.9",
+      "@types/qrcode": "^1.4.1",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.42"
+   "version": "0.0.45"
 }
