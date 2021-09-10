@@ -33,5 +33,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }} koush/scrypted:latest
+          tags: koush/scrypted:latest #${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
