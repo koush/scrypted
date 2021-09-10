@@ -7,6 +7,7 @@ import debounce from "lodash/debounce";
 import { Driver, Endpoint, ZWaveController, ZWaveNode, CommandClass } from "zwave-js";
 import { ValueID, CommandClasses } from "@zwave-js/core"
 import { randomBytes } from "crypto";
+import path from "path/posix";
 
 const { log, deviceManager } = sdk;
 
@@ -60,8 +61,13 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
             this.log.a('No Network Key was present, so a random one was generated. You can change the Network Key in Settings.')
         }
         
+        const cacheDir = path.join(process.env['SCRYPTED_PLUGIN_VOLUME'], 'cache');
+        this.console.log(process.cwd());
         const driver = new Driver(this.storage.getItem('serialPort'), {
-            networkKey
+            networkKey,
+            storage: {
+                cacheDir,
+            }
         });
         this.driver = driver;
         console.log(driver.cacheDir);

@@ -21,8 +21,8 @@
       persistent-hint
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="green" dark tile @click="save" class="shift-up">
-          <v-icon>check</v-icon>
+        <v-btn v-if="dirty" color="green" outlined @click="save" class="shift-up">
+          <v-icon>fa-save</v-icon>
         </v-btn>
       </template>
     </v-select>
@@ -55,8 +55,8 @@
       :description="lazyValue.description"
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="green" dark tile @click="save" class="shift-up">
-          <v-icon>check</v-icon>
+        <v-btn v-if="dirty" color="green" outlined @click="save" class="shift-up">
+          <v-icon>fa-save</v-icon>
         </v-btn>
       </template>
     </DevicePicker>
@@ -72,8 +72,8 @@
       :type="lazyValue.type && lazyValue.type.toLowerCase() === 'password' ? 'password' : undefined"
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="green" dark tile @click="save" class="shift-up">
-          <v-icon>check</v-icon>
+        <v-btn v-if="dirty" color="green" outlined @click="save" class="shift-up">
+          <v-icon>fa-save</v-icon>
         </v-btn>
       </template>
     </v-text-field>

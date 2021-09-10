@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/rtsp",
-   "version": "0.0.19",
+   "version": "0.0.20",
    "description": "RTSP Cameras and Streams Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",

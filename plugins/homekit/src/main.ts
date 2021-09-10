@@ -60,9 +60,19 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
     }
 
     getUsername() {
-        return this.storage.getItem("mac") || (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
+        let username = this.storage.getItem("mac") || (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
             .flat().map(([iface, entry]) => entry).find(i => i && (i.family === 'IPv4' || i.family === 'IPv6'))?.mac;
-    }
+
+        if (!username) {
+            const buffers = [];
+            for (let i = 0; i < 6; i++) {
+                buffers.push(randomBytes(1).toString('hex'));
+            }
+            username = buffers.join(':');
+            this.storage.setItem('mac', username);
+        }
+        return username;
+   }
 
     async getSettings(): Promise<Setting[]> {
         return [
@@ -116,7 +126,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
             }
             catch (e) {
                 console.error('error while checking device if syncable', e);
-                throw e;
+                continue;
             }
 
             const accessory = supportedType.getAccessory(device);
@@ -141,15 +151,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
         this.storage.setItem('defaultIncluded', JSON.stringify(defaultIncluded));
 
-        let username = this.getUsername();
-        if (!username) {
-            const buffers = [];
-            for (let i = 0; i < 6; i++) {
-                buffers.push(randomBytes(1).toString('hex'));
-            }
-            username = buffers.join(':');
-            this.storage.setItem('username', username);
-        }
+        const username = this.getUsername();
 
         this.bridge.publish({
             username: this.getUsername(),
