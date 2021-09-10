@@ -56,7 +56,7 @@ npm run serve
 # visit https://localhost:9443/ in a browser
 ```
 
-### Run and Debug in VSCode
+## Run and Debug in VSCode
 
 1. Open scrypted/server in VS Code
 2. Launch
