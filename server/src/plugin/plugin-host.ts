@@ -115,7 +115,7 @@ export class PluginHost {
             });
 
             attachPluginRemote(remote, {
-                createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager),
+                createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager, console),
             });
         }
 
@@ -409,7 +409,7 @@ export function startPluginClusterWorker() {
     const replPort = createREPLServer(events);
 
     attachPluginRemote(peer, {
-        createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager),
+        createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager, getDeviceConsole(undefined)),
         events,
         getDeviceConsole,
         async getServicePort(name) {

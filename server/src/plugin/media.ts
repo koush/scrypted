@@ -24,7 +24,7 @@ interface RTCSession {
 const rtcSessions: { [id: string]: RTCSession } = {};
 
 
-function addBuiltins(mediaManager: MediaManager, converters: BufferConverter[]) {
+function addBuiltins(console: Console, mediaManager: MediaManager, converters: BufferConverter[]) {
     converters.push({
         fromMimeType: ScryptedMimeTypes.Url + ';' + ScryptedMimeTypes.AcceptUrlParameter,
         toMimeType: ScryptedMimeTypes.FFmpegInput,
@@ -286,7 +286,7 @@ function addBuiltins(mediaManager: MediaManager, converters: BufferConverter[]) 
 export class MediaManagerImpl implements MediaManager {
     systemManager: SystemManager;
 
-    constructor(systemManager: SystemManager) {
+    constructor(systemManager: SystemManager, public console: Console) {
         this.systemManager = systemManager;
     }
 
@@ -299,7 +299,7 @@ export class MediaManagerImpl implements MediaManager {
         const devices = Object.keys(this.systemManager.getSystemState()).map(id => this.systemManager.getDeviceById(id));
         const converters = Object.values(devices).filter(device => device.interfaces?.includes(ScryptedInterface.BufferConverter))
             .map(device => device as ScryptedDevice & BufferConverter);
-        addBuiltins(this, converters);
+        addBuiltins(this.console, this, converters);
         return converters;
     }
 
