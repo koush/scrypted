@@ -20,16 +20,10 @@ Supported accessories:
 ## Run on Docker
 
 ```sh
-# checkout source
-git clone https://github.com/koush/scrypted.git
-cd scrypted
-```
-
-```sh
-# build image from current checkout
-sudo docker build -t scrypted .
-# run it
-sudo docker run --network host -v $(pwd)/server/volume:/server/volume scrypted
+# pull the image
+sudo docker pull koush/scrypted
+# run the image, saving the database and configuration files in a subdirectory named "scrypted"
+sudo docker run --network host -v $(pwd)/scrypted:/server/volume koush/scrypted
 ```
 
 ## Run Locally for Development
