@@ -46,10 +46,8 @@ sudo apt install libavahi-compat-libdnssd-dev
 ```sh
 # checkout source
 git clone https://github.com/koush/scrypted.git
-cd scrypted
-```
 
-```sh
+# npm install and run
 cd scrypted/server
 npm install
 npm run serve
@@ -58,9 +56,22 @@ npm run serve
 
 ## Run and Debug in VSCode
 
-1. Install any prerequisites listed above.
-2. Open the scrypted/server folder in VSCode: `code scrypted/server`
-3. Launch
+
+```sh
+# Install any prerequisites listed above.
+
+# checkout source
+git clone https://github.com/koush/scrypted.git
+
+# npm install
+cd scrypted/server
+npm install
+
+# start VSCode
+code .
+```
+
+You can now launch Scrypted in VSCode.
 
 ## Plugin Development Documentation
 
