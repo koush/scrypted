@@ -209,8 +209,8 @@ function addBuiltins(mediaManager: MediaManager, converters: BufferConverter[]) 
                 // stdio: 'ignore',
             });
             cp.on('error', e => console.error('ffmpeg error', e));
-            // cp.stdout.on('data', data => console.log(data.toString()));
-            // cp.stderr.on('data', data => console.error(data.toString()));
+            cp.stdout.on('data', data => console.log(data.toString()));
+            cp.stderr.on('data', data => console.error(data.toString()));
 
             const resolution = new Promise<Array<string>>(resolve => {
                 cp.stdout.on('data', data => {
