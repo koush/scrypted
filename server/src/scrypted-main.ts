@@ -22,6 +22,9 @@ import child_process from 'child_process';
 import os from 'os';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
+import { install as installSourceMapSupport } from 'source-map-support';
+
+installSourceMapSupport();
 
 process.on('unhandledRejection', error => {
     if (error?.constructor !== RPCResultError) {
