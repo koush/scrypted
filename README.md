@@ -41,7 +41,7 @@ sudo docker run --network host -v $(pwd)/scrypted:/server/volume koush/scrypted
 sudo apt install libavahi-compat-libdnssd-dev
 ```
 
-### Run
+### Run in Terminal
 
 ```sh
 # checkout source
@@ -55,6 +55,11 @@ npm install
 npm run serve
 # visit https://localhost:9443/ in a browser
 ```
+
+### Run and Debug in VSCode
+
+1. Open scrypted/server in VS Code
+2. Launch
 
 ## Plugin Development Documentation
 
