@@ -77,7 +77,7 @@ else {
     }
 
     async function start() {
-        const db = level(path.join(process.cwd(), 'scrypted.db'));
+        const db = level(path.join(process.cwd(), 'volume', 'scrypted.db'));
         await db.open();
 
         let certSetting = await db.tryGet(Settings, 'certificate') as Settings;

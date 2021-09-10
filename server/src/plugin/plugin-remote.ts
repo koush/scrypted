@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import { Volume } from 'memfs';
 import path from 'path';
-import { DeviceManager, Logger, Device, DeviceManifest, DeviceState, EventDetails, EventListenerOptions, EventListenerRegister, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
+import { DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from '../server-settings';
 import { PluginAPI, PluginLogger, PluginRemote } from './plugin-api';
 import { SystemManagerImpl } from './system';

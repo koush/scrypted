@@ -1,12 +1,12 @@
 import cluster from 'cluster';
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, MediaManager, SystemDeviceState, HttpRequest } from '@scrypted/sdk/types'
+import { Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
 import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
-import { PluginAPI, PluginRemote } from './plugin-api';
+import { PluginRemote } from './plugin-api';
 import { Logger } from '../logger';
 import { MediaManagerImpl } from './media';
 import { getState } from '../state';
@@ -19,6 +19,8 @@ import { PassThrough } from 'stream';
 import { Console } from 'console'
 import { sleep } from '../sleep';
 import { PluginHostAPI } from './plugin-host-api';
+import mkdirp from 'mkdirp';
+import path from 'path';
 
 export class PluginHost {
     worker: cluster.Worker;
@@ -80,7 +82,16 @@ export class PluginHost {
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(plugin._id));
 
         if (true) {
-            this.startPluginClusterHost(logger);
+            const cwd = path.join(process.cwd(), 'volume', 'plugins', this.pluginId);
+            try {
+                mkdirp.sync(cwd);
+            }
+            catch (e) {
+            }
+
+            this.startPluginClusterHost(logger, {
+                SCRYPTED_PLUGIN_VOLUME: cwd,
+            });
         }
         else {
             const remote = new RpcPeer((message, reject) => {
@@ -194,8 +205,8 @@ export class PluginHost {
         });
     }
 
-    startPluginClusterHost(logger: Logger) {
-        this.worker = cluster.fork();
+    startPluginClusterHost(logger: Logger,env?: any) {
+        this.worker = cluster.fork(env);
 
         this.worker.process.stdout.on('data', data => {
             process.stdout.write(data);
@@ -428,9 +439,9 @@ class LazyRemote implements PluginRemote {
     remote: PluginRemote;
 
     constructor(init: Promise<PluginRemote>) {
-        this.init = (async() => {
+        this.init = (async () => {
             this.remote = await init;
-            return this. remote;
+            return this.remote;
         })();
     }
 
