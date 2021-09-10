@@ -29,7 +29,7 @@ cd scrypted
 # build image from current checkout
 sudo docker build -t scrypted .
 # run it
-sudo docker run --network host -v $(pwd)/server/scrypted.db:/server/scrypted.db scrypted
+sudo docker run --network host -v $(pwd)/server/volume:/server/volume scrypted
 ```
 
 ## Run Locally for Development
