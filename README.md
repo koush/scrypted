@@ -58,8 +58,9 @@ npm run serve
 
 ## Run and Debug in VSCode
 
-1. Open scrypted/server in VS Code
-2. Launch
+1. Install any prerequisites listed above.
+2. Open the scrypted/server folder in VSCode: `code scrypted/server`
+3. Launch
 
 ## Plugin Development Documentation
 
