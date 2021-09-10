@@ -28,7 +28,7 @@ sudo docker pull koush/scrypted
 sudo docker run --network host -v $(pwd)/scrypted:/server/volume koush/scrypted
 ```
 
-## Run Locally for Development
+## Run Locally
 
 ### Prerequisites
 
