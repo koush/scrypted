@@ -77,6 +77,6 @@ https://developer.scrypted.app
 2. Open https://localhost:9443/
 3. Install the HomeKit Plugin from the available plugins tab
 4. Install the Unifi or Amcrest camera plugin
-5. (optional/recommended) Install the Prebuffer plugin to keep a short video loop of the stream leading up to the motion.
+5. (optional/recommended) Install the Rebroadcast and Prebuffer plugin to keep a short video loop of the stream leading up to the motion.
 6. Pair with the Scrypted Hub accessory using your HomeKit app on iOS or Mac.
 
