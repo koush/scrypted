@@ -294,6 +294,14 @@
                 <v-list-item-content>
                   <v-list-item-title>{{ mixin.name }}</v-list-item-title>
                 </v-list-item-content>
+
+                <v-list-item-icon>
+                  <v-list-item-action
+                    ><v-btn icon @click.stop="openMixin(mixin)"
+                      ><v-icon x-small>fa-external-link-alt</v-icon></v-btn
+                    ></v-list-item-action
+                  >
+                </v-list-item-icon>
               </v-list-item>
             </v-list-item-group>
           </v-card>
@@ -711,6 +719,9 @@ export default {
       } catch (e) {
         this.showSaveError = true;
       }
+    },
+    openMixin(mixin) {
+      this.$router.push(getDeviceViewPath(mixin.id));
     },
     async toggleMixin(mixin) {
       await setMixin(

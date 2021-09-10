@@ -33,7 +33,8 @@ const numberPrebufferSegments = 1;
 async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration): AsyncGenerator<Buffer, void, unknown> {
 
-    console.log('fragment session starting', configuration);
+    console.log('recording session starting', configuration);
+
     const media = await device.getVideoStream({
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
         container: 'mp4',
@@ -220,7 +221,7 @@ addSupportedType({
                 callback(null, response);
             },
             async handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback) {
-                console.log(request);
+                console.log('streaming session started', request);
                 if (request.type === StreamRequestTypes.STOP) {
                     killSession(request.sessionID);
                     callback();
@@ -247,6 +248,10 @@ addSupportedType({
 
 
                 callback();
+
+
+                const videomtu = 188 * 3;
+                const audiomtu = 188 * 1;
 
                 try {
                     const media = await device.getVideoStream();
@@ -289,7 +294,7 @@ addSupportedType({
                         "-srtp_out_suite", session.request.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
                         "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                         "-srtp_out_params", videoKey.toString('base64'),
-                        `srtp://${session.request.targetAddress}:${session.request.video.port}?rtcpport=${session.request.video.port}&pkt_size=1316`
+                        `srtp://${session.request.targetAddress}:${session.request.video.port}?rtcpport=${session.request.video.port}&pkt_size=${videomtu}`
                     )
 
                     const codec = (request as StartStreamRequest).audio.codec;
@@ -317,7 +322,7 @@ addSupportedType({
                             "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                             "-srtp_out_params", audioKey.toString('base64'),
                             "-f", "rtp",
-                            `srtp://${session.request.targetAddress}:${session.request.audio.port}?rtcpport=${session.request.audio.port}&pkt_size=188`
+                            `srtp://${session.request.targetAddress}:${session.request.audio.port}?rtcpport=${session.request.audio.port}&pkt_size=${audiomtu}`
                         )
                     }
                     else {
