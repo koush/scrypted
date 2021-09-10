@@ -54,20 +54,14 @@ npm run serve
 # visit https://localhost:9443/ in a browser
 ```
 
-## Run and Debug in VSCode
+## Debug in VSCode
 
+Follow the steps for running locally above.
 
 ```sh
-# Install any prerequisites listed above.
-
-# checkout source
-git clone https://github.com/koush/scrypted.git
-
-# npm install
+# in directory with the scrypted git checkout
 cd scrypted/server
-npm install
-
-# start VSCode
+# open this directory in VSCode
 code .
 ```
 
