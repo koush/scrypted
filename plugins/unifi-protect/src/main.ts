@@ -279,9 +279,16 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     }
                 }
 
-                const d = {
+                const d: Device = {
                     name: camera.name,
                     nativeId: camera.id,
+                    info: {
+                        manufacturer: 'Ubiquiti',
+                        model: camera.type,
+                        firmware: camera.firmwareVersion,
+                        version: camera.hardwareRevision,
+                        serialNumber: camera.id,
+                    },
                     interfaces: [
                         ScryptedInterface.Camera,
                         ScryptedInterface.VideoCamera,
