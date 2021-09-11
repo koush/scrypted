@@ -1,5 +1,5 @@
 export * from './types'
-import { ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, ScryptedDevice  } from './types';
+import { DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, ScryptedDevice  } from './types';
 
 export class ScryptedDeviceBase implements DeviceState {
   constructor(nativeId?: string);
@@ -13,7 +13,7 @@ export class ScryptedDeviceBase implements DeviceState {
   id?: string;
   interfaces?: string[];
   mixins?: string[];
-  metadata?: any;
+  info?: DeviceInformation;
   name?: string;
   providedInterfaces?: string[];
   providedName?: ScryptedDeviceType;
@@ -73,7 +73,7 @@ export class MixinDeviceBase<T> implements DeviceState {
   id?: string;
   interfaces?: string[];
   mixins?: string[];
-  metadata?: any;
+  info?: DeviceInformation;
   name?: string;
   providedInterfaces?: string[];
   providedName?: ScryptedDeviceType;

@@ -5,7 +5,7 @@ export interface DeviceState {
   id?: string;
   interfaces?: string[];
   mixins?: string[];
-  metadata?: any;
+  info?: DeviceInformation;
   name?: string;
   providedInterfaces?: string[];
   providedName?: ScryptedDeviceType;
@@ -72,8 +72,8 @@ export interface ScryptedDevice {
   id?: string;
   interfaces?: string[];
   mixins?: string[];
-  metadata?: any;
   name?: string;
+  info?: DeviceInformation;
   providedInterfaces?: string[];
   providedName?: ScryptedDeviceType;
   providedRoom?: string;
@@ -732,13 +732,20 @@ export interface DeviceManager {
    */
   requestRestart(): Promise<void>;
 }
+export interface DeviceInformation {
+  model?: string;
+  manufacturer?: string;
+  version?: string;
+  firmware?: string;
+  serialNumber?: string;
+  metadata?: any;
+}
 /**
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
  */
 export interface Device {
   interfaces?: string[];
-  metadata?: any;
-  model?: string;
+  info?: DeviceInformation;
   name?: string;
   /**
    * The native id that is used by the DeviceProvider used to internally identify provided devices.
@@ -1032,7 +1039,7 @@ export enum ScryptedInterfaceProperty {
     id = "id",
     interfaces = "interfaces",
     mixins = "mixins",
-    metadata = "metadata",
+    info = "info",
     name = "name",
     providedInterfaces = "providedInterfaces",
     providedName = "providedName",

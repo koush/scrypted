@@ -16,13 +16,6 @@ export class PluginComponent {
     getStorage(id: string) {
         return this.scrypted.findPluginDeviceById(id)?.storage || {};
     }
-    async setMetadata(id: string, key: string, value: any) {
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        const metadata = pluginDevice.state[ScryptedInterfaceProperty.metadata].value || {};
-        metadata[key] = value;
-        this.scrypted.stateManager.setState(id, ScryptedInterfaceProperty.metadata, metadata);
-        await this.scrypted.datastore.upsert(pluginDevice);
-    }
     async setStorage(id: string, storage: { [key: string]: string }) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
         pluginDevice.storage = storage;

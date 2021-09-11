@@ -119,7 +119,7 @@ module.exports.ScryptedInterfaceDescriptors = {
         "id",
         "interfaces",
         "mixins",
-        "metadata",
+        "info",
         "name",
         "providedInterfaces",
         "providedName",
