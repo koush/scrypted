@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/chromecast",
-   "version": "0.1.31",
+   "version": "0.1.32",
    "description": "Send video, audio, and text to speech notifications to Chromecast and Google Home devices",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -38,6 +38,7 @@
       "query-string": "^7.0.0"
    },
    "devDependencies": {
+      "@types/mdns": "^0.0.34",
       "@types/mime": "^2.0.3",
       "@types/node": "^16.9.0"
    }

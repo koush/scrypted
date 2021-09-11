@@ -466,13 +466,11 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
       var device: Device = {
         nativeId: id,
         name,
-        model,
+        info: {
+          model,
+        },
         type,
         interfaces,
-        metadata: {
-          syncWithIntegrations: false,
-          syncWithGoogle: false,
-        },
       };
 
       const host = service.addresses[0];
