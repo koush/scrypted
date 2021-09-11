@@ -1,7 +1,7 @@
 import util from 'util';
 import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCAVMessage, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
-import mdns from 'mdns';
+import mdns from 'multicast-dns';
 import mime from 'mime';
 
 const { mediaManager, systemManager, endpointManager, deviceManager, log } = sdk;
@@ -18,15 +18,15 @@ util.inherits(ScryptedMediaReceiver, DefaultMediaReceiver);
 // in the quickjs environment.
 function toBuffer(buffer) {
   if (buffer && (buffer.constructor.name === ArrayBuffer.name || buffer.constructor.name === Uint8Array.name)) {
-    var ret = Buffer.from(buffer);
+    const ret = Buffer.from(buffer);
     return ret;
   }
   return buffer;
 }
 const BufferConcat = Buffer.concat;
 Buffer.concat = function (bufs) {
-  var copy = [];
-  for (var buf of bufs) {
+  const copy = [];
+  for (const buf of bufs) {
     copy.push(toBuffer(buf));
   }
   return BufferConcat(copy);
@@ -66,7 +66,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     return this.playerPromise = this.connectClient()
       .then(client => {
         return new Promise((resolve, reject) => {
-          this.log.i('launching');
+          this.console.log('launching');
           client.launch(app, (err, player) => {
             if (err) {
               reject(err);
@@ -74,12 +74,12 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
             }
 
             player.on('close', () => {
-              this.log.i('player closed');
+              this.console.log('player closed');
               player.removeAllListeners();
               this.playerPromise = undefined;
             });
 
-            this.log.i('player launched.');
+            this.console.log('player launched.');
             resolve(player);
           });
         });
@@ -96,9 +96,9 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
       return this.clientPromise;
     }
 
-    var promise;
+    let promise;
     return this.clientPromise = promise = new Promise((resolve, reject) => {
-      var client = new Client();
+      const client = new Client();
 
       const cleanup = () => {
         client.removeAllListeners();
@@ -109,12 +109,12 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
       }
       client.on('close', cleanup);
       client.on('error', err => {
-        this.log.i(`Client error: ${err.message}`);
+        this.console.log(`Client error: ${err.message}`);
         cleanup();
         reject(err);
       });
       client.on('status', async status => {
-        this.log.i(JSON.stringify(status));
+        this.console.log(JSON.stringify(status));
         try {
           await this.joinPlayer();
         }
@@ -122,7 +122,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         }
       })
       client.connect(this.host, () => {
-        this.log.i(`client connected.`);
+        this.console.log(`client connected.`);
         resolve(client);
       });
     })
@@ -131,7 +131,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
   tokens = new Map<string, MediaObject>();
 
   async sendMediaToClient(title: string, mediaUrl: string, mimeType: string, opts?: any) {
-    var media: any = {
+    const media: any = {
       // Here you can plug an URL to any mp4, webm, mp3 or jpg file with the proper contentType.
       contentId: mediaUrl,
       contentType: mimeType,
@@ -156,14 +156,14 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     const player = await this.connectPlayer(DefaultMediaReceiver)
     player.load(media, opts, (err, status) => {
       if (err) {
-        this.log.e(`load error: ${err}`);
+        this.console.error(`load error: ${err}`);
         return;
       }
-      this.log.i(`media loaded playerState=${status.playerState}`);
+      this.console.log(`media loaded playerState=${status.playerState}`);
     });
   }
 
-  async load(media: string|MediaObject, options: MediaPlayerOptions) {
+  async load(media: string | MediaObject, options: MediaPlayerOptions) {
     // check to see if this is url friendly media.
     if (typeof media === 'string')
       media = mediaManager.createMediaObject(media, ScryptedMimeTypes.Url);
@@ -194,7 +194,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     const token = Math.random().toString();
     this.tokens.set(token, media);
 
-    var castMedia: any = {
+    const castMedia: any = {
       contentId: cameraStreamAuthToken,
       contentType: ScryptedMimeTypes.LocalUrl,
       streamType: 'LIVE',
@@ -218,10 +218,10 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     const player = await this.connectPlayer(ScryptedMediaReceiver as any)
     player.load(castMedia, opts, (err, status) => {
       if (err) {
-        this.log.e(`load error: ${err}`);
+        this.console.error(`load error: ${err}`);
         return;
       }
-      this.log.i(`media loaded playerState=${status.playerState}`);
+      this.console.log(`media loaded playerState=${status.playerState}`);
     });
   }
 
@@ -230,45 +230,45 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     const ws = new WebSocket(webSocketUrl);
 
     ws.onmessage = async (message) => {
-        const token = message.data as string;
+      const token = message.data as string;
 
-        const videoStream = this.tokens.get(token);
-        if (!videoStream) {
-          ws.close();
-          return;
-        }
+      const videoStream = this.tokens.get(token);
+      if (!videoStream) {
+        ws.close();
+        return;
+      }
 
-        const offer: RTCAVMessage = JSON.parse((await mediaManager.convertMediaObjectToBuffer(
-            videoStream,
-            ScryptedMimeTypes.RTCAVOffer
-        )).toString());
+      const offer: RTCAVMessage = JSON.parse((await mediaManager.convertMediaObjectToBuffer(
+        videoStream,
+        ScryptedMimeTypes.RTCAVOffer
+      )).toString());
 
-        ws.send(JSON.stringify(offer));
+      ws.send(JSON.stringify(offer));
 
-        const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data)) as string;
-        const mo = mediaManager.createMediaObject(Buffer.from(answer), ScryptedMimeTypes.RTCAVAnswer);
+      const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data)) as string;
+      const mo = mediaManager.createMediaObject(Buffer.from(answer), ScryptedMimeTypes.RTCAVAnswer);
+      const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
+      ws.send(result.toString());
+
+      ws.onmessage = async (message) => {
+        const mo = mediaManager.createMediaObject(Buffer.from(message.data), ScryptedMimeTypes.RTCAVAnswer);
         const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
         ws.send(result.toString());
+      }
 
-        ws.onmessage = async (message) => {
-            const mo = mediaManager.createMediaObject(Buffer.from(message.data), ScryptedMimeTypes.RTCAVAnswer);
-            const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-            ws.send(result.toString());
-        }
-
-        const emptyObject = JSON.stringify({
-            description: null,
-            id: offer.id,
-            candidates: [],
-            configuration: null,
-        });
-        while (true ){
-            const mo = mediaManager.createMediaObject(Buffer.from(emptyObject), ScryptedMimeTypes.RTCAVAnswer);
-            const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-            ws.send(result.toString());
-        }
+      const emptyObject = JSON.stringify({
+        description: null,
+        id: offer.id,
+        candidates: [],
+        configuration: null,
+      });
+      while (true) {
+        const mo = mediaManager.createMediaObject(Buffer.from(emptyObject), ScryptedMimeTypes.RTCAVAnswer);
+        const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
+        ws.send(result.toString());
+      }
     }
-}
+  }
 
 
   mediaPlayerPromise: Promise<any>;
@@ -278,10 +278,10 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
       return this.mediaPlayerPromise;
     }
 
-    this.log.i('attempting to join session2');
+    this.console.log('attempting to join session2');
     return this.mediaPlayerPromise = this.connectClient()
       .then(client => {
-        this.log.i('attempting to join session');
+        this.console.log('attempting to join session');
         return new Promise((resolve, reject) => {
           client.getSessions((err, applications) => {
             if (err) {
@@ -302,7 +302,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
               }
 
               player.on('close', () => {
-                this.log.i('player closed');
+                this.console.log('player closed');
                 player.removeAllListeners();
                 this.mediaPlayerPromise = undefined;
                 this.mediaPlayerStatus = undefined;
@@ -333,7 +333,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         });
       })
       .catch(e => {
-        this.log.e(`Error connecting to current session ${e}`);
+        this.console.error(`Error connecting to current session ${e}`);
         this.mediaPlayerPromise = undefined;
         throw e;
       })
@@ -385,7 +385,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     return this.getMediaStatusInternal();
   }
   getMediaStatusInternal(): MediaStatus {
-    var mediaPlayerState: MediaPlayerState = this.parseState();
+    const mediaPlayerState: MediaPlayerState = this.parseState();
     const media = this.mediaPlayerStatus && this.mediaPlayerStatus.media;
     const metadata = media && media.metadata;
     let position = this.mediaPlayerStatus && this.mediaPlayerStatus.currentTime;
@@ -438,57 +438,85 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
 class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
   devices: any = {};
   search = new EventEmitter();
-  browser = mdns.createBrowser(mdns.tcp('googlecast'));
+  browser = mdns()
   searching: boolean;
 
   constructor() {
     super(null);
 
-    this.browser.on('serviceUp', (service) => {
-      this.log.i(JSON.stringify(service));
-      var id = service.txtRecord.id;
-      if (!id) {
-        // wtf?
-        return;
+
+    this.browser.on('response', response => {
+      for (const additional of response.additionals) {
+        if (additional.name.endsWith('_googlecast._tcp.local') && additional.type === 'TXT') {
+          const txt = new Map<string, string>();
+          for (const d of additional.data as any) {
+            const parts = d.toString().split('=');
+            txt.set(parts[0], parts[1]);
+          }
+
+          const id = txt.get('id');
+          if (!id) {
+            // wtf?
+            return;
+          }
+          const model = txt.get('md');
+          const name = txt.get('fn');;
+
+          const service = response.additionals.find(check => check.type === 'SRV' && check.name === additional.name);
+          if (!service) {
+            console.warn('no SRV found for', additional.name);
+            continue;
+          }
+          const host = (service.data as any).target;
+          let arec = response.additionals.find(check => check.name === host && check.type === 'A');
+          if (!arec)
+            arec = response.additionals.find(check => check.name === host && check.type === 'AAAA');
+          if (!arec) {
+            console.warn('no A/AAAA record found for', additional.name);
+            continue;
+          }
+          const ip = arec.data as string;
+          const port = (service.data as any).port;
+
+          this.onDiscover(id, name, model, ip, port);
+        }
       }
-      var model = service.txtRecord.md;
-      var name = service.txtRecord.fn;
-      var type = (model && model.indexOf('Google Home') != -1 && model.indexOf('Hub') == -1) ? ScryptedDeviceType.Speaker : ScryptedDeviceType.Display;
-
-      var interfaces = [
-        ScryptedInterface.MediaPlayer,
-        ScryptedInterface.Refresh,
-        ScryptedInterface.StartStop,
-        ScryptedInterface.Pause,
-        ScryptedInterface.EngineIOHandler,
-      ];
-
-      var device: Device = {
-        nativeId: id,
-        name,
-        info: {
-          model,
-        },
-        type,
-        interfaces,
-      };
-
-      const host = service.addresses[0];
-      const port = service.port;
-
-
-      this.log.i(`found cast device: ${name}`);
-
-      var castDevice = this.devices[id] || (this.devices[id] = new CastDevice(this, device.nativeId));
-      castDevice.device = device;
-      castDevice.host = host;
-      castDevice.port = port;
-
-      this.search.emit(id);
-      deviceManager.onDeviceDiscovered(device);
-    });
+    })
 
     this.discoverDevices(30000);
+  }
+
+  onDiscover(id: string, name: string, model: string, ip: string, port: number) {
+
+    const interfaces = [
+      ScryptedInterface.MediaPlayer,
+      ScryptedInterface.Refresh,
+      ScryptedInterface.StartStop,
+      ScryptedInterface.Pause,
+      ScryptedInterface.EngineIOHandler,
+    ];
+
+    const type = (model && model.indexOf('Google Home') != -1 && model.indexOf('Hub') == -1) ? ScryptedDeviceType.Speaker : ScryptedDeviceType.Display;
+
+    const device: Device = {
+      nativeId: id,
+      name,
+      info: {
+        model,
+      },
+      type,
+      interfaces,
+    };
+
+    console.log(`found cast device: ${name}`);
+
+    const castDevice = this.devices[id] || (this.devices[id] = new CastDevice(this, device.nativeId));
+    castDevice.device = device;
+    castDevice.host = ip;
+    castDevice.port = port;
+
+    this.search.emit(id);
+    deviceManager.onDeviceDiscovered(device);
   }
 
   getDevice(nativeId: string) {
@@ -501,12 +529,24 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
     }
     this.searching = true;
     duration = duration || 10000;
-    setTimeout(() => {
-      this.searching = false;
-      this.browser.stop();
-    }, duration)
+    // setTimeout(() => {
+    //   this.searching = false;
+    //   this.browser.stop();
+    // }, duration)
 
-    this.browser.start();
+    // this.browser.start();
+    for (let i = 0; i < 6; i++) {
+      setTimeout(() => {
+        this.browser.query([
+          {
+            type: 'PTR',
+            name: '_googlecast._tcp.local'
+          }
+        ]);
+      }, i * 10000)
+    }
+
+    // this.querySSDP();
   }
 }
 
