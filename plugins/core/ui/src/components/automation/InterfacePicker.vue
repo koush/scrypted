@@ -1,28 +1,28 @@
 <template>
-  <v-card style="margin-bottom: 16px;">
-    <v-card-title class="small-header red-gradient white--text font-weight-light subtitle-2">Action</v-card-title>
-    <v-form>
-      <v-container>
-        <v-layout>
-          <v-flex xs12>
-            <Select2
-              v-model="lazyValue.selected"
-              :options="interfaces"
-              :unselected="unselected"
-              @input="onInput"
-            ></Select2>
+  <v-card style="margin-bottom: 16px">
+    <v-card-title
+      class="small-header red-gradient white--text font-weight-light subtitle-2"
+      >Action</v-card-title
+    >
 
-            <component
-              :testDevice="testDevice"
-              :is="lazyValue.selected.component"
-              :properties="lazyValue.selected.properties"
-              v-model="lazyValue.model"
-              @input="onInput"
-            ></component>
-          </v-flex>
-        </v-layout>
-      </v-container>
-    </v-form>
+    <v-flex xs12>
+      <Select2
+        v-model="lazyValue.selected"
+        :options="interfaces"
+        :unselected="unselected"
+        @input="onInput"
+      ></Select2>
+
+      <component
+        :testDevice="
+          lazyValue.selected.component === 'Javascript' ? testDevice : undefined
+        "
+        :is="lazyValue.selected.component"
+        :properties="lazyValue.selected.properties"
+        v-model="lazyValue.model"
+        @input="onInput"
+      ></component>
+    </v-flex>
   </v-card>
 </template>
 
@@ -50,14 +50,14 @@ import Program from "../../interfaces/Program.vue";
 import ColorSettingRgb from "../../interfaces/ColorSettingRgb.vue";
 import ColorSettingTemperature from "../../interfaces/ColorSettingTemperature.vue";
 import Brightness from "../../interfaces/Brightness.vue";
-import { actionableInterfaces } from './interfaces';
+import { actionableInterfaces } from "./interfaces";
 
 import Select2 from "../../common/Select2.vue";
 function unassigned() {
   return {
     id: "unassigned",
     text: "Select Action",
-    component: "Unassigned"
+    component: "Unassigned",
   };
 }
 
@@ -67,7 +67,7 @@ export default {
     interfaces: Array,
     unselected: {
       type: Object,
-      default: unassigned
+      default: unassigned,
     },
     testDevice: Object,
   },
@@ -95,31 +95,31 @@ export default {
     Scene,
     Program,
 
-    Select2
+    Select2,
   },
   watch: {
-    'lazyValue.selected.component'() {
+    "lazyValue.selected.component"() {
       this.lazyValue.model = {};
-    }
+    },
   },
   methods: {
     createLazyValue() {
       let selected =
         (this.value.id == "unassigned"
           ? unassigned()
-          : this.interfaces.find(e => e.id == this.value.id)) || unassigned();
+          : this.interfaces.find((e) => e.id == this.value.id)) || unassigned();
       selected = cloneDeep(selected) || unassigned();
       return {
         selected,
-        model: cloneDeep(this.value.model)
+        model: cloneDeep(this.value.model),
       };
     },
     createInputValue() {
       return {
         id: this.lazyValue.selected.id,
         model: this.lazyValue.model,
-      }
-    }
-  }
+      };
+    },
+  },
 };
 </script>

@@ -1,17 +1,30 @@
 <template>
   <div>
-    <v-dialog v-if="editMode" dark v-model="showCardComponentSettings" max-width="500px">
+    <v-dialog
+      v-if="editMode"
+      dark
+      v-model="showCardComponentSettings"
+      max-width="500px"
+    >
       <v-card color="purple" raised>
         <v-card-title>
-          <font-awesome-icon size="sm" icon="sliders-h" color="white" style="margin-right: 20px" />
-          <span
-            v-if="!!cardComponentSettings"
-            class="title font-weight-light"
-          >{{ cardComponentSettings.cardComponent.component }} Settings</span>
+          <font-awesome-icon
+            size="sm"
+            icon="sliders-h"
+            color="white"
+            style="margin-right: 20px"
+          />
+          <span v-if="!!cardComponentSettings" class="title font-weight-light"
+            >{{ cardComponentSettings.cardComponent.component }} Settings</span
+          >
         </v-card-title>
 
         <v-container>
-          <Settings v-if="!!cardComponentSettings" :device="cardComponentSettings" :value="{}"></Settings>
+          <Settings
+            v-if="!!cardComponentSettings"
+            :device="cardComponentSettings"
+            :value="{}"
+          ></Settings>
         </v-container>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -25,24 +38,35 @@
         <v-flex>
           <v-card>
             <v-card-title>Edit Layout</v-card-title>
-            <v-btn small color="pink" dark absolute bottom left fab @click="addCard">
+            <v-btn
+              small
+              color="pink"
+              dark
+              absolute
+              bottom
+              left
+              fab
+              @click="addCard"
+            >
               <v-icon>add</v-icon>
             </v-btn>
 
-            <v-form>
-              <v-container>
-                <v-layout>
-                  <v-flex>
-                    <v-switch v-model="cardAlignCenter" label="Align Center"></v-switch>
-                  </v-flex>
-                </v-layout>
-              </v-container>
-            </v-form>
+            <v-flex>
+              <v-switch
+                v-model="cardAlignCenter"
+                label="Align Center"
+              ></v-switch>
+            </v-flex>
+
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn text color="blue" @click="editCards = !editCards">Toggle Preview</v-btn>
+              <v-btn text color="blue" @click="editCards = !editCards"
+                >Toggle Preview</v-btn
+              >
               <v-btn text color="blue" @click="saveLayout">Save</v-btn>
-              <v-btn text color="primary" @click="editMode = !editMode">Done</v-btn>
+              <v-btn text color="primary" @click="editMode = !editMode"
+                >Done</v-btn
+              >
             </v-card-actions>
           </v-card>
         </v-flex>
@@ -53,11 +77,15 @@
       <div v-if="!cardColumns"></div>
       <v-flex v-else-if="isEmpty" xs12 md6 lg4>
         <v-flex>
-          <v-card raised >
+          <v-card raised>
             <v-card-title
               class="red-gradient subtitle-1 text--white font-weight-light"
-            >No Devices Found</v-card-title>
-            <v-card-text>No devices found, install a plugin to add support for your things</v-card-text>
+              >No Devices Found</v-card-title
+            >
+            <v-card-text
+              >No devices found, install a plugin to add support for your
+              things</v-card-text
+            >
             <v-card-actions>
               <v-spacer></v-spacer>
 
@@ -76,9 +104,16 @@
         v-for="(cardColumn, index) in cardColumns"
         :key="index"
       >
-        <div v-for="(card, cardIndex) in cardColumn" :key="cardIndex" class="pb-4">
-          <v-card raised  v-if="!card.state.hidden || editCardMode">
-            <v-card-title :class="card.color" class="subtitle-1 font-weight-light">
+        <div
+          v-for="(card, cardIndex) in cardColumn"
+          :key="cardIndex"
+          class="pb-4"
+        >
+          <v-card raised v-if="!card.state.hidden || editCardMode">
+            <v-card-title
+              :class="card.color"
+              class="subtitle-1 font-weight-light"
+            >
               <v-text-field
                 hide-details
                 dark
@@ -92,18 +127,57 @@
             <div v-if="editCardMode">
               <v-card-actions>
                 <v-layout align-center justify-center>
-                  <v-btn small dark fab color="green" @click="card.color = 'green-gradient'"></v-btn>
-                  <v-btn small dark fab color="purple" @click="card.color = 'purple-gradient'"></v-btn>
-                  <v-btn small dark fab color="red" @click="card.color = 'red-gradient'"></v-btn>
-                  <v-btn small dark fab color="orange" @click="card.color = 'orange-gradient'"></v-btn>
-                  <v-btn small dark fab color="blue" @click="card.color = 'blue-gradient'"></v-btn>
-                  <v-btn small icon @click="card.state.hidden = !card.state.hidden">
+                  <v-btn
+                    small
+                    dark
+                    fab
+                    color="green"
+                    @click="card.color = 'green-gradient'"
+                  ></v-btn>
+                  <v-btn
+                    small
+                    dark
+                    fab
+                    color="purple"
+                    @click="card.color = 'purple-gradient'"
+                  ></v-btn>
+                  <v-btn
+                    small
+                    dark
+                    fab
+                    color="red"
+                    @click="card.color = 'red-gradient'"
+                  ></v-btn>
+                  <v-btn
+                    small
+                    dark
+                    fab
+                    color="orange"
+                    @click="card.color = 'orange-gradient'"
+                  ></v-btn>
+                  <v-btn
+                    small
+                    dark
+                    fab
+                    color="blue"
+                    @click="card.color = 'blue-gradient'"
+                  ></v-btn>
+                  <v-btn
+                    small
+                    icon
+                    @click="card.state.hidden = !card.state.hidden"
+                  >
                     <font-awesome-icon
                       :icon="card.state.hidden ? 'eye-slash' : 'eye'"
-                      style="color: #a9afbb;"
+                      style="color: #a9afbb"
                     />
                   </v-btn>
-                  <v-btn small icon @click="cardColumn.splice(cardIndex, 1)" color="#a9afbb">
+                  <v-btn
+                    small
+                    icon
+                    @click="cardColumn.splice(cardIndex, 1)"
+                    color="#a9afbb"
+                  >
                     <v-icon>delete</v-icon>
                   </v-btn>
                 </v-layout>
@@ -127,7 +201,10 @@
 
             <v-list flat>
               <v-list-item-group>
-                <div v-for="(component, componentIndex) in card.components" :key="componentIndex">
+                <div
+                  v-for="(component, componentIndex) in card.components"
+                  :key="componentIndex"
+                >
                   <component
                     v-if="!component.state.hidden || editCardMode"
                     v-bind="component.value"
@@ -138,26 +215,51 @@
                       <v-btn
                         small
                         icon
-                        @click="moveCardComponent(index, cardIndex, componentIndex, -1, 0)"
+                        @click="
+                          moveCardComponent(
+                            index,
+                            cardIndex,
+                            componentIndex,
+                            -1,
+                            0
+                          )
+                        "
                       >
                         <v-icon>arrow_left</v-icon>
                       </v-btn>
                       <v-btn
                         small
                         icon
-                        @click="moveCardComponent(index, cardIndex, componentIndex, 0, 1)"
+                        @click="
+                          moveCardComponent(
+                            index,
+                            cardIndex,
+                            componentIndex,
+                            0,
+                            1
+                          )
+                        "
                       >
                         <v-icon>arrow_drop_down</v-icon>
                       </v-btn>
                       <v-spacer></v-spacer>
 
                       <v-btn small icon @click="editCardComponent(component)">
-                        <font-awesome-icon icon="sliders-h" style="color: #a9afbb;" />
+                        <font-awesome-icon
+                          icon="sliders-h"
+                          style="color: #a9afbb"
+                        />
                       </v-btn>
-                      <v-btn small icon @click="component.state.hidden = !component.state.hidden">
+                      <v-btn
+                        small
+                        icon
+                        @click="
+                          component.state.hidden = !component.state.hidden
+                        "
+                      >
                         <font-awesome-icon
                           :icon="component.state.hidden ? 'eye-slash' : 'eye'"
-                          style="color: #a9afbb;"
+                          style="color: #a9afbb"
                         />
                       </v-btn>
                       <v-btn
@@ -171,14 +273,30 @@
                       <v-btn
                         small
                         icon
-                        @click="moveCardComponent(index, cardIndex, componentIndex, 0, -1)"
+                        @click="
+                          moveCardComponent(
+                            index,
+                            cardIndex,
+                            componentIndex,
+                            0,
+                            -1
+                          )
+                        "
                       >
                         <v-icon>arrow_drop_up</v-icon>
                       </v-btn>
                       <v-btn
                         small
                         icon
-                        @click="moveCardComponent(index, cardIndex, componentIndex, 1, 0)"
+                        @click="
+                          moveCardComponent(
+                            index,
+                            cardIndex,
+                            componentIndex,
+                            1,
+                            0
+                          )
+                        "
                       >
                         <v-icon>arrow_right</v-icon>
                       </v-btn>
@@ -219,7 +337,7 @@ import {
   getDefaultDashboard,
   getCardComponentSettings,
   CardComponent,
-  Card
+  Card,
 } from "./layout";
 import { Menu } from "../../store";
 import { Settings as SettingsInterface, Setting } from "@scrypted/sdk/types";
@@ -248,7 +366,7 @@ class CardComponentSettings implements SettingsInterface {
     var settings = cloneDeep(
       getCardComponentSettings().get(this.cardComponent.component)
     );
-    var setting = settings.find(setting => setting.key === key);
+    var setting = settings.find((setting) => setting.key === key);
     if (!setting.type || setting.type.indexOf("[]") === -1) {
       Vue.set(this.cardComponent.value, key, value);
     } else {
@@ -269,10 +387,10 @@ export default {
     DashboardStartStop,
     DashboardAddComponent,
     DashboardMediaPlayer,
-    Settings
+    Settings,
   },
   directives: {
-    ClickOutside
+    ClickOutside,
   },
   data() {
     return {
@@ -280,7 +398,7 @@ export default {
       editCards: false,
       cardColumns: null,
       cardAlignCenter: false,
-      cardComponentSettings: null
+      cardComponentSettings: null,
     };
   },
   mounted() {
@@ -291,22 +409,22 @@ export default {
         click: () => {
           this.editMode = true;
           this.editCards = true;
-        }
+        },
       },
       {
         title: "Save Layout",
         icon: "fa-save",
         click: () => {
           this.saveLayout();
-        }
+        },
       },
       {
         title: "Auto Layout",
         icon: "fa-bell",
         click: async () => {
           await this.getCardLayout(true);
-        }
-      }
+        },
+      },
     ];
 
     this.$store.commit("setMenu", menu);
@@ -320,7 +438,7 @@ export default {
     "$vuetify.breakpoint.name"() {
       this.cardColumnns = [];
       this.getCardLayout();
-    }
+    },
   },
   methods: {
     getCardComponentSettings,
@@ -330,13 +448,12 @@ export default {
       var cardComponent: CardComponent = {
         component,
         state: {},
-        value: {}
+        value: {},
       };
 
-      var cardComponentSettings: CardComponentSettings = new CardComponentSettings(
-        cardComponent
-      );
-      settings.forEach(setting => {
+      var cardComponentSettings: CardComponentSettings =
+        new CardComponentSettings(cardComponent);
+      settings.forEach((setting) => {
         cardComponentSettings.putSetting(setting.key, setting.value);
       });
 
@@ -348,7 +465,7 @@ export default {
         components: [],
         height: 1,
         color: "green-gradient",
-        state: {}
+        state: {},
       };
       this.cardColumns[0].splice(0, 0, card);
     },
@@ -357,7 +474,7 @@ export default {
         this.currentLayoutKey,
         JSON.stringify({
           cardColumns: this.cardColumns,
-          cardAlignCenter: this.cardAlignCenter
+          cardAlignCenter: this.cardAlignCenter,
         })
       );
     },
@@ -395,8 +512,8 @@ export default {
             newCardIndex =
               (cardIndex + this.cardColumns[newColumn].length - 1) %
               this.cardColumns[newColumn].length;
-            newComponentIndex = this.cardColumns[newColumn][newCardIndex]
-              .components.length;
+            newComponentIndex =
+              this.cardColumns[newColumn][newCardIndex].components.length;
           } else {
             newCardIndex = cardIndex;
           }
@@ -421,8 +538,8 @@ export default {
             height: 1,
             color: "green-gradient",
             state: {
-              hidden: false
-            }
+              hidden: false,
+            },
           };
           cardColumns[colIndex][cardIndex] = Object.assign(sanitized, card);
 
@@ -431,8 +548,8 @@ export default {
               component: undefined,
               value: undefined,
               state: {
-                hidden: false
-              }
+                hidden: false,
+              },
             };
 
             card.components[componentIndex] = Object.assign(
@@ -502,7 +619,7 @@ export default {
           return 1;
       }
       return 1;
-    }
+    },
   },
   computed: {
     isEmpty() {
@@ -519,7 +636,7 @@ export default {
       },
       set() {
         this.cardComponentSettings = null;
-      }
+      },
     },
     editCardMode() {
       return this.editMode && this.editCards;
@@ -543,7 +660,7 @@ export default {
     },
     currentLayoutKey() {
       return `cardColumns-${this.$vuetify.breakpoint.name}`;
-    }
-  }
+    },
+  },
 };
 </script>

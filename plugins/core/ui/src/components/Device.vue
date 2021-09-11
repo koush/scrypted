@@ -80,36 +80,34 @@
               </v-layout>
             </v-flex>
 
-            <v-form>
-              <v-container>
-                <v-layout>
-                  <v-flex xs12>
-                    <v-text-field
-                      v-model="name"
-                      label="Name"
-                      required
-                    ></v-text-field>
-                    <v-select
-                      v-if="inferredTypes.length > 1"
-                      :items="inferredTypes"
-                      label="Type"
-                      outlined
-                      v-model="type"
-                    ></v-select>
-                    <v-combobox
-                      v-if="
-                        hasFixedPhysicalLocation(type, deviceState.interfaces)
-                      "
-                      :items="existingRooms"
-                      outlined
-                      v-model="room"
-                      label="Room"
-                      required
-                    ></v-combobox>
-                  </v-flex>
-                </v-layout>
-              </v-container>
-            </v-form>
+            <v-container>
+              <v-layout>
+                <v-flex xs12>
+                  <v-text-field
+                    v-model="name"
+                    label="Name"
+                    required
+                  ></v-text-field>
+                  <v-select
+                    v-if="inferredTypes.length > 1"
+                    :items="inferredTypes"
+                    label="Type"
+                    outlined
+                    v-model="type"
+                  ></v-select>
+                  <v-combobox
+                    v-if="
+                      hasFixedPhysicalLocation(type, deviceState.interfaces)
+                    "
+                    :items="existingRooms"
+                    outlined
+                    v-model="room"
+                    label="Room"
+                    required
+                  ></v-combobox>
+                </v-flex>
+              </v-layout>
+            </v-container>
 
             <v-card-actions>
               <component
@@ -313,7 +311,6 @@
               class="green-gradient subtitle-1 text--white font-weight-light"
               >Storage</v-card-title
             >
-            <v-form>
               <v-container>
                 <v-layout>
                   <v-flex xs12>
@@ -324,7 +321,6 @@
                   </v-flex>
                 </v-layout>
               </v-container>
-            </v-form>
           </v-card>
         </v-flex>
 
@@ -451,9 +447,7 @@ const cardUnderInterfaces = [
   ScryptedInterface.MixinProvider,
 ];
 
-const noCardInterfaces = [
-  ScryptedInterface.Settings
-];
+const noCardInterfaces = [ScryptedInterface.Settings];
 
 const cardInterfaces = [
   ScryptedInterface.Brightness,

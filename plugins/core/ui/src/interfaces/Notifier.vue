@@ -1,5 +1,5 @@
 <template>
-  <v-form>
+  <div>
     <v-container>
       <v-layout>
         <v-flex xs12>
@@ -34,7 +34,7 @@
       <v-spacer></v-spacer>
       <v-btn text @click="send">Send</v-btn>
     </v-card-actions>
-  </v-form>
+  </div>
 </template>
 
 <script>
@@ -82,7 +82,7 @@ export default {
       );
       return ret;
     },
-    onChange: function() {
+    onChange: function () {
       if (this.device) {
         return;
       }
@@ -90,7 +90,7 @@ export default {
     },
     send() {
       this.update();
-    }
-  }
+    },
+  },
 };
 </script>

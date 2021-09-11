@@ -1,22 +1,24 @@
 <template>
-  <v-form>
-    <v-container>
-      <v-layout>
-        <v-flex>
-          <Grower
-            addButton="Add Password"
-            v-model="passwords"
-            :empty="{ key: '', value:''}"
-            @input="onInput"
-          >
-            <template v-slot:default="slotProps">
-              <PasswordEntry :device="device" v-model="slotProps.item" @input="slotProps.onInput"></PasswordEntry>
-            </template>
-          </Grower>
-        </v-flex>
-      </v-layout>
-    </v-container>
-  </v-form>
+  <v-container>
+    <v-layout>
+      <v-flex>
+        <Grower
+          addButton="Add Password"
+          v-model="passwords"
+          :empty="{ key: '', value: '' }"
+          @input="onInput"
+        >
+          <template v-slot:default="slotProps">
+            <PasswordEntry
+              :device="device"
+              v-model="slotProps.item"
+              @input="slotProps.onInput"
+            ></PasswordEntry>
+          </template>
+        </Grower>
+      </v-flex>
+    </v-layout>
+  </v-container>
 </template>
 <script>
 import RPCInterface from "./RPCInterface.vue";
@@ -27,31 +29,31 @@ export default {
   mixins: [RPCInterface],
   components: {
     Grower,
-    PasswordEntry
+    PasswordEntry,
   },
   data() {
     return {
-      passwords: []
+      passwords: [],
     };
   },
   watch: {
     value() {
       this.refresh();
-    }
+    },
   },
   methods: {
     async refresh() {
       this.passwords = (await this.rpc().getPasswords()).map(
         (password, index) => ({
           key: index,
-          value: password
+          value: password,
         })
       );
-    }
+    },
   },
   mounted() {
     this.refresh();
   },
-  onChange() {}
+  onChange() {},
 };
 </script>

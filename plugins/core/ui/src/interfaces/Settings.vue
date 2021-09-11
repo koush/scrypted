@@ -12,14 +12,12 @@
         >{{ key }}</v-card-title
       >
       <v-flex xs12>
-        <v-form>
-          <Setting
-            :device="device"
-            v-for="setting in settingsGroup"
-            :key="setting.key"
-            v-model="setting.value"
-          ></Setting>
-        </v-form>
+        <Setting
+          :device="device"
+          v-for="setting in settingsGroup"
+          :key="setting.key"
+          v-model="setting.value"
+        ></Setting>
       </v-flex>
     </v-card>
   </div>

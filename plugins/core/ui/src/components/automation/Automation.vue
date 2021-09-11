@@ -19,72 +19,66 @@
         automation.</v-card-text
       >
 
-      <v-form>
-        <v-container>
-          <v-layout>
-            <v-flex xs12>
-              <EventsPicker
-                :name="device.triggers.name"
-                :events="availableEvents"
-                :interfaces="availableInterfaces"
-                v-model="device.triggers"
-                @input="onChange"
-              ></EventsPicker>
-              <v-tooltip bottom>
-                <template v-slot:activator="{ on }">
-                  <v-checkbox
-                    @input="onChange"
-                    v-on="on"
-                    v-model="device.denoiseEvents"
-                    label="Denoise All Events"
-                  ></v-checkbox>
-                </template>
-                <span
-                  >Denoising events will suppress events where the same event
-                  data is sent multiple times in a row. For example, if a sensor
-                  sent multiple door open events, only the first event will
-                  trigger this automation. The automation will fire again once
-                  the door sends a close event.</span
-                >
-              </v-tooltip>
+      <v-flex xs12>
+        <EventsPicker
+          :name="device.triggers.name"
+          :events="availableEvents"
+          :interfaces="availableInterfaces"
+          v-model="device.triggers"
+          @input="onChange"
+        ></EventsPicker>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on }">
+            <v-checkbox
+              @input="onChange"
+              v-on="on"
+              v-model="device.denoiseEvents"
+              label="Denoise All Events"
+            ></v-checkbox>
+          </template>
+          <span
+            >Denoising events will suppress events where the same event data is
+            sent multiple times in a row. For example, if a sensor sent multiple
+            door open events, only the first event will trigger this automation.
+            The automation will fire again once the door sends a close
+            event.</span
+          >
+        </v-tooltip>
 
-              <v-tooltip bottom>
-                <template v-slot:activator="{ on }">
-                  <v-checkbox
-                    @input="onChange"
-                    v-on="on"
-                    v-model="device.staticEvents"
-                    label="Reset Automation on All Events"
-                  ></v-checkbox>
-                </template>
-                <span
-                  >By default, running Automation timers will be reset if the
-                  same device fires the event again. Check this box to reset
-                  Automation timers on all of the configured events.</span
-                >
-              </v-tooltip>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on }">
+            <v-checkbox
+              @input="onChange"
+              v-on="on"
+              v-model="device.staticEvents"
+              label="Reset Automation on All Events"
+            ></v-checkbox>
+          </template>
+          <span
+            >By default, running Automation timers will be reset if the same
+            device fires the event again. Check this box to reset Automation
+            timers on all of the configured events.</span
+          >
+        </v-tooltip>
 
-              <v-tooltip bottom>
-                <template v-slot:activator="{ on }">
-                  <v-checkbox
-                    @input="onChange"
-                    v-on="on"
-                    v-model="device.runToCompletion"
-                    label="Run Automations to Completion"
-                  ></v-checkbox>
-                </template>
-                <span
-                  >By default, autotomations that are executing will reset if
-                  triggered by a new event. Check this box to require an
-                  automation to run to completion before it can be triggered
-                  again. This setting can be used in conjunction with a timer to
-                  prevent an automation from running too often.</span
-                >
-              </v-tooltip>
-            </v-flex>
-          </v-layout>
-        </v-container>
-      </v-form>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on }">
+            <v-checkbox
+              @input="onChange"
+              v-on="on"
+              v-model="device.runToCompletion"
+              label="Run Automations to Completion"
+            ></v-checkbox>
+          </template>
+          <span
+            >By default, autotomations that are executing will reset if
+            triggered by a new event. Check this box to require an automation to
+            run to completion before it can be triggered again. This setting can
+            be used in conjunction with a timer to prevent an automation from
+            running too often.</span
+          >
+        </v-tooltip>
+      </v-flex>
     </v-card>
 
     <v-card raised style="margin-bottom: 60px">
@@ -106,21 +100,15 @@
         >Specify action(s) to take when the scene is activated.</v-card-text
       >
 
-      <v-form>
-        <v-container>
-          <v-layout>
-            <v-flex xs12>
-              <InterfacesPicker
-                :testDevice="testDevice"
-                :name="device.actions.name"
-                :interfaces="contextualInterfaces"
-                v-model="device.actions"
-                @input="onChange"
-              ></InterfacesPicker>
-            </v-flex>
-          </v-layout>
-        </v-container>
-      </v-form>
+      <v-flex xs12>
+        <InterfacesPicker
+          :testDevice="testDevice"
+          :name="device.actions.name"
+          :interfaces="contextualInterfaces"
+          v-model="device.actions"
+          @input="onChange"
+        ></InterfacesPicker>
+      </v-flex>
     </v-card>
 
     <v-card raised v-if="device.automationType === 'Scene'">
@@ -134,20 +122,14 @@
         >Specify action(s) to take when the scene deactivated.</v-card-text
       >
 
-      <v-form>
-        <v-container>
-          <v-layout>
-            <v-flex xs12>
-              <InterfacesPicker
-                :name="device.deactivateActions.name"
-                :interfaces="contextualInterfaces"
-                v-model="device.deactivateActions.actions"
-                @input="onChange"
-              ></InterfacesPicker>
-            </v-flex>
-          </v-layout>
-        </v-container>
-      </v-form>
+      <v-flex xs12>
+        <InterfacesPicker
+          :name="device.deactivateActions.name"
+          :interfaces="contextualInterfaces"
+          v-model="device.deactivateActions.actions"
+          @input="onChange"
+        ></InterfacesPicker>
+      </v-flex>
     </v-card>
   </div>
 </template>
