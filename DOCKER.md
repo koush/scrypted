@@ -24,6 +24,7 @@ services:
         environment:
             - TZ=America/Seattle
         volumes:
+            # LOCAL_STORAGE is the path on host to where the database will be written
             - LOCAL_STORAGE/scrypted:/server/volume
 ```
 
@@ -43,5 +44,6 @@ services:
         devices:
             - /dev/ttyACM0
         volumes:
+            # LOCAL_STORAGE is the path on host to where the database will be written
             - LOCAL_STORAGE/scrypted:/server/volume
 ```
