@@ -1,29 +1,12 @@
 import hue from "node-hue-api";
 const { v3 } = hue;
-import sdk, { Brightness, Device, DeviceManager, DeviceProvider, OnOff, Refresh, ScryptedDeviceBase } from '@scrypted/sdk';
+import sdk, { Brightness, Device, DeviceManager, DeviceProvider, OnOff, Refresh, ScryptedDeviceBase, Setting, Settings } from '@scrypted/sdk';
 const { deviceManager, log } = sdk;
 import axios from "axios";
 import Api from "node-hue-api/lib/api/Api";
 
 const LightState = v3.lightStates.LightState;
 const LocalBootstrap = require("./bootstrap");
-
-let username;
-let bridgeId = localStorage.getItem('bridgeId');
-let bridgeAddress = localStorage.getItem('bridgeAddress');;
-if (!bridgeId) {
-    log.i('No "bridgeId" was specified in Plugin Settings. Press the pair button on the Hue bridge.');
-    log.i('Searching for Hue Bridge...');
-}
-else {
-    username = localStorage.getItem(`user-${bridgeId}`);
-    if (username) {
-        log.i(`Using existing login for bridge ${bridgeId}`);
-    }
-    else {
-        log.i(`No login found for ${bridgeId}. You will need to press the pairing button on your Hue bridge, and the save plugin to reload it.`);
-    }
-}
 
 const StateSetters = {
     OnOff: function (s, state) {
@@ -90,33 +73,152 @@ class HueBulb extends ScryptedDeviceBase implements OnOff, Brightness, Refresh {
         this._refresh();
     };
 
-    async turnOn () {
+    async turnOn() {
         await this.api.lights.setLightState(this.light.id, new LightState().on(undefined));
         this._refresh();
     };
 
-    async setBrightness (level) {
+    async setBrightness(level) {
         await this.api.lights.setLightState(this.light.id, new LightState().brightness(level));
         this._refresh();
     }
 
-    async setTemperature (kelvin) {
+    async setTemperature(kelvin) {
         var mired = Math.round(1000000 / kelvin);
         await this.api.lights.setLightState(this.light.id, new LightState().ct(mired));
         this._refresh();
     }
 
-    async setHsv (h, s, v) {
+    async setHsv(h, s, v) {
         await this.api.lights.setLightState(this.light.id, new LightState().hsb(h, s * 100, v * 100));
         this._refresh();
     }
 }
 
-class HueHub extends ScryptedDeviceBase implements DeviceProvider {
+class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
     api: Api;
     devices = {};
 
+    constructor() {
+        super();
+        this.discoverDevices(0);
+    }
+
+    async getSettings(): Promise<Setting[]> {
+        return [
+            {
+                title: 'Bridge Address Override',
+                key: 'bridgeAddress',
+                placeholder: '192.168.2.100',
+                value: localStorage.getItem('bridgeAddress'),
+            },
+            {
+                title: 'Bridge ID',
+                description: 'Bridge ID of the bridge currently in use. Unused if Address Override is present.',
+                key: 'bridgeId',
+                value: localStorage.getItem('bridgeId'),
+            },
+        ]
+    }
+    putSetting(key: string, value: string | number | boolean): Promise<void> {
+        localStorage.setItem(key, value?.toString());
+        this.discoverDevices(0);
+    }
+
     async discoverDevices(duration: number) {
+
+        let addressOverride = localStorage.getItem('bridgeAddress');
+        let bridgeAddress: string;
+        let bridgeId: string;
+
+        if (!addressOverride) {
+            bridgeId = localStorage.getItem('bridgeId');
+            if (bridgeId === 'manual')
+                bridgeId = undefined;
+
+            const response = await axios.get('https://discovery.meethue.com', {
+                headers: { accept: 'application/json' },
+            });
+
+            if (response.status !== 200)
+                throw new Error(`Status code unexpected when using N-UPnP endpoint: ${response.status}`);
+
+            const bridges = response.data;
+
+            if (!bridgeId) {
+                if (bridges.length == 0) {
+                    log.a('No Hue bridges found. If you know the bridge address, enter it in Settings.');
+                    return;
+                }
+                else if (bridges.length != 1) {
+                    console.error('Multiple hue bridges found: ');
+                    for (const found of bridges) {
+                        console.error(found.id);
+                    }
+                    log.a('Multiple bridges found. Please specify which bridge to manage using the Plugin Setting "bridgeId"');
+                    return;
+                }
+
+                bridgeId = bridges[0].id;
+                console.log(`Found bridge ${bridgeId}. Setting as default.`);
+                localStorage.setItem('bridgeId', bridgeId);
+            }
+
+            for (let found of bridges) {
+                if (found.id === bridgeId) {
+                    bridgeAddress = found.internalipaddress;
+                    break;
+                }
+            }
+
+            if (!bridgeAddress) {
+                console.warn(`Unable to locate bridge address for bridge: ${bridgeId}.`);
+                console.warn('Unable to locate most recent bridge address with nupnp search. using last known address.')
+
+                bridgeAddress = localStorage.getItem('lastKnownBridgeAddress');
+            }
+            else {
+                localStorage.setItem('lastKnownBridgeAddress', bridgeAddress);
+            }
+        }
+        else {
+            bridgeAddress = addressOverride;
+            bridgeId = 'manual';
+            localStorage.setItem('bridgeId', 'manual');
+        }
+
+        if (!bridgeAddress) {
+            log.a('Unable to discover bridge. Enter an IP address in Settings');
+            return;
+        }
+
+        console.log(`Hue Bridges Found: ${bridgeId}`);
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+        let username = localStorage.getItem(`user-${bridgeId}`);
+
+        if (!username) {
+            const unauthenticatedApi = await v3.api.createLocal(bridgeAddress).connect();
+            try {
+                const createdUser = await unauthenticatedApi.users.createUser(bridgeAddress, 'ScryptedServer');
+                console.log(`Created user on ${bridgeId}: ${createdUser}`);
+                username = createdUser.username;
+                localStorage.setItem(`user-${bridgeId}`, username);
+            }
+            catch (e) {
+                console.error('user creation error', e);
+                log.a('Unable to create user on bridge. You may need to press the pair button on the bridge.');
+                throw e;
+            }
+        }
+
+        console.log('Querying devices...');
+
+        this.api = await new LocalBootstrap(bridgeAddress).connect(username);
+
+        log.clearAlerts();
+
+
         const result = await this.api.lights.getAll()
 
         var devices = [];
@@ -140,7 +242,7 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider {
                 type: 'Light',
             };
 
-            log.i(`Found device: ${JSON.stringify(device)}`);
+            console.log('Found device', device);
             devices.push(device);
 
             this.devices[light.id] = new HueBulb(this.api, light, device);
@@ -153,86 +255,4 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider {
     }
 }
 
-const hueHub = new HueHub();
-
-
-async function search() {
-    const response = await axios.get('https://discovery.meethue.com', {
-        headers: { accept: 'application/json' },
-    });
-
-    if (response.status !== 200)
-        throw new Error(`Status code unexpected when using N-UPnP endpoint: ${response.status}`);
-
-    const bridges = response.data;
-
-    if (!bridgeId) {
-        if (bridges.length == 0) {
-            log.e('No Hue bridges found');
-            return;
-        }
-        else if (bridges.length != 1) {
-            log.e('Multiple hue bridges found: ');
-            for (let found of bridges) {
-                log.e(found.id);
-            }
-            log.e('Please specify which bridge to manage using the Plugin Setting "bridgeId"');
-            return;
-        }
-
-        bridgeId = bridges[0].id;
-        log.i(`Found bridge ${bridgeId}. Setting as default.`);
-        localStorage.setItem('bridgeId', bridgeId);
-    }
-
-    let foundAddress;
-    for (let found of bridges) {
-        if (found.id == bridgeId) {
-            foundAddress = found.internalipaddress;
-            break;
-        }
-    }
-
-    if (!foundAddress) {
-        if (!bridgeAddress) {
-            log.e(`Unable to locate bridge address for bridge: ${bridgeId}.`);
-            return;
-        }
-
-        log.w('Unable to locate most recent bridge address with nupnp search. using last known address.')
-    }
-    else {
-        bridgeAddress = foundAddress;
-    }
-
-    log.i(`Hue Bridges Found: ${bridgeId}`);
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
-    if (!username) {
-        const unauthenticatedApi = await v3.api.createLocal(bridgeAddress).connect();
-        try {
-            const createdUser = await unauthenticatedApi.users.createUser(bridgeAddress, 'ScryptedServer');
-            log.i(`Created user on ${bridgeId}: ${createdUser}`);
-            username = createdUser.username;
-            localStorage.setItem(`user-${bridgeId}`, username);
-        }
-        catch (e) {
-            log.a(`Unable to create user on bridge ${bridgeId}: ${e}`);
-            log.a('You may need to press the pair button on the bridge.');
-            throw e;
-        }
-    }
-
-    log.i('Querying devices...');
-
-    hueHub.api = await new LocalBootstrap(bridgeAddress).connect(username);
-
-    log.clearAlerts();
-    hueHub.discoverDevices(null);
-}
-
-search().catch(err => {
-    throw new Error(`Problems resolving hue bridges, ${err.message}`);
-})
-
-export default hueHub;
+export default new HueHub();

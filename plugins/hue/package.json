@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/hue",
-   "version": "1.2.18",
+   "version": "1.2.19",
    "description": "A Philips Hue plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -24,7 +24,8 @@
       "name": "Hue Bridge",
       "type": "DeviceProvider",
       "interfaces": [
-         "DeviceProvider"
+         "DeviceProvider",
+         "Settings"
       ]
    },
    "devDependencies": {
