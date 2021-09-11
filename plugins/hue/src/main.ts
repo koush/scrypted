@@ -120,7 +120,7 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
             },
         ]
     }
-    putSetting(key: string, value: string | number | boolean): Promise<void> {
+    async putSetting(key: string, value: string | number | boolean) {
         localStorage.setItem(key, value?.toString());
         this.discoverDevices(0);
     }
