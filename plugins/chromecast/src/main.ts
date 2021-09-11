@@ -33,14 +33,8 @@ Buffer.concat = function (bufs) {
 }
 
 class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, EngineIOHandler {
-  provider: CastDeviceProvider;
-  host: any;
-  device: Device;
-  port: number;
-
-  constructor(provider: CastDeviceProvider, nativeId: string) {
+  constructor(public provider: CastDeviceProvider, nativeId: string) {
     super(nativeId);
-    this.provider = provider;
   }
 
   currentApp: any;
@@ -121,7 +115,9 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         catch (e) {
         }
       })
-      client.connect(this.host, () => {
+
+      let host = this.storage.getItem('host');
+      client.connect(host, () => {
         this.console.log(`client connected.`);
         resolve(client);
       });
@@ -436,7 +432,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
 }
 
 class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
-  devices: any = {};
+  devices = new Map<string, CastDevice>();
   search = new EventEmitter();
   browser = mdns()
   searching: boolean;
@@ -486,7 +482,7 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
     this.discoverDevices(30000);
   }
 
-  onDiscover(id: string, name: string, model: string, ip: string, port: number) {
+  async onDiscover(id: string, name: string, model: string, ip: string, port: number) {
 
     const interfaces = [
       ScryptedInterface.MediaPlayer,
@@ -510,17 +506,20 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
 
     console.log(`found cast device: ${name}`);
 
-    const castDevice = this.devices[id] || (this.devices[id] = new CastDevice(this, device.nativeId));
-    castDevice.device = device;
-    castDevice.host = ip;
-    castDevice.port = port;
-
     this.search.emit(id);
-    deviceManager.onDeviceDiscovered(device);
+    await deviceManager.onDeviceDiscovered(device);
+
+    const castDevice = this.getDevice(id);
+    castDevice.storage.setItem('host', ip);
   }
 
   getDevice(nativeId: string) {
-    return this.devices[nativeId] || (this.devices[nativeId] = new CastDevice(this, nativeId));
+    let ret = this.devices.get(nativeId);
+    if (!ret) {
+      ret = new CastDevice(this, nativeId);
+      this.devices.set(nativeId, ret);
+    }
+    return ret;
   }
 
   async discoverDevices(duration: number) {
@@ -529,12 +528,7 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
     }
     this.searching = true;
     duration = duration || 10000;
-    // setTimeout(() => {
-    //   this.searching = false;
-    //   this.browser.stop();
-    // }, duration)
 
-    // this.browser.start();
     for (let i = 0; i < 6; i++) {
       setTimeout(() => {
         this.browser.query([
@@ -545,8 +539,6 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
         ]);
       }, i * 10000)
     }
-
-    // this.querySSDP();
   }
 }
 
