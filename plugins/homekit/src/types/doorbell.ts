@@ -1,6 +1,6 @@
 
 import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice, bindCharacteristic, supportedTypes } from '../common'
+import { addSupportedType, DummyDevice, supportedTypes } from '../common'
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
 

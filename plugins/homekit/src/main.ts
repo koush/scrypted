@@ -1,5 +1,5 @@
 import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, MixinDeviceBase, Camera, MediaObject } from '@scrypted/sdk';
-import { Bridge, Categories, HAPStorage } from './hap';
+import { Bridge, Categories, Characteristic, HAPStorage, Service } from './hap';
 import os from 'os';
 import { supportedTypes } from './common';
 import './types'
@@ -7,6 +7,7 @@ import { CameraMixin } from './camera-mixin';
 import { maybeAddBatteryService } from './battery';
 import { randomBytes } from 'crypto';
 import qrcode from 'qrcode';
+import packageJson from "../package.json";
 
 const { systemManager, mediaManager } = sdk;
 
@@ -170,8 +171,14 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
         const username = this.getUsername();
 
+        const info = this.bridge.getService(Service.AccessoryInformation)!;
+        info.setCharacteristic(Characteristic.Manufacturer, "scrypted.app");
+        info.setCharacteristic(Characteristic.Model, "scrypted");
+        info.setCharacteristic(Characteristic.SerialNumber, username);
+        info.setCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
+
         this.bridge.publish({
-            username: this.getUsername(),
+            username,
             pincode: '123-45-678',
             port: Math.round(Math.random() * 30000 + 10000),
         }, true);
