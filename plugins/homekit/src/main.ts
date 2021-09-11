@@ -153,6 +153,21 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
 
                 maybeAddBatteryService(device, accessory);
 
+                const deviceInfo = device.info;
+                if (deviceInfo) {
+                    const info = accessory.getService(Service.AccessoryInformation)!;
+                    if (deviceInfo.manufacturer)
+                        info.setCharacteristic(Characteristic.Manufacturer, deviceInfo.manufacturer);
+                    if (deviceInfo.model)
+                        info.setCharacteristic(Characteristic.Model, deviceInfo.model);
+                    if (deviceInfo.serialNumber)
+                        info.setCharacteristic(Characteristic.SerialNumber, deviceInfo.serialNumber);
+                    if (deviceInfo.firmware)
+                        info.setCharacteristic(Characteristic.FirmwareRevision, deviceInfo.firmware);
+                    if (deviceInfo.version)
+                        info.setCharacteristic(Characteristic.Version, deviceInfo.version);
+                }
+
                 if (supportedType.noBridge) {
                     accessory.publish({
                         username: '12:34:45:54:24:44',
