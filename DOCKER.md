@@ -20,8 +20,7 @@ services:
         image: koush/scrypted
         container_name: scrypted
         restart: unless-stopped
-        ports:
-            - 9443:9443
+        network_mode: host
         environment:
             - TZ=America/Seattle
         volumes:
@@ -38,8 +37,7 @@ services:
         image: koush/scrypted
         container_name: scrypted
         restart: unless-stopped
-        ports:
-            - 9443:9443
+        network_mode: host
         environment:
             - TZ=America/Seattle
         devices:
