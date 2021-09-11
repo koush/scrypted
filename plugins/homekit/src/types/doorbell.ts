@@ -1,7 +1,7 @@
 
 import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
 import { addSupportedType, DummyDevice, supportedTypes } from '../common'
-import { Characteristic, Service } from '../hap';
+import { Characteristic, CharacteristicEventTypes, CharacteristicGetCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 
 addSupportedType({
@@ -26,6 +26,13 @@ addSupportedType({
             if (device.binaryState)
                 service.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
         });
+
+        service
+            .getCharacteristic(Characteristic.ProgrammableSwitchEvent)
+            // Provide the status of this doorbell. This must always return null, per the HomeKit spec.
+            .on(CharacteristicEventTypes.GET, callback => callback(null, null));
+
+        service.setPrimaryService(true);
 
         return accessory;
     }

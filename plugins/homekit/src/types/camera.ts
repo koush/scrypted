@@ -370,9 +370,16 @@ addSupportedType({
                     levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
                     profiles: [H264Profile.MAIN],
                 },
+
                 resolutions: [
-                    [1280, 720, 15],
-                    [1920, 1080, 15],
+                    // 3840x2160@30 (4k).
+                    [3840, 2160, 30],
+                    // 1920x1080@30 (1080p).
+                    [1920, 1080, 30],
+                    // 1280x720@30 (720p).
+                    [1280, 720, 30],
+                    // 320x240@15 (Apple Watch).
+                    [320, 240, 15],
                 ]
             },
             audio: {
