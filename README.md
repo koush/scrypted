@@ -4,7 +4,7 @@
 
 ## Discord
 
-https://discord.gg/DcFzmBHYGq
+[Join Scrypted Discord](https://discord.gg/DcFzmBHYGq)
 
 ## Supported Platforms
 
