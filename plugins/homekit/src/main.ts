@@ -61,19 +61,23 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
     }
 
     getUsername() {
-        let username = this.storage.getItem("mac") || (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
-            .flat().map(([iface, entry]) => entry).find(i => i && (i.family === 'IPv4' || i.family === 'IPv6'))?.mac;
+        let username = this.storage.getItem("mac");
 
         if (!username) {
-            const buffers = [];
-            for (let i = 0; i < 6; i++) {
-                buffers.push(randomBytes(1).toString('hex'));
+            username = (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
+                .flat().map(([iface, entry]) => entry).find(i => i && (i.family === 'IPv4' || i.family === 'IPv6'))?.mac;
+
+            if (!username) {
+                const buffers = [];
+                for (let i = 0; i < 6; i++) {
+                    buffers.push(randomBytes(1).toString('hex'));
+                }
+                username = buffers.join(':');
             }
-            username = buffers.join(':');
             this.storage.setItem('mac', username);
         }
         return username;
-   }
+    }
 
     async getSettings(): Promise<Setting[]> {
         return [

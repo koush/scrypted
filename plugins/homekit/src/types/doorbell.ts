@@ -19,7 +19,13 @@ addSupportedType({
         const accessory = cameraCheck.probe(faux) ? cameraCheck.getAccessory(device) : makeAccessory(device);
 
         const service = accessory.addService(Service.Doorbell);
-        bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ProgrammableSwitchEvent, () => !!device.binaryState, true);
+        device.listen({
+            event: ScryptedInterface.BinarySensor,
+            watch: false,
+        }, () => {
+            if (device.binaryState)
+                service.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
+        });
 
         return accessory;
     }
