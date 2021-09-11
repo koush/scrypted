@@ -4,7 +4,7 @@ import { EventEmitter } from 'events';
 import mdns from 'multicast-dns';
 import mime from 'mime';
 
-const { mediaManager, systemManager, endpointManager, deviceManager, log } = sdk;
+const { mediaManager, endpointManager, deviceManager } = sdk;
 const { DefaultMediaReceiver } = require('castv2-client');
 const Client = require('castv2-client').Client;
 
@@ -13,24 +13,6 @@ function ScryptedMediaReceiver() {
 }
 ScryptedMediaReceiver.APP_ID = '00F7C5DD';
 util.inherits(ScryptedMediaReceiver, DefaultMediaReceiver);
-
-// castv2 makes the the assumption that protobufjs returns Buffers, which is does not. It returns ArrayBuffers
-// in the quickjs environment.
-function toBuffer(buffer) {
-  if (buffer && (buffer.constructor.name === ArrayBuffer.name || buffer.constructor.name === Uint8Array.name)) {
-    const ret = Buffer.from(buffer);
-    return ret;
-  }
-  return buffer;
-}
-const BufferConcat = Buffer.concat;
-Buffer.concat = function (bufs) {
-  const copy = [];
-  for (const buf of bufs) {
-    copy.push(toBuffer(buf));
-  }
-  return BufferConcat(copy);
-}
 
 class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, EngineIOHandler {
   constructor(public provider: CastDeviceProvider, nativeId: string) {
