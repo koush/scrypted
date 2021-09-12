@@ -1,4 +1,4 @@
-import sdk, { Setting, MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
 import { Stream } from "stream";
 import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
 import { RtspCamera, RtspProvider } from "../../rtsp/src/rtsp";
@@ -58,7 +58,7 @@ class AmcrestCamera extends RtspCamera implements Camera {
             {
                 key: 'ip',
                 title: 'Amcrest Camera IP',
-                placeholder: '192.168.1.100[:554]',
+                placeholder: '192.168.1.100',
                 value: this.storage.getItem('ip'),
             },
         ];
