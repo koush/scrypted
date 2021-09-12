@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/amcrest",
-   "version": "0.0.21",
+   "version": "0.0.22",
    "description": "Amcrest Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -28,15 +28,10 @@
          "Settings"
       ]
    },
-   "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk",
-      "@types/multiparty": "^0.0.33",
-      "@types/node": "^16.7.10"
-   },
    "dependencies": {
+      "@types/multiparty": "^0.0.33",
+      "@scrypted/sdk": "file:../../sdk",
       "@mhoc/axios-digest-auth": "^0.7.0",
-      "axios": "^0.21.1",
-      "multiparty": "^4.2.2",
-      "url-parse": "^1.4.7"
+      "multiparty": "^4.2.2"
    }
 }

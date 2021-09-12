@@ -1,7 +1,6 @@
 import AxiosDigestAuth from '@mhoc/axios-digest-auth';
-import { Socket } from 'net';
-import { PassThrough, Readable, Stream } from 'stream';
-import {Form, Part} from 'multiparty';
+import { PassThrough, Readable } from 'stream';
+import { Form } from 'multiparty';
 import { once } from 'events';
 
 export enum AmcrestEvent {
@@ -11,7 +10,7 @@ export enum AmcrestEvent {
     AudioStop = "Code=AudioMutation;action=Stop",
 }
 
-async function readEvent(readable: Readable): Promise<AmcrestEvent|void> {
+async function readEvent(readable: Readable): Promise<AmcrestEvent | void> {
     const pt = new PassThrough();
     readable.pipe(pt);
     const buffers: Buffer[] = [];
@@ -49,7 +48,7 @@ export class AmcrestCameraClient {
     }
 
     async* listenEvents(): AsyncGenerator<AmcrestEvent> {
-        const response =  await this.digestAuth.request({
+        const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'stream',
             url: `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion,AudioMutation]`,
