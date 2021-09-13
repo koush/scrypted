@@ -1,11 +1,11 @@
 import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
 import { Stream } from "stream";
 import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
-import { RtspCamera, RtspProvider } from "../../rtsp/src/rtsp";
+import { RtspSmartCamera, RtspProvider } from "../../rtsp/src/rtsp";
 const { mediaManager } = sdk;
 
 
-class AmcrestCamera extends RtspCamera implements Camera {
+class AmcrestCamera extends RtspSmartCamera implements Camera {
     eventStream: Stream;
 
     constructor(nativeId: string) {
@@ -49,19 +49,7 @@ class AmcrestCamera extends RtspCamera implements Camera {
     }
 
     async getStreamUrl() {
-        const ip = this.storage.getItem('ip');
-        return `rtsp://${ip}/cam/realmonitor?channel=1&subtype=0`;
-    }
-
-    async getUrlSettings() {
-        return [
-            {
-                key: 'ip',
-                title: 'Amcrest Camera IP',
-                placeholder: '192.168.1.100',
-                value: this.storage.getItem('ip'),
-            },
-        ];
+        return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
     }
 }
 

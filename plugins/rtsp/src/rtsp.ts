@@ -78,8 +78,9 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
             {
                 key: 'noAudio',
                 title: 'No Audio',
-                description: 'Enable this setting if this camera does not have audio.',
+                description: 'Enable this setting if this camera does not have an audio stream.',
                 type: 'boolean',
+                value: (this.storage.getItem('noAudio') === 'true').toString(),
             }
         ];
     }
