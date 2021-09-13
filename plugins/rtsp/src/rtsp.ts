@@ -2,7 +2,6 @@ import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDev
 const { log, deviceManager, mediaManager } = sdk;
 
 export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
-
     constructor(nativeId: string) {
         super(nativeId);
     }
@@ -18,7 +17,7 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
         url.username = this.storage.getItem("username")
         url.password = this.storage.getItem("password");
 
-        return mediaManager.createFFmpegMediaObject({
+        const ret = {
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -31,10 +30,19 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
                 "-i",
                 url.toString(),
             ]
-        });
+        };
+
+
+        if (this.storage.getItem('noAudio')) {
+            ret.inputArguments.push(
+                '-f', 'lavfi', '-i', 'anullsrc',
+            );
+        }
+
+        return mediaManager.createFFmpegMediaObject(ret);
     }
 
-    async getUrlSettings() {
+    async getUrlSettings(): Promise<Setting[]> {
         return [
             {
                 key: 'url',
@@ -66,12 +74,51 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
                 title: 'Password',
                 value: this.getPassword(),
                 type: 'Password',
+            },
+            {
+                key: 'noAudio',
+                title: 'No Audio',
+                description: 'Enable this setting if this camera does not have audio.',
+                type: 'boolean',
             }
         ];
     }
 
     async putSetting(key: string, value: string | number) {
         this.storage.setItem(key, value.toString());
+    }
+}
+
+export class RtspSmartCamera extends RtspCamera {
+    async getUrlSettings() {
+        return [
+            {
+                key: 'ip',
+                title: 'Address',
+                placeholder: '192.168.1.100',
+                value: this.storage.getItem('ip'),
+            },
+            {
+                key: 'httpPort',
+                title: 'HTTP Port Override',
+                placeholder: '80',
+                value: this.storage.getItem('httpPort'),
+            },
+            {
+                key: 'rtspPort',
+                title: 'RTSP Port Override',
+                placeholder: '554',
+                value: this.storage.getItem('rtspPort'),
+            },
+        ];
+    }
+
+    getHttpAddress() {
+        return `${this.storage.getItem('ip')}:${this.storage.getItem('httpPort') || 80}`;
+    }
+
+    getRtspAddress() {
+        return `${this.storage.getItem('ip')}:${this.storage.getItem('rtspPort') || 554}`;
     }
 }
 
@@ -108,6 +155,7 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
         log.a(text);
         log.clearAlert(text);
     }
+
     async discoverDevices(duration: number) {
     }
 
