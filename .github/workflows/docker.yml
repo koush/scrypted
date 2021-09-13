@@ -39,7 +39,7 @@ jobs:
         
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/armhf
+          platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: koush/scrypted:latest
           # tags: ${{ steps.meta.outputs.tags }}
