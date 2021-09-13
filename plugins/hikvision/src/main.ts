@@ -42,8 +42,12 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword());
 
         (async() => {
-            if (!await client.isH264Stream()) {
+            const streamSetup = await client.checkStreamSetup();
+            if (streamSetup.videoCodecType !== 'H.264') {
                 this.log.a('This camera is configured for H.265 on the main channel. Configuring it it for H.264 is recommended for optimal performance.');
+            }
+            if (streamSetup.audioCodecType !== 'AAC') {
+                this.log.a('This camera is configured for H.265 on the main channel. Configuring it it for AAC is recommended for optimal performance.');
             }
         })();
         return client;
@@ -63,7 +67,6 @@ class HikVisionProvider extends RtspProvider {
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Camera,
-            ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,
         ];
     }

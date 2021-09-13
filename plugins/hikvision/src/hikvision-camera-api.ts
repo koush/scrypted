@@ -23,6 +23,11 @@ async function readEvent(readable: Readable): Promise<HikVisionCameraEvent | voi
     console.log('unhandled', Buffer.concat(buffers).toString());
 }
 
+export interface HikVisionCameraStreamSetup {
+    videoCodecType: string;
+    audioCodecType: string;
+}
+
 export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
 
@@ -33,7 +38,7 @@ export class HikVisionCameraAPI {
         });
     }
 
-    async isH264Stream(): Promise<boolean> {
+    async checkStreamSetup(): Promise<HikVisionCameraStreamSetup> {
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'text',
@@ -42,7 +47,13 @@ export class HikVisionCameraAPI {
 
         // this is bad:
         // <videoCodecType opt="H.264,H.265">H.265</videoCodecType>
-        return response.data.indexOf('>H.265</videoCodecType>') === -1;
+        const vcodec = response.data.match(/>(.*?)<\/videoCodecType>/);
+        const acodec = response.data.match(/>(.*?)<\/audioCompressionType>/);
+
+        return {
+            videoCodecType: vcodec[1],
+            audioCodecType: acodec[1],
+        }
     }
 
 
