@@ -357,6 +357,15 @@ export interface VideoCamera {
   getVideoStreamOptions(): Promise<VideoStreamOptions[]|void>;
 
 }
+
+/**
+ * Intercom devices can play back 
+ */
+export interface Intercom {
+  startIntercom(media: MediaObject): Promise<void>;
+  stopIntercom(): Promise<void>;
+}
+
 /**
  * Lock controls devices that can lock or unlock entries. Often works in tandem with PasswordControl.
  */
@@ -1000,6 +1009,7 @@ export enum ScryptedInterface {
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",
   VideoCamera = "VideoCamera",
+  Intercom = "Intercom",
   Lock = "Lock",
   PasswordStore = "PasswordStore",
   Authenticator = "Authenticator",

@@ -77,6 +77,7 @@ module.exports.ScryptedInterface = {
   HumiditySensor: "HumiditySensor",
   Camera: "Camera",
   VideoCamera: "VideoCamera",
+  Intercom: "Intercom",
   Lock: "Lock",
   PasswordStore: "PasswordStore",
   Authenticator: "Authenticator",
@@ -270,6 +271,15 @@ module.exports.ScryptedInterfaceDescriptors = {
         "getVideoStream",
         "getVideoStreamOptions",
       ]
+  },
+  Intercom: {
+    name: "Intercom",
+    properties: [
+    ],
+    methods: [
+      "startIntercom",
+      "stopIntercom",
+    ]
   },
   Lock: {
       name: "Lock",
