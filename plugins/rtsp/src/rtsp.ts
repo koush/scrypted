@@ -12,6 +12,10 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
         return this.storage.getItem("url");
     }
 
+    isAudioDisabled() {
+        return this.storage.getItem('noAudio') === 'true';
+    }
+
     async getVideoStream(): Promise<MediaObject> {
         const url = new URL(await this.getStreamUrl());
         url.username = this.storage.getItem("username")
@@ -33,7 +37,7 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
         };
 
 
-        if (this.storage.getItem('noAudio')) {
+        if (this.isAudioDisabled()) {
             ret.inputArguments.push(
                 '-f', 'lavfi', '-i', 'anullsrc',
             );
@@ -80,7 +84,7 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
                 title: 'No Audio',
                 description: 'Enable this setting if this camera does not have an audio stream.',
                 type: 'boolean',
-                value: (this.storage.getItem('noAudio') === 'true').toString(),
+                value: (this.isAudioDisabled()).toString(),
             }
         ];
     }
