@@ -13,6 +13,8 @@ const { mediaManager } = sdk;
 const defaultPrebufferDuration = 15000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
+const REENCODE_AUDIO = 'reencodeAudio';
+const REENCODE_VIDEO = 'reencodeVideo';
 
 interface PrebufferMpegTs {
   buffer: Buffer;
@@ -74,12 +76,20 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         key: SEND_KEYFRAME,
         value: (this.storage.getItem(SEND_KEYFRAME) === 'true').toString(),
       },
+      {
+        title: 'Reencode Audio',
+        description: 'Reencode the audio (necessary if camera outputs PCM).',
+        type: 'boolean',
+        key: REENCODE_AUDIO,
+        value: (this.storage.getItem(REENCODE_AUDIO) === 'true').toString(),
+      }
     );
     return settings;
   }
 
   async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
     this.storage.setItem(key, value.toString());
+    this.prebufferSession?.then(session => session.kill());
   }
 
   ensurePrebufferSession() {
@@ -93,7 +103,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.prebufferMpegTs = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await this.mixinDevice.getVideoStream(), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-    const acodec = [
+
+    const reencodeAudio = this.storage.getItem(REENCODE_AUDIO) === 'true';
+
+    const acodec = reencodeAudio ? [] : [
       '-acodec',
       'copy',
     ];
@@ -176,7 +189,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   async getVideoStream(options?: VideoStreamOptions): Promise<MediaObject> {
     this.ensurePrebufferSession();
 
-    const sendKeyframe = !!this.storage.getItem(SEND_KEYFRAME);
+    const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) === 'true';
 
     if (!options?.prebuffer && !sendKeyframe) {
       const session = await this.prebufferSession;
