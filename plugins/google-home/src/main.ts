@@ -14,7 +14,7 @@ import { commandHandlers } from './handlers';
 import { canAccess } from './commands/camerastream';
 
 import mdns from 'mdns';
-import {URL} from 'url';
+import { URL } from 'url';
 
 const { systemManager, mediaManager, endpointManager, deviceManager } = sdk;
 
@@ -89,6 +89,9 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 return;
 
             if (!eventDetails.changed)
+                return;
+
+            if (!eventDetails.property)
                 return;
 
             if (eventDetails.property !== ScryptedInterfaceProperty.id) {
@@ -202,7 +205,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 candidates: [],
                 configuration: null,
             });
-            while (true ){
+            while (true) {
                 const mo = mediaManager.createMediaObject(Buffer.from(emptyObject), ScryptedMimeTypes.RTCAVAnswer);
                 const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
                 ws.send(result.toString());

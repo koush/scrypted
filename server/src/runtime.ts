@@ -565,19 +565,19 @@ export class ScryptedRuntime {
         mixinInterfaces.push(...providedInterfaces.slice());
         mixinInterfaces = [...new Set(mixinInterfaces)];
 
-        setState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);
-        setState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
-        setState(pluginDevice, ScryptedInterfaceProperty.info, device.info);
-        setState(pluginDevice, ScryptedInterfaceProperty.providerId, provider?._id);
-        setState(pluginDevice, ScryptedInterfaceProperty.providedName, providedName);
-        setState(pluginDevice, ScryptedInterfaceProperty.providedType, providedType);
+        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);
+        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
+        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.info, device.info);
+        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providerId, provider?._id);
+        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedName, providedName);
+        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedType, providedType);
         if (isUsingDefaultType)
-            setState(pluginDevice, ScryptedInterfaceProperty.type, getProvidedTypeOrDefault(pluginDevice));
+            this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.type, getProvidedTypeOrDefault(pluginDevice));
         if (isUsingDefaultName)
-            setState(pluginDevice, ScryptedInterfaceProperty.name, getProvidedNameOrDefault(pluginDevice));
-        setState(pluginDevice, ScryptedInterfaceProperty.providedRoom, providedRoom);
+            this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.name, getProvidedNameOrDefault(pluginDevice));
+        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedRoom, providedRoom);
         if (isUsingDefaultRoom)
-            setState(pluginDevice, ScryptedInterfaceProperty.room, getProvidedRoomOrDefault(pluginDevice));
+            this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.room, getProvidedRoomOrDefault(pluginDevice));
         // pluginDevice.state.model = device.model;
 
         const ret = this.notifyPluginDeviceDescriptorChanged(pluginDevice);

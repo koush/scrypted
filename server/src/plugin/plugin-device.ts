@@ -28,16 +28,16 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     invalidate() {
         const mixinTable = this.mixinTable;
         this.mixinTable = undefined;
-        (async() => {
+        (async () => {
             for (const mixinEntry of (await mixinTable || [])) {
                 if (!mixinEntry.mixinProviderId)
                     continue;
-                (async() => {
+                (async () => {
                     const mixinProvider = this.scrypted.getDevice(mixinEntry.mixinProviderId) as ScryptedDevice & MixinProvider;
                     mixinProvider?.releaseMixin(this.id, await mixinEntry.proxy);
-                })().catch(() => {});
+                })().catch(() => { });
             }
-        })().catch(() => {});;
+        })().catch(() => { });;
     }
 
     ensureProxy(): Promise<PluginDevice> {
@@ -85,7 +85,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                     if (!interfaces) {
                         console.warn(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
                         const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
-                        setState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
+                        this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
                         this.scrypted.datastore.upsert(pluginDevice);
                         continue;
                     }

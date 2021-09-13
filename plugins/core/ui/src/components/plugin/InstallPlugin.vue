@@ -37,23 +37,19 @@
           result.package.description
         }}</v-card-text>
         <v-container class="ml-2">
-              <v-layout align-center>
-                <img
-                  :src="avatar(result.package.publisher.email)"
-                  class="mx-1"
-                />
-                <span>
-                  <b>{{ result.package.publisher.username }}</b>
-                </span>
-                <span class="mx-1">{{
-                  " published " +
-                  result.package.version +
-                  " • " +
-                  new Date(result.package.date).toDateString()
-                }}</span>
-              </v-layout>
-              
-              </v-container>
+          <v-layout align-center>
+            <img :src="avatar(result.package.publisher.email)" class="mx-1" />
+            <span>
+              <b>{{ result.package.publisher.username }}</b>
+            </span>
+            <span class="mx-1">{{
+              " published " +
+              result.package.version +
+              " • " +
+              new Date(result.package.date).toDateString()
+            }}</span>
+          </v-layout>
+        </v-container>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn

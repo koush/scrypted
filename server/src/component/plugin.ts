@@ -1,7 +1,7 @@
 import { ScryptedInterfaceProperty } from "@scrypted/sdk/types";
 import { ScryptedRuntime } from "../runtime";
 import { Plugin } from '../db-types';
-import { getState, setState } from "../state";
+import { getState } from "../state";
 
 export class PluginComponent {
     scrypted: ScryptedRuntime;
