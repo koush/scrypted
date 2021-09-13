@@ -19,6 +19,9 @@ export interface FFMpegRebroadcastSession {
     server: Server;
     cp: ChildProcess;
     ffmpegInput: FFMpegInput;
+    inputAudioCodec?: string;
+    inputVideoCodec?: string;
+    inputVideoResolution?: string[];
     kill(): void;
     isActive(): boolean;
     resetActivityTimer(): void;
@@ -32,6 +35,53 @@ export interface FFMpegRebroadcastOptions {
     timeout?: number;
 }
 
+export async function parseResolution(cp: ChildProcess) {
+    return new Promise<string[]>(resolve => {
+        const parser = data => {
+            const stdout = data.toString();
+            const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
+            if (res) {
+                cp.stdout.removeListener('data', parser);
+                cp.stderr.removeListener('data', parser);
+                resolve(res);
+            }
+        };
+        cp.stdout.on('data', parser);
+        cp.stderr.on('data', parser);
+    });
+}
+
+async function parseToken(cp: ChildProcess, token: string) {
+    return new Promise<string>(resolve => {
+        const parser = data => {
+            const stdout: string = data.toString();
+            const idx = stdout.indexOf(`${token}: `);
+            if (idx !== -1) {
+                const check = stdout.substring(idx + token.length + 1).trim();
+                let next = check.indexOf(' ');
+                const next2 = check.indexOf(',');
+                if (next !== -1 && next2 < next)
+                    next = next2;
+                if (next !== -1) {
+                    cp.stdout.removeListener('data', parser);
+                    cp.stderr.removeListener('data', parser);
+                    resolve(check.substring(0, next));
+                }
+            }
+        };
+        cp.stdout.on('data', parser);
+        cp.stderr.on('data', parser);
+    });
+}
+
+export async function parseVideoCodec(cp: ChildProcess) {
+    return parseToken(cp, 'Video');
+}
+
+export async function parseAudioCodec(cp: ChildProcess) {
+    return parseToken(cp, 'Audio');
+}
+
 export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options: FFMpegRebroadcastOptions): Promise<FFMpegRebroadcastSession> {
     return new Promise(async (resolve) => {
         let clients = 0;
@@ -39,6 +89,10 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         let isActive = true;
         const events = new EventEmitter();
 
+        let inputAudioCodec: string;
+        let inputVideoCodec: string;
+        let inputVideoResolution: string[];
+    
         function kill() {
             if (isActive) {
                 events.emit('killed');
@@ -119,6 +173,10 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
             });
 
             resolve({
+                inputAudioCodec,
+                inputVideoCodec,
+                inputVideoResolution,
+
                 events,
                 resetActivityTimer,
                 isActive() { return isActive },
@@ -149,11 +207,15 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         console.log(args);
 
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-            stdio: 'ignore',
+            // stdio: 'ignore',
         });
-        // cp.stdout.on('data', data => console.log(data.toString()));
-        // cp.stderr.on('data', data => console.error(data.toString()));
+        cp.stdout.on('data', data => console.log(data.toString()));
+        cp.stderr.on('data', data => console.error(data.toString()));
 
         cp.on('exit', kill);
+
+        parseAudioCodec(cp).then(result => inputAudioCodec = result);
+        parseVideoCodec(cp).then(result => inputVideoCodec = result);
+        parseResolution(cp).then(result => inputVideoResolution = result);
     });
 }
