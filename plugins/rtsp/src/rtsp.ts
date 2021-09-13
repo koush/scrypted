@@ -20,6 +20,8 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
 
         return mediaManager.createFFmpegMediaObject({
             inputArguments: [
+                "-rtsp_transport",
+                "tcp",
                 '-analyzeduration', '15000000',
                 '-probesize', '100000000',
                 "-reorder_queue_size",
