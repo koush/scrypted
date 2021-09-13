@@ -83,19 +83,41 @@
             <v-container>
               <v-layout>
                 <v-flex xs12>
-                  <v-text-field
-                    v-model="name"
-                    label="Name"
-                    required
-                  ></v-text-field>
+                  <v-text-field dense v-model="name" label="Name" required outlined>
+                    <template v-slot:append-outer>
+                      <v-btn
+                        v-if="name !== device.name"
+                        color="success"
+                        text
+                        class="shift-up"
+                        @click="saveName"
+                      >
+                        <v-icon>send</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-text-field>
                   <v-select
+                    dense
                     v-if="inferredTypes.length > 1"
                     :items="inferredTypes"
                     label="Type"
                     outlined
                     v-model="type"
-                  ></v-select>
+                  >
+                    <template v-slot:append-outer>
+                      <v-btn
+                        v-if="type !== device.type"
+                        color="success"
+                        text
+                        class="shift-up"
+                        @click="saveType"
+                      >
+                        <v-icon>send</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-select>
                   <v-combobox
+                    dense
                     v-if="
                       hasFixedPhysicalLocation(type, deviceState.interfaces)
                     "
@@ -104,7 +126,19 @@
                     v-model="room"
                     label="Room"
                     required
-                  ></v-combobox>
+                  >
+                    <template v-slot:append-outer>
+                      <v-btn
+                        v-if="room !== device.room"
+                        color="success"
+                        text
+                        class="shift-up"
+                        @click="saveRoom"
+                      >
+                        <v-icon>send</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-combobox>
                 </v-flex>
               </v-layout>
             </v-container>
@@ -162,28 +196,8 @@
                   </v-card-actions>
                 </v-card>
               </v-dialog>
-
-              <v-btn color="primary" v-if="!loading" text @click="save"
-                >Save</v-btn
-              >
             </v-card-actions>
           </v-card>
-          <v-alert
-            outlined
-            v-model="showSave"
-            dismissible
-            close-text="Close Alert"
-            type="success"
-            >Saved.</v-alert
-          >
-          <v-alert
-            outlined
-            v-model="showSaveError"
-            dismissible
-            close-text="Close Alert"
-            type="success"
-            >There was an error while saving. Please check the logs.</v-alert
-          >
         </v-flex>
 
         <v-flex xs12 v-if="!ownerDevice && pluginData">
@@ -311,16 +325,17 @@
               class="green-gradient subtitle-1 text--white font-weight-light"
               >Storage</v-card-title
             >
-              <v-container>
-                <v-layout>
-                  <v-flex xs12>
-                    <Storage
-                      v-model="pluginData.storage"
-                      @input="onChange"
-                    ></Storage>
-                  </v-flex>
-                </v-layout>
-              </v-container>
+            <v-container>
+              <v-layout>
+                <v-flex xs12>
+                  <Storage
+                    v-model="pluginData.storage"
+                    @input="onChange"
+                    @save="saveStorage"
+                  ></Storage>
+                </v-flex>
+              </v-layout>
+            </v-container>
           </v-card>
         </v-flex>
 
@@ -552,7 +567,9 @@ export default {
     if (this.needsLoad) {
       this.reload();
     }
-    this.device.refresh?.(undefined, true);
+    this.device?.listen(undefined, (eventSource, eventDetails, eventData) => {
+      if (eventDetails.eventInterface === "Storage") this.reloadStorage();
+    });
   },
   destroyed() {
     this.cleanupListener();
@@ -581,8 +598,6 @@ export default {
         showConsole: false,
         showRepl: false,
         showDelete: false,
-        showSave: false,
-        showSaveError: false,
         pluginData: undefined,
         name: undefined,
         room: undefined,
@@ -646,6 +661,14 @@ export default {
       await installNpm(this.pluginData.pluginId);
       this.reload();
     },
+    async reloadStorage() {
+      if (!this.pluginData) return;
+
+      const plugins = await this.$scrypted.systemManager.getComponent(
+        "plugins"
+      );
+      this.pluginData.storage = await plugins.getStorage(this.id);
+    },
     async reload() {
       this.name = this.device.name;
       this.room = this.device.room;
@@ -689,32 +712,23 @@ export default {
       this.$router.replace("/device");
       this.$scrypted.systemManager.removeDevice(id);
     },
-    async save() {
-      this.showSaveError = false;
-      this.showSave = false;
-      try {
-        const device = this.device;
-        await device.setName(this.name);
-        await device.setType(this.type);
-        await device.setRoom(this.room);
-        const plugins = await this.$scrypted.systemManager.getComponent(
-          "plugins"
-        );
-        if (this.deviceData) {
-          this.pluginData.storage.data = this.deviceData;
-        }
-        await plugins.setStorage(device.id, this.pluginData.storage);
-        if (this.deviceData) {
-          await this.$scrypted.deviceManager.onDeviceEvent(
-            this.pluginData.nativeId,
-            "Storage",
-            null
-          );
-        }
-        this.showSave = true;
-      } catch (e) {
-        this.showSaveError = true;
+    async saveName() {
+      await this.device.setName(this.name);
+    },
+    async saveType() {
+      await this.device.setType(this.type);
+    },
+    async saveRoom() {
+      await this.device.setRoom(this.room);
+    },
+    async saveStorage() {
+      const plugins = await this.$scrypted.systemManager.getComponent(
+        "plugins"
+      );
+      if (this.deviceData) {
+        this.pluginData.storage.data = this.deviceData;
       }
+      await plugins.setStorage(device.id, this.pluginData.storage);
     },
     openMixin(mixin) {
       this.$router.push(getDeviceViewPath(mixin.id));
@@ -810,5 +824,11 @@ export default {
 <style>
 a.alert-link {
   color: white;
+}
+</style>
+</script>
+<style scoped>
+.shift-up {
+  margin-top: -8px;
 }
 </style>

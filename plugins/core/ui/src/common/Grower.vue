@@ -4,7 +4,11 @@
       <slot v-bind:item="item" v-bind:onInput="setIndex(index)"></slot>
     </div>
 
-    <v-btn @click="add">{{ addButton }}</v-btn>
+    <v-card-actions>
+      <v-spacer></v-spacer>
+      <v-btn @click="add">{{ addButton }}</v-btn>
+      <v-btn v-if="saveButton" @click="$emit('save')">{{ saveButton }}</v-btn>
+    </v-card-actions>
     <slot name="append-outer"></slot>
   </div>
 </template>
@@ -17,20 +21,24 @@ export default {
     empty: undefined,
     addButton: {
       default: "Add",
-      type: String
-    }
+      type: String,
+    },
+    saveButton: {
+      default: undefined,
+      type: String,
+    },
   },
   mixins: [CustomValue],
   methods: {
     setIndex(index) {
-      return entry => {
-          this.lazyValue[index] = entry;
-          this.onInput();
+      return (entry) => {
+        this.lazyValue[index] = entry;
+        this.onInput();
       };
     },
     add() {
       this.lazyValue.push(cloneDeep(this.empty));
-    }
-  }
+    },
+  },
 };
 </script>

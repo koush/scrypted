@@ -1,9 +1,11 @@
 <template>
   <Grower
+    saveButton="Save Storage"
     addButton="Add Storage Entry"
     v-model="lazyValue"
     :empty="{ key: '', value:''}"
     @input="onInput"
+    @save="$emit('save')"
   >
     <template v-slot:default="slotProps">
       <StorageEntry v-model="slotProps.item" @input="slotProps.onInput"></StorageEntry>

@@ -21,13 +21,15 @@
       persistent-hint
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="green" outlined @click="save" class="shift-up">
-          <v-icon>fa-save</v-icon>
+        <v-btn v-if="dirty" color="success" @click="save" class="shift-up">
+          <v-icon>send</v-icon>
         </v-btn>
       </template>
     </v-select>
     <Grower
-      v-else-if="lazyValue.type && lazyValue.type.toLowerCase().startsWith('device[]')"
+      v-else-if="
+        lazyValue.type && lazyValue.type.toLowerCase().startsWith('device[]')
+      "
       v-model="lazyValue.value"
     >
       <template v-slot:default="slotProps">
@@ -41,26 +43,27 @@
       </template>
 
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" @click="save" >
-         Save
-        </v-btn>
+        <v-btn v-if="dirty" @click="save"> Save </v-btn>
       </template>
     </Grower>
 
     <DevicePicker
-      v-else-if="lazyValue.type && lazyValue.type.toLowerCase().startsWith('device')"
+      v-else-if="
+        lazyValue.type && lazyValue.type.toLowerCase().startsWith('device')
+      "
       v-model="lazyValue.value"
       :devices="devices"
       :title="lazyValue.title"
       :description="lazyValue.description"
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="green" outlined @click="save" class="shift-up">
-          <v-icon>fa-save</v-icon>
+        <v-btn v-if="dirty" color="success" @click="save" class="shift-up">
+          <v-icon>send</v-icon>
         </v-btn>
       </template>
     </DevicePicker>
     <v-text-field
+      dense
       :readonly="lazyValue.readonly"
       v-else
       outlined
@@ -69,11 +72,15 @@
       :label="lazyValue.title"
       :hint="lazyValue.description"
       persistent-hint
-      :type="lazyValue.type && lazyValue.type.toLowerCase() === 'password' ? 'password' : undefined"
+      :type="
+        lazyValue.type && lazyValue.type.toLowerCase() === 'password'
+          ? 'password'
+          : undefined
+      "
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="green" outlined @click="save" class="shift-up">
-          <v-icon>fa-save</v-icon>
+        <v-btn v-if="dirty" color="success" text @click="save" class="shift-up">
+          <v-icon>send</v-icon>
         </v-btn>
       </template>
     </v-text-field>
@@ -89,7 +96,7 @@ export default {
   mixins: [RPCInterface],
   components: {
     DevicePicker,
-    Grower
+    Grower,
   },
   computed: {
     booleanValue: {
@@ -100,7 +107,7 @@ export default {
       },
       set(val) {
         this.lazyValue.value = val.toString();
-      }
+      },
     },
     dirty() {
       var type = this.value.type || "";
@@ -118,8 +125,8 @@ export default {
         expression = "true;";
       }
       var ret = this.$store.state.scrypted.devices
-        .map(id => this.$scrypted.systemManager.getDeviceById(id))
-        .filter(device => {
+        .map((id) => this.$scrypted.systemManager.getDeviceById(id))
+        .filter((device) => {
           try {
             return eval(
               `(function() { var interfaces = ${JSON.stringify(
@@ -130,16 +137,16 @@ export default {
             return true;
           }
         })
-        .map(device => ({
+        .map((device) => ({
           id: device.id,
-          text: device.name
+          text: device.name,
         }));
-        ret.splice(0, 0, {
-          id: null,
-          text: "Select a Device",
-        })
-        return ret;
-    }
+      ret.splice(0, 0, {
+        id: null,
+        text: "Select a Device",
+      });
+      return ret;
+    },
   },
   methods: {
     createLazyValue() {
@@ -159,17 +166,17 @@ export default {
       }
 
       var ret = cloneDeep(this.lazyValue);
-      ret.value = JSON.stringify(ret.value.filter(id => id));
+      ret.value = JSON.stringify(ret.value.filter((id) => id));
       return ret;
     },
     save() {
       this.rpc().putSetting(this.lazyValue.key, this.createInputValue().value);
       this.onInput();
-    }
-  }
+    },
+  },
 };
 </script>
-<style>
+<style scoped>
 .shift-up {
   margin-top: -8px;
 }
