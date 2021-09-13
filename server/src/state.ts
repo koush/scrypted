@@ -88,7 +88,7 @@ export class ScryptedStateManager extends EventRegistry {
         this.notify(undefined, undefined, ScryptedInterface.ScryptedDevice, ScryptedInterfaceProperty.id, id, true);
     }
 
-    notifyInterfaceEvent(device: PluginDevice, eventInterface: ScryptedInterface, value: any) {
+    notifyInterfaceEvent(device: PluginDevice, eventInterface: ScryptedInterface | string, value: any) {
         const eventTime = Date.now();
 
         this.notify(device?._id, eventTime, eventInterface, undefined, value, true);

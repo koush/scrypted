@@ -76,6 +76,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         const device = this.scrypted.findPluginDevice(this.pluginId, nativeId)
         device.storage = storage;
         this.scrypted.datastore.upsert(device);
+        this.scrypted.stateManager.notifyInterfaceEvent(device, 'Storage', undefined);
     }
 
     async onDevicesChanged(deviceManifest: DeviceManifest) {
