@@ -337,7 +337,7 @@ export interface VideoStreamOptions {
     minBitrate?: number;
     maxBitrate?: number;
     fps?: number;
-    idrIntervalMillis: number;
+    idrIntervalMillis?: number;
   }
 
   audio?: {
