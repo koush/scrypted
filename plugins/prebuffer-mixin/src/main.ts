@@ -8,7 +8,7 @@ import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { MP4Atom, parseFragmentedMP4 } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 
-const { mediaManager } = sdk;
+const { mediaManager, log } = sdk;
 
 const defaultPrebufferDuration = 15000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
@@ -35,7 +35,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   released = false;
   ftyp: MP4Atom;
   moov: MP4Atom;
-  idrInterval = 0;
+  detectedIdrInterval = 0;
+  detectedVcodec = '';
+  detectedAcodec = '';
   prevIdr = 0;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
@@ -63,13 +65,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
       },
       {
-        title: 'Detected Keyframe Interval',
-        description: "Currently detected keyframe interval. This value may vary based on the stream behavior.",
-        readonly: true,
-        key: 'detectedIdr',
-        value: this.idrInterval.toString(),
-      },
-      {
         title: 'Start at Previous Keyframe',
         description: 'Start live streams from the previous key frame. Improves startup time.',
         type: 'boolean',
@@ -82,7 +77,29 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         type: 'boolean',
         key: REENCODE_AUDIO,
         value: (this.storage.getItem(REENCODE_AUDIO) === 'true').toString(),
-      }
+      },
+      {
+        group: 'Media Information',
+        title: 'Detected Video Codec',
+        readonly: true,
+        key: 'detectedVcodec',
+        value: this.detectedVcodec.toString() || 'none',
+      },
+      {
+        group: 'Media Information',
+        title: 'Detected Audio Codec',
+        readonly: true,
+        key: 'detectedAcodec',
+        value: this.detectedAcodec.toString() || 'none',
+      },
+      {
+        group: 'Media Information',
+        title: 'Detected Keyframe Interval',
+        description: "Currently detected keyframe interval. This value may vary based on the stream behavior.",
+        readonly: true,
+        key: 'detectedIdr',
+        value: this.detectedIdrInterval.toString() || 'none',
+      },
     );
     return settings;
   }
@@ -130,7 +147,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         else {
           if (atom.type === 'mdat') {
             if (this.prevIdr)
-              this.idrInterval = now - this.prevIdr;
+              this.detectedIdrInterval = now - this.prevIdr;
             this.prevIdr = now;
           }
 
@@ -166,6 +183,18 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       vcodec,
       acodec,
     });
+
+    this.detectedAcodec = session.inputAudioCodec || '';
+    this.detectedVcodec = session.inputVideoCodec || '';
+
+    if (this.detectedAcodec !== 'aac') {
+      console.error('Detected audio codec was not AAC.')
+    }
+
+    if (session.inputAudioCodec && session.inputAudioCodec !== 'h264') {
+      console.error(`${this.name} video codec is not AAC. Enable Reencode Audio if there are errors.`);
+    }
+
     session.events.on('killed', () => {
       fmp4OutputServer.close();
       this.prebufferSession = undefined;
@@ -197,7 +226,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       return mo;
     }
 
-    const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? (this.idrInterval || 4000) + 1000 : 0);
+    const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? (this.detectedIdrInterval || 4000) + 1000 : 0);
 
     console.log(this.name, 'prebuffer request started');
 
