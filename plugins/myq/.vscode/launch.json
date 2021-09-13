@@ -7,7 +7,7 @@
         {
             "name": "Scrypted Debugger",
             "address": "${config:scrypted.debugHost}",
-            "port": 9091,
+            "port": 10081,
             "request": "attach",
             "skipFiles": [
                 "<node_internals>/**"
