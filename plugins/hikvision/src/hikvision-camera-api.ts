@@ -1,0 +1,84 @@
+import { once } from 'events';
+import { PassThrough, Readable } from 'stream';
+import { Form } from 'multiparty';
+import AxiosDigestAuth from '@mhoc/axios-digest-auth';
+
+export enum HikVisionCameraEvent {
+    MotionDetected = "<eventType>VMD</eventType>",
+}
+
+async function readEvent(readable: Readable): Promise<HikVisionCameraEvent | void> {
+    const pt = new PassThrough();
+    readable.pipe(pt);
+    const buffers: Buffer[] = [];
+    for await (const buffer of pt) {
+        buffers.push(buffer);
+        const data = Buffer.concat(buffers).toString();
+        for (const event of Object.values(HikVisionCameraEvent)) {
+            if (data.indexOf(event) !== -1) {
+                return event;
+            }
+        }
+    }
+    console.log('unhandled', Buffer.concat(buffers).toString());
+}
+
+export class HikVisionCameraAPI {
+    digestAuth: AxiosDigestAuth;
+
+    constructor(public ip: string, username: string, password: string) {
+        this.digestAuth = new AxiosDigestAuth({
+            username,
+            password,
+        });
+    }
+
+    async isH264Stream(): Promise<boolean> {
+        const response = await this.digestAuth.request({
+            method: "GET",
+            responseType: 'text',
+            url: `http://${this.ip}/ISAPI/Streaming/channels/101/capabilities`,
+        });
+
+        // this is bad:
+        // <videoCodecType opt="H.264,H.265">H.265</videoCodecType>
+        return response.data.indexOf('>H.265</videoCodecType>') === -1;
+    }
+
+
+    async jpegSnapshot(): Promise<Buffer> {
+        const response = await this.digestAuth.request({
+            method: "GET",
+            responseType: 'arraybuffer',
+            url: `http://${this.ip}/ISAPI/Streaming/channels/101/picture?snapShotImageType=JPEG`,
+        });
+
+        return Buffer.from(response.data);
+    }
+
+    async* listenEvents() {
+        const response = await this.digestAuth.request({
+            method: "GET",
+            url: `http://${this.ip}/ISAPI/Event/notification/alertStream`,
+            responseType: 'stream',
+        });
+        const stream = response.data;
+
+        const form = new Form();
+
+        try {
+            // massage this so the parser doesn't fail on a bad content type
+            stream.headers['content-type'] = stream.headers['content-type'].replace('multipart/mixed', 'multipart/form-data');
+            form.parse(stream);
+            while (true) {
+                const [part] = await once(form, 'part');
+                const event = await readEvent(part);
+                if (event)
+                    yield event;
+            }
+        }
+        finally {
+            stream.destroy();
+        }
+    }
+}
