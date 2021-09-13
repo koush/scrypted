@@ -44,10 +44,10 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         (async() => {
             const streamSetup = await client.checkStreamSetup();
             if (streamSetup.videoCodecType !== 'H.264') {
-                this.log.a('This camera is configured for H.265 on the main channel. Configuring it it for H.264 is recommended for optimal performance.');
+                this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
             }
-            if (streamSetup.audioCodecType !== 'AAC') {
-                this.log.a('This camera is configured for H.265 on the main channel. Configuring it it for AAC is recommended for optimal performance.');
+            if (!this.isAudioDisabled() && streamSetup.audioCodecType !== 'AAC') {
+                this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it it for AAC is recommended for optimal performance.`);
             }
         })();
         return client;

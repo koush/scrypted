@@ -51,8 +51,8 @@ export class HikVisionCameraAPI {
         const acodec = response.data.match(/>(.*?)<\/audioCompressionType>/);
 
         return {
-            videoCodecType: vcodec[1],
-            audioCodecType: acodec[1],
+            videoCodecType: vcodec?.[1],
+            audioCodecType: acodec?.[1],
         }
     }
 
