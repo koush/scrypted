@@ -73,4 +73,5 @@ https://developer.scrypted.app
 5. Install the Rebroadcast and Prebuffer plugin.
     * This is optional but highly recommended. It keeps a short video loop of the stream in memory leading up to the motion.  
 7. Pair with the Scrypted Hub accessory using your HomeKit app on iOS or Mac.
-
+8. Enable recording on the cameras in HomeKit.
+    * Troubleshooting: Reload the HomeKit Plugin and/or restart Scrypted if streaming works, but recording events do not.
