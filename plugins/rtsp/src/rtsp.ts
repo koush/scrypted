@@ -94,8 +94,9 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
     }
 }
 
-export class RtspSmartCamera extends RtspCamera {
+export abstract class RtspSmartCamera extends RtspCamera {
     async getUrlSettings() {
+        const constructed = await this.getConstructedStreamUrl();
         return [
             {
                 key: 'ip',
@@ -110,10 +111,11 @@ export class RtspSmartCamera extends RtspCamera {
                 value: this.storage.getItem('httpPort'),
             },
             {
-                key: 'rtspPort',
-                title: 'RTSP Port Override',
-                placeholder: '554',
-                value: this.storage.getItem('rtspPort'),
+                key: 'rtspUrlOverride',
+                title: 'RTSP URL Override',
+                description: "Override the RTSP URL if your camera is using a non default port, channel, or rebroadcasted through an NVR. Default: " + constructed,
+                placeholder: constructed,
+                value: this.storage.getItem('rtspUrlOverride'),
             },
         ];
     }
@@ -122,8 +124,18 @@ export class RtspSmartCamera extends RtspCamera {
         return `${this.storage.getItem('ip')}:${this.storage.getItem('httpPort') || 80}`;
     }
 
+    getRtspUrlOverride() {
+        return this.storage.getItem('rtspUrlOverride');
+    }
+
+    abstract getConstructedStreamUrl(): Promise<string>;
+
     getRtspAddress() {
         return `${this.storage.getItem('ip')}:${this.storage.getItem('rtspPort') || 554}`;
+    }
+
+    async getStreamUrl() {
+        return this.getRtspUrlOverride() || await this.getConstructedStreamUrl();
     }
 }
 
