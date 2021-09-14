@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, VideoStreamOptions } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, VideoStreamOptions, Intercom } from "@scrypted/sdk";
 import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
 import { ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
@@ -92,6 +92,15 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         });
 
         return video;
+    }
+}
+
+class UnifiDoorbell extends UnifiCamera implements Intercom {
+    startIntercom(media: MediaObject): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+    stopIntercom(): Promise<void> {
+        throw new Error("Method not implemented.");
     }
 }
 
@@ -299,6 +308,9 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 if (camera.featureFlags.hasChime) {
                     d.interfaces.push(ScryptedInterface.BinarySensor);
                 }
+                if (camera.featureFlags.hasSpeaker) {
+                    d.interfaces.push(ScryptedInterface.Intercom);
+                }
                 devices.push(d);
             }
 
@@ -320,7 +332,12 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         await this.startup;
         if (this.cameras.has(nativeId))
             return this.cameras.get(nativeId);
-        const ret = new UnifiCamera(this, nativeId, this.api.Cameras.find(camera => camera.id === nativeId));
+        const camera = this.api.Cameras.find(camera => camera.id === nativeId);
+        if (!camera)
+            throw new Error('camera not found?');
+        const ret = camera.featureFlags.hasSpeaker ?
+            new UnifiCamera(this, nativeId, camera)
+            : new UnifiDoorbell(this, nativeId, camera);
         this.cameras.set(nativeId, ret);
         return ret;
     }

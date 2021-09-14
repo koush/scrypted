@@ -32,7 +32,8 @@ export async function ensureBuffer(data: Buffer|string): Promise<Buffer> {
 }
 
 export async function convert(converters: BufferConverter[], mediaObject: MediaObjectRemote, toMimeType: string): Promise<{data: Buffer|string, mimeType: string}> {
-    console.log('converting', mediaObject.mimeType, toMimeType);
+    // console.log('converting', mediaObject.mimeType, toMimeType);
+    
     const mediaMime = new MimeType(mediaObject.mimeType);
     const outputMime = new MimeType(toMimeType);
 

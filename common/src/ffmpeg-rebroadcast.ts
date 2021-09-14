@@ -34,6 +34,7 @@ export interface FFMpegRebroadcastOptions {
     acodec: string[];
     additionalOutputs?: string[];
     timeout?: number;
+    outputFormat?: string;
 }
 
 export async function parseResolution(cp: ChildProcess) {
@@ -199,7 +200,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
         args.push(
             ...(options.additionalOutputs || []),
-            '-f', 'mpegts',
+            '-f', options.outputFormat || 'mpegts',
             ...(options.vcodec || []),
             ...(options.acodec || []),
             `tcp://127.0.0.1:${serverPort}`

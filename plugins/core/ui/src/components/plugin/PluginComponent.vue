@@ -78,18 +78,11 @@ export default {
             hideType: true,
             tableProps: {
               extraColumn0: "Version",
-              // extraColumn1: "PID",
+              extraColumn1: "PID",
             },
             extraColumn0: PluginUpdate,
-            // extraColumn1: PluginPid,
+            extraColumn1: PluginPid,
           },
-          // {
-          //   name: "Scripts",
-          //   devices: devices.filter(
-          //     device =>
-          //       !device.metadata.npmPackage && !device.metadata.ownerPlugin
-          //   )
-          // }
         ];
       },
       default: [
@@ -100,18 +93,11 @@ export default {
           hideType: true,
           tableProps: {
             extraColumn0: "Version",
-            // extraColumn1: "PID",
+            extraColumn1: "PID",
           },
           extraColumn0: PluginUpdate,
-          // extraColumn1: PluginPid,
+          extraColumn1: PluginPid,
         },
-        // {
-        //   name: "Scripts",
-        //   devices: devices.filter(
-        //     device =>
-        //       !device.metadata.npmPackage && !device.metadata.ownerPlugin
-        //   )
-        // }
       ],
     },
   },

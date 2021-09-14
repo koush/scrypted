@@ -1,5 +1,5 @@
 
-import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor } from '@scrypted/sdk'
+import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom } from '@scrypted/sdk'
 import { addSupportedType, DummyDevice } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SnapshotRequest, SnapshotRequestCallback, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
@@ -7,7 +7,7 @@ import { makeAccessory } from './common';
 import sdk from '@scrypted/sdk';
 import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
-import dgram from 'dgram';
+import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import debounce from 'lodash/debounce';
 
@@ -16,11 +16,14 @@ import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate,
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { ffmpegLogInitialOutput } from '../../../../common/src/ffmpeg-helper';
 import throttle from 'lodash/throttle';
+import { RtpDemuxer } from '../rtp-demuxer';
+import { FFMpegRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { IntercomSession } from '../intercom';
 
 const { log, mediaManager, deviceManager } = sdk;
 
-async function getPort(): Promise<{ socket: dgram.Socket, port: number }> {
-    const socket = dgram.createSocket('udp4');
+async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket, port: number }> {
+    const socket = dgram.createSocket(socketType || 'udp4');
     while (true) {
         const port = Math.round(10000 + Math.random() * 30000);
         socket.bind(port);
@@ -127,7 +130,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor) {
+    getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom) {
         interface Session {
             request: PrepareStreamRequest;
             videossrc: number;
@@ -135,12 +138,15 @@ addSupportedType({
             cp: ChildProcess;
             videoReturn: dgram.Socket;
             audioReturn: dgram.Socket;
+            demuxer?: RtpDemuxer;
+            intercomSession?: Promise<IntercomSession>;
         }
         const sessions = new Map<string, Session>();
 
         let lastPicture = 0;
         let picture: Buffer;
 
+        const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
         function killSession(sessionID: string) {
             const session = sessions.get(sessionID);
@@ -203,8 +209,9 @@ addSupportedType({
                 const videossrc = CameraController.generateSynchronisationSource();
                 const audiossrc = CameraController.generateSynchronisationSource();
 
-                const { socket: videoReturn, port: videoPort } = await getPort();
-                const { socket: audioReturn, port: audioPort } = await getPort();
+                const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
+                const { socket: videoReturn, port: videoPort } = await getPort(socketType);
+                const { socket: audioReturn, port: audioPort } = await getPort(socketType);
 
                 const session: Session = {
                     request,
@@ -214,6 +221,27 @@ addSupportedType({
                     videoReturn,
                     audioReturn,
                 }
+
+                const audioKey = Buffer.concat([session.request.audio.srtp_key, session.request.audio.srtp_salt]);
+
+                if (twoWayAudio) {
+                    session.demuxer = new RtpDemuxer(device.name, console, audioReturn);
+                    const intercom = new IntercomSession(device, socketType, request.targetAddress, audioKey);
+                    // const ffmpegInput = await intercom.start();
+                    session.demuxer.on('rtp', (buffer: Buffer) => {
+                        audioReturn.send(buffer, intercom.port);
+                    });
+                    session.demuxer.once('rtcp', () => {
+                        intercom.start().then(_ => {
+                            session.demuxer.on('rtcp', (buffer: Buffer) => {
+                                intercom.heartbeat(audioReturn, buffer);
+                            });
+                        });
+
+                    });
+                    // session.rtpRebroadcast = intercom.session;
+                }
+
                 sessions.set(request.sessionID, session);
 
                 const response: PrepareStreamResponse = {
@@ -279,6 +307,7 @@ addSupportedType({
 
                     const videoKey = Buffer.concat([session.request.video.srtp_key, session.request.video.srtp_salt]);
                     const audioKey = Buffer.concat([session.request.audio.srtp_key, session.request.audio.srtp_salt]);
+
                     const args: string[] = [];
                     args.push(...ffmpegInput.inputArguments);
                     args.push(
@@ -396,7 +425,8 @@ addSupportedType({
                 ]
             },
             audio: {
-                codecs
+                codecs,
+                twoWayAudio,
             },
             supportedCryptoSuites: [
                 // not supported by ffmpeg
