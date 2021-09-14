@@ -59,7 +59,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
     }
 
     async getStreamUrl() {
-        return `rtsp://${this.getRtspAddress()}`;
+        return `rtsp://${this.getRtspAddress()}/Streaming/Channels/101/?transportmode=unicast`;
     }
 }
 
