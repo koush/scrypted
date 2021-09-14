@@ -5,6 +5,7 @@ import { FFMpegInput } from '@scrypted/sdk/types';
 import { listenZeroCluster } from './listen-cluster';
 import { EventEmitter, once } from 'events';
 import sdk from "@scrypted/sdk";
+import { ffmpegLogInitialOutput } from './ffmpeg-helper';
 
 const { mediaManager } = sdk;
 
@@ -209,8 +210,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
             // stdio: 'ignore',
         });
-        cp.stdout.on('data', data => console.log(data.toString()));
-        cp.stderr.on('data', data => console.error(data.toString()));
+        ffmpegLogInitialOutput(console, cp);
 
         cp.on('exit', kill);
 
