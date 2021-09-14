@@ -15,6 +15,7 @@ import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue,
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioRecordingSamplerateValues, CameraRecordingConfiguration, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { ffmpegLogInitialOutput } from '../../../../common/src/ffmpeg-helper';
+import throttle from 'lodash/throttle';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -153,15 +154,27 @@ addSupportedType({
             session.audioReturn?.close();
         }
 
+        const throttledTakePicture = throttle(async () => {
+            console.log('snapshot throttle fetch', device.name);
+            const media = await device.takePicture();
+            const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
+            return jpeg;
+        }, 9000, {
+            leading: true,
+            trailing: true,
+        });
+
         const delegate: CameraStreamingDelegate = {
             async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
                 try {
-                    console.log('snapshot request', request);
+                    // an idle Home.app will hit this endpoint every 10 seconds, and slow requests bog up the entire app.
+                    // avoid slow requests by prefetching every 9 seconds.
 
                     if (device.interfaces.includes(ScryptedInterface.Camera)) {
-                        const media = await device.takePicture();
-                        const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
-                        callback(null, jpeg);
+                        // this call is not a bug, to force lodash to take a picture on the trailing edge,
+                        // throttle must be called twice.
+                        throttledTakePicture();
+                        callback(null, await throttledTakePicture());
                         return;
                     }
                     if (lastPicture + 60000 > Date.now()) {
