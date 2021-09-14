@@ -49,10 +49,10 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
 
 
             const tmpfile = tmp.fileSync();
-            args.push('-y', "-vf", "select=eq(n\\,1)", "-vframes", "1", '-f', 'singlejpeg', tmpfile.name);
+            args.push('-y', "-vframes", "1", '-f', 'image2', tmpfile.name);
 
             const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-                stdio: 'ignore',
+                // stdio: 'ignore',
             });
             ffmpegLogInitialOutput(console, cp);
             cp.on('error', (code) => {
