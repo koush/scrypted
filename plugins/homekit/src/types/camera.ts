@@ -14,6 +14,7 @@ import debounce from 'lodash/debounce';
 import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue, NodeCallback } from '../../HAP-NodeJS/src';
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioRecordingSamplerateValues, CameraRecordingConfiguration, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { ffmpegLogInitialOutput } from '../../../../common/src/ffmpeg-helper';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -340,8 +341,7 @@ addSupportedType({
                     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
                         // stdio: 'ignore',
                     });
-                    cp.stdout.on('data', data => console.log(data.toString()));
-                    cp.stderr.on('data', data => console.error(data.toString()));
+                    ffmpegLogInitialOutput(console, cp);
 
                     session.cp = cp;
                 }
