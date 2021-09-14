@@ -72,10 +72,24 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
             const { id } = rtcInput;
             const session = rtcSessions[id];
             const pc = rtcSessions[id].pc;
+            let pendingCandidates: RTCIceCandidateInit[] = [];
+
+            // safari sends the candidates before the RTC Answer? watch for that.
             if (!pc.remoteDescription) {
-                await pc.setRemoteDescription(rtcInput.description);
+                if (!rtcInput.description) {
+                    // can't do anything with this yet, candidates out of order.
+                    pendingCandidates.push(...(rtcInput.candidates || []));
+                }
+                else {
+                    await pc.setRemoteDescription(rtcInput.description);
+                    if (!rtcInput.candidates)
+                        rtcInput.candidates = [];
+                    rtcInput.candidates.push(...pendingCandidates);
+                    pendingCandidates = [];
+                }
             }
-            else if (rtcInput.candidates?.length) {
+
+            if (pc.remoteDescription && rtcInput.candidates?.length) {
                 for (const candidate of rtcInput.candidates) {
                     pc.addIceCandidate(candidate);
                 }
