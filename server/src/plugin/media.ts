@@ -10,6 +10,7 @@ import net from 'net';
 import os from 'os';
 import { listenZeroCluster } from "./cluster-helper";
 import pathToFfmpeg from 'ffmpeg-for-homebridge';
+import { ffmpegLogInitialOutput } from '../../../common/src/ffmpeg-helper';
 
 const wrtc = require('wrtc');
 Object.assign(global, wrtc);
@@ -53,8 +54,7 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
             const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
                 stdio: 'ignore',
             });
-            // cp.stdout.on('data', data => console.log(data.toString()));
-            // cp.stderr.on('data', data => console.error(data.toString()));
+            ffmpegLogInitialOutput(console, cp);
             cp.on('error', (code) => {
                 console.error('ffmpeg error code', code);
             })
@@ -206,11 +206,10 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
             args.push(`tcp://127.0.0.1:${videoPort}`);
 
             const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-                // stdio: 'ignore',
+                // DO NOT IGNORE STDIO, NEED THE DATA FOR RESOLUTION PARSING, ETC.
             });
+            ffmpegLogInitialOutput(console, cp);
             cp.on('error', e => console.error('ffmpeg error', e));
-            cp.stdout.on('data', data => console.log(data.toString()));
-            cp.stderr.on('data', data => console.error(data.toString()));
 
             const resolution = new Promise<Array<string>>(resolve => {
                 cp.stdout.on('data', data => {
