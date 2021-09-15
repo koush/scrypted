@@ -34,23 +34,23 @@ export default {
             "Create custom smart home actions that trigger on specific events.",
           title: "Create New Automation",
         },
-        {
-          body: null,
-          buttons: [
-            {
-              method: "POST",
-              path: "new",
-              title: "Create Scene",
-              value: "scene",
-              click() {
-                self.newAutomation(true);
-              },
-            },
-          ],
-          description:
-            "Create custom smart home scenes that control multiple devices.",
-          title: "Create New Scene",
-        },
+        // {
+        //   body: null,
+        //   buttons: [
+        //     {
+        //       method: "POST",
+        //       path: "new",
+        //       title: "Create Scene",
+        //       value: "scene",
+        //       click() {
+        //         self.newAutomation(true);
+        //       },
+        //     },
+        //   ],
+        //   description:
+        //     "Create custom smart home scenes that control multiple devices.",
+        //   title: "Create New Scene",
+        // },
       ],
       resettable: true,
       component: {
