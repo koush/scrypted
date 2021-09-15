@@ -1,10 +1,10 @@
 import { ChildProcess } from "child_process";
 
-export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess) {
+export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forever?: boolean) {
     function logger(log: (str: string) => void): (buffer: Buffer) => void {
         const ret = (buffer: Buffer) => {
             const str = buffer.toString();
-            if (str.indexOf('frame=') !== -1 || str.indexOf('size=') !== -1) {
+            if (!forever && (str.indexOf('frame=') !== -1 || str.indexOf('size=') !== -1)) {
                 log(str);
                 log('video/audio detected, discarding further input');
                 cp.stdout.removeListener('data', ret);
