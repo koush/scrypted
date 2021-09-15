@@ -13,7 +13,7 @@
                 "<node_internals>/**"
             ],
             "preLaunchTask": "npm: build",
-            "program": "${workspaceFolder}/dist/server/src/scrypted-main.js",
+            "program": "${workspaceFolder}/dist/scrypted-main.js",
             "runtimeArgs": [
                 "--expose-gc",
                 "--nolazy",

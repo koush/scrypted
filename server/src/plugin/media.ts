@@ -10,7 +10,7 @@ import net from 'net';
 import os from 'os';
 import { listenZeroCluster } from "./cluster-helper";
 import pathToFfmpeg from 'ffmpeg-for-homebridge';
-import { ffmpegLogInitialOutput } from '../../../common/src/ffmpeg-helper';
+import { ffmpegLogInitialOutput } from "../ffmpeg-helper";
 
 const wrtc = require('wrtc');
 Object.assign(global, wrtc);

@@ -30,8 +30,8 @@
     "source-map-support": "^0.5.20",
     "tar": "^6.1.11",
     "tmp": "^0.2.1",
-    "ts-node": "^9.1.1",
-    "typescript": "^4.1.5",
+    "ts-node": "^10.2.1",
+    "typescript": "^4.4.3",
     "whatwg-mimetype": "^2.3.0",
     "wrtc": "^0.4.7",
     "zwave-js": "^8.1.1"
@@ -50,9 +50,10 @@
   },
   "scripts": {
     "preserve": "npm run build",
-    "serve": "node dist/server/src/scrypted-main.js",
-    "serve-no-build": "node dist/server/src/scrypted-main.js",
+    "serve": "node dist/scrypted-main.js",
+    "serve-no-build": "node dist/scrypted-main.js",
     "ts-serve": "ts-node src/scrypted-main.ts",
+    "prebuild": "tsc --build --clean",
     "build": "tsc --outDir dist"
   },
   "author": "",
