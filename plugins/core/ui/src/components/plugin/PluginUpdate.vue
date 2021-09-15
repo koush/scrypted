@@ -29,7 +29,7 @@ export default {
     checkUpdate(
       this.device.pluginId,
       this.device.npmPackageVersion
-    ).then(updateAvailable => (this.updateAvailable = updateAvailable));
+    ).then(({updateAvailable}) => (this.updateAvailable = updateAvailable));
   },
   data() {
     return {

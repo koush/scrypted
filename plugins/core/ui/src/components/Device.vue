@@ -231,19 +231,7 @@
               >
 
               <v-spacer></v-spacer>
-              <v-btn
-                v-if="!pluginData.updateAvailable"
-                text
-                color="blue"
-                @click="openNpm"
-                xs4
-                >{{ pluginData.packageJson.name }}@{{
-                  pluginData.packageJson.version
-                }}</v-btn
-              >
-              <v-btn v-else color="orange" @click="doInstall" dark
-                >Install Update {{ pluginData.updateAvailable }}</v-btn
-              >
+              <PluginAdvancedUpdate :pluginData="pluginData" @installed="reload" />
             </v-card-actions>
           </v-card>
         </v-flex>
@@ -441,11 +429,11 @@ import PositionSensor from "../interfaces/sensors/PositionSensor.vue";
 import DeviceProvider from "../interfaces/DeviceProvider.vue";
 import MixinProvider from "../interfaces/MixinProvider.vue";
 import Storage from "../common/Storage.vue";
-import { checkUpdate, installNpm, getNpmPath } from "./plugin/plugin";
+import { checkUpdate } from "./plugin/plugin";
 import AggregateDevice from "./aggregate/AggregateDevice.vue";
 import Automation from "./automation/Automation.vue";
 import Script from "./script/Script.vue";
-import Javascript from "../interfaces/automation/Javascript.vue";
+import PluginAdvancedUpdate from './plugin/PluginAdvancedUpdate.vue';
 import Vue from "vue";
 import {
   getDeviceAvailableMixins,
@@ -556,6 +544,7 @@ export default {
     OauthClient,
     HttpRequestHandler,
 
+    PluginAdvancedUpdate,
     VueSlider,
     LogCard,
     ConsoleCard,
@@ -616,9 +605,6 @@ export default {
         showStorage: false,
       };
     },
-    openNpm() {
-      window.open(getNpmPath(this.pluginData.packageJson.name), "npm");
-    },
     escapeHtml(html) {
       return html
         .replace(/&/g, "&amp;")
@@ -665,10 +651,6 @@ export default {
       );
       await plugins.reload(this.pluginData.packageJson.name);
     },
-    async doInstall() {
-      await installNpm(this.pluginData.pluginId);
-      this.reload();
-    },
     async reloadStorage() {
       if (!this.pluginData) return;
 
@@ -687,6 +669,7 @@ export default {
       );
       const pluginData = {
         updateAvailable: false,
+        versions: null,
       };
       pluginData.nativeId = await plugins.getNativeId(this.id);
       pluginData.pluginId = await plugins.getPluginId(this.id);
@@ -696,7 +679,7 @@ export default {
       );
       this.pluginData = pluginData;
       checkUpdate(pluginData.pluginId, pluginData.packageJson.version).then(
-        (updateAvailable) => (pluginData.updateAvailable = updateAvailable)
+        result => Object.assign(pluginData, result)
       );
 
       const device = this.device;
