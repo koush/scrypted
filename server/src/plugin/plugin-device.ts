@@ -4,7 +4,7 @@ import { PluginDevice } from "../db-types";
 import { MixinProvider } from "@scrypted/sdk/types";
 import { handleFunctionInvocations } from "../rpc";
 import { getState, setState } from "../state";
-import { getProvidedTypeOrDefault } from "../infer-defaults";
+import { getDisplayType, getProvidedTypeOrDefault } from "../infer-defaults";
 import { hasSameElements } from "../collection";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
 
@@ -63,7 +63,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             if (!proxy)
                 console.error('null proxy', this.id);
             // after creating an actual device, apply all the mixins
-            const type = getProvidedTypeOrDefault(pluginDevice);
+            const type = getDisplayType(pluginDevice);
             const allInterfaces: ScryptedInterface[] = getState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces) || [];
 
             const mixinTable: MixinTable[] = [];
