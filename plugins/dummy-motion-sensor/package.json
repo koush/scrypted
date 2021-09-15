@@ -11,6 +11,13 @@
       "scrypted-package-json": "scrypted-package-json",
       "scrypted-webpack": "scrypted-webpack"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "dummy",
+      "motion",
+      "sensor"
+   ],
    "scrypted": {
       "name": "Dummy Motion Sensor",
       "type": "Sensor",
@@ -26,5 +33,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.15"
+   "version": "0.0.16"
 }
