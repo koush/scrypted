@@ -408,8 +408,8 @@ addSupportedType({
         const codecs: AudioStreamingCodec[] = [];
         // multiple audio options can be provided but lets stick with AAC ELD 24k,
         // that's what the talkback ffmpeg session in rtp-ffmpeg-input.ts will use.
-        for (const type of [AudioStreamingCodecType.AAC_ELD]) {
-            for (const samplerate of [AudioStreamingSamplerate.KHZ_24]) {
+        for (const type of [AudioStreamingCodecType.OPUS, AudioStreamingCodecType.AAC_ELD]) {
+            for (const samplerate of [AudioStreamingSamplerate.KHZ_8, AudioStreamingSamplerate.KHZ_16, AudioStreamingSamplerate.KHZ_24]) {
                 codecs.push({
                     type,
                     samplerate,

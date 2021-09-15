@@ -37,8 +37,6 @@ export class RtpDemuxer extends EventEmitter {
 
         // Split the message into RTP and RTCP packets.
         this.socket.on("message", (msg) => {
-            console.log('rtsp message');
-
             // Send RTP packets to the RTP port.
             if (this.isRtpMessage(msg)) {
                 this.emit('rtp', msg);
