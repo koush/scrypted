@@ -1,6 +1,6 @@
 <template>
   <div>
-    <Javascript v-model="data" :testDevice="testDevice"> </Javascript>
+    <Javascript showSave="true" @save="$emit('save')" @input="onChange" v-model="data" :testDevice="testDevice"> </Javascript>
   </div>
 </template>
 <script>

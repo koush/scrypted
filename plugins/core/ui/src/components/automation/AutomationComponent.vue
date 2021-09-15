@@ -91,12 +91,12 @@ export default {
               device.nativeId?.startsWith("automation:")
             ),
           },
-          {
-            name: "Scenes",
-            devices: devices.filter((device) =>
-              device.nativeId?.startsWith("scene:")
-            ),
-          },
+          // {
+          //   name: "Scenes",
+          //   devices: devices.filter((device) =>
+          //     device.nativeId?.startsWith("scene:")
+          //   ),
+          // },
         ];
       },
       default: [
@@ -104,10 +104,10 @@ export default {
           name: "Automations",
           devices: [],
         },
-        {
-          name: "Scenes",
-          devices: [],
-        },
+        // {
+        //   name: "Scenes",
+        //   devices: [],
+        // },
       ],
     },
   },

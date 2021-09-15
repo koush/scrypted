@@ -79,6 +79,12 @@
           >
         </v-tooltip>
       </v-flex>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn color="primary" text @click="$emit('save')">
+          Save Triggers
+        </v-btn>
+      </v-card-actions>
     </v-card>
 
     <v-card raised style="margin-bottom: 60px">
@@ -109,6 +115,12 @@
           @input="onChange"
         ></InterfacesPicker>
       </v-flex>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn color="primary" text @click="$emit('save')">
+          Save Actions
+        </v-btn>
+      </v-card-actions>
     </v-card>
 
     <v-card raised v-if="device.automationType === 'Scene'">
@@ -130,6 +142,12 @@
           @input="onChange"
         ></InterfacesPicker>
       </v-flex>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn color="primary" text @click="$emit('save')">
+          Save Actions
+        </v-btn>
+      </v-card-actions>
     </v-card>
   </div>
 </template>

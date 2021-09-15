@@ -3,6 +3,14 @@
     <v-toolbar dense v-if="testDevice">
       <v-tooltip top>
         <template v-slot:activator="{ on }">
+          <v-btn v-on="on" text @click="$emit('save')">
+            <v-icon x-small>fa-save</v-icon>
+          </v-btn>
+        </template>
+        <span>Save Script</span>
+      </v-tooltip>
+      <v-tooltip top>
+        <template v-slot:activator="{ on }">
           <v-btn v-on="on" text @click="eval">
             <v-icon x-small>fa-play</v-icon>
           </v-btn>
@@ -60,7 +68,7 @@ monaco.languages.typescript.typescriptDefaults.addExtraLib(
 );
 
 export default {
-  props: ["testDevice"],
+  props: ["testDevice", "showSave"],
   mixins: [RPCInterface],
   mounted() {
     monaco.editor.getModels().forEach((model) => model.dispose());

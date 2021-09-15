@@ -13,6 +13,12 @@
         name="Selected Device Interfaces"
       ></InterfaceMultiselect>
     </v-flex>
+    <v-card-actions>
+      <v-spacer></v-spacer>
+      <v-btn color="primary" text @click="$emit('save')">
+        Save Group
+      </v-btn>
+    </v-card-actions>
   </v-card>
 </template>
 <script>

@@ -2,6 +2,7 @@
   <v-layout wrap>
     <v-flex xs12 v-if="deviceComponent && deviceComponent === 'Script'">
       <component
+        @save="saveStorage"
         :is="deviceComponent"
         v-model="deviceData"
         :id="id"
@@ -83,7 +84,13 @@
             <v-container>
               <v-layout>
                 <v-flex xs12>
-                  <v-text-field dense v-model="name" label="Name" required outlined>
+                  <v-text-field
+                    dense
+                    v-model="name"
+                    label="Name"
+                    required
+                    outlined
+                  >
                     <template v-slot:append-outer>
                       <v-btn
                         v-if="name !== device.name"
@@ -243,6 +250,7 @@
 
         <v-flex xs12 v-if="deviceComponent && deviceComponent !== 'Script'">
           <component
+            @save="saveStorage"
             :is="deviceComponent"
             v-model="deviceData"
             :id="id"
@@ -728,7 +736,7 @@ export default {
       if (this.deviceData) {
         this.pluginData.storage.data = this.deviceData;
       }
-      await plugins.setStorage(device.id, this.pluginData.storage);
+      await plugins.setStorage(this.device.id, this.pluginData.storage);
     },
     openMixin(mixin) {
       this.$router.push(getDeviceViewPath(mixin.id));
