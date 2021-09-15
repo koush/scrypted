@@ -8,10 +8,6 @@
 import { Socket } from "dgram";
 import { EventEmitter } from "stream";
 
-// How often, in seconds, should we heartbeat FFmpeg in two-way audio sessions. This should be less than 5 seconds, which is
-// FFmpeg's input timeout interval.
-export const PROTECT_TWOWAY_HEARTBEAT_INTERVAL = 3.5;
-
 /*
  * Here's the problem this class solves: FFmpeg doesn't support multiplexing RTP and RTCP data on a single UDP port (RFC 5761).
  * If it did, we wouldn't need this workaround for HomeKit compatibility, which does multiplex RTP and RTCP over a single UDP port.
@@ -23,15 +19,12 @@ export const PROTECT_TWOWAY_HEARTBEAT_INTERVAL = 3.5;
  * discussion and brainstorming on this and other topics.
  */
 export class RtpDemuxer extends EventEmitter {
-    private heartbeatTimer!: NodeJS.Timeout;
-    private heartbeatMsg!: Buffer;
-
     // Create an instance of RtpDemuxer.
     constructor(public deviceName: string, public console: Console, public socket: Socket) {
         super();
         // Catch errors when they happen on our demuxer.
         this.socket.on("error", (error) => {
-            this.console.error("%s: RtpDemuxer Error: %s", this.deviceName, error);
+            this.console.error(this.deviceName, "RtpDemuxer Error:", error);
             this.socket.close();
         });
 
@@ -44,9 +37,6 @@ export class RtpDemuxer extends EventEmitter {
                 this.emit('rtcp', msg);
             }
         });
-
-        this.console.log("%s: Creating an RtpDemuxer instance - inbound port: %s, RTCP port: %s, RTP port: %s.",
-            this.deviceName);
     }
 
     // Retrieve the payload information from a packet to discern what the packet payload is.

@@ -24,8 +24,7 @@
       "interfaces": [
          "MixinProvider",
          "Settings"
-      ],
-      "realfs": true
+      ]
    },
    "dependencies": {
       "hap-nodejs": "file:../HAP-NodeJS",
@@ -41,5 +40,5 @@
       "@types/qrcode": "^1.4.1",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.58"
+   "version": "0.0.60"
 }
