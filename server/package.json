@@ -54,7 +54,8 @@
     "serve-no-build": "node dist/scrypted-main.js",
     "ts-serve": "ts-node src/scrypted-main.ts",
     "prebuild": "tsc --build --clean",
-    "build": "tsc --outDir dist"
+    "build": "tsc --outDir dist",
+    "postbuild": "node test/check-build-output.js"
   },
   "author": "",
   "license": "ISC"

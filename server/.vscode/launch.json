@@ -84,24 +84,24 @@
                 "DEBUG": "/scrypted/*",
             }
         },
-        {
-            "type": "pwa-node",
-            "request": "launch",
-            "name": "Launch Tests",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceFolder}/test/test-main.ts",
-            "runtimeArgs": [
-                "--expose-gc",
-                "--nolazy",
-                "-r",
-                "ts-node/register"
-            ],
-            "sourceMaps": true,
-            "outFiles": [
-                "${workspaceFolder}/**/*.js"
-            ]
-        }
+        // {
+        //     "type": "pwa-node",
+        //     "request": "launch",
+        //     "name": "Launch Tests",
+        //     "skipFiles": [
+        //         "<node_internals>/**"
+        //     ],
+        //     "program": "${workspaceFolder}/test/test-main.ts",
+        //     "runtimeArgs": [
+        //         "--expose-gc",
+        //         "--nolazy",
+        //         "-r",
+        //         "ts-node/register"
+        //     ],
+        //     "sourceMaps": true,
+        //     "outFiles": [
+        //         "${workspaceFolder}/**/*.js"
+        //     ]
+        // }
     ]
 }
