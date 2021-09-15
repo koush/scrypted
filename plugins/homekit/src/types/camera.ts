@@ -1,6 +1,6 @@
 
 import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice } from '../common'
+import { addSupportedType, DummyDevice, HomeKitSession } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SnapshotRequest, SnapshotRequestCallback, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
 
@@ -16,9 +16,8 @@ import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate,
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { ffmpegLogInitialOutput } from '../../../../common/src/ffmpeg-helper';
 import throttle from 'lodash/throttle';
-import { RtpDemuxer } from '../rtp-demuxer';
-import { FFMpegRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { IntercomSession } from '../intercom';
+import { RtpDemuxer } from '../rtp/rtp-demuxer';
+import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -130,7 +129,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom) {
+    getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
         interface Session {
             request: PrepareStreamRequest;
             videossrc: number;
@@ -139,7 +138,8 @@ addSupportedType({
             videoReturn: dgram.Socket;
             audioReturn: dgram.Socket;
             demuxer?: RtpDemuxer;
-            intercomSession?: Promise<IntercomSession>;
+            rtpSink?: HomeKitRtpSink;
+            targetAddress?: string;
         }
         const sessions = new Map<string, Session>();
 
@@ -158,10 +158,11 @@ addSupportedType({
             session.cp?.kill();
             session.videoReturn?.close();
             session.audioReturn?.close();
+            session.rtpSink?.destroy();
         }
 
         const throttledTakePicture = throttle(async () => {
-            console.log('snapshot throttle fetch', device.name);
+            // console.log(device.name, 'throttled snapshot fetch');
             const media = await device.takePicture();
             const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
             return jpeg;
@@ -170,16 +171,30 @@ addSupportedType({
             trailing: true,
         });
 
+        function snapshotAll() {
+            for (const snapshotThrottle of homekitSession.snapshotThrottles.values()) {
+                snapshotThrottle();
+            }
+        }
+
+        homekitSession.snapshotThrottles.set(device.id, throttledTakePicture);
+
         const delegate: CameraStreamingDelegate = {
             async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
                 try {
+                    // console.log(device.name, 'snapshot request');
+
                     // an idle Home.app will hit this endpoint every 10 seconds, and slow requests bog up the entire app.
                     // avoid slow requests by prefetching every 9 seconds.
 
                     if (device.interfaces.includes(ScryptedInterface.Camera)) {
+                        // snapshots are requested em masse, so trigger them rather than wait for home to
+                        // fetch everything serially.
                         // this call is not a bug, to force lodash to take a picture on the trailing edge,
                         // throttle must be called twice.
-                        throttledTakePicture();
+                        snapshotAll();
+                        snapshotAll();
+
                         callback(null, await throttledTakePicture());
                         return;
                     }
@@ -220,26 +235,6 @@ addSupportedType({
                     cp: null,
                     videoReturn,
                     audioReturn,
-                }
-
-                const audioKey = Buffer.concat([session.request.audio.srtp_key, session.request.audio.srtp_salt]);
-
-                if (twoWayAudio) {
-                    session.demuxer = new RtpDemuxer(device.name, console, audioReturn);
-                    const intercom = new IntercomSession(device, socketType, request.targetAddress, audioKey);
-                    // const ffmpegInput = await intercom.start();
-                    session.demuxer.on('rtp', (buffer: Buffer) => {
-                        audioReturn.send(buffer, intercom.port);
-                    });
-                    session.demuxer.once('rtcp', () => {
-                        intercom.start().then(_ => {
-                            session.demuxer.on('rtcp', (buffer: Buffer) => {
-                                intercom.heartbeat(audioReturn, buffer);
-                            });
-                        });
-
-                    });
-                    // session.rtpRebroadcast = intercom.session;
                 }
 
                 sessions.set(request.sessionID, session);
@@ -296,7 +291,6 @@ addSupportedType({
 
 
                 callback();
-
 
                 const videomtu = 188 * 3;
                 const audiomtu = 188 * 1;
@@ -380,23 +374,42 @@ addSupportedType({
 
                     console.log(args);
 
-                    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-                        // stdio: 'ignore',
-                    });
+                    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
                     ffmpegLogInitialOutput(console, cp);
 
                     session.cp = cp;
+
+                    if (twoWayAudio) {
+                        // const demuxer = await createRtpDemuxer(audioReturn, request.audio.srtp_key, request.audio.srtp_salt);
+                        session.demuxer = new RtpDemuxer(device.name, console, session.audioReturn);
+                        const socketType = session.request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
+
+                        session.rtpSink = await startRtpSink(socketType, session.request.targetAddress,
+                            audioKey, (request as StartStreamRequest).audio.sample_rate);
+
+                        session.demuxer.on('rtp', (buffer: Buffer) => {
+                            session.audioReturn.send(buffer, session.rtpSink.rtpPort);
+                        });
+
+                        session.demuxer.on('rtcp', (buffer: Buffer) => {
+                            session.rtpSink.heartbeat(session.audioReturn, buffer);
+                        });
+
+                        const mo = mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput);
+                        device.startIntercom(mo);
+                    }
                 }
                 catch (e) {
-                    log.e(`stream failed ${e}`);
                     console.error('streaming error', e);
                 }
             },
         };
 
         const codecs: AudioStreamingCodec[] = [];
-        for (const type of [AudioStreamingCodecType.OPUS, AudioStreamingCodecType.AAC_ELD]) {
-            for (const samplerate of [AudioStreamingSamplerate.KHZ_8, AudioStreamingSamplerate.KHZ_16, AudioStreamingSamplerate.KHZ_24]) {
+        // multiple audio options can be provided but lets stick with AAC ELD 24k,
+        // that's what the talkback ffmpeg session in rtp-ffmpeg-input.ts will use.
+        for (const type of [AudioStreamingCodecType.AAC_ELD]) {
+            for (const samplerate of [AudioStreamingSamplerate.KHZ_24]) {
                 codecs.push({
                     type,
                     samplerate,

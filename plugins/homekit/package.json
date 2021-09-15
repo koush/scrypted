@@ -24,7 +24,8 @@
       "interfaces": [
          "MixinProvider",
          "Settings"
-      ]
+      ],
+      "realfs": true
    },
    "dependencies": {
       "hap-nodejs": "file:../HAP-NodeJS",

@@ -114,7 +114,7 @@ addSupportedType({
 
             allowedIdentifiers.add(check.id);
 
-            const input = accessory.addService(Service.InputSource, `input-${check.id}`, check.name);
+            const input = accessory.addService(Service.InputSource, check.name, `input-${check.id}`);
             input.setCharacteristic(Characteristic.Identifier, check.id)
                 .setCharacteristic(Characteristic.ConfiguredName, check.name)
                 .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)

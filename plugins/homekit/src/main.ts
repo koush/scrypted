@@ -1,7 +1,7 @@
 import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, MixinDeviceBase, Camera, MediaObject } from '@scrypted/sdk';
 import { Bridge, Categories, Characteristic, HAPStorage, PublishInfo, Service } from './hap';
 import os from 'os';
-import { supportedTypes } from './common';
+import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
 import './types'
 import { CameraMixin } from './camera-mixin';
 import { maybeAddBatteryService } from './battery';
@@ -53,8 +53,9 @@ const uuid = localStorage.getItem('uuid');
 const includeToken = 4;
 
 
-class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
+class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, HomeKitSession {
     bridge = new Bridge('Scrypted', uuid);
+    snapshotThrottles = new Map<string, SnapshotThrottle>();
 
     constructor() {
         super();
@@ -147,7 +148,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings {
                 continue;
             }
 
-            const accessory = supportedType.getAccessory(device);
+            const accessory = supportedType.getAccessory(device, this);
             if (accessory) {
                 accessoryIds.add(id);
 

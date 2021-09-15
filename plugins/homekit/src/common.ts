@@ -1,16 +1,25 @@
 
 import { EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
 import { Accessory, Service } from './hap';
+import throttle from 'lodash/throttle';
 
 export interface DummyDevice {
     interfaces?: string[];
     type?: ScryptedDeviceType;
 }
 
+export interface SnapshotThrottle {
+    (): Promise<Buffer>;
+}
+
+export interface HomeKitSession {
+    snapshotThrottles: Map<string, SnapshotThrottle>;
+}
+
 interface SupportedType {
     type: ScryptedDeviceType;
     probe(device: DummyDevice): boolean;
-    getAccessory: (device: ScryptedDevice & any) => Accessory;
+    getAccessory: (device: ScryptedDevice & any, homekitSession: HomeKitSession) => Accessory;
     noBridge?: boolean;
 }
 

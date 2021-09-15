@@ -37,6 +37,7 @@ export class RtpDemuxer extends EventEmitter {
 
         // Split the message into RTP and RTCP packets.
         this.socket.on("message", (msg) => {
+            console.log('rtsp message');
 
             // Send RTP packets to the RTP port.
             if (this.isRtpMessage(msg)) {
@@ -48,14 +49,6 @@ export class RtpDemuxer extends EventEmitter {
 
         this.console.log("%s: Creating an RtpDemuxer instance - inbound port: %s, RTCP port: %s, RTP port: %s.",
             this.deviceName);
-    }
-
-    // Close the socket and cleanup.
-    public close(): void {
-        this.console.log("%s: Closing the RtpDemuxer instance on port %s.", this.deviceName);
-
-        clearTimeout(this.heartbeatTimer);
-        this.socket.close();
     }
 
     // Retrieve the payload information from a packet to discern what the packet payload is.
