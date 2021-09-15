@@ -158,12 +158,12 @@ else {
             }
         });
 
-        app.post(['/web/component/script/install/:pkg', '/web/component/script/install/@:owner/:pkg'], async (req, res) => {
-            const { owner, pkg } = req.params;
+        app.post(['/web/component/script/install/:pkg', '/web/component/script/install/@:owner/:pkg', '/web/component/script/install/@:owner/:pkg/:tag'], async (req, res) => {
+            const { owner, pkg, tag } = req.params;
             let endpoint = pkg;
             if (owner)
                 endpoint = `@${owner}/${endpoint}`;
-            const plugin = await scrypted.installNpm(endpoint);
+            const plugin = await scrypted.installNpm(endpoint, tag);
             res.send({
                 id: scrypted.findPluginDevice(plugin.pluginId)._id,
             });

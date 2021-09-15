@@ -381,12 +381,14 @@ export class ScryptedRuntime {
         return proxyPair;
     }
 
-    async installNpm(pkg: string): Promise<PluginHost> {
+    async installNpm(pkg: string, version?: string): Promise<PluginHost> {
         const registry = (await axios(`https://registry.npmjs.org/${pkg}`)).data;
-        const latest = registry['dist-tags'].latest;
-        console.log('latest package', pkg, latest);
+        if (!version) {
+            version = registry['dist-tags'].latest;
+        }
+        console.log('installing package', pkg, version);
 
-        const tarball = (await axios(`${registry.versions[latest].dist.tarball}`, {
+        const tarball = (await axios(`${registry.versions[version].dist.tarball}`, {
             responseType: 'arraybuffer'
         })).data;
         console.log('downloaded tarball', tarball?.length);
