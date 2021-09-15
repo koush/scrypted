@@ -17,6 +17,7 @@ export default {
     name: String,
     value: Array,
     filter: Function,
+    ignore: String,
   },
   mixins: [CustomValue],
   components: {
@@ -38,6 +39,8 @@ export default {
       for (const id of Object.keys(
         this.$scrypted.systemManager.getSystemState()
       )) {
+        if (id === this.ignore)
+          continue;
         const device = this.$scrypted.systemManager.getDeviceById(id);
         ret.push(
           device.interfaces.map((iface) => ({

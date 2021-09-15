@@ -9,6 +9,7 @@
     <v-flex xs12>
       <InterfaceMultiselect
         @input="onChange"
+        :ignore="id"
         v-model="device.deviceInterfaces"
         name="Selected Device Interfaces"
       ></InterfaceMultiselect>
