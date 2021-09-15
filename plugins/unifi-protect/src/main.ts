@@ -1,7 +1,9 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, VideoStreamOptions, Intercom } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, VideoStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput } from "@scrypted/sdk";
 import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
 import { ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
+import child_process, { ChildProcess } from 'child_process';
+import { ffmpegLogInitialOutput } from '../../../common/src/ffmpeg-helper';
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -50,8 +52,11 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         const data = await response.arrayBuffer();
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
+    findCamera() {
+        return this.protect.api.Cameras.find(camera => camera.id === this.nativeId);
+    }
     async getVideoStream(): Promise<MediaObject> {
-        const camera = this.protect.api.Cameras.find(camera => camera.id === this.nativeId);
+        const camera = this.findCamera();
         const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled);
         const rtspChannel = rtspChannels[0];
 
@@ -74,7 +79,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         });
     }
     async getVideoStreamOptions(): Promise<VideoStreamOptions[] | void> {
-        const camera = this.protect.api.Cameras.find(camera => camera.id === this.nativeId);
+        const camera = this.findCamera();
         const video: VideoStreamOptions[] = camera.channels.map(channel => {
             return {
                 video: {
@@ -96,11 +101,34 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
 }
 
 class UnifiDoorbell extends UnifiCamera implements Intercom {
-    startIntercom(media: MediaObject): Promise<void> {
-        throw new Error("Method not implemented.");
+    cp?: ChildProcess;
+
+    async startIntercom(media: MediaObject) {
+        const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
+        const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
+
+        const args = ffmpegInput.inputArguments.slice();
+
+        const camera = this.findCamera();
+
+        args.push(
+            "-acodec", camera.talkbackSettings.typeFmt,
+            "-flags", "+global_header",
+            "-ar", camera.talkbackSettings.samplingRate.toString(),
+            "-b:a", "64k",
+            "-f", "adts",
+            "udp://" + camera.host + ":" + camera.talkbackSettings.bindPort,
+        )
+
+        const ffmpeg = await mediaManager.getFFmpegPath();
+        this.cp = child_process.spawn(ffmpeg, args);
+        this.cp.on('killed', () => this.cp = undefined);
+        ffmpegLogInitialOutput(console, this.cp);
     }
-    stopIntercom(): Promise<void> {
-        throw new Error("Method not implemented.");
+
+    async stopIntercom() {
+        this.cp?.kill();
+        this.cp = undefined;
     }
 }
 
@@ -336,8 +364,8 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         if (!camera)
             throw new Error('camera not found?');
         const ret = camera.featureFlags.hasSpeaker ?
-            new UnifiCamera(this, nativeId, camera)
-            : new UnifiDoorbell(this, nativeId, camera);
+            new UnifiDoorbell(this, nativeId, camera)
+            : new UnifiCamera(this, nativeId, camera);
         this.cameras.set(nativeId, ret);
         return ret;
     }
