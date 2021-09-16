@@ -131,7 +131,8 @@ addSupportedType({
     },
     getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
         interface Session {
-            request: PrepareStreamRequest;
+            prepareRequest: PrepareStreamRequest;
+            startRequest: StartStreamRequest;
             videossrc: number;
             audiossrc: number;
             cp: ChildProcess;
@@ -230,7 +231,8 @@ addSupportedType({
                 const { socket: audioReturn, port: audioPort } = await getPort(socketType);
 
                 const session: Session = {
-                    request,
+                    prepareRequest: request,
+                    startRequest: null,
                     videossrc,
                     audiossrc,
                     cp: null,
@@ -282,6 +284,15 @@ addSupportedType({
                     // stop for restart
                     session.cp?.kill();
                     session.cp = undefined;
+
+                    // override the old values for new.
+                    if (request.video) {
+                        Object.assign(session.startRequest.video, request.video);
+                    }
+                    request = session.startRequest;
+                }
+                else {
+                    session.startRequest = request as StartStreamRequest;
                 }
 
                 // watch for data to verify other side is alive.
@@ -301,8 +312,8 @@ addSupportedType({
                     const media = await device.getVideoStream();
                     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
-                    const videoKey = Buffer.concat([session.request.video.srtp_key, session.request.video.srtp_salt]);
-                    const audioKey = Buffer.concat([session.request.audio.srtp_key, session.request.audio.srtp_salt]);
+                    const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
+                    const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
                     const args: string[] = [];
                     args.push(...ffmpegInput.inputArguments);
@@ -336,10 +347,10 @@ addSupportedType({
                         "-payload_type", (request as StartStreamRequest).video.pt.toString(),
                         "-ssrc", session.videossrc.toString(),
                         "-f", "rtp",
-                        "-srtp_out_suite", session.request.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
+                        "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
                         "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                         "-srtp_out_params", videoKey.toString('base64'),
-                        `srtp://${session.request.targetAddress}:${session.request.video.port}?rtcpport=${session.request.video.port}&pkt_size=${videomtu}`
+                        `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
                     )
 
                     const codec = (request as StartStreamRequest).audio.codec;
@@ -363,11 +374,11 @@ addSupportedType({
                             "-payload_type",
                             (request as StartStreamRequest).audio.pt.toString(),
                             "-ssrc", session.audiossrc.toString(),
-                            "-srtp_out_suite", session.request.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
+                            "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
                             "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                             "-srtp_out_params", audioKey.toString('base64'),
                             "-f", "rtp",
-                            `srtp://${session.request.targetAddress}:${session.request.audio.port}?rtcpport=${session.request.audio.port}&pkt_size=${audiomtu}`
+                            `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
                         )
                     }
                     else {
@@ -384,9 +395,9 @@ addSupportedType({
                     if (twoWayAudio) {
                         // const demuxer = await createRtpDemuxer(audioReturn, request.audio.srtp_key, request.audio.srtp_salt);
                         session.demuxer = new RtpDemuxer(device.name, console, session.audioReturn);
-                        const socketType = session.request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
+                        const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
 
-                        session.rtpSink = await startRtpSink(socketType, session.request.targetAddress,
+                        session.rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
                             audioKey, (request as StartStreamRequest).audio.sample_rate);
 
                         session.demuxer.on('rtp', (buffer: Buffer) => {
