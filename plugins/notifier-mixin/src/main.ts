@@ -47,13 +47,15 @@ class NotifierMixin extends MixinDeviceBase<MediaPlayer> implements Notifier {
 }
 
 class NotifierProvider extends ScryptedDeviceBase implements MixinProvider {
-  canMixin(type: ScryptedDeviceType, interfaces: string[]): string[] {
+  async releaseMixin(id: string, mixinDevice: any) {
+  }
+  async canMixin(type: ScryptedDeviceType, interfaces: string[]) {
     if (!interfaces.includes(ScryptedInterface.MediaPlayer))
       return null;
     return [ScryptedInterface.Notifier];
   }
 
-  getMixin(mixinDevice: MediaPlayer, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+  async getMixin(mixinDevice: MediaPlayer, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
     return new NotifierMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
   }
 }
