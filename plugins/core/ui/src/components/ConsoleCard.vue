@@ -1,6 +1,16 @@
 <template>
   <v-card raised>
-    <v-toolbar dark color="blue"> Console </v-toolbar>
+    <v-toolbar dark color="blue">
+      Console
+      <v-tooltip bottom>
+        <template v-slot:activator="{ on }">
+          <v-btn @click="copy" v-on="on" text
+            ><v-icon small> far fa-copy</v-icon>
+          </v-btn>
+        </template>
+        <span>Copy</span>
+      </v-tooltip>
+    </v-toolbar>
     <div ref="terminal"></div>
   </v-card>
 </template>
@@ -13,8 +23,10 @@ import { sleep } from "../common/sleep";
 export default {
   props: ["deviceId"],
   socket: null,
+  buffer: [],
   methods: {
     reconnect(term) {
+      this.buffer = [];
       const endpointPath = `/endpoint/@scrypted/core`;
 
       const options = {
@@ -23,11 +35,17 @@ export default {
       const rootLocation = `${window.location.protocol}//${window.location.host}`;
       this.socket = eio(rootLocation, options);
 
-      this.socket.on("message", (data) => term.write(new Uint8Array(data)));
+      this.socket.on("message", (data) => {
+        this.buffer.push(Buffer.from(data));
+        term.write(new Uint8Array(data));
+      });
       this.socket.on("close", async () => {
         await sleep(1000);
         this.reconnect(term);
       });
+    },
+    copy() {
+      this.$copyText(Buffer.concat(this.buffer).toString());
     },
   },
   mounted() {

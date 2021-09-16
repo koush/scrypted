@@ -32,8 +32,9 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                 }
             }
             catch (e) {
-                console.error('event listener failure', e);
+                this.console.error('event listener failure', e);
                 await new Promise(resolve => setTimeout(resolve, 10000));
+                this.console.log('reconnecting to event stream...');
             }
         }
     }

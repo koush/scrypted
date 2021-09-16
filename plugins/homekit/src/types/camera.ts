@@ -144,7 +144,7 @@ addSupportedType({
         const sessions = new Map<string, Session>();
 
         let lastPicture = 0;
-        let picture: Buffer;
+        let videoCameraPicture: Promise<Buffer>;
 
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
@@ -162,10 +162,31 @@ addSupportedType({
         }
 
         const throttledTakePicture = throttle(async () => {
-            // console.log(device.name, 'throttled snapshot fetch');
-            const media = await device.takePicture();
-            const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
-            return jpeg;
+            if (device.interfaces.includes(ScryptedInterface.Camera)) {
+                const media = await device.takePicture();
+                const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
+                return jpeg;
+            }
+
+            // recent conversion? use it.
+            if (videoCameraPicture && lastPicture + 60000 > Date.now()) {
+                return videoCameraPicture;
+            }
+
+            // out of date? send it, nuke it to force refresh.
+            if (videoCameraPicture) {
+                videoCameraPicture.finally(async () => {
+                    videoCameraPicture = undefined;
+                });
+                return videoCameraPicture;
+            }
+
+            lastPicture = Date.now();
+
+            // begin a refresh
+            videoCameraPicture = device.getVideoStream().then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
+
+            return videoCameraPicture;
         }, 9000, {
             leading: true,
             trailing: true,
@@ -182,37 +203,17 @@ addSupportedType({
         const delegate: CameraStreamingDelegate = {
             async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
                 try {
-                    // console.log(device.name, 'snapshot request');
-
                     // an idle Home.app will hit this endpoint every 10 seconds, and slow requests bog up the entire app.
                     // avoid slow requests by prefetching every 9 seconds.
 
-                    if (device.interfaces.includes(ScryptedInterface.Camera)) {
-                        // snapshots are requested em masse, so trigger them rather than wait for home to
-                        // fetch everything serially.
-                        // this call is not a bug, to force lodash to take a picture on the trailing edge,
-                        // throttle must be called twice.
-                        snapshotAll();
-                        snapshotAll();
+                    // snapshots are requested em masse, so trigger them rather than wait for home to
+                    // fetch everything serially.
+                    // this call is not a bug, to force lodash to take a picture on the trailing edge,
+                    // throttle must be called twice.
+                    snapshotAll();
+                    snapshotAll();
 
-                        callback(null, await throttledTakePicture());
-                        return;
-                    }
-                    if (lastPicture + 60000 > Date.now()) {
-                        callback(null, picture);
-                        return;
-                    }
-
-                    lastPicture = Date.now();
-                    callback(null, picture);
-
-                    try {
-                        // begin a refresh
-                        const media = await device.getVideoStream();
-                        picture = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
-                    }
-                    catch (e) {
-                    }
+                    callback(null, await throttledTakePicture());
                 }
                 catch (e) {
                     console.error('snapshot error', e);
@@ -264,7 +265,7 @@ addSupportedType({
                 callback(null, response);
             },
             async handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback) {
-                console.log('streaming request', request);
+                console.log(device.name, 'streaming request', request);
                 if (request.type === StreamRequestTypes.STOP) {
                     killSession(request.sessionID);
                     callback();
@@ -296,6 +297,7 @@ addSupportedType({
                 const audiomtu = 188 * 1;
 
                 try {
+                    console.log(device.name, 'fetching video stream');
                     const media = await device.getVideoStream();
                     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
@@ -369,10 +371,10 @@ addSupportedType({
                         )
                     }
                     else {
-                        console.warn('unknown audio codec', request);
+                        console.warn(device.name, 'unknown audio codec', request);
                     }
 
-                    console.log(args);
+                    console.log(device.name, args);
 
                     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
                     ffmpegLogInitialOutput(console, cp);
@@ -400,7 +402,7 @@ addSupportedType({
                     }
                 }
                 catch (e) {
-                    console.error('streaming error', e);
+                    console.error(device.name, 'streaming error', e);
                 }
             },
         };
