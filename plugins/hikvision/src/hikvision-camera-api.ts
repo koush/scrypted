@@ -5,6 +5,7 @@ import AxiosDigestAuth from '@mhoc/axios-digest-auth';
 
 export enum HikVisionCameraEvent {
     MotionDetected = "<eventType>VMD</eventType>",
+    VideoLoss = "<eventType>videoloss</eventType>",
 }
 
 async function readEvent(readable: Readable): Promise<HikVisionCameraEvent | void> {
