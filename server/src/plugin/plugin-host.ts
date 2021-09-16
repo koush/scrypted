@@ -38,6 +38,10 @@ export class PluginHost {
     api: PluginHostAPI;
     pluginName: string;
     listener: EventListenerRegister;
+    stats: {
+        cpuUsage: NodeJS.CpuUsage,
+        memoryUsage: NodeJS.MemoryUsage,
+    };
 
     kill() {
         this.listener.removeListener();
@@ -236,11 +240,16 @@ export class PluginHost {
                 });
             }
             else if (reject) {
-                reject(new Error('peer'));
+                reject(new Error('peer disconnected'));
             }
         });
-    }
 
+        this.peer.onOob = (oob: any) => {
+            if (oob.type === 'stats') {
+                this.stats = oob;
+            }
+        };
+    }
 }
 
 async function createConsoleServer(events: EventEmitter): Promise<number> {
@@ -404,6 +413,17 @@ export function startPluginClusterWorker() {
             reject(e);
     }));
     process.on('message', message => peer.handleMessage(message as RpcMessage));
+
+    let lastCpuUsage: NodeJS.CpuUsage;
+    setInterval(() => {
+        const cpuUsage = process.cpuUsage(lastCpuUsage);
+        lastCpuUsage = cpuUsage;
+        peer.sendOob({
+            type: 'stats',
+            cpu: cpuUsage,
+            memoryUsage: process.memoryUsage(),
+        })
+    }, 10000);
 
     const consolePort = createConsoleServer(events);
     const replPort = createREPLServer(events);

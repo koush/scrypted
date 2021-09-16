@@ -35,6 +35,10 @@ interface RpcResult extends RpcMessage {
     result?: any;
 }
 
+interface RpcOob extends RpcMessage {
+    oob: any;
+}
+
 interface RpcRemoteProxyValue {
     __remote_proxy_id: string;
     __remote_constructor_name: string;
@@ -169,8 +173,8 @@ export interface RpcSerializer {
 }
 
 export class RpcPeer {
+    onOob: (oob: any) => void;
     params: { [name: string]: any } = {};
-    send: (message: RpcMessage, reject?: (e: Error) => void) => void;
     pendingResults: { [id: string]: Deferred } = {};
     proxyCounter = 1;
     localProxied = new Map<any, string>();
@@ -181,8 +185,7 @@ export class RpcPeer {
     nameDeserializerMap = new Map<string, RpcSerializer>();
     constructorSerializerMap = new Map<string, string>();
 
-    constructor(send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
-        this.send = send;
+    constructor(public send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
     }
 
     kill(message?: string) {
@@ -234,6 +237,13 @@ export class RpcPeer {
         promise.catch(() => {});
 
         return promise;
+    }
+
+    sendOob(oob: any) {
+        this.send({
+            type: 'oob',
+            oob,
+        } as RpcOob)
     }
 
     evalLocal<T>(script: string, filename?: string, coercedParams?: { [name: string]: any }): T {
@@ -382,7 +392,18 @@ export class RpcPeer {
                         for (const arg of (rpcApply.argArray || [])) {
                             args.push(this.deserialize(arg));
                         }
-                        const value = rpcApply.method ? await target[rpcApply.method](...args) : await target(...args);
+
+                        // const value = rpcApply.method ? await target[rpcApply.method](...args) : await target(...args);
+                        let value: any;
+                        if (rpcApply.method) {
+                            const method = target[rpcApply.method];
+                            if (!method)
+                                throw new Error(`target ${target?.constructor.name} does not have method ${rpcApply.method}`);
+                            value = await target[rpcApply.method](...args);
+                        }
+                        else {
+                            value = await target(...args);
+                        }
 
                         result.result = this.serialize(value);
                     }
@@ -415,6 +436,11 @@ export class RpcPeer {
                     const local = this.localProxyMap[rpcFinalize.__local_proxy_id];
                     delete this.localProxyMap[rpcFinalize.__local_proxy_id];
                     this.localProxied.delete(local);
+                    break;
+                }
+                case 'oob': {
+                    const rpcOob = message as RpcOob;
+                    this.onOob?.(rpcOob.oob);
                     break;
                 }
                 default:

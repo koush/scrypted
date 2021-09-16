@@ -66,8 +66,10 @@ export class PluginComponent {
     }
     async getPluginInfo(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
+        const host = this.scrypted.plugins[pluginId];
         return {
-            pid: this.scrypted.plugins[pluginId]?.worker?.process.pid,
+            pid: host?.worker?.process.pid,
+            stats: host?.stats,
             packageJson: plugin.packageJson,
             id: this.scrypted.findPluginDevice(pluginId),
         }
