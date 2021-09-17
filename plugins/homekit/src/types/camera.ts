@@ -349,15 +349,29 @@ addSupportedType({
                     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
                     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
+                    const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
                     const args: string[] = [];
 
                     const storage = deviceManager.getMixinStorage(device.id, undefined);
+
+                    // decoder arguments
                     const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
                     if (videoDecoderArguments) {
                         args.push(...evalRequest(videoDecoderArguments, request));
                     }
 
+                    // ffmpeg input for decoder
                     args.push(...ffmpegInput.inputArguments);
+
+                    // dummy audio
+                    if (!noAudio) {
+                        // create a dummy audio track if none actually exists.
+                        // this track will only be used if no audio track is available.
+                        // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+                        args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+                    }
+
+                    // video encoding
                     args.push(
                         "-an", '-sn', '-dn',
                     );
@@ -400,8 +414,8 @@ addSupportedType({
                         `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
                     )
 
-                    const probe = await probeVideoCamera(device);
-                    if (!probe.noAudio) {
+                    // audio encoding
+                    if (!noAudio) {
                         const codec = (request as StartStreamRequest).audio.codec;
                         args.push(
                             "-vn", '-sn', '-dn',
@@ -443,8 +457,8 @@ addSupportedType({
 
                     session.cp = cp;
 
+                    // audio talkback
                     if (twoWayAudio) {
-                        // const demuxer = await createRtpDemuxer(audioReturn, request.audio.srtp_key, request.audio.srtp_salt);
                         session.demuxer = new RtpDemuxer(device.name, console, session.audioReturn);
                         const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
 
