@@ -48,7 +48,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera {
         return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
     }
 
-    async getStreamUrl() {
+    async getConstructedStreamUrl() {
         return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
     }
 }
