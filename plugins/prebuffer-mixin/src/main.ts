@@ -1,11 +1,12 @@
 
-import { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, VideoStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { createServer, Server, Socket } from 'net';
 import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
 import EventEmitter from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
 import { MP4Atom, parseFragmentedMP4 } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 
 const { mediaManager, log } = sdk;
@@ -123,10 +124,19 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const reencodeAudio = this.storage.getItem(REENCODE_AUDIO) === 'true';
 
-    const acodec = reencodeAudio ? [] : [
-      '-acodec',
-      'copy',
-    ];
+    const probe = await probeVideoCamera(this.mixinDevice);
+
+    let acodec: string[];
+    // no audio? explicitly disable it.
+    if (probe.noAudio) {
+      acodec = ['-an'];
+    }
+    else {
+      acodec = reencodeAudio ? [] : [
+        '-acodec',
+        'copy',
+      ];
+    }
 
     const vcodec = [
       '-vcodec',
@@ -215,13 +225,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     return session;
   }
 
-  async getVideoStream(options?: VideoStreamOptions): Promise<MediaObject> {
+  async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
     this.ensurePrebufferSession();
 
     const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) === 'true';
 
+    const session = await this.prebufferSession;
     if (!options?.prebuffer && !sendKeyframe) {
-      const session = await this.prebufferSession;
       const mo = mediaManager.createFFmpegMediaObject(session.ffmpegInput);
       return mo;
     }
@@ -300,11 +310,24 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const port = await listenZeroCluster(server);
 
+    const mediaStreamOptions = session.ffmpegInput.mediaStreamOptions
+      ? Object.assign({}, session.ffmpegInput.mediaStreamOptions)
+      : undefined;
+
+    if (mediaStreamOptions && mediaStreamOptions.audio) {
+      const reencodeAudio = this.storage.getItem(REENCODE_AUDIO) === 'true';
+      if (reencodeAudio)
+        mediaStreamOptions.audio = {
+          codec: 'aac',
+        }
+    }
+
     const ffmpegInput: FFMpegInput = {
       inputArguments: [
         '-f', options?.container === 'mp4' ? 'mp4' : 'mpegts',
         '-i', `tcp://127.0.0.1:${port}`,
       ],
+      mediaStreamOptions,
     }
 
     console.log(this.name, 'prebuffer ffmpeg input', ffmpegInput.inputArguments[3]);
@@ -312,8 +335,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     return mo;
   }
 
-  async getVideoStreamOptions(): Promise<void | VideoStreamOptions[]> {
-    const ret: VideoStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
+  async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
+    const ret: MediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
     let first = ret[0];
     if (!first) {
       first = {};
