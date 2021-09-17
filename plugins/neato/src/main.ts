@@ -16,7 +16,7 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
         this.robot = robot;
 
         this.refresher = (err, data) => {
-            this.console.log(data);
+            log.d(data);
             this._refresh();
         }
     }
@@ -31,7 +31,7 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
 
     _refresh(cb?) {
         this.robot.getState((error, state) => {
-            this.console.log(state);
+            this.log.d(JSON.stringify(state));
             this.running = (state && state.state != 1) || false
             this.docked =  (state && state.details && state.details.isDocked) || false;
             this.paused = (state && state.state == 3) || false;
@@ -109,7 +109,7 @@ NeatoController.prototype.updateRobots = function (robots) {
         }
     })
 
-    this.console.i(`found robots: ${JSON.stringify(devices)}`);
+    log.i(`found robots: ${JSON.stringify(devices)}`);
 
     deviceManager.onDevicesChanged({
         devices
@@ -154,7 +154,7 @@ NeatoController.prototype.onOauthCallback = function (callbackUrl) {
     });
 
     if (authError) {
-        this.console.a(`There was an error logging in with Neato: ${authError} ${authErrorDescription}`);
+        log.a(`There was an error logging in with Neato: ${authError} ${authErrorDescription}`);
         return;
     }
 
@@ -168,14 +168,14 @@ var neatoController = new NeatoController();
 //authorize
 
 function getRobots() {
-    this.console.clearAlerts();
+    log.clearAlerts();
     //get your robots
     client.getRobots(function (error, robots) {
         if (error) {
-            this.console.a(`Error retrieving Neato robots: ${error}`);
+            log.a(`Error retrieving Neato robots: ${error}`);
             throw error;
         }
-        this.console.clearAlerts();
+        log.clearAlerts();
 
         var validRobots = robots
             .filter(robot => robot._serial && robot._secret);
@@ -195,7 +195,7 @@ else if (username && password) {
     log.clearAlerts();
     client.authorize(username, password, false, function (error) {
         if (error) {
-            this.console.a(`Error authorizing with Neato servers: ${error}`);
+            log.a(`Error authorizing with Neato servers: ${error}`);
             throw error;
         }
 
