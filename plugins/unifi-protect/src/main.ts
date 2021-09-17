@@ -7,7 +7,7 @@ import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor {
+class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings {
     protect: UnifiProtect;
     motionTimeout: NodeJS.Timeout;
     ringTimeout: NodeJS.Timeout;
@@ -26,6 +26,25 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         if (this.interfaces.includes(ScryptedInterface.BinarySensor)) {
             this.binaryState = false;
         }
+    }
+
+    isChannelEnabled(channel: ProtectCameraChannelConfig) {
+        return this.storage.getItem('disable-'+channel.id) !== 'true';
+    }
+
+    async getSettings(): Promise<Setting[]> {
+        const channels = this.findCamera().channels || [];
+        return channels.map(channel => ({
+            title: `Disable Stream: ${channel.name}`,
+            key: 'disable-'+channel.id,
+            value: (!this.isChannelEnabled(channel)).toString(),
+            type: 'boolean',
+            description: 'Prevent usage of this Unifi Protect RTSP channel in Scrypted.',
+        }));
+    }
+
+    async putSetting(key: string, value: string | number | boolean){
+        this.storage.setItem(key, value?.toString());
     }
 
     resetMotionTimeout() {
@@ -57,7 +76,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const camera = this.findCamera();
-        const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled);
+        const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled && this.isChannelEnabled(channel));
 
         const rtspChannel = camera.channels.find(channel => channel.id === options?.id) || rtspChannels[0];
         this.console.log('serving rtsp channel', rtspChannel);
@@ -338,6 +357,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                         serialNumber: camera.id,
                     },
                     interfaces: [
+                        ScryptedInterface.Settings,
                         ScryptedInterface.Camera,
                         ScryptedInterface.VideoCamera,
                         ScryptedInterface.MotionSensor,
