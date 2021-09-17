@@ -1,4 +1,7 @@
 import { Settings, Setting, MixinDeviceBase, ScryptedInterface } from "@scrypted/sdk";
+import sdk from "@scrypted/sdk";
+
+const { deviceManager } = sdk;
 
 export interface SettingsMixinDeviceOptions {
     providerNativeId: string;
@@ -42,6 +45,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
             return this.mixinDevice.putSetting(key, value);
         }
 
-        return this.putMixinSetting(key.substring(prefix.length), value)
+        await this.putMixinSetting(key.substring(prefix.length), value)
+        deviceManager.onMixinEvent?.(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, null);
     }
 }
