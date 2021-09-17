@@ -1,11 +1,18 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, VideoStreamOptions, ScryptedInterface } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput } from "@scrypted/sdk";
 const { log, deviceManager, mediaManager } = sdk;
 
 export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
     constructor(nativeId: string) {
         super(nativeId);
     }
-    async getVideoStreamOptions(): Promise<void | VideoStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
+        return [
+            {
+                video: {
+                },
+                audio: this.isAudioDisabled() ? null : {},
+            }
+        ];
     }
 
     async getStreamUrl() {
@@ -21,27 +28,22 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
         url.username = this.storage.getItem("username")
         url.password = this.storage.getItem("password");
 
-        const ret = {
+        const vso = await this.getVideoStreamOptions();
+        const ret: FFMpegInput = {
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
                 '-analyzeduration', '15000000',
-                '-probesize', '100000000',
+                '-probesize', '10000000',
                 "-reorder_queue_size",
                 "1024",
                 "-max_delay",
                 "20000000",
                 "-i",
                 url.toString(),
-            ]
+            ],
+            mediaStreamOptions: vso?.[0],
         };
-
-
-        if (this.isAudioDisabled()) {
-            ret.inputArguments.push(
-                '-f', 'lavfi', '-i', 'anullsrc',
-            );
-        }
 
         return mediaManager.createFFmpegMediaObject(ret);
     }
@@ -82,7 +84,7 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
             {
                 key: 'noAudio',
                 title: 'No Audio',
-                description: 'Enable this setting if this camera does not have an audio stream.',
+                description: 'Enable this setting if the stream does not have audio or to mute audio.',
                 type: 'boolean',
                 value: (this.isAudioDisabled()).toString(),
             }
