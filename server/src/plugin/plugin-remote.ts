@@ -27,7 +27,6 @@ class DeviceLogger implements Logger {
     }
 
     async log(level: string, message: string) {
-        this.console.log(message);
         (await this.ensureLogger()).log(level, message);
     }
 

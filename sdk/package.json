@@ -20,14 +20,18 @@
   "dependencies": {
     "@babel/core": "^7.2.2",
     "@babel/plugin-proposal-class-properties": "^7.4.4",
+    "@babel/plugin-proposal-optional-chaining": "^7.13.12",
     "@babel/plugin-transform-modules-commonjs": "^7.2.0",
     "@babel/plugin-transform-typescript": "^7.15.0",
     "@babel/polyfill": "^7.2.5",
     "@babel/preset-env": "^7.2.3",
     "@babel/preset-typescript": "^7.15.0",
+    "@types/node": "^16.6.1",
     "adm-zip": "^0.4.13",
     "axios": "^0.21.1",
     "babel-loader": "^8.0.4",
+    "babel-plugin-const-enum": "^1.1.0",
+    "babel-plugin-minify-dead-code-elimination": "^0.5.1",
     "babel-polyfill": "^6.26.0",
     "babel-template": "^6.26.0",
     "browserify-buffertools": "^1.0.2",
@@ -47,11 +51,10 @@
     "typescript": "^4.3.5",
     "webpack": "^4.28.1",
     "webpack-cli": "^3.1.2",
-    "webpack-inject-plugin": "^1.0.2",
-    "@babel/plugin-proposal-optional-chaining": "^7.13.12",
-    "@types/node": "^16.6.1",
-    "babel-plugin-const-enum": "^1.1.0",
-    "babel-plugin-minify-dead-code-elimination": "^0.5.1"
+    "webpack-inject-plugin": "^1.0.2"
   },
-  "types": "./index.d.ts"
+  "types": "./index.d.ts",
+  "devDependencies": {
+    "typescript-json-schema": "^0.50.1"
+  }
 }

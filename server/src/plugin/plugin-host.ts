@@ -443,13 +443,12 @@ export function startPluginClusterWorker() {
         events.emit('scrypted', scrypted);
 
         process.on('uncaughtException', e => {
-            scrypted.log.e('uncaughtException');
-            scrypted.log.e(e.toString());
-            scrypted.log.e(e.stack);
+            console.error('uncaughtException', e);
+            scrypted.log.e('uncaughtException ' + e?.toString());
         });
         process.on('unhandledRejection', e => {
-            scrypted.log.e('unhandledRejection');
-            scrypted.log.e(e.toString());
+            console.error('unhandledRejection', e);
+            scrypted.log.e('unhandledRejection ' + e?.toString());
         });
     })
 }
