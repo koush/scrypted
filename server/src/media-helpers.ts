@@ -1,4 +1,5 @@
 import { ChildProcess } from "child_process";
+import { MediaStreamOptions, VideoCamera } from "@scrypted/sdk";
 
 export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forever?: boolean) {
     function logger(log: (str: string) => void): (buffer: Buffer) => void {
@@ -19,4 +20,19 @@ export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forev
     };
     cp.stdout?.on('data', logger(console.log));
     cp.stderr?.on('data', logger(console.error));
+}
+
+export async function probeVideoCamera(device: VideoCamera) {
+    let options: MediaStreamOptions[];
+    try {
+      options = await device.getVideoStreamOptions() || [];
+    }
+    catch (e) {
+    }
+
+    const noAudio = options && options.length && options[0].audio === null;
+    return {
+        options,
+        noAudio,
+    };
 }

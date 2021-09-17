@@ -6,7 +6,7 @@ import { listenZeroCluster } from './listen-cluster';
 import { Readable } from 'stream';
 import { readLength } from './read-length';
 import sdk from "@scrypted/sdk";
-import { ffmpegLogInitialOutput } from './ffmpeg-helper';
+import { ffmpegLogInitialOutput } from './media-helpers';
 
 const { mediaManager } = sdk;
 

@@ -5,7 +5,7 @@ import { FFMpegInput } from '@scrypted/sdk/types';
 import { listenZeroCluster } from './listen-cluster';
 import { EventEmitter, once } from 'events';
 import sdk from "@scrypted/sdk";
-import { ffmpegLogInitialOutput } from './ffmpeg-helper';
+import { ffmpegLogInitialOutput } from './media-helpers';
 
 const { mediaManager } = sdk;
 
@@ -189,7 +189,8 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
                     inputArguments: [
                         '-f', 'mpegts',
                         '-i', `tcp://127.0.0.1:${rebroadcastPort}`,
-                    ]
+                    ],
+                    mediaStreamOptions: ffmpegInput.mediaStreamOptions,
                 },
             });
         });

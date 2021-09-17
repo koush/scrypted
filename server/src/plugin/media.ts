@@ -10,7 +10,7 @@ import net from 'net';
 import os from 'os';
 import { listenZeroCluster } from "./cluster-helper";
 import pathToFfmpeg from 'ffmpeg-for-homebridge';
-import { ffmpegLogInitialOutput } from "../ffmpeg-helper";
+import { ffmpegLogInitialOutput } from "../media-helpers";
 
 const wrtc = require('wrtc');
 Object.assign(global, wrtc);
@@ -135,7 +135,7 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
 
             pc.onicecandidate = evt => {
                 if (evt.candidate) {
-                    console.log('local candidate', evt.candidate);
+                    // console.log('local candidate', evt.candidate);
                     session.pendingCandidates.push(evt.candidate);
                     session.resolve?.(null);
                 }
@@ -143,8 +143,52 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
 
             const videoSource = new RTCVideoSource();
             pc.addTrack(videoSource.createTrack());
-            const audioSource = new RTCAudioSource();
-            pc.addTrack(audioSource.createTrack());
+
+
+            let audioPort: number;
+
+            // wrtc causes browser to hang if there's no audio track? so always make sure one exists.
+            const noAudio = ffInput.mediaStreamOptions && ffInput.mediaStreamOptions.audio === null;
+
+            if (!noAudio) {
+                const audioSource = new RTCAudioSource();
+                pc.addTrack(audioSource.createTrack());
+
+                const audioServer = net.createServer(async (socket) => {
+                    audioServer.close()
+                    const { sample_rate, channels } = await sampleInfo;
+                    const bitsPerSample = 16;
+                    const channelCount = channels[1] === 'mono' ? 1 : 2;
+                    const sampleRate = parseInt(sample_rate[1]);
+
+                    const toRead = sampleRate / 100 * channelCount * 2;
+                    socket.on('readable', () => {
+                        while (true) {
+                            const buffer: Buffer = socket.read(toRead);
+                            if (!buffer)
+                                return;
+
+                            const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + toRead)
+                            const samples = new Int16Array(ab);  // 10 ms of 16-bit mono audio
+
+                            const data = {
+                                samples,
+                                sampleRate,
+                                bitsPerSample,
+                                channelCount,
+                            };
+                            try {
+                                audioSource.onData(data);
+                            }
+                            catch (e) {
+                                cp.kill();
+                                console.error(e);
+                            }
+                        }
+                    });
+                });
+                audioPort = await listenZeroCluster(audioServer);
+            }
 
             const videoServer = net.createServer(async (socket) => {
                 videoServer.close()
@@ -171,53 +215,32 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
             });
             const videoPort = await listenZeroCluster(videoServer);
 
-            const audioServer = net.createServer(async (socket) => {
-                audioServer.close()
-                const { sample_rate, channels } = await sampleInfo;
-                const bitsPerSample = 16;
-                const channelCount = channels[1] === 'mono' ? 1 : 2;
-                const sampleRate = parseInt(sample_rate[1]);
-
-                const toRead = sampleRate / 100 * channelCount * 2;
-                socket.on('readable', () => {
-                    while (true) {
-                        const buffer: Buffer = socket.read(toRead);
-                        if (!buffer)
-                            return;
-    
-                        const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + toRead)
-                        const samples = new Int16Array(ab);  // 10 ms of 16-bit mono audio
-    
-                        const data = {
-                            samples,
-                            sampleRate,
-                            bitsPerSample,
-                            channelCount,
-                        };
-                        try {
-                            audioSource.onData(data);
-                        }
-                        catch (e) {
-                            cp.kill();
-                            console.error(e);
-                        }
-                    }
-                });
-            });
-            const audioPort = await listenZeroCluster(audioServer);
-
             const args = [];
             args.push('-y');
+
             args.push(...ffInput.inputArguments);
-            args.push('-vcodec', 'none');
-            args.push('-acodec', 'pcm_s16le');
-            args.push('-f', 's16le');
-            args.push(`tcp://127.0.0.1:${audioPort}`);
+
+            if (!noAudio) {
+                // create a dummy audio track if none actually exists.
+                // this track will only be used if no audio track is available.
+                // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+                args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+
+                args.push('-vn');
+                args.push('-acodec', 'pcm_s16le');
+                args.push('-f', 's16le');
+                args.push(`tcp://127.0.0.1:${audioPort}`);
+            }
+
             args.push('-vcodec', 'rawvideo');
-            args.push('-acodec', 'none');
+            args.push('-an');
             args.push('-pix_fmt', 'yuv420p');
             args.push('-f', 'rawvideo');
             args.push(`tcp://127.0.0.1:${videoPort}`);
+
+
+            console.log(ffInput);
+            console.log(args);
 
             const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
                 // DO NOT IGNORE STDIO, NEED THE DATA FOR RESOLUTION PARSING, ETC.

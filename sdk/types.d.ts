@@ -321,7 +321,7 @@ export interface Camera {
  * calling getVideoStreamOptions or no audio/video
  * is requested when calling getVideoStream.
  */
-export interface VideoStreamOptions {
+export interface MediaStreamOptions {
   /**
    * Prebuffer time in milliseconds.
    */
@@ -350,11 +350,11 @@ export interface VideoStreamOptions {
  * VideoCamera devices can capture video streams.
  */
 export interface VideoCamera {
-  getVideoStream(options?: VideoStreamOptions): Promise<MediaObject>;
+  getVideoStream(options?: MediaStreamOptions): Promise<MediaObject>;
   /**
    * Get the available video streaming options.
    */
-  getVideoStreamOptions(): Promise<VideoStreamOptions[]|void>;
+  getVideoStreamOptions(): Promise<MediaStreamOptions[]|void>;
 
 }
 
@@ -677,6 +677,7 @@ export interface MediaManager {
 }
 export interface FFMpegInput {
   inputArguments?: string[];
+  mediaStreamOptions?: MediaStreamOptions;
 }
 /**
  * DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted.
