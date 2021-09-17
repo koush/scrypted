@@ -161,6 +161,10 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
                     const concat = Buffer.concat(pending);
 
+                    if (concat[0] != 0x47) {
+                        throw new Error('Invalid sync byte in mpeg-ts packet. Terminating stream.')
+                    }
+
                     const remaining = concat.length % 188;
                     const left = concat.slice(0, concat.length - remaining);
                     const right = concat.slice(concat.length - remaining);
