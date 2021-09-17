@@ -14,7 +14,7 @@ import debounce from 'lodash/debounce';
 import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue, NodeCallback } from '../../HAP-NodeJS/src';
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioRecordingSamplerateValues, CameraRecordingConfiguration, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
-import { ffmpegLogInitialOutput } from '../../../../common/src/ffmpeg-helper';
+import { probeVideoCamera, ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import throttle from 'lodash/throttle';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
@@ -274,6 +274,7 @@ addSupportedType({
                     return;
                 }
 
+                
                 const session = sessions.get(request.sessionID);
 
                 if (!session) {
@@ -353,36 +354,40 @@ addSupportedType({
                         `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
                     )
 
-                    const codec = (request as StartStreamRequest).audio.codec;
-                    args.push(
-                        "-vn", '-sn', '-dn',
-                    );
-                    if (false && !transcodeStreaming) {
+                    const probe = await probeVideoCamera(device);
+                    if (!probe.noAudio) {
+                        const codec = (request as StartStreamRequest).audio.codec;
                         args.push(
-                            "-acodec", "copy",
+                            "-vn", '-sn', '-dn',
                         );
-                    }
-                    else if (codec === AudioStreamingCodecType.OPUS || codec === AudioStreamingCodecType.AAC_ELD) {
-                        args.push(
-                            '-acodec', ...(codec === AudioStreamingCodecType.OPUS ?
-                                ['libopus', '-application', 'lowdelay'] :
-                                ['libfdk_aac', '-profile:a', 'aac_eld']),
-                            '-flags', '+global_header',
-                            '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
-                            '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
-                            '-ac', `${(request as StartStreamRequest).audio.channel}`,
-                            "-payload_type",
-                            (request as StartStreamRequest).audio.pt.toString(),
-                            "-ssrc", session.audiossrc.toString(),
-                            "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
-                            "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
-                            "-srtp_out_params", audioKey.toString('base64'),
-                            "-f", "rtp",
-                            `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
-                        )
-                    }
-                    else {
-                        console.warn(device.name, 'unknown audio codec', request);
+                        
+                        if (false && !transcodeStreaming) {
+                            args.push(
+                                "-acodec", "copy",
+                            );
+                        }
+                        else if (codec === AudioStreamingCodecType.OPUS || codec === AudioStreamingCodecType.AAC_ELD) {
+                            args.push(
+                                '-acodec', ...(codec === AudioStreamingCodecType.OPUS ?
+                                    ['libopus', '-application', 'lowdelay'] :
+                                    ['libfdk_aac', '-profile:a', 'aac_eld']),
+                                '-flags', '+global_header',
+                                '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
+                                '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
+                                '-ac', `${(request as StartStreamRequest).audio.channel}`,
+                                "-payload_type",
+                                (request as StartStreamRequest).audio.pt.toString(),
+                                "-ssrc", session.audiossrc.toString(),
+                                "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
+                                "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
+                                "-srtp_out_params", audioKey.toString('base64'),
+                                "-f", "rtp",
+                                `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
+                            )
+                        }
+                        else {
+                            console.warn(device.name, 'unknown audio codec', request);
+                        }
                     }
 
                     console.log(device.name, args);
