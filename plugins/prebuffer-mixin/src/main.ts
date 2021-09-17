@@ -228,9 +228,15 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
     this.ensurePrebufferSession();
 
-    const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) === 'true';
-
     const session = await this.prebufferSession;
+
+    // if a specific stream is requested, and it's not what we're streaming, just fall through to source.
+    if (options && options.id !== session.ffmpegInput.mediaStreamOptions?.id) {
+      console.log(this.name, 'rebroadcast session cant be used here', options);
+      return this.mixinDevice.getVideoStream(options);
+    }
+
+    const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) === 'true';
     if (!options?.prebuffer && !sendKeyframe) {
       const mo = mediaManager.createFFmpegMediaObject(session.ffmpegInput);
       return mo;
