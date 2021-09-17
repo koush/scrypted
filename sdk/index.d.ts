@@ -65,7 +65,8 @@ export class ScryptedDeviceBase implements DeviceState {
 
 
 export class MixinDeviceBase<T> implements DeviceState {
-  constructor(mixinDevice: T, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string);
+  constructor(mixinDevice: T, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, mixinProviderNativeId: string);
+  mixinProviderNativeId: string;
   mixinDevice: ScryptedDevice & T;
   mixinDeviceInterfaces: ScryptedInterface[];
   console: Console;

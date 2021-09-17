@@ -709,9 +709,14 @@ export interface DeviceManager {
    * @param id The id of the device being mixined.
    * @param nativeId The nativeId of the MixinProvider.
    */
-  getMixinStorage(id: string, nativeId?: string): Storage;
+  getMixinStorage(id: string, nativeId: string): Storage;
 
   /**
+   * Fire an event for a mixin provided by this plugin.
+   */
+  onMixinEvent(id: string, nativeId: string, eventInterface: string, eventData: any): Promise<void>;
+
+   /**
    * Get the per device Storage object.
    */
   getDeviceStorage(nativeId: string): Storage;
