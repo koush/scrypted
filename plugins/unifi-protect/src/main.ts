@@ -3,7 +3,7 @@ import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
 import { ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
 import child_process, { ChildProcess } from 'child_process';
-import { ffmpegLogInitialOutput } from '../../../common/src/ffmpeg-helper';
+import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -92,7 +92,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
                     maxBitrate: channel.maxBitrate,
                     fps: channel.fps,
                     idrIntervalMillis: channel.idrInterval * 1000,
-                }
+                },
+                audio: {
+                    codec: 'aac',
+                },
             }
         });
 
@@ -270,7 +273,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         }
 
         if (!this.api) {
-            this.api = new ProtectApi(console.log.bind(console), console, ip, username, password);
+            this.api = new ProtectApi(() => {}, console, ip, username, password);
         }
 
         try {
