@@ -198,11 +198,14 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.detectedVcodec = session.inputVideoCodec || '';
 
     if (this.detectedAcodec !== 'aac') {
-      console.error('Detected audio codec was not AAC.')
+      console.error('Detected audio codec was not AAC.');
+      if (this.name?.indexOf('pcm') !== -1 && !reencodeAudio) {
+        log.a(`${this.name} is using PCM audio. You will need to enable Reencode Audio in Rebroadcast Settings for this stream.`);
+      }
     }
 
-    if (session.inputAudioCodec && session.inputAudioCodec !== 'h264') {
-      console.error(`${this.name} video codec is not AAC. Enable Reencode Audio if there are errors.`);
+    if (this.detectedVcodec !== 'h264') {
+      console.error(`${this.name} video codec is not h264. If there are errors, try changing your camera's encoder output.`);
     }
 
     session.events.on('killed', () => {
