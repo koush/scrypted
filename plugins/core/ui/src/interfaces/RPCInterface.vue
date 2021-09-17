@@ -5,16 +5,26 @@ export default {
   props: {
     device: undefined,
     value: Object,
-    properties: Object
+    properties: Object,
   },
   mixins: [CustomValue],
+  interfaceListener: null,
   mounted() {
     // call onChange to guarantee sane values.
     if (!this.device && !this.lazyValue.rpc) {
       this.onChange();
     }
+    if (this.device) {
+      this.interfaceListener = this.device.listen(this.$options._componentTag, () => this.refresh());
+    }
+  },
+  destroyed() {
+    this.interfaceListener?.removeListener();
   },
   methods: {
+    refresh() {
+
+    },
     rpc(options) {
       if (this.device) {
         return this.device;

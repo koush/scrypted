@@ -9,6 +9,7 @@
       :placeholder="lazyValue.placeholder"
       persistent-hint
       @change="save"
+      :class="lazyValue.description ? 'mb-2' : ''"
     ></v-checkbox>
     <v-select
       :readonly="lazyValue.readonly"
