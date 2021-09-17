@@ -297,7 +297,7 @@ addSupportedType({
 
                 let selectedStream: MediaStreamOptions;
                 if (request.type === StreamRequestTypes.RECONFIGURE) {
-                    // not impleemented
+                    // not impleemented, this doesn't work.
                     return;
 
                     // // stop for restart
@@ -380,8 +380,8 @@ addSupportedType({
                         `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
                     )
 
-                    // const probe = await probeVideoCamera(device);
-                    if (true) {//!probe.noAudio) {
+                    const probe = await probeVideoCamera(device);
+                    if (!probe.noAudio) {
                         const codec = (request as StartStreamRequest).audio.codec;
                         args.push(
                             "-vn", '-sn', '-dn',
