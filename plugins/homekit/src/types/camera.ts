@@ -34,6 +34,13 @@ async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket,
 const iframeIntervalSeconds = 4;
 const numberPrebufferSegments = 1;
 
+// request is used by the eval, do not remove.
+function evalRequest(value: string, request: any) {
+    if (value.startsWith('`'))
+        value = eval(value) as string;
+    return value.split(' ');
+}
+
 async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration): AsyncGenerator<Buffer, void, unknown> {
 
@@ -46,7 +53,7 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
 
-    const storage = deviceManager.getMixinStorage(device.id);
+    const storage = deviceManager.getMixinStorage(device.id, undefined);
     const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
 
     let audioArgs: string[];
@@ -343,25 +350,38 @@ addSupportedType({
                     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
                     const args: string[] = [];
+
+                    const storage = deviceManager.getMixinStorage(device.id, undefined);
+                    const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
+                    if (videoDecoderArguments) {
+                        args.push(...evalRequest(videoDecoderArguments, request));
+                    }
+
                     args.push(...ffmpegInput.inputArguments);
                     args.push(
                         "-an", '-sn', '-dn',
                     );
 
-                    const storage = deviceManager.getMixinStorage(device.id);
                     const transcodeStreaming = storage.getItem('transcodeStreaming') === 'true';
 
                     if (transcodeStreaming) {
+                        const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
+                        const vcodec = h264EncoderArguments
+                            ? evalRequest(h264EncoderArguments, request) :
+                            [
+                                "-vcodec", "libx264",
+                                '-pix_fmt', 'yuvj420p',
+                                "-profile:v", "high",
+                                '-color_range', 'mpeg',
+                                "-bf", "0",
+                                "-b:v", request.video.max_bit_rate.toString() + "k",
+                                "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
+                                "-maxrate", request.video.max_bit_rate.toString() + "k",
+                                "-filter:v", "fps=fps=" + request.video.fps.toString(),
+                            ];
+
                         args.push(
-                            "-vcodec", "libx264",
-                            '-pix_fmt', 'yuvj420p',
-                            "-profile:v", "high",
-                            '-color_range', 'mpeg',
-                            "-bf", "0",
-                            "-b:v", request.video.max_bit_rate.toString() + "k",
-                            "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
-                            "-maxrate", request.video.max_bit_rate.toString() + "k",
-                            "-filter:v", "fps=fps=" + request.video.fps.toString(),
+                            ...vcodec,
                         )
                     }
                     else {
@@ -498,7 +518,7 @@ addSupportedType({
 
         const accessory = makeAccessory(device);
 
-        const storage = deviceManager.getMixinStorage(device.id);
+        const storage = deviceManager.getMixinStorage(device.id, undefined);
         const detectAudio = storage.getItem('detectAudio') === 'true';
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
 

@@ -16,6 +16,8 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
     async getMixinSettings(): Promise<Setting[]> {
         const settings: Setting[] = [];
 
+        let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true';
+
         settings.push({
             title: 'Transcode Streaming',
             type: 'boolean',
@@ -31,6 +33,25 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
                 type: 'boolean',
                 value: (this.storage.getItem('transcodeRecording') === 'true').toString(),
                 description: 'Use FFMpeg to transcode recording to a format supported by HomeKit Secure Video.',
+            });
+
+            showTranscodeArgs = showTranscodeArgs || this.storage.getItem('transcodeRecording') === 'true';
+        }
+
+        if (showTranscodeArgs) {
+            settings.push({
+                title: 'Video Decoder Arguments',
+                key: "videoDecoderArguments",
+                value: this.storage.getItem('videoDecoderArguments'),
+                description: 'FFmpeg arguments used to decode input video.',
+                placeholder: '-hwaccel auto',
+            });
+            settings.push({
+                title: 'H264 Encoder Arguments',
+                key: "h264EncoderArguments",
+                value: this.storage.getItem('h264EncoderArguments'),
+                description: 'FFmpeg arguments used to encode h264 video.',
+                placeholder: '-vcodec h264_omx',
             });
         }
 
