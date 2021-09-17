@@ -1,7 +1,7 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, VideoStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput } from "@scrypted/sdk";
 import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
-import { ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
+import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 
@@ -55,10 +55,12 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     findCamera() {
         return this.protect.api.Cameras.find(camera => camera.id === this.nativeId);
     }
-    async getVideoStream(): Promise<MediaObject> {
+    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const camera = this.findCamera();
         const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled);
-        const rtspChannel = rtspChannels[0];
+
+        const rtspChannel = camera.channels.find(channel => channel.id === options?.id) || rtspChannels[0];
+        this.console.log('serving rtsp channel', rtspChannel);
 
         const { rtspAlias } = rtspChannel;
         const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
@@ -75,29 +77,35 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
                 "20000000",
                 "-i",
                 u.toString(),
-            ]
+            ],
+            mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
         });
     }
-    async getVideoStreamOptions(): Promise<VideoStreamOptions[] | void> {
+
+    createMediaStreamOptions(channel: ProtectCameraChannelConfig) {
+        const ret: MediaStreamOptions = {
+            id: channel.id,
+            name: channel.name,
+            video: {
+                codec: 'h264',
+                width: channel.width,
+                height: channel.height,
+                bitrate: channel.maxBitrate,
+                minBitrate: channel.minBitrate,
+                maxBitrate: channel.maxBitrate,
+                fps: channel.fps,
+                idrIntervalMillis: channel.idrInterval * 1000,
+            },
+            audio: {
+                codec: 'aac',
+            },
+        };
+        return ret;
+    }
+
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[] | void> {
         const camera = this.findCamera();
-        const video: VideoStreamOptions[] = camera.channels.map(channel => {
-            return {
-                video: {
-                    name: channel.name,
-                    codec: 'h264',
-                    width: channel.width,
-                    height: channel.height,
-                    bitrate: channel.maxBitrate,
-                    minBitrate: channel.minBitrate,
-                    maxBitrate: channel.maxBitrate,
-                    fps: channel.fps,
-                    idrIntervalMillis: channel.idrInterval * 1000,
-                },
-                audio: {
-                    codec: 'aac',
-                },
-            }
-        });
+        const video: MediaStreamOptions[] = camera.channels.map(channel => this.createMediaStreamOptions(channel));
 
         return video;
     }
