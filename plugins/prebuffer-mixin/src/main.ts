@@ -176,7 +176,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     }
 
     const fmp4OutputServer = createServer(socket => {
-      fragmentClientHandler(socket).catch(e => console.log('fragmented mp4 session ended', e));
+      fragmentClientHandler(socket).catch(e => console.log(this.name, 'fragmented mp4 session ended', e));
     });
     const fmp4Port = await listenZeroCluster(fmp4OutputServer);
 
@@ -197,8 +197,11 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.detectedAcodec = session.inputAudioCodec || '';
     this.detectedVcodec = session.inputVideoCodec || '';
 
-    if (this.detectedAcodec !== 'aac') {
-      console.error('Detected audio codec was not AAC.');
+    if (!this.detectedAcodec) {
+      console.warn(this.name, 'no audio detected.');
+    }
+    else if (this.detectedAcodec !== 'aac') {
+      console.error(this.name, 'Detected audio codec was not AAC.');
       if (this.name?.indexOf('pcm') !== -1 && !reencodeAudio) {
         log.a(`${this.name} is using PCM audio. You will need to enable Reencode Audio in Rebroadcast Settings for this stream.`);
       }
@@ -234,7 +237,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const session = await this.prebufferSession;
 
     // if a specific stream is requested, and it's not what we're streaming, just fall through to source.
-    if (options && options.id !== session.ffmpegInput.mediaStreamOptions?.id) {
+    if (options?.id && options.id !== session.ffmpegInput.mediaStreamOptions?.id) {
       console.log(this.name, 'rebroadcast session cant be used here', options);
       return this.mixinDevice.getVideoStream(options);
     }
