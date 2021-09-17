@@ -252,7 +252,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const server = new Server(socket => {
       server.close();
-      const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? (this.detectedIdrInterval || 4000) * 1.5 : 0);
+      const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5 : 0);
 
       const now = Date.now();
 
