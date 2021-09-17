@@ -325,11 +325,12 @@ export interface MediaStreamOptions {
   /**
    * Prebuffer time in milliseconds.
    */
+   id?: string;
+   name?: string;
    prebuffer?: number;
    container?: string;
 
    video?: {
-    name?: string;
     codec?: string;
     width?: number;
     height?: number;
