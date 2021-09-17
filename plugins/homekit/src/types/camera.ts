@@ -1,5 +1,5 @@
 
-import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom } from '@scrypted/sdk'
+import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions } from '@scrypted/sdk'
 import { addSupportedType, DummyDevice, HomeKitSession } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SnapshotRequest, SnapshotRequestCallback, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
@@ -162,7 +162,8 @@ addSupportedType({
             session.rtpSink?.destroy();
         }
 
-        const throttledTakePicture = throttle(async () => {
+
+        const takePicture = async () => {
             if (device.interfaces.includes(ScryptedInterface.Camera)) {
                 const media = await device.takePicture();
                 const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
@@ -188,7 +189,9 @@ addSupportedType({
             videoCameraPicture = device.getVideoStream().then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
 
             return videoCameraPicture;
-        }, 9000, {
+        }
+
+        const throttledTakePicture = throttle(takePicture, 9000, {
             leading: true,
             trailing: true,
         });
@@ -203,6 +206,14 @@ addSupportedType({
 
         const delegate: CameraStreamingDelegate = {
             async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
+                // console.log(device.name, 'snapshot request', request);
+
+                // non zero reason is for homekit secure video... or something else.
+                if (!request.reason) {
+                    callback(null, await takePicture());
+                    return;
+                }
+
                 try {
                     // an idle Home.app will hit this endpoint every 10 seconds, and slow requests bog up the entire app.
                     // avoid slow requests by prefetching every 9 seconds.
@@ -274,23 +285,40 @@ addSupportedType({
                     return;
                 }
 
-                
+
                 const session = sessions.get(request.sessionID);
 
                 if (!session) {
                     callback(new Error('unknown session'));
                     return;
                 }
-                if (request.type === StreamRequestTypes.RECONFIGURE) {
-                    // stop for restart
-                    session.cp?.kill();
-                    session.cp = undefined;
 
-                    // override the old values for new.
-                    if (request.video) {
-                        Object.assign(session.startRequest.video, request.video);
-                    }
-                    request = session.startRequest;
+                callback();
+
+                let selectedStream: MediaStreamOptions;
+                if (request.type === StreamRequestTypes.RECONFIGURE) {
+                    // not impleemented
+                    return;
+
+                    // // stop for restart
+                    // session.cp?.kill();
+                    // session.cp = undefined;
+
+                    // // override the old values for new.
+                    // if (request.video) {
+                    //     Object.assign(session.startRequest.video, request.video);
+                    // }
+                    // request = session.startRequest;
+
+                    // const vso = await device.getVideoStreamOptions();
+                    // // try to match by bitrate.
+                    // for (const check of vso || []) {
+                    //     selectedStream = check;
+                    //     if (check?.video?.bitrate < request.video.max_bit_rate * 1000) {
+                    //         break;
+                    //     }
+                    // }
+                    // console.log('reconfigure selected stream', selectedStream);
                 }
                 else {
                     session.startRequest = request as StartStreamRequest;
@@ -303,14 +331,12 @@ addSupportedType({
                 }, 60000));
 
 
-                callback();
-
                 const videomtu = 188 * 3;
                 const audiomtu = 188 * 1;
 
                 try {
                     console.log(device.name, 'fetching video stream');
-                    const media = await device.getVideoStream();
+                    const media = await device.getVideoStream(selectedStream);
                     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
                     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
@@ -354,13 +380,13 @@ addSupportedType({
                         `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
                     )
 
-                    const probe = await probeVideoCamera(device);
-                    if (!probe.noAudio) {
+                    // const probe = await probeVideoCamera(device);
+                    if (true) {//!probe.noAudio) {
                         const codec = (request as StartStreamRequest).audio.codec;
                         args.push(
                             "-vn", '-sn', '-dn',
                         );
-                        
+
                         if (false && !transcodeStreaming) {
                             args.push(
                                 "-acodec", "copy",
