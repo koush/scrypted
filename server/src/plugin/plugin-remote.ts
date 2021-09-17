@@ -174,6 +174,9 @@ class DeviceManagerImpl implements DeviceManager {
     getMixinStorage(id: string, nativeId?: string) {
         return new StorageImpl(this, nativeId, `mixin:${id}:`);
     }
+    async onMixinEvent(id: string, nativeId: string, eventInterface: string, eventData: any) {
+        return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);
+    }
     getNativeIds(): string[] {
         return Array.from(this.nativeIds.keys());
     }

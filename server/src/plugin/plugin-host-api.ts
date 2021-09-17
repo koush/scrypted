@@ -28,6 +28,18 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         this.pluginId = plugin._id;
     }
 
+    async onMixinEvent(id: string, nativeId: string, eventInterface: any, eventData?: any) {
+        const device = this.scrypted.findPluginDeviceById(id);
+        const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeId);
+        const mixins: string[] = getState(device, ScryptedInterfaceProperty.mixins) || [];
+        if (!mixins.includes(mixinProvider._id))
+            throw new Error(`${mixinProvider._id} is not a mixin provider for ${id}`);
+        const tableEntry = (await this.scrypted.devices[device._id].handler.mixinTable).find(entry => entry.mixinProviderId === mixinProvider._id);
+        if (!tableEntry.interfaces.includes(eventInterface))
+            throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
+        this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
+    }
+
     getMediaManager(): Promise<MediaManager> {
         return null;
     }

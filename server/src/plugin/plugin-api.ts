@@ -12,6 +12,7 @@ export interface PluginAPI {
     onDevicesChanged(deviceManifest: DeviceManifest): Promise<void>;
     onDeviceDiscovered(device: Device): Promise<void>;
     onDeviceEvent(nativeId: string, eventInterface: any, eventData?: any): Promise<void>;
+    onMixinEvent(id: string, nativeId: string, eventInterface: any, eventData?: any): Promise<void>;
     onDeviceRemoved(nativeId: string): Promise<void>;
     setStorage(nativeId: string, storage: {[key: string]: any}): Promise<void>;
 
@@ -81,6 +82,9 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
     }
     onDeviceEvent(nativeId: string, eventInterface: any, eventData?: any): Promise<void> {
         return this.api.onDeviceEvent(nativeId, eventInterface, eventData);
+    }
+    onMixinEvent(id: string, nativeId: string, eventInterface: any, eventData?: any): Promise<void> {
+        return this.api.onMixinEvent(nativeId, eventInterface, eventData);
     }
     onDeviceRemoved(nativeId: string): Promise<void> {
         return this.api.onDeviceRemoved(nativeId);
