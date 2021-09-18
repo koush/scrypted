@@ -216,7 +216,7 @@ addSupportedType({
                 // console.log(device.name, 'snapshot request', request);
 
                 // non zero reason is for homekit secure video... or something else.
-                if (!request.reason) {
+                if (request.reason) {
                     callback(null, await takePicture());
                     return;
                 }
