@@ -105,6 +105,13 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 value: localStorage.getItem('addressOverride'),
                 key: 'addressOverride',
                 description: 'Override the default network address used by the Scrypted bridge. Set this to your wired IP if connected by both wired and wireless.'
+            },
+            {
+                title: 'Never Wait for Snapshots',
+                value: (localStorage.getItem('blankSnapshots') === 'true').toString(),
+                key: 'blankSnapshots',
+                description: 'Send blank images instead of waiting snapshots. Improves up HomeKit responsiveness when bridging a large number of cameras.',
+                type: 'boolean'
             }
         ]
     }

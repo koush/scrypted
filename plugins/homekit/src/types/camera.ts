@@ -18,6 +18,7 @@ import { probeVideoCamera, ffmpegLogInitialOutput } from '@scrypted/common/src/m
 import throttle from 'lodash/throttle';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
+import fs from 'fs';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -102,8 +103,14 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
         ];
     }
 
+    // create a dummy audio track if none actually exists.
+    // this track will only be used if no audio track is available.
+    // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+    ffmpegInput.inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+
     log.i(`${device.name} motion recording starting`);
     const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs);
+
     log.i(`${device.name} motion recording started`);
     const { socket, cp, generator } = session;
     let pending: Buffer[] = [];
@@ -131,6 +138,8 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     }
 }
 
+const black = fs.readFileSync('black.jpg');
+
 addSupportedType({
     type: ScryptedDeviceType.Camera,
     probe(device: DummyDevice) {
@@ -151,8 +160,9 @@ addSupportedType({
         }
         const sessions = new Map<string, Session>();
 
-        let lastPicture = 0;
-        let videoCameraPicture: Promise<Buffer>;
+        let lastPictureTime = 0;
+        let lastPicture: Buffer;
+        let pendingPicture: Promise<Buffer>;
 
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
@@ -171,31 +181,47 @@ addSupportedType({
 
 
         const takePicture = async () => {
+            if (pendingPicture)
+                return pendingPicture;
+
             if (device.interfaces.includes(ScryptedInterface.Camera)) {
                 const media = await device.takePicture();
-                const jpeg = await mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
-                return jpeg;
+                pendingPicture = mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
+            }
+            else {
+                pendingPicture = device.getVideoStream().then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
             }
 
-            // recent conversion? use it.
-            if (videoCameraPicture && lastPicture + 60000 > Date.now()) {
-                return videoCameraPicture;
-            }
+            const wrapped = pendingPicture;
+            pendingPicture = new Promise((resolve, reject) => {
+                let timedOut = false;
+                const timeout = setTimeout(() => {
+                    timedOut = true;
+                    pendingPicture = undefined;
+                    reject(new Error('snapshot timed out'));
+                }, 60000);
 
-            // out of date? send it, nuke it to force refresh.
-            if (videoCameraPicture) {
-                videoCameraPicture.finally(async () => {
-                    videoCameraPicture = undefined;
-                });
-                return videoCameraPicture;
-            }
+                wrapped.then(picture => {
+                    if (!timedOut) {
+                        lastPictureTime = Date.now();
+                        lastPicture = picture;
+                        pendingPicture = undefined;
+                        clearTimeout(timeout);
+                        resolve(picture)
+                    }
+                })
+                    .catch(e => {
+                        if (!timedOut) {
+                            lastPictureTime = Date.now();
+                            lastPicture = undefined;
+                            pendingPicture = undefined;
+                            clearTimeout(timeout);
+                            reject(e);
+                        }
+                    })
+            });
 
-            lastPicture = Date.now();
-
-            // begin a refresh
-            videoCameraPicture = device.getVideoStream().then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
-
-            return videoCameraPicture;
+            return pendingPicture;
         }
 
         const throttledTakePicture = throttle(takePicture, 9000, {
@@ -213,15 +239,15 @@ addSupportedType({
 
         const delegate: CameraStreamingDelegate = {
             async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
-                // console.log(device.name, 'snapshot request', request);
-
-                // non zero reason is for homekit secure video... or something else.
-                if (request.reason) {
-                    callback(null, await takePicture());
-                    return;
-                }
-
                 try {
+                    // non zero reason is for homekit secure video... or something else.
+                    if (request.reason) {
+                        callback(null, await takePicture());
+                        return;
+                    }
+
+                    // console.log(device.name, 'snapshot request', request);
+
                     // an idle Home.app will hit this endpoint every 10 seconds, and slow requests bog up the entire app.
                     // avoid slow requests by prefetching every 9 seconds.
 
@@ -231,6 +257,17 @@ addSupportedType({
                     // throttle must be called twice.
                     snapshotAll();
                     snapshotAll();
+
+                    // path to return blank snapshots
+                    if (localStorage.getItem('blankSnapshots') === 'true') {
+                        if (lastPicture && lastPictureTime > Date.now() - 15000) {
+                            callback(null, lastPicture);
+                        }
+                        else {
+                            callback(null, black);
+                        }
+                        return;
+                    }
 
                     callback(null, await throttledTakePicture());
                 }

@@ -7,7 +7,6 @@ jsonSerializable.add(Object.name);
 jsonSerializable.add(Boolean.name);
 jsonSerializable.add(Array.name);
 
-let idCounter = 1;
 
 export interface RpcMessage {
     type: string;
@@ -113,7 +112,7 @@ class RpcProxy implements ProxyHandler<any> {
             args.push(this.peer.serialize(arg));
         }
 
-        const id = (idCounter++).toString();
+        const id = (this.peer.idCounter++).toString();
         const rpcApply: RpcApply = {
             type: "apply",
             id,
@@ -173,6 +172,7 @@ export interface RpcSerializer {
 }
 
 export class RpcPeer {
+    idCounter = 1;
     onOob: (oob: any) => void;
     params: { [name: string]: any } = {};
     pendingResults: { [id: string]: Deferred } = {};
@@ -212,7 +212,7 @@ export class RpcPeer {
     }
 
     eval (script: string, filename?: string, params?: { [name: string]: any }, requireProxy?: boolean): Promise<any> {
-        const id = (idCounter++).toString();
+        const id = (this.idCounter++).toString();
 
         const coercedParams: { [name: string]: any } = {};
         for (const key of Object.keys(params || {})) {
