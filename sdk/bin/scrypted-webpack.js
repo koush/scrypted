@@ -77,6 +77,7 @@ async function pack() {
                 webpackConfig = defaultWebpackConfig;
             }
 
+            process.cwd(path.dirname(webpackCmd));
             var child = spawn(webpackCmd, [
                 // "--json",
                 '--config',
@@ -88,6 +89,7 @@ async function pack() {
                 '--entry',
                 "main=" + entry,
             ], {
+                cwd,
                 env: Object.assign({},process.env, {
                     NODE_PATH,
                     SCRYPTED_DEFAULT_WEBPACK_CONFIG: defaultWebpackConfig,
@@ -103,6 +105,7 @@ async function pack() {
             });
             
             child.on('exit', function (data) {
+                process.cwd(cwd);
                 if (data)
                     return reject(new Error('webpack failed: ' + data));
             
