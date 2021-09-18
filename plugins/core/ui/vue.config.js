@@ -16,7 +16,12 @@ const proxyOpts = {
 
 module.exports = {
   productionSourceMap: false,
-
+  transpileDependencies: [
+    'vue-echarts',
+    'resize-detector',
+    'vuetify'
+  ],
+  
   // https://cli.vuejs.org/config/#css-extract
   css: {
     extract: { ignoreOrder: true },

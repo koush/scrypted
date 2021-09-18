@@ -2,6 +2,7 @@
 import BasicComponent from "../BasicComponent.vue";
 import PluginUpdate from "./PluginUpdate.vue";
 import PluginPid from "./PluginPid.vue";
+import PluginStats from "./PluginStats.vue";
 
 export default {
   mixins: [BasicComponent],
@@ -16,6 +17,8 @@ export default {
   data() {
     var self = this;
     return {
+      stats: [],
+      footer: PluginStats,
       cards: [
         {
           body: null,
@@ -43,8 +46,15 @@ export default {
     };
   },
   asyncComputed: {
+    footerModel: {
+      async get() {
+        return (await this.deviceGroups)[0].devices;
+      },
+      default: [],
+    },
     deviceGroups: {
       async get() {
+        this.stats = [];
         const ids = Object.keys(this.$store.state.systemState);
 
         const devices = [];
@@ -55,8 +65,8 @@ export default {
               return;
             const {name, type} = device;
             const pluginId = await plugins.getPluginId(device.id);
-            const packageJson = await plugins.getPackageJson(pluginId);
-            const pid = await plugins.getPluginProcessId(pluginId);
+            const pluginInfo = await plugins.getPluginInfo(pluginId);
+            const { packageJson, pid, stats }  = pluginInfo;
             const npmPackageVersion = packageJson.version;
             devices.push({
               id,
@@ -65,6 +75,7 @@ export default {
               pluginId,
               npmPackageVersion,
               pid,
+              stats,
             })
         });
 

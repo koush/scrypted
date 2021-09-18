@@ -72,8 +72,8 @@
           </DeviceTable>
         </v-card>
       </v-flex>
-      <component v-if="footer" :is="footer" />
     </v-layout>
+    <component v-if="footer" :is="footer" v-model="footerModel" />
   </div>
 </template>
 <script>

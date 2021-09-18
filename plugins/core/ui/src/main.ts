@@ -5,6 +5,7 @@ import './plugins/script2';
 import './plugins/clipboard';
 import './plugins/maps';
 import './plugins/async-computed';
+import './plugins/apexcharts';
 import App from './App.vue'
 import './registerServiceWorker'
 

@@ -19,8 +19,6 @@
   </div>
 </template>
 <script>
-import { getDeviceViewPath } from "../helpers";
-
 import { checkUpdate, installNpm } from "./plugin";
 
 export default {
