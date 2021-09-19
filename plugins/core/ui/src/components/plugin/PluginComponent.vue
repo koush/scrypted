@@ -66,7 +66,7 @@ export default {
             const {name, type} = device;
             const pluginId = await plugins.getPluginId(device.id);
             const pluginInfo = await plugins.getPluginInfo(pluginId);
-            const { packageJson, pid, stats }  = pluginInfo;
+            const { packageJson, pid, stats, rpcObjects }  = pluginInfo;
             const npmPackageVersion = packageJson.version;
             devices.push({
               id,
@@ -76,6 +76,7 @@ export default {
               npmPackageVersion,
               pid,
               stats,
+              rpcObjects,
             })
         });
 

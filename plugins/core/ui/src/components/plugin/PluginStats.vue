@@ -20,6 +20,16 @@
         :series="memorySeries"
       />
     </v-flex>
+    <v-flex xs12 md6>
+      <Stats
+        v-if="objectInteresting.length"
+        :interesting="objectInteresting"
+        v-model="value"
+        label="RPC Objects"
+        :labels="objectLabels"
+        :series="objectSeries"
+      />
+    </v-flex>
   </v-layout>
 </template>
 
@@ -49,12 +59,16 @@ export default {
     },
     cpuSeries() {
       const series = this.cpuInteresting
-        .map((device) => Math.round((device.stats.cpu.system + device.stats.cpu.user) / 1000000))
+        .map((device) =>
+          Math.round(
+            (device.stats.cpu.system + device.stats.cpu.user) / 1000000
+          )
+        )
         .sort();
       return series;
     },
     memoryInteresting() {
-      const cpu = this.value
+      const memory = this.value
         .slice()
         .sort(
           (d1, d2) =>
@@ -62,7 +76,7 @@ export default {
         )
         .reverse()
         .slice(0, 10);
-      return cpu;
+      return memory;
     },
     memoryLabels() {
       return this.memoryInteresting.map((device) => device.name);
@@ -70,6 +84,23 @@ export default {
     memorySeries() {
       const series = this.memoryInteresting
         .map((device) => Math.round(device.stats.memoryUsage.heapTotal / 1000000))
+        .sort();
+      return series;
+    },
+    objectInteresting() {
+      const objects = this.value
+        .slice()
+        .sort((d1, d2) => d1.rpcObjects - d2.rpcObjects)
+        .reverse()
+        .slice(0, 10);
+      return objects;
+    },
+    objectLabels() {
+      return this.objectInteresting.map((device) => device.name);
+    },
+    objectSeries() {
+      const series = this.objectInteresting
+        .map((device) => device.rpcObjects)
         .sort();
       return series;
     },
