@@ -1,4 +1,6 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput } from "@scrypted/sdk";
+import { KeyObject } from "crypto";
+import { EventEmitter } from "stream";
 const { log, deviceManager, mediaManager } = sdk;
 
 export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
@@ -96,7 +98,32 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
     }
 }
 
+export interface Destroyable {
+    destroy(): void ;
+}
+
 export abstract class RtspSmartCamera extends RtspCamera {
+    constructor(nativeId?: string) {
+        super(nativeId);
+        this.listenLoop();
+    }
+
+    listener: EventEmitter & Destroyable;
+
+    listenLoop() {
+        this.listener = this.listenEvents();
+        this.listener.on('error', e => {
+            this.console.error('listen loop error, restarting in 10 seconds', e);
+            setTimeout(() => this.listenLoop(), 10000);
+        });
+    }
+
+    async putSetting(key: string, value: string | number) {
+        super.putSetting(key, value);
+
+        this.listener.emit('error', new Error("new settings"));
+    }
+
     async getUrlSettings() {
         const constructed = await this.getConstructedStreamUrl();
         return [
@@ -131,6 +158,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 
     abstract getConstructedStreamUrl(): Promise<string>;
+    abstract listenEvents(): EventEmitter & Destroyable;
 
     getRtspAddress() {
         return `${this.storage.getItem('ip')}:${this.storage.getItem('rtspPort') || 554}`;
@@ -142,6 +170,17 @@ export abstract class RtspSmartCamera extends RtspCamera {
 }
 
 export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
+    devices = new Map<string, any>();
+
+    constructor(nativeId?: string) {
+        super(nativeId);
+
+        for (const camId of deviceManager.getNativeIds()) {
+            if (camId)
+                this.getDevice(camId);
+        }
+    }
+
     async getSettings(): Promise<Setting[]> {
         return [
             {
@@ -178,7 +217,18 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
     async discoverDevices(duration: number) {
     }
 
-    getDevice(nativeId: string): object {
+    createCamera(nativeId: string): RtspCamera{
         return new RtspCamera(nativeId);
+
+    }
+
+    getDevice(nativeId: string) {
+        let ret = this.devices.get(nativeId);
+        if (!ret) {
+            ret = this.createCamera(nativeId);
+            if (ret)
+                this.devices.set(nativeId, ret);
+        }
+        return ret;
     }
 }
