@@ -1,5 +1,5 @@
 import { once } from 'events';
-import { PassThrough, Readable } from 'stream';
+import { EventEmitter, PassThrough, Readable } from 'stream';
 import { Form } from 'multiparty';
 import AxiosDigestAuth from '@mhoc/axios-digest-auth';
 
@@ -68,44 +68,24 @@ export class HikVisionCameraAPI {
         return Buffer.from(response.data);
     }
 
-    async* listenEvents() {
+    async listenEvents() {
         const response = await this.digestAuth.request({
             method: "GET",
             url: `http://${this.ip}/ISAPI/Event/notification/alertStream`,
             responseType: 'stream',
         });
-        const stream = response.data;
+        const stream = response.data as Readable;
 
-        const form = new Form();
-
-        try {
-            // massage this so the parser doesn't fail on a bad content type
-            stream.headers['content-type'] = stream.headers['content-type'].replace('multipart/mixed', 'multipart/form-data');
-            form.parse(stream);
-            form.on('close', () => form.emit('error', new Error('listener closed')));
-            stream.on('error', (e: Error) => form.emit('error', e));
-
-            while (true) {
-                const [part] = await once(form, 'part');
-                const e = (err: Error) => part.emit('error', err);
-                const c = () => part.emit('error', new Error('form closed'));
-                try {
-                    stream.on('error', e);
-                    stream.on('end', c);
-                    stream.on('close', c);
-                    const event = await readEvent(part);
-                    if (event)
-                        yield event;
-                }
-                finally {
-                    stream.removeListener('error', e);
-                    stream.removeListener('end', c);
-                    stream.removeListener('close', c);
+        stream.on('data', (buffer: Buffer) => {
+            const data = buffer.toString();
+            console.log('camera event', data);
+            for (const event of Object.values(HikVisionCameraEvent)) {
+                if (data.indexOf(event) !== -1) {
+                    stream.emit('event', event);
                 }
             }
-        }
-        finally {
-            stream.destroy();
-        }
+        });
+
+        return stream;
     }
 }

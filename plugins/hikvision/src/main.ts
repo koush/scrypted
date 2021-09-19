@@ -1,48 +1,47 @@
 import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
-import { Stream } from "stream";
+import { EventEmitter, Stream } from "stream";
 import { HikVisionCameraAPI } from "./hikvision-camera-api";
-import { RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
+import { Destroyable, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
 import { HikVisionCameraEvent } from "./hikvision-camera-api";
+import { removeListener } from "process";
 const { mediaManager } = sdk;
 
-
 class HikVisionCamera extends RtspSmartCamera implements Camera {
-    eventStream: Stream;
-    motionTimeout: NodeJS.Timeout;
-
-    constructor(nativeId: string) {
-        super(nativeId);
-
-        this.createMotionStream();
-    }
-
-    async createMotionStream() {
-        while (true) {
+    listenEvents() {
+        let motionTimeout: NodeJS.Timeout;
+        const ret = new EventEmitter() as (EventEmitter & Destroyable);
+        ret.destroy = () => {
+        };
+        (async () => {
+            const api = this.createClient();
             try {
-                this.motionDetected = false;
-                this.audioDetected = false;
+                const events = await api.listenEvents();
+                ret.destroy = () => {
+                    events.removeAllListeners();
+                    events.destroy();
+                };
 
-                const api = this.createClient();
-                for await (const event of api.listenEvents()) {
+                events.on('close', () => ret.emit('error', new Error('close')));
+                events.on('error', e => ret.emit('error', e));
+                events.on('event', (event: HikVisionCameraEvent) => {
                     if (event === HikVisionCameraEvent.MotionDetected) {
                         this.motionDetected = true;
-                        clearTimeout(this.motionTimeout);
-                        this.motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
+                        clearTimeout(motionTimeout);
+                        motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
                     }
-                }
+                })
             }
             catch (e) {
-                this.console.error('event listener failure', e);
-                await new Promise(resolve => setTimeout(resolve, 10000));
-                this.console.log('reconnecting to event stream...');
+                ret.emit('error', e);
             }
-        }
+        })();
+        return ret;
     }
 
     createClient() {
         const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword());
 
-        (async() => {
+        (async () => {
             const streamSetup = await client.checkStreamSetup();
             if (streamSetup.videoCodecType !== 'H.264') {
                 this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
@@ -72,7 +71,7 @@ class HikVisionProvider extends RtspProvider {
         ];
     }
 
-    getDevice(nativeId: string): object {
+    createCamera(nativeId: string) {
         return new HikVisionCamera(nativeId);
     }
 }
