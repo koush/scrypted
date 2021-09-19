@@ -18,6 +18,7 @@ export class Plugin extends ScryptedDocument {
 export class ScryptedUser extends ScryptedDocument {
     passwordDate: number;
     passwordHash: string;
+    token: string;
     salt: string;
 }
 

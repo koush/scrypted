@@ -67,9 +67,14 @@ export class PluginComponent {
     async getPluginInfo(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
         const host = this.scrypted.plugins[pluginId];
+        let rpcObjects = 0;
+        if (host.peer) {
+            rpcObjects = host.peer.localProxied.size + Object.keys(host.peer.remoteWeakProxies).length;
+        }
         return {
             pid: host?.worker?.process.pid,
             stats: host?.stats,
+            rpcObjects,
             packageJson: plugin.packageJson,
             id: this.scrypted.findPluginDevice(pluginId),
         }

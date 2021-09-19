@@ -18,11 +18,11 @@ import cookieParser from 'cookie-parser';
 import axios from 'axios';
 import qs from 'query-string';
 import { RPCResultError } from './rpc';
-import child_process from 'child_process';
-import os from 'os';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import { install as installSourceMapSupport } from 'source-map-support';
+import httpAuth from 'http-auth';
+
 
 installSourceMapSupport();
 
@@ -106,6 +106,24 @@ else {
             certSetting = await db.upsert(certSetting);
         }
 
+
+        const basicAuth = httpAuth.basic({
+            realm: 'Scrypted',
+        }, async (username, password, callback) => {
+            const user = await db.tryGet(ScryptedUser, username);
+            if (!user) {
+                callback(false);
+                return;
+            }
+
+            const salted = user.salt + password;
+            const hash = crypto.createHash('sha256');
+            hash.update(salted);
+            const sha = hash.digest().toString('hex');
+
+            callback(sha === user.passwordHash || password === user.token);
+        });
+
         const keys = certSetting.value;
         const secure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, app).listen(SCRYPTED_SECURE_PORT);
         const insecure = http.createServer(app).listen(SCRYPTED_INSECURE_PORT);
@@ -133,6 +151,16 @@ else {
                 }
 
                 res.locals.username = username;
+            }
+            else if (req.protocol === 'https' && req.headers.authorization) {
+                const basicChecker = basicAuth.check((req) => {
+                    res.locals.username = req.user;
+                    next();
+                });
+
+                // this automatically handles unauthorized.
+                basicChecker(req, res);
+                return;
             }
             next();
         });
@@ -253,6 +281,7 @@ else {
             const timestamp = Date.now();
 
             if (hasLogin) {
+
                 const user = await db.tryGet(ScryptedUser, username);
                 if (!user) {
                     res.send({
@@ -319,6 +348,28 @@ else {
         });
 
         app.get('/login', async (req, res) => {
+            if (req.protocol === 'https' && req.headers.authorization) {
+                const username = await new Promise(resolve => {
+                    const basicChecker = basicAuth.check((req) => {
+                        resolve(req.user);
+                    });
+
+                    // this automatically handles unauthorized.
+                    basicChecker(req, res);
+                });
+
+                const user = await db.tryGet(ScryptedUser, username);
+                if (!user.token) {
+                    user.token = crypto.randomBytes(16).toString('hex');
+                    await db.upsert(user);
+                }
+                res.send({
+                    username,
+                    token: user.token,
+                });
+                return;
+            }
+
             const hasLogin = await db.getCount(ScryptedUser) > 0;
             const { login_user_token } = req.signedCookies;
             if (!login_user_token) {
