@@ -53,12 +53,21 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     });
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
-
     const storage = deviceManager.getMixinStorage(device.id, undefined);
     const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
 
+    const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
+
+    if (noAudio) {
+        console.log(device.name, 'adding dummy audio track');
+        // create a dummy audio track if none actually exists.
+        // this track will only be used if no audio track is available.
+        // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+        ffmpegInput.inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+    }
+
     let audioArgs: string[];
-    if (transcodeRecording) {
+    if (noAudio || transcodeRecording) {
         audioArgs = [
             '-bsf:a', 'aac_adtstoasc',
             '-acodec', 'libfdk_aac',
@@ -102,11 +111,6 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
             // '-frag_duration', `${configuration.mediaContainerConfiguration.fragmentLength * 1000}`,
         ];
     }
-
-    // create a dummy audio track if none actually exists.
-    // this track will only be used if no audio track is available.
-    // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-    ffmpegInput.inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
 
     log.i(`${device.name} motion recording starting`);
     const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs);
