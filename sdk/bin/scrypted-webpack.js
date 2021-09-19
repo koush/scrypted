@@ -62,7 +62,10 @@ var zip = new AdmZip();
 
 const NODE_PATH = path.resolve(__dirname, '..', 'node_modules');
 
-process.chdir(__dirname);
+// hack to override NODE_PATH dynamically.
+// otherwise webpack plugins are not found.
+process.env.NODE_PATH = NODE_PATH;
+require('module').Module._initPaths();
 
 async function pack() {
     if (out)
@@ -100,44 +103,6 @@ async function pack() {
                 console.log(runtime.output);
                 resolve();
             })
-
-            // var child = spawn('webpack-cli', [
-            //     // "--json",
-            //     '--config',
-            //     webpackConfig,
-            //     '--output-path',
-            //     out,
-            //     '--output-filename',
-            //     runtime.output,
-            //     '--entry',
-            //     "main=" + entry,
-            // ], {
-            //     env: Object.assign({},process.env, {
-            //         NODE_PATH,
-            //         SCRYPTED_DEFAULT_WEBPACK_CONFIG: defaultWebpackConfig,
-            //     }),
-            // });
-
-            // child.stdout.on('data', function (data) {
-            //     process.stdout.write(data);
-            // });
-
-            // child.stderr.on('data', function (data) {
-            //     process.stdout.write(data);
-            // });
-
-            // child.on('exit', function (data) {
-            //     if (data)
-            //         return reject(new Error('webpack failed: ' + data));
-
-            //     // create a zip that has a main.js in the root, and an fs folder containing a read only virtual file system.
-            //     // todo: read write file system? seems like a potential sandbox and backup nightmare to do a real fs. scripts should
-            //     // use localStorage, etc?
-            //     zip.addLocalFile(path.join(out, runtime.output));
-            //     console.log(runtime.output);
-            //     resolve();
-            // });
-
         });
     }
 
