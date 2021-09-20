@@ -1,9 +1,8 @@
-
 const types = require("!!raw-loader!@scrypted/sdk/types.d.ts");
 const sdk = require("!!raw-loader!@scrypted/sdk/index.d.ts");
 const client = require("!!raw-loader!./mqtt-client.ts");
 
-function monacoEvalDefaultsFunction(monaco) {
+function monacoEvalDefaultsFunction(monaco, types, sdk, client) {
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
         Object.assign(
             {},
@@ -49,6 +48,8 @@ const types = \`${types}\`;
 const sdk = \`${sdk}\`;
 const client = \`${client}\`;
 
-return ${monacoEvalDefaultsFunction};
+return (monaco) => {
+    (${monacoEvalDefaultsFunction})(monaco, types, sdk, client);
+} 
 })();
 `;
