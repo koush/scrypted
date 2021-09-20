@@ -15,7 +15,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         (async () => {
             const api = this.createClient();
             try {
-                const events = await api.listenEvents();
+                const events = await api.listenEvents(this.isAnalogueCamera(), this.getRtspChannel());
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();
@@ -55,7 +55,66 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     async takePicture(): Promise<MediaObject> {
         const api = this.createClient();
-        return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
+        return mediaManager.createMediaObject(api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
+    }
+
+    async getSettings() {
+        return [
+            ...await this.getUrlSettings(),
+            {
+                key: 'isAnalogueCamera',
+                title: 'Is this an analogue camera?',
+                description: 'Turn this on if you are using ip cameras. This will use the URL override, channel, and URL parameters to construct the RTSP stream URL.',
+                type: 'boolean',
+                value: this.storage.getItem('isAnalogueCamera'),
+            },
+            {
+                key: 'rtspChannel',
+                title: 'Channel number',
+                description: "What channel does this camera use?",
+                placeholder: '1/2/3/etc.',
+                value: this.storage.getItem('rtspChannel'),
+            },
+            {
+                key: 'rtspUrlParams',
+                title: 'RTSP URL Params Override',
+                description: "Override the RTSP URL parameters - ?transportmode=unicast&...",
+                placeholder: '?transportmode=unicast&...',
+                value: this.storage.getItem('rtspUrlParams'),
+            },
+        ]
+    }
+
+    isAnalogueCamera() {
+        return this.storage.getItem('isAnalogueCamera') === 'true';
+    }
+
+    getRtspChannel() {
+        return this.storage.getItem('rtspChannel') || ''
+    }
+
+    getRtspUrl() {
+        return this.storage.getItem('rtspUrlOverride')
+    }
+
+    getRtspUrlParams() {
+        return this.storage.getItem('rtspUrlParams') || '?transportmode=unicast'
+    }
+
+    getAnalogueCameraUrl() {
+        const channel = this.getRtspChannel()
+        const url = this.getRtspUrl()
+        const params = this.getRtspUrlParams()
+
+        return `${url}/${channel}01/${params}`
+    }
+
+    getRtspUrlOverride() {
+        if (this.isAnalogueCamera() && !!this.getRtspChannel()) {
+            return this.getAnalogueCameraUrl()
+        }
+
+        return this.getRtspUrl()
     }
 
     async getConstructedStreamUrl() {

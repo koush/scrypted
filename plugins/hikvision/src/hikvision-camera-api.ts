@@ -8,21 +8,6 @@ export enum HikVisionCameraEvent {
     VideoLoss = "<eventType>videoloss</eventType>",
 }
 
-async function readEvent(readable: Readable): Promise<HikVisionCameraEvent | void> {
-    const pt = new PassThrough();
-    readable.pipe(pt);
-    const buffers: Buffer[] = [];
-    for await (const buffer of pt) {
-        buffers.push(buffer);
-        const data = Buffer.concat(buffers).toString();
-        for (const event of Object.values(HikVisionCameraEvent)) {
-            if (data.indexOf(event) !== -1) {
-                return event;
-            }
-        }
-    }
-    console.log('unhandled', Buffer.concat(buffers).toString());
-}
 
 export interface HikVisionCameraStreamSetup {
     videoCodecType: string;
@@ -58,17 +43,21 @@ export class HikVisionCameraAPI {
     }
 
 
-    async jpegSnapshot(): Promise<Buffer> {
+    async jpegSnapshot(channel: string): Promise<Buffer> {
+        const url = channel
+            ? `http://${this.ip}/ISAPI/Streaming/channels/${channel}01/picture?snapShotImageType=JPEG`
+            : `http://${this.ip}/ISAPI/Streaming/channels/101/picture?snapShotImageType=JPEG`
+
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'arraybuffer',
-            url: `http://${this.ip}/ISAPI/Streaming/channels/101/picture?snapShotImageType=JPEG`,
+            url: url,
         });
 
         return Buffer.from(response.data);
     }
 
-    async listenEvents() {
+    async listenEvents(isAnalogueCamera = false, channel: string) {
         const response = await this.digestAuth.request({
             method: "GET",
             url: `http://${this.ip}/ISAPI/Event/notification/alertStream`,
@@ -78,10 +67,11 @@ export class HikVisionCameraAPI {
 
         stream.on('data', (buffer: Buffer) => {
             const data = buffer.toString();
-            console.log('camera event', data);
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
-                    stream.emit('event', event);
+                    isAnalogueCamera && channel
+                        ? data.indexOf(`<channelID>${channel}</channelID>`) !== -1 && stream.emit('event', event)
+                        : stream.emit('event', event)
                 }
             }
         });
