@@ -55,6 +55,16 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
             });
         }
 
+        settings.push({
+            title: 'Linked Motion Sensor',
+            key: 'linkedMotionSensor',
+            type: 'device:interfaces.includes("MotionSensor")',
+            value: this.storage.getItem('linkedMotionSensor') || null,
+            placeholder: this.providedInterfaces.includes(ScryptedInterface.MotionSensor)
+                ? 'Built-In Motion Sensor' : 'None',
+            description: "Link motion sensor used to trigger HomeKit Secure Video recordings.",
+        })
+
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.AudioSensor)) {
             settings.push({
                 title: 'Audio Activity Detection',
@@ -69,9 +79,9 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
     }
 
     async putMixinSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem(key, value.toString());
-        if (key === 'detectAudio') {
-            log.a('You must reload the HomeKit plugin for this change to take effect.');
+        this.storage.setItem(key, value?.toString());
+        if (key === 'detectAudio' || key === 'linkedMotionSensor') {
+            log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);
         }
     }
 }

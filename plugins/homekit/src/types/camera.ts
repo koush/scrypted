@@ -20,7 +20,7 @@ import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
 import fs from 'fs';
 
-const { log, mediaManager, deviceManager } = sdk;
+const { log, mediaManager, deviceManager, systemManager } = sdk;
 
 async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket, port: number }> {
     const socket = dgram.createSocket(socketType || 'udp4');
@@ -45,7 +45,7 @@ function evalRequest(value: string, request: any) {
 async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration): AsyncGenerator<Buffer, void, unknown> {
 
-    console.log('recording session starting', configuration);
+    console.log(device.name, 'recording session starting', configuration);
 
     const media = await device.getVideoStream({
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
@@ -576,8 +576,9 @@ addSupportedType({
         const storage = deviceManager.getMixinStorage(device.id, undefined);
         const detectAudio = storage.getItem('detectAudio') === 'true';
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
+        const linkedMotionSensor = storage.getItem('linkedMotionSensor');
 
-        if (device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
+        if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
                 handleFragmentsRequests(configuration): AsyncGenerator<Buffer, void, unknown> {
                     return handleFragmentsRequests(device, configuration)
@@ -640,9 +641,14 @@ addSupportedType({
         accessory.configureController(controller);
 
         if (controller.motionService) {
+            const motionDevice = systemManager.getDeviceById<MotionSensor & AudioSensor>(linkedMotionSensor) || device;
+            if (!motionDevice) {
+                return;
+            }
+
             const motionDetected = needAudioMotionService ?
-                () => device.audioDetected || device.motionDetected :
-                () => !!device.motionDetected;
+                () => motionDevice.audioDetected || motionDevice.motionDetected :
+                () => !!motionDevice.motionDetected;
 
             const service = controller.motionService;
             service.getCharacteristic(Characteristic.MotionDetected)
@@ -650,7 +656,7 @@ addSupportedType({
                     callback(null, motionDetected());
                 });
 
-            device.listen({
+            motionDevice.listen({
                 event: ScryptedInterface.MotionSensor,
                 watch: false,
             }, (eventSource, eventDetails, data) => {
@@ -658,7 +664,7 @@ addSupportedType({
             });
 
             if (needAudioMotionService) {
-                device.listen({
+                motionDevice.listen({
                     event: ScryptedInterface.AudioSensor,
                     watch: false,
                 }, (eventSource, eventDetails, data) => {
