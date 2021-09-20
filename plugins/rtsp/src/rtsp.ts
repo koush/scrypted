@@ -71,7 +71,6 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
 
     async getSettings(): Promise<Setting[]> {
         return [
-            ...await this.getUrlSettings(),
             {
                 key: 'username',
                 title: 'Username',
@@ -89,7 +88,8 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
                 description: 'Enable this setting if the stream does not have audio or to mute audio.',
                 type: 'boolean',
                 value: (this.isAudioDisabled()).toString(),
-            }
+            },
+            ...await this.getUrlSettings(),
         ];
     }
 

@@ -58,9 +58,9 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return mediaManager.createMediaObject(api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
     }
 
-    async getSettings() {
+    async getUrlSettings() {
         return [
-            ...await this.getUrlSettings(),
+            ...await super.getUrlSettings(),
             {
                 key: 'rtspChannel',
                 title: 'Channel number',
@@ -77,7 +77,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
             },
         ]
     }
-
+    
     getRtspChannel() {
         return this.storage.getItem('rtspChannel');
     }
