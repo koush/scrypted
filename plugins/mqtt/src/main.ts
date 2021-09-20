@@ -28,7 +28,7 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
     client: Client;
     handler: any;
     pathname: string;
-    
+
     constructor(nativeId: string) {
         super(nativeId);
 
@@ -246,15 +246,22 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
         this.netServer?.close();
 
         if (this.storage.getItem('enableBroker') !== 'true')
-        return;
-            const instance = aedes();
-            this.netServer = net.createServer(instance.handle);
-            const tcpPort = parseInt(this.storage.getItem('tcpPort')) || 1883;
-            const httpPort = parseInt(this.storage.getItem('httpPort')) || 8888;
-            this.netServer.listen(tcpPort);
-            this.httpServer = http.createServer();
-            ws.createServer({ server: this.httpServer}).on('connection', instance.handle);
-            this.httpServer.listen(httpPort);
+            return;
+        const instance = aedes();
+        this.netServer = net.createServer(instance.handle);
+        const tcpPort = parseInt(this.storage.getItem('tcpPort')) || 1883;
+        const httpPort = parseInt(this.storage.getItem('httpPort')) || 8888;
+        this.netServer.listen(tcpPort);
+        this.httpServer = http.createServer();
+        ws.createServer({ server: this.httpServer }).on('connection', instance.handle);
+        this.httpServer.listen(httpPort);
+
+        instance.on('publish', packet => {
+            if (!packet.payload)
+                return;
+            const preview = packet.payload.length > 512 ? '[large payload suppressed]' : packet.payload.toString();
+            this.console.log('mqtt message', packet.topic, preview);
+        });
     }
 
     async putSetting(key: string, value: string | number) {
