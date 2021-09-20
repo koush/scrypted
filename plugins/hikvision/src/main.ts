@@ -15,7 +15,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         (async () => {
             const api = this.createClient();
             try {
-                const events = await api.listenEvents(this.getRtspChannel());
+                const events = await api.listenEvents();
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();
@@ -39,7 +39,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
     }
 
     createClient() {
-        const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword());
+        const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel());
 
         (async () => {
             const streamSetup = await client.checkStreamSetup();
@@ -55,7 +55,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     async takePicture(): Promise<MediaObject> {
         const api = this.createClient();
-        return mediaManager.createMediaObject(api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
+        return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
     }
 
     async getUrlSettings() {

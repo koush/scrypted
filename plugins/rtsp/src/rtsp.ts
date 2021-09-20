@@ -130,7 +130,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
             {
                 key: 'ip',
                 title: 'Address',
-                placeholder: '192.168.1.100',
+                placeholder: '192.168.1.100[:554]',
                 value: this.storage.getItem('ip'),
             },
             {
@@ -161,7 +161,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
     abstract listenEvents(): EventEmitter & Destroyable;
 
     getRtspAddress() {
-        return `${this.storage.getItem('ip')}:${this.storage.getItem('rtspPort') || 554}`;
+        return this.storage.getItem('ip');
     }
 
     async getStreamUrl() {

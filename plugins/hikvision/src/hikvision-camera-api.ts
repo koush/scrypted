@@ -17,7 +17,7 @@ export interface HikVisionCameraStreamSetup {
 export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
 
-    constructor(public ip: string, username: string, password: string) {
+    constructor(public ip: string, username: string, password: string, public channel?: string) {
         this.digestAuth = new AxiosDigestAuth({
             username,
             password,
@@ -43,9 +43,9 @@ export class HikVisionCameraAPI {
     }
 
 
-    async jpegSnapshot(channel: string): Promise<Buffer> {
-        const url = channel
-            ? `http://${this.ip}/ISAPI/Streaming/channels/${channel}01/picture?snapShotImageType=JPEG`
+    async jpegSnapshot(): Promise<Buffer> {
+        const url = this.channel
+            ? `http://${this.ip}/ISAPI/Streaming/channels/${this.channel}01/picture?snapShotImageType=JPEG`
             : `http://${this.ip}/ISAPI/Streaming/channels/101/picture?snapShotImageType=JPEG`
 
         const response = await this.digestAuth.request({
@@ -57,7 +57,7 @@ export class HikVisionCameraAPI {
         return Buffer.from(response.data);
     }
 
-    async listenEvents(channel?: string) {
+    async listenEvents() {
         const response = await this.digestAuth.request({
             method: "GET",
             url: `http://${this.ip}/ISAPI/Event/notification/alertStream`,
@@ -69,7 +69,7 @@ export class HikVisionCameraAPI {
             const data = buffer.toString();
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
-                    if (channel && data.indexOf(`<channelID>${channel}</channelID>`) === -1)
+                    if (this.channel && data.indexOf(`<channelID>${this.channel}</channelID>`) === -1)
                         continue;
                     stream.emit('event', event);
                 }
