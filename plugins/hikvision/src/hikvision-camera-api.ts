@@ -28,7 +28,7 @@ export class HikVisionCameraAPI {
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'text',
-            url: `http://${this.ip}/ISAPI/Streaming/channels/${this.channel || '101'}/capabilities`,
+            url: `http://${this.ip}/ISAPI/Streaming/channels/${this.getChannel()}/capabilities`,
         });
 
         // this is bad:
@@ -42,9 +42,12 @@ export class HikVisionCameraAPI {
         }
     }
 
+    getChannel() {
+        return this.channel || '101';
+    }
 
     async jpegSnapshot(): Promise<Buffer> {
-        const url = `http://${this.ip}/ISAPI/Streaming/channels/${this.channel || '101'}/picture?snapShotImageType=JPEG`
+        const url = `http://${this.ip}/ISAPI/Streaming/channels/${this.getChannel()}/picture?snapShotImageType=JPEG`
 
         const response = await this.digestAuth.request({
             method: "GET",
