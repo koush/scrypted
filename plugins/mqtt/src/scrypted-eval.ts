@@ -32,7 +32,6 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, p
             device,
         });
 
-
         try {
             const f = vm.compileFunction(compiled, Object.keys(allParams), {
                 filename: 'script.js',

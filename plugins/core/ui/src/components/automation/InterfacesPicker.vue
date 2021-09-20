@@ -1,7 +1,7 @@
 <template>
   <Grower v-model="lazyValue" :empty="unassigned" @input="onInput">
     <template v-slot:default="slotProps">
-      <InterfacePicker :testDevice="testDevice" :interfaces="interfaces" v-model="slotProps.item" @input="slotProps.onInput"></InterfacePicker>
+      <InterfacePicker :interfaces="interfaces" v-model="slotProps.item" @input="slotProps.onInput"></InterfacePicker>
     </template>
   </Grower>
 </template>
@@ -15,7 +15,6 @@ export default {
   props: {
     name: String,
     interfaces: Array,
-    testDevice: Object,
   },
   mixins: [CustomValue],
   components: {

@@ -14,9 +14,6 @@
       ></Select2>
 
       <component
-        :testDevice="
-          lazyValue.selected.component === 'Javascript' ? testDevice : undefined
-        "
         :is="lazyValue.selected.component"
         :properties="lazyValue.selected.properties"
         v-model="lazyValue.model"
@@ -34,7 +31,7 @@ import Unassigned from "../../interfaces/Unassigned.vue";
 
 import Condition from "../../interfaces/automation/Condition.vue";
 import Timer from "../../interfaces/automation/Timer.vue";
-import Javascript from "../../interfaces/automation/Javascript.vue";
+import Scriptable from "../../interfaces/automation/Scriptable.vue";
 
 import EventListener from "../../interfaces/EventListener.vue";
 import OnOff from "../../interfaces/OnOff.vue";
@@ -69,7 +66,6 @@ export default {
       type: Object,
       default: unassigned,
     },
-    testDevice: Object,
   },
   mixins: [CustomValue],
   components: {
@@ -78,7 +74,7 @@ export default {
 
     Condition,
     Timer,
-    Javascript,
+    Scriptable,
 
     EventListener,
     OnOff,

@@ -1,12 +1,20 @@
 <template>
   <v-layout wrap>
-    <v-flex xs12 v-if="deviceComponent && deviceComponent === 'Script'">
+    <!-- <v-flex xs12 v-if="deviceComponent && deviceComponent === 'Script'">
       <component
         @save="saveStorage"
         :is="deviceComponent"
         v-model="deviceData"
         :id="id"
         ref="componentCard"
+      ></component>
+    </v-flex> -->
+
+    <v-flex v-for="iface in noCardAboveInterfaces" :key="iface">
+      <component
+        :value="deviceState"
+        :device="device"
+        :is="iface"
       ></component>
     </v-flex>
 
@@ -428,6 +436,7 @@ import TemperatureSetting from "../interfaces/TemperatureSetting.vue";
 import PositionSensor from "../interfaces/sensors/PositionSensor.vue";
 import DeviceProvider from "../interfaces/DeviceProvider.vue";
 import MixinProvider from "../interfaces/MixinProvider.vue";
+import Scriptable from "../interfaces/automation/Scriptable.vue";
 import Storage from "../common/Storage.vue";
 import { checkUpdate } from "./plugin/plugin";
 import AggregateDevice from "./aggregate/AggregateDevice.vue";
@@ -459,6 +468,7 @@ const cardUnderInterfaces = [
 ];
 
 const noCardInterfaces = [ScryptedInterface.Settings];
+const noCardAboveInterfaces = [ScryptedInterface.Scriptable];
 
 const cardInterfaces = [
   ScryptedInterface.Brightness,
@@ -556,6 +566,7 @@ export default {
     Automation,
     Program,
     Script,
+    Scriptable,
   },
   data() {
     return this.initialState();
@@ -775,6 +786,7 @@ export default {
     noCardInterfaces: filterInterfaces(noCardInterfaces),
     cardUnderInterfaces: filterInterfaces(cardUnderInterfaces),
     cardHeaderInterfaces: filterInterfaces(cardHeaderInterfaces),
+    noCardAboveInterfaces: filterInterfaces(noCardAboveInterfaces),
     inferredTypes() {
       return inferTypesFromInterfaces(
         this.device.type,

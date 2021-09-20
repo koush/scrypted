@@ -1,4 +1,4 @@
-import { EventDetails, EventListenerOptions, EventListenerRegister, Javascript, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface } from "@scrypted/sdk";
+import { EventDetails, EventListenerRegister, OnOff, ScryptedDevice, ScryptedDeviceBase } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import { AutomationJavascript } from "./builtins/javascript";
 import { Scheduler } from "./builtins/scheduler";
@@ -6,7 +6,7 @@ import { Listen } from "./builtins/listen";
 import { scryptedEval } from "./scrypted-eval";
 const { systemManager } = sdk;
 
-export class Automation extends ScryptedDeviceBase implements OnOff, Javascript {
+export class Automation extends ScryptedDeviceBase implements OnOff {
     registers: EventListenerRegister[] = [];
 
     constructor(nativeId: string) {
@@ -53,18 +53,18 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Javascript 
                     const parts = action.id.split('#');
                     const id = parts[0];
 
-                    let device: any;
-                    if (id === 'javascript') {
-                        device = new AutomationJavascript(this, eventSource, eventDetails, eventData);
+                    if (id === 'scriptable') {
+                        const script = new AutomationJavascript(this, eventSource, eventDetails, eventData);
+                        script.run(action.model['script.ts'])
                     }
                     else {
-                        device = systemManager.getDeviceById(id);
+                        const device = systemManager.getDeviceById(id);
                         if (!device)
                             throw new Error(`unknown trigger ${action.id}`);
-                    }
 
-                    const { rpc } = action.model;
-                    device[rpc.method](...rpc.parameters || []);
+                            const { rpc } = action.model;
+                            device[rpc.method](...rpc.parameters || []);
+                    }
                 }
             }
 
