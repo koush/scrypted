@@ -227,6 +227,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
                 placeholder: '1883',
                 type: 'number',
                 group: 'MQTT Broker',
+                value: this.storage.getItem('tcpPort'),
             },
             {
                 title: 'HTTP Port',
@@ -235,6 +236,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
                 placeholder: '8888',
                 type: 'number',
                 group: 'MQTT Broker',
+                value: this.storage.getItem('httpPort'),
             },
         ]
     }
