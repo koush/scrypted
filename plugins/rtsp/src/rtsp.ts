@@ -140,32 +140,11 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 value: this.storage.getItem('httpPort'),
             },
             {
-                key: 'isAnalogueCamera',
-                title: 'Is this an analogue camera?',
-                description: 'Turn this on if you are not using ip cameras. This will use the URL override, channel, and URL parameters to construct the RTSP url.',
-                type: 'boolean',
-                value: this.storage.getItem('isAnalogueCamera'),
-            },
-            {
                 key: 'rtspUrlOverride',
                 title: 'RTSP URL Override',
                 description: "Override the RTSP URL if your camera is using a non default port, channel, or rebroadcasted through an NVR. Default: " + constructed,
                 placeholder: constructed,
                 value: this.storage.getItem('rtspUrlOverride'),
-            },
-            {
-                key: 'rtspChannel',
-                title: 'Channel number',
-                description: "What channel does this camera use?",
-                placeholder: '1/2/3/etc.',
-                value: this.storage.getItem('rtspChannel'),
-            },
-            {
-                key: 'rtspUrlParams',
-                title: 'RTSP URL Params Override',
-                description: "Override the RTSP URL parameters",
-                placeholder: '?transportmode=unicast&...',
-                value: this.storage.getItem('rtspUrlParams'),
             },
         ];
     }
@@ -174,36 +153,8 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return `${this.storage.getItem('ip')}:${this.storage.getItem('httpPort') || 80}`;
     }
 
-    isAnalogueCamera() {
-        return this.storage.getItem('isAnalogueCamera') === 'true';
-    }
-
-    getRtspChannel() {
-        return this.storage.getItem('rtspChannel') || ''
-    }
-
-    getRtspUrl() {
-        return this.storage.getItem('rtspUrlOverride')
-    }
-
-    getRtspUrlParams() {
-        return this.storage.getItem('rtspUrlParams') || '?transportmode=unicast'
-    }
-
-    getAnalogueCameraUrl() {
-        const channel = this.getRtspChannel()
-        const url = this.getRtspUrl()
-        const params = this.getRtspUrlParams()
-
-        return `${url}/${channel}01/${params}`
-    }
-
     getRtspUrlOverride() {
-        if (this.isAnalogueCamera() && !!this.getRtspChannel()) {
-            return this.getAnalogueCameraUrl()
-        }
-
-        return this.getRtspUrl()
+        return this.storage.getItem('rtspUrlOverride');
     }
 
     abstract getConstructedStreamUrl(): Promise<string>;
