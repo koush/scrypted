@@ -181,6 +181,11 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
         }
     }
 
+    getAdditionalInterfaces() {
+        return [
+        ];
+    }
+
     async getSettings(): Promise<Setting[]> {
         return [
             {
@@ -189,11 +194,6 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
                 placeholder: 'Camera name, e.g.: Back Yard Camera, Baby Camera, etc',
             }
         ]
-    }
-
-    getAdditionalInterfaces() {
-        return [
-        ];
     }
 
     async putSetting(key: string, value: string | number) {
@@ -219,7 +219,6 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
 
     createCamera(nativeId: string): RtspCamera{
         return new RtspCamera(nativeId);
-
     }
 
     getDevice(nativeId: string) {
