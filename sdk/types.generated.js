@@ -110,7 +110,7 @@ module.exports.ScryptedInterface = {
   EngineIOHandler: "EngineIOHandler",
   PushHandler: "PushHandler",
   Program: "Program",
-  Javascript: "Javascript",
+  Scriptable: "Scriptable",
 }
 
 module.exports.ScryptedInterfaceDescriptors = {
@@ -557,11 +557,13 @@ module.exports.ScryptedInterfaceDescriptors = {
       "run",
     ]
   },
-  Javascript: {
-    name: "Javascript",
+  Scriptable: {
+    name: "Scriptable",
     properties: [
     ],
     methods: [
+      "saveScript",
+      "loadScripts",
       "eval",
     ]
   },

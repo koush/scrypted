@@ -495,8 +495,16 @@ export interface Program {
   run(variables?: { [name: string]: any }): Promise<any>;
 
 }
-export interface Javascript {
-  eval(script: string, variables?: { [name: string]: any }): Promise<any>;
+export interface ScriptSource {
+  name?: string;
+  script?: string;
+  language?: string;
+  monacoEvalDefaults?: string;
+}
+export interface Scriptable {
+  saveScript(script: ScriptSource): Promise<void>;
+  loadScripts(): Promise<{ [filename: string]: ScriptSource }>;
+  eval(source: ScriptSource, variables?: { [name: string]: any }): Promise<any>;
 }
 /**
  * SoftwareUpdate provides a way to check for updates and install them. This may be a Scrypted Plugin or device firmware.
@@ -1049,7 +1057,7 @@ export enum ScryptedInterface {
   EngineIOHandler = "EngineIOHandler",
   PushHandler = "PushHandler",
   Program = "Program",
-  Javascript = "Javascript",
+  Scriptable = "Scriptable",
 }
 
 export enum ScryptedInterfaceProperty {
