@@ -80,7 +80,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         this.app.onDisconnect(this.onDisconnect.bind(this));
 
         systemManager.listen((source, details, data) => {
-            if (source)
+            if (source && details.changed && details.property)
                 this.queueReportState(source);
         });
 
