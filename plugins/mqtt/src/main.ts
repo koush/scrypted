@@ -83,12 +83,14 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
             urlWithoutPath.pathname = '';
 
             const client = this.client = connect(urlWithoutPath.toString());
-            client.on('connect', err => {
-                if (err) {
-                    this.console.error('error subscribing to mqtt', err);
-                    return;
-                }
-            })
+            setTimeout(() => {
+                client.on('connect', err => {
+                    if (err) {
+                        this.console.error('error subscribing to mqtt', err);
+                        return;
+                    }
+                })
+            }, 500);
 
             const allInterfaces: string[] = [
                 ScryptedInterface.Scriptable,
@@ -153,12 +155,14 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
 
             Object.assign(this, handler);
 
-            deviceManager.onDeviceDiscovered({
+            await deviceManager.onDeviceDiscovered({
                 nativeId: this.nativeId,
                 interfaces: allInterfaces,
                 type: ScryptedDeviceType.Unknown,
                 name: this.providedName,
-            })
+            });
+
+            this.console.log('MQTT device started.');
         }
         catch (e) {
             this.log.a('There was an error starting the MQTT handler. Check the Console.');
