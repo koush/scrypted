@@ -18,6 +18,7 @@ export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
 
     constructor(public ip: string, username: string, password: string, public channel?: string) {
+        this.channel = channel || '101';
         this.digestAuth = new AxiosDigestAuth({
             username,
             password,
@@ -28,7 +29,7 @@ export class HikVisionCameraAPI {
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'text',
-            url: `http://${this.ip}/ISAPI/Streaming/channels/101/capabilities`,
+            url: `http://${this.ip}/ISAPI/Streaming/channels/${this.channel}/capabilities`,
         });
 
         // this is bad:
@@ -44,9 +45,7 @@ export class HikVisionCameraAPI {
 
 
     async jpegSnapshot(): Promise<Buffer> {
-        const url = this.channel
-            ? `http://${this.ip}/ISAPI/Streaming/channels/${this.channel}01/picture?snapShotImageType=JPEG`
-            : `http://${this.ip}/ISAPI/Streaming/channels/101/picture?snapShotImageType=JPEG`
+        const url = `http://${this.ip}/ISAPI/Streaming/channels/${this.channel}/picture?snapShotImageType=JPEG`
 
         const response = await this.digestAuth.request({
             method: "GET",
