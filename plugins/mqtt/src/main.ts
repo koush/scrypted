@@ -27,6 +27,7 @@ const { log, deviceManager } = sdk;
 class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
     client: Client;
     handler: any;
+    pathname: string;
     
     constructor(nativeId: string) {
         super(nativeId);
@@ -75,7 +76,13 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
             this.handler = undefined;
             this.client?.end();
             this.client = undefined;
-            const client = this.client = connect(this.storage.getItem('url'));
+            const url = new URL(this.storage.getItem('url'));
+            const { pathname } = url;
+            this.pathname = pathname;
+            const urlWithoutPath = new URL(this.storage.getItem('url'));
+            urlWithoutPath.pathname = '';
+
+            const client = this.client = connect(urlWithoutPath.toString());
             client.on('connect', err => {
                 if (err) {
                     this.console.error('error subscribing to mqtt', err);
@@ -91,15 +98,16 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
             const mqtt: MqttClient = {
                 subscribe: (subscriptions: MqttSubscriptions, options?: any) => {
                     for (const topic of Object.keys(subscriptions)) {
+                        const fullTopic = pathname + topic;
                         const cb = subscriptions[topic];
                         if (options) {
-                            client.subscribe(topic, options)
+                            client.subscribe(fullTopic, options)
                         }
                         else {
-                            client.subscribe(topic)
+                            client.subscribe(fullTopic)
                         }
                         client.on('message', (messageTopic, message) => {
-                            if (topic !== messageTopic)
+                            if (fullTopic !== messageTopic)
                                 return;
                             this.console.log('mqtt message', topic, message.toString());
                             cb({
@@ -129,7 +137,7 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
                         value = JSON.stringify(value);
                     if (value.constructor.name !== Buffer.name)
                         value = value.toString();
-                    client.publish(topic, value);
+                    client.publish(pathname + topic, value);
                 }
             }
             await scryptedEval(this, script, {
@@ -163,8 +171,8 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
             title: 'Subscription URL',
             key: 'url',
             value: this.storage.getItem('url'),
-            description: "The base subscription URL for the device",
-            placeholder: "http://localhost:8888/device/kitchen-light",
+            description: "The base subscription URL for the device. All MQTT publish and subscribe requests will use this as the base path.",
+            placeholder: "mqtt://localhost/device/kitchen-light",
         }];
     }
     async putSetting(key: string, value: string | number | boolean) {

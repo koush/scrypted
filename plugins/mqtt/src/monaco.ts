@@ -30,7 +30,7 @@ function monacoEvalDefaultsFunction(monaco, types, sdk, client) {
         const mediaManager: MediaManager;
         const systemManager: SystemManager;
         const mqtt: MqttClient;
-        const device: ScryptedDeviceBase;
+        const device: ScryptedDeviceBase & { pathname : string };
       }
       `,
 

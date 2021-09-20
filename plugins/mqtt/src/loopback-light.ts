@@ -14,6 +14,10 @@ mqtt.subscribe({
     '/light/status': value => device.on = value.json.on,
 });
 
+/**
+ * Commands from Scrypted (via the web dashboard, HomeKit, Google Home, etc)
+ *  get handled here and sent to the MQTT broker.
+ */
 mqtt.handle<OnOff & Brightness>({
     async turnOff() {
         mqtt.publish('/light/set', { on: false });
