@@ -1,17 +1,17 @@
 <template>
   <div>
-    <Javascript showSave="true" @save="$emit('save')" @input="onChange" v-model="data" :testDevice="testDevice"> </Javascript>
+    <Scriptable @input="onChange" v-model="data" :device="device"> </Scriptable>
   </div>
 </template>
 <script>
-import Javascript from "../../interfaces/automation/Javascript.vue";
+import Scriptable from "../../interfaces/automation/Scriptable.vue";
 
 export default {
   components: {
-    Javascript,
+    Scriptable,
   },
   computed: {
-    testDevice() {
+    device() {
       return this.$scrypted.systemManager.getDeviceById(this.id);
     },
   },
@@ -20,9 +20,11 @@ export default {
     let data;
     try {
       data = JSON.parse(this.value);
+      if (!data['script.ts'])
+        throw new Error();
     } catch (e) {
       data = {
-        script: "",
+        'script.ts': "",
       };
     }
 

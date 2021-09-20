@@ -30,7 +30,7 @@ async function reportAutomation(nativeId: string) {
     const device: Device = {
         nativeId,
         type: ScryptedDeviceType.Automation,
-        interfaces: [ScryptedInterface.OnOff, ScryptedInterface.Javascript]
+        interfaces: [ScryptedInterface.OnOff]
     }
     await deviceManager.onDeviceDiscovered(device);
 }
@@ -39,7 +39,7 @@ async function reportScript(nativeId: string) {
     const device: Device = {
         nativeId,
         type: ScryptedDeviceType.Program,
-        interfaces: [ScryptedInterface.Javascript, ScryptedInterface.Program]
+        interfaces: [ScryptedInterface.Scriptable, ScryptedInterface.Program]
     }
     await deviceManager.onDeviceDiscovered(device);
 }

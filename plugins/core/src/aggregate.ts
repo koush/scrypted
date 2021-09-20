@@ -1,4 +1,4 @@
-import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera, VideoStreamOptions } from "@scrypted/sdk";
+import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from "../../../common/src/ffmpeg-rebroadcast";
 const { systemManager, mediaManager } = sdk;

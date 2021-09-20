@@ -29,6 +29,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, p
             log: device.log,
             console: device.console,
             localStorage: device.storage,
+            device,
         });
 
 

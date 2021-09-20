@@ -26,11 +26,12 @@ export default {
 
     },
     rpc(options) {
-      if (this.device) {
+      options = options || {};
+
+      if (this.device && !options.rpc) {
         return this.device;
       }
 
-      options = options || {};
       const { varargs, append } = options;
       var vm = this;
       return new Proxy(
@@ -38,24 +39,23 @@ export default {
         {
           get: function(target, method) {
             return function() {
-              var parameters = Array.prototype.slice.call(arguments);
-              if (!vm.device) {
-                if (append) {
-                  vm.lazyValue.rpc.push({
-                    method,
-                    parameters,
-                    varargs
-                  });
-                } else {
-                  vm.lazyValue.rpc = {
-                    method,
-                    parameters,
-                    varargs
-                  };
-                }
-                vm.onInput();
+              if (vm.device && !options.rpc)
                 return;
+              var parameters = Array.prototype.slice.call(arguments);
+              if (append) {
+                vm.lazyValue.rpc.push({
+                  method,
+                  parameters,
+                  varargs
+                });
+              } else {
+                vm.lazyValue.rpc = {
+                  method,
+                  parameters,
+                  varargs
+                };
               }
+              vm.onInput();
             };
           }
         }

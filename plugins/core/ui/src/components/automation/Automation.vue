@@ -108,7 +108,6 @@
 
       <v-flex xs12>
         <InterfacesPicker
-          :testDevice="testDevice"
           :name="device.actions.name"
           :interfaces="contextualInterfaces"
           v-model="device.actions"
@@ -192,9 +191,6 @@ export default {
     EventsPicker,
   },
   computed: {
-    testDevice() {
-      return this.$scrypted.systemManager.getDeviceById(this.id);
-    },
     availableEvents() {
       const ret = [
         {
@@ -223,9 +219,9 @@ export default {
     availableInterfaces() {
       const ret = [
         {
-          id: "javascript",
+          id: "scriptable",
           text: "Run Script",
-          component: "Javascript",
+          component: "Scriptable",
         },
       ];
 
