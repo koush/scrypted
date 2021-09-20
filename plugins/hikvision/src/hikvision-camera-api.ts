@@ -57,7 +57,7 @@ export class HikVisionCameraAPI {
         return Buffer.from(response.data);
     }
 
-    async listenEvents(isAnalogueCamera = false, channel: string) {
+    async listenEvents(channel?: string) {
         const response = await this.digestAuth.request({
             method: "GET",
             url: `http://${this.ip}/ISAPI/Event/notification/alertStream`,
@@ -69,9 +69,9 @@ export class HikVisionCameraAPI {
             const data = buffer.toString();
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
-                    isAnalogueCamera && channel
-                        ? data.indexOf(`<channelID>${channel}</channelID>`) !== -1 && stream.emit('event', event)
-                        : stream.emit('event', event)
+                    if (channel && data.indexOf(`<channelID>${channel}</channelID>`) === -1)
+                        continue;
+                    stream.emit('event', event);
                 }
             }
         });

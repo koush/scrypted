@@ -15,7 +15,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         (async () => {
             const api = this.createClient();
             try {
-                const events = await api.listenEvents(this.isAnalogueCamera(), this.getRtspChannel());
+                const events = await api.listenEvents(this.getRtspChannel());
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();
@@ -62,13 +62,6 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return [
             ...await this.getUrlSettings(),
             {
-                key: 'isAnalogueCamera',
-                title: 'Is this an analogue camera?',
-                description: 'Turn this on if you are using ip cameras. This will use the URL override, channel, and URL parameters to construct the RTSP stream URL.',
-                type: 'boolean',
-                value: this.storage.getItem('isAnalogueCamera'),
-            },
-            {
                 key: 'rtspChannel',
                 title: 'Channel number',
                 description: "What channel does this camera use?",
@@ -85,40 +78,18 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         ]
     }
 
-    isAnalogueCamera() {
-        return this.storage.getItem('isAnalogueCamera') === 'true';
-    }
-
     getRtspChannel() {
-        return this.storage.getItem('rtspChannel') || ''
-    }
-
-    getRtspUrl() {
-        return this.storage.getItem('rtspUrlOverride')
+        return this.storage.getItem('rtspChannel');
     }
 
     getRtspUrlParams() {
-        return this.storage.getItem('rtspUrlParams') || '?transportmode=unicast'
-    }
-
-    getAnalogueCameraUrl() {
-        const channel = this.getRtspChannel()
-        const url = this.getRtspUrl()
-        const params = this.getRtspUrlParams()
-
-        return `${url}/${channel}01/${params}`
-    }
-
-    getRtspUrlOverride() {
-        if (this.isAnalogueCamera() && !!this.getRtspChannel()) {
-            return this.getAnalogueCameraUrl()
-        }
-
-        return this.getRtspUrl()
+        return this.storage.getItem('rtspUrlParams');
     }
 
     async getConstructedStreamUrl() {
-        return `rtsp://${this.getRtspAddress()}/Streaming/Channels/101/?transportmode=unicast`;
+        const channel = this.getRtspChannel() || '101';
+        const params = this.getRtspUrlParams() || '?transportmode=unicast';
+        return `rtsp://${this.getRtspAddress()}/Streaming/Channels/${channel}/${params}`;
     }
 }
 
