@@ -144,7 +144,7 @@ export default {
         }));
       ret.splice(0, 0, {
         id: null,
-        text: "Select a Device",
+        text: this.lazyValue.placeholder || "Select a Device",
       });
       return ret;
     },
