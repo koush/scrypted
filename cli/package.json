@@ -1,6 +1,6 @@
 {
   "name": "scrypted",
-  "version": "1.0.11",
+  "version": "1.0.13",
   "description": "",
   "main": "dist/main.js",
   "bin": {
@@ -13,7 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@scrypted/sdk": "@scrypted/sdk",
+    "@scrypted/sdk": "^0.0.79",
     "axios": "^0.21.4",
     "mkdirp": "^1.0.4",
     "readline-sync": "^1.4.10",
