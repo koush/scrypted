@@ -110,7 +110,7 @@ export default {
           "script.ts";
         this.scriptSource.script =
           this.lazyValue[this.scriptSource.filename]?.toString();
-        this.scriptsSource.monacoEvalDefaults = monacoEvalDefaults;
+        this.scriptSource.monacoEvalDefaults = () => monacoEvalDefaults;
       }
 
       const editor = monaco.editor.create(this.$refs.container, {
