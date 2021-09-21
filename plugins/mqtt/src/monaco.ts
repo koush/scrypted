@@ -1,8 +1,11 @@
-const types = require("!!raw-loader!@scrypted/sdk/types.d.ts");
-const sdk = require("!!raw-loader!@scrypted/sdk/index.d.ts");
-const client = require("!!raw-loader!./mqtt-client.ts");
+const libs = {
+    types: require("!!raw-loader!@scrypted/sdk/types.d.ts"),
+    sdk: require("!!raw-loader!@scrypted/sdk/index.d.ts"),
+    client: require("!!raw-loader!./api/mqtt-client.ts"),
+    frigate: require("!!raw-loader!./api/frigate.ts"),
+};
 
-function monacoEvalDefaultsFunction(monaco, types, sdk, client) {
+function monacoEvalDefaultsFunction(monaco, libs) {
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
         Object.assign(
             {},
@@ -14,14 +17,13 @@ function monacoEvalDefaultsFunction(monaco, types, sdk, client) {
         )
     );
 
+    const catLibs = Object.values(libs).join('\n');
+    const catlibsNoExport = Object.keys(libs).filter(lib => lib !== 'sdk').map(lib => libs[lib]).map(lib => lib.toString().replace(/export /g, '')).join('\n');
     monaco.languages.typescript.typescriptDefaults.addExtraLib(`
-      ${types}
-      ${sdk}
-      ${client}
+      ${catLibs}
 
       declare global {
-        ${types.replace("export interface", "interface")}
-        ${client.replace("export interface", "interface")}
+        ${catlibsNoExport}
 
         const log: Logger;
   
@@ -38,18 +40,16 @@ function monacoEvalDefaultsFunction(monaco, types, sdk, client) {
     );
 
     monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        sdk,
+        libs['sdk'],
         "node_modules/@types/scrypted__sdk/index.d.ts"
     );
 }
 
 export const monacoEvalDefaults = `(function() {
-const types = \`${types}\`;
-const sdk = \`${sdk}\`;
-const client = \`${client}\`;
+const libs = ${JSON.stringify(libs)};
 
 return (monaco) => {
-    (${monacoEvalDefaultsFunction})(monaco, types, sdk, client);
+    (${monacoEvalDefaultsFunction})(monaco, libs);
 } 
 })();
 `;

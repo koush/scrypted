@@ -16,6 +16,6 @@ export interface MqttHandler {
 
 export interface MqttClient {
     subscribe(subscriptions: MqttSubscriptions, options?: any): void;
-    handle<T>(handler?: T, ...interfaces: ScryptedInterface[]): void;
+    handle<T>(handler?: T, ...interfaces: string[]): void;
     publish(topic: string, value: any): Promise<void>;
 }

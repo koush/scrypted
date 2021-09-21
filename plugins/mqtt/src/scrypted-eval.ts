@@ -2,6 +2,13 @@ import ts, { ScriptTarget } from "typescript";
 import sdk, { ScryptedDeviceBase } from "@scrypted/sdk";
 import vm from "vm";
 
+const frigate = require("!!raw-loader!./api/frigate.ts");
+const types = require("!!raw-loader!!@scrypted/sdk/types.d.ts");
+const libs = {
+    frigate,
+    types,
+};
+
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
 function tsCompile(source: string, options: ts.TranspileOptions = null): string {
@@ -19,7 +26,8 @@ function tsCompile(source: string, options: ts.TranspileOptions = null): string 
 
 export async function scryptedEval(device: ScryptedDeviceBase, script: string, params: { [name: string]: any }) {
     try {
-        const compiled = tsCompile(script);
+        const allScripts = Object.values(libs).join('\n').toString() + script;
+        const compiled = tsCompile(allScripts);
 
         const allParams = Object.assign({}, params, {
             systemManager,
@@ -30,6 +38,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, p
             console: device.console,
             localStorage: device.storage,
             device,
+            exports: {},
         });
 
         try {

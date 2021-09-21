@@ -6,14 +6,14 @@ import { Settings, Setting, DeviceProvider, OnOff, ScryptedDeviceBase, ScryptedI
 import sdk from '@scrypted/sdk';
 import { monacoEvalDefaults } from './monaco';
 import { scryptedEval } from './scrypted-eval';
-import { MqttClient, MqttSubscriptions } from './mqtt-client';
+import { MqttClient, MqttSubscriptions } from './api/mqtt-client';
 import { connect, Client, IClientSubscribeOptions, ClientSubscribeCallback } from 'mqtt';
 import aedes from 'aedes';
 import net from 'net';
 import ws from 'websocket-stream';
 import http from 'http';
 
-const loopbackLight = require("!!raw-loader!./loopback-light.ts");
+const loopbackLight = require("!!raw-loader!./examples/loopback-light.ts");
 
 const methodInterfaces: { [method: string]: string } = {};
 for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
@@ -77,8 +77,7 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
             this.client?.end();
             this.client = undefined;
             const url = new URL(this.storage.getItem('url'));
-            const { pathname } = url;
-            this.pathname = pathname;
+            this.pathname = url.pathname.substring(1);
             const urlWithoutPath = new URL(this.storage.getItem('url'));
             urlWithoutPath.pathname = '';
 
@@ -100,7 +99,7 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
             const mqtt: MqttClient = {
                 subscribe: (subscriptions: MqttSubscriptions, options?: any) => {
                     for (const topic of Object.keys(subscriptions)) {
-                        const fullTopic = pathname + topic;
+                        const fullTopic = this.pathname + topic;
                         const cb = subscriptions[topic];
                         if (options) {
                             client.subscribe(fullTopic, options)
@@ -109,7 +108,7 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
                             client.subscribe(fullTopic)
                         }
                         client.on('message', (messageTopic, message) => {
-                            if (fullTopic !== messageTopic)
+                            if (fullTopic !== messageTopic && fullTopic !== '/' + messageTopic)
                                 return;
                             this.console.log('mqtt message', topic, message.toString());
                             cb({
@@ -139,7 +138,7 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
                         value = JSON.stringify(value);
                     if (value.constructor.name !== Buffer.name)
                         value = value.toString();
-                    client.publish(pathname + topic, value);
+                    client.publish(this.pathname + topic, value);
                 }
             }
             await scryptedEval(this, script, {
