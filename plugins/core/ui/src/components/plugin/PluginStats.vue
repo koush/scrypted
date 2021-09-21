@@ -51,7 +51,7 @@ export default {
     cpuInteresting() {
       const cpu = this.value
         .slice()
-        .filter(d => !!d.stats.cpu)
+        .filter(d => !!d.stats?.cpu)
         .sort(
           (d1, d2) =>
             d1.stats.cpu.system +
@@ -77,7 +77,7 @@ export default {
     memoryInteresting() {
       const memory = this.value
         .slice()
-        .filter(d => !!d.stats.memoryUsage)
+        .filter(d => !!d.stats?.memoryUsage)
         .sort(
           (d1, d2) =>
             d1.stats.memoryUsage.heapTotal - d2.stats.memoryUsage.heapTotal
