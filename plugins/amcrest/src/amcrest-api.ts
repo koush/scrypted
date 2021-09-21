@@ -10,22 +10,6 @@ export enum AmcrestEvent {
     AudioStop = "Code=AudioMutation;action=Stop",
 }
 
-async function readEvent(readable: Readable): Promise<AmcrestEvent | void> {
-    const pt = new PassThrough();
-    readable.pipe(pt);
-    const buffers: Buffer[] = [];
-    for await (const buffer of pt) {
-        buffers.push(buffer);
-        const data = Buffer.concat(buffers).toString();
-        for (const event of Object.values(AmcrestEvent)) {
-            if (data.indexOf(event) !== -1) {
-                return event;
-            }
-        }
-    }
-    console.log('unhandled', Buffer.concat(buffers).toString());
-}
-
 export class AmcrestCameraClient {
     digestAuth: AxiosDigestAuth;
 
@@ -47,30 +31,23 @@ export class AmcrestCameraClient {
         return Buffer.from(response.data);
     }
 
-    async* listenEvents(): AsyncGenerator<AmcrestEvent> {
+    async listenEvents() {
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'stream',
             url: `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion,AudioMutation]`,
         });
+        const stream = response.data as Readable;
 
-        const stream = response.data;
-
-        const form = new Form();
-
-        try {
-            // massage this so the parser doesn't fail on a bad content type
-            stream.headers['content-type'] = stream.headers['content-type'].replace('multipart/x-mixed-replace', 'multipart/form-data');
-            form.parse(stream);
-            while (true) {
-                const [part] = await once(form, 'part');
-                const event = await readEvent(part);
-                if (event)
-                    yield event;
+        stream.on('data', (buffer: Buffer) => {
+            const data = buffer.toString();
+            for (const event of Object.values(AmcrestEvent)) {
+                if (data.indexOf(event) !== -1) {
+                    stream.emit('event', event);
+                }
             }
-        }
-        finally {
-            stream.destroy();
-        }
+        });
+
+        return stream;
     }
 }
