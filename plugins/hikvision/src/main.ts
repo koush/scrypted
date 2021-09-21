@@ -1,9 +1,8 @@
 import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
-import { EventEmitter, Stream } from "stream";
+import { EventEmitter } from "stream";
 import { HikVisionCameraAPI } from "./hikvision-camera-api";
 import { Destroyable, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
 import { HikVisionCameraEvent } from "./hikvision-camera-api";
-import { removeListener } from "process";
 const { mediaManager } = sdk;
 
 class HikVisionCamera extends RtspSmartCamera implements Camera {
