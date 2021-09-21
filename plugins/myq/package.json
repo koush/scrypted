@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/myq",
-   "version": "0.1.38",
+   "version": "0.1.39",
    "description": "A MyQ Garage plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -35,9 +35,9 @@
       "@types/node-fetch": "^2.5.12"
    },
    "dependencies": {
+      "@hjdhjd/myq": "^6.0.4",
       "axios": "^0.19.2",
       "lodash": "^4.17.21",
-      "myq": "file:/",
       "node-fetch": "^3.0.0-beta.10",
       "node-html-parser": "^4.1.4",
       "pkce-challenge": "^2.2.0"

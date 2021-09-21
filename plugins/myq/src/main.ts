@@ -2,7 +2,7 @@
 // include directly.
 import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface } from '@scrypted/sdk';
 const { log } = sdk;
-import { myQApi, myQDevice } from './myq/src';
+import { myQApi, myQDevice } from '@hjdhjd/myq';
 import throttle from 'lodash/throttle';
 
 const { deviceManager } = sdk;
@@ -70,7 +70,7 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
         throw new Error('Not logged in.');
       }
   
-      this.account = new myQApi(console.log.bind(console), console, email, password);
+      this.account = new myQApi(email, password, console);
     }
 
     await this.account.refreshDevices();
@@ -134,28 +134,28 @@ class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh, EntrySens
   }
 }
 
-class GarageLight extends ScryptedDeviceBase implements OnOff, Refresh {
-  controller: GarageController;
-  info: Device;
+// class GarageLight extends ScryptedDeviceBase implements OnOff, Refresh {
+//   controller: GarageController;
+//   info: Device;
 
-  constructor(controller, info: Device) {
-    super(info.nativeId);
-    this.controller = controller;
-    this.info = info;
-    this.refresh();
-  }
+//   constructor(controller, info: Device) {
+//     super(info.nativeId);
+//     this.controller = controller;
+//     this.info = info;
+//     this.refresh();
+//   }
 
-  async turnOn() {
-    // this.lightStateCommand(1);
-  }
-  async turnOff() {
-    // this.lightStateCommand(0);
-  }
-  async refresh() {
-  };
-  async getRefreshFrequency() {
-    return 60;
-  };
-}
+//   async turnOn() {
+//     // this.lightStateCommand(1);
+//   }
+//   async turnOff() {
+//     // this.lightStateCommand(0);
+//   }
+//   async refresh() {
+//   };
+//   async getRefreshFrequency() {
+//     return 60;
+//   };
+// }
 
 export default new GarageController();
