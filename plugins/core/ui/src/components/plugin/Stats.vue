@@ -1,13 +1,13 @@
 <template>
   <v-card style="height: 400px">
     <v-card-title>{{ label }}</v-card-title>
-      <apexchart
-        type="donut"
-        height="300"
-        width="100%"
-        :options="chartOptions"
-        :series="series"
-      ></apexchart>
+    <apexchart
+      type="donut"
+      height="300"
+      width="100%"
+      :options="chartOptions"
+      :series="series"
+    ></apexchart>
   </v-card>
 </template>
 
@@ -16,8 +16,14 @@ export default {
   props: ["labels", "series", "label"],
   computed: {
     chartOptions() {
+      const self = this;
       return {
         chart: {
+          events: {
+            dataPointSelection(e, t, dataPoint) {
+              self.$emit('dataPointSelection', dataPoint);
+            },
+          },
           type: "donut",
           animations: {
             speed: 400,
