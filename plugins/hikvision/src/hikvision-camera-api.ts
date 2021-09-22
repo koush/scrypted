@@ -71,7 +71,6 @@ export class HikVisionCameraAPI {
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
                     if (this.channel
-                        && data.indexOf(`<channelID>${this.channel}</channelID>`) === -1
                         && data.indexOf(`<channelID>${this.channel.substr(0, 1)}</channelID>`) === -1) {
                         continue;
                     }
