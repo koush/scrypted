@@ -414,7 +414,7 @@ else {
             }
 
             res.send({
-                expiration: Date.now() - timestamp,
+                expiration: 86400000 - (Date.now() - timestamp),
                 username,
             })
         });
