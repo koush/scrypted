@@ -1,5 +1,3 @@
-import { ScryptedInterface } from "@scrypted/sdk";
-
 export interface MqttEvent {
     buffer?: Buffer;
     json?: any;
@@ -16,6 +14,6 @@ export interface MqttHandler {
 
 export interface MqttClient {
     subscribe(subscriptions: MqttSubscriptions, options?: any): void;
-    handle<T>(handler?: T, ...interfaces: string[]): void;
+    handle<T>(handler?: T & object, ...interfaces: string[]): void;
     publish(topic: string, value: any): Promise<void>;
 }
