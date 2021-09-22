@@ -233,8 +233,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             }
 
             const device = systemManager.getDeviceById(eventSource?.id);
-            this.log.i(`Accessory descriptor changed: ${device?.name}. Requesting restart.`);
             this.console.log('restart event', eventSource?.id, eventDetails.property, eventData);
+            this.log.a(`${device.name} was updated. Reload the HomeKit plugin to sync these changes.`);
             // deviceManager.requestRestart();
         });
     }
@@ -267,8 +267,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         if (device.mixins?.includes(this.id)) {
             return;
         }
-        this.log.i(`Accessory removed from HomeKit: ${device.name}. Requesting restart.`);
         this.console.log('release mixin', id);
+        this.log.a(`${device.name} was removed. Reload the HomeKit plugin to sync these changes.`);
         // deviceManager.requestRestart();
     }
 }
