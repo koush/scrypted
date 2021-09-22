@@ -140,7 +140,7 @@ export interface PluginRemote {
 
     ioEvent(id: string, event: string, message?: any): Promise<void>;
 
-    createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): Promise<any>;
+    createDeviceState(id: string, setState: (property: string, value: any) => Promise<any>): Promise<any>;
 
     getServicePort(name: string): Promise<number>;
 }

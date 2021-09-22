@@ -58,6 +58,8 @@ export class ScryptedStateManager extends EventRegistry {
 
         this.upserts.add(device._id);
         this.upsertThrottle();
+
+        return changed;
     }
 
     notifyPropertyEvent(device: PluginDevice, property: string, value: any, changed?: boolean) {

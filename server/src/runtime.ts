@@ -534,7 +534,7 @@ export class ScryptedRuntime {
         }
     }
 
-    upsertDevice(pluginId: string, device: Device): Promise<PluginDevice> {
+    upsertDevice(pluginId: string, device: Device, invalidate?: boolean): Promise<PluginDevice> {
         // JSON stringify over rpc turns undefined into null.
         if (device.nativeId === null)
             device.nativeId = undefined;
@@ -557,7 +557,7 @@ export class ScryptedRuntime {
         const providedRoom = device.room;
         const isUsingDefaultRoom = getDisplayRoom(pluginDevice) === getProvidedRoomOrDefault(pluginDevice);
 
-        const providedInterfaces = device.interfaces || [];
+        const providedInterfaces = [...new Set(device.interfaces || [])].sort();
         // assure final mixin resolved interface list has at least all the
         // interfaces from the provided. the actual list will resolve lazily.
         let mixinInterfaces: string[] = [];
@@ -565,10 +565,10 @@ export class ScryptedRuntime {
         if (mixins.length)
             mixinInterfaces.push(...getState(pluginDevice, ScryptedInterfaceProperty.interfaces) || []);
         mixinInterfaces.push(...providedInterfaces.slice());
-        mixinInterfaces = [...new Set(mixinInterfaces)];
+        mixinInterfaces = [...new Set(mixinInterfaces)].sort();
 
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);
-        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
+        const interfacesChanged = this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.info, device.info);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providerId, provider?._id);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedName, providedName);
@@ -587,6 +587,11 @@ export class ScryptedRuntime {
         if (newDevice) {
             const logger = this.getDeviceLogger(pluginDevice);
             logger.log('a', 'New Device Added.');
+        }
+
+        if (invalidate && interfacesChanged) {
+            console.log('invalidating on request');
+            this.invalidatePluginDevice(pluginDevice._id);
         }
 
         return ret;
