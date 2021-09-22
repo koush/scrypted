@@ -1,7 +1,5 @@
-import AxiosDigestAuth from '@mhoc/axios-digest-auth';
-import { PassThrough, Readable } from 'stream';
-import { Form } from 'multiparty';
-import { once } from 'events';
+import AxiosDigestAuth from '@koush/axios-digest-auth';
+import { Readable } from 'stream';
 
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
@@ -13,8 +11,7 @@ export enum AmcrestEvent {
 export class AmcrestCameraClient {
     digestAuth: AxiosDigestAuth;
 
-    constructor(public ip: string, public username: string, public password: string) {
-
+    constructor(public ip: string, username: string, password: string) {
         this.digestAuth = new AxiosDigestAuth({
             username,
             password,
@@ -32,10 +29,13 @@ export class AmcrestCameraClient {
     }
 
     async listenEvents() {
+        const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion,AudioMutation]`;
+        console.log('preparing event listener', url);
+
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'stream',
-            url: `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion,AudioMutation]`,
+            url,
         });
         const stream = response.data as Readable;
 
