@@ -103,6 +103,8 @@ export interface Destroyable {
 }
 
 export abstract class RtspSmartCamera extends RtspCamera {
+    lastListen = 0;
+
     constructor(nativeId?: string) {
         super(nativeId);
         this.listenLoop();
@@ -111,10 +113,13 @@ export abstract class RtspSmartCamera extends RtspCamera {
     listener: EventEmitter & Destroyable;
 
     listenLoop() {
+        this.lastListen = Date.now();
         this.listener = this.listenEvents();
         this.listener.on('error', e => {
             this.console.error('listen loop error, restarting in 10 seconds', e);
-            setTimeout(() => this.listenLoop(), 10000);
+            const listenDuration = Date.now() - this.lastListen;
+            const listenNext = listenDuration > 10000 ? 0 : 10000;
+            setTimeout(() => this.listenLoop(), listenNext);
         });
     }
 
