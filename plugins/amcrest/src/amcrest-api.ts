@@ -11,7 +11,7 @@ export enum AmcrestEvent {
 export class AmcrestCameraClient {
     digestAuth: AxiosDigestAuth;
 
-    constructor(public ip: string, username: string, password: string) {
+    constructor(public ip: string, username: string, password: string, public console?: Console) {
         this.digestAuth = new AxiosDigestAuth({
             username,
             password,
@@ -41,6 +41,7 @@ export class AmcrestCameraClient {
 
         stream.on('data', (buffer: Buffer) => {
             const data = buffer.toString();
+            this.console?.log('event', data);
             for (const event of Object.values(AmcrestEvent)) {
                 if (data.indexOf(event) !== -1) {
                     stream.emit('event', event);

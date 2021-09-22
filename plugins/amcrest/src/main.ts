@@ -48,7 +48,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera {
 
 
     createClient() {
-        return new AmcrestCameraClient(this.storage.getItem('ip'), this.getUsername(), this.getPassword());
+        return new AmcrestCameraClient(this.storage.getItem('ip'), this.getUsername(), this.getPassword(), this.console);
     }
 
     async takePicture(): Promise<MediaObject> {
