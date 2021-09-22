@@ -279,6 +279,7 @@ else {
 
             const { username, password, change_password } = req.body;
             const timestamp = Date.now();
+            const maxAge = 86400000;
 
             if (hasLogin) {
 
@@ -303,9 +304,9 @@ else {
                     return;
                 }
 
-                const login_user_token = `${username}#${timestamp}`
+                const login_user_token = `${username}#${timestamp}`;
                 res.cookie('login_user_token', login_user_token, {
-                    maxAge: 86400000,
+                    maxAge,
                     secure: true,
                     signed: true,
                     httpOnly: true,
@@ -320,7 +321,7 @@ else {
 
                 res.send({
                     username,
-                    expiration: 30 * 60 * 1000,
+                    expiration: maxAge,
                 });
 
                 return;
@@ -335,7 +336,7 @@ else {
 
             const login_user_token = `${username}#${timestamp}`
             res.cookie('login_user_token', login_user_token, {
-                maxAge: 86400000,
+                maxAge,
                 secure: true,
                 signed: true,
                 httpOnly: true,
@@ -343,7 +344,7 @@ else {
 
             res.send({
                 username,
-                expiration: 30 * 60 * 1000,
+                expiration: maxAge,
             });
         });
 
