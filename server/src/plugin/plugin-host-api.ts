@@ -64,6 +64,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
             case ScryptedInterfaceProperty.name:
                 const device = this.scrypted.findPluginDeviceById(id);
                 this.scrypted.stateManager.setPluginDeviceState(device, property, value);
+                this.scrypted.notifyPluginDeviceDescriptorChanged(device);
                 return;
             default:
                 throw new Error(`Not allowed to set property ${property}`);

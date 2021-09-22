@@ -155,14 +155,17 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     async setName(name: string): Promise<void> {
         const device = this.scrypted.findPluginDeviceById(this.id);
         this.scrypted.stateManager.setPluginDeviceState(device, ScryptedInterfaceProperty.name, name);
+        this.scrypted.stateManager.updateDescriptor(device);
     }
     async setRoom(room: string): Promise<void> {
         const device = this.scrypted.findPluginDeviceById(this.id);
         this.scrypted.stateManager.setPluginDeviceState(device, ScryptedInterfaceProperty.room, room);
+        this.scrypted.stateManager.updateDescriptor(device);
     }
     async setType(type: ScryptedDeviceType): Promise<void> {
         const device = this.scrypted.findPluginDeviceById(this.id);
         this.scrypted.stateManager.setPluginDeviceState(device, ScryptedInterfaceProperty.type, type);
+        this.scrypted.stateManager.updateDescriptor(device);
     }
 
     async applyMixin(method: string, argArray?: any): Promise<any> {

@@ -54,15 +54,10 @@ export class ScryptedStateManager extends EventRegistry {
 
         const changed = setState(device, property, value);
 
-        if (ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice].properties.includes(property as ScryptedInterfaceProperty)) {
-            this.scrypted.notifyPluginDeviceDescriptorChanged(device);
-        }
-        else {
-            this.notifyPropertyEvent(device, property, value, changed);
+        this.notifyPropertyEvent(device, property, value, changed);
 
-            this.upserts.add(device._id);
-            this.upsertThrottle();
-        }
+        this.upserts.add(device._id);
+        this.upsertThrottle();
     }
 
     notifyPropertyEvent(device: PluginDevice, property: string, value: any, changed?: boolean) {
