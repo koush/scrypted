@@ -414,7 +414,7 @@ else {
             }
 
             res.send({
-                expiration: 30 * 60 * 1000,
+                expiration: Date.now() - timestamp,
                 username,
             })
         });
