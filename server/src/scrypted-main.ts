@@ -22,7 +22,11 @@ import fs from 'fs';
 import mkdirp from 'mkdirp';
 import { install as installSourceMapSupport } from 'source-map-support';
 import httpAuth from 'http-auth';
+import semver from 'semver';
 
+if (!semver.gte(process.version, '16.0.0')) {
+    throw new Error('"node" version out of date. Please update node to v16 or higher.')
+}
 
 installSourceMapSupport();
 
