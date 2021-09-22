@@ -155,6 +155,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 continue;
             }
 
+            this.console.log('adding', device.name);
+
             const accessory = supportedType.getAccessory(device, this);
             if (accessory) {
                 accessoryIds.add(id);

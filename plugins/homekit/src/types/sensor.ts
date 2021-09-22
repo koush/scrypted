@@ -21,7 +21,7 @@ addSupportedType({
         }
 
         if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
-            const motionSensorService = accessory.addService(Service.ContactSensor, device.name);
+            const motionSensorService = accessory.addService(Service.MotionSensor, device.name);
             motionSensorService.getCharacteristic(Characteristic.MotionDetected)
                 .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
                     callback(null, !!device.motionDetected);
