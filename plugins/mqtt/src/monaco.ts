@@ -3,6 +3,7 @@ const libs = {
     sdk: require("!!raw-loader!@scrypted/sdk/index.d.ts"),
     client: require("!!raw-loader!./api/mqtt-client.ts"),
     frigate: require("!!raw-loader!./api/frigate.ts"),
+    util: require("!!raw-loader!./api/util.ts"),
 };
 
 function monacoEvalDefaultsFunction(monaco, libs) {
@@ -18,7 +19,10 @@ function monacoEvalDefaultsFunction(monaco, libs) {
     );
 
     const catLibs = Object.values(libs).join('\n');
-    const catlibsNoExport = Object.keys(libs).filter(lib => lib !== 'sdk').map(lib => libs[lib]).map(lib => lib.toString().replace(/export /g, '')).join('\n');
+    const catlibsNoExport = Object.keys(libs).filter(lib => lib !== 'sdk')
+        .map(lib => libs[lib]).map(lib =>
+            lib.toString().replace(/export /g, '').replace(/import.*?/g, ''))
+        .join('\n');
     monaco.languages.typescript.typescriptDefaults.addExtraLib(`
       ${catLibs}
 

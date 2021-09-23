@@ -129,8 +129,10 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
                         });
                     }
                 },
-                handle: <T>(handler?: T, ...interfaces: ScryptedInterface[]) => {
+                handle: <T>(handler?: T & object) => {
                     this.handler = handler;
+                },
+                handleTypes: (...interfaces: ScryptedInterface[]) => {
                     allInterfaces.push(...interfaces);
                 },
                 publish: async (topic: string, value: any) => {

@@ -8,12 +8,9 @@ export interface MqttSubscriptions {
     [topic: string]: (event: MqttEvent) => void;
 }
 
-export interface MqttHandler {
-
-}
-
 export interface MqttClient {
     subscribe(subscriptions: MqttSubscriptions, options?: any): void;
-    handle<T>(handler?: T & object, ...interfaces: string[]): void;
+    handle<T>(handler?: T & object): void;
+    handleTypes(...interfaces: string[]): void;
     publish(topic: string, value: any): Promise<void>;
 }

@@ -2,11 +2,13 @@ import ts, { ScriptTarget } from "typescript";
 import sdk, { ScryptedDeviceBase } from "@scrypted/sdk";
 import vm from "vm";
 
+const util = require("!!raw-loader!./api/util.ts");
 const frigate = require("!!raw-loader!./api/frigate.ts");
 const types = require("!!raw-loader!!@scrypted/sdk/types.d.ts");
 const libs = {
     frigate,
     types,
+    util,
 };
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;

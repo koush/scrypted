@@ -4,7 +4,6 @@ import type { MqttClient, MqttSubscriptions } from "./mqtt-client";
 declare const mqtt: MqttClient;
 declare const device: ScryptedDeviceBase;
 
-
 export type FrigateObjectType =
     'person' |
     'bicycle' |
@@ -104,5 +103,5 @@ export function frigateMotionSensor(zoneWatcher: FrigateZoneWatcher, ...zoneWatc
         } 
     }
     mqtt.subscribe(subs);
-    mqtt.handle({}, "MotionSensor");
+    mqtt.handleTypes("MotionSensor");
 }
