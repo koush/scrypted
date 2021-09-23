@@ -21,7 +21,7 @@ module.exports = {
     'resize-detector',
     'vuetify'
   ],
-  
+
   // https://cli.vuejs.org/config/#css-extract
   css: {
     extract: { ignoreOrder: true },
@@ -35,7 +35,7 @@ module.exports = {
     }
   },
 
-  
+
   parallel: false,
 
   chainWebpack: config => {
@@ -90,10 +90,11 @@ module.exports = {
 
   runtimeCompiler: true,
   devServer: {
-    port: 8081,
     disableHostCheck: true,
-    // public: 'home.scrypted.app',
+    host: 'localhost',
     https: true,
+    port: 8081,
+    progress: false,
     proxy: {
       '^/(login|logout|static|endpoint|whitelist|web)': proxyOpts,
     }
