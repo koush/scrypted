@@ -135,28 +135,30 @@ else {
         // use a hash of the private key as the cookie secret.
         app.use(cookieParser(crypto.createHash('sha256').update(certSetting.value.clientKey).digest().toString('hex')));
 
-        app.all(['/endpoint/@:owner/:pkg', '/endpoint/@:owner/:pkg/*', '/endpoint/@:owner/:pkg', '/endpoint/@:owner/:pkg/*'], async (req, res, next) => {
+        app.all('*', async (req, res, next) => {
+            // this is a trap for all auth.
+            // only basic auth will fail with 401. it is up to the endpoints to manage
+            // lack of login from cookie auth.
+
             const { login_user_token } = req.signedCookies;
             if (login_user_token) {
                 const userTokenParts = login_user_token.split('#');
                 const username = userTokenParts[0];
                 const timestamp = parseInt(userTokenParts[1]);
                 if (timestamp + 86400000 < Date.now()) {
-                    res.status(401);
-                    res.send('Login expired.');
-                    return;
+                    console.warn('login expired');
+                    return next();
                 }
 
                 const user = await db.tryGet(ScryptedUser, username);
                 if (!user) {
-                    res.status(401);
-                    res.send('User not found');
-                    return;
+                    console.warn('login not found');
+                    return next();
                 }
 
                 res.locals.username = username;
             }
-            else if (req.protocol === 'https' && req.headers.authorization) {
+            else if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
                 const basicChecker = basicAuth.check((req) => {
                     res.locals.username = req.user;
                     next();
@@ -174,6 +176,15 @@ else {
         console.log('#############################################');
         const scrypted = new ScryptedRuntime(db, insecure, secure, app);
         await scrypted.start();
+
+        app.all('/web/component/*', (req, res, next) => {
+            if (!res.locals.username) {
+                res.status(401);
+                res.send('Not Authorized');
+                return ;
+            }
+            next();
+        })
 
         app.get(['/web/component/script/npm/:pkg', '/web/component/script/npm/@:owner/:pkg'], async (req, res) => {
             const { owner, pkg } = req.params;
