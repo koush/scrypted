@@ -2,9 +2,10 @@
   "name": "ui",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve",
+    "serve": "vue-cli-service serve --open",
     "build": "vue-cli-service build --dest ../fs/dist",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "postinstall": "(cd ../../../server && npm install); (cd ../client && npm install)"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.15.4",
