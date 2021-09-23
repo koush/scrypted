@@ -14,7 +14,7 @@ import debounce from 'lodash/debounce';
 import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue, NodeCallback } from '../../HAP-NodeJS/src';
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioRecordingSamplerateValues, CameraRecordingConfiguration, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
-import { probeVideoCamera, ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
+import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import throttle from 'lodash/throttle';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';

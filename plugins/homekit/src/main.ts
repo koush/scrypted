@@ -9,11 +9,11 @@ import { randomBytes } from 'crypto';
 import qrcode from 'qrcode';
 import packageJson from "../package.json";
 
-const { systemManager, mediaManager } = sdk;
+const { systemManager } = sdk;
 
 HAPStorage.storage();
 class HAPLocalStorage {
-    initSync(options?: any) {
+    initSync() {
 
     }
     getItem(key: string): any {
@@ -66,8 +66,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         let username = this.storage.getItem("mac");
 
         if (!username) {
-            username = (Object.entries(os.networkInterfaces()).filter(([iface, entry]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
-                .flat().map(([iface, entry]) => entry).find(i => i && (i.family === 'IPv4' || i.family === 'IPv6'))?.mac;
+            username = (Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
+                .flat().map(([, entry]) => entry).find(i => i && (i.family === 'IPv4' || i.family === 'IPv6'))?.mac;
 
             if (!username) {
                 const buffers = [];
@@ -212,11 +212,11 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
         this.bridge.publish(publishInfo, true);
 
-        const code = qrcode.toString(this.bridge.setupURI(), {
+        qrcode.toString(this.bridge.setupURI(), {
             type: 'terminal',
-        }, (e, qrcode) => {
+        }, (e, code) => {
             this.console.log('Pairing QR Code:')
-            this.console.log(qrcode);
+            this.console.log(code);
         })
 
         systemManager.listen((eventSource, eventDetails, eventData) => {
