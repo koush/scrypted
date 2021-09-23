@@ -6,7 +6,7 @@ import { listenZeroCluster } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput } from './media-helpers';
-import { StreamParser } from './stream-parser';
+import { StreamChunk, StreamParser } from './stream-parser';
 
 const { mediaManager } = sdk;
 
@@ -124,18 +124,27 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
     for (const container of Object.keys(options.parsers)) {
         const parser = options.parsers[container];
 
+        const eventName = container + '-data';
         const rebroadcast = createServer(socket => {
             clients++;
             console.log('rebroadcast client', clients);
 
             clearTimeout(timeout)
 
-            const data = (data: Buffer) => {
-                socket.write(data);
+            let first = true;
+            const writeData = (data: StreamChunk) => {
+              if (first) {
+                first = false;
+                if (data.startStream) {
+                  socket.write(data.startStream)
+                }
+              }
+              socket.write(data.chunk);
             };
+
             const cleanup = () => {
                 socket.removeAllListeners();
-                events.removeListener('data', data);
+                events.removeListener(eventName, writeData);
                 clients--;
                 if (clients === 0) {
                     resetActivityTimer();
@@ -143,7 +152,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
                 socket.destroy();
             }
 
-            events.on('data', data);
+            events.on(eventName, writeData);
 
             socket.on('end', cleanup);
             socket.on('close', cleanup);
