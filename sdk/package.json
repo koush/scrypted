@@ -28,7 +28,7 @@
     "@babel/preset-typescript": "^7.15.0",
     "@types/node": "^16.6.1",
     "adm-zip": "^0.4.13",
-    "axios": "^0.21.1",
+    "axios": "^0.21.4",
     "babel-loader": "^8.0.4",
     "babel-plugin-const-enum": "^1.1.0",
     "babel-plugin-minify-dead-code-elimination": "^0.5.1",

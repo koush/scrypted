@@ -9,6 +9,37 @@ const path = require('path');
 const fs = require('fs');
 const chalk = require('chalk');
 
+
+function getUserHome() {
+    const ret = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+    if (!ret)
+        throw new Error('Neither USERPROFILE or HOME are defined.');
+    return ret;
+}
+
+const scryptedHome = path.join(getUserHome(), '.scrypted');
+const loginPath = path.join(scryptedHome, 'login.json');
+
+function getLogin(ip) {
+    let login;
+    try {
+        login = JSON.parse(fs.readFileSync(loginPath).toString());
+    }
+    catch (e) {
+        login = {};
+    }
+
+    login = login[ip];
+
+    const ret = {
+        username: login.username,
+        password: login.token,
+    };
+    console.log('login', ret);
+
+    return ret;
+}
+
 exports.deploy = function (debugHost, noRebind) {
     return new Promise((resolve, reject) => {
         var out;
@@ -39,9 +70,14 @@ exports.deploy = function (debugHost, noRebind) {
 
         axios.post(setupUrl, packageJson,
             {
+                auth: getLogin(debugHost),
                 timeout: 10000,
                 maxRedirects: 0,
                 validateStatus: function (status) {
+                    if (status === 401) {
+                        console.error('Authorization required. Please log in with the following:');
+                        console.error('     npx scrypted login [ip]');
+                    }
                     return status >= 200 && status < 300;
                 },
             })
@@ -50,6 +86,7 @@ exports.deploy = function (debugHost, noRebind) {
 
                 return axios.post(deployUrl, fileContents,
                     {
+                        auth: getLogin(debugHost),
                         timeout: 10000,
                         maxRedirects: 0,
                         validateStatus: function (status) {
@@ -85,7 +122,8 @@ exports.debug = function (debugHost, entryPoint) {
         const debugUrl = `https://${debugHost}:9443/web/component/script/debug?filename=${outFilename}&npmPackage=${npmPackage}`
         console.log(`initiating debugger on ${debugHost}`);
 
-        axios.post(debugUrl, {
+        axios.post(debugUrl, undefined, {
+            auth: getLogin(debugHost),
             timeout: 10000,
             maxRedirects: 0,
             validateStatus: function (status) {
