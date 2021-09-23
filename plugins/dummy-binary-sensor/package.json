@@ -23,7 +23,7 @@
       "type": "Sensor",
       "interfaces": [
          "OnOff",
-         "Binary"
+         "BinarySensor"
       ]
    },
    "dependencies": {
