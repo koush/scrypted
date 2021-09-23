@@ -1,6 +1,7 @@
 import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from "../../../common/src/ffmpeg-rebroadcast";
+import { createMpegTsParser } from "../../../common/src/stream-parser";
 const { systemManager, mediaManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
@@ -109,9 +110,11 @@ function createVideoCamera(devices: VideoCamera[]): VideoCamera {
         );
 
         const ret = startRebroadcastSession(filteredInput, {
-            // can this be raw frames?
-            vcodec: ['-vcodec', 'libx264'],
-            acodec: undefined,
+            parsers: {
+                mpegts: createMpegTsParser({
+                    vcodec: ['-vcodec', 'libx264'],
+                })
+            },
             timeout: 30000,
         });
 
@@ -132,7 +135,7 @@ function createVideoCamera(devices: VideoCamera[]): VideoCamera {
                 session.events.on('killed', () => sessionPromise = undefined);
             }
 
-            return mediaManager.createFFmpegMediaObject((await sessionPromise).ffmpegInput);
+            return mediaManager.createFFmpegMediaObject((await sessionPromise).ffmpegInputs.mpegts);
         }
     }
 }
