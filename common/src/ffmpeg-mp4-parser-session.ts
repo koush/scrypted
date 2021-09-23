@@ -3,40 +3,16 @@ import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput } from '@scrypted/sdk/types';
 import { listenZeroCluster } from './listen-cluster';
-import { Readable } from 'stream';
-import { readLength } from './read-length';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput } from './media-helpers';
+import { MP4Atom, parseFragmentedMP4 } from './stream-parser';
 
 const { mediaManager } = sdk;
-
-export interface MP4Atom {
-    header: Buffer;
-    length: number;
-    type: string;
-    data: Buffer;
-}
 
 export interface FFMpegFragmentedMP4Session {
     socket: Socket;
     cp: ChildProcess;
     generator: AsyncGenerator<MP4Atom>;
-}
-
-export async function* parseFragmentedMP4(readable: Readable): AsyncGenerator<MP4Atom> {
-    while (true) {
-        const header = await readLength(readable, 8);
-        const length = header.readInt32BE(0) - 8;
-        const type = header.slice(4).toString();
-        const data = await readLength(readable, length);
-
-        yield {
-            header,
-            length,
-            type,
-            data,
-        };
-    }
 }
 
 export async function startFFMPegFragmetedMP4Session(ffmpegInput: FFMpegInput, audioOutputArgs: string[], videoOutputArgs: string[]): Promise<FFMpegFragmentedMP4Session> {

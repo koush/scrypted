@@ -107,8 +107,6 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     else {
         videoArgs = [
             '-vcodec', 'copy',
-            // should this be behind a flag?
-            // '-frag_duration', `${configuration.mediaContainerConfiguration.fragmentLength * 1000}`,
         ];
     }
 

@@ -1,13 +1,13 @@
 
 import { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { createServer, Server, Socket } from 'net';
+import { Server } from 'net';
 import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
 import EventEmitter from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
-import { MP4Atom, parseFragmentedMP4 } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk } from '@scrypted/common/src/stream-parser';
 
 const { mediaManager, log } = sdk;
 
@@ -17,28 +17,23 @@ const SEND_KEYFRAME = 'sendKeyframe';
 const REENCODE_AUDIO = 'reencodeAudio';
 const REENCODE_VIDEO = 'reencodeVideo';
 
-interface PrebufferMpegTs {
-  buffer: Buffer;
+interface PrebufferStreamChunk {
+  chunk: StreamChunk;
   time: number;
 }
-
-interface PrebufferFmp4 {
-  atom: MP4Atom;
-  time: number;
-}
-
 
 class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
   prebufferSession: Promise<FFMpegRebroadcastSession>;
-  prebufferMpegTs: PrebufferMpegTs[] = [];
-  prebufferFmp4: PrebufferFmp4[] = [];
+  prebuffers = {
+    mp4: [],
+    mpegts: [],
+  };
   events = new EventEmitter();
   released = false;
   ftyp: MP4Atom;
   moov: MP4Atom;
+  session: FFMpegRebroadcastSession;
   detectedIdrInterval = 0;
-  detectedVcodec = '';
-  detectedAcodec = '';
   prevIdr = 0;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
@@ -70,7 +65,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         description: 'Start live streams from the previous key frame. Improves startup time.',
         type: 'boolean',
         key: SEND_KEYFRAME,
-        value: (this.storage.getItem(SEND_KEYFRAME) === 'true').toString(),
+        value: (this.storage.getItem(SEND_KEYFRAME) !== 'false').toString(),
       },
       {
         title: 'Reencode Audio',
@@ -84,14 +79,14 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         title: 'Detected Video Codec',
         readonly: true,
         key: 'detectedVcodec',
-        value: this.detectedVcodec.toString() || 'none',
+        value: this.session?.inputVideoCodec.toString() || 'none',
       },
       {
         group: 'Media Information',
         title: 'Detected Audio Codec',
         readonly: true,
         key: 'detectedAcodec',
-        value: this.detectedAcodec.toString() || 'none',
+        value: this.session?.inputAudioCodec.toString() || 'none',
       },
       {
         group: 'Media Information',
@@ -118,7 +113,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   async startPrebufferSession() {
-    this.prebufferMpegTs = [];
+    this.prebuffers.mp4 = [];
+    this.prebuffers.mpegts = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await this.mixinDevice.getVideoStream(), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
@@ -143,91 +139,65 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       'copy',
     ];
 
-    const fragmentClientHandler = async (socket: Socket) => {
-      fmp4OutputServer.close();
-      const parser = parseFragmentedMP4(socket);
-      for await (const atom of parser) {
-        const now = Date.now();
-        if (!this.ftyp) {
-          this.ftyp = atom;
-        }
-        else if (!this.moov) {
-          this.moov = atom;
-        }
-        else {
-          if (atom.type === 'mdat') {
-            if (this.prevIdr)
-              this.detectedIdrInterval = now - this.prevIdr;
-            this.prevIdr = now;
-          }
-
-          this.prebufferFmp4.push({
-            atom,
-            time: now,
-          });
-        }
-
-        while (this.prebufferFmp4.length && this.prebufferFmp4[0].time < now - prebufferDurationMs) {
-          this.prebufferFmp4.shift();
-        }
-
-        this.events.emit('atom', atom);
-      }
-    }
-
-    const fmp4OutputServer = createServer(socket => {
-      fragmentClientHandler(socket).catch(e => console.log(this.name, 'fragmented mp4 session ended', e));
-    });
-    const fmp4Port = await listenZeroCluster(fmp4OutputServer);
-
-    const additionalOutputs = [
-      '-f', 'mp4',
-      ...acodec,
-      ...vcodec,
-      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-      `tcp://127.0.0.1:${fmp4Port}`
-    ];
-
     const session = await startRebroadcastSession(ffmpegInput, {
-      additionalOutputs,
-      vcodec,
-      acodec,
+      parsers: {
+        mp4: createFragmentedMp4Parser({
+          vcodec,
+          acodec,
+        }),
+        mpegts: createMpegTsParser({
+          vcodec,
+          acodec,
+        }),
+      }
     });
 
-    this.detectedAcodec = session.inputAudioCodec || '';
-    this.detectedVcodec = session.inputVideoCodec || '';
+    this.session = session;
 
-    if (!this.detectedAcodec) {
+    if (!this.session.inputAudioCodec) {
       console.warn(this.name, 'no audio detected.');
     }
-    else if (this.detectedAcodec !== 'aac') {
+    else if (this.session.inputAudioCodec !== 'aac') {
       console.error(this.name, 'Detected audio codec was not AAC.');
       if (this.name?.indexOf('pcm') !== -1 && !reencodeAudio) {
         log.a(`${this.name} is using PCM audio. You will need to enable Reencode Audio in Rebroadcast Settings for this stream.`);
       }
     }
 
-    if (this.detectedVcodec !== 'h264') {
+    if (this.session.inputVideoCodec !== 'h264') {
       console.error(`${this.name} video codec is not h264. If there are errors, try changing your camera's encoder output.`);
     }
 
     session.events.on('killed', () => {
-      fmp4OutputServer.close();
       this.prebufferSession = undefined;
     });
-    session.events.on('data', (data: Buffer) => {
-      const now = Date.now();
-      this.prebufferMpegTs.push({
-        time: now,
-        buffer: data,
+
+    for (const container of ['mpegts', 'mp4']) {
+      const eventName = container + '-data';
+      const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+
+      session.events.on(eventName, (chunk: StreamChunk) => {
+        const now = Date.now();
+
+        if (chunk.type === 'mdat') {
+          if (this.prevIdr)
+            this.detectedIdrInterval = now - this.prevIdr;
+          this.prevIdr = now;
+        }
+
+        prebufferContainer.push({
+          time: now,
+          chunk,
+        });
+
+        while (prebufferContainer.length && prebufferContainer[0].time < now - prebufferDurationMs) {
+          prebufferContainer.shift();
+        }
+
+        this.events.emit(eventName, chunk);
       });
+    }
 
-      while (this.prebufferMpegTs.length && this.prebufferMpegTs[0].time < now - prebufferDurationMs) {
-        this.prebufferMpegTs.shift();
-      }
-
-      this.events.emit('mpegts-data', data);
-    });
     return session;
   }
 
@@ -237,18 +207,22 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const session = await this.prebufferSession;
 
     // if a specific stream is requested, and it's not what we're streaming, just fall through to source.
-    if (options?.id && options.id !== session.ffmpegInput.mediaStreamOptions?.id) {
+    if (options?.id && options.id !== session.ffmpegInputs['mpegts'].mediaStreamOptions?.id) {
       console.log(this.name, 'rebroadcast session cant be used here', options);
       return this.mixinDevice.getVideoStream(options);
     }
 
-    const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) === 'true';
+    const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) !== 'false';
     if (!options?.prebuffer && !sendKeyframe) {
-      const mo = mediaManager.createFFmpegMediaObject(session.ffmpegInput);
+      const mo = mediaManager.createFFmpegMediaObject(session.ffmpegInputs['mpegts']);
       return mo;
     }
 
     console.log(this.name, 'prebuffer request started');
+
+    const container = options?.container || 'mpegts';
+    const eventName = container + '-data';
+    const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
     const server = new Server(socket => {
       server.close();
@@ -258,58 +232,31 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
       let cleanup: () => void;
 
-      if (options?.container === 'mp4') {
-        const writeAtom = (atom: MP4Atom) => {
-          socket.write(Buffer.concat([atom.header, atom.data]));
-        };
+      let first = true;
+      const writeData = (data: StreamChunk) => {
+        if (first) {
+          first = false;
+          if (data.startStream) {
+            socket.write(data.startStream)
+          }
+        }
+        socket.write(data.chunk);
+      };
 
-        if (this.ftyp) {
-          writeAtom(this.ftyp);
-        }
-        if (this.moov) {
-          writeAtom(this.moov);
-        }
-        const now = Date.now();
-        let needMoof = true;
-        for (const prebuffer of this.prebufferFmp4) {
-          if (prebuffer.time < now - requestedPrebuffer)
-            continue;
-          if (needMoof && prebuffer.atom.type !== 'moof')
-            continue;
-          needMoof = false;
-          // console.log('writing prebuffer atom', prebuffer.atom);
-          writeAtom(prebuffer.atom);
-        }
+      for (const prebuffer of prebufferContainer) {
+        if (prebuffer.time < now - requestedPrebuffer)
+          continue;
 
-        this.events.on('atom', writeAtom);
-        cleanup = () => {
-          console.log(this.name, 'prebuffer request ended');
-          this.events.removeListener('atom', writeAtom);
-          this.events.removeListener('killed', cleanup);
-          socket.removeAllListeners();
-          socket.destroy();
-        }
-
+        writeData(prebuffer.chunk);
       }
-      else {
-        const writeData = (data: Buffer) => {
-          socket.write(data);
-        };
 
-        for (const prebuffer of this.prebufferMpegTs) {
-          if (prebuffer.time < now - requestedPrebuffer)
-            continue;
-          writeData(prebuffer.buffer);
-        }
-
-        this.events.on('mpegts-data', writeData);
-        cleanup = () => {
-          console.log(this.name, 'prebuffer request ended');
-          this.events.removeListener('mpegts-data', writeData);
-          this.events.removeListener('killed', cleanup);
-          socket.removeAllListeners();
-          socket.destroy();
-        }
+      this.events.on(eventName, writeData);
+      cleanup = () => {
+        console.log(this.name, 'prebuffer request ended');
+        this.events.removeListener(eventName, writeData);
+        this.events.removeListener('killed', cleanup);
+        socket.removeAllListeners();
+        socket.destroy();
       }
 
       this.events.once('killed', cleanup);
@@ -322,8 +269,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const port = await listenZeroCluster(server);
 
-    const mediaStreamOptions = session.ffmpegInput.mediaStreamOptions
-      ? Object.assign({}, session.ffmpegInput.mediaStreamOptions)
+    const mediaStreamOptions = session.ffmpegInputs[container].mediaStreamOptions
+      ? Object.assign({}, session.ffmpegInputs[container].mediaStreamOptions)
       : undefined;
 
     if (mediaStreamOptions && mediaStreamOptions.audio) {
@@ -336,7 +283,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const ffmpegInput: FFMpegInput = {
       inputArguments: [
-        '-f', options?.container === 'mp4' ? 'mp4' : 'mpegts',
+        '-f', container,
         '-i', `tcp://127.0.0.1:${port}`,
       ],
       mediaStreamOptions,
