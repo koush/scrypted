@@ -1,5 +1,6 @@
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { Readable } from 'stream';
+import https from 'https';
 
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
@@ -19,7 +20,12 @@ export class AmcrestCameraClient {
     }
 
     async jpegSnapshot(): Promise<Buffer> {
+        const httpsAgent = new https.Agent({
+            rejectUnauthorized: false
+        });
+
         const response = await this.digestAuth.request({
+            httpsAgent,
             method: "GET",
             responseType: 'arraybuffer',
             url: `http://${this.ip}/cgi-bin/snapshot.cgi`,
@@ -32,7 +38,12 @@ export class AmcrestCameraClient {
         const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion,AudioMutation]`;
         console.log('preparing event listener', url);
 
+        const httpsAgent = new https.Agent({
+            rejectUnauthorized: false
+        });
+
         const response = await this.digestAuth.request({
+            httpsAgent,
             method: "GET",
             responseType: 'stream',
             url,
