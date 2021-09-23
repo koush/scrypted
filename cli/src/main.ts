@@ -33,13 +33,22 @@ async function main() {
 
         const scryptedHome = path.join(getUserHome(), '.scrypted');
         const loginPath = path.join(scryptedHome, 'login.json');
+        let username: string;
+        let password: string;
         let login: any;
         try {
             login = JSON.parse(fs.readFileSync(loginPath).toString());
+            if (typeof login !== 'object')
+                login = {};
+                
+            if (!login[ip].username || !login[ip].token)
+                throw new Error();
+            username = login[ip].username;
+            password = login[ip].token;
         }
         catch (e) {
-            const username = readline.question('username: ');
-            const password = readline.question('password: ', {
+            username = readline.question('username: ');
+            password = readline.question('password: ', {
                 hideEchoBack: true,
             });
 
@@ -57,11 +66,19 @@ async function main() {
             mkdirp.sync(scryptedHome);
             login = login || {};
             login[ip] = response.data;
-            fs.writeFileSync(loginPath, JSON.stringify(loginPath));
+            fs.writeFileSync(loginPath, JSON.stringify(login));
         }
 
         const url = `https://${ip}:9443/web/component/script/install/${pkg}`;
-        const response = await axios.post(url, undefined, axiosConfig);
+        const response = await axios.post(url, undefined, Object.assign({
+            method: 'GET',
+            auth: {
+                username: login[ip].username,
+                password: login[ip].token,
+            },
+            url,
+        }, axiosConfig));
+
         console.log('install successful. id:',response.data.id);
    }
     else {
