@@ -35,7 +35,6 @@ function getLogin(ip) {
         username: login.username,
         password: login.token,
     };
-    console.log('login', ret);
 
     return ret;
 }
