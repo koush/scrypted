@@ -2,7 +2,9 @@
   "name": "ui",
   "private": true,
   "scripts": {
+    "dev": "concurrently --names 'server,client' --prefix-colors 'gray,white.bold' --prefix '{time} ({name})\t' --timestamp-format 'HH:mm:ss.SSS' --kill-others npm:serve-server npm:serve",
     "serve": "vue-cli-service serve --open",
+    "serve-server": "cd ../../../server && npm run serve",
     "build": "vue-cli-service build --dest ../fs/dist",
     "lint": "vue-cli-service lint",
     "postinstall": "(cd ../../../server && npm install); (cd ../client && npm install)"
@@ -74,6 +76,7 @@
     "@vue/cli-service": "^4.5.13",
     "babel-eslint": "^10.1.0",
     "babel-plugin-transform-imports": "^2.0.0",
+    "concurrently": "^6.2.1",
     "eslint": "^7.21.0",
     "eslint-plugin-vue": "^7.7.0",
     "monaco-editor-webpack-plugin": "^4.1.2",
