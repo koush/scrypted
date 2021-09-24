@@ -4,6 +4,7 @@ import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdat
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
+import { recommendRebroadcast } from "../../rtsp/src/recommend";
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -275,6 +276,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         super();
 
         this.startup = this.discoverDevices(0)
+        recommendRebroadcast();
     }
 
     async discoverDevices(duration: number) {

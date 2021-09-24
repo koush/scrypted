@@ -1,4 +1,4 @@
-import { MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 
 const { systemManager } = sdk;

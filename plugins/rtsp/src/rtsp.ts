@@ -1,7 +1,8 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput } from "@scrypted/sdk";
-import { KeyObject } from "crypto";
 import { EventEmitter } from "stream";
+import { recommendRebroadcast } from "./recommend";
 const { log, deviceManager, mediaManager } = sdk;
+
 
 export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
     constructor(nativeId: string) {
@@ -184,6 +185,8 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
             if (camId)
                 this.getDevice(camId);
         }
+
+        recommendRebroadcast();
     }
 
     getAdditionalInterfaces() {

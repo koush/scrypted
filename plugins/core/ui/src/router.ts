@@ -42,6 +42,10 @@ let router = new VueRouter({
         component: InstallPlugin
       },
       {
+        path: "/component/plugin/install/*",
+        component: InstallPlugin
+      },
+      {
         path: "/component/aggregate",
         component: AggregateComponent
       },

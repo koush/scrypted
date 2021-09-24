@@ -1,21 +1,38 @@
 <template>
   <v-layout wrap>
-    <!-- <v-flex xs12 v-if="deviceComponent && deviceComponent === 'Script'">
-      <component
-        @save="saveStorage"
-        :is="deviceComponent"
-        v-model="deviceData"
-        :id="id"
-        ref="componentCard"
-      ></component>
-    </v-flex> -->
+    <v-flex xs12>
+      <div v-if="deviceAlerts.length" class="pb-5">
+        <v-alert
+          dismissible
+          @input="removeAlert(alert)"
+          v-for="alert in deviceAlerts"
+          :key="alert.id"
+          xs12
+          md6
+          lg6
+          outlined
+          text
+          color="primary"
+          icon="mdi-vuetify"
+          border="left"
+        >
+          <template v-slot:prepend>
+            <v-icon class="white--text mr-3" size="sm" color="#a9afbb">{{
+              getAlertIcon(alert)
+            }}</v-icon>
+          </template>
+          <div class="caption">{{ alert.title }}</div>
+          <div
+            v-linkified:options="{ className: 'alert-link' }"
+            v-html="alert.message.replace('origin:', origin)"
+            style="color: white"
+          ></div>
+        </v-alert>
+      </div>
+    </v-flex>
 
     <v-flex v-for="iface in noCardAboveInterfaces" :key="iface">
-      <component
-        :value="deviceState"
-        :device="device"
-        :is="iface"
-      ></component>
+      <component :value="deviceState" :device="device" :is="iface"></component>
     </v-flex>
 
     <v-flex xs12 v-if="showConsole" ref="consoleEl">
@@ -28,34 +45,6 @@
     <v-flex xs12 md6 v-if="name != null">
       <v-layout row wrap>
         <v-flex xs12>
-          <div v-if="deviceAlerts.length" class="pb-5">
-            <v-alert
-              dismissible
-              @input="removeAlert(alert)"
-              v-for="alert in deviceAlerts"
-              :key="alert.id"
-              xs12
-              md6
-              lg6
-              outlined
-              text
-              color="primary"
-              icon="mdi-vuetify"
-              border="left"
-            >
-              <template v-slot:prepend>
-                <v-icon class="white--text mr-3" size="sm" color="#a9afbb">{{
-                  getAlertIcon(alert)
-                }}</v-icon>
-              </template>
-              <div class="caption">{{ alert.title }}</div>
-              <div
-                v-linkified:options="{ className: 'alert-link' }"
-                v-html="alert.message"
-                style="color: white"
-              ></div>
-            </v-alert>
-          </div>
 
           <v-card raised>
             <v-card-title class="orange-gradient subtitle-1 font-weight-light">
@@ -239,7 +228,10 @@
               >
 
               <v-spacer></v-spacer>
-              <PluginAdvancedUpdate :pluginData="pluginData" @installed="reload" />
+              <PluginAdvancedUpdate
+                :pluginData="pluginData"
+                @installed="reload"
+              />
             </v-card-actions>
           </v-card>
         </v-flex>
@@ -442,7 +434,7 @@ import { checkUpdate } from "./plugin/plugin";
 import AggregateDevice from "./aggregate/AggregateDevice.vue";
 import Automation from "./automation/Automation.vue";
 import Script from "./script/Script.vue";
-import PluginAdvancedUpdate from './plugin/PluginAdvancedUpdate.vue';
+import PluginAdvancedUpdate from "./plugin/PluginAdvancedUpdate.vue";
 import Vue from "vue";
 import {
   getDeviceAvailableMixins,
@@ -690,7 +682,7 @@ export default {
       );
       this.pluginData = pluginData;
       checkUpdate(pluginData.pluginId, pluginData.packageJson.version).then(
-        result => Object.assign(pluginData, result)
+        (result) => Object.assign(pluginData, result)
       );
 
       const device = this.device;
@@ -769,6 +761,9 @@ export default {
     },
   },
   computed: {
+    origin() {
+      return window.location.origin;
+    },
     ownerDevice() {
       if (this.device.providerId === this.device.id) return;
       return this.$scrypted.systemManager.getDeviceById(this.device.providerId);

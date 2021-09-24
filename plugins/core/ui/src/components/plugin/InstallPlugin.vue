@@ -78,7 +78,7 @@ import { installNpm } from "./plugin";
 export default {
   data: function () {
     return {
-      search: "",
+      search: this.$route.params.pathMatch || '',
       results: [],
     };
   },
