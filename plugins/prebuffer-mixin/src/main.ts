@@ -10,7 +10,7 @@ import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
 import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 
-const { mediaManager, log, systemManager } = sdk;
+const { mediaManager, log, systemManager, deviceManager } = sdk;
 
 const defaultPrebufferDuration = 15000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
@@ -318,6 +318,15 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 }
 
+function millisUntilMidnight() {
+  var midnight = new Date();
+  midnight.setHours(24);
+  midnight.setMinutes(0);
+  midnight.setSeconds(0);
+  midnight.setMilliseconds(0);
+  return (midnight.getTime() - new Date().getTime());
+}
+
 class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider {
   constructor(nativeId?: string) {
     super(nativeId);
@@ -329,6 +338,12 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
         continue;
       device.getVideoStreamOptions();
     }
+
+    // schedule restarts at 2am
+    const midnight = millisUntilMidnight();
+    const twoAM = midnight + 2 * 60 * 60 * 1000;
+    this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
+    setTimeout(() => deviceManager.requestRestart(), twoAM);
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
