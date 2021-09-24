@@ -198,9 +198,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
     console.log(args);
 
-    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-        // stdio: 'ignore',
-    });
+    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
     ffmpegLogInitialOutput(console, cp);
 
     cp.on('exit', kill);
