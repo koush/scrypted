@@ -1,6 +1,6 @@
 import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
-import { Stream } from "stream";
-import { RtspSmartCamera, RtspProvider } from "../../rtsp/src/rtsp";
+import { EventEmitter, Stream } from "stream";
+import { RtspSmartCamera, RtspProvider, Destroyable } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifEvent } from "./onvif-api";
 
 const { mediaManager } = sdk;
@@ -8,6 +8,14 @@ const { mediaManager } = sdk;
 
 class OnvifCamera extends RtspSmartCamera implements Camera {
     eventStream: Stream;
+    listenEvents(): EventEmitter & Destroyable {
+        const ret: any = new EventEmitter();
+        ret.destroy = () => {
+
+        };
+
+        return ret;
+    }
 
     constructor(nativeId: string) {
         super(nativeId);
