@@ -8,8 +8,9 @@ import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
 import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk } from '@scrypted/common/src/stream-parser';
+import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 
-const { mediaManager, log } = sdk;
+const { mediaManager, log, systemManager } = sdk;
 
 const defaultPrebufferDuration = 15000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
@@ -35,6 +36,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   session: FFMpegRebroadcastSession;
   detectedIdrInterval = 0;
   prevIdr = 0;
+  unexpectedPCM = false;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
     super(mixinDevice, mixinDeviceState, {
@@ -118,7 +120,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await this.mixinDevice.getVideoStream(), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
-    const reencodeAudio = this.storage.getItem(REENCODE_AUDIO) === 'true';
+    const reencodeAudio = this.storage.getItem(REENCODE_AUDIO) === 'true' || this.unexpectedPCM;
 
     const probe = await probeVideoCamera(this.mixinDevice);
 
@@ -159,8 +161,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     }
     else if (this.session.inputAudioCodec !== 'aac') {
       console.error(this.name, 'Detected audio codec was not AAC.');
-      if (this.name?.indexOf('pcm') !== -1 && !reencodeAudio) {
-        log.a(`${this.name} is using PCM audio. You will need to enable Reencode Audio in Rebroadcast Settings for this stream.`);
+      if (session.inputAudioCodec && session.inputAudioCodec.indexOf('pcm') !== -1 && !reencodeAudio) {
+        log.a(`${this.name} is using PCM audio and will be reencoded. Enable Reencode Audio in Rebroadcast Settings to disable this alert.`);
+        this.unexpectedPCM = true;
       }
     }
 
@@ -315,7 +318,19 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 }
 
-class PrebufferProvider extends ScryptedDeviceBase implements MixinProvider {
+class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider {
+  constructor(nativeId?: string) {
+    super(nativeId);
+
+    // trigger the prebuffer.
+    for (const id of Object.keys(systemManager.getSystemState())) {
+      const device = systemManager.getDeviceById<VideoCamera>(id);
+      if (!device.mixins?.includes(this.id))
+        continue;
+      device.getVideoStreamOptions();
+    }
+  }
+
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
@@ -323,6 +338,7 @@ class PrebufferProvider extends ScryptedDeviceBase implements MixinProvider {
   }
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+    this.setHasEnabledMixin(mixinDeviceState.id);
     return new PrebufferMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
   }
   async releaseMixin(id: string, mixinDevice: any) {
