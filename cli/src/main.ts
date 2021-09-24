@@ -59,7 +59,7 @@ const axiosConfig: AxiosRequestConfig = {
 
 async function main() {
     if (process.argv[2] === 'login') {
-        const ip = process.argv[4] || '127.0.0.1';
+        const ip = process.argv[3] || '127.0.0.1';
         await doLogin(ip);
         console.log('login successful.')
     }
