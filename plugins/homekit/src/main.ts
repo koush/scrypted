@@ -8,6 +8,7 @@ import { maybeAddBatteryService } from './battery';
 import { randomBytes } from 'crypto';
 import qrcode from 'qrcode';
 import packageJson from "../package.json";
+import { randomPinCode } from './pincode';
 
 const { systemManager } = sdk;
 
@@ -52,10 +53,10 @@ const uuid = localStorage.getItem('uuid');
 
 const includeToken = 4;
 
-
 class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, HomeKitSession {
     bridge = new Bridge('Scrypted', uuid);
     snapshotThrottles = new Map<string, SnapshotThrottle>();
+    pincode = randomPinCode();
 
     constructor() {
         super();
@@ -87,7 +88,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 title: "Manual Pairing Code",
                 key: "pairingCode",
                 readonly: true,
-                value: "123-45-678",
+                value: this.pincode,
             },
             {
                 title: "Camera QR Code",
@@ -181,7 +182,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 if (supportedType.noBridge) {
                     accessory.publish({
                         username: '12:34:45:54:24:44',
-                        pincode: '123-45-678',
+                        pincode: this.pincode,
                         port: Math.round(Math.random() * 30000 + 10000),
                         category: Categories.TELEVISION,
                     })
@@ -205,7 +206,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         const publishInfo: PublishInfo = {
             username: username,
             port: Math.round(Math.random() * 30000 + 10000),
-            pincode: '123-45-678',
+            pincode: this.pincode,
             category: Categories.BRIDGE,
             addIdentifyingMaterial: true,
         };
