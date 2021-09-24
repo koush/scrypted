@@ -6,46 +6,27 @@ import { connectCameraAPI, OnvifEvent } from "./onvif-api";
 const { mediaManager } = sdk;
 
 
-class OnvifCamera extends RtspSmartCamera implements Camera {
+class OnvifCamera extends RtspSmartCamera {
     eventStream: Stream;
     listenEvents(): EventEmitter & Destroyable {
+        (async () => {
+            const client = await this.createClient();
+            const events = client.listenEvents();
+            events.on('event', event => {
+                if (event === OnvifEvent.MotionStart)
+                    this.motionDetected = true;
+                else if (event === OnvifEvent.MotionStop)
+                    this.motionDetected = false;
+                else if (event === OnvifEvent.AudioStart)
+                    this.audioDetected = true;
+                else if (event === OnvifEvent.AudioStop)
+                    this.audioDetected = false;
+            })
+        })();
         const ret: any = new EventEmitter();
         ret.destroy = () => {
-
         };
-
         return ret;
-    }
-
-    constructor(nativeId: string) {
-        super(nativeId);
-
-        this.createMotionStream();
-    }
-
-    async createMotionStream() {
-        while (true) {
-            try {
-                this.motionDetected = false;
-                this.audioDetected = false;
-
-                const api = await this.createClient();
-                for await (const event of api.listenEvents()) {
-                    if (event === OnvifEvent.MotionStart)
-                        this.motionDetected = true;
-                    else if (event === OnvifEvent.MotionStop)
-                        this.motionDetected = false;
-                    else if (event === OnvifEvent.AudioStart)
-                        this.audioDetected = true;
-                    else if (event === OnvifEvent.AudioStop)
-                        this.audioDetected = false;
-                }
-            }
-            catch (e) {
-                console.error('event listener failure', e);
-                await new Promise(resolve => setTimeout(resolve, 10000));
-            }
-        }
     }
 
     createClient() {

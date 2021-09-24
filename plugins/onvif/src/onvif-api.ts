@@ -1,4 +1,5 @@
 import { EventEmitter, once } from 'events';
+import { Destroyable } from '../../rtsp/src/rtsp';
 import DigestClient from './digest-client';
 
 const onvif = require('onvif');
@@ -11,37 +12,31 @@ export enum OnvifEvent {
     AudioStop,
 }
 
-export class OnvifCameraAPI extends EventEmitter {
+export class OnvifCameraAPI {
     digestAuth: DigestClient;
 
     constructor(public cam: any, username: string, password: string) {
-        super();
-
         this.digestAuth = new DigestClient(username, password);
     }
 
-    async* listenEvents() {
-
+    listenEvents() {
+        const ret = new EventEmitter();
         this.cam.on('event', (event: any) => {
             const value = event.message?.message?.data?.simpleItem?.$?.Value;
             if (event.topic?._?.indexOf('MotionAlarm') !== -1) {
                 if (value === true)
-                    this.emit('event', OnvifEvent.MotionStart)
+                    ret.emit('event', OnvifEvent.MotionStart)
                 else if (value === false)
-                    this.emit('event', OnvifEvent.MotionStop)
+                    ret.emit('event', OnvifEvent.MotionStop)
             }
             else if (event.topic?._?.indexOf('DetectedSound') !== -1) {
                 if (value === true)
-                    this.emit('event', OnvifEvent.AudioStart)
+                    ret.emit('event', OnvifEvent.AudioStart)
                 if (value === false)
-                    this.emit('event', OnvifEvent.AudioStop)
+                    ret.emit('event', OnvifEvent.AudioStop)
             }
         });
-
-        while (true) {
-            const [event] = await once(this, 'event');
-            yield event as OnvifEvent;
-        }
+        return ret;
     }
 
     async getStreamUrl(): Promise<string> {
@@ -51,7 +46,7 @@ export class OnvifCameraAPI extends EventEmitter {
     async jpegSnapshot(): Promise<Buffer> {
         const url: string = (await new Promise((resolve, reject) => this.cam.getSnapshotUri((err: Error, uri: string) => err ? reject(err) : resolve(uri))) as any).uri;
 
-        const response = await this.digestAuth.fetch(            url);
+        const response = await this.digestAuth.fetch(url);
         const buffer = await response.arrayBuffer();
 
         return Buffer.from(buffer);
