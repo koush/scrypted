@@ -1,12 +1,13 @@
 {
   "name": "scrypted",
-  "version": "1.0.18",
+  "version": "1.0.20",
   "description": "",
   "main": "dist/main.js",
   "bin": {
     "scrypted": "dist/main.js"
   },
   "scripts": {
+    "prepublishOnly": "npm run build",
     "build": "tsc",
     "start": "node dist/main.js"
   },
