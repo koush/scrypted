@@ -12,6 +12,24 @@ export enum OnvifEvent {
     AudioStop,
 }
 
+function stripNamespaces(topic: string) {
+    // example input :-   tns1:MediaControl/tnsavg:ConfigurationUpdateAudioEncCfg 
+    // Split on '/'
+    // For each part, remove any namespace
+    // Recombine parts that were split with '/'
+    let output = '';
+    let parts = topic.split('/')
+    for (let index = 0; index < parts.length; index++) {
+        let stringNoNamespace = parts[index].split(':').pop() // split on :, then return the last item in the array
+        if (output.length == 0) {
+            output += stringNoNamespace
+        } else {
+            output += '/' + stringNoNamespace
+        }
+    }
+    return output
+}
+
 export class OnvifCameraAPI {
     digestAuth: DigestClient;
 
@@ -22,18 +40,21 @@ export class OnvifCameraAPI {
     listenEvents() {
         const ret = new EventEmitter();
         this.cam.on('event', (event: any) => {
-            const value = event.message?.message?.data?.simpleItem?.$?.Value;
-            if (event.topic?._?.indexOf('MotionAlarm') !== -1) {
-                if (value === true)
-                    ret.emit('event', OnvifEvent.MotionStart)
-                else if (value === false)
-                    ret.emit('event', OnvifEvent.MotionStop)
-            }
-            else if (event.topic?._?.indexOf('DetectedSound') !== -1) {
-                if (value === true)
-                    ret.emit('event', OnvifEvent.AudioStart)
-                if (value === false)
-                    ret.emit('event', OnvifEvent.AudioStop)
+            const eventTopic = stripNamespaces(event.topic._)
+
+            if (event.message.message.data && event.message.message.data.simpleItem) {
+                const dataValue = event.message.message.data.simpleItem.$.Value
+                if (eventTopic.includes('MotionAlarm')) {
+                    if (dataValue)
+                        ret.emit('event', OnvifEvent.MotionStart)
+                    else
+                        ret.emit('event', OnvifEvent.MotionStop)
+                } else if (eventTopic.includes('DetectedSound')) {
+                    if (dataValue)
+                        ret.emit('event', OnvifEvent.AudioStart)
+                    else
+                        ret.emit('event', OnvifEvent.AudioStop)
+                }
             }
         });
         return ret;
