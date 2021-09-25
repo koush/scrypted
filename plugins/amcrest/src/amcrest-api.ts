@@ -7,6 +7,8 @@ export enum AmcrestEvent {
     MotionStop = "Code=VideoMotion;action=Stop",
     AudioStart = "Code=AudioMutation;action=Start",
     AudioStop = "Code=AudioMutation;action=Stop",
+    TalkInvite = "Code=_DoTalkAction_;action=Invite",
+    TalkHangup = "Code=_DoTalkAction_;action=Hangup",
 }
 
 export class AmcrestCameraClient {
@@ -35,7 +37,7 @@ export class AmcrestCameraClient {
     }
 
     async listenEvents() {
-        const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[VideoMotion,AudioMutation]`;
+        const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[All]`;
         console.log('preparing event listener', url);
 
         const httpsAgent = new https.Agent({
