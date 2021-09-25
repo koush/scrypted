@@ -70,6 +70,10 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
         return this.storage.getItem('password');
     }
 
+    async getOtherSettings(): Promise<Setting[]> {
+        return [];
+    }
+
     async getSettings(): Promise<Setting[]> {
         return [
             {
@@ -91,6 +95,7 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
                 value: (this.isAudioDisabled()).toString(),
             },
             ...await this.getUrlSettings(),
+            ...await this.getOtherSettings(),
         ];
     }
 
@@ -100,7 +105,7 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
 }
 
 export interface Destroyable {
-    destroy(): void ;
+    destroy(): void;
 }
 
 export abstract class RtspSmartCamera extends RtspCamera {
@@ -204,18 +209,26 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
         ]
     }
 
-    async putSetting(key: string, value: string | number) {
-        // generate a random id
-        var nativeId = Math.random().toString();
-        var name = value.toString();
+    getInterfaces() {
+        return [ScryptedInterface.VideoCamera,
+        ScryptedInterface.Settings, ...this.getAdditionalInterfaces()];
+    }
 
+    updateDevice(nativeId: string, name: string, interfaces: string[], type?: ScryptedDeviceType) {
         deviceManager.onDeviceDiscovered({
             nativeId,
-            name: name,
-            interfaces: [ScryptedInterface.VideoCamera,
-            ScryptedInterface.Settings, ...this.getAdditionalInterfaces()],
-            type: ScryptedDeviceType.Camera,
+            name,
+            interfaces,
+            type: type || ScryptedDeviceType.Camera,
         });
+    }
+
+    async putSetting(key: string, value: string | number) {
+        // generate a random id
+        const nativeId = Math.random().toString();
+        const name = value.toString();
+
+        this.updateDevice(nativeId, name, this.getInterfaces());
 
         var text = `New Camera ${name} ready. Check the notification area to complete setup.`;
         log.a(text);
@@ -225,7 +238,7 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
     async discoverDevices(duration: number) {
     }
 
-    createCamera(nativeId: string): RtspCamera{
+    createCamera(nativeId: string): RtspCamera {
         return new RtspCamera(nativeId);
     }
 
