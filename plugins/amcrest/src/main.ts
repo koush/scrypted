@@ -37,10 +37,10 @@ class AmcrestCamera extends RtspSmartCamera implements Camera {
                     else if (event === AmcrestEvent.AudioStop) {
                         this.audioDetected = false;
                     }
-                    else if (event === AmcrestEvent.TalkInvite) {
+                    else if (event === AmcrestEvent.TalkInvite || event === AmcrestEvent.AlarmIPCStart) {
                         this.binaryState = true;
                     }
-                    else if (event === AmcrestEvent.TalkHangup) {
+                    else if (event === AmcrestEvent.TalkHangup || event === AmcrestEvent.AlarmIPCStop) {
                         this.binaryState = false;
                     }
                 })
