@@ -407,6 +407,9 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 continue;
             try {
                 const status = await supportedType.query(device);
+                // don't report state on devices with no state
+                if (!Object.keys(status).length)
+                    continue;
                 report.payload.devices.states[id] = Object.assign({
                     online: true,
                 }, status);
