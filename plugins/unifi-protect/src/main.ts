@@ -4,6 +4,7 @@ import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdat
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
+import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
 import { recommendRebroadcast } from "../../rtsp/src/recommend";
 
 const { log, deviceManager, mediaManager } = sdk;
@@ -30,21 +31,21 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     }
 
     isChannelEnabled(channel: ProtectCameraChannelConfig) {
-        return this.storage.getItem('disable-'+channel.id) !== 'true';
+        return this.storage.getItem('disable-' + channel.id) !== 'true';
     }
 
     async getSettings(): Promise<Setting[]> {
         const channels = this.findCamera().channels || [];
         return channels.map(channel => ({
             title: `Disable Stream: ${channel.name}`,
-            key: 'disable-'+channel.id,
+            key: 'disable-' + channel.id,
             value: (!this.isChannelEnabled(channel)).toString(),
             type: 'boolean',
             description: 'Prevent usage of this Unifi Protect RTSP channel in Scrypted.',
         }));
     }
 
-    async putSetting(key: string, value: string | number | boolean){
+    async putSetting(key: string, value: string | number | boolean) {
         this.storage.setItem(key, value?.toString());
     }
 
@@ -154,7 +155,7 @@ class UnifiDoorbell extends UnifiCamera implements Intercom {
         const ffmpeg = await mediaManager.getFFmpegPath();
         this.cp = child_process.spawn(ffmpeg, args);
         this.cp.on('killed', () => this.cp = undefined);
-        ffmpegLogInitialOutput(console, this.cp);
+        ffmpegLogInitialOutput(this.console, this.cp);
     }
 
     async stopIntercom() {
@@ -170,11 +171,18 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     api: ProtectApi;
     startup: Promise<void>;
 
+    constructor(nativeId?: string, createOnly?: boolean) {
+        super(nativeId);
+
+        this.startup = this.discoverDevices(0)
+        recommendRebroadcast();
+    }
+
     listener = (event: Buffer) => {
-        const updatePacket = ProtectApiUpdates.decodeUpdatePacket(console, event);
+        const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
 
         if (!updatePacket) {
-            console.error("%s: Unable to process message from the realtime update events API.", this.api.getNvrName());
+            this.console.error("%s: Unable to process message from the realtime update events API.", this.api.getNvrName());
             return;
         }
 
@@ -272,13 +280,6 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
     };
 
-    constructor() {
-        super();
-
-        this.startup = this.discoverDevices(0)
-        recommendRebroadcast();
-    }
-
     async discoverDevices(duration: number) {
         const ip = this.getSetting('ip');
         const username = this.getSetting('username');
@@ -302,7 +303,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         }
 
         if (!this.api) {
-            this.api = new ProtectApi(() => {}, console, ip, username, password);
+            this.api = new ProtectApi(() => { }, this.console, ip, username, password);
         }
 
         try {
@@ -349,6 +350,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 }
 
                 const d: Device = {
+                    providerNativeId: this.nativeId,
                     name: camera.name,
                     nativeId: camera.id,
                     info: {
@@ -377,9 +379,15 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 devices.push(d);
             }
 
-            await deviceManager.onDevicesChanged({
-                devices
-            });
+            for (const d of devices) {
+                await deviceManager.onDeviceDiscovered(d);
+            }
+
+            // todo: uncomment after implementing per providerNativeId onDevicesChanged.
+            // await deviceManager.onDevicesChanged({
+            //     providerNativeId: this.nativeId,
+            //     devices
+            // });
 
             for (const device of devices) {
                 this.getDevice(device.nativeId);
@@ -409,13 +417,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         return this.storage.getItem(key);
     }
     async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'ip',
-                title: 'Unifi Protect IP',
-                placeholder: '192.168.1.100',
-                value: this.getSetting('ip') || '',
-            },
+        const ret: Setting[] = [
             {
                 key: 'username',
                 title: 'Username',
@@ -427,12 +429,35 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 type: 'Password',
                 value: this.getSetting('password') || '',
             },
+            {
+                key: 'ip',
+                title: 'Unifi Protect IP',
+                placeholder: '192.168.1.100',
+                value: this.getSetting('ip') || '',
+            },
         ];
+
+        if (!isInstanceableProviderModeEnabled()) {
+            ret.push({
+                key: 'instance-mode',
+                title: 'Multiple Unifi Protect Applications',
+                value: '',
+                description: 'To add more than one Unifi Protect application, you will need to migrate the plugin to multi-application mode. Type "MIGRATE" in the textbox to confirm.',
+                placeholder: 'MIGRATE',
+            });
+        }
+        return ret;
     }
     async putSetting(key: string, value: string | number) {
+        if (key === 'instance-mode') {
+            if (value === 'MIGRATE') {
+                await enableInstanceableProviderMode();
+            }
+            return;
+        }
         this.storage.setItem(key, value.toString());
         this.discoverDevices(0);
     }
 }
 
-export default new UnifiProtect();
+export default createInstanceableProviderPlugin(nativeid => new UnifiProtect(nativeid));
