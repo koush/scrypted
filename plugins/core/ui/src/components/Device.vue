@@ -412,6 +412,7 @@ import Thermometer from "../interfaces/sensors/Thermometer.vue";
 import HumiditySensor from "../interfaces/sensors/HumiditySensor.vue";
 import EntrySensor from "../interfaces/sensors/EntrySensor.vue";
 import MotionSensor from "../interfaces/sensors/MotionSensor.vue";
+import BinarySensor from "../interfaces/sensors/BinarySensor.vue";
 import AudioSensor from "../interfaces/sensors/AudioSensor.vue";
 import OccupancySensor from "../interfaces/sensors/OccupancySensor.vue";
 import Settings from "../interfaces/Settings.vue";
@@ -446,6 +447,7 @@ const cardHeaderInterfaces = [
   ScryptedInterface.OccupancySensor,
   ScryptedInterface.EntrySensor,
   ScryptedInterface.MotionSensor,
+  ScryptedInterface.BinarySensor,
   ScryptedInterface.AudioSensor,
   ScryptedInterface.HumiditySensor,
   ScryptedInterface.Thermometer,
@@ -540,6 +542,7 @@ export default {
     HumiditySensor,
     EntrySensor,
     MotionSensor,
+    BinarySensor,
     AudioSensor,
     OccupancySensor,
 
