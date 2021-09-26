@@ -12,17 +12,19 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         ret.destroy = () => {
         };
         (async () => {
-            const api = this.createClient();
+            const api = (this.provider as HikVisionProvider).createSharedClient(this.getHttpAddress(), this.getUsername(), this.getPassword());
             try {
                 const events = await api.listenEvents();
                 ret.destroy = () => {
                     events.removeAllListeners();
-                    events.destroy();
                 };
 
                 events.on('close', () => ret.emit('error', new Error('close')));
                 events.on('error', e => ret.emit('error', e));
-                events.on('event', (event: HikVisionCameraEvent) => {
+                events.on('event', (event: HikVisionCameraEvent, channel: string) => {
+                    if (this.getRtspChannel() && channel !== this.getRtspChannel().substr(0, 1)) {
+                        return;
+                    }
                     if (event === HikVisionCameraEvent.MotionDetected) {
                         this.motionDetected = true;
                         clearTimeout(motionTimeout);
@@ -39,9 +41,13 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     createClient() {
         const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel());
+        return client;
+    }
 
+    async takePicture(): Promise<MediaObject> {
+        const api = this.createClient();
         (async () => {
-            const streamSetup = await client.checkStreamSetup();
+            const streamSetup = await api.checkStreamSetup();
             if (streamSetup.videoCodecType !== 'H.264') {
                 this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
             }
@@ -49,11 +55,6 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                 this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it it for AAC is recommended for optimal performance.`);
             }
         })();
-        return client;
-    }
-
-    async takePicture(): Promise<MediaObject> {
-        const api = this.createClient();
         return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
     }
 
@@ -76,7 +77,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
             },
         ]
     }
-    
+
     getRtspChannel() {
         return this.storage.getItem('rtspChannel');
     }
@@ -93,6 +94,12 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 }
 
 class HikVisionProvider extends RtspProvider {
+    clients: Map<string, HikVisionCameraAPI>;
+
+    constructor() {
+        super();
+    }
+
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Camera,
@@ -100,8 +107,20 @@ class HikVisionProvider extends RtspProvider {
         ];
     }
 
+    createSharedClient(address: string, username: string, password: string) {
+        if (!this.clients)
+            this.clients = new Map();
+
+        const check = this.clients.get(address);
+        if (check)
+            return check;
+        const client = new HikVisionCameraAPI(address, username, password);
+        this.clients.set(address, client);
+        return client;
+    }
+
     createCamera(nativeId: string) {
-        return new HikVisionCamera(nativeId);
+        return new HikVisionCamera(nativeId, this);
     }
 }
 

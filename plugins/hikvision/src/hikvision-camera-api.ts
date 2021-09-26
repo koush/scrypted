@@ -17,7 +17,7 @@ export interface HikVisionCameraStreamSetup {
 export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
 
-    constructor(public ip: string, username: string, password: string, public channel: string) {
+    constructor(public ip: string, username: string, password: string, public channel?: string) {
         this.digestAuth = new AxiosDigestAuth({
             username,
             password,
@@ -70,11 +70,12 @@ export class HikVisionCameraAPI {
             const data = buffer.toString();
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
+                    const channel = data.match(/<channelID>(.*?)</)?.[1];
                     if (this.channel
                         && data.indexOf(`<channelID>${this.channel.substr(0, 1)}</channelID>`) === -1) {
                         continue;
                     }
-                    stream.emit('event', event);
+                    stream.emit('event', event, channel);
                 }
             }
         });
