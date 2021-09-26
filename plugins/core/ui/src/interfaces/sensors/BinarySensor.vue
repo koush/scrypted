@@ -14,7 +14,7 @@
         small
       >far fa-circle</v-icon>
     </template>
-    <span>{{ !lazyValue.binaryState ? 'Binary State True ' : 'Binary State False' }}</span>
+    <span>{{ !lazyValue.binaryState ? 'Binary State False ' : 'Binary State True' }}</span>
   </v-tooltip>
 </template>
 
