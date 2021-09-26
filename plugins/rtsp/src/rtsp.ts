@@ -5,7 +5,7 @@ const { log, deviceManager, mediaManager } = sdk;
 
 
 export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
-    constructor(nativeId: string) {
+    constructor(nativeId: string, public provider: RtspProvider) {
         super(nativeId);
     }
     async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
@@ -111,8 +111,8 @@ export interface Destroyable {
 export abstract class RtspSmartCamera extends RtspCamera {
     lastListen = 0;
 
-    constructor(nativeId?: string) {
-        super(nativeId);
+    constructor(nativeId: string, provider: RtspProvider) {
+        super(nativeId, provider);
         this.listenLoop();
     }
 
@@ -238,14 +238,14 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
     async discoverDevices(duration: number) {
     }
 
-    createCamera(nativeId: string): RtspCamera {
-        return new RtspCamera(nativeId);
+    createCamera(nativeId: string, provider: RtspProvider): RtspCamera {
+        return new RtspCamera(nativeId, provider);
     }
 
     getDevice(nativeId: string) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
-            ret = this.createCamera(nativeId);
+            ret = this.createCamera(nativeId, this);
             if (ret)
                 this.devices.set(nativeId, ret);
         }
