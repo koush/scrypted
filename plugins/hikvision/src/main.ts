@@ -6,6 +6,8 @@ import { HikVisionCameraEvent } from "./hikvision-camera-api";
 const { mediaManager } = sdk;
 
 class HikVisionCamera extends RtspSmartCamera implements Camera {
+    hasCheckedCodec = false;
+
     listenEvents() {
         let motionTimeout: NodeJS.Timeout;
         const ret = new EventEmitter() as (EventEmitter & Destroyable);
@@ -41,13 +43,12 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     createClient() {
         const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel());
-        return client;
-    }
 
-    async takePicture(): Promise<MediaObject> {
-        const api = this.createClient();
         (async () => {
-            const streamSetup = await api.checkStreamSetup();
+            if (this.hasCheckedCodec)
+                return;
+            const streamSetup = await client.checkStreamSetup();
+            this.hasCheckedCodec = true;
             if (streamSetup.videoCodecType !== 'H.264') {
                 this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
             }
@@ -55,6 +56,13 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                 this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it it for AAC is recommended for optimal performance.`);
             }
         })();
+
+        return client;
+    }
+
+    async takePicture(): Promise<MediaObject> {
+        const api = this.createClient();
+
         return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
     }
 
