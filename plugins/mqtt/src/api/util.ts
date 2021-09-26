@@ -27,5 +27,7 @@ export function createMotionSensor(options: {
         timeout = setTimeout(() => device.motionDetected = false, options.delay * 1000);
     };
 
+    mqtt.subscribe(subscriptions);
+
     mqtt.handleTypes("MotionSensor");
 }
