@@ -444,18 +444,24 @@ export class ScryptedRuntime {
             this.invalidatePluginDevice(pluginDevice._id);
         }
 
+        const execArgv = ['--expose-gc'];
+        if (process.argv[0].endsWith('ts-node'))
+            execArgv.push('-r', 'ts-node/register');
+
         if (pluginDebug) {
             console.log('plugin inspect port', pluginDebug.inspectPort)
+            execArgv.push('--inspect');
+
             cluster.setupMaster({
                 silent: true,
                 inspectPort: pluginDebug.inspectPort,
-                execArgv: process.argv[0].endsWith('ts-node') ? ['--inspect', '-r', 'ts-node/register'] : ['--inspect'],
+                execArgv,
             });
         }
         else {
             cluster.setupMaster({
                 silent: true,
-                execArgv: process.argv[0].endsWith('ts-node') ? ['-r', 'ts-node/register'] : [],
+                execArgv,
             });
         }
 

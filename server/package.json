@@ -55,9 +55,9 @@
   },
   "scripts": {
     "preserve": "npm run build",
-    "serve": "node dist/scrypted-main.js",
-    "serve-no-build": "node dist/scrypted-main.js",
-    "ts-serve": "ts-node src/scrypted-main.ts",
+    "serve": "node --expose-gc dist/scrypted-main.js",
+    "serve-no-build": "node --expose-gc dist/scrypted-main.js",
+    "ts-serve": "ts-node --expose-gc src/scrypted-main.ts",
     "prebuild": "tsc --build --clean",
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js"

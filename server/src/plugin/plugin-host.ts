@@ -421,7 +421,8 @@ export function startPluginClusterWorker() {
             type: 'stats',
             cpu: cpuUsage,
             memoryUsage: process.memoryUsage(),
-        })
+        });
+        global?.gc();
     }, 10000);
 
     const consolePort = createConsoleServer(events);
