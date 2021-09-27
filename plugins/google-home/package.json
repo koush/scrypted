@@ -27,8 +27,10 @@
       ]
    },
    "dependencies": {
-      "actions-on-google": "^2.13.0",
+      "@googleapis/homegraph": "^2.0.0",
+      "actions-on-google": "^3.0.0",
       "axios": "^0.21.1",
+      "google-auth-library": "^7.9.2",
       "lodash": "^4.17.21",
       "mdns": "^2.7.2",
       "query-string": "^7.0.0",

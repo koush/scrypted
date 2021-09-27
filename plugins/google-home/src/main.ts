@@ -1,20 +1,24 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinDeviceBase, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
+import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands, SmartHomeV1QueryRequest, SmartHomeV1QueryResponse, SmartHomeV1ReportStateRequest, SmartHomeV1SyncRequest, SmartHomeV1SyncResponse } from 'actions-on-google/dist/service/smarthome/api/v1';
-import { smarthome } from 'actions-on-google/dist/service/smarthome';
-import type { Headers } from 'actions-on-google/dist/framework';
+import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
+// import { smarthome } from 'actions-on-google/dist/service/smarthome';
+// import type { Headers } from 'actions-on-google/dist/framework';
 import { supportedTypes } from './common';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
 import http from 'http';
 import './types';
 import './commands';
+import type { homegraph_v1 } from "@googleapis/homegraph/v1"
+import { GoogleAuth } from "google-auth-library"
 
 import { commandHandlers } from './handlers';
 import { canAccess } from './commands/camerastream';
 
 import mdns from 'mdns';
 import { URL } from 'url';
+import { homegraph } from '@googleapis/homegraph';
+import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
 
 const { systemManager, mediaManager, endpointManager, deviceManager } = sdk;
 
@@ -34,14 +38,15 @@ function parseJwt(jwt: string) {
     }
 }
 
+const googleAuth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/homegraph'],
+});
+
 const includeToken = 3;
 
 class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, MixinProvider {
     linkTracker = localStorage.getItem('linkTracker');
     agentUserId = localStorage.getItem('agentUserId');
-    app = smarthome({
-        jwt: parseJwt(localStorage.getItem('jwt')),
-    });
     reportQueue = new Set<string>();
     reportStateThrottled = throttle(() => this.reportState(), 2000);
     throttleSync = throttle(() => this.requestSync(), 15000, {
@@ -51,9 +56,17 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     plugins: Promise<any>;
     defaultIncluded: any;
     localEndpoint: http.Server;
+    jwt = parseJwt(this.storage.getItem('jwt'));
+    googleAuthClient: JSONClient;
+
+    homegraph = homegraph('v1');
 
     constructor() {
         super();
+
+        if (this.jwt) {
+            this.googleAuthClient = googleAuth.fromJSON(this.jwt);
+        }
 
         // the tracker tracks whether this device has been reported in a sync request payload.
         // this is because reporting too many devices in the initial sync fails upstream at google.
@@ -73,11 +86,6 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         catch (e) {
             this.defaultIncluded = {};
         }
-
-        this.app.onSync(this.onSync.bind(this));
-        this.app.onQuery(this.onQuery.bind(this));
-        this.app.onExecute(this.onExecute.bind(this));
-        this.app.onDisconnect(this.onDisconnect.bind(this));
 
         systemManager.listen((source, details, data) => {
             if (source && details.changed && details.property)
@@ -224,8 +232,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         this.reportStateThrottled();
     }
 
-    async onSync(body: SmartHomeV1SyncRequest, headers: Headers): Promise<SmartHomeV1SyncResponse> {
-        const ret: SmartHomeV1SyncResponse = {
+    async onSync(body: homegraph_v1.Schema$SyncRequest): Promise<homegraph_v1.Schema$SyncResponse> {
+        const ret: homegraph_v1.Schema$SyncResponse = {
             requestId: body.requestId,
             payload: {
                 agentUserId: this.agentUserId,
@@ -248,6 +256,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             const probe = await supportedType.getSyncResponse(device);
 
             probe.roomHint = device.room;
+            probe.notificationSupportedByAgent = true;
             ret.payload.devices.push(probe);
 
             if (this.storage.getItem(`link-${device.id}`) !== this.linkTracker) {
@@ -264,7 +273,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         return ret;
     }
 
-    async onQuery(body: SmartHomeV1QueryRequest, headers: Headers): Promise<SmartHomeV1QueryResponse> {
+    async onQuery(body: homegraph_v1.Schema$QueryRequest): Promise<homegraph_v1.Schema$QueryRequest> {
         const ret = {
             requestId: body.requestId,
             payload: {
@@ -317,7 +326,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         return ret;
     }
 
-    async onExecute(body: SmartHomeV1ExecuteRequest, headers: Headers): Promise<SmartHomeV1ExecuteResponse> {
+    async onExecute(body: SmartHomeV1ExecuteRequest): Promise<SmartHomeV1ExecuteResponse> {
         const ret: SmartHomeV1ExecuteResponse = {
             requestId: body.requestId,
             payload: {
@@ -376,7 +385,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         return ret;
     }
 
-    async onDisconnect(body: SmartHomeV1DisconnectRequest, headers: Headers): Promise<SmartHomeV1DisconnectResponse> {
+    async onDisconnect(body: SmartHomeV1DisconnectRequest): Promise<SmartHomeV1DisconnectResponse> {
         localStorage.setItem('disconnected', '');
         return {
         }
@@ -386,7 +395,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         const reporting = new Set(this.reportQueue);
         this.reportQueue.clear();
 
-        const report: SmartHomeV1ReportStateRequest = {
+        const report: homegraph_v1.Schema$ReportStateAndNotificationRequest = {
             requestId: uuidv4(),
             agentUserId: this.agentUserId,
             payload: {
@@ -426,8 +435,12 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
         this.console.log('reporting state:');
         this.console.log(JSON.stringify(report, undefined, 2));
-        if (this.app.jwt) {
-            const result = await this.app.reportState(report);
+        if (this.jwt) {
+            // const result = await this.app.reportState(report);
+            const result = await this.homegraph.devices.reportStateAndNotification({
+                auth: this.googleAuthClient,
+                requestBody: report,
+            });
             this.console.log('report state result:')
             this.console.log(result);
             return;
@@ -441,7 +454,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             return;
         }
         const { token_info } = cloudStorage;
-        const response = await axios.post('https://home.scrypted.app/_punch/reportState', report, {
+        const response = await axios.post('http://home.scrypted.app/_punch/reportState', report, {
             headers: {
                 Authorization: `Bearer ${token_info}`
             },
@@ -451,8 +464,13 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     }
 
     async requestSync() {
-        if (this.app.jwt) {
-            this.app.requestSync(this.agentUserId);
+        if (this.jwt) {
+            this.homegraph.devices.requestSync({
+                auth: this.googleAuthClient,
+                requestBody: {
+                    agentUserId: this.agentUserId,
+                }
+            });
             return;
         }
 
@@ -484,8 +502,22 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         this.console.log(request.body);
         const body = JSON.parse(request.body);
         try {
-            const result = await this.app.handler(body, request.headers as Headers);
-            const res = JSON.stringify(result.body);
+            let result: any;
+            switch (body.inputs[0].intent) {
+                case 'action.devices.QUERY':
+                    result = await this.onQuery(body);
+                    break;
+                case 'action.devices.SYNC':
+                    result = await this.onSync(body);
+                    break;
+                case 'action.devices.EXECUTE':
+                    result = await this.onExecute(body);
+                    break;
+                case 'action.devices.DISCONNECT':
+                    result = await this.onDisconnect(body);
+                    break;
+            }
+            const res = JSON.stringify(result);
             this.console.log(res);
             response.send(res, {
                 headers: result.headers,

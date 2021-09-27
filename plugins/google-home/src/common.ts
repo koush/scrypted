@@ -1,6 +1,7 @@
 import { Battery, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import type { SmartHomeV1ExecuteResponseCommands, SmartHomeV1SyncDevices } from 'actions-on-google/dist/service/smarthome/api/v1';
+import type { SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
+import type { homegraph_v1 } from "@googleapis/homegraph/v1"
 
 const { systemManager } = sdk;
 
@@ -12,7 +13,7 @@ export interface DummyDevice {
 interface SupportedType {
     type: ScryptedDeviceType;
     probe(device: DummyDevice): boolean;
-    getSyncResponse: (device: ScryptedDevice & any) => Promise<SmartHomeV1SyncDevices>;
+    getSyncResponse: (device: ScryptedDevice & any) => Promise<homegraph_v1.Schema$Device>;
     query: (device: ScryptedDevice & any) => Promise<any>;
 }
 
@@ -22,8 +23,8 @@ export function addSupportedType(type: SupportedType) {
     supportedTypes[type.type] = type;
 }
 
-export function syncResponse(device: ScryptedDevice, type: string): SmartHomeV1SyncDevices {
-    const ret: SmartHomeV1SyncDevices = {
+export function syncResponse(device: ScryptedDevice, type: string): homegraph_v1.Schema$Device {
+    const ret: homegraph_v1.Schema$Device = {
         id: device.id,
         name: {
             name: device.name,
