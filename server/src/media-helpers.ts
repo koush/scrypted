@@ -33,6 +33,7 @@ export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forev
     };
     cp.stdout?.on('data', logger(console.log));
     cp.stderr?.on('data', logger(console.error));
+    cp.on('kill', () => console.log('ffmpeg killed'));
 }
 
 export async function probeVideoCamera(device: VideoCamera) {

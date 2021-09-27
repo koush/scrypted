@@ -1,13 +1,18 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
 import { Stream } from "stream";
 import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
 import { RtspSmartCamera, RtspProvider, Destroyable } from "../../rtsp/src/rtsp";
 import { EventEmitter } from "stream";
+import child_process, { ChildProcess } from 'child_process';
+import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
+import net from 'net';
+import { listenZeroCluster } from "../../../common/src/listen-cluster";
 
 const { mediaManager } = sdk;
 
-class AmcrestCamera extends RtspSmartCamera implements Camera {
+class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     eventStream: Stream;
+    cp: ChildProcess;
 
     listenEvents() {
         const ret = new EventEmitter() as (EventEmitter & Destroyable);
@@ -88,9 +93,61 @@ class AmcrestCamera extends RtspSmartCamera implements Camera {
 
         this.storage.setItem(key, value);
         if (value === 'true')
-            provider.updateDevice(this.nativeId, this.name, [...provider.getInterfaces(), ScryptedInterface.BinarySensor], ScryptedDeviceType.Doorbell);
+            provider.updateDevice(this.nativeId, this.name, [...provider.getInterfaces(), ScryptedInterface.BinarySensor, ScryptedInterface.Intercom], ScryptedDeviceType.Doorbell);
         else
             provider.updateDevice(this.nativeId, this.name, provider.getInterfaces());
+    }
+
+    async startIntercom(media: MediaObject): Promise<void> {
+        // not sure if this all works, since i don't actually have a doorbell.
+        // good luck!
+
+        const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
+        const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
+
+        const args = ffmpegInput.inputArguments.slice();
+
+        const server = new net.Server(async (socket) => {
+            server.close();
+
+            const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=1`;
+            this.console.log('posting audio data to', url);
+
+            socket.on('data', data => this.console.log('got data', data.length));
+
+            const client = this.createClient();
+            try {
+                await client.digestAuth.request({
+                    method: 'POST',
+                    url,
+                    headers: {
+                        'Content-Type': 'Audio/G.711A',
+                        'Content-Length': '9999999'
+                    },
+                    data: socket
+                });
+            }
+            catch (e) {
+                this.console.error('audio finished', e);
+            }
+        });
+        const port = await listenZeroCluster(server)
+
+        args.push(
+            "-vn",
+            "-f",
+            "alaw",
+            `tcp://127.0.0.1:${port}`,
+        );
+
+        const ffmpeg = await mediaManager.getFFmpegPath();
+        this.cp = child_process.spawn(ffmpeg, args);
+        this.cp.on('killed', () => this.cp = undefined);
+        ffmpegLogInitialOutput(this.console, this.cp);
+    }
+    async stopIntercom(): Promise<void> {
+        this.cp?.kill();
+        this.cp = undefined;
     }
 }
 
