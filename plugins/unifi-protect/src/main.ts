@@ -460,4 +460,4 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     }
 }
 
-export default createInstanceableProviderPlugin(nativeid => new UnifiProtect(nativeid));
+export default createInstanceableProviderPlugin("Unifi Protect Application", nativeid => new UnifiProtect(nativeid));
