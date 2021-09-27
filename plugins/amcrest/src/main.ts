@@ -113,8 +113,6 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
             const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=1`;
             this.console.log('posting audio data to', url);
 
-            socket.on('data', data => this.console.log('got data', data.length));
-
             const client = this.createClient();
             try {
                 await client.digestAuth.request({
@@ -128,8 +126,9 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
                 });
             }
             catch (e) {
-                this.console.error('audio finished', e);
+                this.console.error('audio finished with error', e);
             }
+            this.cp.kill();
         });
         const port = await listenZeroCluster(server)
 
