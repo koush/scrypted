@@ -37,10 +37,14 @@ class AmcrestCamera extends RtspSmartCamera implements Camera {
                     else if (event === AmcrestEvent.AudioStop) {
                         this.audioDetected = false;
                     }
-                    else if (event === AmcrestEvent.TalkInvite || event === AmcrestEvent.AlarmIPCStart) {
+                    else if (event === AmcrestEvent.TalkInvite
+                        || event === AmcrestEvent.PhoneCallDetectStart
+                        || event === AmcrestEvent.AlarmIPCStart) {
                         this.binaryState = true;
                     }
-                    else if (event === AmcrestEvent.TalkHangup || event === AmcrestEvent.AlarmIPCStop) {
+                    else if (event === AmcrestEvent.TalkHangup
+                        || event === AmcrestEvent.PhoneCallDetectStop
+                        || event === AmcrestEvent.AlarmIPCStop) {
                         this.binaryState = false;
                     }
                 })
@@ -100,7 +104,7 @@ class AmcrestProvider extends RtspProvider {
     }
 
     getDevice(nativeId: string): object {
-        return new AmcrestCamera(nativeId);
+        return new AmcrestCamera(nativeId, this);
     }
 }
 

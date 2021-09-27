@@ -11,6 +11,8 @@ export enum AmcrestEvent {
     TalkHangup = "Code=_DoTalkAction_;action=Hangup",
     AlarmIPCStart = "Code=AlarmIPC;action=Start",
     AlarmIPCStop = "Code=AlarmIPC;action=Stop",
+    PhoneCallDetectStart = "Code=PhoneCallDetect;action=Start",
+    PhoneCallDetectStop = "Code=PhoneCallDetect;action=Stop",
 }
 
 export class AmcrestCameraClient {
