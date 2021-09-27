@@ -15,6 +15,7 @@ interface SupportedType {
     probe(device: DummyDevice): boolean;
     getSyncResponse: (device: ScryptedDevice & any) => Promise<homegraph_v1.Schema$Device>;
     query: (device: ScryptedDevice & any) => Promise<any>;
+    notifications?: (device: ScryptedDevice & any) => Promise<any>;
 }
 
 export const supportedTypes: { [type: string]: SupportedType } = {};

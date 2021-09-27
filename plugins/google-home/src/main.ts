@@ -1,8 +1,6 @@
 import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
-// import { smarthome } from 'actions-on-google/dist/service/smarthome';
-// import type { Headers } from 'actions-on-google/dist/framework';
 import { supportedTypes } from './common';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
@@ -416,12 +414,19 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 continue;
             try {
                 const status = await supportedType.query(device);
+                const notifications = await supportedType?.notifications(device);
+                const hasNotifications = notifications && !!Object.keys(notifications).length;
                 // don't report state on devices with no state
-                if (!Object.keys(status).length)
+                if (!Object.keys(status).length && !hasNotifications)
                     continue;
                 report.payload.devices.states[id] = Object.assign({
                     online: true,
                 }, status);
+                if (hasNotifications) {
+                    report.payload.devices.notifications[id] = notifications;
+                    // doesn't matter that this gets written per device.
+                    report.eventId = Date.now().toString();
+                }
             }
             catch (e) {
                 report.payload.devices.states[id] = {

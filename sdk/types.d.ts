@@ -786,7 +786,11 @@ export interface Device {
  * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
  */
 export interface DeviceManifest {
-  devices?: Device[];
+  /**
+   * The native id of the hub or discovery DeviceProvider that manages these devices.
+   */
+   providerNativeId?: string;
+   devices?: Device[];
 }
 /**
  * EndpointManager provides publicly accessible URLs that can be used to contact your Scrypted Plugin.

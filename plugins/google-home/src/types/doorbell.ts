@@ -1,4 +1,4 @@
-import { ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
 import { addSupportedType, queryResponse, syncResponse } from '../common';
 
 addSupportedType({
@@ -23,4 +23,19 @@ addSupportedType({
         const ret = queryResponse(device);
         return ret;
     },
+    async notifications(device: ScryptedDevice & BinarySensor) {
+        if (!device.binaryState)
+            return {};
+
+        const ret = {
+            ObjectDetection: {
+                objects: {
+                    "unfamiliar": 1
+                },
+                priority: 0,
+                detectionTimestamp: Date.now(),
+            }
+        }
+        return ret;
+    }
 })
