@@ -399,6 +399,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             payload: {
                 devices: {
                     states: {
+                    },
+                    notifications: {
                     }
                 }
             }

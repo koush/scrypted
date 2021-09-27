@@ -43,5 +43,5 @@
       "@types/mdns": "^0.0.34",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.20"
+   "version": "0.0.21"
 }
