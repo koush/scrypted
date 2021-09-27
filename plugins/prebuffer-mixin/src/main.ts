@@ -81,14 +81,14 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         title: 'Detected Video Codec',
         readonly: true,
         key: 'detectedVcodec',
-        value: this.session?.inputVideoCodec.toString() || 'none',
+        value: this.session?.inputVideoCodec?.toString() || 'none',
       },
       {
         group: 'Media Information',
         title: 'Detected Audio Codec',
         readonly: true,
         key: 'detectedAcodec',
-        value: this.session?.inputAudioCodec.toString() || 'none',
+        value: this.session?.inputAudioCodec?.toString() || 'none',
       },
       {
         group: 'Media Information',
@@ -96,7 +96,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         description: "Currently detected keyframe interval. This value may vary based on the stream behavior.",
         readonly: true,
         key: 'detectedIdr',
-        value: this.detectedIdrInterval.toString() || 'none',
+        value: this.detectedIdrInterval?.toString() || 'none',
       },
     );
     return settings;
