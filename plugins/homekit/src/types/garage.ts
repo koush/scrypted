@@ -7,14 +7,14 @@ import { makeAccessory } from './common';
 addSupportedType({
     type: ScryptedDeviceType.Garage,
     probe(device: DummyDevice): boolean {
-        return device.interfaces.includes(ScryptedInterface.Entry);
+        return device.interfaces.includes(ScryptedInterface.Entry) && device.interfaces.includes(ScryptedInterface.EntrySensor);
     },
     getAccessory: (device: ScryptedDevice & Entry) => {
         const accessory = makeAccessory(device);
 
         const service = accessory.addService(Service.GarageDoorOpener, device.name);
 
-        bindCharacteristic(device, ScryptedInterface.Entry, service, Characteristic.CurrentDoorState,
+        bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.CurrentDoorState,
             () => !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED);
 
         let targetState = !!device.entryOpen ? Characteristic.CurrentDoorState.OPEN : Characteristic.CurrentDoorState.CLOSED;
