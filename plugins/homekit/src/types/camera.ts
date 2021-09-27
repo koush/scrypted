@@ -627,7 +627,7 @@ addSupportedType({
         }
 
         const controller = new CameraController({
-            cameraStreamCount: 2,
+            cameraStreamCount: 8,
             delegate,
             streamingOptions,
             recording: {
