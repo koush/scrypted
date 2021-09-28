@@ -107,29 +107,22 @@ class RpcProxy implements ProxyHandler<any> {
 
     apply(target: any, thisArg: any, argArray?: any): any {
         const method = target();
-        const args = [];
+        const args: any[] = [];
         for (const arg of (argArray || [])) {
             args.push(this.peer.serialize(arg));
         }
 
-        const id = (this.peer.idCounter++).toString();
-        const rpcApply: RpcApply = {
-            type: "apply",
-            id,
-            proxyId: this.id,
-            argArray: args,
-            method,
-        }
-
-        const promise = new Promise((resolve, reject) => {
-            this.peer.pendingResults[id] = { resolve, reject };
+        return this.peer.createPendingResult(id => {
+            const rpcApply: RpcApply = {
+                type: "apply",
+                id,
+                proxyId: this.id,
+                argArray: args,
+                method,
+            };
 
             this.peer.send(rpcApply, e => new RPCResultError(e.message, e));
-        });
-        // todo: make this an option so rpc doesn't nuke the process if uncaught?
-        promise.catch(() => {});
-
-        return promise;
+        })
     }
 }
 
@@ -188,6 +181,23 @@ export class RpcPeer {
     constructor(public send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
     }
 
+    createPendingResult(cb: (id: string) => void): Promise<any> {
+        if (Object.isFrozen(this.pendingResults))
+            return Promise.reject(Error('RpcPeer has been killed'));
+
+        const promise = new Promise((resolve, reject) => {
+            const id = (this.idCounter++).toString();
+            this.pendingResults[id] = { resolve, reject };
+
+            cb(id);
+        });
+
+        // todo: make this an option so rpc doesn't nuke the process if uncaught?
+        promise.catch(() => { });
+
+        return promise;
+    }
+
     kill(message?: string) {
         const error = new RPCResultError(message || 'peer was killed');
         for (const result of Object.values(this.pendingResults)) {
@@ -214,32 +224,24 @@ export class RpcPeer {
         this.send(rpcFinalize);
     }
 
-    eval (script: string, filename?: string, params?: { [name: string]: any }, requireProxy?: boolean): Promise<any> {
-        const id = (this.idCounter++).toString();
+    eval(script: string, filename?: string, params?: { [name: string]: any }, requireProxy?: boolean): Promise<any> {
+        return this.createPendingResult(id => {
+            const coercedParams: { [name: string]: any } = {};
+            for (const key of Object.keys(params || {})) {
+                coercedParams[key] = this.serialize(params[key]);
+            }
 
-        const coercedParams: { [name: string]: any } = {};
-        for (const key of Object.keys(params || {})) {
-            coercedParams[key] = this.serialize(params[key]);
-        }
-
-        const evalMessage: RpcEval = {
-            type: 'eval',
-            id,
-            script,
-            filename,
-            params: coercedParams,
-            requireProxy,
-        }
-
-        const promise = new Promise((resolve, reject) => {
-            this.pendingResults[id] = { resolve, reject };
+            const evalMessage: RpcEval = {
+                type: 'eval',
+                id,
+                script,
+                filename,
+                params: coercedParams,
+                requireProxy,
+            };
 
             this.send(evalMessage, e => new RPCResultError(e.message, e));
         });
-        // todo: make this an option so rpc doesn't nuke the process if uncaught?
-        promise.catch(() => {});
-
-        return promise;
     }
 
     sendOob(oob: any) {
@@ -344,7 +346,7 @@ export class RpcPeer {
     newProxy(proxyId: string, proxyConstructorName: string, proxyProps: any) {
         const rpc = new RpcProxy(this, proxyId, proxyConstructorName, proxyProps);
         const wrapped = this.remoteProxyWrapper[proxyConstructorName]?.(rpc) || rpc;
-        const target = proxyConstructorName === 'Function' ? function() {} : wrapped;
+        const target = proxyConstructorName === 'Function' ? function () { } : wrapped;
         const proxy = new Proxy(target, wrapped);
         const weakref = new WeakRef(proxy);
         this.remoteWeakProxies[proxyId] = weakref;
