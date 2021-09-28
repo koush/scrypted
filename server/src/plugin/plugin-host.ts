@@ -379,9 +379,13 @@ export function startPluginClusterWorker() {
             retrieveSourceMap(source) {
                 if (source === '/plugin/main.nodejs.js') {
                     const entry = zip.getEntry('main.nodejs.js.map')
+                    const map = entry?.getData().toString();
+                    if (!map)
+                        return null;
+
                     return {
                         url: '/plugin/main.nodejs.js',
-                        map: entry?.getData().toString(),
+                        map,
                     }
                 }
                 return null;
