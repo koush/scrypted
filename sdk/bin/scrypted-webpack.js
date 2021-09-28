@@ -100,8 +100,7 @@ async function pack() {
                 // todo: read write file system? seems like a potential sandbox and backup nightmare to do a real fs. scripts should
                 // use localStorage, etc?
                 zip.addLocalFile(path.join(out, runtime.output));
-                if (process.NODE_ENV === 'production')
-                    zip.addLocalFile(path.join(out, runtime.output + '.map'));
+                zip.addLocalFile(path.join(out, runtime.output + '.map'));
                 console.log(runtime.output);
                 resolve();
             })
