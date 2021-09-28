@@ -32,6 +32,7 @@ function stripNamespaces(topic: string) {
 
 export class OnvifCameraAPI {
     digestAuth: DigestClient;
+    mainProfileToken: Promise<string>;
 
     constructor(public cam: any, username: string, password: string) {
         this.digestAuth = new DigestClient(username, password);
@@ -60,12 +61,26 @@ export class OnvifCameraAPI {
         return ret;
     }
 
+    async getMainProfileToken() {
+        if (this.mainProfileToken)
+            return this.mainProfileToken;
+        this.mainProfileToken = new Promise(async (resolve, reject) => {
+            const profiles = await new Promise((resolve) => this.cam.getProfiles((err: Error, result: any) => err ? reject(err) : resolve(result)));
+            const { token } = profiles[0].$;
+            resolve(token);
+        });
+        this.mainProfileToken.catch(() => this.mainProfileToken = undefined);
+        return this.mainProfileToken;
+    }
+
     async getStreamUrl(): Promise<string> {
-        return new Promise((resolve, reject) => this.cam.getStreamUri({ protocol: 'RTSP' }, (err: Error, uri: string) => err ? reject(err) : resolve(uri)));
+        const token = await this.getMainProfileToken();
+        return new Promise((resolve, reject) => this.cam.getStreamUri({ protocol: 'RTSP', profileToken: token }, (err: Error, uri: string) => err ? reject(err) : resolve(uri)));
     }
 
     async jpegSnapshot(): Promise<Buffer> {
-        const url: string = (await new Promise((resolve, reject) => this.cam.getSnapshotUri((err: Error, uri: string) => err ? reject(err) : resolve(uri))) as any).uri;
+        const token = await this.getMainProfileToken();
+        const url: string = (await new Promise((resolve, reject) => this.cam.getSnapshotUri({ profileToken: token }, (err: Error, uri: string) => err ? reject(err) : resolve(uri))) as any).uri;
 
         const response = await this.digestAuth.fetch(url);
         const buffer = await response.arrayBuffer();

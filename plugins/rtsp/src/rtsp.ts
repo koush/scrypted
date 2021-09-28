@@ -28,8 +28,13 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
 
     async getVideoStream(): Promise<MediaObject> {
         const url = new URL(await this.getStreamUrl());
-        url.username = this.storage.getItem("username")
-        url.password = this.storage.getItem("password");
+        this.console.log('rtsp stream url', url.toString());
+        const username = this.storage.getItem("username");
+        const password = this.storage.getItem("password");
+        if (username)
+            url.username = username;
+        if (password)
+            url.password = password;
 
         const vso = await this.getVideoStreamOptions();
         const ret: FFMpegInput = {

@@ -1,13 +1,15 @@
 import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable } from "../../rtsp/src/rtsp";
-import { connectCameraAPI, OnvifEvent } from "./onvif-api";
+import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 
 const { mediaManager } = sdk;
 
 
 class OnvifCamera extends RtspSmartCamera {
     eventStream: Stream;
+    client: OnvifCameraAPI;
+
     listenEvents(): EventEmitter & Destroyable {
         (async () => {
             const client = await this.createClient();
@@ -34,8 +36,9 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     async takePicture(): Promise<MediaObject> {
-        const api = await this.createClient();
-        return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
+        if (!this.client)
+            this.client = await this.createClient();
+        return mediaManager.createMediaObject(this.client.jpegSnapshot(), 'image/jpeg');
     }
 
     async getConstructedStreamUrl() {
@@ -53,7 +56,7 @@ class OnvifProvider extends RtspProvider {
     }
 
     getDevice(nativeId: string): object {
-        return new OnvifCamera(nativeId);
+        return new OnvifCamera(nativeId, this);
     }
 }
 
