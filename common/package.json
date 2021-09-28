@@ -9,7 +9,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@scrypted/sdk": "file:../sdk"
+    "@scrypted/sdk": "file:../sdk",
+    "typescript": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^16.9.0"
