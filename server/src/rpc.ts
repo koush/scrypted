@@ -193,7 +193,10 @@ export class RpcPeer {
         for (const result of Object.values(this.pendingResults)) {
             result.reject(error);
         }
-        this.pendingResults = {};
+        this.pendingResults = Object.freeze({});
+        this.remoteWeakProxies = Object.freeze({});
+        this.localProxyMap = Object.freeze({});
+        this.localProxied.clear();
     }
 
     // need a name/constructor map due to babel name mangling? fix somehow?

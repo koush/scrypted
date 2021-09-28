@@ -37,13 +37,13 @@ export interface PluginAPI {
 }
 
 class EventListenerRegisterProxy implements EventListenerRegister {
-    removeListener: () => void;
+    removeListener() {
+        this.listeners.delete(this);
+        this.listener.removeListener();
+    }
 
-    constructor(public listeners: Set<EventListenerRegister>, removeListener: () => void) {
-        this.removeListener = () => {
-            listeners.delete(this);
-            removeListener();
-        };
+    constructor(public listener: EventListenerRegister, public listeners: Set<EventListenerRegister>) {
+        this.listeners.add(this);
     }
 }
 
@@ -51,11 +51,7 @@ export class PluginAPIManagedListeners {
     listeners = new Set<EventListenerRegister>();
 
     manageListener(listener: EventListenerRegister): EventListenerRegister {
-        this.listeners.add(listener);
-        return new EventListenerRegisterProxy(this.listeners, () => {
-            this.listeners.delete(listener);
-            listener.removeListener();
-        });
+        return new EventListenerRegisterProxy(listener, this.listeners);
     }
 
     removeListeners() {

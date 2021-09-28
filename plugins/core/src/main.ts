@@ -237,6 +237,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         })
 
         ws.onclose = () => {
+            peer.kill('engine.io connection closed.')
             api.removeListeners();
         }
     }
