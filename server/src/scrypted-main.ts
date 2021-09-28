@@ -28,7 +28,6 @@ if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
 }
 
-installSourceMapSupport();
 
 process.on('unhandledRejection', error => {
     if (error?.constructor !== RPCResultError) {
@@ -41,6 +40,10 @@ if (!cluster.isMaster) {
     startPluginRemoteClusterWorker();
 }
 else {
+    installSourceMapSupport({
+        environment: 'node',
+    });
+
     let workerInspectPort: number = undefined;
 
     const debugServer = net.createServer(socket => {

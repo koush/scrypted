@@ -21,6 +21,7 @@ import { sleep } from '../sleep';
 import { PluginHostAPI } from './plugin-host-api';
 import mkdirp from 'mkdirp';
 import path from 'path';
+import { install as installSourceMapSupport } from 'source-map-support';
 
 export class PluginHost {
     worker: cluster.Worker;
@@ -372,6 +373,22 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
 export function startPluginClusterWorker() {
     const events = new EventEmitter();
 
+    events.once('zip', (zip: AdmZip) => {
+        installSourceMapSupport({
+            environment: 'node',
+            retrieveSourceMap(source) {
+                if (source === '/plugin/main.nodejs.js') {
+                    const entry = zip.getEntry('main.nodejs.js.map')
+                    return {
+                        url: '/plugin/main.nodejs.js',
+                        map: entry?.getData().toString(),
+                    }
+                }
+                return null;
+            }
+        })
+    });
+
     const getDeviceConsole = (nativeId?: string) => {
         const stdout = new PassThrough();
         const stderr = new PassThrough();
@@ -441,13 +458,14 @@ export function startPluginClusterWorker() {
         }
     }).then(scrypted => {
         events.emit('scrypted', scrypted);
+        const deviceConsole = getDeviceConsole(undefined);
 
         process.on('uncaughtException', e => {
-            console.error('uncaughtException', e);
+            deviceConsole.error('uncaughtException', e);
             scrypted.log.e('uncaughtException ' + e?.toString());
         });
         process.on('unhandledRejection', e => {
-            console.error('unhandledRejection', e);
+            deviceConsole.error('unhandledRejection', e);
             scrypted.log.e('unhandledRejection ' + e?.toString());
         });
     })
