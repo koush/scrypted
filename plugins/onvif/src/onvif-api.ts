@@ -40,9 +40,6 @@ export class OnvifCameraAPI {
 
     listenEvents() {
         const ret = new EventEmitter();
-        this.cam.getEventProperties((err, results) => {
-            this.console.log(results);
-        })
 
         this.cam.on('event', (event: any) => {
             this.console.log('onvif event', event);
