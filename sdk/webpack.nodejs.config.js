@@ -108,9 +108,5 @@ module.exports = {
         minimize: isProduction,
     },
 
-    // don't bother doing source maps in production:
-    // compressed code is on one line which can't be debugged by duktape anyways.
-    // see optimization comment above.
-    // this also reduces the package size.
-    devtool: isProduction ? 'none' : 'source-map',
+    devtool: 'source-map',
 };
