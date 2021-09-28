@@ -6,6 +6,9 @@ const onvif = require('onvif');
 const { Cam } = onvif;
 
 export enum OnvifEvent {
+    // some onvif cameras spam motion events with IsMotion value as false.
+    // just use a timeout based approach.
+    MotionBuggy,
     MotionStart,
     MotionStop,
     AudioStart,
@@ -41,13 +44,16 @@ export class OnvifCameraAPI {
     listenEvents() {
         const ret = new EventEmitter();
 
-        this.cam.on('event', (event: any) => {
-            this.console.log('onvif event', event);
+        this.cam.on('event', (event: any, xml: string) => {
             const eventTopic = stripNamespaces(event.topic._)
+            // this.console.log('event', eventTopic);
+            // this.console.log(JSON.stringify(event, null, 2));
+            // this.console.log(xml);
 
             if (event.message.message.data && event.message.message.data.simpleItem) {
                 const dataValue = event.message.message.data.simpleItem.$.Value
                 if (eventTopic.includes('MotionAlarm')) {
+                    // ret.emit('event', OnvifEvent.MotionBuggy);
                     if (dataValue)
                         ret.emit('event', OnvifEvent.MotionStart)
                     else

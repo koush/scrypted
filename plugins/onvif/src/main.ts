@@ -9,13 +9,22 @@ const { mediaManager } = sdk;
 class OnvifCamera extends RtspSmartCamera {
     eventStream: Stream;
     client: OnvifCameraAPI;
-    streamUrl;
+    streamUrl: string;
 
     listenEvents(): EventEmitter & Destroyable {
+        let motionTimeout: NodeJS.Timeout;
+
         (async () => {
             const client = await this.createClient();
             const events = client.listenEvents();
             events.on('event', event => {
+                if (event === OnvifEvent.MotionBuggy) {
+                    this.motionDetected = true;
+                    clearTimeout(motionTimeout);
+                    motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
+                    return;
+                }
+
                 if (event === OnvifEvent.MotionStart)
                     this.motionDetected = true;
                 else if (event === OnvifEvent.MotionStop)
@@ -33,7 +42,7 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     createClient() {
-        return connectCameraAPI(this.storage.getItem('ip'), this.getUsername(), this.getPassword(), this.console);
+        return connectCameraAPI(this.getRtspAddress(), this.getUsername(), this.getPassword(), this.console);
     }
 
     async takePicture(): Promise<MediaObject> {
@@ -54,6 +63,12 @@ class OnvifCamera extends RtspSmartCamera {
         catch (e) {
             return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
         }
+    }
+
+    putSetting(key: string, value: string) {
+        this.client = undefined;
+        this.streamUrl = undefined;
+        return super.putSetting(key, value);
     }
 }
 
