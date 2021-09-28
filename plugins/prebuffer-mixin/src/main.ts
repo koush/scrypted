@@ -78,17 +78,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       },
       {
         group: 'Media Information',
-        title: 'Detected Video Codec',
+        title: 'Detected Resolution',
         readonly: true,
-        key: 'detectedVcodec',
-        value: this.session?.inputVideoCodec?.toString() || 'none',
+        key: 'detectedAcodec',
+        value: `${this.session?.inputVideoResolution?.[0] || "unknown"}`
       },
       {
         group: 'Media Information',
-        title: 'Detected Audio Codec',
+        title: 'Detected Video/Audio Codecs',
         readonly: true,
-        key: 'detectedAcodec',
-        value: this.session?.inputAudioCodec?.toString() || 'none',
+        key: 'detectedVcodec',
+        value: (this.session?.inputVideoCodec?.toString() || 'unknown') + '/' + (this.session?.inputAudioCodec?.toString() || 'unknown'),
       },
       {
         group: 'Media Information',
