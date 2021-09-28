@@ -58,8 +58,10 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable {
             },
         });
         cp.stdin.write(source.script);
+        cp.stdin.end();
         cp.stdout.on('data', data => this.console.log(data.toString()));
         cp.stderr.on('data', data => this.console.log(data.toString()));
+        cp.on('exit', () => this.console.log('shell exited'));
     }
 }
 
