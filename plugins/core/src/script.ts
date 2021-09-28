@@ -1,56 +1,8 @@
 import { Scriptable, Program, ScryptedDeviceBase, ScriptSource } from "@scrypted/sdk";
+import { createMonacoEvalDefaults } from "../../../common/src/scrypted-eval";
 import { scryptedEval } from "./scrypted-eval";
 
-const types = require("!!raw-loader!@scrypted/sdk/types.d.ts");
-const sdk = require("!!raw-loader!@scrypted/sdk/index.d.ts");
-
-function monacoEvalDefaultsFunction(monaco) {
-    monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
-        Object.assign(
-            {},
-            monaco.languages.typescript.typescriptDefaults.getCompilerOptions(),
-            {
-                moduleResolution:
-                    monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-            }
-        )
-    );
-
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(`
-      ${types}
-      ${sdk}
-      
-      declare global {
-        ${types.replace("export interface", "interface")}
-  
-        const log: Logger;
-  
-        const deviceManager: DeviceManager;
-        const endpointManager: EndpointManager;
-        const mediaManager: MediaManager;
-        const systemManager: SystemManager;
-        const eventSource: any;
-        const eventDetails: EventDetails;
-        const eventData: any;
-      }
-      `,
-
-        "node_modules/@types/scrypted__sdk/types.d.ts"
-    );
-
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        sdk,
-        "node_modules/@types/scrypted__sdk/index.d.ts"
-    );
-}
-
-const monacoEvalDefaults = `(function() {
-const types = \`${types}\`;
-const sdk = \`${sdk}\`;
-
-return ${monacoEvalDefaultsFunction};
-})();
-`;
+const monacoEvalDefaults = createMonacoEvalDefaults({});
 
 export class Script extends ScryptedDeviceBase implements Scriptable, Program {
     constructor(nativeId: string) {
