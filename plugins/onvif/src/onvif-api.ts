@@ -34,13 +34,18 @@ export class OnvifCameraAPI {
     digestAuth: DigestClient;
     mainProfileToken: Promise<string>;
 
-    constructor(public cam: any, username: string, password: string) {
+    constructor(public cam: any, username: string, password: string, public console: Console) {
         this.digestAuth = new DigestClient(username, password);
     }
 
     listenEvents() {
         const ret = new EventEmitter();
+        this.cam.getEventProperties((err, results) => {
+            this.console.log(results);
+        })
+
         this.cam.on('event', (event: any) => {
+            this.console.log('onvif event', event);
             const eventTopic = stripNamespaces(event.topic._)
 
             if (event.message.message.data && event.message.message.data.simpleItem) {
@@ -75,7 +80,7 @@ export class OnvifCameraAPI {
 
     async getStreamUrl(): Promise<string> {
         const token = await this.getMainProfileToken();
-        return new Promise((resolve, reject) => this.cam.getStreamUri({ protocol: 'RTSP', profileToken: token }, (err: Error, uri: string) => err ? reject(err) : resolve(uri)));
+        return new Promise((resolve, reject) => this.cam.getStreamUri({ protocol: 'RTSP', profileToken: token }, (err: Error, uri: any) => err ? reject(err) : resolve(uri.uri)));
     }
 
     async jpegSnapshot(): Promise<Buffer> {
@@ -89,15 +94,18 @@ export class OnvifCameraAPI {
     }
 }
 
-export async function connectCameraAPI(hostname: string, username: string, password: string) {
+export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console) {
+    const split = ipAndPort.split(':');
+    const [hostname, port] = split;
     const cam = await new Promise((resolve, reject) => {
         const cam = new Cam({
             hostname,
             username,
             password,
+            port,
         }, (err: Error) => err ? reject(err) : resolve(cam)
         )
     });
 
-    return new OnvifCameraAPI(cam, username, password);
+    return new OnvifCameraAPI(cam, username, password, console);
 }
