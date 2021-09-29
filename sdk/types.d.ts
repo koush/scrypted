@@ -1,3 +1,5 @@
+export type ScryptedNativeId = string | undefined;
+
 /**
  * DeviceState is returned by DeviceManager.getDeviceState, and allows getting/setting of a device provided by a DeviceProvider.
  */
@@ -438,7 +440,7 @@ export interface DeviceProvider {
   /**
    * Get an instance of a previously discovered device that was reported to the device manager.
    */
-  getDevice(nativeId: string): any;
+  getDevice(nativeId?: ScryptedNativeId): any;
 
 }
 /**
@@ -695,17 +697,17 @@ export interface DeviceManager {
   /**
    * Get the logger for a device given a native id.
    */
-  getDeviceLogger(nativeId: string): Logger;
+  getDeviceLogger(nativeId?: ScryptedNativeId): Logger;
 
   /**
    * Get the console for the device given a native id.
    */
-  getDeviceConsole?(nativeId?: string): Console;
+  getDeviceConsole?(nativeId?: ScryptedNativeId): Console;
 
   /**
    * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
    */
-  getDeviceState(nativeId?: string): DeviceState;
+  getDeviceState(nativeId?: ScryptedNativeId): DeviceState;
 
   /**
    * Get the per script Storage object.
@@ -717,17 +719,17 @@ export interface DeviceManager {
    * @param id The id of the device being mixined.
    * @param nativeId The nativeId of the MixinProvider.
    */
-  getMixinStorage(id: string, nativeId: string): Storage;
+  getMixinStorage(id: string, nativeId?: ScryptedNativeId): Storage;
 
   /**
    * Fire an event for a mixin provided by this plugin.
    */
-  onMixinEvent(id: string, nativeId: string, eventInterface: string, eventData: any): Promise<void>;
+  onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any): Promise<void>;
 
    /**
    * Get the per device Storage object.
    */
-  getDeviceStorage(nativeId: string): Storage;
+  getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
 
   getNativeIds(): string[];
 
@@ -739,12 +741,12 @@ export interface DeviceManager {
   /**
    * Fire an event for a device provided by this plugin.
    */
-  onDeviceEvent(nativeId: string, eventInterface: string, eventData: any): Promise<void>;
+  onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: string, eventData: any): Promise<void>;
 
   /**
    * onDeviceRemoved is used to report when discovered devices are removed.
    */
-  onDeviceRemoved(nativeId: string): Promise<void>;
+  onDeviceRemoved(nativeId?: ScryptedNativeId): Promise<void>;
 
   /**
    * onDevicesChanged is used to sync Scrypted with devices that are attached to a hub, such as Hue or SmartThings. All the devices should be reported at once.
@@ -768,19 +770,19 @@ export interface DeviceInformation {
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
  */
 export interface Device {
-  interfaces?: string[];
-  info?: DeviceInformation;
-  name?: string;
+  name: string;
   /**
    * The native id that is used by the DeviceProvider used to internally identify provided devices.
    */
-  nativeId?: string;
+  nativeId: string;
+  type: ScryptedDeviceType;
+  interfaces: string[];
+  info?: DeviceInformation;
   /**
    * The native id of the hub or discovery DeviceProvider that manages this device.
    */
-  providerNativeId?: string;
+  providerNativeId?: ScryptedNativeId;
   room?: string;
-  type?: ScryptedDeviceType;
 }
 /**
  * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
@@ -789,7 +791,7 @@ export interface DeviceManifest {
   /**
    * The native id of the hub or discovery DeviceProvider that manages these devices.
    */
-   providerNativeId?: string;
+   providerNativeId?: ScryptedNativeId;
    devices?: Device[];
 }
 /**
@@ -804,7 +806,7 @@ export interface EndpointManager {
   /**
    * Get an URL pathname that can be accessed on your local network or cloud while authenticated. This is an absolute path that requires cookie authentication, and generally used only in browser contexts.
    */
-  getAuthenticatedPath(nativeId: string): Promise<string>;
+  getAuthenticatedPath(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
    * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are without any encryption. Plugin implementation is responsible for authentication.
@@ -814,7 +816,7 @@ export interface EndpointManager {
   /**
    * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are without any encryption. Plugin implementation is responsible for authentication.
    */
-  getInsecurePublicLocalEndpoint(nativeId: string): Promise<string>;
+  getInsecurePublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
    * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
@@ -824,7 +826,7 @@ export interface EndpointManager {
   /**
    * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
    */
-  getPublicCloudEndpoint(nativeId: string): Promise<string>;
+  getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
    * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are over SSL with a self signed certificate. Plugin implementation is responsible for authentication.
@@ -834,7 +836,7 @@ export interface EndpointManager {
   /**
    * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are over SSL with a self signed certificate. Plugin implementation is responsible for authentication.
    */
-  getPublicLocalEndpoint(nativeId: string): Promise<string>;
+  getPublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
    * Get an URL that can be used to send a push message to the client. This differs from a cloud endpoint, in that, the Plugin does not send a response back. Plugin implementation is responsible for authentication.
@@ -844,7 +846,7 @@ export interface EndpointManager {
   /**
    * Get an URL that can be used to send a push message to the client. This differs from a cloud endpoint, in that, the Plugin does not send a response back. Plugin implementation is responsible for authentication.
    */
-  getPublicPushEndpoint(nativeId: string): Promise<string>;
+  getPublicPushEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
    * Deliver a push notification to the system.
