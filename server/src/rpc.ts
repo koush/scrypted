@@ -183,7 +183,7 @@ export class RpcPeer {
 
     createPendingResult(cb: (id: string) => void): Promise<any> {
         if (Object.isFrozen(this.pendingResults))
-            return Promise.reject(Error('RpcPeer has been killed'));
+            return Promise.reject(new RPCResultError('RpcPeer has been killed'));
 
         const promise = new Promise((resolve, reject) => {
             const id = (this.idCounter++).toString();

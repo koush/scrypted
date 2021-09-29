@@ -104,16 +104,8 @@ const disallowedScryptedDeviceProperties = new Set<string>([
 ]);
 
 class DeviceStateProxyHandler implements ProxyHandler<any> {
-    deviceManager: DeviceManagerImpl;
-    id: string;
-    setState: (property: string, value: any) => Promise<void>;
-
-    constructor(deviceManager: DeviceManagerImpl, id: string,
-        setState: (property: string, value: any) => Promise<void>) {
-        // JSON stringify over rpc turns undefined into null.
-        this.deviceManager = deviceManager;
-        this.id = id;
-        this.setState = setState;
+    constructor(public deviceManager: DeviceManagerImpl, public id: string,
+        public setState: (property: string, value: any) => Promise<void>) {
     }
 
     get?(target: any, p: PropertyKey, receiver: any) {
