@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import { Volume } from 'memfs';
 import path from 'path';
-import { DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
+import { ScryptedNativeId, DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from '../server-settings';
 import { PluginAPI, PluginLogger, PluginRemote } from './plugin-api';
 import { SystemManagerImpl } from './system';
@@ -11,11 +11,11 @@ import { EventEmitter } from 'events';
 import { createWebSocketClass } from './plugin-remote-websocket';
 
 class DeviceLogger implements Logger {
-    nativeId: string;
+    nativeId: ScryptedNativeId;
     api: PluginAPI;
     logger: Promise<PluginLogger>;
 
-    constructor(api: PluginAPI, nativeId: string, public console: any) {
+    constructor(api: PluginAPI, nativeId: ScryptedNativeId, public console: any) {
         this.api = api;
         this.nativeId = nativeId;
     }
@@ -65,7 +65,7 @@ class EndpointManagerImpl implements EndpointManager {
     pluginId: string;
     mediaManager: MediaManager;
 
-    getEndpoint(nativeId?: string) {
+    getEndpoint(nativeId?: ScryptedNativeId) {
         if (!nativeId)
             return this.pluginId;
         const id = this.deviceManager.nativeIds.get(nativeId)?.id;
@@ -74,21 +74,21 @@ class EndpointManagerImpl implements EndpointManager {
         return id;
     }
 
-    async getAuthenticatedPath(nativeId?: string): Promise<string> {
+    async getAuthenticatedPath(nativeId?: ScryptedNativeId): Promise<string> {
         return `/endpoint/${this.getEndpoint(nativeId)}/`;
     }
-    async getInsecurePublicLocalEndpoint(nativeId?: string): Promise<string> {
+    async getInsecurePublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         return `http://${getIpAddress()}:${SCRYPTED_INSECURE_PORT}/endpoint/${this.getEndpoint(nativeId)}/public/`;
     }
-    async getPublicCloudEndpoint(nativeId?: string): Promise<string> {
+    async getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         const local = await this.getPublicLocalEndpoint(nativeId);
         const mo = this.mediaManager.createMediaObject(local, ScryptedMimeTypes.LocalUrl);
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     }
-    async getPublicLocalEndpoint(nativeId?: string): Promise<string> {
+    async getPublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         return `https://${getIpAddress()}:${SCRYPTED_SECURE_PORT}/endpoint/${this.getEndpoint(nativeId)}/public/`;
     }
-    async getPublicPushEndpoint(nativeId?: string): Promise<string> {
+    async getPublicPushEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         const mo = this.mediaManager.createMediaObject(Buffer.from(this.getEndpoint(nativeId)), ScryptedMimeTypes.PushEndpoint);
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.PushEndpoint);
     }
@@ -150,7 +150,7 @@ class DeviceManagerImpl implements DeviceManager {
     nativeIds = new Map<string, DeviceManagerDevice>();
     systemManager: SystemManagerImpl;
 
-    constructor(systemManager: SystemManagerImpl, public events?: EventEmitter, public getDeviceConsole?: (nativeId?: string) => Console) {
+    constructor(systemManager: SystemManagerImpl, public events?: EventEmitter, public getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console) {
         this.systemManager = systemManager;
     }
 
@@ -158,7 +158,7 @@ class DeviceManagerImpl implements DeviceManager {
         return this.api.requestRestart();
     }
 
-    getDeviceLogger(nativeId?: string): Logger {
+    getDeviceLogger(nativeId?: ScryptedNativeId): Logger {
         return new DeviceLogger(this.api, nativeId, this.getDeviceConsole?.(nativeId) || console);
     }
 
@@ -171,10 +171,10 @@ class DeviceManagerImpl implements DeviceManager {
     getDeviceStorage(nativeId?: any): StorageImpl {
         return new StorageImpl(this, nativeId);
     }
-    getMixinStorage(id: string, nativeId?: string) {
+    getMixinStorage(id: string, nativeId?: ScryptedNativeId) {
         return new StorageImpl(this, nativeId, `mixin:${id}:`);
     }
-    async onMixinEvent(id: string, nativeId: string, eventInterface: string, eventData: any) {
+    async onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any) {
         return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);
     }
     getNativeIds(): string[] {
@@ -197,7 +197,7 @@ class DeviceManagerImpl implements DeviceManager {
 class StorageImpl implements Storage {
     api: PluginAPI;
 
-    constructor(public deviceManager: DeviceManagerImpl, public nativeId: string, public prefix?: string) {
+    constructor(public deviceManager: DeviceManagerImpl, public nativeId: ScryptedNativeId, public prefix?: string) {
         this.deviceManager = deviceManager;
         this.api = deviceManager.api;
         this.nativeId = nativeId;
@@ -264,7 +264,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
 export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
     getServicePort?: (name: string) => Promise<number>;
-    getDeviceConsole?: (nativeId?: string) => Console;
+    getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     events?: EventEmitter;
 }
 
@@ -328,7 +328,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
             },
 
-            async setNativeId(nativeId: string, id: string, storage: { [key: string]: any }) {
+            async setNativeId(nativeId: ScryptedNativeId, id: string, storage: { [key: string]: any }) {
                 // JSON stringify over rpc turns undefined into null.
                 if (nativeId === null)
                     nativeId = undefined;

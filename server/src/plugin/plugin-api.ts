@@ -1,4 +1,4 @@
-import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaObject, SystemDeviceState, MediaManager, HttpRequest } from '@scrypted/sdk/types'
+import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaObject, SystemDeviceState, MediaManager, HttpRequest } from '@scrypted/sdk/types'
 
 export interface PluginLogger {
     log(level: string, message: string): Promise<void>;
@@ -8,11 +8,11 @@ export interface PluginLogger {
 }
 
 export interface PluginAPI {
-    setState(nativeId: string | undefined, key: string, value: any): Promise<void>;
+    setState(nativeId: ScryptedNativeId, key: string, value: any): Promise<void>;
     onDevicesChanged(deviceManifest: DeviceManifest): Promise<void>;
     onDeviceDiscovered(device: Device): Promise<void>;
-    onDeviceEvent(nativeId: string, eventInterface: any, eventData?: any): Promise<void>;
-    onMixinEvent(id: string, nativeId: string, eventInterface: any, eventData?: any): Promise<void>;
+    onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void>;
+    onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void>;
     onDeviceRemoved(nativeId: string): Promise<void>;
     setStorage(nativeId: string, storage: {[key: string]: any}): Promise<void>;
 
@@ -27,7 +27,7 @@ export interface PluginAPI {
 
     deliverPush(endpoint: string, request: HttpRequest): Promise<void>;
 
-    getLogger(nativeId: string): Promise<PluginLogger>;
+    getLogger(nativeId: ScryptedNativeId): Promise<PluginLogger>;
 
     getComponent(id: string): Promise<any>;
 
@@ -67,7 +67,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
         super();
     }
 
-    setState(nativeId: string, key: string, value: any): Promise<void> {
+    setState(nativeId: ScryptedNativeId, key: string, value: any): Promise<void> {
         return this.api.setState(nativeId, key, value);
     }
     onDevicesChanged(deviceManifest: DeviceManifest): Promise<void> {
@@ -76,16 +76,16 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
     onDeviceDiscovered(device: Device): Promise<void> {
         return this.api.onDeviceDiscovered(device);
     }
-    onDeviceEvent(nativeId: string, eventInterface: any, eventData?: any): Promise<void> {
+    onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void> {
         return this.api.onDeviceEvent(nativeId, eventInterface, eventData);
     }
-    onMixinEvent(id: string, nativeId: string, eventInterface: any, eventData?: any): Promise<void> {
+    onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void> {
         return this.api.onMixinEvent(nativeId, eventInterface, eventData);
     }
     onDeviceRemoved(nativeId: string): Promise<void> {
         return this.api.onDeviceRemoved(nativeId);
     }
-    setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
+    setStorage(nativeId: ScryptedNativeId, storage: { [key: string]: any; }): Promise<void> {
         return this.api.setStorage(nativeId, storage);
     }
     getDeviceById(id: string): Promise<ScryptedDevice> {
@@ -112,7 +112,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
     deliverPush(endpoint: string, request: HttpRequest): Promise<void> {
         return this.api.deliverPush(endpoint, request);
     }
-    getLogger(nativeId: string): Promise<PluginLogger> {
+    getLogger(nativeId: ScryptedNativeId): Promise<PluginLogger> {
         return this.api.getLogger(nativeId);
     }
     getComponent(id: string): Promise<any> {
@@ -130,7 +130,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
 export interface PluginRemote {
     loadZip(packageJson: any, zipData: Buffer): Promise<any>;
     setSystemState(state: {[id: string]: {[property: string]: SystemDeviceState}}): Promise<void>;
-    setNativeId(nativeId: string, id: string, storage: {[key: string]: any}): Promise<void>;
+    setNativeId(nativeId: ScryptedNativeId, id: string, storage: {[key: string]: any}): Promise<void>;
     updateDescriptor(id: string, state: {[property: string]: SystemDeviceState}): Promise<void>;
     notify(id: string, eventTime: number, eventInterface: string, property: string|undefined, value: SystemDeviceState|any, changed?: boolean): Promise<void>;
 

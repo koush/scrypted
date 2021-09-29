@@ -1,5 +1,5 @@
 import { LevelDocument } from "./level";
-import { SystemDeviceState } from "@scrypted/sdk/types";
+import { ScryptedNativeId, SystemDeviceState } from "@scrypted/sdk/types";
 
 export class ScryptedDocument implements LevelDocument {
     _id?: string;
@@ -34,7 +34,7 @@ export class PluginDevice extends ScryptedDocument {
         super();
         this._id = id;
     }
-    nativeId?: string;
+    nativeId: ScryptedNativeId;
     pluginId: string;
     state: { [property: string]: SystemDeviceState };
     stateVersion: number;

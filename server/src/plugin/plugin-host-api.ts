@@ -1,4 +1,4 @@
-import { ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaManager, HttpRequest } from '@scrypted/sdk/types'
+import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaManager, HttpRequest } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import { PluginAPI, PluginAPIManagedListeners } from './plugin-api';
@@ -28,7 +28,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         this.pluginId = plugin._id;
     }
 
-    async onMixinEvent(id: string, nativeId: string, eventInterface: any, eventData?: any) {
+    async onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: any, eventData?: any) {
         const device = this.scrypted.findPluginDeviceById(id);
         const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeId);
         const mixins: string[] = getState(device, ScryptedInterfaceProperty.mixins) || [];
@@ -48,7 +48,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         return this.scrypted.deliverPush(endpoint, httpRequest);
     }
 
-    async getLogger(nativeId: string): Promise<Logger> {
+    async getLogger(nativeId: ScryptedNativeId): Promise<Logger> {
         const device = this.scrypted.findPluginDevice(this.pluginId, nativeId);
         return this.scrypted.getDeviceLogger(device);
     }
@@ -81,11 +81,11 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         this.pluginHost.ws[id]?.send(message);
     }
 
-    async setState(nativeId: string, key: string, value: any) {
+    async setState(nativeId: ScryptedNativeId, key: string, value: any) {
         this.scrypted.stateManager.setPluginState(this.pluginId, nativeId, key, value);
     }
 
-    async setStorage(nativeId: string, storage: { [key: string]: string }) {
+    async setStorage(nativeId: ScryptedNativeId, storage: { [key: string]: string }) {
         const device = this.scrypted.findPluginDevice(this.pluginId, nativeId)
         device.storage = storage;
         this.scrypted.datastore.upsert(device);

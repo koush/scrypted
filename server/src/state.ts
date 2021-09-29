@@ -1,5 +1,5 @@
 import { ScryptedRuntime } from "./runtime";
-import { EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, SystemDeviceState } from "@scrypted/sdk/types";
+import { ScryptedNativeId, EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, SystemDeviceState } from "@scrypted/sdk/types";
 import { RefreshSymbol } from "./plugin/plugin-device";
 import throttle from 'lodash/throttle';
 import { sleep } from "./sleep";
@@ -34,7 +34,7 @@ export class ScryptedStateManager extends EventRegistry {
         this.scrypted = scrypted;
     }
 
-    setPluginState(pluginId: string, nativeId: string | undefined, property: string, value: any) {
+    setPluginState(pluginId: string, nativeId: ScryptedNativeId, property: string, value: any) {
         const device = this.scrypted.findPluginDevice(pluginId, nativeId);
         if (!device)
             throw new Error(`device not found for plugin id ${pluginId} native id ${nativeId}`);

@@ -440,7 +440,7 @@ export interface DeviceProvider {
   /**
    * Get an instance of a previously discovered device that was reported to the device manager.
    */
-  getDevice(nativeId?: ScryptedNativeId): any;
+  getDevice(nativeId: ScryptedNativeId): any;
 
 }
 /**
@@ -746,7 +746,7 @@ export interface DeviceManager {
   /**
    * onDeviceRemoved is used to report when discovered devices are removed.
    */
-  onDeviceRemoved(nativeId?: ScryptedNativeId): Promise<void>;
+  onDeviceRemoved(nativeId: string): Promise<void>;
 
   /**
    * onDevicesChanged is used to sync Scrypted with devices that are attached to a hub, such as Hue or SmartThings. All the devices should be reported at once.

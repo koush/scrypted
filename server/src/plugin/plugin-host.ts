@@ -1,7 +1,7 @@
 import cluster from 'cluster';
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
+import { ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
@@ -254,7 +254,7 @@ export class PluginHost {
 
 async function createConsoleServer(events: EventEmitter): Promise<number> {
     const outputs = new Map<string, Buffer[]>();
-    const appendOutput = (data: Buffer, nativeId: string) => {
+    const appendOutput = (data: Buffer, nativeId: ScryptedNativeId) => {
         if (!nativeId)
             nativeId = undefined;
         let buffers = outputs.get(nativeId);
@@ -280,7 +280,7 @@ async function createConsoleServer(events: EventEmitter): Promise<number> {
             socket.write(concat);
         }
 
-        const cb = (data: Buffer, nativeId: string) => {
+        const cb = (data: Buffer, nativeId: ScryptedNativeId) => {
             if (nativeId !== filter)
                 return;
             socket.write(data);
@@ -393,7 +393,7 @@ export function startPluginClusterWorker() {
         })
     });
 
-    const getDeviceConsole = (nativeId?: string) => {
+    const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
         const stdout = new PassThrough();
         const stderr = new PassThrough();
 
@@ -497,7 +497,7 @@ class LazyRemote implements PluginRemote {
             await this.init;
         return this.remote.setSystemState(state);
     }
-    async setNativeId(nativeId: string, id: string, storage: { [key: string]: any; }): Promise<void> {
+    async setNativeId(nativeId: ScryptedNativeId, id: string, storage: { [key: string]: any; }): Promise<void> {
         if (!this.remote)
             await this.init;
         return this.remote.setNativeId(nativeId, id, storage);
