@@ -12,6 +12,8 @@ import aedes from 'aedes';
 import net from 'net';
 import ws from 'websocket-stream';
 import http from 'http';
+import { MqttDeviceBase } from './api/mqtt-device-base';
+import { MqttAutoDiscoveryDevice, MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
 
 const loopbackLight = require("!!raw-loader!./examples/loopback-light.ts");
 
@@ -24,10 +26,8 @@ for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
 
 const { log, deviceManager } = sdk;
 
-class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
-    client: Client;
+class MqttDevice extends MqttDeviceBase implements Scriptable {
     handler: any;
-    pathname: string;
 
     constructor(nativeId: string) {
         super(nativeId);
@@ -74,22 +74,8 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
         const { script } = source;
         try {
             this.handler = undefined;
-            this.client?.end();
-            this.client = undefined;
-            const url = new URL(this.storage.getItem('url'));
-            this.pathname = url.pathname.substring(1);
-            const urlWithoutPath = new URL(this.storage.getItem('url'));
-            urlWithoutPath.pathname = '';
 
-            const client = this.client = connect(urlWithoutPath.toString());
-            setTimeout(() => {
-                client.on('connect', err => {
-                    if (err) {
-                        this.console.error('error subscribing to mqtt', err);
-                        return;
-                    }
-                })
-            }, 500);
+            const client = this.connectClient();
 
             const allInterfaces: string[] = [
                 ScryptedInterface.Scriptable,
@@ -170,19 +156,6 @@ class MqttDevice extends ScryptedDeviceBase implements Scriptable, Settings {
             this.console.error(e);
         }
     }
-
-    async getSettings(): Promise<Setting[]> {
-        return [{
-            title: 'Subscription URL',
-            key: 'url',
-            value: this.storage.getItem('url'),
-            description: "The base subscription URL for the device. All MQTT publish and subscribe requests will use this as the base path.",
-            placeholder: "mqtt://localhost/device/kitchen-light",
-        }];
-    }
-    async putSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem(key, value.toString());
-    }
 }
 
 class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
@@ -201,17 +174,17 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
         }
     }
 
-    getAdditionalInterfaces() {
-        return [
-        ];
-    }
-
     async getSettings(): Promise<Setting[]> {
         return [
             {
                 key: 'new-device',
-                title: 'Add MQTT Device',
+                title: 'Add MQTT Custom Handler',
                 placeholder: 'Device name, e.g.: Kitchen Light, Office Light, etc',
+            },
+            {
+                key: 'new-autodiscovery',
+                title: 'Add MQTT Autodiscovery',
+                placeholder: 'Autodiscovery name, e.g.: Zwavejs2Mqtt, Zibgee2Mqtt, etc',
             },
             {
                 title: 'Enable MQTT Broker',
@@ -260,7 +233,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
         instance.on('publish', packet => {
             if (!packet.payload)
                 return;
-            const preview = packet.payload.length > 512 ? '[large payload suppressed]' : packet.payload.toString();
+            const preview = packet.payload.length > 2048 ? '[large payload suppressed]' : packet.payload.toString();
             this.console.log('mqtt message', packet.topic, preview);
         });
     }
@@ -273,37 +246,61 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
             return;
         }
 
-        if (key !== 'new-device')
+        if (key === 'new-device') {
+
+            // generate a random id
+            var nativeId = Math.random().toString();
+            var name = value.toString();
+
+            deviceManager.onDeviceDiscovered({
+                nativeId,
+                name: name,
+                interfaces: [ScryptedInterface.Scriptable, ScryptedInterface.Settings],
+                type: ScryptedDeviceType.Unknown,
+            });
+
+            var text = `New MQTT Device ${name} ready. Check the notification area to continue configuration.`;
+            log.a(text);
+            log.clearAlert(text);
             return;
+        }
 
-        // generate a random id
-        var nativeId = Math.random().toString();
-        var name = value.toString();
+        if (key === 'new-autodiscovery') {
 
-        deviceManager.onDeviceDiscovered({
-            nativeId,
-            name: name,
-            interfaces: [ScryptedInterface.Scriptable,
-            ScryptedInterface.Settings, ...this.getAdditionalInterfaces()],
-            type: ScryptedDeviceType.Unknown,
-        });
+            // generate a random id
+            var nativeId = 'autodiscovery:' + Math.random().toString();
+            var name = value.toString();
 
-        var text = `New MQTT Device ${name} ready. Check the notification area to continue configuration.`;
-        log.a(text);
-        log.clearAlert(text);
+            deviceManager.onDeviceDiscovered({
+                nativeId,
+                name: name,
+                interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.Settings],
+                type: ScryptedDeviceType.DeviceProvider,
+            });
+
+            var text = `New MQTT Autodiscovery ${name} ready. Check the notification area to continue configuration.`;
+            log.a(text);
+            log.clearAlert(text);
+            return;
+        }
     }
 
     async discoverDevices(duration: number) {
     }
 
     createMqttDevice(nativeId: string): MqttDevice {
-        return new MqttDevice(nativeId);
+        return;
     }
 
     getDevice(nativeId: string) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
-            ret = this.createMqttDevice(nativeId);
+            if (nativeId.startsWith('autodiscovery:')) {
+                ret = new MqttAutoDiscoveryProvider(nativeId);
+            }
+            else if (nativeId.startsWith('0.')) {
+                ret = new MqttDevice(nativeId);
+            }
             if (ret)
                 this.devices.set(nativeId, ret);
         }
