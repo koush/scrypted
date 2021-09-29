@@ -1,13 +1,45 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { recommendRebroadcast } from "./recommend";
+import AxiosDigestAuth from '@koush/axios-digest-auth';
+import https from 'https';
+
 const { log, deviceManager, mediaManager } = sdk;
 
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+});
 
-export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Settings {
+export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
+    snapshotAuth: AxiosDigestAuth;
+
     constructor(nativeId: string, public provider: RtspProvider) {
         super(nativeId);
     }
+
+    async takePicture(): Promise<MediaObject> {
+        const snapshotUrl = this.storage.getItem('snapshotUrl');
+        if (!snapshotUrl) {
+            throw new Error('RTSP Camera has no snapshot URL');
+        }
+
+        if (!this.snapshotAuth) {
+            this.snapshotAuth = new AxiosDigestAuth({
+                username: this.getUsername(),
+                password: this.getPassword(),
+            });
+        }
+
+        const response = await this.snapshotAuth.request({
+            httpsAgent,
+            method: "GET",
+            responseType: 'arraybuffer',
+            url: snapshotUrl,
+        });
+
+        return mediaManager.createMediaObject(Buffer.from(response.data), response.headers['Content-Type'] || 'image/jpeg');
+    }
+
     async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
         return [
             {
@@ -64,6 +96,13 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
                 placeholder: 'rtsp://192.168.1.100:4567/foo/bar',
                 value: this.storage.getItem('url'),
             },
+            {
+                key: 'snapshotUrl',
+                title: 'Snapshot URL',
+                placeholder: 'http://192.168.1.100/snapshot.jpg',
+                value: this.storage.getItem('snapshotUrl'),
+                description: 'Optional: The snapshot URL that will returns the current JPEG image.'
+            },
         ];
     }
 
@@ -106,6 +145,18 @@ export class RtspCamera extends ScryptedDeviceBase implements VideoCamera, Setti
 
     async putSetting(key: string, value: string | number) {
         this.storage.setItem(key, value.toString());
+
+        this.snapshotAuth = undefined;
+
+        if (key === 'snapshotUrl') {
+            const interfaces = this.providedInterfaces;
+            if (!value)
+                interfaces.filter(iface => iface !== ScryptedInterface.Camera)
+            else
+                interfaces.push(ScryptedInterface.Camera);
+
+            this.provider.updateDevice(this.nativeId, this.providedName, interfaces);
+        }
     }
 }
 
