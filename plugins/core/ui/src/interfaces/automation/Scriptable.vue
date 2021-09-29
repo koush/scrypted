@@ -35,6 +35,16 @@ import sdk from "!!raw-loader!@scrypted/sdk/index.d.ts";
 import * as monaco from "monaco-editor";
 
 function monacoEvalDefaults() {
+  monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(
+    Object.assign(
+      {},
+      monaco.languages.typescript.typescriptDefaults.getDiagnosticsOptions(),
+      {
+        diagnosticCodesToIgnore: [1375, 1378],
+      }
+    )
+  );
+
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
     Object.assign(
       {},
@@ -103,7 +113,12 @@ export default {
           scripts[this.scriptSource.filename].name?.toString();
         this.scriptSource.language =
           scripts[this.scriptSource.filename].language || "typescript";
-        this.scriptSource.monacoEvalDefaults = () => eval(scripts[this.scriptSource.filename].monacoEvalDefaults?.toString() || "");
+        this.scriptSource.monacoEvalDefaults = () =>
+          eval(
+            scripts[
+              this.scriptSource.filename
+            ].monacoEvalDefaults?.toString() || ""
+          );
       } else {
         this.scriptSource.filename =
           Object.keys(this.lazyValue).filter((k) => k !== "rpc")[0] ||
@@ -135,8 +150,8 @@ export default {
         }
       });
 
-        const f = this.scriptSource.monacoEvalDefaults?.();
-        f(monaco);
+      const f = this.scriptSource.monacoEvalDefaults?.();
+      f(monaco);
     },
     eval() {
       this.device.eval({
