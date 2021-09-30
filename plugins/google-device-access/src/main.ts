@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, VideoStreamOptions } from '@scrypted/sdk';
+import sdk, { Camera, DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -64,7 +64,7 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         this.device = device;
     }
 
-    async getVideoStream(options?: VideoStreamOptions): Promise<MediaObject> {
+    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
             command: "sdm.devices.commands.CameraLiveStream.GenerateRtspStream",
             params: {}
@@ -87,23 +87,50 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
             ]
         })
     }
-    async getVideoStreamOptions(): Promise<void | VideoStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
     }
+}
+
+const setpointMap = new Map<string, string>();
+setpointMap.set('sdm.devices.commands.ThermostatTemperatureSetpoint.SetRange', 'HEATCOOL');
+setpointMap.set('sdm.devices.commands.ThermostatTemperatureSetpoint.SetHeat', 'HEAT');
+setpointMap.set('sdm.devices.commands.ThermostatTemperatureSetpoint.SetCool', 'COOL');
+
+const setpointReverseMap = new Map<string, string>();
+for (const [k, v] of setpointMap.entries()) {
+    setpointReverseMap.set(v, k);
 }
 
 class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Settings, Refresh {
     device: any;
     provider: GoogleSmartDeviceAccess;
-    executeParams: any = {};
+    executeCommandSetMode: any = undefined;
+    executeCommandSetCelsius: any = undefined;
 
-    executeThrottle = throttle(() => {
-        const params = this.executeParams;
-        this.executeParams = {};
-        return this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
-            command: "sdm.devices.commands.ThermostatMode.SetMode",
-            params,
-        });
-    }, 6000)
+    executeThrottle = throttle(async () => {
+        if (this.executeCommandSetCelsius) {
+            const mode = setpointMap.get(this.executeCommandSetCelsius.command);
+            if (mode !== this.device.traits['sdm.devices.traits.ThermostatMode'].mode
+                && this.executeCommandSetMode?.params.mode !== mode) {
+                this.executeCommandSetMode = {
+                    command: 'sdm.devices.commands.ThermostatMode.SetMode',
+                    params: {
+                        mode: mode,
+                    },
+                };
+            }
+        }
+        if (this.executeCommandSetMode) {
+            const command = this.executeCommandSetMode;
+            this.executeCommandSetMode = undefined;
+            await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, command);
+        }
+        if (this.executeCommandSetCelsius) {
+            const command = this.executeCommandSetCelsius;
+            this.executeCommandSetCelsius = undefined;
+            return this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, command);
+        }
+    }, 12000)
 
     constructor(provider: GoogleSmartDeviceAccess, device: any) {
         super(device.name.split('/').pop());
@@ -122,13 +149,14 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
             if (nest)
                 modes.push(nest);
             else
-                console.warn('unknown mode', mode);
+                this.console.warn('unknown mode', mode);
 
         }
         this.thermostatAvailableModes = modes;
         this.thermostatMode = fromNestMode(device.traits['sdm.devices.traits.ThermostatMode'].mode);
-        this.temperature = device.traits['sdm.devices.traits.Temperature'].ambientTemperatureCelsius;
-        this.humidity = device.traits["sdm.devices.traits.Humidity"].ambientHumidityPercent;
+        // round the temperature to 1 digit to prevent state noise.
+        this.temperature = Math.round(10 * device.traits['sdm.devices.traits.Temperature'].ambientTemperatureCelsius) / 10;
+        this.humidity = Math.round(10 * device.traits["sdm.devices.traits.Humidity"].ambientHumidityPercent) / 10;
         this.temperatureUnit = device.traits['sdm.devices.traits.Settings'] === 'FAHRENHEIT' ? TemperatureUnit.F : TemperatureUnit.C;
         const heat = device.traits?.['sdm.devices.traits.ThermostatTemperatureSetpoint']?.heatCelsius;
         const cool = device.traits?.['sdm.devices.traits.ThermostatTemperatureSetpoint']?.coolCelsius;
@@ -182,23 +210,48 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
     }
     async setThermostatMode(mode: ThermostatMode): Promise<void> {
-        this.executeParams.mode = toNestMode(mode);
+        this.executeCommandSetMode = {
+            command: 'sdm.devices.commands.ThermostatMode.SetMode',
+            params: {
+                mode: toNestMode(mode),
+            },
+        }
         await this.executeThrottle();
         await this.refresh(null, true);
     }
     async setThermostatSetpoint(degrees: number): Promise<void> {
-        this.executeParams.heatCelsius = degrees;
-        this.executeParams.coolCelsius = degrees;
+        const mode = this.device.traits['sdm.devices.traits.ThermostatMode'].mode;
+
+        this.executeCommandSetCelsius = {
+            command: setpointReverseMap.get(mode),
+            params: {
+            },
+        };
+
+        if (mode === 'HEAT' || mode === 'HEATCOOL')
+            this.executeCommandSetCelsius.params.heatCelius = degrees;
+        if (mode === 'COOL' || mode === 'HEATCOOL')
+            this.executeCommandSetCelsius.params.coolCelsius = degrees;
         await this.executeThrottle();
         await this.refresh(null, true);
     }
     async setThermostatSetpointHigh(high: number): Promise<void> {
-        this.executeParams.heatCelsius = high;
+        this.executeCommandSetCelsius = {
+            command: 'sdm.devices.commands.ThermostatTemperatureSetpoint.SetRange',
+            params: {
+                heatCelsius: high,
+            },
+        };
         await this.executeThrottle();
         await this.refresh(null, true);
     }
     async setThermostatSetpointLow(low: number): Promise<void> {
-        this.executeParams.coolCelsius = low;
+        this.executeCommandSetCelsius = {
+            command: 'sdm.devices.commands.ThermostatTemperatureSetpoint.SetRange',
+            params: {
+                coolCelsius: low,
+            },
+        };
         await this.executeThrottle();
         await this.refresh(null, true);
     }
@@ -209,8 +262,6 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     devices = new Map<string, any>();
     refreshThrottled = throttle(async () => {
         const response = await this.authGet('/devices');
-        this.console.log('refresh headers', response.headers);
-        this.console.log('refersh data', response.data);
         const userId = response.headers['user-id'];
         if (userId && this.storage.getItem('userId') !== userId) {
             try {
@@ -240,7 +291,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
         const nativeId = payload.resourceUpdate.name.split('/').pop();
         const device = this.devices.get(nativeId);
-        if (device ) {
+        if (device) {
             if (traits) {
                 Object.assign(device.traits, traits);
                 if (device.type === 'sdm.devices.types.THERMOSTAT') {
@@ -370,7 +421,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             }
             catch (e) {
                 await new Promise(resolve => setTimeout(resolve, refreshFrequency * 1000));
-                console.error(e);
+                this.console.error(e);
             }
         }
 
