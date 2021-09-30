@@ -30,7 +30,7 @@ function updateClient() {
 
 updateClient();
 
-const refreshFrequency = 20;
+const refreshFrequency = 60;
 
 function fromNestMode(mode: string): ThermostatMode {
     switch (mode) {
@@ -123,11 +123,13 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         if (this.executeCommandSetMode) {
             const command = this.executeCommandSetMode;
             this.executeCommandSetMode = undefined;
+            this.console.log('executeCommandSetMode', command);
             await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, command);
         }
         if (this.executeCommandSetCelsius) {
             const command = this.executeCommandSetCelsius;
             this.executeCommandSetCelsius = undefined;
+            this.console.log('executeCommandSetCelsius', command);
             return this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, command);
         }
     }, 12000)
@@ -210,10 +212,14 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
     }
     async setThermostatMode(mode: ThermostatMode): Promise<void> {
+        // set this in case round trip is slow.
+        const nestMode = toNestMode(mode);
+        this.device.traits['sdm.devices.traits.ThermostatMode'].mode = nestMode;
+
         this.executeCommandSetMode = {
             command: 'sdm.devices.commands.ThermostatMode.SetMode',
             params: {
-                mode: toNestMode(mode),
+                mode: nestMode,
             },
         }
         await this.executeThrottle();
@@ -229,7 +235,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         };
 
         if (mode === 'HEAT' || mode === 'HEATCOOL')
-            this.executeCommandSetCelsius.params.heatCelius = degrees;
+            this.executeCommandSetCelsius.params.heatCelsius = degrees;
         if (mode === 'COOL' || mode === 'HEATCOOL')
             this.executeCommandSetCelsius.params.coolCelsius = degrees;
         await this.executeThrottle();
@@ -441,7 +447,6 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     nativeId: nativeId,
                     type: ScryptedDeviceType.Thermostat,
                     interfaces: [
-                        ScryptedInterface.Refresh,
                         ScryptedInterface.TemperatureSetting,
                         ScryptedInterface.HumiditySensor,
                         ScryptedInterface.Thermometer,
