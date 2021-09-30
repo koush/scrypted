@@ -176,7 +176,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                     if (deviceInfo.firmware)
                         info.setCharacteristic(Characteristic.FirmwareRevision, deviceInfo.firmware);
                     if (deviceInfo.version)
-                        info.setCharacteristic(Characteristic.Version, deviceInfo.version);
+                        info.setCharacteristic(Characteristic.HardwareRevision, deviceInfo.version);
                 }
 
                 if (supportedType.noBridge) {
