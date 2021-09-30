@@ -61,12 +61,12 @@ interface Deferred {
 export function handleFunctionInvocations(thiz: ProxyHandler<any>, target: any, p: PropertyKey, receiver: any): any {
     if (p === 'apply') {
         return (thisArg: any, args: any[]) => {
-            return thiz.apply(target, this, args);
+            return thiz.apply(target, thiz, args);
         }
     }
     else if (p === 'call') {
         return (thisArg: any, ...args: any[]) => {
-            return thiz.apply(target, this, args);
+            return thiz.apply(target, thiz, args);
         }
     }
 }

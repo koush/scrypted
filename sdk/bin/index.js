@@ -39,6 +39,11 @@ function getLogin(ip) {
     return ret;
 }
 
+function showLoginError() {
+    console.error('Authorization required. Please log in with the following:');
+    console.error('     npx scrypted login [ip]');
+}
+
 exports.deploy = function (debugHost, noRebind) {
     return new Promise((resolve, reject) => {
         var out;
@@ -67,15 +72,23 @@ exports.deploy = function (debugHost, noRebind) {
         const fileContents = fs.readFileSync(main);
         console.log(`deploying to ${debugHost}`);
 
+        let auth;
+        try {
+            auth = getLogin(debugHost);
+        }
+        catch (e) {
+            showLoginError();
+            process.exit(1);
+        }
+
         axios.post(setupUrl, packageJson,
             {
-                auth: getLogin(debugHost),
+                auth,
                 timeout: 10000,
                 maxRedirects: 0,
                 validateStatus: function (status) {
                     if (status === 401) {
-                        console.error('Authorization required. Please log in with the following:');
-                        console.error('     npx scrypted login [ip]');
+                        showLoginError();
                     }
                     return status >= 200 && status < 300;
                 },
