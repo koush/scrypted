@@ -72,6 +72,16 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
     }, extraLibs);
 
     function monacoEvalDefaultsFunction(monaco, libs) {
+        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(
+            Object.assign(
+                {},
+                monaco.languages.typescript.typescriptDefaults.getDiagnosticsOptions(),
+                {
+                    diagnosticCodesToIgnore: [1375, 1378],
+                }
+            )
+        );
+
         monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
             Object.assign(
                 {},
