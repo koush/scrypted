@@ -37,6 +37,7 @@ export class MqttDeviceBase extends ScryptedDeviceBase implements Settings {
         urlWithoutPath.pathname = '';
 
         const client = this.client = connect(urlWithoutPath.toString());
+        client.setMaxListeners(Infinity);
 
         setTimeout(() => {
             client.on('connect', err => {

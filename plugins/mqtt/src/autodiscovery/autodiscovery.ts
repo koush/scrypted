@@ -1,4 +1,4 @@
-import { Brightness, DeviceProvider, Lock, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from "@scrypted/sdk";
+import { Brightness, DeviceProvider, Lock, LockState, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from "@scrypted/sdk";
 import { MqttClient, connect } from "mqtt";
 import { MqttDeviceBase } from "../api/mqtt-device-base";
 import nunjucks from 'nunjucks';
@@ -7,7 +7,8 @@ import sdk from "@scrypted/sdk";
 const { deviceManager } = sdk;
 
 interface Component {
-    interfaces: string[];
+    getInterfaces?(config: any): string[];
+    interfaces?: string[];
     type: ScryptedDeviceType;
 }
 
@@ -24,10 +25,15 @@ typeMap.set('lock', {
     interfaces: [ScryptedInterface.Lock],
     type: ScryptedDeviceType.Lock,
 });
-// typeMap.set('binary_sensor', {
-//     interfaces: [ScryptedInterface.BinarySensor],
-//     type: ScryptedDeviceType.Sensor,
-// });
+typeMap.set('binary_sensor', {
+    getInterfaces(config: any) {
+        if (config.device_class === 'motion')
+            return [ScryptedInterface.MotionSensor];
+        if (config.device_class === 'door' || config.device_class === 'garage_door' || config.device_class === 'window')
+            return [ScryptedInterface.EntrySensor];
+    },
+    type: ScryptedDeviceType.Sensor,
+});
 
 export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceProvider {
     client: MqttClient;
@@ -56,13 +62,14 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
                 pathParts.shift();
                 const component = pathParts.shift();
                 // remove node_id, it is unused
+                let nodeId: string;
                 if (pathParts.length > 2)
-                    pathParts.shift();
+                    nodeId = pathParts.shift();
                 let objectId = pathParts.shift();
 
                 const config = JSON.parse(payload.toString());
 
-                objectId = config.unique_id || objectId;
+                const nativeIdSuffix = component + '/' + (nodeId || config.unique_id || objectId);
 
                 const type = typeMap.get(component);
                 if (!type) {
@@ -72,33 +79,75 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
 
                 this.console.log(topic, config);
 
-                const nativeId = 'autodiscovered:' + this.nativeId + ':' + objectId;
+                const nativeId = 'autodiscovered:' + this.nativeId + ':' + nativeIdSuffix;
+
+                let deviceInterfaces: string[];
+                if (type.interfaces)
+                    deviceInterfaces = type.interfaces;
+                else
+                    deviceInterfaces = type.getInterfaces(config);
+
+                if (!deviceInterfaces)
+                    return;
+
+                let interfaces = [];
+                interfaces.push(...deviceInterfaces);
+                // try combine into existing device if this mqtt device presents
+                // a node id, which may imply multiple interfaces.
+                if (nodeId && deviceManager.getNativeIds().includes(nativeId)) {
+                    const existing = await this.getDevice(nativeId, true);
+                    const allInterfaces = [];
+                    allInterfaces.push(...existing.providedInterfaces, ...interfaces);
+                    interfaces = allInterfaces;
+                }
 
                 await deviceManager.onDeviceDiscovered({
                     providerNativeId: this.nativeId,
                     nativeId,
-                    name: config.name,
-                    interfaces: type.interfaces,
+                    name: config.device?.name || nodeId || config.name,
+                    interfaces,
                     type: type.type,
+                    info: {
+                        manufacturer: config.device?.manufacturer,
+                        model: config.device?.model,
+                        firmware: config.device?.sw_version,
+                    },
                 });
 
-                const device = await this.getDevice(nativeId);
-                device.storage.setItem('config', payload.toString());
+                const device = await this.getDevice(nativeId, true);
+                let configs = {};
+                try {
+                    configs = JSON.parse(device.storage.getItem('configs'));
+                }
+                catch (e) {
+                }
+                for (const iface of deviceInterfaces) {
+                    configs[iface] = config;
+                }
+                device.storage.setItem('configs', JSON.stringify(configs));
                 device.storage.setItem('component', component);
+                device.bind();
             });
         }
         catch (e) {
             this.console.error(e);
+        }
+
+        const prefix = 'autodiscovered:' + this.nativeId + ':';
+        for (const check of deviceManager.getNativeIds()) {
+            if (!check?.startsWith(prefix))
+                continue;
+            this.getDevice(check);
         }
     }
 
     async discoverDevices(duration: number): Promise<void> {
     }
 
-    async getDevice(nativeId: string) {
+    async getDevice(nativeId: string, noBind?: boolean) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
-            ret = new MqttAutoDiscoveryDevice(nativeId, this);
+            ret = new MqttAutoDiscoveryDevice(nativeId, this, noBind);
             this.devices.set(nativeId, ret);
         }
         return ret;
@@ -113,9 +162,9 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
 export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff, Brightness, Lock {
     messageListeners: ((topic: string, payload: Buffer) => void)[] = [];
 
-    constructor(nativeId: string, public provider: MqttAutoDiscoveryProvider) {
+    constructor(nativeId: string, public provider: MqttAutoDiscoveryProvider, noBind?: boolean) {
         super(nativeId);
-        if (this.storage.getItem('config'))
+        if (!noBind && this.storage.getItem('configs'))
             this.bind();
     }
 
@@ -130,41 +179,62 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
         const listener = (messageTopic: string, payload: Buffer) => {
             if (topic !== messageTopic)
                 return;
-            cb(payload);
+            try {
+                cb(payload);
+            }
+            catch (e) {
+                this.console.error('callback error', e);
+            }
         };
         this.provider.client.on('message', listener);
         this.messageListeners.push(listener);
     }
 
     bind() {
-        const { config } = this.loadComponentConfig();
         const { client } = this.provider;
         if (this.providedInterfaces.includes(ScryptedInterface.Brightness)) {
+            const config = this.loadComponentConfig(ScryptedInterface.Brightness);
             client.subscribe(config.brightness_state_topic);
             this.bindMessage(config.brightness_state_topic,
                 payload => this.brightness = this.eval(config.brightness_value_template, payload));
         }
         if (this.providedInterfaces.includes(ScryptedInterface.OnOff)) {
+            const config = this.loadComponentConfig(ScryptedInterface.OnOff);
             client.subscribe(config.state_topic);
-            this.bindMessage(config.brightness_state_topic,
+            this.bindMessage(config.state_topic,
                 payload => this.on = (config.payload_on || 'ON') === this.eval(config.state_value_template, payload));
+        }
+        if (this.providedInterfaces.includes(ScryptedInterface.Lock)) {
+            const config = this.loadComponentConfig(ScryptedInterface.Lock);
+            client.subscribe(config.state_topic);
+            this.bindMessage(config.state_topic,
+                payload => {
+                    this.lockState = (config.state_locked || 'LOCKED') === this.eval(config.state_value_template, payload)
+                        ? LockState.Locked : LockState.Unlocked;
+                });
+        }
+        if (this.providedInterfaces.includes(ScryptedInterface.EntrySensor)) {
+            const config = this.loadComponentConfig(ScryptedInterface.EntrySensor);
+            client.subscribe(config.state_topic);
+            this.bindMessage(config.state_topic,
+                payload => this.entryOpen = config.payload_on === this.eval(config.value_template, payload));
+        }
+        if (this.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
+            const config = this.loadComponentConfig(ScryptedInterface.MotionSensor);
+            client.subscribe(config.state_topic);
+            this.bindMessage(config.state_topic,
+                payload => this.motionDetected = config.payload_on === this.eval(config.value_template, payload));
         }
     }
 
-    loadComponentConfig() {
-        return {
-            type: this.storage.getItem('component'),
-            config: JSON.parse(this.storage.getItem('config')),
-        };
+    loadComponentConfig(iface: ScryptedInterface) {
+        const configs = JSON.parse(this.storage.getItem('configs'));
+        return configs[iface];
     }
 
-    turn(config: any, payload: any) {
-        this.publishValue(config.command_topic,
-            config.brightness_value_template,
-            payload);
-    }
-
-    publishValue(command_topic: string, template: string, value: any) {
+    publishValue(command_topic: string, template: string, value: any, defaultValue: any) {
+        if (value == null)
+            value = defaultValue;
         const payload = template ? nunjucks.renderString(template, {
             value_json: {
                 value,
@@ -177,27 +247,39 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
     }
 
     async turnOff(): Promise<void> {
-        const { config } = this.loadComponentConfig();
+        const config = this.loadComponentConfig(ScryptedInterface.OnOff);
         if (config.on_command_type === 'brightness')
             return this.publishValue(config.brightness_command_topic,
-                config.brightness_value_template, 0);
-        return this.turn(config, config.payload_off)
+                config.brightness_value_template, 0, 0);
+        return this.publishValue(config.command_topic,
+            config.brightness_value_template,
+            config.payload_off, 'OFF');
     }
+
     async turnOn(): Promise<void> {
-        const { config } = this.loadComponentConfig();
+        const config = this.loadComponentConfig(ScryptedInterface.OnOff);
         if (config.on_command_type === 'brightness')
             return this.publishValue(config.brightness_command_topic,
-                config.brightness_value_template, 255);
-        return this.turn(config, config.payload_on)
+                config.brightness_value_template, 255, 255);
+        return this.publishValue(config.command_topic,
+            config.brightness_value_template,
+            config.payload_on, 'ON');
     }
     async setBrightness(brightness: number): Promise<void> {
-        const { config } = this.loadComponentConfig();
+        const config = this.loadComponentConfig(ScryptedInterface.Brightness);
+        const scaledBrightness = Math.round(brightness / 100 * (config.brightness_scale || 100));
         this.publishValue(config.brightness_command_topic,
             config.brightness_value_template,
-            Math.round(brightness / 100 * (config.brightness_scale || 100)));
+            scaledBrightness, scaledBrightness);
     }
     async lock(): Promise<void> {
+        const config = this.loadComponentConfig(ScryptedInterface.Lock);
+        return this.publishValue(config.command_topic,
+            config.value_template, config.payload_lock, 'LOCK');
     }
     async unlock(): Promise<void> {
+        const config = this.loadComponentConfig(ScryptedInterface.Lock);
+        return this.publishValue(config.command_topic,
+            config.value_template, config.payload_unlock, 'UNLOCK');
     }
 }

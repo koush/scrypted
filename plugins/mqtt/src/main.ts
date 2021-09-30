@@ -37,6 +37,7 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
 
     async saveScript(source: ScriptSource): Promise<void> {
         this.storage.setItem('data', JSON.stringify(source));
+        this.bind();
     }
     async loadScripts(): Promise<{ [filename: string]: ScriptSource; }> {
         try {
