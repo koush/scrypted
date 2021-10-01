@@ -4,6 +4,7 @@
   "description": "",
   "private": true,
   "dependencies": {
+    "@koush/opencv4nodejs": "^5.6.2",
     "@scrypted/sdk": "file:../sdk",
     "@types/adm-zip": "^0.4.33",
     "@types/cookie-parser": "^1.4.2",
@@ -61,6 +62,9 @@
     "prebuild": "tsc --build --clean",
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js"
+  },
+  "opencv4nodejs": {
+    "disableAutoBuild": 1
   },
   "author": "",
   "license": "ISC"
