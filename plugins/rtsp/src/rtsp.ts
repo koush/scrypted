@@ -149,9 +149,9 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         this.snapshotAuth = undefined;
 
         if (key === 'snapshotUrl') {
-            const interfaces = this.providedInterfaces;
+            let interfaces = this.providedInterfaces;
             if (!value)
-                interfaces.filter(iface => iface !== ScryptedInterface.Camera)
+                interfaces = interfaces.filter(iface => iface !== ScryptedInterface.Camera)
             else
                 interfaces.push(ScryptedInterface.Camera);
 
