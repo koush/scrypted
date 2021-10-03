@@ -13,6 +13,8 @@ import cv, { Mat, Size } from "@koush/opencv4nodejs";
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
+const defaultArea = 2000;
+
 class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements MotionSensor, Settings {
   area: number;
 
@@ -24,7 +26,11 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
       groupKey: "opencv",
     });
 
-    this.area = parseInt(localStorage.getItem('area')) || 1000;
+    this.area = parseInt(localStorage.getItem('area')) || defaultArea;
+    if (this.mixinDevice.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
+      log.a(`${this.name} has a built in MotionSensor. OpenCV motion processing cancelled. Pleaes disable this extension.`);
+      return;
+    }
     this.start();
   }
 
@@ -97,9 +103,10 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
       {
         title: "Motion Area Threshold",
         description: "The area size required to trigger motion. Higher values (larger areas) are less sensitive.",
-        value: this.storage.getItem('area') || '1000',
+        value: this.storage.getItem('area') || defaultArea.toString(),
         key: 'area',
-        placeholder: '1000',
+        placeholder: defaultArea.toString(),
+        type: 'number',
       }
     ];
   }
@@ -107,7 +114,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
   async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
     this.storage.setItem(key, value.toString());
     if (key === 'area')
-      this.area = parseInt(value.toString()) || 1000;
+      this.area = parseInt(value.toString()) || defaultArea;
   }
 
   release() {
