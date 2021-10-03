@@ -44,7 +44,9 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
         async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer | string> {
             const ffInput: FFMpegInput = JSON.parse(data.toString());
 
-            const args = [];
+            const args = [
+                '-hide_banner',
+            ];
             args.push(...ffInput.inputArguments);
 
 
@@ -215,8 +217,11 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
             });
             const videoPort = await listenZeroCluster(videoServer);
 
-            const args = [];
-            args.push('-y');
+            const args = [
+                '-hide_banner',
+                // don't think this is actually necessary but whatever.
+                '-y',
+            ];
 
             args.push(...ffInput.inputArguments);
 

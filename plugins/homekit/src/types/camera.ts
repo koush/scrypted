@@ -389,7 +389,9 @@ addSupportedType({
                     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
                     const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
-                    const args: string[] = [];
+                    const args: string[] = [
+                        '-hide_banner',
+                    ];
 
                     const storage = deviceManager.getMixinStorage(device.id, undefined);
 

@@ -106,6 +106,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
 
         const args = ffmpegInput.inputArguments.slice();
+        args.unshift('-hide_banner');
 
         const server = new net.Server(async (socket) => {
             server.close();

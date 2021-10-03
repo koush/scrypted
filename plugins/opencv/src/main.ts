@@ -53,7 +53,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
           await new Promise(resolve => setTimeout(resolve, 10000));
         }
       }
-    }, 1);
+    }, 10000);
   }
 
   async start() {
@@ -64,8 +64,11 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     }
 
     let {width, height} = ffmpegInput.mediaStreamOptions?.video;
-    width = Math.floor(width / 6);
-    height = Math.floor(height / 6);
+    // we'll use an image 1/6 of the dimension in size for motion.
+    // however, opencv also expects that input images are modulo 6.
+    // so make sure both are satisfied.
+    width = Math.floor(width / 36) * 6;
+    height = Math.floor(height / 36) * 6;
 
     const session = await startRebroadcastSession(ffmpegInput, {
       parsers: {

@@ -29,15 +29,15 @@ export async function startFFMPegFragmetedMP4Session(ffmpegInput: FFMpegInput, a
         const serverPort = await listenZeroCluster(server);
 
         const args = ffmpegInput.inputArguments.slice();
-
-        args.push('-f', 'mp4');
-        args.push(...videoOutputArgs);
-        args.push(...audioOutputArgs);
         args.push(
+            '-f', 'mp4',
+            ...videoOutputArgs,
+            ...audioOutputArgs,
             '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
             `tcp://127.0.0.1:${serverPort}`
         );
 
+        args.unshift('-hide_banner');
         console.log(args);
 
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
