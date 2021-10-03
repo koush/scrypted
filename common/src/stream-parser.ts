@@ -6,7 +6,7 @@ import { readLength } from "./read-length";
 export interface StreamParser {
     container: string;
     outputArguments: string[];
-    parse: (socket: Socket) => AsyncGenerator<StreamChunk>;
+    parse: (socket: Socket, width: number, height: number) => AsyncGenerator<StreamChunk>;
 }
 
 export interface StreamParserOptions {
@@ -18,6 +18,8 @@ export interface StreamChunk {
     startStream?: Buffer;
     chunk: Buffer;
     type?: string;
+    width?: number;
+    height?: number;
 }
 
 export function createMpegTsParser(options?: StreamParserOptions): StreamParser {
@@ -114,6 +116,40 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
 
                 if (ftyp && moov && !startStream) {
                     startStream = Buffer.concat([ftyp.header, ftyp.data, moov.header, moov.data])
+                }
+            }
+        }
+    }
+}
+
+export function createRawVideoParser(size?: {width: number, height: number}): StreamParser {
+    let filter: string[];
+    if (size) {
+        filter = ['-vf', `scale=${size.width}:${size.height}`];
+    }
+
+    return {
+        container: 'rawvideo',
+        outputArguments: [
+            ...(filter || []),
+            '-an',
+            '-vcodec', 'rawvideo',
+            '-pix_fmt', 'yuv420p',
+            '-f', 'rawvideo',
+        ],
+        async *parse(socket: Socket, width: number, height: number): AsyncGenerator<StreamChunk> {
+            if (!width || !height)
+                throw new Error("error parsing rawvideo, unknown width and height");            
+
+            width = size?.width || width;
+            height = size?.height || height
+            const toRead = width * height * 1.5;
+            while (true) {
+                const buffer = await readLength(socket, toRead);
+                yield {
+                    chunk: buffer,
+                    width,
+                    height,
                 }
             }
         }

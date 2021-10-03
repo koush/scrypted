@@ -177,7 +177,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
             try {
                 const eventName = container + '-data';
-                for await (const chunk of parser.parse(socket)) {
+                for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
                     events.emit(eventName, chunk);
                 }
             }

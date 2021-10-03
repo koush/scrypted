@@ -3,20 +3,26 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { Server } from 'net';
 import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
-import EventEmitter from 'events';
+import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
-import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk } from '@scrypted/common/src/stream-parser';
+import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk, createRawVideoParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import cv, { Mat, Size } from "@koush/opencv4nodejs";
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
 const defaultArea = 2000;
+const defaultThreshold = 25;
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements MotionSensor, Settings {
   area: number;
+  threshold: number;
   released = false;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
@@ -28,6 +34,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     });
 
     this.area = parseInt(localStorage.getItem('area')) || defaultArea;
+    this.threshold = parseInt(localStorage.getItem('threshold')) || defaultThreshold;
     if (this.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
       log.a(`${this.name} has a built in MotionSensor. OpenCV motion processing cancelled. Pleaes disable this extension.`);
       return;
@@ -36,57 +43,79 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
     console.log(this.name, 'session starting in 10 seconds');
     setTimeout(async () => {
-      try {
-        await this.start();
-        console.log(this.name, 'shut down gracefully');
+      while (!this.released) {
+        try {
+          await this.start();
+          console.log(this.name, 'shut down gracefully');
+        }
+        catch (e) {
+          console.error(this.name, 'session unexpectedly terminated, restarting in 10 seconds', e);
+          await new Promise(resolve => setTimeout(resolve, 10000));
+        }
       }
-      catch (e) {
-        console.error(this.name, 'session unexpectedly terminated, restarting in 10 seconds');
-        await new Promise(resolve => setTimeout(resolve, 10000));
-      }
-    }, 10000);
+    }, 1);
   }
 
   async start() {
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await this.mixinDevice.getVideoStream(), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-    const inputFlag = ffmpegInput.inputArguments.indexOf('-i');
-    if (!inputFlag) {
-      throw new Error('flag -i not found');
+    const realDevice = await systemManager.getDeviceById<VideoCamera>(this.id);
+    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    if (!ffmpegInput.mediaStreamOptions?.video?.width || !ffmpegInput.mediaStreamOptions?.video?.height) {
+      throw new Error("Width and Height were not provided. Install and enable the rebroadcast plugin.");
     }
 
-    const inputUrl = ffmpegInput.inputArguments[inputFlag + 1];
-    const cap = new cv.VideoCapture(inputUrl);
+    let {width, height} = ffmpegInput.mediaStreamOptions?.video;
+    width = Math.round(width / 6);
+    height = Math.round(height / 6);
+
+    const session = await startRebroadcastSession(ffmpegInput, {
+      parsers: {
+        rawvideo: createRawVideoParser({ width, height }),
+      }
+    });
+    try {
+      await this.startWrapped(session);
+    }
+    finally {
+      session.kill();
+    }
+  }
+
+  async startWrapped(session: FFMpegRebroadcastSession) {
     let previousFrame: Mat;
     let lastFrameProcessed = 0;
 
     let timeout: NodeJS.Timeout;
+
     const triggerMotion = () => {
       this.motionDetected = true;
       clearTimeout(timeout);
       setTimeout(() => this.motionDetected = false, 10000);
     }
-    this.motionDetected = false;
-    while (!this.released) {
-      let mat = await cap.readAsync();
 
+    this.motionDetected = false;
+
+    while (!this.released) {
       if (this.motionDetected) {
         // during motion just eat the frames.
         previousFrame = undefined;
+        await sleep(1000);
         continue;
       }
 
       // limit processing to 2fps
       const now = Date.now()
-      if (lastFrameProcessed > now - 500)
+      if (lastFrameProcessed > now - 500) {
+        await sleep(now - lastFrameProcessed);
         continue;
+      }
+
+      const args = await once(session.events, 'rawvideo-data');
+      const chunk: StreamChunk = args[0];
+      const mat = new Mat(chunk.chunk, chunk.height * 3 / 2, chunk.width, cv.CV_8U);
+
       lastFrameProcessed = now;
 
-      if (mat.cols > 1920 / 4) {
-        const cols = 1920 / 4;
-        const rows = Math.round(mat.rows / mat.cols * (1920 / 4));
-        mat = await mat.resizeAsync(rows, cols);
-      }
-      const gray = await mat.cvtColorAsync(cv.COLOR_BGR2GRAY);
+      const gray = await mat.cvtColorAsync(cv.COLOR_YUV420p2GRAY);
       const curFrame = await gray.gaussianBlurAsync(new Size(21, 21), 0);
 
       try {
@@ -95,7 +124,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
         }
 
         const frameDelta = previousFrame.absdiff(curFrame);
-        let thresh = await frameDelta.thresholdAsync(25, 255, cv.THRESH_BINARY);
+        let thresh = await frameDelta.thresholdAsync(this.threshold, 255, cv.THRESH_BINARY);
         const dilated = await thresh.dilateAsync(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(4, 4)), new cv.Point2(-1, -1), 2)
         const dilatedCopy = await dilated.copyAsync();
         const contours = await dilatedCopy.findContoursAsync(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
@@ -114,13 +143,21 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
   async getMixinSettings(): Promise<Setting[]> {
     return [
       {
-        title: "Motion Area Threshold",
+        title: "Motion Area",
         description: "The area size required to trigger motion. Higher values (larger areas) are less sensitive.",
         value: this.storage.getItem('area') || defaultArea.toString(),
         key: 'area',
         placeholder: defaultArea.toString(),
         type: 'number',
-      }
+      },
+      {
+        title: "Motion Threshold",
+        description: "The threshold required to consider a pixel changed. Higher values (larger changes) are less sensitive.",
+        value: this.storage.getItem('threshold') || defaultThreshold.toString(),
+        key: 'threshold',
+        placeholder: defaultThreshold.toString(),
+        type: 'number',
+      },
     ];
   }
 
@@ -128,6 +165,8 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     this.storage.setItem(key, value.toString());
     if (key === 'area')
       this.area = parseInt(value.toString()) || defaultArea;
+    if (key === 'threshold')
+      this.threshold = parseInt(value.toString()) || defaultThreshold;
   }
 
   release() {
