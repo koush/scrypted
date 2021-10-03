@@ -284,6 +284,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         }
     }
 
+    if (mediaStreamOptions.video) {
+      Object.assign(mediaStreamOptions.video, {
+        width: parseInt(this.session.inputVideoResolution[2]),
+        height: parseInt(this.session.inputVideoResolution[3]),
+      })
+    }
+
     const ffmpegInput: FFMpegInput = {
       inputArguments: [
         '-f', container,
