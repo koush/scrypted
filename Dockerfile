@@ -1,13 +1,13 @@
 FROM koush/opencv4nodejs
 RUN apt-get -y update
 RUN apt-get -y upgrade
+RUN apt-get -y install libavahi-compat-libdnssd-dev
 
 WORKDIR /
 COPY . .
 
 WORKDIR /server
-RUN apt-get -y update
-RUN apt-get -y install libavahi-compat-libdnssd-dev
+ENV OPENCV4NODEJS_DISABLE_AUTOBUILD=true
 RUN npm install
 
 WORKDIR /opencv4nodejs-install/opencv4nodejs
