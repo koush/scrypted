@@ -1,0 +1,43 @@
+{
+   "name": "@scrypted/opencv",
+   "version": "0.1.48",
+   "description": "Motion and Object Detection for VideoCameras.",
+   "author": "Scrypted",
+   "license": "Apache-2.0",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "opencv",
+      "motion",
+      "object",
+      "detect",
+      "detection"
+   ],
+   "scrypted": {
+      "name": "OpenCV Motion and Object Detection",
+      "singleInstance": true,
+      "type": "API",
+      "interfaces": [
+         "MixinProvider"
+      ]
+   },
+   "dependencies": {
+      "@koush/opencv4nodejs": "^5.6.6",
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "devDependencies": {
+      "@types/node": "^14.17.11"
+   }
+}
