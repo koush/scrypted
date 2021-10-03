@@ -17,6 +17,7 @@ const defaultArea = 2000;
 
 class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements MotionSensor, Settings {
   area: number;
+  released = false;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
     super(mixinDevice, mixinDeviceState, {
@@ -27,11 +28,23 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     });
 
     this.area = parseInt(localStorage.getItem('area')) || defaultArea;
-    if (this.mixinDevice.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
+    if (this.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
       log.a(`${this.name} has a built in MotionSensor. OpenCV motion processing cancelled. Pleaes disable this extension.`);
       return;
     }
-    this.start();
+
+    // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
+    console.log(this.name, 'session starting in 10 seconds');
+    setTimeout(async () => {
+      try {
+        await this.start();
+        console.log(this.name, 'shut down gracefully');
+      }
+      catch (e) {
+        console.error(this.name, 'session unexpectedly terminated, restarting in 10 seconds');
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      }
+    }, 10000);
   }
 
   async start() {
@@ -53,7 +66,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
       setTimeout(() => this.motionDetected = false, 10000);
     }
     this.motionDetected = false;
-    while (true) {
+    while (!this.released) {
       let mat = await cap.readAsync();
 
       if (this.motionDetected) {
@@ -118,12 +131,22 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
   }
 
   release() {
+    this.released = true;
   }
 }
 
 class OpenCVProvider extends AutoenableMixinProvider implements MixinProvider {
   constructor(nativeId?: string) {
     super(nativeId);
+
+    // trigger opencv.
+    for (const id of Object.keys(systemManager.getSystemState())) {
+      const device = systemManager.getDeviceById<VideoCamera>(id);
+      if (!device.mixins?.includes(this.id))
+        continue;
+      device.getVideoStreamOptions();
+    }
+
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
