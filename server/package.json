@@ -4,15 +4,7 @@
   "description": "",
   "private": true,
   "dependencies": {
-    "@koush/opencv4nodejs": "^5.6.3",
     "@scrypted/sdk": "file:../sdk",
-    "@types/adm-zip": "^0.4.33",
-    "@types/cookie-parser": "^1.4.2",
-    "@types/debug": "^4.1.5",
-    "@types/engine.io": "^3.1.5",
-    "@types/express": "^4.17.11",
-    "@types/node-dijkstra": "^2.5.1",
-    "@types/pem": "^1.9.5",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
@@ -20,7 +12,6 @@
     "debug": "^4.3.1",
     "engine.io": "^5.2.0",
     "express": "^4.17.1",
-    "ffmpeg-for-homebridge": "^0.0.9",
     "http-auth": "^4.1.9",
     "level": "^6.0.1",
     "lodash": "^4.17.21",
@@ -30,7 +21,6 @@
     "pem": "^1.14.4",
     "query-string": "^6.14.1",
     "semver": "^7.3.5",
-    "serialport": "^9.2.0",
     "source-map-support": "^0.5.20",
     "tar": "^6.1.11",
     "tmp": "^0.2.1",
@@ -41,9 +31,19 @@
     "zwave-js": "^8.1.1"
   },
   "optionalDependencies": {
-    "mdns": "^2.7.2"
+    "@koush/opencv4nodejs": "^5.6.6",
+    "ffmpeg-for-homebridge": "^0.0.9",
+    "mdns": "^2.7.2",
+    "serialport": "^9.2.0"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.4.33",
+    "@types/cookie-parser": "^1.4.2",
+    "@types/debug": "^4.1.5",
+    "@types/engine.io": "^3.1.5",
+    "@types/express": "^4.17.11",
+    "@types/node-dijkstra": "^2.5.1",
+    "@types/pem": "^1.9.5",
     "@types/http-auth": "^4.1.1",
     "@types/lodash": "^4.14.168",
     "@types/mkdirp": "^1.0.2",
@@ -61,10 +61,8 @@
     "ts-serve": "ts-node --expose-gc src/scrypted-main.ts",
     "prebuild": "tsc --build --clean",
     "build": "tsc --outDir dist",
+    "build-opencv": "cd node_modules/@koush/opencv4nodejs && npm run build",
     "postbuild": "node test/check-build-output.js"
-  },
-  "opencv4nodejs": {
-    "disableAutoBuild": 1
   },
   "author": "",
   "license": "ISC"
