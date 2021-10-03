@@ -346,7 +346,7 @@ export class RpcPeer {
     newProxy(proxyId: string, proxyConstructorName: string, proxyProps: any) {
         const rpc = new RpcProxy(this, proxyId, proxyConstructorName, proxyProps);
         const wrapped = this.remoteProxyWrapper[proxyConstructorName]?.(rpc) || rpc;
-        const target = proxyConstructorName === 'Function' ? function () { } : wrapped;
+        const target = proxyConstructorName === 'Function' || proxyConstructorName === 'AsyncFunction' ? function () { } : wrapped;
         const proxy = new Proxy(target, wrapped);
         const weakref = new WeakRef(proxy);
         this.remoteWeakProxies[proxyId] = weakref;
