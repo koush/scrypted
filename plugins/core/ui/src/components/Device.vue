@@ -746,12 +746,15 @@ export default {
           this.$scrypted.systemManager,
           this.device
         );
-        const availableMixins = await getDeviceAvailableMixins(
+        const availableMixins = (await getDeviceAvailableMixins(
           this.$scrypted.systemManager,
           this.device
-        );
+        ))
+        .filter(device => !mixins.includes(device.id));
 
-        const ret = availableMixins.map((provider) => ({
+        const allMixins = [...mixins.map(id => this.$scrypted.systemManager.getDeviceById(id)), ...availableMixins];
+
+        const ret = allMixins.map((provider) => ({
           id: provider.id,
           name: provider.name,
           enabled: mixins.includes(provider.id),
