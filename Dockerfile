@@ -7,6 +7,5 @@ COPY . .
 WORKDIR /server
 ENV OPENCV4NODEJS_DISABLE_AUTOBUILD=true
 RUN npm install
-RUN ./build-opencv4nodejs-linux.sh
 RUN npm run build
 CMD npm run serve-no-build
