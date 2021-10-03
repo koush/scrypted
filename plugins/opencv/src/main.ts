@@ -124,10 +124,9 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
         }
 
         const frameDelta = previousFrame.absdiff(curFrame);
-        let thresh = await frameDelta.thresholdAsync(this.threshold, 255, cv.THRESH_BINARY);
+        const thresh = await frameDelta.thresholdAsync(this.threshold, 255, cv.THRESH_BINARY);
         const dilated = await thresh.dilateAsync(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(4, 4)), new cv.Point2(-1, -1), 2)
-        const dilatedCopy = await dilated.copyAsync();
-        const contours = await dilatedCopy.findContoursAsync(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        const contours = await dilated.findContoursAsync(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         const filteredContours = contours.filter(cnt => cnt.area > this.area).map(cnt => cnt.area);
         if (filteredContours.length) {
           console.log(this.name, 'motion triggered by area(s)', filteredContours.join(','));
