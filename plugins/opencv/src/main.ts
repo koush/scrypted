@@ -64,8 +64,8 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     }
 
     let {width, height} = ffmpegInput.mediaStreamOptions?.video;
-    width = Math.round(width / 6);
-    height = Math.round(height / 6);
+    width = Math.floor(width / 6);
+    height = Math.floor(height / 6);
 
     const session = await startRebroadcastSession(ffmpegInput, {
       parsers: {
