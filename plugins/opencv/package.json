@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/opencv",
-   "version": "0.0.2",
-   "description": "Motion and Object Detection for VideoCameras.",
+   "version": "0.0.3",
+   "description": "Motion Detection for VideoCameras.",
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {
@@ -25,7 +25,7 @@
       "detection"
    ],
    "scrypted": {
-      "name": "OpenCV Motion and Object Detection",
+      "name": "OpenCV Motion Detection",
       "singleInstance": true,
       "type": "API",
       "interfaces": [

@@ -1,4 +1,4 @@
-# OpenCV Motion and Object detection for VideoCamera devices.
+# OpenCV Motion detection for VideoCamera devices.
 
 ## npm commands
  * npm run scrypted-webpack
