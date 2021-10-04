@@ -126,12 +126,24 @@ class OnvifCamera extends RtspSmartCamera {
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
         const client = await this.getClient();
+        // if no id is provided, choose the first available/enabled profile
+        if (!options?.id) {
+            try {
+                const vsos = await this.getVideoStreamOptions();
+                const vso = vsos.find(vso => this.isChannelEnabled(vso.id));
+                return mediaManager.createMediaObject(client.jpegSnapshot(vso?.id), 'image/jpeg');
+            }
+            catch (e) {
+            }
+        }
+
         return mediaManager.createMediaObject(client.jpegSnapshot(options?.id), 'image/jpeg');
     }
 
     async getConstructedStreamUrl(options?: MediaStreamOptions) {
-        try {
-            const client = await this.getClient();
+        const client = await this.getClient();
+        // if no id is provided, choose the first available/enabled profile
+        if (!options?.id) {
             try {
                 const vsos = await this.getVideoStreamOptions();
                 const vso = vsos.find(vso => this.isChannelEnabled(vso.id));
@@ -139,11 +151,8 @@ class OnvifCamera extends RtspSmartCamera {
             }
             catch (e) {
             }
-            return client.getStreamUrl(options?.id);
         }
-        catch (e) {
-            return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
-        }
+        return client.getStreamUrl(options?.id);
     }
 
     putSetting(key: string, value: string) {
