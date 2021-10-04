@@ -33,6 +33,7 @@ export interface FFMpegRebroadcastSession {
 export interface FFMpegRebroadcastOptions {
     parsers: { [container: string]: StreamParser };
     timeout?: number;
+    console: Console;
 }
 
 export async function parseResolution(cp: ChildProcess) {
@@ -87,6 +88,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
     let timeout: any;
     let isActive = true;
     const events = new EventEmitter();
+    const { console } = options;
 
     let inputAudioCodec: string;
     let inputVideoCodec: string;

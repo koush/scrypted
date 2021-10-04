@@ -43,7 +43,7 @@ function evalRequest(value: string, request: any) {
 }
 
 async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration): AsyncGenerator<Buffer, void, unknown> {
+    configuration: CameraRecordingConfiguration, console: Console): AsyncGenerator<Buffer, void, unknown> {
 
     console.log(device.name, 'recording session starting', configuration);
 
@@ -148,6 +148,10 @@ addSupportedType({
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
     getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
+        const console = deviceManager.getMixinConsole
+            ? deviceManager.getMixinConsole(device.id, undefined)
+            : deviceManager.getDeviceConsole(undefined);
+
         interface Session {
             prepareRequest: PrepareStreamRequest;
             startRequest: StartStreamRequest;
@@ -581,7 +585,7 @@ addSupportedType({
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
                 handleFragmentsRequests(configuration): AsyncGenerator<Buffer, void, unknown> {
-                    return handleFragmentsRequests(device, configuration)
+                    return handleFragmentsRequests(device, configuration, console)
                 }
             };
 

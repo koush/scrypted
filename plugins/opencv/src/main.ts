@@ -41,15 +41,15 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     }
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
-    console.log(this.name, 'session starting in 10 seconds');
+    this.console.log('session starting in 10 seconds');
     setTimeout(async () => {
       while (!this.released) {
         try {
           await this.start();
-          console.log(this.name, 'shut down gracefully');
+          this.console.log('shut down gracefully');
         }
         catch (e) {
-          console.error(this.name, 'session unexpectedly terminated, restarting in 10 seconds', e);
+          this.console.error(this.name, 'session unexpectedly terminated, restarting in 10 seconds', e);
           await new Promise(resolve => setTimeout(resolve, 10000));
         }
       }
@@ -71,6 +71,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     height = Math.floor(height / 36) * 6;
 
     const session = await startRebroadcastSession(ffmpegInput, {
+      console: this.console,
       parsers: {
         rawvideo: createRawVideoParser({ width, height }),
       }
@@ -132,7 +133,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
         const contours = await dilated.findContoursAsync(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         const filteredContours = contours.filter(cnt => cnt.area > this.area).map(cnt => cnt.area);
         if (filteredContours.length) {
-          console.log(this.name, 'motion triggered by area(s)', filteredContours.join(','));
+          this.console.log('motion triggered by area(s)', filteredContours.join(','));
           triggerMotion();
         }
       }

@@ -47,7 +47,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     });
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
-    console.log(`${this.name} prebuffer session starting in 10 seconds`);
+    this.console.log(`prebuffer session starting in 10 seconds`);
     setTimeout(() => this.ensurePrebufferSession(), 10000);
   }
 
@@ -110,7 +110,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   ensurePrebufferSession() {
     if (this.prebufferSession || this.released)
       return;
-    console.log(`${this.name} prebuffer session started`);
+    console.log(`prebuffer session started`);
     this.prebufferSession = this.startPrebufferSession();
   }
 
@@ -142,6 +142,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     ];
 
     const session = await startRebroadcastSession(ffmpegInput, {
+      console: this.console,
       parsers: {
         mp4: createFragmentedMp4Parser({
           vcodec,
@@ -157,18 +158,18 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.session = session;
 
     if (!this.session.inputAudioCodec) {
-      console.warn(this.name, 'no audio detected.');
+      this.console.warn('no audio detected.');
     }
     else if (this.session.inputAudioCodec !== 'aac') {
-      console.error(this.name, 'Detected audio codec was not AAC.');
-      if (session.inputAudioCodec && session.inputAudioCodec.indexOf('pcm') !== -1 && !reencodeAudio) {
+      this.console.error('Detected audio codec was not AAC.');
+      if (!probe.noAudio && session.inputAudioCodec && session.inputAudioCodec.indexOf('pcm') !== -1 && !reencodeAudio) {
         log.a(`${this.name} is using PCM audio and will be reencoded. Enable Reencode Audio in Rebroadcast Settings to disable this alert.`);
         this.unexpectedPCM = true;
       }
     }
 
     if (this.session.inputVideoCodec !== 'h264') {
-      console.error(`${this.name} video codec is not h264. If there are errors, try changing your camera's encoder output.`);
+      this.console.error(`video codec is not h264. If there are errors, try changing your camera's encoder output.`);
     }
 
     session.events.on('killed', () => {
@@ -211,7 +212,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     // if a specific stream is requested, and it's not what we're streaming, just fall through to source.
     if (options?.id && options.id !== session.ffmpegInputs['mpegts'].mediaStreamOptions?.id) {
-      console.log(this.name, 'rebroadcast session cant be used here', options);
+      this.console.log('rebroadcast session cant be used here', options);
       return this.mixinDevice.getVideoStream(options);
     }
 
@@ -221,7 +222,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       return mo;
     }
 
-    console.log(this.name, 'prebuffer request started');
+    this.console.log('prebuffer request started');
 
     const container = options?.container || 'mpegts';
     const eventName = container + '-data';
@@ -255,7 +256,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
       this.events.on(eventName, writeData);
       cleanup = () => {
-        console.log(this.name, 'prebuffer request ended');
+        this.console.log('prebuffer request ended');
         this.events.removeListener(eventName, writeData);
         this.events.removeListener('killed', cleanup);
         socket.removeAllListeners();
@@ -299,7 +300,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       mediaStreamOptions,
     }
 
-    console.log(this.name, 'prebuffer ffmpeg input', ffmpegInput.inputArguments[3]);
+    this.console.log('prebuffer ffmpeg input', ffmpegInput.inputArguments[3]);
     const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
     return mo;
   }
@@ -316,10 +317,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   release() {
-    console.log(this.name, 'prebuffer releasing if started');
+    this.console.log('prebuffer releasing if started');
     this.released = true;
     this.prebufferSession?.then(start => {
-      console.log(this.name, 'prebuffer released');
+      this.console.log('prebuffer released');
       start.kill();
     });
   }

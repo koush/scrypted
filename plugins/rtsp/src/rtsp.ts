@@ -197,7 +197,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
             {
                 key: 'ip',
                 title: 'Address',
-                placeholder: '192.168.1.100[:554]',
+                placeholder: '192.168.1.100',
                 value: this.storage.getItem('ip'),
             },
             {
