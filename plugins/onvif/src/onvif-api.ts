@@ -1,5 +1,4 @@
 import { EventEmitter, once } from 'events';
-import { Destroyable } from '../../rtsp/src/rtsp';
 import DigestClient from './digest-client';
 
 const onvif = require('onvif');
@@ -33,10 +32,20 @@ function stripNamespaces(topic: string) {
     return output
 }
 
+async function promisify<T>(block: (callback: (err: Error, value: T) => void) => void): Promise<T> {
+    return new Promise((resolve, reject) => {
+        block((err, value) => {
+            if (err) return reject(err);
+            resolve(value);
+        });
+    })
+}
+
 export class OnvifCameraAPI {
     digestAuth: DigestClient;
     mainProfileToken: Promise<string>;
     snapshotUri: string;
+    rtspUrl: string;
 
     constructor(public cam: any, username: string, password: string, public console: Console) {
         this.digestAuth = new DigestClient(username, password);
@@ -73,24 +82,28 @@ export class OnvifCameraAPI {
     async getMainProfileToken() {
         if (this.mainProfileToken)
             return this.mainProfileToken;
-        this.mainProfileToken = new Promise(async (resolve, reject) => {
-            const profiles = await new Promise((resolve) => this.cam.getProfiles((err: Error, result: any) => err ? reject(err) : resolve(result)));
+        this.mainProfileToken = promisify(cb => this.cam.getProfiles(cb)).then(profiles => {
             const { token } = profiles[0].$;
-            resolve(token);
+            return token;
         });
         this.mainProfileToken.catch(() => this.mainProfileToken = undefined);
         return this.mainProfileToken;
     }
 
     async getStreamUrl(): Promise<string> {
-        const token = await this.getMainProfileToken();
-        return new Promise((resolve, reject) => this.cam.getStreamUri({ protocol: 'RTSP', profileToken: token }, (err: Error, uri: any) => err ? reject(err) : resolve(uri.uri)));
+        if (!this.rtspUrl) {
+            const token = await this.getMainProfileToken();
+            const result = await promisify(cb => this.cam.getStreamUri({ protocol: 'RTSP', profileToken: token }, cb)) as any;
+            this.rtspUrl = result.uri;
+        }
+        return this.rtspUrl;
     }
 
     async jpegSnapshot(): Promise<Buffer> {
         if (!this.snapshotUri) {
             const token = await this.getMainProfileToken();
-            this.snapshotUri = (await new Promise((resolve, reject) => this.cam.getSnapshotUri({ profileToken: token }, (err: Error, uri: string) => err ? reject(err) : resolve(uri))) as any).uri;
+            const result = await promisify(cb => this.cam.getSnapshotUri({ profileToken: token }, cb)) as any;
+            this.snapshotUri = result.uri;
         }
 
         const response = await this.digestAuth.fetch(this.snapshotUri);
@@ -103,14 +116,13 @@ export class OnvifCameraAPI {
 export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console) {
     const split = ipAndPort.split(':');
     const [hostname, port] = split;
-    const cam = await new Promise((resolve, reject) => {
+    const cam = await promisify(cb => {
         const cam = new Cam({
             hostname,
             username,
             password,
             port,
-        }, (err: Error) => err ? reject(err) : resolve(cam)
-        )
+        }, (err: Error) => cb(err, cam));
     });
 
     return new OnvifCameraAPI(cam, username, password, console);
