@@ -307,11 +307,20 @@ export enum ThermostatMode {
   Dry = "Dry",
   On = "On",
 }
+export interface PictureOptions {
+  id?: string;
+  name?: string;
+  picture?: {
+    width?: number;
+    height?: number;
+  }
+}
 /**
  * Camera devices can take still photos.
  */
 export interface Camera {
-  takePicture(): Promise<MediaObject>;
+  takePicture(options?: PictureOptions): Promise<MediaObject>;
+  getPictureOptions?(): Promise<PictureOptions[]>;
 
 }
 
@@ -357,7 +366,7 @@ export interface VideoCamera {
   /**
    * Get the available video streaming options.
    */
-  getVideoStreamOptions(): Promise<MediaStreamOptions[]|void>;
+  getVideoStreamOptions?(): Promise<MediaStreamOptions[]>;
 
 }
 

@@ -40,7 +40,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         return mediaManager.createMediaObject(Buffer.from(response.data), response.headers['Content-Type'] || 'image/jpeg');
     }
 
-    async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         return [
             {
                 video: {
@@ -50,7 +50,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         ];
     }
 
-    async getStreamUrl() {
+    async getStreamUrl(options?: MediaStreamOptions) {
         return this.storage.getItem("url");
     }
 
@@ -58,8 +58,8 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         return this.storage.getItem('noAudio') === 'true';
     }
 
-    async getVideoStream(): Promise<MediaObject> {
-        const url = new URL(await this.getStreamUrl());
+    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        const url = new URL(await this.getStreamUrl(options));
         this.console.log('rtsp stream url', url.toString());
         const username = this.storage.getItem("username");
         const password = this.storage.getItem("password");
@@ -118,6 +118,29 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         return [];
     }
 
+    isChannelEnabled(channelId: string) {
+        return this.storage.getItem('disable-' + channelId) !== 'true';
+    }
+
+    async getStreamSettings(): Promise<Setting[]> {
+        try {
+            const vsos = await this.getVideoStreamOptions();
+            if (!vsos?.length || vsos?.length === 1)
+                return [];
+            
+            return vsos.map(channel => ({
+                title: `Disable Stream: ${channel.name}`,
+                key: 'disable-' + channel.id,
+                value: (!this.isChannelEnabled(channel.id)).toString(),
+                type: 'boolean',
+                description: 'Prevent usage of this RTSP channel in Scrypted.',
+            }));
+        }
+        catch (e) {
+            return [];
+        }
+    }
+
     async getSettings(): Promise<Setting[]> {
         return [
             {
@@ -139,6 +162,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
                 value: (this.isAudioDisabled()).toString(),
             },
             ...await this.getUrlSettings(),
+            ...await this.getStreamSettings(),
             ...await this.getOtherSettings(),
         ];
     }
@@ -193,7 +217,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
 
     async getUrlSettings() {
         const constructed = await this.getConstructedStreamUrl();
-        return [
+        const ret: Setting[] = [
             {
                 key: 'ip',
                 title: 'Address',
@@ -206,14 +230,25 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 placeholder: '80',
                 value: this.storage.getItem('httpPort'),
             },
-            {
-                key: 'rtspUrlOverride',
-                title: 'RTSP URL Override',
-                description: "Override the RTSP URL if your camera is using a non default port, channel, or rebroadcasted through an NVR. Default: " + constructed,
-                placeholder: constructed,
-                value: this.storage.getItem('rtspUrlOverride'),
-            },
         ];
+
+        if (this.showRtspUrlOverride()) {
+            ret.push(
+                {
+                    key: 'rtspUrlOverride',
+                    title: 'RTSP URL Override',
+                    description: "Override the RTSP URL if your camera is using a non default port, channel, or rebroadcasted through an NVR. Default: " + constructed,
+                    placeholder: constructed,
+                    value: this.storage.getItem('rtspUrlOverride'),
+                },
+            );
+        }
+
+        return ret;
+    }
+
+    showRtspUrlOverride() {
+        return true;
     }
 
     getHttpAddress() {
@@ -221,18 +256,20 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 
     getRtspUrlOverride() {
+        if (!this.showRtspUrlOverride())
+            return;
         return this.storage.getItem('rtspUrlOverride');
     }
 
-    abstract getConstructedStreamUrl(): Promise<string>;
+    abstract getConstructedStreamUrl(options?: MediaStreamOptions): Promise<string>;
     abstract listenEvents(): EventEmitter & Destroyable;
 
     getRtspAddress() {
         return this.storage.getItem('ip');
     }
 
-    async getStreamUrl() {
-        return this.getRtspUrlOverride() || await this.getConstructedStreamUrl();
+    async getStreamUrl(options?: MediaStreamOptions) {
+        return this.getRtspUrlOverride() || await this.getConstructedStreamUrl(options);
     }
 }
 

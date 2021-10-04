@@ -1,15 +1,84 @@
-import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 
 const { mediaManager } = sdk;
 
+function computeInterval(fps: number, govLength: number) {
+    if (!fps || !govLength)
+        return;
+    return govLength / fps * 1000;
+}
+
+function computeBitrate(bitrate: number) {
+    if (!bitrate)
+        return;
+    return bitrate * 1000;
+}
+
+function convertAudioCodec(codec: string) {
+    if (codec === 'MP4A-LATM')
+        return 'aac';
+    return codec;
+}
 
 class OnvifCamera extends RtspSmartCamera {
     eventStream: Stream;
     client: OnvifCameraAPI;
-    streamUrl: string;
+
+    async getPictureOptions?(): Promise<PictureOptions[]> {
+        try {
+            const vso = await this.getVideoStreamOptions();
+            const ret = vso.map(({ id, name, video }) => ({
+                id,
+                name,
+                // onvif doesn't actually specify the snapshot dimensions for a profile.
+                // it may just send whatever.
+                picture: {
+                    width: video?.width,
+                    height: video?.height,
+                }
+            }));
+            return ret;
+        }
+        catch (e) {
+        }
+    }
+
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+        try {
+            const client = await this.getClient();
+            const profiles: any[] = await client.getProfiles();
+            const ret: MediaStreamOptions[] = profiles.map(({ $, name, videoEncoderConfiguration, audioEncoderConfiguration }) => ({
+                id: $.token,
+                name: name,
+                video: {
+                    fps: videoEncoderConfiguration?.rateControl?.frameRateLimit,
+                    bitrate: computeBitrate(videoEncoderConfiguration?.rateControl?.bitrateLimit),
+                    width: videoEncoderConfiguration?.resolution?.width,
+                    height: videoEncoderConfiguration?.resolution?.height,
+                    codec: videoEncoderConfiguration?.encoding?.toLowerCase(),
+                    idrIntervalMillis: computeInterval(videoEncoderConfiguration?.rateControl?.frameRateLimit,
+                        videoEncoderConfiguration?.$.GovLength),
+                },
+                audio: this.isAudioDisabled() ? null : {
+                    bitrate: computeBitrate(audioEncoderConfiguration?.bitrate),
+                    codec: convertAudioCodec(audioEncoderConfiguration?.encoding),
+                }
+            }))
+            return ret;
+        }
+        catch (e) {
+            return [
+                {
+                    video: {
+                    },
+                    audio: this.isAudioDisabled() ? null : {},
+                }
+            ];
+        }
+    }
 
     listenEvents(): EventEmitter & Destroyable {
         let motionTimeout: NodeJS.Timeout;
@@ -45,20 +114,32 @@ class OnvifCamera extends RtspSmartCamera {
         return connectCameraAPI(this.getRtspAddress(), this.getUsername(), this.getPassword(), this.console);
     }
 
-    async takePicture(): Promise<MediaObject> {
+    async getClient() {
         if (!this.client)
             this.client = await this.createClient();
-        return mediaManager.createMediaObject(this.client.jpegSnapshot(), 'image/jpeg');
+        return this.client;
     }
 
-    async getConstructedStreamUrl() {
+    showRtspUrlOverride() {
+        return false;
+    }
+
+    async takePicture(options?: PictureOptions): Promise<MediaObject> {
+        const client = await this.getClient();
+        return mediaManager.createMediaObject(client.jpegSnapshot(options?.id), 'image/jpeg');
+    }
+
+    async getConstructedStreamUrl(options?: MediaStreamOptions) {
         try {
-            if (!this.streamUrl) {
-                if (!this.client)
-                this.client = await this.createClient();
-                this.streamUrl = await this.client.getStreamUrl();
+            const client = await this.getClient();
+            try {
+                const vsos = await this.getVideoStreamOptions();
+                const vso = vsos.find(vso => this.isChannelEnabled(vso.id));
+                return client.getStreamUrl(vso?.id);
             }
-            return this.streamUrl;
+            catch (e) {
+            }
+            return client.getStreamUrl(options?.id);
         }
         catch (e) {
             return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
@@ -67,7 +148,6 @@ class OnvifCamera extends RtspSmartCamera {
 
     putSetting(key: string, value: string) {
         this.client = undefined;
-        this.streamUrl = undefined;
         return super.putSetting(key, value);
     }
 }

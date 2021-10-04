@@ -43,9 +43,9 @@ async function promisify<T>(block: (callback: (err: Error, value: T) => void) =>
 
 export class OnvifCameraAPI {
     digestAuth: DigestClient;
-    mainProfileToken: Promise<string>;
-    snapshotUri: string;
-    rtspUrl: string;
+    snapshotUrls = new Map<string, string>();
+    rtspUrls = new Map<string, string>();
+    profiles: Promise<any>;
 
     constructor(public cam: any, username: string, password: string, public console: Console) {
         this.digestAuth = new DigestClient(username, password);
@@ -79,34 +79,42 @@ export class OnvifCameraAPI {
         return ret;
     }
 
+    async getProfiles() {
+        if (!this.profiles) {
+            this.profiles = promisify(cb => this.cam.getProfiles(cb));
+            this.profiles.catch(() => this.profiles = undefined);
+        }
+        return this.profiles;
+    }
+
     async getMainProfileToken() {
-        if (this.mainProfileToken)
-            return this.mainProfileToken;
-        this.mainProfileToken = promisify(cb => this.cam.getProfiles(cb)).then(profiles => {
-            const { token } = profiles[0].$;
-            return token;
-        });
-        this.mainProfileToken.catch(() => this.mainProfileToken = undefined);
-        return this.mainProfileToken;
+        const profiles = await this.getProfiles();
+        const { token } = profiles[0].$;
+        return token;
     }
 
-    async getStreamUrl(): Promise<string> {
-        if (!this.rtspUrl) {
-            const token = await this.getMainProfileToken();
-            const result = await promisify(cb => this.cam.getStreamUri({ protocol: 'RTSP', profileToken: token }, cb)) as any;
-            this.rtspUrl = result.uri;
+    async getStreamUrl(profileToken?: string): Promise<string> {
+        if (!profileToken)
+            profileToken = await this.getMainProfileToken();
+        if (!this.rtspUrls.has(profileToken)) {
+            const result = await promisify(cb => this.cam.getStreamUri({ protocol: 'RTSP', profileToken }, cb)) as any;
+            const url = result.uri;
+            this.rtspUrls.set(profileToken, url);
         }
-        return this.rtspUrl;
+        return this.rtspUrls.get(profileToken);
     }
 
-    async jpegSnapshot(): Promise<Buffer> {
-        if (!this.snapshotUri) {
-            const token = await this.getMainProfileToken();
-            const result = await promisify(cb => this.cam.getSnapshotUri({ profileToken: token }, cb)) as any;
-            this.snapshotUri = result.uri;
+    async jpegSnapshot(profileToken?: string): Promise<Buffer> {
+        if (!profileToken)
+            profileToken = await this.getMainProfileToken();
+        if (!this.snapshotUrls.has(profileToken)) {
+            const result = await promisify(cb => this.cam.getSnapshotUri({ profileToken }, cb)) as any;
+            const url = result.uri;
+            this.snapshotUrls.set(profileToken, url);
         }
+        const snapshotUri = this.snapshotUrls.get(profileToken);
 
-        const response = await this.digestAuth.fetch(this.snapshotUri);
+        const response = await this.digestAuth.fetch(snapshotUri);
         const buffer = await response.arrayBuffer();
 
         return Buffer.from(buffer);

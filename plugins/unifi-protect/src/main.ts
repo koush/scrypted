@@ -124,7 +124,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         return ret;
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[] | void> {
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         const camera = this.findCamera();
         const video: MediaStreamOptions[] = camera.channels.map(channel => this.createMediaStreamOptions(channel));
 
