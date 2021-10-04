@@ -1,4 +1,5 @@
 const types = require('./types.generated.js');
+const stream = require('stream');
 
 class ScryptedDeviceBase {
     constructor(nativeId) {
@@ -53,6 +54,17 @@ class MixinDeviceBase {
             this._storage = deviceManager.getMixinStorage(this.id, this.mixinProviderNativeId);
         }
         return this._storage;
+    }
+
+    get console() {
+        if (!this._console) {
+            if (deviceManager.getMixinConsole)
+                this._console = deviceManager.getMixinConsole(this.id, this.mixinProviderNativeId);
+            else
+                this._console = deviceManager.getDeviceConsole(this.mixinProviderNativeId);
+        }
+
+        return this._console;
     }
 
     _lazyLoadDeviceState() {

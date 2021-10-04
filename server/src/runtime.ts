@@ -311,6 +311,13 @@ export class ScryptedRuntime {
     async getComponent(componentId: string): Promise<any> {
         const self = this;
         switch (componentId) {
+            case 'info':
+                class Info {
+                    getVersion() {
+                        return process.env.GITHUB_SHA?.substring(0, 8) || require('./package.json').version;
+                    }
+                }
+                return new Info();
             case 'plugins':
                 return new PluginComponent(this);
             case 'logger':

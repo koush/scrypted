@@ -140,10 +140,11 @@ interface DeviceManagerDevice {
 class DeviceManagerImpl implements DeviceManager {
     api: PluginAPI;
     nativeIds = new Map<string, DeviceManagerDevice>();
-    systemManager: SystemManagerImpl;
 
-    constructor(systemManager: SystemManagerImpl, public events?: EventEmitter, public getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console) {
-        this.systemManager = systemManager;
+    constructor(public systemManager: SystemManagerImpl,
+        public events?: EventEmitter,
+        public getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console,
+        public getMixinConsole?: (mixinId: string, nativeId?: ScryptedNativeId) => Console) {
     }
 
     async requestRestart() {
@@ -257,11 +258,12 @@ export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
     getServicePort?: (name: string) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
+    getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
     events?: EventEmitter;
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
-    const { createMediaManager, getServicePort, events, getDeviceConsole } = options || {};
+    const { createMediaManager, getServicePort, events, getDeviceConsole, getMixinConsole } = options || {};
 
     peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
 
@@ -270,7 +272,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
     peer.params.getRemote = async (api: PluginAPI, pluginId: string) => {
         const systemManager = new SystemManagerImpl();
-        const deviceManager = new DeviceManagerImpl(systemManager, events, getDeviceConsole);
+        const deviceManager = new DeviceManagerImpl(systemManager, events, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
         const ioSockets: { [id: string]: WebSocketCallbacks } = {};
         const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager);
@@ -360,6 +362,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 systemManager.state = state;
                 done(ret);
             },
+
             async loadZip(packageJson: any, zipData: Buffer) {
                 const zip = new AdmZip(zipData);
                 events?.emit('zip', zip);
@@ -446,6 +449,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     return exports.default;
                 }
                 catch (e) {
+                    params?.console.error(e);
                     console.error(e);
                     throw e;
                 }
@@ -457,4 +461,3 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
     return retPromise;
 }
-

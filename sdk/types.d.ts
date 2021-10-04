@@ -705,6 +705,11 @@ export interface DeviceManager {
   getDeviceConsole?(nativeId?: ScryptedNativeId): Console;
 
   /**
+   * Get the console for the device given a native id.
+   */
+  getMixinConsole?(nativeId?: ScryptedNativeId, mixinId?: string): Console;
+
+  /**
    * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
    */
   getDeviceState(nativeId?: ScryptedNativeId): DeviceState;

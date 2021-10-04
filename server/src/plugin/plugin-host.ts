@@ -1,7 +1,7 @@
 import cluster from 'cluster';
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
+import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
@@ -22,6 +22,7 @@ import { PluginHostAPI } from './plugin-host-api';
 import mkdirp from 'mkdirp';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
+import net from 'net'
 
 export class PluginHost {
     worker: cluster.Worker;
@@ -209,7 +210,7 @@ export class PluginHost {
         });
     }
 
-    startPluginClusterHost(logger: Logger,env?: any) {
+    startPluginClusterHost(logger: Logger, env?: any) {
         this.worker = cluster.fork(env);
 
         this.worker.process.stdout.on('data', data => {
@@ -252,7 +253,7 @@ export class PluginHost {
     }
 }
 
-async function createConsoleServer(events: EventEmitter): Promise<number> {
+async function createConsoleServer(events: EventEmitter): Promise<number[]> {
     const outputs = new Map<string, Buffer[]>();
     const appendOutput = (data: Buffer, nativeId: ScryptedNativeId) => {
         if (!nativeId)
@@ -297,7 +298,36 @@ async function createConsoleServer(events: EventEmitter): Promise<number> {
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    return listenZeroCluster(server);
+
+
+    const writeServer = new Server(async (socket) => {
+        const [data] = await once(socket, 'data');
+        let filter: string = data.toString();
+        const newline = filter.indexOf('\n');
+        if (newline !== -1) {
+            socket.unshift(Buffer.from(filter.substring(newline + 1)));
+        }
+        filter = filter.substring(0, newline);
+
+        if (filter === 'undefined')
+            filter = undefined;
+
+        const cb = (data: Buffer) => events.emit('stdout', data, filter);
+
+        socket.on('data', cb);
+
+        const cleanup = () => {
+            events.removeListener('data', cb);
+        };
+
+        socket.on('close', cleanup);
+        socket.on('error', cleanup);
+        socket.on('end', cleanup);
+    });
+    const consoleReader = await listenZeroCluster(server);
+    const consoleWriter = await listenZeroCluster(writeServer);
+
+    return [consoleReader, consoleWriter];
 }
 
 async function createREPLServer(events: EventEmitter): Promise<number> {
@@ -393,12 +423,22 @@ export function startPluginClusterWorker() {
         })
     });
 
-    const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
+    let systemManager: SystemManager;
+    let deviceManager: DeviceManager;
+
+    function idForNativeId(nativeId: ScryptedNativeId) {
+        if (!deviceManager)
+            return;
+        const ds = deviceManager.getDeviceState(nativeId);
+        return ds?.id;
+    }
+
+    const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>) => {
+
         const stdout = new PassThrough();
         const stderr = new PassThrough();
 
-        stdout.on('data', data => events.emit('stdout', data, nativeId));
-        stderr.on('data', data => events.emit('stderr', data, nativeId));
+        hook(stdout, stderr);
 
         const ret = new Console(stdout, stderr);
 
@@ -426,6 +466,51 @@ export function startPluginClusterWorker() {
         return ret;
     }
 
+    const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
+        return getConsole(async (stdout, stderr) => {
+            stdout.on('data', data => events.emit('stdout', data, nativeId));
+            stderr.on('data', data => events.emit('stderr', data, nativeId));
+        });
+    }
+
+    const getMixinConsole = (mixinId: string, nativeId?: ScryptedNativeId) => {
+        return getConsole(async (stdout, stderr) => {
+            if (!mixinId || !systemManager.getDeviceById(mixinId).mixins.includes(idForNativeId(nativeId))) {
+                stdout.on('data', data => events.emit('stdout', data, nativeId));
+                stderr.on('data', data => events.emit('stderr', data, nativeId));
+                return;
+            }
+            const plugins = await systemManager.getComponent('plugins');
+            const connect = async () => {
+                const ds = deviceManager.getDeviceState(nativeId);
+                if (!ds) {
+                    // deleted?
+                    return;
+                }
+                const {pluginId, nativeId: mixinNativeId} = await plugins.getDeviceInfo(mixinId);
+                const port = await plugins.getRemoteServicePort(pluginId, 'console-writer');
+                const socket = net.connect(port);
+                socket.write(mixinNativeId + '\n');
+                const writer = (data: Buffer) => {
+                    let str = data.toString().trim();
+                    str = str.replaceAll('\n', `\n[${ds.name}]: `);
+                    str = `[${ds.name}]: ` + str + '\n';
+                    socket.write(str);
+                };
+                stdout.on('data', writer);
+                stderr.on('data', writer);
+                socket.on('error', () => {
+                    stdout.removeAllListeners();
+                    stderr.removeAllListeners();
+                    stdout.pause();
+                    stderr.pause();
+                    setTimeout(connect, 10000);
+                });
+            };
+            connect();
+        });
+    }
+
     const peer = new RpcPeer((message, reject) => process.send(message, undefined, {
         swallowErrors: !reject,
     }, e => {
@@ -446,30 +531,36 @@ export function startPluginClusterWorker() {
         global?.gc();
     }, 10000);
 
-    const consolePort = createConsoleServer(events);
+    const consolePorts = createConsoleServer(events);
     const replPort = createREPLServer(events);
 
+    const pluginConsole = getDeviceConsole(undefined);
     attachPluginRemote(peer, {
-        createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager, getDeviceConsole(undefined)),
+        createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager, pluginConsole),
         events,
         getDeviceConsole,
+        getMixinConsole,
         async getServicePort(name) {
             if (name === 'repl')
                 return replPort;
             if (name === 'console')
-                return consolePort;
+                return (await consolePorts)[0];
+            if (name === 'console-writer')
+                return (await consolePorts)[1];
             throw new Error(`unknown service ${name}`);
         }
     }).then(scrypted => {
+        systemManager = scrypted.systemManager;
+        deviceManager = scrypted.deviceManager;
+
         events.emit('scrypted', scrypted);
-        const deviceConsole = getDeviceConsole(undefined);
 
         process.on('uncaughtException', e => {
-            deviceConsole.error('uncaughtException', e);
+            pluginConsole.error('uncaughtException', e);
             scrypted.log.e('uncaughtException ' + e?.toString());
         });
         process.on('unhandledRejection', e => {
-            deviceConsole.error('unhandledRejection', e);
+            pluginConsole.error('unhandledRejection', e);
             scrypted.log.e('unhandledRejection ' + e?.toString());
         });
     })

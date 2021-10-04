@@ -7,7 +7,6 @@ export class PluginComponent {
     scrypted: ScryptedRuntime;
     constructor(scrypted: ScryptedRuntime) {
         this.scrypted = scrypted;
-
     }
 
     getNativeId(id: string) {
