@@ -166,7 +166,7 @@
               >
 
               <v-btn color="info" text @click="openLogs" v-if="!loading"
-                >Logs</v-btn
+                >Events</v-btn
               >
 
               <v-dialog v-if="!loading" v-model="showDelete" width="500">

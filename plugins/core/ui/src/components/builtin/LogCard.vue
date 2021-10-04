@@ -1,7 +1,7 @@
 <template>
   <v-card raised>
       <v-toolbar dark color="blue">
-      Logs
+      Events
       <v-spacer></v-spacer>
       <v-text-field v-model="search" append-icon="search" label="Search" single-line hide-details></v-text-field>
     </v-toolbar>
