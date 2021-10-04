@@ -16,4 +16,6 @@ WORKDIR /server
 RUN npm link @koush/opencv4nodejs
 
 RUN npm run build
+
+ENV COMMIT_SHA=${GITHUB_SHA}
 CMD npm run serve-no-build
