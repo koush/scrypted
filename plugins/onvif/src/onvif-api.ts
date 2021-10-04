@@ -36,6 +36,7 @@ function stripNamespaces(topic: string) {
 export class OnvifCameraAPI {
     digestAuth: DigestClient;
     mainProfileToken: Promise<string>;
+    snapshotUri: string;
 
     constructor(public cam: any, username: string, password: string, public console: Console) {
         this.digestAuth = new DigestClient(username, password);
@@ -87,10 +88,12 @@ export class OnvifCameraAPI {
     }
 
     async jpegSnapshot(): Promise<Buffer> {
-        const token = await this.getMainProfileToken();
-        const url: string = (await new Promise((resolve, reject) => this.cam.getSnapshotUri({ profileToken: token }, (err: Error, uri: string) => err ? reject(err) : resolve(uri))) as any).uri;
+        if (!this.snapshotUri) {
+            const token = await this.getMainProfileToken();
+            this.snapshotUri = (await new Promise((resolve, reject) => this.cam.getSnapshotUri({ profileToken: token }, (err: Error, uri: string) => err ? reject(err) : resolve(uri))) as any).uri;
+        }
 
-        const response = await this.digestAuth.fetch(url);
+        const response = await this.digestAuth.fetch(this.snapshotUri);
         const buffer = await response.arrayBuffer();
 
         return Buffer.from(buffer);
