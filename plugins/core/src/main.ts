@@ -28,6 +28,7 @@ interface RoutedHttpRequest extends HttpRequest {
 
 async function reportAutomation(nativeId: string) {
     const device: Device = {
+        name: undefined,
         nativeId,
         type: ScryptedDeviceType.Automation,
         interfaces: [ScryptedInterface.OnOff]
@@ -37,6 +38,7 @@ async function reportAutomation(nativeId: string) {
 
 async function reportScript(nativeId: string) {
     const device: Device = {
+        name: undefined,
         nativeId,
         type: ScryptedDeviceType.Program,
         interfaces: [ScryptedInterface.Scriptable, ScryptedInterface.Program]
@@ -46,6 +48,7 @@ async function reportScript(nativeId: string) {
 
 async function reportAggregate(nativeId: string, interfaces: string[]) {
     const device: Device = {
+        name: undefined,
         nativeId,
         type: ScryptedDeviceType.Unknown,
         interfaces,
@@ -71,6 +74,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     name: 'HTTP file host',
                     nativeId: 'http',
                     interfaces: [ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
+                    type: ScryptedDeviceType.API,
                 },
             );
             await deviceManager.onDeviceDiscovered(
@@ -78,6 +82,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     name: 'HTTPS file host',
                     nativeId: 'https',
                     interfaces: [ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
+                    type: ScryptedDeviceType.API,
                 }
             );
             this.httpHost = new UrlConverter(false);

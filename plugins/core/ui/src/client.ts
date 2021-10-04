@@ -65,6 +65,7 @@ Vue.use(Vue => {
                 store.commit("setSystemState", systemState);
                 store.commit("setDevices", Object.keys(systemState));
                 store.commit("setIsConnected", true);
+                store.commit("setVersion", scrypted.version);
 
                 scrypted.onClose = () => {
                     store.commit("setIsConnected", false);

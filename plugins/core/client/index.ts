@@ -8,6 +8,7 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     disconnect(): void;
     onClose?: Function;
     userStorage: Storage,
+    version: string;
 }
 
 export default {
@@ -37,7 +38,16 @@ export default {
 
                     const userStorage = await rpcPeer.eval('return userStorage');
 
+                    const info = await systemManager.getComponent('info');
+                    let version = 'unknown';
+                    try {
+                        version = await info.getVersion();
+                    }
+                    catch (e) {
+                    }
+
                     const ret: ScryptedClientStatic = {
+                        version,
                         systemManager,
                         deviceManager,
                         endpointManager,

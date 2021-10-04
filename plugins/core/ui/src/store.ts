@@ -5,6 +5,7 @@ Vue.use(Vuex);
 
 const store = new Vuex.Store({
   state: {
+    version: undefined,
     menu: undefined,
     systemState: {},
     scrypted: {
@@ -63,6 +64,9 @@ const store = new Vuex.Store({
     },
     setHasLogin(store, hasLogin) {
       store.hasLogin = hasLogin;
+    },
+    setVersion(store, version) {
+      store.version = version;
     },
     setMenu(store, menu) {
       Vue.set(store, 'menu', menu);

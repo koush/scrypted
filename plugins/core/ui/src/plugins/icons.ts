@@ -74,6 +74,7 @@ import {
   faFaucet,
   faExternalLinkAlt,
   faSortDown,
+  faCodeBranch,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -154,6 +155,7 @@ const icons =[
   faFaucet,
   faExternalLinkAlt,
   faSortDown,
+  faCodeBranch,
 ];
 
 for (var icon in icons) {

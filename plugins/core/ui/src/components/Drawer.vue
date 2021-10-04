@@ -39,6 +39,45 @@
         </v-list-item>
         <v-divider></v-divider>
       </div>
+        <v-subheader>Social</v-subheader>
+      <v-list-item
+        link
+        href="https://discord.gg/DcFzmBHYGq"
+        active-class="purple white--text tile"
+      >
+        <v-list-item-icon>
+          <v-icon small>fab fa-discord</v-icon>
+        </v-list-item-icon>
+
+        <v-list-item-content>
+          <v-list-item-title>Discord</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+      <v-list-item
+        link
+        href="https://github.com/koush/scrypted"
+        active-class="purple white--text tile"
+      >
+        <v-list-item-icon>
+          <v-icon small>fab fa-github</v-icon>
+        </v-list-item-icon>
+
+        <v-list-item-content>
+          <v-list-item-title>Github</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+        <v-divider></v-divider>
+      <v-list-item
+        active-class="purple white--text tile"
+      >
+        <v-list-item-icon>
+          <v-icon small>fa-code-branch</v-icon>
+        </v-list-item-icon>
+
+        <v-list-item-content>
+          <v-list-item-title>Version {{ scryptedVersion || "Unknown" }}</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
     </v-list>
   </v-navigation-drawer>
 </template>
@@ -77,7 +116,7 @@ export default {
             icon: "fa-terminal",
             category: "Components",
           },
-          { id: "log", name: "Live Log", icon: "list", category: "Utilities" },
+          // { id: "log", name: "Live Log", icon: "list", category: "Utilities" },
           // {
           //   id: "settings",
           //   name: "Settings",
@@ -87,6 +126,11 @@ export default {
         ];
       },
     },
+  },
+  computed: {
+    scryptedVersion() {
+      return this.$store.state.version;
+    }
   },
   methods: {
     getComponentViewPath,
@@ -116,7 +160,10 @@ export default {
           active: false,
         },
       ],
-      categories: ["Components", "Utilities"],
+      categories: [
+        "Components",
+        // "Utilities"
+        ],
     };
   },
 };
