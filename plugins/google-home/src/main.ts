@@ -416,7 +416,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 continue;
             try {
                 const status = await supportedType.query(device);
-                const notifications = await supportedType?.notifications(device);
+                const notifications = await supportedType.notifications?.(device);
                 const hasNotifications = notifications && !!Object.keys(notifications).length;
                 // don't report state on devices with no state
                 if (!Object.keys(status).length && !hasNotifications)
