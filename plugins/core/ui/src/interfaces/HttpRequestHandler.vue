@@ -31,12 +31,10 @@ export default {
   },
   methods: {
     async viewPublic() {
-        const endpoint = await this.rpc().getEndpoint();
-        window.open(`/endpoint/${endpoint}/public/`, 'endpoint');
+        window.open(`/endpoint/${this.id}/public/`, 'endpoint');
     },
     async viewPrivate() {
-        const endpoint = await this.rpc().getEndpoint();
-        window.open(`/endpoint/${endpoint}/`, 'endpoint');
+        window.open(`/endpoint/${this.id}/`, 'endpoint');
     }
   }
 };

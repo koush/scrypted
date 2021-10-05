@@ -45,7 +45,6 @@
     <v-flex xs12 md6 v-if="name != null">
       <v-layout row wrap>
         <v-flex xs12>
-
           <v-card raised>
             <v-card-title class="orange-gradient subtitle-1 font-weight-light">
               {{ name || "No Device Name" }}
@@ -65,6 +64,12 @@
                 ></component>
               </v-layout>
             </v-card-title>
+
+            <v-card-subtitle v-if="ownerDevice && pluginData">
+              <a @click="openDevice(ownerDevice.id)">{{ ownerDevice.name }}</a>
+              (Native ID: {{ pluginData.nativeId }})
+              <div></div>
+            </v-card-subtitle>
 
             <v-flex v-if="cardButtonInterfaces.length">
               <v-layout align-center justify-center>
@@ -147,6 +152,22 @@
               </v-layout>
             </v-container>
 
+            <v-card-actions v-if="!ownerDevice && pluginData">
+              <v-spacer></v-spacer>
+              <v-btn
+                small
+                outlined
+                color="blue"
+                @click="reloadPlugin"
+                class="mr-2"
+                >Reload Plugin</v-btn
+              >
+              <PluginAdvancedUpdate
+                :pluginData="pluginData"
+                @installed="reload"
+              />
+            </v-card-actions>
+
             <v-card-actions>
               <component
                 v-for="iface in cardActionInterfaces"
@@ -161,17 +182,48 @@
                 >Console</v-btn
               >
 
-              <v-btn color="info" text @click="openRepl" v-if="!loading"
-                >REPL</v-btn
-              >
+              <v-tooltip bottom v-if="!loading">
+                <template v-slot:activator="{ on }">
+                  <v-btn x-small v-on="on" color="info" text @click="openRepl"
+                    ><v-icon x-small>fa-terminal</v-icon></v-btn
+                  >
+                </template>
+                <span>REPL</span>
+              </v-tooltip>
 
-              <v-btn color="info" text @click="openLogs" v-if="!loading"
-                >Events</v-btn
-              >
+              <v-tooltip bottom v-if="!loading">
+                <template v-slot:activator="{ on }">
+                  <v-btn x-small v-on="on" color="info" text @click="openLogs"
+                    ><v-icon x-small>fa-history</v-icon></v-btn
+                  >
+                </template>
+                <span>Events</span>
+              </v-tooltip>
+
+              <v-tooltip bottom v-if="!loading">
+                <template v-slot:activator="{ on }">
+                  <v-btn
+                    x-small
+                    v-on="on"
+                    color="info"
+                    text
+                    @click="showStorage = !showStorage"
+                    ><v-icon x-small>fa-hdd</v-icon></v-btn
+                  >
+                </template>
+                <span>Storage</span>
+              </v-tooltip>
 
               <v-dialog v-if="!loading" v-model="showDelete" width="500">
                 <template v-slot:activator="{ on }">
-                  <v-btn color="error" text v-on="on">Delete</v-btn>
+                  <v-tooltip bottom v-on="on">
+                    <template v-slot:activator="{ on }">
+                      <v-btn x-small v-on="on" color="error" text
+                        ><v-icon x-small>fa-trash</v-icon></v-btn
+                      >
+                    </template>
+                    <span>Delete</span>
+                  </v-tooltip>
                 </template>
 
                 <v-card>
@@ -244,31 +296,6 @@
             :id="id"
             ref="componentCard"
           ></component>
-        </v-flex>
-
-        <v-flex xs12 v-if="ownerDevice && pluginData">
-          <v-card raised>
-            <v-card-title
-              class="green-gradient subtitle-1 text--white font-weight-light"
-            >
-              <font-awesome-icon size="sm" icon="server" />
-              &nbsp;&nbsp;Managed Device
-            </v-card-title>
-            <v-card-text></v-card-text>
-            <v-card-text>
-              <b>Native ID:</b>
-              {{ pluginData.nativeId }}
-            </v-card-text>
-            <v-card-actions>
-              <v-btn text color="primary" @click="showStorage = !showStorage"
-                >Storage</v-btn
-              >
-              <v-spacer></v-spacer>
-              <v-btn text color="blue" :to="`/device/${ownerDevice.id}`">{{
-                ownerDevice.name
-              }}</v-btn>
-            </v-card-actions>
-          </v-card>
         </v-flex>
 
         <v-flex xs12 v-if="availableMixins.length">
@@ -728,7 +755,10 @@ export default {
       await plugins.setStorage(this.device.id, this.pluginData.storage);
     },
     openMixin(mixin) {
-      this.$router.push(getDeviceViewPath(mixin.id));
+      this.openDevice(mixin.id);
+    },
+    openDevice(id) {
+      this.$router.push(getDeviceViewPath(id));
     },
     async toggleMixin(mixin) {
       await setMixin(
@@ -746,13 +776,17 @@ export default {
           this.$scrypted.systemManager,
           this.device
         );
-        const availableMixins = (await getDeviceAvailableMixins(
-          this.$scrypted.systemManager,
-          this.device
-        ))
-        .filter(device => !mixins.includes(device.id));
+        const availableMixins = (
+          await getDeviceAvailableMixins(
+            this.$scrypted.systemManager,
+            this.device
+          )
+        ).filter((device) => !mixins.includes(device.id));
 
-        const allMixins = [...mixins.map(id => this.$scrypted.systemManager.getDeviceById(id)), ...availableMixins];
+        const allMixins = [
+          ...mixins.map((id) => this.$scrypted.systemManager.getDeviceById(id)),
+          ...availableMixins,
+        ];
 
         const ret = allMixins.map((provider) => ({
           id: provider.id,

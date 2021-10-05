@@ -2,6 +2,7 @@
   <v-menu text close-on-click bottom>
     <template v-slot:activator="{ on, attrs }">
       <v-btn
+       small
         :color="pluginData.updateAvailable ? 'orange' : 'blue'"
         v-bind="attrs"
         v-on="on"
