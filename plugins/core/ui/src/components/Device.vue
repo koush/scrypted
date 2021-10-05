@@ -215,10 +215,15 @@
               </v-tooltip>
 
               <v-dialog v-if="!loading" v-model="showDelete" width="500">
-                <template v-slot:activator="{ on }">
-                  <v-btn x-small v-on="on" color="error" text
-                    ><v-icon x-small>fa-trash</v-icon></v-btn
-                  >
+                <template #activator="{ on: dialog }">
+                  <v-tooltip bottom>
+                    <template #activator="{ on: tooltip }">
+                      <v-btn x-small v-on="{ ...tooltip, ...dialog }" color="error" text
+                        ><v-icon x-small>fa-trash</v-icon></v-btn
+                      >
+                    </template>
+                    <span>Delete</span>
+                  </v-tooltip>
                 </template>
 
                 <v-card>
@@ -250,7 +255,7 @@
             </v-card-actions>
           </v-card>
         </v-flex>
-        <!-- 
+<!--
         <v-flex xs12 v-if="!ownerDevice && pluginData">
           <v-card raised>
             <v-card-title
