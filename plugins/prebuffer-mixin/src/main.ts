@@ -305,7 +305,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     return mo;
   }
 
-  async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
+  async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
     const ret: MediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
     let first = ret[0];
     if (!first) {

@@ -20,7 +20,7 @@
       "plugin"
    ],
    "scrypted": {
-      "name": "Unifi Protect Controller",
+      "name": "Unifi Protect Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
