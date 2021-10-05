@@ -589,6 +589,9 @@ addSupportedType({
 
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
+                prepareRecording(recording) {
+                    console.log('prepareRecording', recording);
+                },
                 handleFragmentsRequests(configuration): AsyncGenerator<Buffer, void, unknown> {
                     return handleFragmentsRequests(device, configuration, console)
                 }
