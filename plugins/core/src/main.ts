@@ -1,7 +1,7 @@
 // https://developer.scrypted.app/#getting-started
 // package.json contains the metadata (name, interfaces) about this device
 // under the "scrypted" key.
-import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, EventListenerRegister, Device, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, ScryptedDeviceType } from '@scrypted/sdk';
+import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, ScryptedDeviceType } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
@@ -17,6 +17,9 @@ import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { Script } from './script';
+import { addBuiltins } from "../../../common/src/wrtc-converters";
+
+addBuiltins(console, mediaManager);
 
 const { pluginHostAPI } = sdk;
 

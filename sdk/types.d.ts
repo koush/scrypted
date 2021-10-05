@@ -659,6 +659,11 @@ export interface OauthClient {
 }
 export interface MediaManager {
   /**
+   * Additional plugin provided convertors to consider for use when converting MediaObjects.
+   */
+  builtinConverters: BufferConverter[];
+
+  /**
    * Convert a media object to a Buffer of the given mime type.
    */
   convertMediaObjectToBuffer(mediaObject: string|MediaObject, toMimeType: string): Promise<Buffer>;

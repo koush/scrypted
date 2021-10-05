@@ -17,9 +17,10 @@ import mdns from 'mdns';
 import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
 import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
+import { addBuiltins } from "../../../common/src/wrtc-converters";
 
 const { systemManager, mediaManager, endpointManager, deviceManager } = sdk;
-
+addBuiltins(console, mediaManager);
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
