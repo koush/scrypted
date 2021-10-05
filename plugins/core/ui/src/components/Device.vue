@@ -216,14 +216,9 @@
 
               <v-dialog v-if="!loading" v-model="showDelete" width="500">
                 <template v-slot:activator="{ on }">
-                  <v-tooltip bottom v-on="on">
-                    <template v-slot:activator="{ on }">
-                      <v-btn x-small v-on="on" color="error" text
-                        ><v-icon x-small>fa-trash</v-icon></v-btn
-                      >
-                    </template>
-                    <span>Delete</span>
-                  </v-tooltip>
+                  <v-btn x-small v-on="on" color="error" text
+                    ><v-icon x-small>fa-trash</v-icon></v-btn
+                  >
                 </template>
 
                 <v-card>
@@ -255,7 +250,7 @@
             </v-card-actions>
           </v-card>
         </v-flex>
-<!-- 
+        <!-- 
         <v-flex xs12 v-if="!ownerDevice && pluginData">
           <v-card raised>
             <v-card-title
