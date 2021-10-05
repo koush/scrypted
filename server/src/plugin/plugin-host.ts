@@ -433,7 +433,7 @@ export function startPluginClusterWorker() {
         return ds?.id;
     }
 
-    const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>) => {
+    const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>, also?: Console, alsoPrefix?: string) => {
 
         const stdout = new PassThrough();
         const stderr = new PassThrough();
@@ -455,11 +455,16 @@ export function startPluginClusterWorker() {
             'groupCollapsed',
         ];
 
+        const printers = ['log', 'info', 'debug', 'trace', 'warn', 'error'];
         for (const m of methods) {
             const old = (ret as any)[m].bind(ret);
             (ret as any)[m] = (...args: any[]) => {
                 (console as any)[m](...args);
                 old(...args);
+
+                if (also && alsoPrefix && printers.includes(m)) {
+                    (also as any)[m](alsoPrefix, ...args);
+                }
             }
         }
 
@@ -508,7 +513,7 @@ export function startPluginClusterWorker() {
                 });
             };
             connect();
-        });
+        }, getDeviceConsole(nativeId), `[${systemManager.getDeviceById(mixinId)?.name}]`);
     }
 
     const peer = new RpcPeer((message, reject) => process.send(message, undefined, {
