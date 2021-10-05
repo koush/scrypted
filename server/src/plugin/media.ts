@@ -152,11 +152,12 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
             // wrtc causes browser to hang if there's no audio track? so always make sure one exists.
             const noAudio = ffInput.mediaStreamOptions && ffInput.mediaStreamOptions.audio === null;
 
+            let audioServer: net.Server;
             if (!noAudio) {
                 const audioSource = new RTCAudioSource();
                 pc.addTrack(audioSource.createTrack());
 
-                const audioServer = net.createServer(async (socket) => {
+                audioServer = net.createServer(async (socket) => {
                     audioServer.close()
                     const { sample_rate, channels } = await sampleInfo;
                     const bitsPerSample = 16;
@@ -237,6 +238,9 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
                 args.push(`tcp://127.0.0.1:${audioPort}`);
             }
 
+            // chromecast seems to crap out on higher than 15fps??? is there
+            // some webrtc video negotiation that is failing here?
+            args.push('-r', '15');
             args.push('-vcodec', 'rawvideo');
             args.push('-an');
             args.push('-pix_fmt', 'yuv420p');
@@ -252,6 +256,12 @@ function addBuiltins(console: Console, mediaManager: MediaManager, converters: B
             });
             ffmpegLogInitialOutput(console, cp);
             cp.on('error', e => console.error('ffmpeg error', e));
+
+            cp.on('exit', () => {
+                videoServer.close();
+                audioServer?.close();
+                pc.close();
+            });
 
             const resolution = new Promise<Array<string>>(resolve => {
                 cp.stdout.on('data', data => {
