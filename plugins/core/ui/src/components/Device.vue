@@ -255,7 +255,7 @@
             </v-card-actions>
           </v-card>
         </v-flex>
-
+<!-- 
         <v-flex xs12 v-if="!ownerDevice && pluginData">
           <v-card raised>
             <v-card-title
@@ -286,7 +286,7 @@
               />
             </v-card-actions>
           </v-card>
-        </v-flex>
+        </v-flex> -->
 
         <v-flex xs12 v-if="deviceComponent && deviceComponent !== 'Script'">
           <component
