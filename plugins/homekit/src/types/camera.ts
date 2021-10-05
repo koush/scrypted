@@ -111,7 +111,7 @@ async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & M
     }
 
     log.i(`${device.name} motion recording starting`);
-    const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs);
+    const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs, console);
 
     log.i(`${device.name} motion recording started`);
     const { socket, cp, generator } = session;
@@ -186,12 +186,17 @@ addSupportedType({
         }
 
 
-        const takePicture = async () => {
+        const takePicture = async (request: SnapshotRequest) => {
             if (pendingPicture)
                 return pendingPicture;
 
             if (device.interfaces.includes(ScryptedInterface.Camera)) {
-                const media = await device.takePicture();
+                const media = await device.takePicture({
+                    picture: {
+                        width: request.width,
+                        height: request.height,
+                    }
+                });
                 pendingPicture = mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
             }
             else {
@@ -235,9 +240,9 @@ addSupportedType({
             trailing: true,
         });
 
-        function snapshotAll() {
+        function snapshotAll(request: SnapshotRequest) {
             for (const snapshotThrottle of homekitSession.snapshotThrottles.values()) {
-                snapshotThrottle();
+                snapshotThrottle(request);
             }
         }
 
@@ -248,7 +253,7 @@ addSupportedType({
                 try {
                     // non zero reason is for homekit secure video... or something else.
                     if (request.reason) {
-                        callback(null, await takePicture());
+                        callback(null, await takePicture(request));
                         return;
                     }
 
@@ -261,8 +266,8 @@ addSupportedType({
                     // fetch everything serially.
                     // this call is not a bug, to force lodash to take a picture on the trailing edge,
                     // throttle must be called twice.
-                    snapshotAll();
-                    snapshotAll();
+                    snapshotAll(request);
+                    snapshotAll(request);
 
                     // path to return blank snapshots
                     if (localStorage.getItem('blankSnapshots') === 'true') {
@@ -275,7 +280,7 @@ addSupportedType({
                         return;
                     }
 
-                    callback(null, await throttledTakePicture());
+                    callback(null, await throttledTakePicture(request));
                 }
                 catch (e) {
                     console.error('snapshot error', e);

@@ -1,7 +1,6 @@
 
 import { EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { Accessory, Service } from './hap';
-import throttle from 'lodash/throttle';
+import { Accessory, Service, SnapshotRequest } from './hap';
 
 export interface DummyDevice {
     interfaces?: string[];
@@ -9,7 +8,7 @@ export interface DummyDevice {
 }
 
 export interface SnapshotThrottle {
-    (): Promise<Buffer>;
+    (request: SnapshotRequest): Promise<Buffer>;
 }
 
 export interface HomeKitSession {
