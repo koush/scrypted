@@ -38,7 +38,7 @@ sudo apt install libavahi-compat-libdnssd-dev
 
 
 ```sh
-# Mac M1 (Apple Silicon Users) should uncomment the nextline to switch to x64 mode
+# Mac M1 (Apple Silicon) should uncomment the nextline to switch to x64 mode
 # arch -x86_64 zsh
 
 # checkout source
