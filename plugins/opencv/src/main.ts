@@ -13,6 +13,7 @@ import cv, { Mat, Size } from "@koush/opencv4nodejs";
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
+const defaultInterval = 10;
 const defaultArea = 2000;
 const defaultThreshold = 25;
 
@@ -73,7 +74,13 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     const session = await startRebroadcastSession(ffmpegInput, {
       console: this.console,
       parsers: {
-        rawvideo: createRawVideoParser({ width, height }),
+        rawvideo: createRawVideoParser({
+          size: {
+            width,
+            height,
+          },
+          everyNFrames: parseInt(this.storage.getItem('interval')) || 10,
+        }),
       }
     });
     try {
@@ -86,7 +93,6 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
 
   async startWrapped(session: FFMpegRebroadcastSession) {
     let previousFrame: Mat;
-    let lastFrameProcessed = 0;
 
     let timeout: NodeJS.Timeout;
 
@@ -106,18 +112,9 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
         continue;
       }
 
-      // limit processing to 2fps
-      const now = Date.now()
-      if (lastFrameProcessed > now - 500) {
-        await sleep(now - lastFrameProcessed);
-        continue;
-      }
-
       const args = await once(session.events, 'rawvideo-data');
       const chunk: StreamChunk = args[0];
       const mat = new Mat(chunk.chunk, chunk.height * 3 / 2, chunk.width, cv.CV_8U);
-
-      lastFrameProcessed = now;
 
       const gray = await mat.cvtColorAsync(cv.COLOR_YUV420p2GRAY);
       const curFrame = await gray.gaussianBlurAsync(new Size(21, 21), 0);
@@ -159,6 +156,14 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
         value: this.storage.getItem('threshold') || defaultThreshold.toString(),
         key: 'threshold',
         placeholder: defaultThreshold.toString(),
+        type: 'number',
+      },
+      {
+        title: "Frame Analysis Interval",
+        description: "The number of frames to wait between motion analysis.",
+        value: this.storage.getItem('interval') || defaultInterval.toString(),
+        key: 'interval',
+        placeholder: defaultInterval.toString(),
         type: 'number',
       },
     ];
