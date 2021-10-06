@@ -22,7 +22,7 @@
       "plugin"
    ],
    "scrypted": {
-      "name": "Chromecast Controller",
+      "name": "Chromecast Plugin",
       "singleInstance": true,
       "type": "DeviceProvider",
       "interfaces": [
