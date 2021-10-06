@@ -122,16 +122,33 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
     }
 }
 
-export function createRawVideoParser(size?: {width: number, height: number}): StreamParser {
-    let filter: string[];
+export interface RawVideoParserOptions {
+    size?: {
+        width: number,
+        height: number
+    };
+    everyNFrames?: number;
+}
+
+export function createRawVideoParser(options?: RawVideoParserOptions): StreamParser {
+    let filter: string;
+    options = options || {};
+    const { size, everyNFrames } = options;
     if (size) {
-        filter = ['-vf', `scale=${size.width}:${size.height}`];
+        filter = `scale=${size.width}:${size.height}`;
+    }
+    if (everyNFrames && everyNFrames > 1) {
+        if (filter)
+            filter += ',';
+        else
+            filter = '';
+        filter = filter + `select=not(mod(n\\,${everyNFrames}))`
     }
 
     return {
         container: 'rawvideo',
         outputArguments: [
-            ...(filter || []),
+            ...(filter ? ['-vf', filter] : []),
             '-an',
             '-vcodec', 'rawvideo',
             '-pix_fmt', 'yuv420p',
