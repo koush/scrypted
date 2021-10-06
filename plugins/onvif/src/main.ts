@@ -141,18 +141,23 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     async getConstructedStreamUrl(options?: MediaStreamOptions) {
-        const client = await this.getClient();
-        // if no id is provided, choose the first available/enabled profile
-        if (!options?.id) {
-            try {
-                const vsos = await this.getVideoStreamOptions();
-                const vso = vsos.find(vso => this.isChannelEnabled(vso.id));
-                return client.getStreamUrl(vso?.id);
+        try {
+            const client = await this.getClient();
+            // if no id is provided, choose the first available/enabled profile
+            if (!options?.id) {
+                try {
+                    const vsos = await this.getVideoStreamOptions();
+                    const vso = vsos.find(vso => this.isChannelEnabled(vso.id));
+                    return client.getStreamUrl(vso?.id);
+                }
+                catch (e) {
+                }
             }
-            catch (e) {
-            }
+            return client.getStreamUrl(options?.id);
         }
-        return client.getStreamUrl(options?.id);
+        catch (e) {
+            return '';
+        }
     }
 
     putSetting(key: string, value: string) {
