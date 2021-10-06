@@ -120,7 +120,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
                     method: 'POST',
                     url,
                     headers: {
-                        'Content-Type': 'Audio/G.711A',
+                        'Content-Type': 'Audio/AAC',
                         'Content-Length': '9999999'
                     },
                     data: socket
@@ -135,10 +135,12 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
 
         args.push(
             "-vn",
-            "-f",
-            "alaw",
+            '-acodec', 'libfdk_aac',
+            '-f', 'adts',
             `tcp://127.0.0.1:${port}`,
         );
+
+        this.console.log('ffmpeg intercom', args);
 
         const ffmpeg = await mediaManager.getFFmpegPath();
         this.cp = child_process.spawn(ffmpeg, args);
