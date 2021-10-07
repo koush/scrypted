@@ -16,7 +16,7 @@ export interface StreamParserOptions {
 
 export interface StreamChunk {
     startStream?: Buffer;
-    chunk: Buffer;
+    chunks: Buffer[];
     type?: string;
     width?: number;
     height?: number;
@@ -56,7 +56,7 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
                 pending = [right];
                 pendingSize = right.length;
                 yield {
-                    chunk: left,
+                    chunks: [left],
                 };
             }
         }
@@ -110,7 +110,7 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
 
                 yield{
                     startStream,
-                    chunk: Buffer.concat([atom.header, atom.data]),
+                    chunks: [atom.header, atom.data],
                     type: atom.type,
                 };
 
@@ -164,7 +164,7 @@ export function createRawVideoParser(options?: RawVideoParserOptions): StreamPar
             while (true) {
                 const buffer = await readLength(socket, toRead);
                 yield {
-                    chunk: buffer,
+                    chunks: [buffer],
                     width,
                     height,
                 }

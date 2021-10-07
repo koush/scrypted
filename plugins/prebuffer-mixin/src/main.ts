@@ -178,7 +178,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     for (const container of ['mpegts', 'mp4']) {
       const eventName = container + '-data';
-      const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+      let prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+      let shifts = 0;
 
       session.events.on(eventName, (chunk: StreamChunk) => {
         const now = Date.now();
@@ -196,6 +197,12 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
         while (prebufferContainer.length && prebufferContainer[0].time < now - prebufferDurationMs) {
           prebufferContainer.shift();
+          shifts++;
+        }
+
+        if (shifts > 1000) {
+          prebufferContainer = this.prebuffers[container] = prebufferContainer.slice();
+          shifts = 0;
         }
 
         this.events.emit(eventName, chunk);
@@ -244,7 +251,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             socket.write(data.startStream)
           }
         }
-        socket.write(data.chunk);
+        for (const chunk of data.chunks) {
+          socket.write(chunk);
+        }
       };
 
       for (const prebuffer of prebufferContainer) {
