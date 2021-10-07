@@ -40,7 +40,7 @@ function monacoEvalDefaults() {
       {},
       monaco.languages.typescript.typescriptDefaults.getDiagnosticsOptions(),
       {
-        diagnosticCodesToIgnore: [1375, 1378],
+        diagnosticCodesToIgnore: [1108, 1375, 1378],
       }
     )
   );

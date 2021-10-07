@@ -48,6 +48,8 @@ export const actionableEvents = [
     ScryptedInterface.LuminanceSensor,
     ScryptedInterface.PositionSensor,
 
+    ScryptedInterface.ObjectDetector,
+
     // 'FaceDetector',
     // 'Scheduler',
 ];

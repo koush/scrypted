@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetection, ObjectDetector } from "@scrypted/sdk";
 import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
@@ -9,13 +9,14 @@ import { recommendRebroadcast } from "../../rtsp/src/recommend";
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings {
+class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings, ObjectDetector {
     protect: UnifiProtect;
     motionTimeout: NodeJS.Timeout;
     ringTimeout: NodeJS.Timeout;
     lastMotion: number;
     lastRing: number;
     lastSeen: number;
+    detections = new Map<string, Promise<Buffer>>();
 
     constructor(protect: UnifiProtect, nativeId: string, protectCamera: Readonly<ProtectCameraConfigInterface>) {
         super(nativeId);
@@ -28,6 +29,14 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         if (this.interfaces.includes(ScryptedInterface.BinarySensor)) {
             this.binaryState = false;
         }
+    }
+
+    async getDetectionInput(detectionId: any): Promise<MediaObject> {
+        const data = this.detections.get(detectionId);
+        if (!data)
+            return;
+        this.console.log('sending detection input');
+        return mediaManager.createMediaObject(await data, 'image/jpeg');
     }
 
     isChannelEnabled(channel: ProtectCameraChannelConfig) {
@@ -63,7 +72,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         }, 30000);
     }
 
-    async takePicture(): Promise<MediaObject> {
+    async getSnapshot(): Promise<Buffer> {
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/snapshot?ts=${Date.now()}`
 
         const response = await this.protect.api.loginFetch(url);
@@ -71,7 +80,12 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
             throw new Error('Unifi Protect login refresh failed.');
         }
         const data = await response.arrayBuffer();
-        return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
+        return Buffer.from(data);
+    }
+
+    async takePicture(): Promise<MediaObject> {
+        const buffer = await this.getSnapshot();
+        return mediaManager.createMediaObject(buffer, 'image/jpeg');
     }
     findCamera() {
         return this.protect.api.Cameras.find(camera => camera.id === this.nativeId);
@@ -273,6 +287,22 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     rtsp.motionDetected = false;
                 }
 
+                const detectionId = Math.random().toString();
+
+                const detection: ObjectDetection = {
+                    detectionId,
+                    timestamp: Date.now(),
+                    detections: payload.smartDetectTypes.map(type => ({
+                        className: type,
+                        score: payload.score,
+                    }))
+                };
+
+                rtsp.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
+                const snapshot = rtsp.getSnapshot();
+                rtsp.detections.set(detectionId, snapshot);
+                setTimeout(() => rtsp.detections.delete(detectionId), 30000);
+
                 rtsp.lastSeen = payload.start;
                 break;
             }
@@ -375,6 +405,9 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 }
                 if (camera.featureFlags.hasSpeaker) {
                     d.interfaces.push(ScryptedInterface.Intercom);
+                }
+                if (camera.featureFlags.smartDetectTypes?.length) {
+                    d.interfaces.push(ScryptedInterface.ObjectDetector);
                 }
                 devices.push(d);
             }
