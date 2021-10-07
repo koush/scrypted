@@ -36,7 +36,11 @@ sudo apt install libavahi-compat-libdnssd-dev
 
 ### Run in Terminal
 
+
 ```sh
+# Mac M1 (Apple Silicon) should uncomment the nextline to switch to x64 mode
+# arch -x86_64 zsh
+
 # checkout source
 git clone https://github.com/koush/scrypted.git
 
