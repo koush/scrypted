@@ -75,10 +75,9 @@ module.exports = {
     resolve: {
 
         alias: {
-            ByteBuffer: "bytebuffer",
-            Long: "long",
+            "@tensorflow/tfjs-node": path.resolve(__dirname, 'polyfill/tfjs-node'),
+            "@tensorflow/tfjs-node-gpu": path.resolve(__dirname, 'polyfill/tfjs-node-gpu'),
 
-            // browser provide plugin polyfills
             wrtc: path.resolve(__dirname, 'polyfill/wrtc'),
             mdns: path.resolve(__dirname, 'polyfill/mdns'),
             serialport: path.resolve(__dirname, 'polyfill/serialport'),
