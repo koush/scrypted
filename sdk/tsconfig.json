@@ -1,6 +1,10 @@
 {
     "compilerOptions": {
+        "module": "commonjs",
+        "target": "esnext",
+        "noImplicitAny": true,
+        "esModuleInterop": true,
         "sourceMap": true,
-        "target": "es5",
-    }
+        "declaration": true,
+    },
 }
