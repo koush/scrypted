@@ -16,6 +16,7 @@
       >
         <v-list-item-action>
           <v-checkbox
+          dense
             @click.stop
             @change="toggleMixin(mixin)"
             v-model="mixin.enabled"
@@ -24,16 +25,14 @@
         </v-list-item-action>
 
         <v-list-item-content>
-          <v-list-item-title>{{ mixin.name }}</v-list-item-title>
+          <v-list-item-subtitle>{{ mixin.name }}</v-list-item-subtitle>
         </v-list-item-content>
         
-        <v-list-item-content>
-          <v-list-item-subtitle>{{ mixin.type }}</v-list-item-subtitle>
-        </v-list-item-content>
+        <v-list-item-icon><v-icon x-small color="grey">{{ typeToIcon(mixin.type) }}</v-icon></v-list-item-icon>
         
      
         <v-list-item-icon>
-          <v-list-item-action><v-btn icon @click.stop="openMixin(mixin)"><v-icon x-small>fa-external-link-alt</v-icon></v-btn></v-list-item-action>
+          <v-list-item-action><v-btn small @click.stop="openMixin(mixin)"><v-icon x-small>fa-external-link-alt</v-icon></v-btn></v-list-item-action>
         </v-list-item-icon>
         
       </v-list-item>
@@ -52,6 +51,7 @@ export default {
     DeviceGroup,
   },
   methods: {
+    typeToIcon,
     async toggleMixin(mixin) {
       const device = this.$scrypted.systemManager.getDeviceById(mixin.id);
       await setMixin(

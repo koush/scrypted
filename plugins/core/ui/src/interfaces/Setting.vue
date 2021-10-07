@@ -1,6 +1,7 @@
 <template>
   <div>
     <v-checkbox
+      dense
       :readonly="lazyValue.readonly"
       v-if="lazyValue.type && lazyValue.type.toLowerCase() === 'boolean'"
       v-model="booleanValue"
@@ -12,6 +13,7 @@
       :class="lazyValue.description ? 'mb-2' : ''"
     ></v-checkbox>
     <v-select
+      dense
       :readonly="lazyValue.readonly"
       v-else-if="lazyValue.choices"
       :items="lazyValue.choices"
