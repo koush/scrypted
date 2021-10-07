@@ -4,7 +4,6 @@ import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, Endp
 import type { DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, ScryptedDevice } from './types';
 
 export class ScryptedDeviceBase implements DeviceState {
-  nativeId: string;
   id?: string;
   interfaces?: string[];
   mixins?: string[];
@@ -63,8 +62,7 @@ export class ScryptedDeviceBase implements DeviceState {
   private _console: Console;
   private _deviceState: DeviceState;
 
-  constructor(nativeId: string) {
-    this.nativeId = nativeId;
+  constructor(public nativeId?: string) {
   }
 
   get storage() {
@@ -102,12 +100,17 @@ export class ScryptedDeviceBase implements DeviceState {
       }
     }
   }
+
+  /**
+   * Fire an event for this device.
+   */
+  onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
+    return deviceManager.onDeviceEvent(this.nativeId, eventInterface, eventData);
+  }
 }
 
 
 export class MixinDeviceBase<T> implements DeviceState {
-  nativeId?: string;
-
   id?: string;
   interfaces?: string[];
   mixins?: string[];
@@ -198,28 +201,28 @@ export class MixinDeviceBase<T> implements DeviceState {
 
 (function () {
   function _createGetState(state: any) {
-      return function () {
-          this._lazyLoadDeviceState();
-          return this._deviceState[state];
-      };
+    return function () {
+      this._lazyLoadDeviceState();
+      return this._deviceState[state];
+    };
   }
 
   function _createSetState(state: any) {
-      return function (value: any) {
-          this._lazyLoadDeviceState();
-          this._deviceState[state] = value;
-      };
+    return function (value: any) {
+      this._lazyLoadDeviceState();
+      this._deviceState[state] = value;
+    };
   }
 
   for (var field of Object.values(ScryptedInterfaceProperty)) {
-      Object.defineProperty(ScryptedDeviceBase.prototype, field, {
-          set: _createSetState(field),
-          get: _createGetState(field),
-      });
-      Object.defineProperty(MixinDeviceBase.prototype, field, {
-          set: _createSetState(field),
-          get: _createGetState(field),
-      });
+    Object.defineProperty(ScryptedDeviceBase.prototype, field, {
+      set: _createSetState(field),
+      get: _createGetState(field),
+    });
+    Object.defineProperty(MixinDeviceBase.prototype, field, {
+      set: _createSetState(field),
+      get: _createGetState(field),
+    });
   }
 })();
 

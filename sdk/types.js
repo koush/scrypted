@@ -113,6 +113,7 @@ var ScryptedInterface;
     ScryptedInterface["PushHandler"] = "PushHandler";
     ScryptedInterface["Program"] = "Program";
     ScryptedInterface["Scriptable"] = "Scriptable";
+    ScryptedInterface["ObjectDetector"] = "ObjectDetector";
 })(ScryptedInterface = exports.ScryptedInterface || (exports.ScryptedInterface = {}));
 var ScryptedInterfaceProperty;
 (function (ScryptedInterfaceProperty) {
@@ -590,5 +591,12 @@ exports.ScryptedInterfaceDescriptors = {
             "eval",
         ]
     },
+    ObjectDetector: {
+        name: "ObjectDetector",
+        properties: [],
+        methods: [
+            "getDetectionInput",
+        ]
+    }
 };
 //# sourceMappingURL=types.js.map

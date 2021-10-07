@@ -63,7 +63,7 @@ export interface ScryptedDevice {
   /**
    * Subscribe to events from a specific interface on a device, such as 'OnOff' or 'Brightness'.
    */
-  listen(event: ScryptedInterface|string|EventListenerOptions, callback: EventListener): EventListenerRegister;
+  listen(event: ScryptedInterface | string | EventListenerOptions, callback: EventListener): EventListenerRegister;
 
   setName(name: string): Promise<void>;
 
@@ -92,7 +92,7 @@ export interface EventListenerOptions {
   /**
    * The EventListener will subscribe to this event interface.
    */
-  event?: ScryptedInterface|string;
+  event?: ScryptedInterface | string;
   /**
    * This EventListener will passively watch for events, and not initiate polling.
    */
@@ -102,7 +102,7 @@ export interface EventListener {
   /**
    * This device type can be hooked by Automation actions to handle events. The event source, event details (interface, time, property), and event data are all passed to the listener as arguments.
    */
-  (eventSource: ScryptedDevice|undefined, eventDetails: EventDetails, eventData: any): void;
+  (eventSource: ScryptedDevice | undefined, eventDetails: EventDetails, eventData: any): void;
 
 }
 export interface EventDetails {
@@ -226,7 +226,7 @@ export interface Notifier {
    * If a the media parameter is supplied, the mime type denotes how to send the media within notification. For example, specify 'image/*' to send a video MediaObject as an image.
 Passing null uses the native type of the MediaObject. If that is not supported by the notifier, the media will be converted to a compatible type.
    */
-  sendNotification(title: string, body: string, media: string|MediaObject, mimeType: string): Promise<void>;
+  sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void>;
 
 }
 /**
@@ -336,12 +336,12 @@ export interface MediaStreamOptions {
   /**
    * Prebuffer time in milliseconds.
    */
-   id?: string;
-   name?: string;
-   prebuffer?: number;
-   container?: string;
+  id?: string;
+  name?: string;
+  prebuffer?: number;
+  container?: string;
 
-   video?: {
+  video?: {
     codec?: string;
     width?: number;
     height?: number;
@@ -479,7 +479,7 @@ export interface Refresh {
 export interface MediaPlayer extends StartStop, Pause {
   getMediaStatus(): Promise<MediaStatus>;
 
-  load(media: string|MediaObject, options: MediaPlayerOptions): Promise<void>;
+  load(media: string | MediaObject, options?: MediaPlayerOptions): Promise<void>;
 
   seek(milliseconds: number): Promise<void>;
 
@@ -531,7 +531,7 @@ export interface SoftwareUpdate {
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type. May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-  convert(data: string|Buffer, fromMimeType: string): Promise<Buffer|string>;
+  convert(data: string | Buffer, fromMimeType: string): Promise<Buffer | string>;
 
   fromMimeType?: string;
   toMimeType?: string;
@@ -542,7 +542,7 @@ export interface BufferConverter {
 export interface Settings {
   getSettings(): Promise<Setting[]>;
 
-  putSetting(key: string, value: boolean|number|string): Promise<void>;
+  putSetting(key: string, value: boolean | number | string): Promise<void>;
 
 }
 export interface BinarySensor {
@@ -582,6 +582,22 @@ export interface Position {
   accuracyRadius?: number;
   latitude?: number;
   longitude?: number;
+}
+export interface ObjectDetection {
+  detections: {
+    className: string;
+    score: number;
+    boundingBox?: number[];
+  }[];
+  detectionId?: any;
+  timestamp: number;
+}
+export interface ObjectDetector {
+  /**
+   * Get the media (image or video) that contains this detection.
+   * @param detectionId
+   */
+  getDetectionInput(detectionId: any): Promise<MediaObject>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -666,22 +682,22 @@ export interface MediaManager {
   /**
    * Convert a media object to a Buffer of the given mime type.
    */
-  convertMediaObjectToBuffer(mediaObject: string|MediaObject, toMimeType: string): Promise<Buffer>;
+  convertMediaObjectToBuffer(mediaObject: string | MediaObject, toMimeType: string): Promise<Buffer>;
 
   /**
    * Convert a media object to a locally accessible URL that serves a media file of the given mime type. If the media object is an externally accessible URL, that will be returned.
    */
-  convertMediaObjectToInsecureLocalUrl(mediaObject: string|MediaObject, toMimeType: string): Promise<string>;
+  convertMediaObjectToInsecureLocalUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string>;
 
   /**
    * Convert a media object to a locally accessible URL that serves a media file of the given mime type. If the media object is an externally accessible URL, that will be returned.
    */
-  convertMediaObjectToLocalUrl(mediaObject: string|MediaObject, toMimeType: string): Promise<string>;
+  convertMediaObjectToLocalUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string>;
 
   /**
    * Convert a media object to a publically accessible URL that serves a media file of the given mime type.
    */
-  convertMediaObjectToUrl(mediaObject: string|MediaObject, toMimeType: string): Promise<string>;
+  convertMediaObjectToUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string>;
 
   /**
    * Create a MediaObject. The media will be created from the provided FFmpeg input arguments.
@@ -691,7 +707,7 @@ export interface MediaManager {
   /**
    * Create a MediaObject. The mime type needs to be provided up front, but the data can be a URL string, Buffer, or a Promise for a URL string or Buffer.
    */
-  createMediaObject(data: string|Buffer|Promise<string|Buffer>, mimeType: string): MediaObject;
+  createMediaObject(data: string | Buffer | Promise<string | Buffer>, mimeType: string): MediaObject;
 
 
   /**
@@ -745,9 +761,9 @@ export interface DeviceManager {
    */
   onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any): Promise<void>;
 
-   /**
-   * Get the per device Storage object.
-   */
+  /**
+  * Get the per device Storage object.
+  */
   getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
 
   getNativeIds(): string[];
@@ -810,8 +826,8 @@ export interface DeviceManifest {
   /**
    * The native id of the hub or discovery DeviceProvider that manages these devices.
    */
-   providerNativeId?: ScryptedNativeId;
-   devices?: Device[];
+  providerNativeId?: ScryptedNativeId;
+  devices?: Device[];
 }
 /**
  * EndpointManager provides publicly accessible URLs that can be used to contact your Scrypted Plugin.
@@ -910,7 +926,7 @@ export interface SystemManager {
   /**
    * Get the current state of every device.
    */
-  getSystemState(): {[id: string]: {[property: string]: SystemDeviceState}};
+  getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } };
 
   /**
    * Passively (without polling) listen to property changed events.
@@ -920,7 +936,7 @@ export interface SystemManager {
   /**
    * Subscribe to events from a specific interface on a device id, such as 'OnOff' or 'Brightness'. This is a convenience method for ScryptedDevice.listen.
    */
-  listenDevice(id: string, event: ScryptedInterface|string|EventListenerOptions, callback: EventListener): EventListenerRegister;
+  listenDevice(id: string, event: ScryptedInterface | string | EventListenerOptions, callback: EventListener): EventListenerRegister;
 
   /**
    * Remove a device from Scrypted. Plugins should use DeviceManager.onDevicesChanged or DeviceManager.onDeviceRemoved to remove their own devices
@@ -1083,54 +1099,55 @@ export enum ScryptedInterface {
   PushHandler = "PushHandler",
   Program = "Program",
   Scriptable = "Scriptable",
+  ObjectDetector = "ObjectDetector",
 }
 
 export enum ScryptedInterfaceProperty {
-    id = "id",
-    interfaces = "interfaces",
-    mixins = "mixins",
-    info = "info",
-    name = "name",
-    providedInterfaces = "providedInterfaces",
-    providedName = "providedName",
-    providedRoom = "providedRoom",
-    providedType = "providedType",
-    providerId = "providerId",
-    room = "room",
-    type = "type",
-    on = "on",
-    brightness = "brightness",
-    colorTemperature = "colorTemperature",
-    rgb = "rgb",
-    hsv = "hsv",
-    running = "running",
-    paused = "paused",
-    docked = "docked",
-    thermostatAvailableModes = "thermostatAvailableModes",
-    thermostatMode = "thermostatMode",
-    thermostatSetpoint = "thermostatSetpoint",
-    thermostatSetpointHigh = "thermostatSetpointHigh",
-    thermostatSetpointLow = "thermostatSetpointLow",
-    temperature = "temperature",
-    temperatureUnit = "temperatureUnit",
-    humidity = "humidity",
-    lockState = "lockState",
-    entryOpen = "entryOpen",
-    batteryLevel = "batteryLevel",
-    online = "online",
-    updateAvailable = "updateAvailable",
-    fromMimeType = "fromMimeType",
-    toMimeType = "toMimeType",
-    binaryState = "binaryState",
-    intrusionDetected = "intrusionDetected",
-    powerDetected = "powerDetected",
-    motionDetected = "motionDetected",
-    audioDetected = "audioDetected",
-    occupied = "occupied",
-    flooded = "flooded",
-    ultraviolet = "ultraviolet",
-    luminance = "luminance",
-    position = "position",
+  id = "id",
+  interfaces = "interfaces",
+  mixins = "mixins",
+  info = "info",
+  name = "name",
+  providedInterfaces = "providedInterfaces",
+  providedName = "providedName",
+  providedRoom = "providedRoom",
+  providedType = "providedType",
+  providerId = "providerId",
+  room = "room",
+  type = "type",
+  on = "on",
+  brightness = "brightness",
+  colorTemperature = "colorTemperature",
+  rgb = "rgb",
+  hsv = "hsv",
+  running = "running",
+  paused = "paused",
+  docked = "docked",
+  thermostatAvailableModes = "thermostatAvailableModes",
+  thermostatMode = "thermostatMode",
+  thermostatSetpoint = "thermostatSetpoint",
+  thermostatSetpointHigh = "thermostatSetpointHigh",
+  thermostatSetpointLow = "thermostatSetpointLow",
+  temperature = "temperature",
+  temperatureUnit = "temperatureUnit",
+  humidity = "humidity",
+  lockState = "lockState",
+  entryOpen = "entryOpen",
+  batteryLevel = "batteryLevel",
+  online = "online",
+  updateAvailable = "updateAvailable",
+  fromMimeType = "fromMimeType",
+  toMimeType = "toMimeType",
+  binaryState = "binaryState",
+  intrusionDetected = "intrusionDetected",
+  powerDetected = "powerDetected",
+  motionDetected = "motionDetected",
+  audioDetected = "audioDetected",
+  occupied = "occupied",
+  flooded = "flooded",
+  ultraviolet = "ultraviolet",
+  luminance = "luminance",
+  position = "position",
 }
 
 export interface RTCAVMessage {
@@ -1152,169 +1169,169 @@ export enum ScryptedMimeTypes {
 }
 
 export interface ScryptedInterfaceDescriptor {
-    name: string;
-    properties: ScryptedInterfaceProperty[];
-    methods: string[];
+  name: string;
+  properties: ScryptedInterfaceProperty[];
+  methods: string[];
 }
 
 export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {
   ScryptedDevice: {
-      name: "ScryptedDevice",
-      properties: [
-        "id",
-        "interfaces",
-        "mixins",
-        "info",
-        "name",
-        "providedInterfaces",
-        "providedName",
-        "providedRoom",
-        "providedType",
-        "providerId",
-        "room",
-        "type",
-      ],
-      methods: [
-        "listen",
-        "setName",
-        "setRoom",
-        "setType",
-      ]
+    name: "ScryptedDevice",
+    properties: [
+      "id",
+      "interfaces",
+      "mixins",
+      "info",
+      "name",
+      "providedInterfaces",
+      "providedName",
+      "providedRoom",
+      "providedType",
+      "providerId",
+      "room",
+      "type",
+    ],
+    methods: [
+      "listen",
+      "setName",
+      "setRoom",
+      "setType",
+    ]
   },
   OnOff: {
-      name: "OnOff",
-      properties: [
-        "on",
-      ],
-      methods: [
-        "turnOff",
-        "turnOn",
-      ]
+    name: "OnOff",
+    properties: [
+      "on",
+    ],
+    methods: [
+      "turnOff",
+      "turnOn",
+    ]
   },
   Brightness: {
-      name: "Brightness",
-      properties: [
-        "brightness",
-      ],
-      methods: [
-        "setBrightness",
-      ]
+    name: "Brightness",
+    properties: [
+      "brightness",
+    ],
+    methods: [
+      "setBrightness",
+    ]
   },
   ColorSettingTemperature: {
-      name: "ColorSettingTemperature",
-      properties: [
-        "colorTemperature",
-      ],
-      methods: [
-        "getTemperatureMaxK",
-        "getTemperatureMinK",
-        "setColorTemperature",
-      ]
+    name: "ColorSettingTemperature",
+    properties: [
+      "colorTemperature",
+    ],
+    methods: [
+      "getTemperatureMaxK",
+      "getTemperatureMinK",
+      "setColorTemperature",
+    ]
   },
   ColorSettingRgb: {
-      name: "ColorSettingRgb",
-      properties: [
-        "rgb",
-      ],
-      methods: [
-        "setRgb",
-      ]
+    name: "ColorSettingRgb",
+    properties: [
+      "rgb",
+    ],
+    methods: [
+      "setRgb",
+    ]
   },
   ColorSettingHsv: {
-      name: "ColorSettingHsv",
-      properties: [
-        "hsv",
-      ],
-      methods: [
-        "setHsv",
-      ]
+    name: "ColorSettingHsv",
+    properties: [
+      "hsv",
+    ],
+    methods: [
+      "setHsv",
+    ]
   },
   Notifier: {
-      name: "Notifier",
-      properties: [
-      ],
-      methods: [
-        "sendNotification",
-      ]
+    name: "Notifier",
+    properties: [
+    ],
+    methods: [
+      "sendNotification",
+    ]
   },
   StartStop: {
-      name: "StartStop",
-      properties: [
-        "running",
-      ],
-      methods: [
-        "start",
-        "stop",
-      ]
+    name: "StartStop",
+    properties: [
+      "running",
+    ],
+    methods: [
+      "start",
+      "stop",
+    ]
   },
   Pause: {
-      name: "Pause",
-      properties: [
-        "paused",
-      ],
-      methods: [
-        "pause",
-        "resume",
-      ]
+    name: "Pause",
+    properties: [
+      "paused",
+    ],
+    methods: [
+      "pause",
+      "resume",
+    ]
   },
   Dock: {
-      name: "Dock",
-      properties: [
-        "docked",
-      ],
-      methods: [
-        "dock",
-      ]
+    name: "Dock",
+    properties: [
+      "docked",
+    ],
+    methods: [
+      "dock",
+    ]
   },
   TemperatureSetting: {
-      name: "TemperatureSetting",
-      properties: [
-        "thermostatAvailableModes",
-        "thermostatMode",
-        "thermostatSetpoint",
-        "thermostatSetpointHigh",
-        "thermostatSetpointLow",
-      ],
-      methods: [
-        "setThermostatMode",
-        "setThermostatSetpoint",
-        "setThermostatSetpointHigh",
-        "setThermostatSetpointLow",
-      ]
+    name: "TemperatureSetting",
+    properties: [
+      "thermostatAvailableModes",
+      "thermostatMode",
+      "thermostatSetpoint",
+      "thermostatSetpointHigh",
+      "thermostatSetpointLow",
+    ],
+    methods: [
+      "setThermostatMode",
+      "setThermostatSetpoint",
+      "setThermostatSetpointHigh",
+      "setThermostatSetpointLow",
+    ]
   },
   Thermometer: {
-      name: "Thermometer",
-      properties: [
-        "temperature",
-        "temperatureUnit",
-      ],
-      methods: [
-      ]
+    name: "Thermometer",
+    properties: [
+      "temperature",
+      "temperatureUnit",
+    ],
+    methods: [
+    ]
   },
   HumiditySensor: {
-      name: "HumiditySensor",
-      properties: [
-        "humidity",
-      ],
-      methods: [
-      ]
+    name: "HumiditySensor",
+    properties: [
+      "humidity",
+    ],
+    methods: [
+    ]
   },
   Camera: {
-      name: "Camera",
-      properties: [
-      ],
-      methods: [
-        "takePicture",
-      ]
+    name: "Camera",
+    properties: [
+    ],
+    methods: [
+      "takePicture",
+    ]
   },
   VideoCamera: {
-      name: "VideoCamera",
-      properties: [
-      ],
-      methods: [
-        "getVideoStream",
-        "getVideoStreamOptions",
-      ]
+    name: "VideoCamera",
+    properties: [
+    ],
+    methods: [
+      "getVideoStream",
+      "getVideoStreamOptions",
+    ]
   },
   Intercom: {
     name: "Intercom",
@@ -1326,272 +1343,272 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     ]
   },
   Lock: {
-      name: "Lock",
-      properties: [
-        "lockState",
-      ],
-      methods: [
-        "lock",
-        "unlock",
-      ]
+    name: "Lock",
+    properties: [
+      "lockState",
+    ],
+    methods: [
+      "lock",
+      "unlock",
+    ]
   },
   PasswordStore: {
-      name: "PasswordStore",
-      properties: [
-      ],
-      methods: [
-        "addPassword",
-        "getPasswords",
-        "removePassword",
-      ]
+    name: "PasswordStore",
+    properties: [
+    ],
+    methods: [
+      "addPassword",
+      "getPasswords",
+      "removePassword",
+    ]
   },
   Authenticator: {
-      name: "Authenticator",
-      properties: [
-      ],
-      methods: [
-        "checkPassword",
-      ]
+    name: "Authenticator",
+    properties: [
+    ],
+    methods: [
+      "checkPassword",
+    ]
   },
   Scene: {
-      name: "Scene",
-      properties: [
-      ],
-      methods: [
-        "activate",
-        "deactivate",
-        "isReversible",
-      ]
+    name: "Scene",
+    properties: [
+    ],
+    methods: [
+      "activate",
+      "deactivate",
+      "isReversible",
+    ]
   },
   Entry: {
-      name: "Entry",
-      properties: [
-      ],
-      methods: [
-        "closeEntry",
-        "openEntry",
-      ]
+    name: "Entry",
+    properties: [
+    ],
+    methods: [
+      "closeEntry",
+      "openEntry",
+    ]
   },
   EntrySensor: {
-      name: "EntrySensor",
-      properties: [
-        "entryOpen",
-      ],
-      methods: [
-      ]
+    name: "EntrySensor",
+    properties: [
+      "entryOpen",
+    ],
+    methods: [
+    ]
   },
   DeviceProvider: {
-      name: "DeviceProvider",
-      properties: [
-      ],
-      methods: [
-        "discoverDevices",
-        "getDevice",
-      ]
+    name: "DeviceProvider",
+    properties: [
+    ],
+    methods: [
+      "discoverDevices",
+      "getDevice",
+    ]
   },
   Battery: {
-      name: "Battery",
-      properties: [
-        "batteryLevel",
-      ],
-      methods: [
-      ]
+    name: "Battery",
+    properties: [
+      "batteryLevel",
+    ],
+    methods: [
+    ]
   },
   Refresh: {
-      name: "Refresh",
-      properties: [
-      ],
-      methods: [
-        "getRefreshFrequency",
-        "refresh",
-      ]
+    name: "Refresh",
+    properties: [
+    ],
+    methods: [
+      "getRefreshFrequency",
+      "refresh",
+    ]
   },
   MediaPlayer: {
-      name: "MediaPlayer",
-      properties: [
-      ],
-      methods: [
-        "getMediaStatus",
-        "load",
-        "seek",
-        "skipNext",
-        "skipPrevious",
-      ]
+    name: "MediaPlayer",
+    properties: [
+    ],
+    methods: [
+      "getMediaStatus",
+      "load",
+      "seek",
+      "skipNext",
+      "skipPrevious",
+    ]
   },
   Online: {
-      name: "Online",
-      properties: [
-        "online",
-      ],
-      methods: [
-      ]
+    name: "Online",
+    properties: [
+      "online",
+    ],
+    methods: [
+    ]
   },
   SoftwareUpdate: {
-      name: "SoftwareUpdate",
-      properties: [
-        "updateAvailable",
-      ],
-      methods: [
-        "checkForUpdate",
-        "installUpdate",
-      ]
+    name: "SoftwareUpdate",
+    properties: [
+      "updateAvailable",
+    ],
+    methods: [
+      "checkForUpdate",
+      "installUpdate",
+    ]
   },
   BufferConverter: {
-      name: "BufferConverter",
-      properties: [
-        "fromMimeType",
-        "toMimeType",
-      ],
-      methods: [
-        "convert",
-      ]
+    name: "BufferConverter",
+    properties: [
+      "fromMimeType",
+      "toMimeType",
+    ],
+    methods: [
+      "convert",
+    ]
   },
   Settings: {
-      name: "Settings",
-      properties: [
-      ],
-      methods: [
-        "getSettings",
-        "putSetting",
-      ]
+    name: "Settings",
+    properties: [
+    ],
+    methods: [
+      "getSettings",
+      "putSetting",
+    ]
   },
   BinarySensor: {
-      name: "BinarySensor",
-      properties: [
-        "binaryState",
-      ],
-      methods: [
-      ]
+    name: "BinarySensor",
+    properties: [
+      "binaryState",
+    ],
+    methods: [
+    ]
   },
   IntrusionSensor: {
-      name: "IntrusionSensor",
-      properties: [
-        "intrusionDetected",
-      ],
-      methods: [
-      ]
+    name: "IntrusionSensor",
+    properties: [
+      "intrusionDetected",
+    ],
+    methods: [
+    ]
   },
   PowerSensor: {
-      name: "PowerSensor",
-      properties: [
-        "powerDetected",
-      ],
-      methods: [
-      ]
+    name: "PowerSensor",
+    properties: [
+      "powerDetected",
+    ],
+    methods: [
+    ]
   },
   AudioSensor: {
-      name: "AudioSensor",
-      properties: [
-        "audioDetected",
-      ],
-      methods: [
-      ]
+    name: "AudioSensor",
+    properties: [
+      "audioDetected",
+    ],
+    methods: [
+    ]
   },
   MotionSensor: {
-      name: "MotionSensor",
-      properties: [
-        "motionDetected",
-      ],
-      methods: [
-      ]
+    name: "MotionSensor",
+    properties: [
+      "motionDetected",
+    ],
+    methods: [
+    ]
   },
   OccupancySensor: {
-      name: "OccupancySensor",
-      properties: [
-        "occupied",
-      ],
-      methods: [
-      ]
+    name: "OccupancySensor",
+    properties: [
+      "occupied",
+    ],
+    methods: [
+    ]
   },
   FloodSensor: {
-      name: "FloodSensor",
-      properties: [
-        "flooded",
-      ],
-      methods: [
-      ]
+    name: "FloodSensor",
+    properties: [
+      "flooded",
+    ],
+    methods: [
+    ]
   },
   UltravioletSensor: {
-      name: "UltravioletSensor",
-      properties: [
-        "ultraviolet",
-      ],
-      methods: [
-      ]
+    name: "UltravioletSensor",
+    properties: [
+      "ultraviolet",
+    ],
+    methods: [
+    ]
   },
   LuminanceSensor: {
-      name: "LuminanceSensor",
-      properties: [
-        "luminance",
-      ],
-      methods: [
-      ]
+    name: "LuminanceSensor",
+    properties: [
+      "luminance",
+    ],
+    methods: [
+    ]
   },
   PositionSensor: {
-      name: "PositionSensor",
-      properties: [
-        "position",
-      ],
-      methods: [
-      ]
+    name: "PositionSensor",
+    properties: [
+      "position",
+    ],
+    methods: [
+    ]
   },
   MediaSource: {
-      name: "MediaSource",
-      properties: [
-      ],
-      methods: [
-        "getMedia",
-      ]
+    name: "MediaSource",
+    properties: [
+    ],
+    methods: [
+      "getMedia",
+    ]
   },
   MessagingEndpoint: {
-      name: "MessagingEndpoint",
-      properties: [
-      ],
-      methods: [
-      ]
+    name: "MessagingEndpoint",
+    properties: [
+    ],
+    methods: [
+    ]
   },
   OauthClient: {
-      name: "OauthClient",
-      properties: [
-      ],
-      methods: [
-        "getOauthUrl",
-        "onOauthCallback",
-      ]
+    name: "OauthClient",
+    properties: [
+    ],
+    methods: [
+      "getOauthUrl",
+      "onOauthCallback",
+    ]
   },
   MixinProvider: {
-      name: "MixinProvider",
-      properties: [
-      ],
-      methods: [
-        "canMixin",
-        "getMixin",
-        "releaseMixin",
-      ]
+    name: "MixinProvider",
+    properties: [
+    ],
+    methods: [
+      "canMixin",
+      "getMixin",
+      "releaseMixin",
+    ]
   },
   HttpRequestHandler: {
-      name: "HttpRequestHandler",
-      properties: [
-      ],
-      methods: [
-        "onRequest",
-      ]
+    name: "HttpRequestHandler",
+    properties: [
+    ],
+    methods: [
+      "onRequest",
+    ]
   },
   EngineIOHandler: {
-      name: "EngineIOHandler",
-      properties: [
-      ],
-      methods: [
-        "onConnection",
-      ]
+    name: "EngineIOHandler",
+    properties: [
+    ],
+    methods: [
+      "onConnection",
+    ]
   },
   PushHandler: {
-      name: "PushHandler",
-      properties: [
-      ],
-      methods: [
-        "onPush",
-      ]
+    name: "PushHandler",
+    properties: [
+    ],
+    methods: [
+      "onPush",
+    ]
   },
   Program: {
     name: "Program",
@@ -1611,18 +1628,26 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       "eval",
     ]
   },
+  ObjectDetector: {
+    name: "ObjectDetector",
+    properties: [
+    ],
+    methods: [
+      "getDetectionInput",
+    ]
+  }
 } as any;
 
 export interface ScryptedStatic {
-    /**
-     * @deprecated
-     */
-    log?: Logger,
+  /**
+   * @deprecated
+   */
+  log?: Logger,
 
-    deviceManager?: DeviceManager,
-    endpointManager?: EndpointManager,
-    mediaManager?: MediaManager,
-    systemManager: SystemManager,
+  deviceManager?: DeviceManager,
+  endpointManager?: EndpointManager,
+  mediaManager?: MediaManager,
+  systemManager: SystemManager,
 
-    pluginHostAPI?: any;
+  pluginHostAPI?: any;
 }

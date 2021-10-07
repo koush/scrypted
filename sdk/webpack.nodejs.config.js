@@ -79,12 +79,12 @@ module.exports = {
             Long: "long",
 
             // browser provide plugin polyfills
-            wrtc: path.resolve(__dirname, 'polyfill/nodejs/wrtc'),
-            mdns: path.resolve(__dirname, 'polyfill/nodejs/mdns'),
-            serialport: path.resolve(__dirname, 'polyfill/nodejs/serialport'),
-            'zwave-js': path.resolve(__dirname, 'polyfill/nodejs/zwave-js'),
-            typescript: path.resolve(__dirname, 'polyfill/nodejs/typescript'),
-            '@koush/opencv4nodejs': path.resolve(__dirname, 'polyfill/nodejs/opencv4nodejs'),
+            wrtc: path.resolve(__dirname, 'polyfill/wrtc'),
+            mdns: path.resolve(__dirname, 'polyfill/mdns'),
+            serialport: path.resolve(__dirname, 'polyfill/serialport'),
+            'zwave-js': path.resolve(__dirname, 'polyfill/zwave-js'),
+            typescript: path.resolve(__dirname, 'polyfill/typescript'),
+            '@koush/opencv4nodejs': path.resolve(__dirname, 'polyfill/opencv4nodejs'),
         },
 
         extensions: ['.tsx', '.ts', '.js']

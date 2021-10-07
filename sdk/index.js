@@ -104,13 +104,18 @@ class ScryptedDeviceBase {
             }
         }
     }
+    /**
+     * Fire an event for this device.
+     */
+    onDeviceEvent(eventInterface, eventData) {
+        return deviceManager.onDeviceEvent(this.nativeId, eventInterface, eventData);
+    }
 }
 exports.ScryptedDeviceBase = ScryptedDeviceBase;
 class MixinDeviceBase {
     mixinDevice;
     mixinDeviceInterfaces;
     mixinProviderNativeId;
-    nativeId;
     id;
     interfaces;
     mixins;

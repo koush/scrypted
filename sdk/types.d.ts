@@ -212,7 +212,7 @@ export interface Notifier {
      * If a the media parameter is supplied, the mime type denotes how to send the media within notification. For example, specify 'image/*' to send a video MediaObject as an image.
   Passing null uses the native type of the MediaObject. If that is not supported by the notifier, the media will be converted to a compatible type.
      */
-    sendNotification(title: string, body: string, media: string | MediaObject, mimeType: string): Promise<void>;
+    sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void>;
 }
 /**
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.
@@ -431,7 +431,7 @@ export interface Refresh {
  */
 export interface MediaPlayer extends StartStop, Pause {
     getMediaStatus(): Promise<MediaStatus>;
-    load(media: string | MediaObject, options: MediaPlayerOptions): Promise<void>;
+    load(media: string | MediaObject, options?: MediaPlayerOptions): Promise<void>;
     seek(milliseconds: number): Promise<void>;
     skipNext(): Promise<void>;
     skipPrevious(): Promise<void>;
@@ -530,6 +530,22 @@ export interface Position {
     accuracyRadius?: number;
     latitude?: number;
     longitude?: number;
+}
+export interface ObjectDetection {
+    detections: {
+        className: string;
+        score: number;
+        boundingBox?: number[];
+    }[];
+    detectionId?: any;
+    timestamp: number;
+}
+export interface ObjectDetector {
+    /**
+     * Get the media (image or video) that contains this detection.
+     * @param detectionId
+     */
+    getDetectionInput(detectionId: any): Promise<MediaObject>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -969,7 +985,8 @@ export declare enum ScryptedInterface {
     EngineIOHandler = "EngineIOHandler",
     PushHandler = "PushHandler",
     Program = "Program",
-    Scriptable = "Scriptable"
+    Scriptable = "Scriptable",
+    ObjectDetector = "ObjectDetector"
 }
 export declare enum ScryptedInterfaceProperty {
     id = "id",

@@ -2,7 +2,7 @@ export * from './types';
 import type { ScryptedNativeId } from './types';
 import type { DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position } from './types';
 export declare class ScryptedDeviceBase implements DeviceState {
-    nativeId: string;
+    nativeId?: string;
     id?: string;
     interfaces?: string[];
     mixins?: string[];
@@ -58,7 +58,7 @@ export declare class ScryptedDeviceBase implements DeviceState {
     private _log;
     private _console;
     private _deviceState;
-    constructor(nativeId: string);
+    constructor(nativeId?: string);
     get storage(): Storage;
     /**
      * @deprecated
@@ -66,12 +66,15 @@ export declare class ScryptedDeviceBase implements DeviceState {
     get log(): Logger;
     get console(): Console;
     _lazyLoadDeviceState(): void;
+    /**
+     * Fire an event for this device.
+     */
+    onDeviceEvent(eventInterface: string, eventData: any): Promise<void>;
 }
 export declare class MixinDeviceBase<T> implements DeviceState {
     mixinDevice: any;
     mixinDeviceInterfaces: ScryptedInterface[];
     mixinProviderNativeId: ScryptedNativeId;
-    nativeId?: string;
     id?: string;
     interfaces?: string[];
     mixins?: string[];
