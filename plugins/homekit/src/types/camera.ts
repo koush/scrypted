@@ -178,6 +178,8 @@ addSupportedType({
             if (!session)
                 return;
 
+            console.log('streaming session killed');
+
             sessions.delete(sessionID);
             session.cp?.kill();
             session.videoReturn?.close();
@@ -513,7 +515,7 @@ addSupportedType({
                         const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
 
                         session.rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
-                            audioKey, (request as StartStreamRequest).audio.sample_rate);
+                            audioKey, (request as StartStreamRequest).audio.sample_rate, console);
 
                         session.demuxer.on('rtp', (buffer: Buffer) => {
                             session.audioReturn.send(buffer, session.rtpSink.rtpPort);

@@ -12,7 +12,7 @@ function pickPort() {
 export class HomeKitRtpSink {
     heartbeatTimer: NodeJS.Timeout;
 
-    constructor(public server: Server, public rtpPort: number, public ffmpegInput: FFMpegInput) {
+    constructor(public server: Server, public rtpPort: number, public ffmpegInput: FFMpegInput, public console: Console) {
     }
 
     // Send a regular heartbeat to FFmpeg to ensure the pipe remains open and the process alive.
@@ -32,12 +32,13 @@ export class HomeKitRtpSink {
     }
 
     destroy() {
+        this.console.log('rtp sink closed');
         this.server?.close();
         clearTimeout(this.heartbeatTimer);
     }
 }
 
-export async function startRtpSink(socketType: SocketType, address: string, srtp: Buffer,sampleRate: AudioStreamingSamplerate) {
+export async function startRtpSink(socketType: SocketType, address: string, srtp: Buffer, sampleRate: AudioStreamingSamplerate, console: Console) {
     const sdpIpVersion = socketType === "udp6" ? "IP6 " : "IP4";
     const rtpPort = pickPort();
 
@@ -142,5 +143,5 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
         ]
     };
 
-    return new HomeKitRtpSink(server, rtpPort, ffmpegInput);
+    return new HomeKitRtpSink(server, rtpPort, ffmpegInput, console);
 }
