@@ -1,0 +1,47 @@
+{
+   "name": "@scrypted/tensorflow",
+   "version": "0.0.10",
+   "description": "Motion Detection for VideoCameras.",
+   "author": "Scrypted",
+   "license": "Apache-2.0",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "tensorflow",
+      "motion",
+      "object",
+      "detect",
+      "detection"
+   ],
+   "scrypted": {
+      "name": "TensorFlow Object Detection",
+      "singleInstance": true,
+      "type": "API",
+      "interfaces": [
+         "MixinProvider"
+      ],
+      "realfs": true
+   },
+   "dependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "@tensorflow-models/coco-ssd": "^2.2.2",
+      "@tensorflow/tfjs-node": "^3.9.0",
+      "@tensorflow/tfjs-node-gpu": "^3.9.0",
+      "jpeg-js": "^0.4.3"
+   },
+   "devDependencies": {
+      "@types/node": "^14.17.11"
+   }
+}

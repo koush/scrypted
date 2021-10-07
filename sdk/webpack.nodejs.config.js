@@ -75,6 +75,8 @@ module.exports = {
     resolve: {
 
         alias: {
+            "@tensorflow/tfjs": path.resolve(__dirname, 'polyfill/tfjs'),
+            "@tensorflow/tfjs-core": path.resolve(__dirname, 'polyfill/tfjs-core'),
             "@tensorflow/tfjs-node": path.resolve(__dirname, 'polyfill/tfjs-node'),
             "@tensorflow/tfjs-node-gpu": path.resolve(__dirname, 'polyfill/tfjs-node-gpu'),
 

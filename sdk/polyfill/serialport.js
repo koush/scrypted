@@ -1,2 +1,2 @@
-const serialport = __non_webpack_require__('serialport');
-module.exports = serialport;
+const e = __non_webpack_require__('serialport');
+module.exports = e;

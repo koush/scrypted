@@ -5,6 +5,8 @@
   "private": true,
   "dependencies": {
     "@scrypted/sdk": "file:../sdk",
+    "@tensorflow-models/coco-ssd": "^2.2.2",
+    "@tensorflow/tfjs-core": "^3.9.0",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
