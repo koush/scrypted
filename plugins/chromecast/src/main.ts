@@ -163,7 +163,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
       this.sendMediaToClient(options && (options as any).title,
         url,
         // prefer the provided mime type hint, otherwise infer from url.
-        options.mimeType || mime.getType(url));
+        options.mimeType || mime.getType(new URL(url).pathname));
       return;
     }
 
