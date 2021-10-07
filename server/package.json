@@ -32,6 +32,8 @@
   },
   "optionalDependencies": {
     "@koush/opencv4nodejs": "^5.6.7",
+    "@tensorflow/tfjs-node": "^3.9.0",
+    "@tensorflow/tfjs-node-gpu": "^3.9.0",
     "ffmpeg-for-homebridge": "^0.0.9",
     "mdns": "^2.7.2",
     "serialport": "^9.2.0"
