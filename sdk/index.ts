@@ -191,6 +191,13 @@ export class MixinDeviceBase<T> implements DeviceState {
     return this._console;
   }
 
+  /**
+   * Fire an event for this device.
+   */
+   onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
+    return deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, eventInterface, eventData);
+  }
+
   _lazyLoadDeviceState() {
   }
 

@@ -133,6 +133,10 @@ export declare class MixinDeviceBase<T> implements DeviceState {
     constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId);
     get storage(): Storage;
     get console(): Console;
+    /**
+     * Fire an event for this device.
+     */
+    onDeviceEvent(eventInterface: string, eventData: any): Promise<void>;
     _lazyLoadDeviceState(): void;
     release(): void;
 }

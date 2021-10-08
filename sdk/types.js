@@ -29,6 +29,7 @@ var ScryptedDeviceType;
     ScryptedDeviceType["Doorbell"] = "Doorbell";
     ScryptedDeviceType["Irrigation"] = "Irrigation";
     ScryptedDeviceType["Valve"] = "Valve";
+    ScryptedDeviceType["Person"] = "Person";
     ScryptedDeviceType["Unknown"] = "Unknown";
 })(ScryptedDeviceType = exports.ScryptedDeviceType || (exports.ScryptedDeviceType = {}));
 var TemperatureUnit;
@@ -596,6 +597,7 @@ exports.ScryptedInterfaceDescriptors = {
         properties: [],
         methods: [
             "getDetectionInput",
+            "getObjectTypes",
         ]
     }
 };

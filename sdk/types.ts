@@ -145,6 +145,7 @@ export enum ScryptedDeviceType {
   Doorbell = "Doorbell",
   Irrigation = "Irrigation",
   Valve = "Valve",
+  Person = "Person",
   Unknown = "Unknown",
 }
 /**
@@ -320,7 +321,7 @@ export interface PictureOptions {
  */
 export interface Camera {
   takePicture(options?: PictureOptions): Promise<MediaObject>;
-  getPictureOptions?(): Promise<PictureOptions[]>;
+  getPictureOptions?(): Promise<void|PictureOptions[]>;
 
 }
 
@@ -598,6 +599,7 @@ export interface ObjectDetector {
    * @param detectionId
    */
   getDetectionInput(detectionId: any): Promise<MediaObject>;
+  getObjectTypes(): Promise<string[]>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -1634,6 +1636,7 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     ],
     methods: [
       "getDetectionInput",
+      "getObjectTypes",
     ]
   }
 } as any;

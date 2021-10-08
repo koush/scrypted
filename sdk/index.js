@@ -192,6 +192,12 @@ class MixinDeviceBase {
         }
         return this._console;
     }
+    /**
+     * Fire an event for this device.
+     */
+    onDeviceEvent(eventInterface, eventData) {
+        return deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, eventInterface, eventData);
+    }
     _lazyLoadDeviceState() {
     }
     release() {
