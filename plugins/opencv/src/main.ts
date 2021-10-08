@@ -68,8 +68,23 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     // we'll use an image 1/6 of the dimension in size for motion.
     // however, opencv also expects that input images are modulo 6.
     // so make sure both are satisfied.
-    width = Math.floor(width / 36) * 6;
-    height = Math.floor(height / 36) * 6;
+
+    if (width > height) {
+      if (width > 318) {
+        height = height / width * 318;
+        width = 318;
+      }
+    }
+    else {
+      if (height > 318) {
+        width = width / height * 318;
+        height = 318;
+      }
+    }
+
+    // square em up
+    width = Math.floor(width / 6) * 6;
+    height = Math.floor(height / 6) * 6;
 
     const session = await startRebroadcastSession(ffmpegInput, {
       console: this.console,
@@ -114,7 +129,9 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
 
       const args = await once(session.events, 'rawvideo-data');
       const chunk: StreamChunk = args[0];
-      const mat = new Mat(chunk.chunk, chunk.height * 3 / 2, chunk.width, cv.CV_8U);
+      // should be one chunk from the parser, but let's not assume that.
+      const raw = chunk.chunks.length === 1 ? chunk.chunks[0] : Buffer.concat(chunk.chunks);
+      const mat = new Mat(raw, chunk.height * 3 / 2, chunk.width, cv.CV_8U);
 
       const gray = await mat.cvtColorAsync(cv.COLOR_YUV420p2GRAY);
       const curFrame = await gray.gaussianBlurAsync(new Size(21, 21), 0);
