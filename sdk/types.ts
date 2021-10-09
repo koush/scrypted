@@ -585,12 +585,19 @@ export interface Position {
   longitude?: number;
 }
 export interface ObjectDetection {
-  detections: {
+  detections?: {
     className: string;
     score: number;
-    boundingBox?: number[];
+    boundingBox?: [number, number, number, number],
+  }[];
+  people?: {
+    id: string;
+    label: string;
+    score: number,
+    boundingBox?: [number, number, number, number],
   }[];
   detectionId?: any;
+  inputDimensions?: [number, number],
   timestamp: number;
 }
 export interface ObjectDetector {
