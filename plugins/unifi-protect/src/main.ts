@@ -31,6 +31,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         }
     }
 
+    async getObjectTypes(): Promise<string[]> {
+        return this.findCamera().featureFlags.smartDetectTypes;
+    }
+
     async getDetectionInput(detectionId: any): Promise<MediaObject> {
         const data = this.detections.get(detectionId);
         if (!data)
@@ -95,7 +99,6 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled && this.isChannelEnabled(channel));
 
         const rtspChannel = camera.channels.find(channel => channel.id === options?.id) || rtspChannels[0];
-        this.console.log('serving rtsp channel', rtspChannel);
 
         const { rtspAlias } = rtspChannel;
         const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
@@ -288,6 +291,8 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 }
 
                 const detectionId = Math.random().toString();
+                const camera = rtsp.findCamera();
+                const snapshotChannel = camera.channels[0];
 
                 const detection: ObjectDetection = {
                     detectionId,
@@ -295,13 +300,14 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     detections: payload.smartDetectTypes.map(type => ({
                         className: type,
                         score: payload.score,
-                    }))
+                    })),
+                    inputDimensions: [snapshotChannel.width, snapshotChannel.height],
                 };
 
-                rtsp.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
                 const snapshot = rtsp.getSnapshot();
                 rtsp.detections.set(detectionId, snapshot);
                 setTimeout(() => rtsp.detections.delete(detectionId), 30000);
+                rtsp.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
 
                 rtsp.lastSeen = payload.start;
                 break;

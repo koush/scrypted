@@ -209,6 +209,16 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       });
     }
 
+    let watchdog: NodeJS.Timeout;
+    session.events.on('mp4-data', () => {
+      clearTimeout(watchdog);
+      setTimeout(() => {
+        this.console.error('watchdog for mp4 parser timed out... killing ffmpeg session');
+        session.kill();
+      }, 30000);
+    })
+    session.events.once('killed', () => clearTimeout(watchdog));
+
     return session;
   }
 
