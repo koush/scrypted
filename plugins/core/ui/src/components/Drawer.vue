@@ -8,7 +8,7 @@
         link
         :to="item.path"
         :active="item.active"
-        active-class="purple white--text tile"
+        active-class="deep-purple accent-4 white--text"
       >
         <v-list-item-icon>
           <v-icon small>{{ item.icon }}</v-icon>
@@ -27,7 +27,7 @@
           :key="item.id"
           link
           :to="getComponentViewPath(item.id)"
-          active-class="purple white--text tile"
+        active-class="deep-purple accent-4 white--text"
         >
           <v-list-item-icon>
             <v-icon small>{{ item.icon }}</v-icon>
@@ -68,7 +68,7 @@
       </v-list-item>
         <v-divider></v-divider>
       <v-list-item
-        active-class="purple white--text tile"
+        active-class="deep-purple accent-4 white--text"
       >
         <v-list-item-icon>
           <v-icon small>fa-code-branch</v-icon>

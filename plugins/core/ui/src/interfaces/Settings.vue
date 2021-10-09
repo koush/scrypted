@@ -1,16 +1,26 @@
 <template>
   <div>
-    <v-card
-      v-for="([key, settingsGroup], index) of Object.entries(settingsGroups)"
-      :class="
-        index === Object.entries(settingsGroups).length - 1 ? undefined : 'mb-6'
-      "
-      :key="key"
-    >
-      <v-card-title
-        class="red-gradient white--text subtitle-1 font-weight-light"
-        >{{ key }}</v-card-title
-      >
+    <v-card>
+      <v-card-title class="subtitle-1 font-weight-light">Settings</v-card-title>
+      <v-flex xs12 v-if="showChips" class="pt-0">
+        <v-chip-group
+          mandatory
+          active-class="deep-purple accent-4 white--text"
+          column
+          v-model="settingsIndex"
+        >
+          <v-chip
+            small
+            v-for="([key], index) of Object.entries(settingsGroups)"
+            :key="index"
+          >
+            {{ key.replace("Settings", "") || "General" }}
+          </v-chip>
+        </v-chip-group>
+      </v-flex>
+
+      <v-divider v-if="showChips"></v-divider>
+
       <v-flex xs12>
         <Setting
           :device="device"
@@ -33,6 +43,7 @@ export default {
   mixins: [RPCInterface],
   data() {
     return {
+      settingsIndex: 0,
       settings: [],
     };
   },
@@ -45,6 +56,14 @@ export default {
     this.refresh();
   },
   computed: {
+    showChips() {
+      return Object.keys(this.settingsGroups).length > 1;
+    },
+    settingsGroup() {
+      const check = Object.entries(this.settingsGroups)[this.settingsIndex];
+      if (!check) return [];
+      return check[1];
+    },
     settingsGroups() {
       const ret = {};
       for (const setting of this.settings) {
