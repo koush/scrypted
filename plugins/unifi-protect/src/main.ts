@@ -339,7 +339,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         }
 
         if (!this.api) {
-            this.api = new ProtectApi(() => { }, this.console, ip, username, password);
+            this.api = new ProtectApi(() => { }, this.console, ip, username, password, true);
         }
 
         try {
