@@ -584,18 +584,20 @@ export interface Position {
   latitude?: number;
   longitude?: number;
 }
+export interface ObjectDetectionResult {
+  className: string;
+  score: number;
+  boundingBox?: [number, number, number, number],
+}
+export interface FaceRecognition {
+  id: string;
+  label: string;
+  score: number,
+  boundingBox?: [number, number, number, number];
+}
 export interface ObjectDetection {
-  detections?: {
-    className: string;
-    score: number;
-    boundingBox?: [number, number, number, number],
-  }[];
-  people?: {
-    id: string;
-    label: string;
-    score: number,
-    boundingBox?: [number, number, number, number],
-  }[];
+  detections?: ObjectDetectionResult[];
+  people?: FaceRecognition[];
   detectionId?: any;
   inputDimensions?: [number, number],
   timestamp: number;
