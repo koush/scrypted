@@ -403,7 +403,7 @@ export class RpcPeer {
                         if (rpcApply.method) {
                             const method = target[rpcApply.method];
                             if (!method)
-                                throw new Error(`target ${target?.constructor.name} does not have method ${rpcApply.method}`);
+                                throw new Error(`target ${target?.constructor?.name} does not have method ${rpcApply.method}`);
                             value = await target[rpcApply.method](...args);
                         }
                         else {

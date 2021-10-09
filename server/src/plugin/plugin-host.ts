@@ -433,7 +433,8 @@ export function startPluginClusterWorker() {
         return ds?.id;
     }
 
-    const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>, also?: Console, alsoPrefix?: string) => {
+    const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>,
+        also?: Console, alsoPrefix?: string) => {
 
         const stdout = new PassThrough();
         const stderr = new PassThrough();
@@ -459,23 +460,27 @@ export function startPluginClusterWorker() {
         for (const m of methods) {
             const old = (ret as any)[m].bind(ret);
             (ret as any)[m] = (...args: any[]) => {
-                (console as any)[m](...args);
-                old(...args);
-
+                // prefer the mixin version for local/remote console dump.
                 if (also && alsoPrefix && printers.includes(m)) {
                     (also as any)[m](alsoPrefix, ...args);
                 }
+                else {
+                    (console as any)[m](...args);
+                }
+                // call through to old method to ensure it gets written
+                // to log buffer.
+                old(...args);
             }
         }
 
         return ret;
     }
 
-    const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
+    const getDeviceConsole = (nativeId?: ScryptedNativeId, disableEcho?: boolean) => {
         return getConsole(async (stdout, stderr) => {
             stdout.on('data', data => events.emit('stdout', data, nativeId));
             stderr.on('data', data => events.emit('stderr', data, nativeId));
-        });
+        }, undefined, undefined);
     }
 
     const getMixinConsole = (mixinId: string, nativeId?: ScryptedNativeId) => {

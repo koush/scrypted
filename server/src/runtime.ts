@@ -539,11 +539,14 @@ export class ScryptedRuntime {
         }
         this.stateManager.removeDevice(device._id);
 
+        const plugin = this.plugins[device.pluginId];
         // remove the plugin too
         if (!device.nativeId) {
-            const plugin = this.plugins[device.pluginId];
             plugin?.kill();
             await this.datastore.removeId(Plugin, device.pluginId);
+        }
+        else {
+            await plugin.remote.setNativeId(device.nativeId, undefined, undefined);
         }
     }
 

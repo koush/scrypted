@@ -326,10 +326,15 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 // JSON stringify over rpc turns undefined into null.
                 if (nativeId === null)
                     nativeId = undefined;
-                deviceManager.nativeIds.set(nativeId?.toString(), {
-                    id,
-                    storage,
-                });
+                if (id) {
+                    deviceManager.nativeIds.set(nativeId?.toString(), {
+                        id,
+                        storage,
+                    });
+                }
+                else {
+                    deviceManager.nativeIds.delete(nativeId);
+                }
             },
 
             async updateDescriptor(id: string, state: { [property: string]: SystemDeviceState }) {
