@@ -18,7 +18,7 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import { streamCamera } from "../common/camera";
-import { ScryptedInterface } from '@scrypted/sdk/types';
+import { ScryptedInterface } from "@scrypted/sdk/types";
 
 export default {
   mixins: [RPCInterface],
@@ -40,6 +40,16 @@ export default {
         this.pc = undefined;
       }
     },
+    async refresh() {
+      const picture = await this.device.takePicture();
+      this.$scrypted.mediaManager
+        .convertMediaObjectToLocalUrl(picture, "image/*")
+        .then((result) => {
+          this.picture = true;
+          const url = new URL(result);
+          this.src = url.pathname;
+        });
+    },
   },
   watch: {
     async dialog(val) {
@@ -56,16 +66,7 @@ export default {
     },
   },
   mounted() {
-    (async () => {
-      const picture = await this.device.takePicture();
-      this.$scrypted.mediaManager
-        .convertMediaObjectToLocalUrl(picture, "image/*")
-        .then((result) => {
-          this.picture = true;
-          const url = new URL(result);
-          this.src = url.pathname;
-        });
-    })();
+    this.refresh();
   },
 };
 </script>

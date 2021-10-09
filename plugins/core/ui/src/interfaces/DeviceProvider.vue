@@ -1,6 +1,6 @@
 <template>
   <v-flex xs12>
-    <v-card-text>These devices were created by {{ device.name }}.</v-card-text>
+    <v-card-text>These things were created by {{ device.name }}.</v-card-text>
     <DeviceGroup :deviceGroup="managedDevices"></DeviceGroup>
   </v-flex>
 </template>

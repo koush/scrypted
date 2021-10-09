@@ -28,6 +28,7 @@ export function typeToIcon(type) {
         case ScryptedDeviceType.Unknown: return "fa-question-circle";
         case ScryptedDeviceType.Valve: return "fa-faucet";
         case ScryptedDeviceType.Irrigation: return "fa-faucet";
+        case ScryptedDeviceType.Person: return "fa-user";
 
     }
     return "toggle-on";
@@ -91,6 +92,7 @@ export function hasFixedPhysicalLocation(type: ScryptedDeviceType, interfaces?: 
         case ScryptedDeviceType.Event:
         case ScryptedDeviceType.DeviceProvider:
         case ScryptedDeviceType.DataSource:
+        case ScryptedDeviceType.Person:
             return false;
     }
     return true;
@@ -172,4 +174,12 @@ export function isSyncable(type: ScryptedDeviceType) {
         // more?
     }
     return false;
+}
+
+const interfaceFriendlyNames = new Map<ScryptedInterface, string>();
+interfaceFriendlyNames.set(ScryptedInterface.MixinProvider, "Compatible Things");
+interfaceFriendlyNames.set(ScryptedInterface.DeviceProvider, "Providing Things");
+
+export function getInterfaceFriendlyName(iface: ScryptedInterface) {
+    return interfaceFriendlyNames.get(iface) || iface.toString();
 }

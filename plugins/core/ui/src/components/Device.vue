@@ -42,7 +42,7 @@
     <v-flex xs12 v-if="showRepl" ref="replEl">
       <REPLCard :deviceId="id"></REPLCard>
     </v-flex>
-    <v-flex xs12 :md6='deviceComponent !== "Automation"'>
+    <v-flex xs12 :md6="deviceComponent !== 'Automation'">
       <v-layout row wrap>
         <v-flex xs12>
           <v-card raised>
@@ -218,7 +218,11 @@
                 <template #activator="{ on: dialog }">
                   <v-tooltip bottom>
                     <template #activator="{ on: tooltip }">
-                      <v-btn x-small v-on="{ ...tooltip, ...dialog }" color="error" text
+                      <v-btn
+                        x-small
+                        v-on="{ ...tooltip, ...dialog }"
+                        color="error"
+                        text
                         ><v-icon x-small>fa-trash</v-icon></v-btn
                       >
                     </template>
@@ -255,7 +259,7 @@
             </v-card-actions>
           </v-card>
         </v-flex>
-<!--
+        <!--
         <v-flex xs12 v-if="!ownerDevice && pluginData">
           <v-card raised>
             <v-card-title
@@ -319,6 +323,7 @@
               >
                 <v-list-item-action>
                   <v-checkbox
+                    dense
                     @click.stop
                     @change="toggleMixin(mixin)"
                     v-model="mixin.enabled"
@@ -332,7 +337,7 @@
 
                 <v-list-item-icon>
                   <v-list-item-action
-                    ><v-btn icon @click.stop="openMixin(mixin)"
+                    ><v-btn small @click.stop="openMixin(mixin)"
                       ><v-icon x-small>fa-external-link-alt</v-icon></v-btn
                     ></v-list-item-action
                   >
@@ -362,10 +367,10 @@
           </v-card>
         </v-flex>
 
-        <v-flex xs12>
-          <v-card raised v-for="iface in cardUnderInterfaces" :key="iface">
+        <v-flex xs12 v-for="iface in cardUnderInterfaces" :key="iface">
+          <v-card raised>
             <v-card-title class="orange-gradient subtitle-1 font-weight-light">
-              {{ iface }}
+              {{ getInterfaceFriendlyName(iface) }}
             </v-card-title>
             <component
               :value="deviceState"
@@ -380,10 +385,10 @@
     <v-flex xs12 md6 lg6>
       <v-layout row wrap>
         <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
-          <v-card >
+          <v-card>
             <v-card-title
               class="red-gradient white--text subtitle-1 font-weight-light"
-              >{{ iface }}</v-card-title
+              >{{ getInterfaceFriendlyName(iface) }}</v-card-title
             >
             <component
               :value="deviceState"
@@ -395,7 +400,6 @@
 
         <v-flex xs12 v-for="iface in noCardInterfaces" :key="iface">
           <component
-            
             :value="deviceState"
             :device="device"
             :is="iface"
@@ -423,6 +427,7 @@ import {
   removeAlert,
   getAlertIcon,
   hasFixedPhysicalLocation,
+  getInterfaceFriendlyName,
 } from "./helpers";
 import { ScryptedInterface } from "@scrypted/sdk/types";
 import Notifier from "../interfaces/Notifier.vue";
@@ -618,6 +623,7 @@ export default {
     },
   },
   methods: {
+    getInterfaceFriendlyName,
     hasFixedPhysicalLocation,
     getComponentWebPath,
     removeAlert,

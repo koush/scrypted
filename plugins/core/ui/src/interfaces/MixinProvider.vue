@@ -1,7 +1,7 @@
 <template>
   <div>
     <v-card-text
-      >{{ device.name }} can be enabled for these devices.</v-card-text
+      >{{ device.name }} can be enabled for these things.</v-card-text
     >
 
     <v-list-item-group>
