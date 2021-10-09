@@ -1,4 +1,4 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice, ObjectDetectionResult, FaceRecognition } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
@@ -7,7 +7,7 @@ import type { DetectedObject } from '@tensorflow-models/coco-ssd'
 import * as coco from '@tensorflow-models/coco-ssd';
 import path from 'path';
 import fetch from 'node-fetch';
-import { ENV, Tensor, tensor, Tensor4D } from '@tensorflow/tfjs-core';
+import { ENV, string, Tensor, tensor, Tensor4D } from '@tensorflow/tfjs-core';
 import * as faceapi from 'face-api.js';
 import { FaceDetection, FaceMatcher, LabeledFaceDescriptors } from 'face-api.js';
 import canvas, { createCanvas } from 'canvas';
@@ -16,6 +16,7 @@ import { randomBytes } from 'crypto';
 import throttle from 'lodash/throttle'
 import { sleep } from './sleep';
 import { CLASSES } from './classes';
+import { makeBoundingBox, makeBoundingBoxFromFace } from './util';
 
 // do not delete this, it makes sure tf is initialized.
 console.log(tf.getBackend());
@@ -170,7 +171,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     super(mixinDevice, mixinDeviceState, {
       providerNativeId: tensorFlow.nativeId,
       mixinDeviceInterfaces,
-      group: "TensorFlow Settings",
+      group: "Object Detection Settings",
       groupKey: "tensorflow",
     });
 
@@ -245,10 +246,10 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
     // anything remaining in currentDetections at this point has left the scene.
     if (this.currentDetections.length) {
-      this.console.log('no longer detected', this.currentDetections.join(','))
+      this.console.log('object no longer detected', this.currentDetections.join(', '))
     }
     if (found.length) {
-      this.console.log('detected', found.join(','));
+      this.console.log('object detected', found.join(', '));
     }
     this.currentDetections = [...classNames];
   }
@@ -261,64 +262,123 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     }
 
     const person = detection.detections.find(detection => detection.className === 'person');
-    if (person) {
-      const resultsQuery = await faceapi.detectAllFaces(input, new faceapi.SsdMobilenetv1Options({
-        minConfidence: this.minConfidence,
-      }))
-        .withFaceLandmarks()
-        .withFaceDescriptors();
 
-      let unknowns: { detection: FaceDetection, descriptor: LabeledFaceDescriptors }[] = [];
-      if (!this.tensorFlow.faceMatcher) {
-        unknowns = resultsQuery.map(q => ({
-          descriptor: new LabeledFaceDescriptors(Buffer.from(randomBytes(8)).toString('hex'), [q.descriptor]),
-          detection: q.detection,
-        }));
+    // no people
+    if (!person)
+      return;
+
+    const facesDetected = await faceapi.detectAllFaces(input, new faceapi.SsdMobilenetv1Options({
+      minConfidence: this.minConfidence,
+    }))
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+
+    // no faces
+    if (!facesDetected.length)
+      return;
+
+    const faces: ObjectDetectionResult[] = facesDetected.map(face => ({
+      className: 'face',
+      score: face.detection.score,
+      boundingBox: makeBoundingBoxFromFace(face),
+    }))
+
+    const recognition: ObjectDetection = Object.assign({}, detection);
+    recognition.people = [];
+    recognition.detections.push(...faces);
+
+    const unknowns: {
+      q: Float32Array,
+      r: FaceDetection,
+    }[] = [];
+    if (!this.tensorFlow.faceMatcher) {
+      unknowns.push(...facesDetected.map(f => ({
+        q: f.descriptor,
+        r: f.detection,
+      })));
+    }
+    else {
+      const matches = await Promise.all(facesDetected.map(async (q) => ({
+        q,
+        m: this.tensorFlow.faceMatcher.findBestMatch(q.descriptor),
+      })));
+
+      unknowns.push(...matches.filter(match => match.m.label === 'unknown').map(match => ({
+        q: match.q.descriptor,
+        r: match.q.detection
+      })));
+
+      for (const match of matches) {
+        if (match.m.label === 'unknown')
+          continue;
+
+        const nativeId = match.m.label;
+        recognition.people.push({
+          id: nativeId,
+          label: deviceManager.getDeviceState(nativeId)?.name,
+          score: 1 - match.m.distance,
+          boundingBox: makeBoundingBoxFromFace(match.q),
+        });
       }
-      else {
-        const matches = await Promise.all(resultsQuery.map(async (q) => ({
-          q,
-          m: this.tensorFlow.faceMatcher.findBestMatch(q.descriptor),
-        })));
-        unknowns = matches.filter(match => match.m.label === 'unknown').map(unk => (
-          {
-            detection: unk.q.detection,
-            descriptor: new LabeledFaceDescriptors(Buffer.from(randomBytes(8)).toString('hex'), [unk.q.descriptor]),
-          }
-        ));
+    }
 
-        for (const match of matches) {
-          if (match.m.label === 'unknown')
-            continue;
-          this.console.log('found', match.m.label);
-        }
-      }
+    if (unknowns.length) {
+      const fullPromise = canvas.loadImage(buffer);
 
-      if (unknowns.length) {
-        const full = await canvas.loadImage(buffer);
-        for (const unknown of unknowns) {
-          const c = createCanvas(unknown.detection.box.width, unknown.detection.box.height);
+      for (const unknown of unknowns) {
+        const nativeId = 'person:' + Buffer.from(randomBytes(8)).toString('hex');
+
+        recognition.people.push({
+          id: nativeId,
+          label: `Unknown Person (${nativeId})`,
+          score: unknown.r.score,
+          boundingBox: makeBoundingBox(unknown.r.box),
+        });
+
+
+        await this.tensorFlow.discoverPerson(nativeId);
+        const storage = deviceManager.getDeviceStorage(nativeId);
+        const d = unknown.q;
+        storage.setItem('descriptor-0', Buffer.from(d.buffer, d.byteOffset, d.byteLength).toString('base64'));
+
+        (async () => {
+          const full = await fullPromise;
+          const c = createCanvas(unknown.r.box.width, unknown.r.box.height);
           const draw = c.getContext('2d');
           draw.drawImage(full,
-            unknown.detection.box.x, unknown.detection.box.y, unknown.detection.box.width, unknown.detection.box.height,
-            0, 0, unknown.detection.box.width, unknown.detection.box.height);
+            unknown.r.box.x, unknown.r.box.y, unknown.r.box.width, unknown.r.box.height,
+            0, 0, unknown.r.box.width, unknown.r.box.height);
           const cropped = c.toBuffer('image/jpeg');
 
-          const nativeId = 'person:' + unknown.descriptor.label;
           require('realfs').writeFileSync(path.join(process.env.SCRYPTED_PLUGIN_VOLUME, nativeId + '.jpg'), cropped)
-
-          await this.tensorFlow.discoverPerson(nativeId);
-
-          const storage = deviceManager.getDeviceStorage(nativeId);
-          unknown.descriptor.descriptors.forEach((d, i) => {
-            storage.setItem('descriptor-' + i, Buffer.from(d.buffer, d.byteOffset, d.byteLength).toString('base64'))
-          })
-        }
+        })();
       }
 
-      if (unknowns.length) {
-        this.tensorFlow.reloadFaceMatcher();
+      this.tensorFlow.reloadFaceMatcher();
+    }
+
+    this.onDeviceEvent(ScryptedInterface.ObjectDetector, recognition);
+
+    const missing: string[] = [];
+    for (const check of recognition.people) {
+      if (!this.currentPeople.has(check.id)) {
+        missing.push(check.id);
       }
+      else {
+        this.currentPeople.delete(check.id);
+      }
+    }
+
+    if (this.currentPeople.size) {
+      this.console.log('object no longer detected', [...this.currentDetections].join(', '))
+    }
+    if (recognition.people.length) {
+      this.console.log('object detected', recognition.people.map(p => p.label).join(', '));
+    }
+
+    this.currentPeople.clear();
+    for (const add of recognition.people) {
+      this.currentPeople.add(add.id);
     }
   }
 
