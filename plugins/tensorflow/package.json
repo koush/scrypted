@@ -25,13 +25,13 @@
       "detection"
    ],
    "scrypted": {
-      "name": "TensorFlow Object Detection",
+      "name": "Object and Face Recognition Plugin",
       "singleInstance": true,
       "type": "API",
       "interfaces": [
+         "DeviceProvider",
          "MixinProvider"
-      ],
-      "realfs": true
+      ]
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
@@ -39,9 +39,14 @@
       "@tensorflow-models/coco-ssd": "^2.2.2",
       "@tensorflow/tfjs-node": "^3.9.0",
       "@tensorflow/tfjs-node-gpu": "^3.9.0",
-      "jpeg-js": "^0.4.3"
+      "canvas": "^2.8.0",
+      "face-api.js": "file:./face-api.js",
+      "google-protobuf": "^3.18.1",
+      "jpeg-js": "^0.4.3",
+      "lodash": "^4.17.21"
    },
    "devDependencies": {
+      "@types/lodash": "^4.14.175",
       "@types/node": "^14.17.11"
    }
 }

@@ -10,3 +10,6 @@
 [submodule "plugins/neato/node-botvac"]
 	path = plugins/neato/node-botvac
 	url = git@github.com:koush/node-botvac
+[submodule "plugins/tensorflow/face-api.js"]
+	path = plugins/tensorflow/face-api.js
+	url = git@github.com:koush/face-api.js
