@@ -13,15 +13,15 @@ const { mediaManager } = sdk;
 class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     eventStream: Stream;
     cp: ChildProcess;
+    client = new AmcrestCameraClient(this.storage.getItem('ip'), this.getUsername(), this.getPassword(), this.console);
 
     listenEvents() {
         const ret = new EventEmitter() as (EventEmitter & Destroyable);
         ret.destroy = () => {
         };
         (async () => {
-            const api = this.createClient();
             try {
-                const events = await api.listenEvents();
+                const events = await this.client.listenEvents();
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();
@@ -61,11 +61,6 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         return ret;
     }
 
-
-    createClient() {
-        return new AmcrestCameraClient(this.storage.getItem('ip'), this.getUsername(), this.getPassword(), this.console);
-    }
-
     async getOtherSettings(): Promise<Setting[]> {
         return [
             {
@@ -79,8 +74,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 
     async takePicture(): Promise<MediaObject> {
-        const api = this.createClient();
-        return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
+        return mediaManager.createMediaObject(await this.client.jpegSnapshot(), 'image/jpeg');
     }
 
     async getConstructedStreamUrl() {
@@ -114,9 +108,8 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
             const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=1`;
             this.console.log('posting audio data to', url);
 
-            const client = this.createClient();
             try {
-                await client.digestAuth.request({
+                await this.client.digestAuth.request({
                     method: 'POST',
                     url,
                     headers: {
