@@ -6,6 +6,16 @@ import AxiosDigestAuth from '@mhoc/axios-digest-auth';
 export enum HikVisionCameraEvent {
     MotionDetected = "<eventType>VMD</eventType>",
     VideoLoss = "<eventType>videoloss</eventType>",
+    // <eventType>linedetection</eventType>
+    // <eventState>active</eventState>
+    // <eventType>linedetection</eventType>
+    // <eventState>inactive</eventState>
+    LineDetection = "<eventType>linedetection</eventType>",
+    // <eventType>fielddetection</eventType>
+    // <eventState>active</eventState>
+    // <eventType>fielddetection</eventType>
+    // <eventState>inactive</eventState>
+    FieldDetection = "<eventType>fielddetection</eventType>",
 }
 
 
@@ -17,7 +27,7 @@ export interface HikVisionCameraStreamSetup {
 export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
 
-    constructor(public ip: string, username: string, password: string, public channel?: string) {
+    constructor(public ip: string, username: string, password: string, public channel: string, public console: Console) {
         this.digestAuth = new AxiosDigestAuth({
             username,
             password,
@@ -68,6 +78,7 @@ export class HikVisionCameraAPI {
 
         stream.on('data', (buffer: Buffer) => {
             const data = buffer.toString();
+            this.console.log(data);
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
                     const channel = data.match(/<channelID>(.*?)</)?.[1];

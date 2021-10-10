@@ -27,7 +27,9 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                     if (this.getRtspChannel() && channel !== this.getRtspChannel().substr(0, 1)) {
                         return;
                     }
-                    if (event === HikVisionCameraEvent.MotionDetected) {
+                    if (event === HikVisionCameraEvent.MotionDetected
+                        || event === HikVisionCameraEvent.LineDetection
+                        || event === HikVisionCameraEvent.FieldDetection) {
                         this.motionDetected = true;
                         clearTimeout(motionTimeout);
                         motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
@@ -42,7 +44,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
     }
 
     createClient() {
-        const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel());
+        const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel(), this.console);
 
         (async () => {
             if (this.hasCheckedCodec)
@@ -122,7 +124,7 @@ class HikVisionProvider extends RtspProvider {
         const check = this.clients.get(address);
         if (check)
             return check;
-        const client = new HikVisionCameraAPI(address, username, password);
+        const client = new HikVisionCameraAPI(address, username, password, undefined, this.console);
         this.clients.set(address, client);
         return client;
     }
