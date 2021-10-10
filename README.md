@@ -73,8 +73,9 @@ https://developer.scrypted.app
 1. Install Scrypted
 2. Open https://localhost:9443/
 3. Install the HomeKit Plugin from the available plugins tab
-4. Install the Unifi, HikVision, or Amcrest camera plugin (HKSV currently requires a plugin with hardware motion detect support)
-5. Install the Rebroadcast and Prebuffer plugin.
+4. Install the Unifi, HikVision, ONVIF, or Amcrest camera plugin
+   * HKSV requires a plugin with hardware motion detect support. If there's plugin that supports your camera, you can install the generic RTSP and the OpenCV motion detector plugin to use your server to detect camera motion.
+6. Install the Rebroadcast plugin.
     * This is optional but highly recommended. It keeps a short video loop of the stream in memory leading up to the motion.  
 7. Pair with the Scrypted Server accessory using your HomeKit app on iOS or Mac.
 8. Enable recording on the cameras in HomeKit.
