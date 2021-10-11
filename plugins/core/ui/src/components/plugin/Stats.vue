@@ -45,7 +45,7 @@ export default {
           },
         },
 
-        labels: this.labels,
+        labels: this.labels.map(label => label.replace(' Plugin', '').replace(' Controller', '')),
         dataLabels: {
           enabled: false,
         },
@@ -55,6 +55,7 @@ export default {
           fontSize: "13px",
           fontFamily: "Quicksand",
           fontWeight: 700,
+          width: 200,
         },
         ...this.options,
       };
