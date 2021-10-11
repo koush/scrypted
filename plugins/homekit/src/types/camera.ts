@@ -1,7 +1,6 @@
-
 import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectDetection } from '@scrypted/sdk'
 import { addSupportedType, DummyDevice, HomeKitSession } from '../common'
-import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SnapshotRequest, SnapshotRequestCallback, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
+import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
 
 import sdk from '@scrypted/sdk';
@@ -12,14 +11,13 @@ import { once } from 'events';
 import debounce from 'lodash/debounce';
 
 import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue, NodeCallback } from '../../HAP-NodeJS/src';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioRecordingSamplerateValues, CameraRecordingConfiguration, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
-import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
-import throttle from 'lodash/throttle';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
-import fs from 'fs';
 import { ContactSensor } from '../../HAP-NodeJS/src/lib/definitions';
+import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
+import { createSnapshotHandler } from './camera/camera-snapshot';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -33,7 +31,6 @@ async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket,
     }
 }
 
-const iframeIntervalSeconds = 4;
 const numberPrebufferSegments = 1;
 
 // request is used by the eval, do not remove.
@@ -42,106 +39,6 @@ function evalRequest(value: string, request: any) {
         value = eval(value) as string;
     return value.split(' ');
 }
-
-async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console): AsyncGenerator<Buffer, void, unknown> {
-
-    console.log(device.name, 'recording session starting', configuration);
-
-    const media = await device.getVideoStream({
-        prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
-        container: 'mp4',
-    });
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-
-    const storage = deviceManager.getMixinStorage(device.id, undefined);
-    const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
-
-    const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
-
-    if (noAudio) {
-        console.log(device.name, 'adding dummy audio track');
-        // create a dummy audio track if none actually exists.
-        // this track will only be used if no audio track is available.
-        // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        ffmpegInput.inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
-    }
-
-    let audioArgs: string[];
-    if (noAudio || transcodeRecording) {
-        audioArgs = [
-            '-bsf:a', 'aac_adtstoasc',
-            '-acodec', 'libfdk_aac',
-            ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
-                ['-profile:a', 'aac_low'] :
-                ['-profile:a', 'aac_eld']),
-            '-ar', `${AudioRecordingSamplerateValues[configuration.audioCodec.samplerate]}k`,
-            '-b:a', `${configuration.audioCodec.bitrate}k`,
-            '-ac', `${configuration.audioCodec.audioChannels}`
-        ];
-    }
-    else {
-        audioArgs = [
-            '-bsf:a', 'aac_adtstoasc',
-            '-acodec', 'copy'
-        ];
-    }
-
-    const profile = configuration.videoCodec.profile === H264Profile.HIGH ? 'high'
-        : configuration.videoCodec.profile === H264Profile.MAIN ? 'main' : 'baseline';
-
-    const level = configuration.videoCodec.level === H264Level.LEVEL4_0 ? '4.0'
-        : configuration.videoCodec.level === H264Level.LEVEL3_2 ? '3.2' : '3.1';
-
-
-    let videoArgs: string[];
-    if (transcodeRecording) {
-        videoArgs = [
-            '-profile:v', profile,
-            '-level:v', level,
-            '-b:v', `${configuration.videoCodec.bitrate}k`,
-            '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
-            '-r', configuration.videoCodec.resolution[2].toString(),
-            '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
-        ];
-    }
-    else {
-        videoArgs = [
-            '-vcodec', 'copy',
-        ];
-    }
-
-    log.i(`${device.name} motion recording starting`);
-    const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs, console);
-
-    log.i(`${device.name} motion recording started`);
-    const { socket, cp, generator } = session;
-    let pending: Buffer[] = [];
-    try {
-        for await (const box of generator) {
-            const { header, type, length, data } = box;
-
-            // every moov/moof frame designates an iframe?
-            pending.push(header, data);
-
-            if (type === 'moov' || type === 'mdat') {
-                const fragment = Buffer.concat(pending);
-                pending = [];
-                yield fragment;
-            }
-            // console.log('mp4 box type', type, length);
-        }
-    }
-    catch (e) {
-        log.i(`${device.name} motion recording complete ${e}`);
-    }
-    finally {
-        socket.destroy();
-        cp.kill();
-    }
-}
-
-const black = fs.readFileSync('black.jpg');
 
 addSupportedType({
     type: ScryptedDeviceType.Camera,
@@ -167,10 +64,6 @@ addSupportedType({
         }
         const sessions = new Map<string, Session>();
 
-        let lastPictureTime = 0;
-        let lastPicture: Buffer;
-        let pendingPicture: Promise<Buffer>;
-
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
         function killSession(sessionID: string) {
@@ -189,107 +82,8 @@ addSupportedType({
         }
 
 
-        const takePicture = async (request: SnapshotRequest) => {
-            if (pendingPicture)
-                return pendingPicture;
-
-            if (device.interfaces.includes(ScryptedInterface.Camera)) {
-                const media = await device.takePicture({
-                    picture: {
-                        width: request.width,
-                        height: request.height,
-                    }
-                });
-                pendingPicture = mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
-            }
-            else {
-                pendingPicture = device.getVideoStream().then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
-            }
-
-            const wrapped = pendingPicture;
-            pendingPicture = new Promise((resolve, reject) => {
-                let timedOut = false;
-                const timeout = setTimeout(() => {
-                    timedOut = true;
-                    pendingPicture = undefined;
-                    reject(new Error('snapshot timed out'));
-                }, 60000);
-
-                wrapped.then(picture => {
-                    if (!timedOut) {
-                        lastPictureTime = Date.now();
-                        lastPicture = picture;
-                        pendingPicture = undefined;
-                        clearTimeout(timeout);
-                        resolve(picture)
-                    }
-                })
-                    .catch(e => {
-                        if (!timedOut) {
-                            lastPictureTime = Date.now();
-                            lastPicture = undefined;
-                            pendingPicture = undefined;
-                            clearTimeout(timeout);
-                            reject(e);
-                        }
-                    })
-            });
-
-            return pendingPicture;
-        }
-
-        const throttledTakePicture = throttle(takePicture, 9000, {
-            leading: true,
-            trailing: true,
-        });
-
-        function snapshotAll(request: SnapshotRequest) {
-            for (const snapshotThrottle of homekitSession.snapshotThrottles.values()) {
-                snapshotThrottle(request);
-            }
-        }
-
-        homekitSession.snapshotThrottles.set(device.id, throttledTakePicture);
-
         const delegate: CameraStreamingDelegate = {
-            async handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
-                try {
-                    // non zero reason is for homekit secure video... or something else.
-                    if (request.reason) {
-                        callback(null, await takePicture(request));
-                        return;
-                    }
-
-                    // console.log(device.name, 'snapshot request', request);
-
-                    // an idle Home.app will hit this endpoint every 10 seconds, and slow requests bog up the entire app.
-                    // avoid slow requests by prefetching every 9 seconds.
-
-                    // snapshots are requested em masse, so trigger them rather than wait for home to
-                    // fetch everything serially.
-                    // this call is not a bug, to force lodash to take a picture on the trailing edge,
-                    // throttle must be called twice.
-                    snapshotAll(request);
-                    snapshotAll(request);
-
-                    // path to return blank snapshots
-                    if (localStorage.getItem('blankSnapshots') === 'true') {
-                        if (lastPicture && lastPictureTime > Date.now() - 15000) {
-                            callback(null, lastPicture);
-                        }
-                        else {
-                            callback(null, black);
-                        }
-                        return;
-                    }
-
-                    callback(null, await throttledTakePicture(request));
-                }
-                catch (e) {
-                    console.error('snapshot error', e);
-                    callback(e);
-                }
-            },
+            handleSnapshotRequest: createSnapshotHandler(device, homekitSession),
             async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
 
                 const videossrc = CameraController.generateSynchronisationSource();
