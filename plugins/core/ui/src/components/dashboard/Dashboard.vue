@@ -340,7 +340,7 @@ import {
   Card,
 } from "./layout";
 import { Menu } from "../../store";
-import { Settings as SettingsInterface, Setting } from "@scrypted/sdk/types";
+import { Settings as SettingsInterface, Setting, SettingValue } from "@scrypted/sdk/types";
 
 class CardComponentSettings implements SettingsInterface {
   cardComponent: CardComponent;
@@ -362,7 +362,7 @@ class CardComponentSettings implements SettingsInterface {
     }
     return settings;
   }
-  async putSetting(key: string, value: string) {
+  async putSetting(key: string, value: SettingValue) {
     var settings = cloneDeep(
       getCardComponentSettings().get(this.cardComponent.component)
     );
@@ -370,7 +370,7 @@ class CardComponentSettings implements SettingsInterface {
     if (!setting.type || setting.type.indexOf("[]") === -1) {
       Vue.set(this.cardComponent.value, key, value);
     } else {
-      Vue.set(this.cardComponent.value, key, JSON.parse(value));
+      Vue.set(this.cardComponent.value, key, JSON.parse(value.toString()));
     }
   }
 }

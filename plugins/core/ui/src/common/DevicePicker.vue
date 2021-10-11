@@ -4,6 +4,7 @@
     :items="devices"
     item-value="id"
     outlined
+    :multiple="multiple"
     :label="title"
     :hint="description"
     persistent-hint
@@ -19,6 +20,6 @@ import CustomValue from "./CustomValue.vue";
 
 export default {
   mixins: [CustomValue],
-  props: ["devices", "title", "description"]
+  props: ["devices", "title", "description", "multiple"]
 };
 </script>

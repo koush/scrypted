@@ -22,12 +22,15 @@
       <v-divider v-if="showChips"></v-divider>
 
       <v-flex xs12>
-        <Setting
-          :device="device"
-          v-for="setting in settingsGroup"
-          :key="setting.key"
-          v-model="setting.value"
-        ></Setting>
+        <div v-for="setting in settingsGroup" :key="setting.key">
+          <Setting
+            v-if="setting.value.choices || setting.value.type === 'device' || !setting.value.multiple"
+            :device="device"
+            v-model="setting.value"
+          ></Setting>
+          <SettingMultiple v-else v-model="setting.value" :device="device">
+          </SettingMultiple>
+        </div>
       </v-flex>
     </v-card>
   </div>
@@ -35,10 +38,12 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import Setting from "./Setting.vue";
+import SettingMultiple from "./SettingMultiple.vue";
 
 export default {
   components: {
     Setting,
+    SettingMultiple,
   },
   mixins: [RPCInterface],
   data() {

@@ -1,9 +1,9 @@
 <template>
   <div>
     <v-checkbox
+      v-if="lazyValue.type && lazyValue.type.toLowerCase() === 'boolean'"
       dense
       :readonly="lazyValue.readonly"
-      v-if="lazyValue.type && lazyValue.type.toLowerCase() === 'boolean'"
       v-model="booleanValue"
       :label="lazyValue.title"
       :hint="lazyValue.description"
@@ -13,10 +13,11 @@
       :class="lazyValue.description ? 'mb-2' : ''"
     ></v-checkbox>
     <v-select
+      v-else-if="lazyValue.choices"
       dense
       :readonly="lazyValue.readonly"
-      v-else-if="lazyValue.choices"
       :items="lazyValue.choices"
+      :multiple="lazyValue.multiple"
       v-model="lazyValue.value"
       outlined
       :label="lazyValue.title"
@@ -24,65 +25,55 @@
       persistent-hint
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="success" @click="save" class="shift-up">
+        <v-btn
+          v-if="dirty && device"
+          color="success"
+          @click="save"
+          class="shift-up"
+        >
           <v-icon>send</v-icon>
         </v-btn>
       </template>
     </v-select>
-    <Grower
-      v-else-if="
-        lazyValue.type && lazyValue.type.toLowerCase().startsWith('device[]')
-      "
-      v-model="lazyValue.value"
-    >
-      <template v-slot:default="slotProps">
-        <DevicePicker
-          v-model="slotProps.item"
-          @input="slotProps.onInput"
-          :devices="devices"
-          :title="lazyValue.title"
-          :description="lazyValue.description"
-        ></DevicePicker>
-      </template>
-
-      <template v-slot:append-outer>
-        <v-btn v-if="dirty" @click="save"> Save </v-btn>
-      </template>
-    </Grower>
-
     <DevicePicker
-      v-else-if="
-        lazyValue.type && lazyValue.type.toLowerCase().startsWith('device')
-      "
+      v-else-if="lazyValue.type === 'device'"
       v-model="lazyValue.value"
+      :multiple="lazyValue.multiple"
       :devices="devices"
       :title="lazyValue.title"
       :description="lazyValue.description"
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="success" @click="save" class="shift-up">
+        <v-btn
+          v-if="dirty && device"
+          color="success"
+          @click="save"
+          class="shift-up"
+        >
           <v-icon>send</v-icon>
         </v-btn>
       </template>
     </DevicePicker>
     <v-text-field
+      v-else
       dense
       :readonly="lazyValue.readonly"
-      v-else
       outlined
       v-model="lazyValue.value"
       :placeholder="lazyValue.placeholder"
       :label="lazyValue.title"
       :hint="lazyValue.description"
       persistent-hint
-      :type="
-        lazyValue.type && lazyValue.type.toLowerCase() === 'password'
-          ? 'password'
-          : undefined
-      "
+      :type="lazyValue.type === 'password' ? 'password' : undefined"
     >
       <template v-slot:append-outer>
-        <v-btn v-if="dirty" color="success" text @click="save" class="shift-up">
+        <v-btn
+          v-if="dirty && device"
+          color="success"
+          text
+          @click="save"
+          class="shift-up"
+        >
           <v-icon>send</v-icon>
         </v-btn>
       </template>
@@ -101,6 +92,12 @@ export default {
     DevicePicker,
     Grower,
   },
+  watch: {
+    dirty() {
+      if (this.device) return;
+      this.onInput();
+    },
+  },
   computed: {
     booleanValue: {
       get() {
@@ -113,16 +110,15 @@ export default {
       },
     },
     dirty() {
-      var type = this.value.type || "";
-      if (type.indexOf("[]") == -1) {
-        return this.lazyValue.value !== this.value.value;
-      }
-      return JSON.stringify(this.lazyValue.value) !== this.value.value;
+      return (
+        JSON.stringify(this.lazyValue.value) !==
+        JSON.stringify(this.value.value)
+      );
     },
     devices() {
       var expression;
       try {
-        expression = this.lazyValue.type.split(":")[1];
+        expression = this.lazyValue.deviceFilter || 'true;';
         // var interfaces = this.$scrypted.systemManager.getDeviceById(id).interfaces.map(iface => `var ${iface} = true`);
       } catch (e) {
         expression = "true;";
@@ -144,14 +140,17 @@ export default {
           id: device.id,
           text: device.name,
         }));
-      ret.splice(0, 0, {
-        id: null,
-        text: this.lazyValue.placeholder || "Select a Device",
-      });
+      if (!this.lazyValue.multiple) {
+        ret.splice(0, 0, {
+          id: null,
+          text: this.lazyValue.placeholder || "Select a Device",
+        });
+      }
       return ret;
     },
   },
   methods: {
+    onChange() {},
     createLazyValue() {
       var type = this.value.type || "";
       if (type.indexOf("[]") == -1) {

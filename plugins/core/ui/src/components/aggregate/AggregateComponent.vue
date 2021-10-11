@@ -59,7 +59,7 @@ export default {
 
         return [
           {
-            name: "Aggregate Devices",
+            name: "Device Groups",
             devices: devices.filter((device) =>
               device.nativeId?.startsWith("aggregate:")
             ),

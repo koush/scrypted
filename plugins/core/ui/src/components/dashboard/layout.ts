@@ -163,7 +163,9 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
         {
             title: "Toggle Devices",
             key: "deviceIds",
-            type: `device[]:${JSON.stringify([ScryptedDeviceType.Light, ScryptedDeviceType.Outlet, ScryptedDeviceType.Switch, ScryptedDeviceType.Fan])}.includes(type) && interfaces.includes(${JSON.stringify(ScryptedInterface.OnOff)})`,
+            type: 'device',
+            multiple: true,
+            deviceFilter: `${JSON.stringify([ScryptedDeviceType.Light, ScryptedDeviceType.Outlet, ScryptedDeviceType.Switch, ScryptedDeviceType.Fan])}.includes(type) && interfaces.includes(${JSON.stringify(ScryptedInterface.OnOff)})`,
             value: JSON.stringify([]),
         }
     ]);
@@ -172,7 +174,9 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
         {
             title: "Position Devices",
             key: "deviceIds",
-            type: `device[]:${JSON.stringify(ScryptedDeviceType.Sensor)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.PositionSensor)})`,
+            type: 'device',
+            multiple: true,
+            deviceFilter: `${JSON.stringify(ScryptedDeviceType.Sensor)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.PositionSensor)})`,
             value: JSON.stringify([]),
         }
     ]);
@@ -181,7 +185,8 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
         {
             title: "Camera Device",
             key: "deviceId",
-            type: `device:(${JSON.stringify(ScryptedDeviceType.Camera)} === type || ${JSON.stringify(ScryptedDeviceType.Doorbell)} === type) && (interfaces.includes(${JSON.stringify(ScryptedInterface.Camera)}) || interfaces.includes(${JSON.stringify(ScryptedInterface.VideoCamera)}))`,
+            type: 'device',
+            deviceFilter: `(${JSON.stringify(ScryptedDeviceType.Camera)} === type || ${JSON.stringify(ScryptedDeviceType.Doorbell)} === type) && (interfaces.includes(${JSON.stringify(ScryptedInterface.Camera)}) || interfaces.includes(${JSON.stringify(ScryptedInterface.VideoCamera)}))`,
             value: null,
         }
     ]);
@@ -195,7 +200,8 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
         {
             title: "Lock Device",
             key: "deviceId",
-            type: `device:${JSON.stringify(ScryptedDeviceType.Lock)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.Lock)})`,
+            type: 'device',
+            deviceFilter: `${JSON.stringify(ScryptedDeviceType.Lock)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.Lock)})`,
             value: null,
         }
     ]);
@@ -209,7 +215,8 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
         {
             title: "Themostat Device",
             key: "deviceId",
-            type: `device:${JSON.stringify(ScryptedDeviceType.Thermostat)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.TemperatureSetting)})`,
+            type: 'device',
+            deviceFilter: `${JSON.stringify(ScryptedDeviceType.Thermostat)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.TemperatureSetting)})`,
             value: null,
         }
     ]);
@@ -223,7 +230,8 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
         {
             title: "Vacuum Device",
             key: "deviceId",
-            type: `device:${JSON.stringify(ScryptedDeviceType.Vacuum)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.StartStop)})`,
+            type: 'device',
+            deviceFilter: `${JSON.stringify(ScryptedDeviceType.Vacuum)} === type && interfaces.includes(${JSON.stringify(ScryptedInterface.StartStop)})`,
             value: null,
         }
     ]);
@@ -238,7 +246,8 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
         {
             title: "Media Player",
             key: "deviceId",
-            type: `device:${JSON.stringify([ScryptedDeviceType.Speaker, ScryptedDeviceType.Display])}.includes(type) && (interfaces.includes(${JSON.stringify(ScryptedInterface.MediaPlayer)}) || interfaces.includes(${JSON.stringify(ScryptedInterface.VideoCamera)}))`,
+            type: 'device',
+            deviceFilter: `${JSON.stringify([ScryptedDeviceType.Speaker, ScryptedDeviceType.Display])}.includes(type) && (interfaces.includes(${JSON.stringify(ScryptedInterface.MediaPlayer)}) || interfaces.includes(${JSON.stringify(ScryptedInterface.VideoCamera)}))`,
             value: null,
         }
     ]);
