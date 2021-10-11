@@ -80,8 +80,19 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
 
     async getSnapshot(options?: PictureOptions): Promise<Buffer> {
         let size = '';
-        if (options?.picture?.width && options?.picture?.height)
-            size = `&w=${options.picture.width}&h=${options.picture.height}`;
+        try {
+            if (options?.picture?.width && options?.picture?.height) {
+                const camera = this.findCamera();
+                const mainChannel = camera.channels[0];
+                const w = options.picture.width;
+                const h = Math.round((mainChannel.height / mainChannel.width) * w);
+
+                size = `&w=${w}&h=${h}`;
+            }
+        }
+        catch (e) {
+
+        }
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/snapshot?ts=${Date.now()}${size}`
 
         const response = await this.protect.api.loginFetch(url);
