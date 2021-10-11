@@ -1,10 +1,11 @@
-import sdk, { VideoCamera, Settings, Setting, ScryptedInterface } from "@scrypted/sdk";
+import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
+import { ContactSensor } from "../HAP-NodeJS/src/lib/definitions";
 
-const { log } = sdk;
+const { log, systemManager } = sdk;
 
-export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings> implements Settings {
-    constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
+export class CameraMixin extends SettingsMixinDeviceBase<any> implements Settings {
+    constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
         super(mixinDevice, mixinDeviceState, {
             providerNativeId,
             mixinDeviceInterfaces,
@@ -15,6 +16,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
 
     async getMixinSettings(): Promise<Setting[]> {
         const settings: Setting[] = [];
+        const realDevice = systemManager.getDeviceById<ObjectDetector>(this.id);
 
         let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true';
 
@@ -26,7 +28,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
             description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
 
-        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor)) {
+        if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
             settings.push({
                 title: 'Transcode Recording',
                 key: 'transcodeRecording',
@@ -58,14 +60,15 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
         settings.push({
             title: 'Linked Motion Sensor',
             key: 'linkedMotionSensor',
-            type: 'device:interfaces.includes("MotionSensor")',
+            type: 'device',
+            deviceFilter: 'interfaces.includes("MotionSensor")',
             value: this.storage.getItem('linkedMotionSensor') || null,
             placeholder: this.providedInterfaces.includes(ScryptedInterface.MotionSensor)
                 ? 'Built-In Motion Sensor' : 'None',
             description: "Link motion sensor used to trigger HomeKit Secure Video recordings.",
         })
 
-        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.AudioSensor)) {
+        if (this.interfaces.includes(ScryptedInterface.AudioSensor)) {
             settings.push({
                 title: 'Audio Activity Detection',
                 key: 'detectAudio',
@@ -75,12 +78,45 @@ export class CameraMixin extends SettingsMixinDeviceBase<VideoCamera & Settings>
             });
         }
 
+        if (this.interfaces.includes(ScryptedInterface.ObjectDetector)) {
+            try {
+                const types = await realDevice.getObjectTypes();
+                const choices = types.people.map(p => p.label) || [];
+                if (types.detections)
+                    choices.push(...types.detections);
+
+                const value: string[] = [];
+                try {
+                    value.push(...JSON.parse(this.storage.getItem('objectDetectionContactSensors')));
+                }
+                catch (e) {
+                }
+
+                settings.push({
+                    title: 'Object Detection Contact Sensors',
+                    type: 'string',
+                    choices,
+                    multiple: true,
+                    key: 'objectDetectionContactSensors',
+                    description: 'Create HomeKit contact sensors that detect specific people or objects.',
+                    value,
+                })
+            }
+            catch (e) {
+            }
+        }
+
         return settings;
     }
 
-    async putMixinSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem(key, value?.toString());
-        if (key === 'detectAudio' || key === 'linkedMotionSensor') {
+    async putMixinSetting(key: string, value: SettingValue) {
+        if (key === 'objectDetectionContactSensors') {
+            this.storage.setItem(key, JSON.stringify(value));
+        }
+        else {
+            this.storage.setItem(key, value?.toString());
+        }
+        if (key === 'detectAudio' || key === 'linkedMotionSensor' || key === 'objectDetectionContactSensors') {
             log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);
         }
     }

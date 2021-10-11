@@ -1,5 +1,5 @@
 
-import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions } from '@scrypted/sdk'
+import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectDetection } from '@scrypted/sdk'
 import { addSupportedType, DummyDevice, HomeKitSession } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SnapshotRequest, SnapshotRequestCallback, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
@@ -19,6 +19,7 @@ import throttle from 'lodash/throttle';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
 import fs from 'fs';
+import { ContactSensor } from '../../HAP-NodeJS/src/lib/definitions';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -685,6 +686,43 @@ addSupportedType({
                     service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
                 });
             }
+        }
+
+        const objectDetectionContactSensorsValue = storage.getItem('objectDetectionContactSensors');
+        const objectDetectionContactSensors: string[] = [];
+        try {
+            objectDetectionContactSensors.push(...JSON.parse(objectDetectionContactSensorsValue));
+        }
+        catch (e) {
+        }
+
+        const sensorMap = new Map<string, ContactSensor>();
+        for (const ojs of new Set(objectDetectionContactSensors)) {
+            const sensor = new ContactSensor(`${device.name} Object Detection:` + ojs, ojs);
+            sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
+            accessory.addService(sensor);
+            sensorMap.set(ojs, sensor);
+        }
+
+        if (sensorMap.size) {
+            device.listen(ScryptedInterface.ObjectDetector, (eventSource, eventDetails, eventData: ObjectDetection) => {
+                const all: string[] = [];
+                if (eventData.detections)
+                    all.push(...eventData.detections.map(d => d.className));
+                if (eventData.people)
+                    all.push(...eventData.people.map(p => p.label));
+
+                const unset = new Set(sensorMap.keys());
+                for (const type of all) {
+                    const sensor = sensorMap.get(type);
+                    sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
+                    unset.delete(type);
+                }
+                for (const type of unset) {
+                    const sensor = sensorMap.get(type);
+                    sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
+                }
+            });
         }
 
         return accessory;
