@@ -492,7 +492,7 @@ export interface BufferConverter {
  */
 export interface Settings {
     getSettings(): Promise<Setting[]>;
-    putSetting(key: string, value: boolean | number | string): Promise<void>;
+    putSetting(key: string, value: SettingValue): Promise<void>;
 }
 export interface BinarySensor {
     binaryState?: boolean;
@@ -540,15 +540,21 @@ export interface ObjectDetectionResult {
 export interface FaceRecognition {
     id: string;
     label: string;
-    score: number;
+    score?: number;
     boundingBox?: [number, number, number, number];
 }
 export interface ObjectDetection {
     detections?: ObjectDetectionResult[];
+    faces?: ObjectDetectionResult[];
     people?: FaceRecognition[];
     detectionId?: any;
     inputDimensions?: [number, number];
     timestamp: number;
+}
+export interface ObjectDetectionTypes {
+    detections?: string[];
+    faces?: boolean;
+    people?: FaceRecognition[];
 }
 export interface ObjectDetector {
     /**
@@ -556,7 +562,7 @@ export interface ObjectDetector {
      * @param detectionId
      */
     getDetectionInput(detectionId: any): Promise<MediaObject>;
-    getObjectTypes(): Promise<string[]>;
+    getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -936,6 +942,7 @@ export declare enum MediaPlayerState {
     Paused = "Paused",
     Buffering = "Buffering"
 }
+export declare type SettingValue = string | number | boolean | string[] | number[];
 export interface Setting {
     choices?: string[];
     description?: string;
@@ -944,8 +951,10 @@ export interface Setting {
     readonly?: boolean;
     group?: string;
     title?: string;
-    type?: string;
-    value?: string;
+    type?: 'string' | 'password' | 'number' | 'boolean' | 'device';
+    deviceFilter?: string;
+    multiple?: boolean;
+    value?: SettingValue;
 }
 export declare enum ScryptedInterface {
     ScryptedDevice = "ScryptedDevice",

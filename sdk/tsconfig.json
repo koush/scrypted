@@ -5,7 +5,6 @@
         "noImplicitAny": true,
         "esModuleInterop": true,
         "sourceMap": true,
-        "declaration": true,
-        "lib": ["ESNext"]
+        "declaration": true
     },
 }
