@@ -1,4 +1,4 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice, ObjectDetectionResult, FaceRecognition } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice, ObjectDetectionResult, FaceRecognition, ObjectDetectionTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
@@ -76,7 +76,7 @@ class RecognizedPerson extends ScryptedDeviceBase implements Camera, Settings {
       title: 'Merge With...',
       description: 'Merge this person with a different person. This will remove the other person.',
       key: 'merge',
-      type: 'choices',
+      type: 'string',
       choices: people.filter(person => person.nativeId !== this.nativeId).map(person => person.name + ` (${person.nativeId})`),
     }
     settings.push(merge);
@@ -118,8 +118,8 @@ class RecognizedPerson extends ScryptedDeviceBase implements Camera, Settings {
       this.storage.setItem('descriptor-' + i, Buffer.from(d.buffer, d.byteOffset, d.byteLength).toString('base64'))
     });
 
+    await deviceManager.onDeviceRemoved(person.nativeId);
     this.tensorFlow.reloadFaceMatcher();
-    deviceManager.onDeviceRemoved(person.nativeId);
   }
 
   async takePicture(options?: PictureOptions): Promise<MediaObject> {
@@ -178,7 +178,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     this.realDevice = systemManager.getDeviceById<Camera & VideoCamera & ObjectDetector>(this.id);
     this.registerMotion = this.realDevice.listen(ScryptedInterface.MotionSensor, async () => {
       const types = await this.getNativeObjectTypes();
-      if (types.includes('person'))
+      if (types.detections?.includes('person'))
         return;
 
       let { buffer, input } = await this.throttledGrab();
@@ -264,8 +264,11 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     const person = detection.detections.find(detection => detection.className === 'person');
 
     // no people
-    if (!person)
+    const recognition: ObjectDetection = Object.assign({}, detection);
+    if (!person) {
+      this.onDeviceEvent(ScryptedInterface.ObjectDetector, recognition);
       return;
+    }
 
     const facesDetected = await faceapi.detectAllFaces(input, new faceapi.SsdMobilenetv1Options({
       minConfidence: this.minConfidence,
@@ -274,8 +277,10 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       .withFaceDescriptors();
 
     // no faces
-    if (!facesDetected.length)
+    if (!facesDetected.length) {
+      this.onDeviceEvent(ScryptedInterface.ObjectDetector, recognition);
       return;
+    }
 
     const faces: ObjectDetectionResult[] = facesDetected.map(face => ({
       className: 'face',
@@ -283,9 +288,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       boundingBox: makeBoundingBoxFromFace(face),
     }))
 
-    const recognition: ObjectDetection = Object.assign({}, detection);
     recognition.people = [];
-    recognition.detections.push(...faces);
+    recognition.faces = faces;
 
     const unknowns: {
       q: Float32Array,
@@ -382,17 +386,25 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     }
   }
 
-  async getNativeObjectTypes(): Promise<string[]> {
+  async getNativeObjectTypes(): Promise<ObjectDetectionTypes> {
     if (this.mixinDeviceInterfaces.includes(ScryptedInterface.ObjectDetector))
       return this.mixinDevice.getObjectTypes();
-    return [];
+    return {};
   }
 
-  async getObjectTypes(): Promise<string[]> {
-    const natives = await this.getNativeObjectTypes();
-    if (this.mixinDeviceInterfaces.includes(ScryptedInterface.ObjectDetector))
-      return natives;
-    return Object.values(CLASSES).map(c => c.displayName);
+  async getObjectTypes(): Promise<ObjectDetectionTypes> {
+    const detections = this.mixinDeviceInterfaces.includes(ScryptedInterface.ObjectDetector)
+      ? await this.getNativeObjectTypes()
+      : Object.values(CLASSES).map(c => c.displayName);
+
+    return {
+      detections: Object.values(CLASSES).map(c => c.displayName),
+      faces: true,
+      people: this.tensorFlow.getAllPeople().map(person => ({
+        id: person.nativeId,
+        label: person.name,
+      })),
+    }
   }
 
   async getDetectionInput(detectionId: any): Promise<MediaObject> {
