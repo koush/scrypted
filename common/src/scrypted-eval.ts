@@ -1,5 +1,5 @@
 import ts, { ScriptTarget } from "typescript";
-import sdk, { ScryptedDeviceBase } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
 import vm from "vm";
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
@@ -35,6 +35,8 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
             localStorage: device.storage,
             device,
             exports: {},
+            ScryptedInterface,
+            ScryptedDeviceType,
         });
 
         try {
