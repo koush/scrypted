@@ -72,7 +72,7 @@ export declare class ScryptedDeviceBase implements DeviceState {
     onDeviceEvent(eventInterface: string, eventData: any): Promise<void>;
 }
 export declare class MixinDeviceBase<T> implements DeviceState {
-    mixinDevice: any;
+    mixinDevice: T;
     mixinDeviceInterfaces: ScryptedInterface[];
     mixinProviderNativeId: ScryptedNativeId;
     id?: string;

@@ -132,6 +132,9 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         if (handled)
             return handled;
         const pluginDevice = this.scrypted.findPluginDeviceById(this.id);
+        // device may be deleted.
+        if (!pluginDevice)
+            return;
         const prop = p.toString();
 
         if (allInterfaceProperties.includes(p))
