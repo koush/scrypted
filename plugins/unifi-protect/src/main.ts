@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetection, ObjectDetector } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetection, ObjectDetector, PictureOptions } from "@scrypted/sdk";
 import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
@@ -76,8 +76,11 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         }, 30000);
     }
 
-    async getSnapshot(): Promise<Buffer> {
-        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/snapshot?ts=${Date.now()}`
+    async getSnapshot(options?: PictureOptions): Promise<Buffer> {
+        let size = '';
+        if (options?.picture?.width && options?.picture?.height)
+            size = `&w=${options.picture.width}&h=${options.picture.height}`;
+        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/snapshot?ts=${Date.now()}${size}`
 
         const response = await this.protect.api.loginFetch(url);
         if (!response) {
@@ -87,8 +90,8 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         return Buffer.from(data);
     }
 
-    async takePicture(): Promise<MediaObject> {
-        const buffer = await this.getSnapshot();
+    async takePicture(options?: PictureOptions): Promise<MediaObject> {
+        const buffer = await this.getSnapshot(options);
         return mediaManager.createMediaObject(buffer, 'image/jpeg');
     }
     findCamera() {
