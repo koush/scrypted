@@ -42,7 +42,7 @@ observeLoadError(frnPromise);
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-const defaultMaxRetained = 5;
+const defaultMaxRetained = 15;
 const defaultMinConfidence = 0.5;
 const defaultObjectInterval = 1000;
 const defaultRecognitionInterval = 1000;
