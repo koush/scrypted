@@ -13,7 +13,13 @@ const { mediaManager } = sdk;
 class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     eventStream: Stream;
     cp: ChildProcess;
-    client = new AmcrestCameraClient(this.storage.getItem('ip'), this.getUsername(), this.getPassword(), this.console);
+    client: AmcrestCameraClient;
+
+    getClient() {
+        if (!this.client)
+            this.client = new AmcrestCameraClient(this.storage.getItem('ip'), this.getUsername(), this.getPassword(), this.console);
+        return this.client;
+    }
 
     listenEvents() {
         const ret = new EventEmitter() as (EventEmitter & Destroyable);
@@ -21,7 +27,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         };
         (async () => {
             try {
-                const events = await this.client.listenEvents();
+                const events = await this.getClient().listenEvents();
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();
@@ -74,7 +80,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 
     async takePicture(): Promise<MediaObject> {
-        return mediaManager.createMediaObject(await this.client.jpegSnapshot(), 'image/jpeg');
+        return mediaManager.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
     }
 
     async getConstructedStreamUrl() {
@@ -109,7 +115,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
             this.console.log('posting audio data to', url);
 
             try {
-                await this.client.digestAuth.request({
+                await this.getClient().digestAuth.request({
                     method: 'POST',
                     url,
                     headers: {

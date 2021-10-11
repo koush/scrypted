@@ -15,6 +15,10 @@ export enum AmcrestEvent {
     PhoneCallDetectStop = "Code=PhoneCallDetect;action=Stop",
 }
 
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+});
+
 export class AmcrestCameraClient {
     digestAuth: AxiosDigestAuth;
 
@@ -26,9 +30,6 @@ export class AmcrestCameraClient {
     }
 
     async jpegSnapshot(): Promise<Buffer> {
-        const httpsAgent = new https.Agent({
-            rejectUnauthorized: false
-        });
 
         const response = await this.digestAuth.request({
             httpsAgent,
@@ -44,10 +45,6 @@ export class AmcrestCameraClient {
         const url = `http://${this.ip}/cgi-bin/eventManager.cgi?action=attach&codes=[All]`;
         console.log('preparing event listener', url);
 
-        const httpsAgent = new https.Agent({
-            rejectUnauthorized: false
-        });
-
         const response = await this.digestAuth.request({
             httpsAgent,
             method: "GET",
@@ -58,7 +55,7 @@ export class AmcrestCameraClient {
 
         stream.on('data', (buffer: Buffer) => {
             const data = buffer.toString();
-            // this.console?.log('event', data);
+            this.console?.log('event', data);
             for (const event of Object.values(AmcrestEvent)) {
                 if (data.indexOf(event) !== -1) {
                     stream.emit('event', event);
