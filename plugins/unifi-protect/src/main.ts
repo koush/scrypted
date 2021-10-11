@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetection, ObjectDetector, PictureOptions } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetection, ObjectDetector, PictureOptions, ObjectDetectionTypes } from "@scrypted/sdk";
 import { ProtectApi } from "./unifi-protect/src/protect-api";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
@@ -31,8 +31,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         }
     }
 
-    async getObjectTypes(): Promise<string[]> {
-        return this.findCamera().featureFlags.smartDetectTypes;
+    async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        return {
+            detections: this.findCamera().featureFlags.smartDetectTypes,
+        }
     }
 
     async getDetectionInput(detectionId: any): Promise<MediaObject> {
