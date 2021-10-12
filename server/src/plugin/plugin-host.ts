@@ -1,5 +1,5 @@
 import cluster from 'cluster';
-import { RpcMessage, RpcPeer } from '../rpc';
+import { RpcMessage, RpcPeer, RPCResultError } from '../rpc';
 import AdmZip from 'adm-zip';
 import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
@@ -264,6 +264,10 @@ async function createConsoleServer(events: EventEmitter): Promise<number[]> {
             outputs.set(nativeId, buffers);
         }
         buffers.push(data);
+        // when we're over 4000 lines or whatever these buffer are,
+        // truncate down to 2000.
+        if (buffers.length > 4000)
+            outputs.set(nativeId, buffers.slice(buffers.length - 2000))
     };
     events.on('stdout', appendOutput);
     events.on('stderr', appendOutput);
@@ -545,6 +549,7 @@ export function startPluginClusterWorker() {
     const replPort = createREPLServer(events);
 
     const pluginConsole = getDeviceConsole(undefined);
+
     attachPluginRemote(peer, {
         createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager, pluginConsole),
         events,
