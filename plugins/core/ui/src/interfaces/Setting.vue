@@ -12,12 +12,37 @@
       @change="save"
       :class="lazyValue.description ? 'mb-2' : ''"
     ></v-checkbox>
-    <v-select
+    <v-combobox
+      v-else-if="lazyValue.choices && lazyValue.combobox"
+      dense
+      :readonly="lazyValue.readonly"
+      :items="lazyValue.choices"
+      :multiple="lazyValue.multiple"
+      :small-chips="lazyValue.multiple"
+      v-model="lazyValue.value"
+      outlined
+      :label="lazyValue.title"
+      :hint="lazyValue.description"
+      persistent-hint
+    >
+      <template v-slot:append-outer>
+        <v-btn
+          v-if="dirty && device"
+          color="success"
+          @click="save"
+          class="shift-up"
+        >
+          <v-icon>send</v-icon>
+        </v-btn>
+      </template>
+    </v-combobox>
+      <v-select
       v-else-if="lazyValue.choices"
       dense
       :readonly="lazyValue.readonly"
       :items="lazyValue.choices"
       :multiple="lazyValue.multiple"
+      :small-chips="lazyValue.multiple"
       v-model="lazyValue.value"
       outlined
       :label="lazyValue.title"
