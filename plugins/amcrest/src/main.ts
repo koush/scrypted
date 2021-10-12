@@ -27,7 +27,8 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         };
         (async () => {
             try {
-                const events = await this.getClient().listenEvents();
+                const client = new AmcrestCameraClient(this.storage.getItem('ip'), this.getUsername(), this.getPassword(), this.console);
+                const events = await client.listenEvents();
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();

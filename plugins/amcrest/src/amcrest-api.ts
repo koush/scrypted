@@ -55,7 +55,7 @@ export class AmcrestCameraClient {
 
         stream.on('data', (buffer: Buffer) => {
             const data = buffer.toString();
-            // this.console?.log('event', data);
+            this.console?.log('event', data);
             for (const event of Object.values(AmcrestEvent)) {
                 if (data.indexOf(event) !== -1) {
                     stream.emit('event', event);
