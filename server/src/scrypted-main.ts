@@ -39,6 +39,13 @@ process.on('unhandledRejection', error => {
 if (!cluster.isMaster) {
     startPluginRemoteClusterWorker();
 }
+else if (process.argv[2] === 'child') {
+    const env = JSON.parse(process.argv[3]);
+    for (const [k, v] of Object.entries(env)) {
+        process.env[k] = v.toString();
+    }
+    startPluginRemoteClusterWorker();
+}
 else {
     installSourceMapSupport({
         environment: 'node',
@@ -184,7 +191,7 @@ else {
             if (!res.locals.username) {
                 res.status(401);
                 res.send('Not Authorized');
-                return ;
+                return;
             }
             next();
         })

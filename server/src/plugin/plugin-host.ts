@@ -1,5 +1,4 @@
-import cluster from 'cluster';
-import { RpcMessage, RpcPeer, RPCResultError } from '../rpc';
+import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
 import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
@@ -23,9 +22,10 @@ import mkdirp from 'mkdirp';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import net from 'net'
+import child_process from 'child_process';
 
 export class PluginHost {
-    worker: cluster.Worker;
+    worker: child_process.ChildProcess;
     peer: RpcPeer;
     pluginId: string;
     module: Promise<any>;
@@ -48,7 +48,7 @@ export class PluginHost {
     kill() {
         this.listener.removeListener();
         this.api.removeListeners();
-        this.worker.process.kill();
+        this.worker.kill();
         this.io.close();
         for (const s of Object.values(this.ws)) {
             s.close();
@@ -157,7 +157,7 @@ export class PluginHost {
         this.zip = new AdmZip(zipBuffer);
 
         logger.log('i', `loading ${this.pluginName}`);
-        logger.log('i', 'pid ' + this.worker?.process.pid);
+        logger.log('i', 'pid ' + this.worker?.pid);
 
         const init = (async () => {
             const remote = await setupPluginRemote(this.peer, this.api, self.pluginId);
@@ -211,12 +211,15 @@ export class PluginHost {
     }
 
     startPluginClusterHost(logger: Logger, env?: any) {
-        this.worker = cluster.fork(env);
+        this.worker = child_process.fork(require.main.filename, ['child', JSON.stringify(env)], {
+            stdio: 'pipe',
+            serialization: 'advanced',
+        });
 
-        this.worker.process.stdout.on('data', data => {
+        this.worker.stdout.on('data', data => {
             process.stdout.write(data);
         });
-        this.worker.process.stderr.on('data', data => process.stderr.write(data));
+        this.worker.stderr.on('data', data => process.stderr.write(data));
 
         let connected = true;
         this.worker.on('disconnect', () => {
@@ -231,7 +234,7 @@ export class PluginHost {
             connected = false;
             logger.log('e', `${this.pluginName} error ${e}`);
         });
-        this.worker.on('message', message => this.peer.handleMessage(message));
+        this.worker.on('message', message => this.peer.handleMessage(message as any));
 
         this.peer = new RpcPeer((message, reject) => {
             if (connected) {
