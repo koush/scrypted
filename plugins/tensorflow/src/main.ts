@@ -246,10 +246,10 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
     // anything remaining in currentDetections at this point has left the scene.
     if (this.currentDetections.length) {
-      this.console.log('object no longer detected', this.currentDetections.join(', '))
+      this.console.log('no longer detected', this.currentDetections.join(', '))
     }
     if (found.length) {
-      this.console.log('object detected', found.join(', '));
+      this.console.log('detected', found.join(', '));
     }
     this.currentDetections = [...classNames];
   }
@@ -374,10 +374,10 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     }
 
     if (this.currentPeople.size) {
-      this.console.log('object no longer detected', [...this.currentDetections].join(', '))
+      this.console.log('no longer detected', [...this.currentDetections].join(', '))
     }
     if (recognition.people.length) {
-      this.console.log('object detected', recognition.people.map(p => p.label).join(', '));
+      this.console.log('detected', recognition.people.map(p => `${p.label}: ${p.score}`).join(', '));
     }
 
     this.currentPeople.clear();

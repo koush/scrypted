@@ -41,7 +41,7 @@ export class PluginComponent {
         return pluginDevice.pluginId;
     }
     async getPluginProcessId(pluginId: string) {
-        return this.scrypted.plugins[pluginId]?.worker?.process.pid;
+        return this.scrypted.plugins[pluginId]?.worker?.pid;
     }
     async reload(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
@@ -71,7 +71,7 @@ export class PluginComponent {
             rpcObjects = host.peer.localProxied.size + Object.keys(host.peer.remoteWeakProxies).length;
         }
         return {
-            pid: host?.worker?.process.pid,
+            pid: host?.worker?.pid,
             stats: host?.stats,
             rpcObjects,
             packageJson: plugin.packageJson,

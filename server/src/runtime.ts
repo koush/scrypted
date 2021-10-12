@@ -21,15 +21,11 @@ import axios from 'axios';
 import tar from 'tar';
 import { once } from 'events';
 import { PassThrough } from 'stream';
+import { PluginDebug } from './plugin/plugin-debug';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
     proxy: ScryptedDevice;
-}
-
-interface PluginDebug {
-    waitDebug: Promise<void>;
-    inspectPort: number;
 }
 
 export class ScryptedRuntime {
@@ -472,7 +468,7 @@ export class ScryptedRuntime {
             });
         }
 
-        const pluginHost = new PluginHost(this, plugin, pluginDebug?.waitDebug);
+        const pluginHost = new PluginHost(this, plugin, pluginDebug);
         this.plugins[plugin._id] = pluginHost;
 
         return pluginHost;

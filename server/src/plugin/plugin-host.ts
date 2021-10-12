@@ -1,5 +1,4 @@
-import cluster from 'cluster';
-import { RpcMessage, RpcPeer, RPCResultError } from '../rpc';
+import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
 import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, ScryptedInterfaceProperty, SystemDeviceState } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
@@ -11,7 +10,7 @@ import { Logger } from '../logger';
 import { MediaManagerImpl } from './media';
 import { getState } from '../state';
 import WebSocket, { EventEmitter } from 'ws';
-import { listenZeroCluster } from './cluster-helper';
+import { listenZero } from './listen-zero';
 import { Server } from 'net';
 import repl from 'repl';
 import { once } from 'events';
@@ -23,9 +22,11 @@ import mkdirp from 'mkdirp';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import net from 'net'
+import child_process from 'child_process';
+import { PluginDebug } from './plugin-debug';
 
 export class PluginHost {
-    worker: cluster.Worker;
+    worker: child_process.ChildProcess;
     peer: RpcPeer;
     pluginId: string;
     module: Promise<any>;
@@ -48,7 +49,7 @@ export class PluginHost {
     kill() {
         this.listener.removeListener();
         this.api.removeListeners();
-        this.worker.process.kill();
+        this.worker.kill();
         this.io.close();
         for (const s of Object.values(this.ws)) {
             s.close();
@@ -80,7 +81,7 @@ export class PluginHost {
         await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
     }
 
-    constructor(scrypted: ScryptedRuntime, plugin: Plugin, waitDebug?: Promise<void>) {
+    constructor(scrypted: ScryptedRuntime, plugin: Plugin, public pluginDebug?: PluginDebug) {
         this.scrypted = scrypted;
         this.pluginId = plugin._id;
         this.pluginName = plugin.packageJson?.name;
@@ -157,7 +158,7 @@ export class PluginHost {
         this.zip = new AdmZip(zipBuffer);
 
         logger.log('i', `loading ${this.pluginName}`);
-        logger.log('i', 'pid ' + this.worker?.process.pid);
+        logger.log('i', 'pid ' + this.worker?.pid);
 
         const init = (async () => {
             const remote = await setupPluginRemote(this.peer, this.api, self.pluginId);
@@ -167,6 +168,7 @@ export class PluginHost {
             }
 
             await remote.setSystemState(scrypted.stateManager.getSystemState());
+            const waitDebug = pluginDebug?.waitDebug;
             if (waitDebug) {
                 console.info('waiting for debugger...');
                 try {
@@ -211,12 +213,20 @@ export class PluginHost {
     }
 
     startPluginClusterHost(logger: Logger, env?: any) {
-        this.worker = cluster.fork(env);
+        const execArgv: string[] = process.execArgv.slice();
+        if (this.pluginDebug) {
+            execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
+        }
+        this.worker = child_process.fork(require.main.filename, ['child', JSON.stringify(env)], {
+            stdio: 'pipe',
+            serialization: 'advanced',
+            execArgv,
+        });
 
-        this.worker.process.stdout.on('data', data => {
+        this.worker.stdout.on('data', data => {
             process.stdout.write(data);
         });
-        this.worker.process.stderr.on('data', data => process.stderr.write(data));
+        this.worker.stderr.on('data', data => process.stderr.write(data));
 
         let connected = true;
         this.worker.on('disconnect', () => {
@@ -231,7 +241,7 @@ export class PluginHost {
             connected = false;
             logger.log('e', `${this.pluginName} error ${e}`);
         });
-        this.worker.on('message', message => this.peer.handleMessage(message));
+        this.worker.on('message', message => this.peer.handleMessage(message as any));
 
         this.peer = new RpcPeer((message, reject) => {
             if (connected) {
@@ -328,8 +338,8 @@ async function createConsoleServer(events: EventEmitter): Promise<number[]> {
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    const consoleReader = await listenZeroCluster(server);
-    const consoleWriter = await listenZeroCluster(writeServer);
+    const consoleReader = await listenZero(server);
+    const consoleWriter = await listenZero(writeServer);
 
     return [consoleReader, consoleWriter];
 }
@@ -401,7 +411,7 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    return listenZeroCluster(server);
+    return listenZero(server);
 }
 
 export function startPluginClusterWorker() {
