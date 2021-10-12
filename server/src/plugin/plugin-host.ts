@@ -23,6 +23,7 @@ import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import net from 'net'
 import child_process from 'child_process';
+import { PluginDebug } from './plugin-debug';
 
 export class PluginHost {
     worker: child_process.ChildProcess;
@@ -80,7 +81,7 @@ export class PluginHost {
         await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
     }
 
-    constructor(scrypted: ScryptedRuntime, plugin: Plugin, waitDebug?: Promise<void>) {
+    constructor(scrypted: ScryptedRuntime, plugin: Plugin, public pluginDebug?: PluginDebug) {
         this.scrypted = scrypted;
         this.pluginId = plugin._id;
         this.pluginName = plugin.packageJson?.name;
@@ -167,6 +168,7 @@ export class PluginHost {
             }
 
             await remote.setSystemState(scrypted.stateManager.getSystemState());
+            const waitDebug = pluginDebug?.waitDebug;
             if (waitDebug) {
                 console.info('waiting for debugger...');
                 try {
@@ -211,9 +213,14 @@ export class PluginHost {
     }
 
     startPluginClusterHost(logger: Logger, env?: any) {
+        const execArgv: string[] = process.execArgv.slice();
+        if (this.pluginDebug) {
+            execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
+        }
         this.worker = child_process.fork(require.main.filename, ['child', JSON.stringify(env)], {
             stdio: 'pipe',
             serialization: 'advanced',
+            execArgv,
         });
 
         this.worker.stdout.on('data', data => {
