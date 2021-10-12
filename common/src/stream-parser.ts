@@ -22,82 +22,47 @@ export interface StreamChunk {
     height?: number;
 }
 
-// function checkTsPacket(pkt: Buffer) {
-//     const pid = ((pkt[1] & 0x1F) << 8) | pkt[2];
-//     if (pid == 256) {
-//         // found video stream
-//         if ((pkt[3] & 0x20) && (pkt[4] > 0)) {
-//             // have AF
-//             if (pkt[5] & 0x40) {
-//                 // found keyframe
-//                 console.log('keyframe');
-//             }
-//         }
-//     }
-// }
-
-function createLengthParser(length: number, verify?: (concat: Buffer) => void) {
-    async function* parse(socket: Socket): AsyncGenerator<StreamChunk> {
-        let pending: Buffer[] = [];
-        let pendingSize = 0;
-        while (true) {
-            const data: Buffer = socket.read();
-            if (!data) {
-                await once(socket, 'readable');
-                continue;
-            }
-            pending.push(data);
-            pendingSize += data.length;
-            if (pendingSize < length)
-                continue;
-
-            const concat = Buffer.concat(pending);
-
-            verify?.(concat);
-
-            const remaining = concat.length % length;
-            const left = concat.slice(0, concat.length - remaining);
-            const right = concat.slice(concat.length - remaining);
-            pending = [right];
-            pendingSize = right.length;
-
-            yield {
-                chunks: [left],
-            };
-        }
-    }
-
-    return parse;
-}
-
-// -ac num channels? cameras are always mono?
-export function createPCMParser(): StreamParser {
-    return {
-        container: 's16le',
-        outputArguments: [
-            '-vn',
-            '-acodec', 'pcm_s16le',
-            '-f', 's16le',
-        ],
-        parse: createLengthParser(64),
-    }
-}
-
 export function createMpegTsParser(options?: StreamParserOptions): StreamParser {
     return {
         container: 'mpegts',
         outputArguments: [
+            '-f', 'mpegts',
             ...(options?.vcodec || []),
             ...(options?.acodec || []),
-            '-f', 'mpegts',
         ],
-        parse: createLengthParser(188, concat => {
-            if (concat[0] != 0x47) {
-                throw new Error('Invalid sync byte in mpeg-ts packet. Terminating stream.')
+        async *parse(socket: Socket): AsyncGenerator<StreamChunk> {
+            let pending: Buffer[] = [];
+            let pendingSize = 0;
+            while (true) {
+                const data: Buffer = socket.read();
+                if (!data) {
+                    await once(socket, 'readable');
+                    continue;
+                }
+                pending.push(data);
+                pendingSize += data.length;
+                if (pendingSize < 188)
+                    continue;
+
+                const concat = Buffer.concat(pending);
+
+                if (concat[0] != 0x47) {
+                    throw new Error('Invalid sync byte in mpeg-ts packet. Terminating stream.')
+                }
+
+                const remaining = concat.length % 188;
+                const left = concat.slice(0, concat.length - remaining);
+                const right = concat.slice(concat.length - remaining);
+                pending = [right];
+                pendingSize = right.length;
+                yield {
+                    chunks: [left],
+                };
             }
-        }),
+        }
     }
 }
+
 export interface MP4Atom {
     header: Buffer;
     length: number;
@@ -125,10 +90,10 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
     return {
         container: 'mp4',
         outputArguments: [
+            '-f', 'mp4',
             ...(options?.vcodec || []),
             ...(options?.acodec || []),
             '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-            '-f', 'mp4',
         ],
         async *parse(socket: Socket): AsyncGenerator<StreamChunk> {
             const parser = parseFragmentedMP4(socket);
@@ -143,7 +108,7 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
                     moov = atom;
                 }
 
-                yield {
+                yield{
                     startStream,
                     chunks: [atom.header, atom.data],
                     type: atom.type,
@@ -191,7 +156,7 @@ export function createRawVideoParser(options?: RawVideoParserOptions): StreamPar
         ],
         async *parse(socket: Socket, width: number, height: number): AsyncGenerator<StreamChunk> {
             if (!width || !height)
-                throw new Error("error parsing rawvideo, unknown width and height");
+                throw new Error("error parsing rawvideo, unknown width and height");            
 
             width = size?.width || width;
             height = size?.height || height
