@@ -152,7 +152,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
                 key: 'password',
                 title: 'Password',
                 value: this.getPassword(),
-                type: 'Password',
+                type: 'password',
             },
             {
                 key: 'noAudio',
