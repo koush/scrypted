@@ -10,7 +10,7 @@ import { Logger } from '../logger';
 import { MediaManagerImpl } from './media';
 import { getState } from '../state';
 import WebSocket, { EventEmitter } from 'ws';
-import { listenZeroCluster } from './cluster-helper';
+import { listenZero } from './listen-zero';
 import { Server } from 'net';
 import repl from 'repl';
 import { once } from 'events';
@@ -338,8 +338,8 @@ async function createConsoleServer(events: EventEmitter): Promise<number[]> {
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    const consoleReader = await listenZeroCluster(server);
-    const consoleWriter = await listenZeroCluster(writeServer);
+    const consoleReader = await listenZero(server);
+    const consoleWriter = await listenZero(writeServer);
 
     return [consoleReader, consoleWriter];
 }
@@ -411,7 +411,7 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
         socket.on('error', cleanup);
         socket.on('end', cleanup);
     });
-    return listenZeroCluster(server);
+    return listenZero(server);
 }
 
 export function startPluginClusterWorker() {
