@@ -1,4 +1,4 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
@@ -102,6 +102,10 @@ class OnvifCamera extends RtspSmartCamera {
                     this.audioDetected = true;
                 else if (event === OnvifEvent.AudioStop)
                     this.audioDetected = false;
+                else if (event === OnvifEvent.BinaryStart)
+                    this.binaryState = true;
+                else if (event === OnvifEvent.BinaryStop)
+                    this.binaryState = false;
             })
         })();
         const ret: any = new EventEmitter();
@@ -111,7 +115,7 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     createClient() {
-        return connectCameraAPI(this.getRtspAddress(), this.getUsername(), this.getPassword(), this.console);
+        return connectCameraAPI(this.getRtspAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'));
     }
 
     async getClient() {
@@ -122,6 +126,26 @@ class OnvifCamera extends RtspSmartCamera {
 
     showRtspUrlOverride() {
         return false;
+    }
+
+    async getOtherSettings(): Promise<Setting[]> {
+      return [
+        {
+          title: 'Onvif Doorbell',
+          type: 'boolean',
+          description: 'Enable if this device is a doorbell',
+          key: 'onvifDoorbell',
+          value: (!!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor)).toString(),
+        },
+        {
+          title: 'Onvif Doorbell Event Name',
+          type: 'string',
+          description: 'Onvif event name to trigger the doorbell',
+          key: "onvifDoorbellEvent",
+          value: this.storage.getItem('onvifDoorbellEvent'),
+          placeholder: 'EventName'
+        }
+      ]
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
@@ -160,9 +184,16 @@ class OnvifCamera extends RtspSmartCamera {
         }
     }
 
-    putSetting(key: string, value: string) {
+    async putSetting(key: string, value: string) {
         this.client = undefined;
-        return super.putSetting(key, value);
+        if (key !== 'onvifDoorbell')
+          return super.putSetting(key, value);
+
+        this.storage.setItem(key, value);
+        if (value === 'true')
+          this.provider.updateDevice(this.nativeId, this.name, [...this.provider.getInterfaces(), ScryptedInterface.BinarySensor], ScryptedDeviceType.Doorbell)
+        else
+          this.provider.updateDevice(this.nativeId, this.name, this.provider.getInterfaces())
     }
 }
 
