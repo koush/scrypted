@@ -452,8 +452,6 @@ addSupportedType({
             ensureHasWidthResolution(recordingResolutions, 1280, 720);
             ensureHasWidthResolution(recordingResolutions, 1920, 1080);
 
-            console.log(device.name, recordingResolutions);
-
             recordingOptions = {
                 motionService: true,
                 prebufferLength: numberPrebufferSegments * iframeIntervalSeconds * 1000,
