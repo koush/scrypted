@@ -12,6 +12,8 @@ export enum OnvifEvent {
     MotionStop,
     AudioStart,
     AudioStop,
+    BinaryStart,
+    BinaryStop,
 }
 
 function stripNamespaces(topic: string) {
@@ -46,9 +48,11 @@ export class OnvifCameraAPI {
     snapshotUrls = new Map<string, string>();
     rtspUrls = new Map<string, string>();
     profiles: Promise<any>;
+    binaryStateEvent: string;
 
-    constructor(public cam: any, username: string, password: string, public console: Console) {
+    constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string) {
         this.digestAuth = new DigestClient(username, password);
+        this.binaryStateEvent = binaryStateEvent
     }
 
     listenEvents() {
@@ -73,6 +77,11 @@ export class OnvifCameraAPI {
                         ret.emit('event', OnvifEvent.AudioStart)
                     else
                         ret.emit('event', OnvifEvent.AudioStop)
+                } else if (eventTopic.includes(this.binaryStateEvent)) {
+                    if (dataValue)
+                        ret.emit('event', OnvifEvent.BinaryStart)
+                    else
+                        ret.emit('event', OnvifEvent.BinaryStop)
                 }
             }
         });
@@ -121,7 +130,7 @@ export class OnvifCameraAPI {
     }
 }
 
-export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console) {
+export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console, binaryStateEvent: string) {
     const split = ipAndPort.split(':');
     const [hostname, port] = split;
     const cam = await promisify(cb => {
@@ -132,6 +141,5 @@ export async function connectCameraAPI(ipAndPort: string, username: string, pass
             port,
         }, (err: Error) => cb(err, cam));
     });
-
-    return new OnvifCameraAPI(cam, username, password, console);
+    return new OnvifCameraAPI(cam, username, password, console, binaryStateEvent);
 }
