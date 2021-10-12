@@ -358,6 +358,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             }
         }
         catch (e) {
+            this.console.error('token error', e);
             this.log.a('Missing token. Please log in.');
             throw new Error('Missing token. Please log in.');
         }
