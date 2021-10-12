@@ -6,6 +6,7 @@ import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
 import { recommendRebroadcast } from "../../rtsp/src/recommend";
+import { fitHeightToWidth } from "../../../common/src/resolution-utils";
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -85,7 +86,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
                 const camera = this.findCamera();
                 const mainChannel = camera.channels[0];
                 const w = options.picture.width;
-                const h = Math.round((mainChannel.height / mainChannel.width) * w);
+                const h = fitHeightToWidth(mainChannel.width, mainChannel.height, w);
 
                 size = `&w=${w}&h=${h}`;
             }
@@ -481,7 +482,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
             {
                 key: 'password',
                 title: 'Password',
-                type: 'Password',
+                type: 'password',
                 value: this.getSetting('password') || '',
             },
             {
