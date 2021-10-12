@@ -944,14 +944,15 @@ export declare enum MediaPlayerState {
 }
 export declare type SettingValue = string | number | boolean | string[] | number[];
 export interface Setting {
-    choices?: string[];
-    description?: string;
     key?: string;
-    placeholder?: string;
-    readonly?: boolean;
-    group?: string;
     title?: string;
+    group?: string;
+    description?: string;
+    placeholder?: string;
     type?: 'string' | 'password' | 'number' | 'boolean' | 'device';
+    readonly?: boolean;
+    choices?: string[];
+    combobox?: boolean;
     deviceFilter?: string;
     multiple?: boolean;
     value?: SettingValue;
