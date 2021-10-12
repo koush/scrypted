@@ -9,7 +9,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.BinarySensor) || device.interfaces.includes(ScryptedInterface.MotionSensor);
     },
-    getAccessory: (device: ScryptedDevice & BinarySensor & MotionSensor) => {
+    getAccessory: async (device: ScryptedDevice & BinarySensor & MotionSensor) => {
         const accessory = makeAccessory(device);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {

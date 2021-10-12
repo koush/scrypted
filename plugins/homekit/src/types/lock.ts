@@ -9,7 +9,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.Lock);
     },
-    getAccessory: (device: ScryptedDevice & Lock) => {
+    getAccessory: async (device: ScryptedDevice & Lock) => {
         const accessory = makeAccessory(device);
         const service = accessory.addService(Service.LockMechanism, device.name);
 

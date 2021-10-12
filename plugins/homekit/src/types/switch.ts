@@ -7,7 +7,7 @@ import { probe, getAccessory } from './onoff-base';
 addSupportedType({
     type: ScryptedDeviceType.Switch,
     probe,
-    getAccessory: (device: ScryptedDevice & OnOff) => {
+    getAccessory: async (device: ScryptedDevice & OnOff) => {
         const {accessory, service} = getAccessory(device, Service.Switch);
         return accessory;
     }

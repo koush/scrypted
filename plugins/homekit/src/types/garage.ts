@@ -9,7 +9,7 @@ addSupportedType({
     probe(device: DummyDevice): boolean {
         return device.interfaces.includes(ScryptedInterface.Entry) && device.interfaces.includes(ScryptedInterface.EntrySensor);
     },
-    getAccessory: (device: ScryptedDevice & Entry) => {
+    getAccessory: async (device: ScryptedDevice & Entry) => {
         const accessory = makeAccessory(device);
 
         const service = accessory.addService(Service.GarageDoorOpener, device.name);

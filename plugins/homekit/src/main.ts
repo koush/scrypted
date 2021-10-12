@@ -1,5 +1,5 @@
 import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, MixinDeviceBase, Camera, MediaObject } from '@scrypted/sdk';
-import { Bridge, Categories, Characteristic, HAPStorage, PublishInfo, Service } from './hap';
+import { Bridge, Categories, Characteristic, HAPStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import os from 'os';
 import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
 import './types'
@@ -158,7 +158,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
             this.console.log('adding', device.name);
 
-            const accessory = supportedType.getAccessory(device, this);
+            const accessory = await supportedType.getAccessory(device, this);
             if (accessory) {
                 accessoryIds.add(id);
 
@@ -209,6 +209,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             pincode: this.pincode,
             category: Categories.BRIDGE,
             addIdentifyingMaterial: true,
+            advertiser: os.platform() === 'win32' ? MDNSAdvertiser.CIAO : MDNSAdvertiser.BONJOUR,
         };
 
         this.bridge.publish(publishInfo, true);

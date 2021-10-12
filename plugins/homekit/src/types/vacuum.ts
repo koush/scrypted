@@ -9,7 +9,7 @@ addSupportedType({
     probe(device: DummyDevice): boolean {
         return device.interfaces.includes(ScryptedInterface.StartStop);
     },
-    getAccessory: (device: ScryptedDevice & StartStop & Dock) => {
+    getAccessory: async (device: ScryptedDevice & StartStop & Dock) => {
         const accessory = makeAccessory(device);
 
         const service = accessory.addService(Service.Outlet, device.name);

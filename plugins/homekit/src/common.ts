@@ -18,7 +18,7 @@ export interface HomeKitSession {
 interface SupportedType {
     type: ScryptedDeviceType;
     probe(device: DummyDevice): boolean;
-    getAccessory: (device: ScryptedDevice & any, homekitSession: HomeKitSession) => Accessory;
+    getAccessory: (device: ScryptedDevice & any, homekitSession: HomeKitSession) => Promise<Accessory>;
     noBridge?: boolean;
 }
 

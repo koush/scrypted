@@ -7,7 +7,7 @@ import { getAccessory, probe } from './onoff-base';
 addSupportedType({
     type: ScryptedDeviceType.Fan,
     probe,
-    getAccessory(device: ScryptedDevice & OnOff) {
+    async getAccessory(device: ScryptedDevice & OnOff) {
         const {accessory, service} = getAccessory(device, Service.Fan);
         return accessory;
     }

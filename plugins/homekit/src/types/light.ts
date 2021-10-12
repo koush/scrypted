@@ -7,7 +7,7 @@ import { probe, getAccessory } from './onoff-base';
 addSupportedType({
     type: ScryptedDeviceType.Light,
     probe,
-    getAccessory: (device: ScryptedDevice & OnOff & Brightness & ColorSettingHsv) => {
+    getAccessory: async (device: ScryptedDevice & OnOff & Brightness & ColorSettingHsv) => {
         const { accessory, service } = getAccessory(device, Service.Lightbulb);
 
         if (device.interfaces.includes(ScryptedInterface.Brightness)) {

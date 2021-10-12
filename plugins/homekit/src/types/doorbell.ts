@@ -9,14 +9,14 @@ addSupportedType({
     probe(device: DummyDevice): boolean {
         return device.interfaces.includes(ScryptedInterface.BinarySensor);
     },
-    getAccessory: (device: ScryptedDevice & BinarySensor, homekitSession: HomeKitSession) => {
+    getAccessory: async (device: ScryptedDevice & BinarySensor, homekitSession: HomeKitSession) => {
         const faux: DummyDevice = {
             interfaces: device.interfaces,
             type: device.type,
         };
         faux.type = ScryptedDeviceType.Camera;
         const cameraCheck = supportedTypes[ScryptedInterface.Camera];
-        const accessory = cameraCheck.probe(faux) ? cameraCheck.getAccessory(device, homekitSession) : makeAccessory(device);
+        const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitSession) : makeAccessory(device);
 
         const service = accessory.addService(Service.Doorbell);
         device.listen({

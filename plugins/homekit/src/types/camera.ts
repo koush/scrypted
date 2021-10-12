@@ -1,7 +1,8 @@
 import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectDetection } from '@scrypted/sdk'
 import { addSupportedType, DummyDevice, HomeKitSession } from '../common'
-import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
+import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes, Resolution } from '../hap';
 import { makeAccessory } from './common';
+import { fitHeightToWidth } from "../../../../common/src/resolution-utils";
 
 import sdk from '@scrypted/sdk';
 import child_process from 'child_process';
@@ -45,7 +46,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
+    async getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
         const console = deviceManager.getMixinConsole
             ? deviceManager.getMixinConsole(device.id, undefined)
             : deviceManager.getDeviceConsole(undefined);
@@ -344,6 +345,52 @@ addSupportedType({
             }
         }
 
+        let msos: MediaStreamOptions[];
+        try {
+            msos = await device.getVideoStreamOptions();
+        }
+        catch (e) {
+        }
+
+        const nativeResolutions: Resolution[] = [];
+        if (msos) {
+            for (const mso of msos) {
+                if (!mso.video)
+                    continue;
+                const { width, height } = mso.video;
+                if (!width || !height)
+                    continue;
+                nativeResolutions.push(
+                    [width, height, mso.video.fps || 30]
+                );
+            }
+        }
+
+        function ensureHasWidthResolution(resolutions: Resolution[], width: number, defaultHeight: number) {
+            if (resolutions.find(res => res[0] === width))
+                return;
+            const topVideo = msos?.[0]?.video;
+
+            if (!topVideo || !topVideo?.width || !topVideo?.height) {
+                resolutions.push([width, defaultHeight, 30]);
+                return;
+            }
+
+            resolutions.unshift(
+                [
+                    width,
+                    fitHeightToWidth(topVideo.width, topVideo.height, width),
+                    topVideo.fps || 30,
+                ]);
+        }
+
+        const streamingResolutions = [...nativeResolutions];
+        // needed for apple watch
+        ensureHasWidthResolution(streamingResolutions, 320, 240);
+        // i think these are required by homekit?
+        ensureHasWidthResolution(streamingResolutions, 1280, 720);
+        ensureHasWidthResolution(streamingResolutions, 1920, 1080);
+
         const streamingOptions: CameraStreamingOptions = {
             video: {
                 codec: {
@@ -351,16 +398,7 @@ addSupportedType({
                     profiles: [H264Profile.MAIN],
                 },
 
-                resolutions: [
-                    // 3840x2160@30 (4k).
-                    [3840, 2160, 30],
-                    // 1920x1080@30 (1080p).
-                    [1920, 1080, 30],
-                    // 1280x720@30 (720p).
-                    [1280, 720, 30],
-                    // 320x240@15 (Apple Watch).
-                    [320, 240, 15],
-                ]
+                resolutions: streamingResolutions,
             },
             audio: {
                 codecs,
@@ -410,6 +448,12 @@ addSupportedType({
                 recordingCodecs.push(entry);
             }
 
+            const recordingResolutions = [...nativeResolutions];
+            ensureHasWidthResolution(recordingResolutions, 1280, 720);
+            ensureHasWidthResolution(recordingResolutions, 1920, 1080);
+
+            console.log(device.name, recordingResolutions);
+
             recordingOptions = {
                 motionService: true,
                 prebufferLength: numberPrebufferSegments * iframeIntervalSeconds * 1000,
@@ -426,10 +470,7 @@ addSupportedType({
                         levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
                         profiles: [H264Profile.BASELINE, H264Profile.MAIN, H264Profile.HIGH],
                     },
-                    resolutions: [
-                        [1280, 720, 30],
-                        [1920, 1080, 30],
-                    ]
+                    resolutions: recordingResolutions,
                 },
                 audio: {
                     codecs: recordingCodecs,

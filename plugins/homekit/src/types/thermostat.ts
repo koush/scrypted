@@ -11,7 +11,7 @@ addSupportedType({
             return false;
         return true;
     },
-    getAccessory: (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor) => {
+    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor) => {
         const accessory = makeAccessory(device);
         const service = accessory.addService(Service.Thermostat, device.name);
 

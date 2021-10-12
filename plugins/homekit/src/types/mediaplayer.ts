@@ -12,7 +12,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.MediaPlayer);
     },
-    getAccessory: (device: ScryptedDevice & MediaPlayer) => {
+    getAccessory: async (device: ScryptedDevice & MediaPlayer) => {
         const accessory = makeAccessory(device);
         accessory.category = Categories.TELEVISION;
         const service = accessory.addService(Service.Television, "Television", "Television");
