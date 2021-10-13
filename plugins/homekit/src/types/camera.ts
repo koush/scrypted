@@ -149,6 +149,13 @@ addSupportedType({
                 callback();
 
                 let selectedStream: MediaStreamOptions;
+
+                const streamingChannel = storage.getItem('streamingChannel');
+                if (streamingChannel) {
+                    const msos = await device.getVideoStreamOptions();
+                    selectedStream = msos.find(mso => mso.name === streamingChannel);
+                }
+
                 if (request.type === StreamRequestTypes.RECONFIGURE) {
                     // not impleemented, this doesn't work.
                     return;
@@ -199,8 +206,6 @@ addSupportedType({
                     const args: string[] = [
                         '-hide_banner',
                     ];
-
-                    const storage = deviceManager.getMixinStorage(device.id, undefined);
 
                     // decoder arguments
                     const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
@@ -345,12 +350,7 @@ addSupportedType({
             }
         }
 
-        let msos: MediaStreamOptions[];
-        try {
-            msos = await device.getVideoStreamOptions();
-        }
-        catch (e) {
-        }
+        const msos = await device.getVideoStreamOptions();
 
         const nativeResolutions: Resolution[] = [];
         if (msos) {

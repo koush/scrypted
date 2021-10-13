@@ -1,5 +1,5 @@
 
-import { FFMpegInput, MotionSensor, ScryptedDevice, ScryptedMimeTypes, VideoCamera, AudioSensor } from '@scrypted/sdk'
+import { FFMpegInput, MotionSensor, ScryptedDevice, ScryptedMimeTypes, VideoCamera, AudioSensor, MediaStreamOptions } from '@scrypted/sdk'
 import { H264Level, H264Profile } from '../../hap';
 
 import sdk from '@scrypted/sdk';
@@ -12,20 +12,30 @@ const { log, mediaManager, deviceManager } = sdk;
 
 export const iframeIntervalSeconds = 4;
 
-// request is used by the eval, do not remove.
-
 export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration, console: Console): AsyncGenerator<Buffer, void, unknown> {
 
     console.log(device.name, 'recording session starting', configuration);
 
+    const storage = deviceManager.getMixinStorage(device.id, undefined);
+
+    let selectedStream: MediaStreamOptions;
+    let recordingChannel = storage.getItem('recordingChannel');
+    if (recordingChannel) {
+        const msos = await device.getVideoStreamOptions();
+        selectedStream = msos.find(mso => mso.name === recordingChannel);
+    }
+
     const media = await device.getVideoStream({
+        id: selectedStream?.id,
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
         container: 'mp4',
     });
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    if (!ffmpegInput.mediaStreamOptions?.prebuffer) {
+        log.a(`${device.name} is not prebuffered. Please install and enable the Rebroadcast plugin.`);
+    }
 
-    const storage = deviceManager.getMixinStorage(device.id, undefined);
     const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
 
     const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;

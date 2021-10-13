@@ -1,4 +1,4 @@
-import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue } from "@scrypted/sdk";
+import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue, MediaStreamOptions } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { ContactSensor } from "../HAP-NodeJS/src/lib/definitions";
 
@@ -16,9 +16,25 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
 
     async getMixinSettings(): Promise<Setting[]> {
         const settings: Setting[] = [];
-        const realDevice = systemManager.getDeviceById<ObjectDetector>(this.id);
+        const realDevice = systemManager.getDeviceById<ObjectDetector & VideoCamera>(this.id);
 
-        let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true';
+        let msos: MediaStreamOptions[] = [];
+        try {
+            msos = await realDevice.getVideoStreamOptions();
+        }
+        catch (e) {
+        }
+
+        if (msos.length) {
+            settings.push({
+                title: 'Live Stream',
+                key: 'streamingChannel',
+                value: this.storage.getItem('streamingChannel') || msos[0].name,
+                description: 'The media stream to use when streaming to HomeKit.',
+                choices: msos.map(mso => mso.name),
+                placeholder: 'Automatic',
+            });
+        }
 
         settings.push({
             title: 'Transcode Streaming',
@@ -27,8 +43,20 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             value: (this.storage.getItem('transcodeStreaming') === 'true').toString(),
             description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
+        let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true';
 
         if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
+            if (msos.length) {
+                settings.push({
+                    title: 'Recording Stream',
+                    key: 'recordingChannel',
+                    value: this.storage.getItem('recordingChannel') || msos[0].name,
+                    description: 'The prebuffered media stream for HomeKit Secure Video.',
+                    choices: msos.map(mso => mso.name),
+                    placeholder: 'Automatic',
+                });
+            }
+
             settings.push({
                 title: 'Transcode Recording',
                 key: 'transcodeRecording',
