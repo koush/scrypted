@@ -24,6 +24,7 @@
       :label="lazyValue.title"
       :hint="lazyValue.description"
       persistent-hint
+      :placeholder="lazyValue.placeholder"
     >
       <template v-slot:append-outer>
         <v-btn
@@ -36,7 +37,7 @@
         </v-btn>
       </template>
     </v-combobox>
-      <v-select
+    <v-select
       v-else-if="lazyValue.choices"
       dense
       :readonly="lazyValue.readonly"
@@ -48,6 +49,7 @@
       :label="lazyValue.title"
       :hint="lazyValue.description"
       persistent-hint
+      :placeholder="lazyValue.placeholder"
     >
       <template v-slot:append-outer>
         <v-btn
@@ -143,7 +145,7 @@ export default {
     devices() {
       var expression;
       try {
-        expression = this.lazyValue.deviceFilter || 'true;';
+        expression = this.lazyValue.deviceFilter || "true;";
         // var interfaces = this.$scrypted.systemManager.getDeviceById(id).interfaces.map(iface => `var ${iface} = true`);
       } catch (e) {
         expression = "true;";

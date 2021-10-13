@@ -152,7 +152,7 @@
               </v-layout>
             </v-container>
 
-            <v-card-actions v-if="!ownerDevice && pluginData">
+            <v-card-actions v-if="!ownerDevice">
               <v-spacer></v-spacer>
               <v-btn
                 small
@@ -163,6 +163,7 @@
                 >Reload Plugin</v-btn
               >
               <PluginAdvancedUpdate
+                v-if="pluginData"
                 :pluginData="pluginData"
                 @installed="reload"
               />
@@ -178,11 +179,11 @@
               ></component>
               <v-spacer></v-spacer>
 
-              <v-btn color="info" text @click="openConsole" v-if="!loading"
+              <v-btn color="info" text @click="openConsole"
                 >Console</v-btn
               >
 
-              <v-tooltip bottom v-if="!loading">
+              <v-tooltip bottom>
                 <template v-slot:activator="{ on }">
                   <v-btn x-small v-on="on" color="info" text @click="openRepl"
                     ><v-icon x-small>fa-terminal</v-icon></v-btn
@@ -191,7 +192,7 @@
                 <span>REPL</span>
               </v-tooltip>
 
-              <v-tooltip bottom v-if="!loading">
+              <v-tooltip bottom>
                 <template v-slot:activator="{ on }">
                   <v-btn x-small v-on="on" color="info" text @click="openLogs"
                     ><v-icon x-small>fa-history</v-icon></v-btn
@@ -200,7 +201,7 @@
                 <span>Events</span>
               </v-tooltip>
 
-              <v-tooltip bottom v-if="!loading">
+              <v-tooltip bottom v-if="pluginData">
                 <template v-slot:activator="{ on }">
                   <v-btn
                     x-small
@@ -214,7 +215,7 @@
                 <span>Storage</span>
               </v-tooltip>
 
-              <v-dialog v-if="!loading" v-model="showDelete" width="500">
+              <v-dialog v-model="showDelete" width="500">
                 <template #activator="{ on: dialog }">
                   <v-tooltip bottom>
                     <template #activator="{ on: tooltip }">
