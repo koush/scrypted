@@ -84,7 +84,7 @@ export function createPCMParser(): StreamParser {
             '-acodec', 'pcm_s16le',
             '-f', 's16le',
         ],
-        parse: createLengthParser(64),
+        parse: createLengthParser(512),
         findSyncFrame,
     }
 }
