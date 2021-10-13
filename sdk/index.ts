@@ -168,7 +168,7 @@ export class MixinDeviceBase<T> implements DeviceState {
   private _console: Console;
   private _deviceState: DeviceState;
 
-  constructor(public mixinDevice: any, public mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public mixinProviderNativeId: ScryptedNativeId) {
+  constructor(public mixinDevice: T, public mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public mixinProviderNativeId: ScryptedNativeId) {
     this._deviceState = mixinDeviceState;
   }
 

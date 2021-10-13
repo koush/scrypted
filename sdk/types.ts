@@ -321,7 +321,7 @@ export interface PictureOptions {
  */
 export interface Camera {
   takePicture(options?: PictureOptions): Promise<MediaObject>;
-  getPictureOptions?(): Promise<void|PictureOptions[]>;
+  getPictureOptions(): Promise<PictureOptions[]>;
 
 }
 
@@ -367,7 +367,7 @@ export interface VideoCamera {
   /**
    * Get the available video streaming options.
    */
-  getVideoStreamOptions?(): Promise<MediaStreamOptions[]>;
+  getVideoStreamOptions(): Promise<MediaStreamOptions[]>;
 
 }
 
