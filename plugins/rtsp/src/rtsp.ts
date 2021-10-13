@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { recommendRebroadcast } from "./recommend";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
@@ -38,6 +38,10 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         });
 
         return mediaManager.createMediaObject(Buffer.from(response.data), response.headers['Content-Type'] || 'image/jpeg');
+    }
+
+    async getPictureOptions(): Promise<PictureOptions[]> {
+        return;
     }
 
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
