@@ -5,7 +5,7 @@ import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
 import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
-import { PluginRemote } from './plugin-api';
+import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { Logger } from '../logger';
 import { MediaManagerImpl } from './media';
 import { getState } from '../state';
@@ -183,7 +183,12 @@ export class PluginHost {
 
             const fail = 'Plugin failed to load. Console for more information.';
             try {
-                const module = await remote.loadZip(plugin.packageJson, zipBuffer);
+                const loadZipOptions: PluginRemoteLoadZipOptions = {
+                    // if debugging, use a normalized path for sourcemap resolution, otherwise
+                    // prefix with module path.
+                    filename: pluginDebug ? '/plugin/main.nodejs.js' : `/${this.pluginId}/main.node.js`,
+                };
+                const module = await remote.loadZip(plugin.packageJson, zipBuffer, loadZipOptions);
                 logger.log('i', `loaded ${this.pluginName}`);
                 logger.clearAlert(fail)
                 return { module, remote };
@@ -602,11 +607,11 @@ class LazyRemote implements PluginRemote {
         })();
     }
 
-    async loadZip(packageJson: any, zipData: Buffer): Promise<any> {
+    async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any> {
         if (!this.remote)
             await this.init;
 
-        return this.remote.loadZip(packageJson, zipData);
+        return this.remote.loadZip(packageJson, zipData, options);
     }
     async setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState; }; }): Promise<void> {
         if (!this.remote)

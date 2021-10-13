@@ -3,7 +3,7 @@ import { Volume } from 'memfs';
 import path from 'path';
 import { ScryptedNativeId, DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from '../server-settings';
-import { PluginAPI, PluginLogger, PluginRemote } from './plugin-api';
+import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { SystemManagerImpl } from './system';
 import { RpcPeer } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
@@ -368,7 +368,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 done(ret);
             },
 
-            async loadZip(packageJson: any, zipData: Buffer) {
+            async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions) {
                 const zip = new AdmZip(zipData);
                 events?.emit('zip', zip);
                 const main = zip.getEntry('main.nodejs.js');
@@ -449,7 +449,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 events?.emit('params', params);
 
                 try {
-                    peer.evalLocal(script, '/plugin/main.nodejs.js', params);
+                    peer.evalLocal(script, options?.filename || '/plugin/main.nodejs.js', params);
                     events?.emit('plugin', exports.default);
                     return exports.default;
                 }

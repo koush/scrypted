@@ -127,8 +127,12 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
     }
 }
 
+export interface PluginRemoteLoadZipOptions {
+    filename?: string;
+}
+
 export interface PluginRemote {
-    loadZip(packageJson: any, zipData: Buffer): Promise<any>;
+    loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any>;
     setSystemState(state: {[id: string]: {[property: string]: SystemDeviceState}}): Promise<void>;
     setNativeId(nativeId: ScryptedNativeId, id: string, storage: {[key: string]: any}): Promise<void>;
     updateDescriptor(id: string, state: {[property: string]: SystemDeviceState}): Promise<void>;
