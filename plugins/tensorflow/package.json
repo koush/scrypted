@@ -30,7 +30,8 @@
       "type": "API",
       "interfaces": [
          "DeviceProvider",
-         "MixinProvider"
+         "MixinProvider",
+         "Settings"
       ]
    },
    "dependencies": {

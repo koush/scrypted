@@ -327,7 +327,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     }
 
     if (unknowns.length) {
-      const fullPromise = canvas.loadImage(buffer);
+      let fullPromise: Promise<canvas.Image>;
+      const autoAdd = this.tensorFlow.storage.getItem('autoAdd') !== 'false';
 
       for (const unknown of unknowns) {
         const nativeId = 'person:' + Buffer.from(randomBytes(8)).toString('hex');
@@ -339,6 +340,11 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
           boundingBox: makeBoundingBox(unknown.r.box),
         });
 
+        if (!autoAdd)
+          continue;
+
+        if (!fullPromise)
+          fullPromise = canvas.loadImage(buffer);
 
         await this.tensorFlow.discoverPerson(nativeId);
         const storage = deviceManager.getDeviceStorage(nativeId);
@@ -505,11 +511,19 @@ class TensorFlow extends AutoenableMixinProvider implements MixinProvider, Devic
   }
 
   async getSettings(): Promise<Setting[]> {
-    throw new Error('Method not implemented.');
+    return [
+      {
+        title: 'Automatically Add New Faces',
+        description: 'Automatically new faces to Scrypted when found. It is recommended to disable this once the people in your household have been added.',
+        value: (this.storage.getItem('autoAdd') !== 'false').toString(),
+        type: 'boolean',
+        key: 'autoAdd',
+      }
+    ]
   }
 
   async putSetting(key: string, value: string | number | boolean): Promise<void> {
-    throw new Error('Method not implemented.');
+    this.storage.setItem(key, value.toString());
   }
 
   reloadFaceMatcher() {
