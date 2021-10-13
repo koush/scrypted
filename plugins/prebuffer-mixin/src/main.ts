@@ -1,13 +1,11 @@
 
 import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { Server } from 'net';
-import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
 import EventEmitter from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { FFMpegRebroadcastOptions, FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { createRebroadcaster, FFMpegRebroadcastOptions, FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
-import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk, createPCMParser } from '@scrypted/common/src/stream-parser';
+import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk, createPCMParser, StreamParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
@@ -32,6 +30,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     mpegts: [],
     s16le: [],
   };
+  parsers: { [container: string]: StreamParser };
+
   events = new EventEmitter();
   released = false;
   ftyp: MP4Atom;
@@ -73,8 +73,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         value: (this.storage.getItem(SEND_KEYFRAME) !== 'false').toString(),
       },
       {
-        title: 'Audio Configuration',
-        description: 'Override the Audio Configuration for the rebroadcast stream.',
+        title: 'Camera Audio Codec',
+        description: 'The expected Audio Codec from by the camera. Setting this properly for PCM audio cameras improves startup time.',
         type: 'string',
         key: AUDIO_CONFIGURATION,
         value: this.storage.getItem(AUDIO_CONFIGURATION),
@@ -170,12 +170,15 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
           vcodec,
           acodec,
         }),
-      }
+      },
+      parseOnly: true,
     };
 
     if (pcmAudio) {
       rbo.parsers.s16le = createPCMParser();
     }
+
+    this.parsers = rbo.parsers;
 
     const session = await startRebroadcastSession(ffmpegInput, rbo);
 
@@ -274,52 +277,42 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       const eventName = container + '-data';
       const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
-      const server = new Server(socket => {
-        server.close();
-        const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5 : 0);
+      const { server, port } = await createRebroadcaster({
+        connect: (writeData, destroy) => {
+          server.close();
+          const now = Date.now();
+          const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5 : 0);
 
-        const now = Date.now();
-
-        let cleanup: () => void;
-
-        let first = true;
-        const writeData = (data: StreamChunk) => {
-          if (first) {
-            first = false;
-            if (data.startStream) {
-              socket.write(data.startStream)
-            }
+          const cleanup = () => {
+            destroy();
+            this.console.log('prebuffer request ended');
+            this.events.removeListener(eventName, writeData);
+            this.session.events.removeListener('killed', cleanup);
           }
-          for (const chunk of data.chunks) {
-            socket.write(chunk);
+
+          this.events.on(eventName, writeData);
+          this.session.events.once('killed', cleanup);
+
+          for (const prebuffer of prebufferContainer) {
+            if (prebuffer.time < now - requestedPrebuffer)
+              continue;
+
+            writeData(prebuffer.chunk);
           }
-        };
 
-        for (const prebuffer of prebufferContainer) {
-          if (prebuffer.time < now - requestedPrebuffer)
-            continue;
-
-          writeData(prebuffer.chunk);
+          // for some reason this doesn't work as well as simply guessing and dumping.
+          // const parser = this.parsers[container];
+          // const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
+          // for (const prebuffer of availablePrebuffers) {
+          //   writeData(prebuffer);
+          // }
+          return cleanup;
         }
-
-        this.events.on(eventName, writeData);
-        cleanup = () => {
-          this.console.log('prebuffer request ended');
-          this.events.removeListener(eventName, writeData);
-          this.events.removeListener('killed', cleanup);
-          socket.removeAllListeners();
-          socket.destroy();
-        }
-
-        this.events.once('killed', cleanup);
-        socket.once('end', cleanup);
-        socket.once('close', cleanup);
-        socket.once('error', cleanup);
-      });
+      })
 
       setTimeout(() => server.close(), 30000);
 
-      return listenZeroCluster(server);
+      return port;
     }
 
     const container = options?.container || 'mpegts';

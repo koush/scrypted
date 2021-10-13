@@ -7,6 +7,11 @@ export interface StreamParser {
     container: string;
     outputArguments: string[];
     parse: (socket: Socket, width: number, height: number) => AsyncGenerator<StreamChunk>;
+    findSyncFrame(streamChunks: StreamChunk[]): StreamChunk[];
+}
+
+function findSyncFrame(streamChunks: StreamChunk[]): StreamChunk[] {
+    return streamChunks;
 }
 
 export interface StreamParserOptions {
@@ -80,6 +85,7 @@ export function createPCMParser(): StreamParser {
             '-f', 's16le',
         ],
         parse: createLengthParser(64),
+        findSyncFrame,
     }
 }
 
@@ -96,6 +102,46 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
                 throw new Error('Invalid sync byte in mpeg-ts packet. Terminating stream.')
             }
         }),
+        findSyncFrame(streamChunks): StreamChunk[] {
+            for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
+                const streamChunk = streamChunks[prebufferIndex];
+
+                for (let chunkIndex = 0; chunkIndex < streamChunk.chunks.length; chunkIndex++) {
+                    const chunk = streamChunk.chunks[chunkIndex];
+
+                    let offset = 0;
+                    while (offset + 188 < chunk.length) {
+                        const pkt = chunk.subarray(offset, offset + 188);
+                        const pid = ((pkt[1] & 0x1F) << 8) | pkt[2];
+                        if (pid == 256) {
+                            // found video stream
+                            if ((pkt[3] & 0x20) && (pkt[4] > 0)) {
+                                // have AF
+                                if (pkt[5] & 0x40) {
+                                    return streamChunks.slice(prebufferIndex);
+                                    // const chunks = streamChunk.chunks.slice(chunkIndex + 1);
+                                    // const take = chunk.subarray(offset);
+                                    // chunks.unshift(take);
+
+                                    // const remainingChunks = findSyncFrame(streamChunks.slice(prebufferIndex + 1));
+                                    // const ret = Object.assign({}, streamChunk);
+                                    // ret.chunks = chunks;
+                                    // return [
+                                    //     ret,
+                                    //     ...remainingChunks
+                                    // ];
+                                }
+                            }
+                        }
+
+                        offset += 188;
+                    }
+
+                }
+            }
+
+            return findSyncFrame(streamChunks);
+        }
     }
 }
 export interface MP4Atom {
@@ -153,7 +199,8 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
                     startStream = Buffer.concat([ftyp.header, ftyp.data, moov.header, moov.data])
                 }
             }
-        }
+        },
+        findSyncFrame,
     }
 }
 
@@ -204,6 +251,7 @@ export function createRawVideoParser(options?: RawVideoParserOptions): StreamPar
                     height,
                 }
             }
-        }
+        },
+        findSyncFrame,
     }
 }

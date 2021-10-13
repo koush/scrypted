@@ -1,4 +1,4 @@
-import { createServer, Server, Socket } from 'net';
+import { createServer, Server } from 'net';
 import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput } from '@scrypted/sdk/types';
@@ -34,6 +34,7 @@ export interface FFMpegRebroadcastOptions {
     parsers: { [container: string]: StreamParser };
     timeout?: number;
     console: Console;
+    parseOnly?: boolean;
 }
 
 export async function parseResolution(cp: ChildProcess) {
@@ -127,50 +128,39 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         const parser = options.parsers[container];
 
         const eventName = container + '-data';
-        const rebroadcast = createServer(socket => {
-            clients++;
-            console.log('rebroadcast client', clients);
-
-            clearTimeout(timeout)
-
-            let first = true;
-            const writeData = (data: StreamChunk) => {
-              if (first) {
-                first = false;
-                if (data.startStream) {
-                  socket.write(data.startStream)
-                }
-              }
-              socket.write(data.chunk);
-            };
-
-            const cleanup = () => {
-                socket.removeAllListeners();
-                events.removeListener(eventName, writeData);
-                clients--;
-                if (clients === 0) {
-                    resetActivityTimer();
-                }
-                socket.destroy();
-            }
-
-            events.on(eventName, writeData);
-
-            socket.on('end', cleanup);
-            socket.on('close', cleanup);
-            socket.on('error', cleanup);
-        });
-        servers.push(rebroadcast);
-
-        const rebroadcastPort = await listenZeroCluster(rebroadcast);
 
         ffmpegInputs[container] = {
-            inputArguments: [
-                '-f', container,
-                '-i', `tcp://127.0.0.1:${rebroadcastPort}`,
-            ],
             mediaStreamOptions: ffmpegInput.mediaStreamOptions,
         };
+
+        if (!options.parseOnly) {
+            const {server: rebroadcast, port: rebroadcastPort } = await createRebroadcaster({
+                connect: (writeData, destroy) => {
+                    clients++;
+                    clearTimeout(timeout);
+
+                    const cleanup = () => {
+                        events.removeListener(eventName, writeData);
+                        events.removeListener('killed', destroy)
+                        clients--;
+                        if (clients === 0) {
+                            resetActivityTimer();
+                        }
+                        destroy();
+                    }
+                    events.on(eventName, writeData);
+                    events.once('killed', cleanup);
+
+                    return cleanup;
+                }
+            })
+
+            servers.push(rebroadcast);
+            ffmpegInput.inputArguments = [
+                '-f', container,
+                '-i', `tcp://127.0.0.1:${rebroadcastPort}`
+            ];
+        }
 
         const server = createServer(async (socket) => {
             server.close();
@@ -224,4 +214,52 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         cp,
         ffmpegInputs,
     };
+}
+
+export interface Rebroadcaster {
+    server: Server;
+    port: number;
+}
+
+export interface RebroadcastSessionCleanup {
+    (): void;
+}
+
+export interface RebroadcasterOptions {
+    connect?: (writeData: (data: StreamChunk) => void, cleanup: () => void) => RebroadcastSessionCleanup|undefined;
+}
+
+export async function createRebroadcaster(options?: RebroadcasterOptions): Promise<Rebroadcaster> {
+    const server = createServer(socket => {
+        let first = true;
+        const writeData = (data: StreamChunk) => {
+            if (first) {
+                first = false;
+                if (data.startStream) {
+                    socket.write(data.startStream)
+                }
+            }
+            for (const chunk of data.chunks) {
+                socket.write(chunk);
+            }
+        };
+
+        const cleanup = () => {
+            socket.removeAllListeners();
+            socket.destroy();
+            const cb = cleanupCallback;
+            cleanupCallback = undefined;
+            cb?.();
+        }
+        let cleanupCallback = options?.connect(writeData, cleanup);
+
+        socket.on('end', cleanup);
+        socket.on('close', cleanup);
+        socket.on('error', cleanup);
+    });
+    const port = await listenZeroCluster(server);
+    return {
+        server,
+        port,
+    }
 }
