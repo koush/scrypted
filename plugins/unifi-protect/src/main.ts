@@ -113,7 +113,8 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const camera = this.findCamera();
-        const rtspChannels = camera.channels.filter(channel => channel.isRtspEnabled && this.isChannelEnabled(channel));
+        const rtspChannels = camera.channels
+            .filter(channel => channel.isRtspEnabled && this.isChannelEnabled(channel));
 
         const rtspChannel = camera.channels.find(channel => channel.id === options?.id) || rtspChannels[0];
 
@@ -160,9 +161,15 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
 
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         const camera = this.findCamera();
-        const video: MediaStreamOptions[] = camera.channels.map(channel => this.createMediaStreamOptions(channel));
+        const video: MediaStreamOptions[] = camera.channels
+            .filter(channel => channel.isRtspEnabled && this.isChannelEnabled(channel))
+            .map(channel => this.createMediaStreamOptions(channel));
 
         return video;
+    }
+
+    async getPictureOptions(): Promise<PictureOptions[]> {
+        return;
     }
 }
 
