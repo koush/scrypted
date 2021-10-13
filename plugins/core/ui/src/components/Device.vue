@@ -739,7 +739,7 @@ export default {
     },
     remove() {
       const id = this.id;
-      this.$router.replace("/device");
+      this.$router.back();
       this.$scrypted.systemManager.removeDevice(id);
     },
     async saveName() {
