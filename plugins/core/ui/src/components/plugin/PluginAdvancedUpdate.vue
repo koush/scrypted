@@ -23,7 +23,7 @@
         <v-divider v-if="index === 1"></v-divider>
         <v-subheader v-if="index === 1">Install Older Release</v-subheader>
         <v-list-item @click="installVersion(item.version)">
-          <v-list-item-title>{{ item.version }}</v-list-item-title>
+          <v-list-item-title>{{ item.version + (item.tag ? ` (${item.tag})` : '') }}</v-list-item-title>
         </v-list-item>
       </div>
     </v-list>
