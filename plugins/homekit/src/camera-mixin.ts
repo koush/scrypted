@@ -2,7 +2,7 @@ import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector,
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { ContactSensor } from "../HAP-NodeJS/src/lib/definitions";
 
-const { log, systemManager } = sdk;
+const { log, systemManager, deviceManager } = sdk;
 
 export class CameraMixin extends SettingsMixinDeviceBase<any> implements Settings {
     constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
@@ -162,5 +162,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         if (key === 'detectAudio' || key === 'linkedMotionSensor' || key === 'objectDetectionContactSensors') {
             log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);
         }
+
+        deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
     }
 }

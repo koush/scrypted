@@ -149,7 +149,8 @@ addSupportedType({
 
                 let selectedStream: MediaStreamOptions;
 
-                const streamingChannel = homekitSession.isHomeKitHub(session.prepareRequest?.targetAddress)
+                const isHomeKitHub = homekitSession.isHomeKitHub(session.prepareRequest?.targetAddress);
+                const streamingChannel = isHomeKitHub
                     ? storage.getItem('streamingChannelHub')
                     : storage.getItem('streamingChannel');
                 if (streamingChannel) {
@@ -230,7 +231,9 @@ addSupportedType({
                         "-an", '-sn', '-dn',
                     );
 
-                    const transcodeStreaming = storage.getItem('transcodeStreaming') === 'true';
+                    const transcodeStreaming = isHomeKitHub
+                        ? storage.getItem('transcodeStreamingHub') === 'true'
+                        : storage.getItem('transcodeStreaming') === 'true';
 
                     if (transcodeStreaming) {
                         const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
@@ -275,6 +278,8 @@ addSupportedType({
                             "-vn", '-sn', '-dn',
                         );
 
+                        // homekit live streaming seems extremely picky about aac output.
+                        // so always transcode audio.
                         if (false && !transcodeStreaming) {
                             args.push(
                                 "-acodec", "copy",
