@@ -61,7 +61,6 @@ addSupportedType({
             audioReturn: dgram.Socket;
             demuxer?: RtpDemuxer;
             rtpSink?: HomeKitRtpSink;
-            targetAddress?: string;
         }
         const sessions = new Map<string, Session>();
 
@@ -150,7 +149,9 @@ addSupportedType({
 
                 let selectedStream: MediaStreamOptions;
 
-                const streamingChannel = storage.getItem('streamingChannel');
+                const streamingChannel = homekitSession.isHomeKitHub(session.prepareRequest?.targetAddress)
+                    ? storage.getItem('streamingChannelHub')
+                    : storage.getItem('streamingChannel');
                 if (streamingChannel) {
                     const msos = await device.getVideoStreamOptions();
                     selectedStream = msos.find(mso => mso.name === streamingChannel);

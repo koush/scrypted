@@ -13,6 +13,7 @@ export interface SnapshotThrottle {
 
 export interface HomeKitSession {
     snapshotThrottles: Map<string, SnapshotThrottle>;
+    isHomeKitHub(ip: string): boolean;
 }
 
 interface SupportedType {

@@ -32,8 +32,26 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                 value: this.storage.getItem('streamingChannel') || msos[0].name,
                 description: 'The media stream to use when streaming to HomeKit.',
                 choices: msos.map(mso => mso.name),
-                placeholder: 'Automatic',
             });
+
+            settings.push({
+                title: 'Live Stream (Hub)',
+                key: 'streamingChannelHub',
+                value: this.storage.getItem('streamingChannelHub') || msos[0].name,
+                description: 'The media stream to use when streaming to a HomeKit Hub (remote viewing).',
+                choices: msos.map(mso => mso.name),
+            });
+        }
+        if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
+            if (msos.length) {
+                settings.push({
+                    title: 'Recording Stream',
+                    key: 'recordingChannel',
+                    value: this.storage.getItem('recordingChannel') || msos[0].name,
+                    description: 'The prebuffered media stream for HomeKit Secure Video.',
+                    choices: msos.map(mso => mso.name),
+                });
+            }
         }
 
         settings.push({
@@ -43,20 +61,17 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             value: (this.storage.getItem('transcodeStreaming') === 'true').toString(),
             description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
-        let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true';
+        settings.push({
+            title: 'Transcode Streaming (Hub)',
+            type: 'boolean',
+            key: 'transcodeStreamingHub',
+            value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
+            description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+        });
+        let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true'
+            || this.storage.getItem('transcodeStreamingHub') === 'true';
 
         if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
-            if (msos.length) {
-                settings.push({
-                    title: 'Recording Stream',
-                    key: 'recordingChannel',
-                    value: this.storage.getItem('recordingChannel') || msos[0].name,
-                    description: 'The prebuffered media stream for HomeKit Secure Video.',
-                    choices: msos.map(mso => mso.name),
-                    placeholder: 'Automatic',
-                });
-            }
-
             settings.push({
                 title: 'Transcode Recording',
                 key: 'transcodeRecording',

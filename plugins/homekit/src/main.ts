@@ -9,6 +9,8 @@ import { randomBytes } from 'crypto';
 import qrcode from 'qrcode';
 import packageJson from "../package.json";
 import { randomPinCode } from './pincode';
+import { EventedHTTPServer } from '../HAP-NodeJS/src/lib/util/eventedhttp';
+import { add } from 'lodash';
 
 const { systemManager } = sdk;
 
@@ -57,6 +59,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     bridge = new Bridge('Scrypted', uuid);
     snapshotThrottles = new Map<string, SnapshotThrottle>();
     pincode = randomPinCode();
+    homekitConnections = new Set<string>();
 
     constructor() {
         super();
@@ -82,6 +85,14 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         return username;
     }
 
+    getHomeKitHubs(): string[] {
+        try {
+            return JSON.parse(this.storage.getItem('homekitHubs'));            
+        }
+        catch (e) {
+        }
+    }
+
     async getSettings(): Promise<Setting[]> {
         return [
             {
@@ -105,7 +116,16 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 title: 'Bridge Address',
                 value: localStorage.getItem('addressOverride'),
                 key: 'addressOverride',
-                description: 'Override the default network address used by the Scrypted bridge. Set this to your wired IP if connected by both wired and wireless.'
+                description: 'Optional: The network address used by the Scrypted bridge. Set this to the wired address to prevent usage of wireless address.'
+            },
+            {
+                title: 'HomeKit Hubs',
+                description: 'Optional: The addresses of your HomeKit Hubs used to serve lower resolution live streams for remote viewing.',
+                key: 'homekitHubs',
+                choices: [...this.homekitConnections],
+                value: this.getHomeKitHubs(),
+                multiple: true,
+                combobox: true,
             },
             {
                 title: 'Never Wait for Snapshots',
@@ -118,7 +138,12 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
-        this.storage.setItem(key, value.toString());
+        if (key === 'homekitHubs') {
+            this.storage.setItem(key, JSON.stringify(value));
+        }
+        else {
+            this.storage.setItem(key, value.toString());
+        }
     }
 
     async start() {
@@ -213,6 +238,15 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         };
 
         this.bridge.publish(publishInfo, true);
+        const server: EventedHTTPServer = (this.bridge as any)._server.httpServer;
+        server.on('connection-opened', connection => {
+            connection.on('authenticated', () => {
+                this.console.log('homekit hub', connection.remoteAddress);
+                this.homekitConnections.add(connection.remoteAddress);
+            })
+            connection.on('closed', () => this.homekitConnections.delete(connection.remoteAddress));
+        });
+
 
         qrcode.toString(this.bridge.setupURI(), {
             type: 'terminal',
@@ -241,6 +275,10 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             this.log.a(`${device.name} was updated. Reload the HomeKit plugin to sync these changes.`);
             // deviceManager.requestRestart();
         });
+    }
+
+    isHomeKitHub(address: string) {
+        return !!this.getHomeKitHubs()?.find(check => check.endsWith(address));
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]) {
