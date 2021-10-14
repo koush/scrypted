@@ -26,10 +26,16 @@ interface PrebufferStreamChunk {
   time: number;
 }
 
+interface Prebuffers {
+  mp4: PrebufferStreamChunk[];
+  mpegts: PrebufferStreamChunk[];
+  s16le: PrebufferStreamChunk[];
+}
+
 class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
   prebufferSession: Promise<FFMpegRebroadcastSession>;
   session: FFMpegRebroadcastSession;
-  prebuffers = {
+  prebuffers: Prebuffers = {
     mp4: [],
     mpegts: [],
     s16le: [],
@@ -47,7 +53,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     super(mixinDevice, mixinDeviceState, {
       providerNativeId,
       mixinDeviceInterfaces,
-      group: "Rebroadcast and Prebuffer Settings",
+      group: "Prebuffer Settings",
       groupKey: "prebuffer",
     });
 
@@ -74,6 +80,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     }
 
     const session = this.session;
+
+    let total = 0;
+    let start = 0;
+    for (const prebuffer of this.prebuffers.mp4) {
+      start = start || prebuffer.time;
+      for (const chunk of prebuffer.chunk.chunks) {
+        total += chunk.byteLength;
+      }
+    }
+    const elapsed = Date.now() - start;
+    const bitrate = Math.round(total / elapsed * 8);
 
     settings.push(
       {
@@ -104,10 +121,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       },
       {
         group: 'Media Information',
-        title: 'Detected Resolution',
+        title: 'Detected Resolution and Bitrate',
         readonly: true,
         key: 'detectedAcodec',
-        value: `${session?.inputVideoResolution?.[0] || "unknown"}`,
+        value: `${session?.inputVideoResolution?.[0] || "unknown"} @ ${bitrate || "unknown"} Kb/s`,
         description: 'Configuring your camera to 1920x1080 is recommended.',
       },
       {
