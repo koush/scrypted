@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BufferConverter, DeviceProvider, HttpRequest, OauthClient, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
+import { BufferConverter, DeviceProvider, HttpRequest, OauthClient, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
 import qs from 'query-string';
 import { GcmRtcManager, GcmRtcConnection } from './legacy';
 import { Duplex } from 'stream';
@@ -89,6 +89,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             await deviceManager.onDeviceDiscovered(
                 {
                     name: 'Cloud Push Endpoint',
+                    type: ScryptedDeviceType.API,
                     nativeId: 'push',
                     interfaces: [ScryptedInterface.BufferConverter],
                 },
@@ -132,6 +133,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async initialize() {
+        const ep = await endpointManager.getPublicLocalEndpoint();
+        const httpsTarget = new URL(ep);
+        httpsTarget.hostname = 'localhost';
+        httpsTarget.pathname = '';
+        const wssTarget = new URL(httpsTarget);
+        wssTarget.protocol = 'wss';
+        const googleHomeTarget = new URL(httpsTarget);
+        googleHomeTarget.pathname = '/endpoint/@scrypted/google-home/public/';
+
         this.server = createServer((req, res) => {
             const url = Url.parse(req.url);
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
@@ -152,7 +162,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             }
             else if (url.path === '/web/component/home/endpoint') {
                 this.proxy.web(req, res, {
-                    target: 'https://localhost:9443/endpoint/@scrypted/google-home/public/',
+                    target: googleHomeTarget.toString(),
                     ignorePath: true,
                     secure: false,
                 });
@@ -163,7 +173,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
 
         this.server.on('upgrade', (req, socket, head) => {
-            this.proxy.ws(req, socket, head, { target: 'wss://localhost:9443', ws: true, secure: false });
+            this.proxy.ws(req, socket, head, { target: wssTarget.toString(), ws: true, secure: false });
         })
 
         // this.server = net.createServer(conn => console.log('connectionz')) as any;
@@ -180,7 +190,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const port = (this.server.address() as any).port;
 
         this.proxy = HttpProxy.createProxy({
-            target: `https://localhost:9443`,
+            target: httpsTarget,
             secure: false,
         });
         this.proxy.on('error', () => { })
@@ -207,20 +217,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
                 await new Promise(resolve => process.nextTick(resolve));
 
-                if (true) {
-                    local = net.connect({
-                        port,
-                        host: '127.0.0.1',
-                    });
-                    await new Promise(resolve => process.nextTick(resolve));
-                }
-                else {
-                    local = tls.connect({
-                        port: 9443,
-                        host: '127.0.0.1',
-                        rejectUnauthorized: false,
-                    })
-                }
+                local = net.connect({
+                    port,
+                    host: '127.0.0.1',
+                });
+                await new Promise(resolve => process.nextTick(resolve));
 
                 socket.pipe(local).pipe(socket);
             });
