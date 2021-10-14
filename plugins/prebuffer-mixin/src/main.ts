@@ -10,10 +10,10 @@ import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-p
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
-const defaultPrebufferDuration = 15000;
+const defaultPrebufferDuration = 10000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
-const AUDIO_CONFIGURATION = 'audioConfiguration';
+const AUDIO_CONFIGURATION_TEMPLATE = 'audioConfiguration';
 const COMPATIBLE_AUDIO = 'MPEG-TS/MP4 Compatible or No Audio (Copy)';
 const OTHER_AUDIO = 'Other Audio';
 const OTHER_AUDIO_DESCRIPTION = `${OTHER_AUDIO} (Transcode)`;
@@ -32,9 +32,10 @@ interface Prebuffers {
   s16le: PrebufferStreamChunk[];
 }
 
-class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
-  prebufferSession: Promise<FFMpegRebroadcastSession>;
-  session: FFMpegRebroadcastSession;
+class PrebufferSession {
+
+  parserSessionPromise: Promise<FFMpegRebroadcastSession>;
+  parserSession: FFMpegRebroadcastSession;
   prebuffers: Prebuffers = {
     mp4: [],
     mpegts: [],
@@ -43,43 +44,51 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   parsers: { [container: string]: StreamParser };
 
   events = new EventEmitter();
-  released = false;
   detectedIdrInterval = 0;
   prevIdr = 0;
   incompatibleDetected = false;
   allowImmediateRestart = false;
 
-  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
-    super(mixinDevice, mixinDeviceState, {
-      providerNativeId,
-      mixinDeviceInterfaces,
-      group: "Prebuffer Settings",
-      groupKey: "prebuffer",
-    });
+  mixinDevice: VideoCamera;
+  console: Console;
+  storage: Storage;
 
-    // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
-    this.console.log(`prebuffer session starting in 10 seconds`);
-    setTimeout(() => this.ensurePrebufferSession(), 10000);
+  AUDIO_CONFIGURATION = AUDIO_CONFIGURATION_TEMPLATE + '-' + this.streamId;
+
+  constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string) {
+    this.storage = mixin.storage;
+    this.console = mixin.console;
+    this.mixinDevice = mixin.mixinDevice;
+  }
+
+  ensurePrebufferSession() {
+    if (this.parserSessionPromise || this.mixin.released)
+      return;
+    this.console.log('prebuffer session started', this.streamId);
+    this.parserSessionPromise = this.startPrebufferSession();
+  }
+
+  getAudioConfig(): {
+    audioConfig: string,
+    pcmAudio: boolean,
+    reencodeAudio: boolean,
+  } {
+    const audioConfig = this.storage.getItem(this.AUDIO_CONFIGURATION) || '';
+    // pcm audio only used when explicitly set.
+    const pcmAudio = audioConfig.indexOf(PCM_AUDIO) !== -1;
+    // reencode audio will be used if explicitly set, OR an incompatible codec was detected, PCM audio was not explicitly set
+    const reencodeAudio = audioConfig.indexOf(OTHER_AUDIO) !== -1 || (!pcmAudio && this.incompatibleDetected);
+    return {
+      audioConfig,
+      pcmAudio,
+      reencodeAudio,
+    }
   }
 
   async getMixinSettings(): Promise<Setting[]> {
     const settings: Setting[] = [];
 
-    const msos = await this.mixinDevice.getVideoStreamOptions();
-    const enabledStream = this.getEnabledMediaStreamOption(msos);
-    if (enabledStream) {
-      settings.push(
-        {
-          title: 'Prebuffered Stream',
-          description: 'The stream to prebuffer for recordings.',
-          key: 'enabledStream',
-          value: enabledStream.name,
-          choices: msos.map(mso => mso.name),
-        },
-      )
-    }
-
-    const session = this.session;
+    const session = this.parserSession;
 
     let total = 0;
     let start = 0;
@@ -92,27 +101,16 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const elapsed = Date.now() - start;
     const bitrate = Math.round(total / elapsed * 8);
 
+    const group = this.streamName ? `Rebroadcast: ${this.streamName}` : 'Rebroadcast';
+
     settings.push(
       {
-        title: 'Prebuffer Duration',
-        description: 'Duration of the prebuffer in milliseconds.',
-        type: 'number',
-        key: PREBUFFER_DURATION_MS,
-        value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
-      },
-      {
-        title: 'Start at Previous Keyframe',
-        description: 'Start live streams from the previous key frame. Improves startup time.',
-        type: 'boolean',
-        key: SEND_KEYFRAME,
-        value: (this.storage.getItem(SEND_KEYFRAME) !== 'false').toString(),
-      },
-      {
         title: 'Audio Codec Transcoding',
+        group,
         description: 'Configuring your camera to output AAC, MP3, or MP2 is recommended. PCM/G711 cameras should set this to Reencode.',
         type: 'string',
-        key: AUDIO_CONFIGURATION,
-        value: this.storage.getItem(AUDIO_CONFIGURATION) || COMPATIBLE_AUDIO,
+        key: this.AUDIO_CONFIGURATION,
+        value: this.storage.getItem(this.AUDIO_CONFIGURATION) || COMPATIBLE_AUDIO,
         choices: [
           COMPATIBLE_AUDIO,
           OTHER_AUDIO_DESCRIPTION,
@@ -120,60 +118,28 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         ],
       },
       {
-        group: 'Media Information',
+        group,
         title: 'Detected Resolution and Bitrate',
         readonly: true,
-        key: 'detectedAcodec',
         value: `${session?.inputVideoResolution?.[0] || "unknown"} @ ${bitrate || "unknown"} Kb/s`,
         description: 'Configuring your camera to 1920x1080 is recommended.',
       },
       {
-        group: 'Media Information',
+        group,
         title: 'Detected Video/Audio Codecs',
         readonly: true,
-        key: 'detectedVcodec',
         value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
         description: 'Configuring your camera to H264 video (2000Kb/s) and AAC/MP3/MP2 audio is recommended.'
       },
       {
-        group: 'Media Information',
+        group,
         title: 'Detected Keyframe Interval',
         description: "Configuring your camera to 4 seconds is recommended (IDR = FPS * 4 seconds).",
         readonly: true,
-        key: 'detectedIdr',
         value: ((this.detectedIdrInterval || 0) / 1000).toString() || 'none',
       },
     );
     return settings;
-  }
-
-  async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
-    this.storage.setItem(key, value.toString());
-    this.prebufferSession?.then(session => session.kill());
-  }
-
-  ensurePrebufferSession() {
-    if (this.prebufferSession || this.released)
-      return;
-    console.log(`prebuffer session started`);
-    this.prebufferSession = this.startPrebufferSession();
-  }
-
-  getAudioConfig(): {
-    audioConfig: string,
-    pcmAudio: boolean,
-    reencodeAudio: boolean,
-  } {
-    const audioConfig = this.storage.getItem(AUDIO_CONFIGURATION) || '';
-    // pcm audio only used when explicitly set.
-    const pcmAudio = audioConfig.indexOf(PCM_AUDIO) !== -1;
-    // reencode audio will be used if explicitly set, OR an incompatible codec was detected, PCM audio was not explicitly set
-    const reencodeAudio = audioConfig.indexOf(OTHER_AUDIO) !== -1 || (!pcmAudio && this.incompatibleDetected);
-    return {
-      audioConfig,
-      pcmAudio,
-      reencodeAudio,
-    }
   }
 
   async startPrebufferSession() {
@@ -182,11 +148,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.prebuffers.s16le = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
-    const enabledStream = this.storage.getItem('enabledStream');
     const probe = await probeVideoCamera(this.mixinDevice);
     let mso: MediaStreamOptions;
     if (probe.options) {
-      mso = probe.options.find(mso => mso.name === enabledStream);
+      mso = probe.options.find(mso => mso.id === this.streamId);
     }
     const probeAudioCodec = probe?.options?.[0].audio?.codec;
     this.incompatibleDetected = this.incompatibleDetected || (probeAudioCodec && !compatibleAudio.includes(probeAudioCodec));
@@ -241,7 +206,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.parsers = rbo.parsers;
 
     const session = await startRebroadcastSession(ffmpegInput, rbo);
-    this.session = session;
+    this.parserSession = session;
 
     let watchdog: NodeJS.Timeout;
     const restartWatchdog = () => {
@@ -254,7 +219,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     session.events.on('mp4-data', restartWatchdog);
 
     session.events.once('killed', () => {
-      this.prebufferSession = undefined;
+      this.parserSessionPromise = undefined;
       session.events.removeListener('mp4-data', restartWatchdog);
       clearTimeout(watchdog);
     });
@@ -268,7 +233,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       this.console.error('Detected audio codec was not AAC.', session.inputAudioCodec);
       // show an alert if no audio config was explicitly specified. Force the user to choose/experiment.
       if (!audioConfig) {
-        log.a(`${this.name} is using ${session.inputAudioCodec} audio. Enable Reencode Audio in Rebroadcast Settings Audio Configuration to disable this alert.`);
+        log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable Reencode Audio in Rebroadcast Settings Audio Configuration to disable this alert.`);
         this.incompatibleDetected = true;
         this.allowImmediateRestart = true;
         // this will probably crash ffmpeg due to mp4/mpegts not being a valid container for pcm,
@@ -320,13 +285,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
     this.ensurePrebufferSession();
 
-    const session = await this.prebufferSession;
-
-    // if a specific stream is requested, and it's not what we're streaming, just fall through to source.
-    if (options?.id !== undefined && options.id !== session.ffmpegInputs['mpegts'].mediaStreamOptions?.id) {
-      this.console.log('rebroadcast session cant be used here', options);
-      return this.mixinDevice.getVideoStream(options);
-    }
+    const session = await this.parserSessionPromise;
 
     const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) !== 'false';
     const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5 : 0);
@@ -336,7 +295,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       return mo;
     }
 
-    this.console.log('prebuffer request started');
+    this.console.log('prebuffer request started', this.streamId);
 
     const createContainerServer = async (container: string) => {
       const eventName = container + '-data';
@@ -421,33 +380,164 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
     return mo;
   }
+}
 
-  getEnabledMediaStreamOption(msos?: MediaStreamOptions[]) {
-    if (msos?.length > 1) {
-      const enabledStream = this.storage.getItem('enabledStream');
-      return msos.find(mso => mso.name === enabledStream) || msos[0];
+class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
+  released = false;
+  sessions = new Map<string, PrebufferSession>();
+
+  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
+    super(mixinDevice, mixinDeviceState, {
+      providerNativeId,
+      mixinDeviceInterfaces,
+      group: "Prebuffer Settings",
+      groupKey: "prebuffer",
+    });
+
+    this.delayStart();
+  }
+
+  delayStart() {
+    this.console.log('prebuffer sessions starting in 5 seconds');
+    // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
+    setTimeout(() => this.ensurePrebufferSessions(), 5000);
+  }
+
+  async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+    await this.ensurePrebufferSessions();
+
+    let id = options?.id;
+    if (!id && !this.sessions.has(id)) {
+      const stream = await this.mixinDevice.getVideoStream(options);
+      const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(stream, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+      id = ffmpegInput?.mediaStreamOptions?.id;
+      this.sessions.set(options?.id, this.sessions.get(id));
     }
+    let session = this.sessions.get(id);
+    if (!session)
+      return this.mixinDevice.getVideoStream(options);
+    session.ensurePrebufferSession();
+    await session.parserSessionPromise;
+    session = this.sessions.get(id);
+    if (!session)
+      return this.mixinDevice.getVideoStream(options);
+    return session.getVideoStream(options);
+  }
+
+  async ensurePrebufferSessions() {
+    const msos = await this.mixinDevice.getVideoStreamOptions();
+    const enabled = this.getEnabledMediaStreamOptions(msos);
+    const ids = enabled ? enabled.map(mso => mso.id) : [undefined];
+    for (const id of ids) {
+      let session = this.sessions.get(id);
+      if (!session) {
+        const name = msos.find(mso => mso.id === id)?.name;
+        session = new PrebufferSession(this, name, id);
+        session.ensurePrebufferSession();
+        this.sessions.set(id, session);
+      }
+    }
+    deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
+  }
+
+  async getMixinSettings(): Promise<Setting[]> {
+    const settings: Setting[] = [];
+
+    const msos = await this.mixinDevice.getVideoStreamOptions();
+    const enabledStreams = this.getEnabledMediaStreamOptions(msos);
+    if (enabledStreams) {
+      settings.push(
+        {
+          title: 'Prebuffered Streams',
+          description: 'The streams to prebuffer.',
+          key: 'enabledStreams',
+          value: enabledStreams.map(mso => mso.name),
+          choices: msos.map(mso => mso.name),
+          multiple: true,
+        },
+      )
+    }
+
+    for (const session of this.sessions.values()) {
+      settings.push(...await session.getMixinSettings());
+    }
+
+    settings.push(
+      {
+        title: 'Prebuffer Duration',
+        description: 'Duration of the prebuffer in milliseconds.',
+        type: 'number',
+        key: PREBUFFER_DURATION_MS,
+        value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
+      },
+      {
+        title: 'Start at Previous Keyframe',
+        description: 'Start live streams from the previous key frame. Improves startup time.',
+        type: 'boolean',
+        key: SEND_KEYFRAME,
+        value: (this.storage.getItem(SEND_KEYFRAME) !== 'false').toString(),
+      },
+    );
+    return settings;
+  }
+
+  async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
+    const sessions = this.sessions;
+    this.sessions = new Map();
+    if (key === 'enabledStreams') {
+      this.storage.setItem(key, JSON.stringify(value));
+    }
+    else {
+      this.storage.setItem(key, value.toString());
+    }
+    for (const session of sessions.values()) {
+      session.parserSessionPromise?.then(session => session.kill());
+    }
+    this.ensurePrebufferSessions();
+  }
+
+  getEnabledMediaStreamOptions(msos?: MediaStreamOptions[]) {
+    if (!msos || !msos.length)
+      return;
+
+    try {
+      const parsed: any[] = JSON.parse(this.storage.getItem('enabledStreams'));
+      const filtered = msos.filter(mso => parsed.includes(mso.name));
+      return filtered;
+    }
+    catch (e) {
+    }
+    return [msos[0]];
   }
 
   async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
     const ret: MediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
-    let enabledStream = this.getEnabledMediaStreamOption(ret);
+    let enabledStreams = this.getEnabledMediaStreamOptions(ret);
 
-    if (!enabledStream) {
-      enabledStream = {};
-      ret.push(enabledStream);
+    const prebuffer = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
+
+    if (!enabledStreams) {
+      ret.push({
+        prebuffer,
+      });
     }
-    enabledStream.prebuffer = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
+    else {
+      for (const enabledStream of enabledStreams) {
+        enabledStream.prebuffer = prebuffer;
+      }
+    }
     return ret;
   }
 
   release() {
     this.console.log('prebuffer releasing if started');
     this.released = true;
-    this.prebufferSession?.then(start => {
-      this.console.log('prebuffer released');
-      start.kill();
-    });
+    for (const session of this.sessions.values()) {
+      session.parserSessionPromise?.then(session => {
+        this.console.log('prebuffer released');
+        session.kill();
+      });
+    }
   }
 }
 
