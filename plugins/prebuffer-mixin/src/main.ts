@@ -64,8 +64,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     if (enabledStream) {
       settings.push(
         {
-          title: 'Enabled Stream',
-          description: 'The stream to prebuffer.',
+          title: 'Prebuffered Stream',
+          description: 'The stream to prebuffer for recordings.',
           key: 'enabledStream',
           value: enabledStream.name,
           choices: msos.map(mso => mso.name),
@@ -407,7 +407,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   getEnabledMediaStreamOption(msos?: MediaStreamOptions[]) {
-    if (msos?.length) {
+    if (msos?.length > 1) {
       const enabledStream = this.storage.getItem('enabledStream');
       return msos.find(mso => mso.name === enabledStream) || msos[0];
     }
