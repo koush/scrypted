@@ -372,14 +372,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
 
-    if (mediaStreamOptions && mediaStreamOptions.audio) {
-      if (reencodeAudio)
-        mediaStreamOptions.audio = {
-          codec: 'aac',
-        }
+    if (reencodeAudio) {
+      // could be anything... as we let the defaults decide. fix this to hardcode aac maybe.
+      mediaStreamOptions.audio = {
+      }
     }
 
-    if (mediaStreamOptions.video) {
+    if (mediaStreamOptions.video && session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
       Object.assign(mediaStreamOptions.video, {
         width: parseInt(session.inputVideoResolution[2]),
         height: parseInt(session.inputVideoResolution[3]),
