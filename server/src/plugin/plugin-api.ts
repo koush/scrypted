@@ -29,7 +29,7 @@ export interface PluginAPI {
 
     getLogger(nativeId: ScryptedNativeId): Promise<PluginLogger>;
 
-    getComponent(id: string): Promise<any>;
+    getComponent(id: string): Promise<any>;    
 
     getMediaManager(): Promise<MediaManager>;
 

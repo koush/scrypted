@@ -12,7 +12,7 @@ import { startPluginClusterWorker as startPluginRemoteClusterWorker } from './pl
 import { ScryptedRuntime } from './runtime';
 import level from './level';
 import { Plugin, ScryptedUser, Settings } from './db-types';
-import { SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import { SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import axios from 'axios';
@@ -23,6 +23,7 @@ import mkdirp from 'mkdirp';
 import { install as installSourceMapSupport } from 'source-map-support';
 import httpAuth from 'http-auth';
 import semver from 'semver';
+import { EventEmitter } from 'events';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -35,6 +36,15 @@ process.on('unhandledRejection', error => {
     }
     console.warn('unhandled rejection of RPC Result', error);
 });
+
+function listenServerPort(env: string, port: number, server: any) {
+    server.listen(port, );
+    server.on('error', (e: Error) => {
+        console.error(`Failed to listen on port ${port}. It may be in use.`);
+        console.error(`Use the environment variable ${env} to change the port.`);
+        throw e;
+    })
+}
 
 if (!cluster.isMaster) {
     startPluginRemoteClusterWorker();
@@ -70,7 +80,8 @@ else {
             socket.destroy();
             target.destroy();
         });
-    }).listen(10081);
+    })
+    listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer);
 
     const app = express();
 
@@ -139,8 +150,10 @@ else {
         });
 
         const keys = certSetting.value;
-        const secure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, app).listen(SCRYPTED_SECURE_PORT);
-        const insecure = http.createServer(app).listen(SCRYPTED_INSECURE_PORT);
+        const secure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, app);
+        listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
+        const insecure = http.createServer(app);
+        listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
 
         // use a hash of the private key as the cookie secret.
         app.use(cookieParser(crypto.createHash('sha256').update(certSetting.value.clientKey).digest().toString('hex')));

@@ -22,6 +22,7 @@ import tar from 'tar';
 import { once } from 'events';
 import { PassThrough } from 'stream';
 import { PluginDebug } from './plugin/plugin-debug';
+import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -307,6 +308,12 @@ export class ScryptedRuntime {
     async getComponent(componentId: string): Promise<any> {
         const self = this;
         switch (componentId) {
+            case 'SCRYPTED_IP_ADDRESS':
+                return getIpAddress();
+            case 'SCRYPTED_INSECURE_PORT':
+                return SCRYPTED_INSECURE_PORT;
+            case 'SCRYPTED_SECURE_PORT':
+                return SCRYPTED_SECURE_PORT;
             case 'info':
                 class Info {
                     getVersion() {

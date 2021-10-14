@@ -1,7 +1,8 @@
 import os from 'os';
 
-export const SCRYPTED_INSECURE_PORT = 10080;
-export const SCRYPTED_SECURE_PORT = 9443;
+export const SCRYPTED_INSECURE_PORT = parseInt(process.env.SCRYPTED_INSECURE_PORT) || 10080;
+export const SCRYPTED_SECURE_PORT = parseInt(process.env.SCRYPTED_SECURE_PORT) || 9443;
+export const SCRYPTED_DEBUG_PORT = parseInt(process.env.SCRYPTED_DEBUG_PORT) || 10081;
 
 export function getIpAddress(): string {
     const ni = os.networkInterfaces();
