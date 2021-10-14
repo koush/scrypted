@@ -449,7 +449,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       settings.push(
         {
           title: 'Prebuffered Streams',
-          description: 'The streams to prebuffer.',
+          description: 'The streams to prebuffer. Enable only as necessary to reduce traffic.',
           key: 'enabledStreams',
           value: enabledStreams.map(mso => mso.name),
           choices: msos.map(mso => mso.name),
@@ -458,7 +458,11 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       )
     }
 
-    for (const session of this.sessions.values()) {
+    for (const id of this.sessions.keys()) {
+      // ignore the default key entry, which will resolve to something else.
+      if (id == null)
+        continue;
+      const session = this.sessions.get(id);
       settings.push(...await session.getMixinSettings());
     }
 
