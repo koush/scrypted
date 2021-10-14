@@ -78,7 +78,7 @@ export class HikVisionCameraAPI {
 
         stream.on('data', (buffer: Buffer) => {
             const data = buffer.toString();
-            this.console.log(data);
+            // this.console.log(data);
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
                     const channel = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
