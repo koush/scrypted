@@ -1,6 +1,6 @@
 import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue, MediaStreamOptions } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { ContactSensor } from "../HAP-NodeJS/src/lib/definitions";
+import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmpeg-hardware-acceleration";
 
 const { log, systemManager, deviceManager } = sdk;
 
@@ -84,12 +84,17 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         }
 
         if (showTranscodeArgs) {
+            const encoderArgs = getH264EncoderArgs();
+            const decoderArgs = getH264DecoderArgs();
+
             settings.push({
                 title: 'Video Decoder Arguments',
                 key: "videoDecoderArguments",
                 value: this.storage.getItem('videoDecoderArguments'),
                 description: 'FFmpeg arguments used to decode input video.',
                 placeholder: '-hwaccel auto',
+                choices: Object.keys(decoderArgs),
+                combobox: true,
             });
             settings.push({
                 title: 'H264 Encoder Arguments',
@@ -97,6 +102,8 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                 value: this.storage.getItem('h264EncoderArguments'),
                 description: 'FFmpeg arguments used to encode h264 video.',
                 placeholder: '-vcodec h264_omx',
+                choices: Object.keys(encoderArgs),
+                combobox: true,
             });
         }
 
@@ -153,12 +160,24 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
     }
 
     async putMixinSetting(key: string, value: SettingValue) {
+        if (key === 'videoDecoderArguments') {
+            const decoderArgs = getH264DecoderArgs();
+            value = decoderArgs[value.toString()]?.join(' ') || value;
+        }
+
+        if (key === 'h264EncoderArguments') {
+            const encoderArgs = getH264EncoderArgs();
+            const substitute = encoderArgs[value.toString()]?.join(' ');
+            value = substitute ? `\`${substitute}\`` : value;
+        }
+
         if (key === 'objectDetectionContactSensors') {
             this.storage.setItem(key, JSON.stringify(value));
         }
         else {
             this.storage.setItem(key, value?.toString());
         }
+
         if (key === 'detectAudio' || key === 'linkedMotionSensor' || key === 'objectDetectionContactSensors') {
             log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);
         }
