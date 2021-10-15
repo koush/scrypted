@@ -156,7 +156,7 @@ class PrebufferSession {
     if (probe.options) {
       mso = probe.options.find(mso => mso.id === this.streamId);
     }
-    const probeAudioCodec = probe?.options?.[0].audio?.codec;
+    const probeAudioCodec = probe?.options?.[0]?.audio?.codec;
     this.incompatibleDetected = this.incompatibleDetected || (probeAudioCodec && !compatibleAudio.includes(probeAudioCodec));
     if (this.incompatibleDetected)
       this.console.warn('configure your camera to output aac, mp3, or mp2 audio. incompatibl audio codec detected', probeAudioCodec);
@@ -443,7 +443,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     for (const id of ids) {
       let session = this.sessions.get(id);
       if (!session) {
-        const name = msos.find(mso => mso.id === id)?.name;
+        const name = msos?.find(mso => mso.id === id)?.name;
         session = new PrebufferSession(this, name, id);
         session.ensurePrebufferSession();
         this.sessions.set(id, session);
