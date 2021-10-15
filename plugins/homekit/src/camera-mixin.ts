@@ -25,7 +25,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         catch (e) {
         }
 
-        if (msos.length) {
+        if (msos?.length) {
             settings.push({
                 title: 'Live Stream',
                 key: 'streamingChannel',
@@ -43,7 +43,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             });
         }
         if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
-            if (msos.length) {
+            if (msos?.length) {
                 settings.push({
                     title: 'Recording Stream',
                     key: 'recordingChannel',
