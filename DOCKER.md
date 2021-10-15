@@ -4,11 +4,10 @@ Docker images are published on [Docker Hub](https://hub.docker.com/repository/re
 
 ```sh
 # pull the image
-sudo docker pull koush/scrypted
+docker pull koush/scrypted
 # run the image, saving the database and configuration files in a subdirectory named "scrypted"
-sudo docker run --network host -v $(pwd)/scrypted:/server/volume koush/scrypted
+docker run --network host -v $(pwd)/scrypted:/server/volume koush/scrypted
 ```
-
 
 ## Docker Compose
 
