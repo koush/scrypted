@@ -497,7 +497,7 @@ export function startPluginClusterWorker() {
         return ret;
     }
 
-    const getDeviceConsole = (nativeId?: ScryptedNativeId, disableEcho?: boolean) => {
+    const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
         return getConsole(async (stdout, stderr) => {
             stdout.on('data', data => events.emit('stdout', data, nativeId));
             stderr.on('data', data => events.emit('stderr', data, nativeId));

@@ -368,6 +368,8 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             },
 
             async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions) {
+                const pluginConsole = getDeviceConsole?.(undefined);
+                pluginConsole?.log('starting plugin', pluginId, packageJson.version);
                 const zip = new AdmZip(zipData);
                 events?.emit('zip', zip, pluginId);
                 const main = zip.getEntry('main.nodejs.js');
@@ -441,20 +443,20 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     WebSocket: createWebSocketClass(websocketConnect),
                 };
 
-                if (getDeviceConsole) {
-                    params.console = getDeviceConsole(undefined);
-                }
+                params.console = pluginConsole;
 
                 events?.emit('params', params);
 
                 try {
                     peer.evalLocal(script, options?.filename || '/plugin/main.nodejs.js', params);
                     events?.emit('plugin', exports.default);
+                    pluginConsole?.log('plugin successfully loaded');
+                    console.log('plugin failed to load');
                     return exports.default;
                 }
                 catch (e) {
-                    params?.console.error(e);
-                    console.error(e);
+                    pluginConsole?.error('plugin failed to load', e);
+                    console.error('plugin failed to load', e);
                     throw e;
                 }
             },
