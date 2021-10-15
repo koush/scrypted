@@ -50,7 +50,7 @@ export class OnvifCameraAPI {
     profiles: Promise<any>;
     binaryStateEvent: string;
 
-    constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string) {
+    constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string, public debug?: boolean) {
         this.digestAuth = new DigestClient(username, password);
         this.binaryStateEvent = binaryStateEvent
     }
@@ -60,9 +60,11 @@ export class OnvifCameraAPI {
 
         this.cam.on('event', (event: any, xml: string) => {
             const eventTopic = stripNamespaces(event.topic._)
-            // this.console.log('event', eventTopic);
-            // this.console.log(JSON.stringify(event, null, 2));
-            // this.console.log(xml);
+            if (this.debug) {
+                this.console.log('event', eventTopic);
+                this.console.log(JSON.stringify(event, null, 2));
+                this.console.log(xml);
+            }
 
             if (event.message.message.data && event.message.message.data.simpleItem) {
                 const dataValue = event.message.message.data.simpleItem.$.Value
@@ -72,7 +74,8 @@ export class OnvifCameraAPI {
                         ret.emit('event', OnvifEvent.MotionStart)
                     else
                         ret.emit('event', OnvifEvent.MotionStop)
-                } else if (eventTopic.includes('DetectedSound')) {
+                }
+                else if (eventTopic.includes('DetectedSound')) {
                     if (dataValue)
                         ret.emit('event', OnvifEvent.AudioStart)
                     else
@@ -130,7 +133,7 @@ export class OnvifCameraAPI {
     }
 }
 
-export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console, binaryStateEvent: string) {
+export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console, binaryStateEvent: string, debugLog?: boolean) {
     const split = ipAndPort.split(':');
     const [hostname, port] = split;
     const cam = await promisify(cb => {
@@ -141,5 +144,5 @@ export async function connectCameraAPI(ipAndPort: string, username: string, pass
             port,
         }, (err: Error) => cb(err, cam));
     });
-    return new OnvifCameraAPI(cam, username, password, console, binaryStateEvent);
+    return new OnvifCameraAPI(cam, username, password, console, binaryStateEvent, debugLog);
 }

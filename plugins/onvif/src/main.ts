@@ -27,7 +27,7 @@ class OnvifCamera extends RtspSmartCamera {
     eventStream: Stream;
     client: OnvifCameraAPI;
 
-    async getPictureOptions?(): Promise<PictureOptions[]> {
+    async getPictureOptions(): Promise<PictureOptions[]> {
         try {
             const vso = await this.getVideoStreamOptions();
             const ret = vso.map(({ id, name, video }) => ({
@@ -115,7 +115,7 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     createClient() {
-        return connectCameraAPI(this.getRtspAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'));
+        return connectCameraAPI(this.getRtspAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'), !!this.storage.getItem('debug'));
     }
 
     async getClient() {
