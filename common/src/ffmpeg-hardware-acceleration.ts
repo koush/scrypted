@@ -46,12 +46,14 @@ export function isRaspberryPi() {
 
 export type CodecArgs = { [type: string]: string[] };
 
+const V4L2 = 'Video4Linux (Docker compatible)';
+
 export function getH264DecoderArgs(): CodecArgs {
     if (isRaspberryPi()) {
-        return {
-            'Raspberry Pi': ['-c:v', 'h264_mmal'],
-            'Video4Linux': ['-c:v', 'h264_v4l2m2m'],
-        }
+        const ret: CodecArgs = {};
+        ret['Raspberry Pi MMAL'] = ['-c:v', 'h264_mmal'];
+        ret[V4L2] = ['-c:v', 'h264_v4l2m2m'];
+        return ret;
     }
     else if (os.platform() === 'darwin') {
         return {
@@ -68,16 +70,15 @@ export function getH264DecoderArgs(): CodecArgs {
         ],
     };
 
-    if (os.platform() === 'linux') {
-        ret['Video4Linux'] = [
-            '-c:v', 'h264_v4l2m2m',
-        ];
-        ret['']
+    if (isRaspberryPi()) {
+        ret['Raspberry Pi'] = ['-c:v', 'h264_mmal'];
+        ret[V4L2] = ['-c:v', 'h264_v4l2m2m'];
+    }
+    else if (os.platform() === 'linux') {
+        ret[V4L2] = ['-c:v', 'h264_v4l2m2m'];
     }
     else if (os.platform() === 'win32') {
-        ret['Intel QuickSync'] = [
-            '-c:v', 'h264_qsv',
-        ];
+        ret['Intel QuickSync'] = ['-c:v', 'h264_qsv'];
     }
     else {
         return {};
@@ -89,8 +90,8 @@ export function getH264DecoderArgs(): CodecArgs {
 export function getH264EncoderArgs() {
     const encoders: { [type: string]: string } = {};
     if (isRaspberryPi()) {
-        encoders['Raspberry Pi'] = 'h264_omx';
-        encoders['Video4Linux'] = 'h264_v4l2m2m';
+        encoders['Raspberry Pi OMX'] = 'h264_omx';
+        encoders[V4L2] = 'h264_v4l2m2m';
     }
     else if (os.platform() === 'darwin') {
         encoders['VideoToolbox'] = 'h264_videotoolbox';
@@ -103,7 +104,6 @@ export function getH264EncoderArgs() {
     }
     else if (os.platform() === 'linux') {
         // h264_v4l2m2m h264_vaapi nvenc_h264
-        encoders['Video4Linux'] = 'h264_v4l2m2m';
         encoders['VAAPI'] = 'h264_vaapi';
         encoders['Nvidia'] = 'nvenc_h264';
     }
