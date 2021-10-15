@@ -1,4 +1,4 @@
-import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, MediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from "../../../common/src/ffmpeg-rebroadcast";
 import { createMpegTsParser } from "../../../common/src/stream-parser";
@@ -39,10 +39,10 @@ aggregators.set(ScryptedInterface.Lock,
     values => values.reduce((prev, cur) => cur === LockState.Unlocked ? cur : prev, LockState.Locked));
 
 
-function createVideoCamera(devices: VideoCamera[]): VideoCamera {
+function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamera {
     let sessionPromise: Promise<FFMpegRebroadcastSession>
 
-    async function getVideoStreamWrapped(options) {
+    async function getVideoStreamWrapped(options: MediaStreamOptions) {
         if (sessionPromise) {
             console.error('session already active?');
         }
@@ -110,6 +110,7 @@ function createVideoCamera(devices: VideoCamera[]): VideoCamera {
         );
 
         const ret = startRebroadcastSession(filteredInput, {
+            console,
             parsers: {
                 mpegts: createMpegTsParser({
                     vcodec: ['-vcodec', 'libx264'],
@@ -123,6 +124,9 @@ function createVideoCamera(devices: VideoCamera[]): VideoCamera {
 
     return {
         async getVideoStreamOptions() {
+            if (devices.length === 1)
+                return devices[0].getVideoStreamOptions();
+            return undefined;
         },
 
         async getVideoStream(options) {
@@ -205,7 +209,7 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
                     const descriptor = ScryptedInterfaceDescriptors[iface];
 
                     if (iface === ScryptedInterface.VideoCamera) {
-                        const camera = createVideoCamera(devices as any);
+                        const camera = createVideoCamera(devices as any, this.console);
                         for (const method of descriptor.methods) {
                             AggregateDeviceImpl.prototype[method] = (...args: any[]) => camera[method](...args);
                         }
@@ -219,7 +223,8 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
                                 ret.push(device[method](...args));
                             }
 
-                            return await Promise.all(ret)[0];
+                            const results = await Promise.all(ret);
+                            return results[0];
                         }
                     }
                 }
