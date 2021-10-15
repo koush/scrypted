@@ -14,17 +14,27 @@ export default {
     if (!this.device && !this.lazyValue.rpc) {
       this.onChange();
     }
-    if (this.device) {
-      this.interfaceListener = this.device.listen(this.$options._componentTag, () => this.refresh());
-    }
+    this.watchDevice();
   },
   destroyed() {
     this.interfaceListener?.removeListener();
   },
-  methods: {
-    refresh() {
-
+  watch: {
+    device() {
+      this.watchDevice();
     },
+  },
+  methods: {
+    watchDevice() {
+      this.interfaceListener?.removeListener();
+      if (this.device) {
+        this.interfaceListener = this.device.listen(
+          this.$options._componentTag,
+          () => this.refresh()
+        );
+      }
+    },
+    refresh() {},
     rpc(options) {
       options = options || {};
 
@@ -37,30 +47,29 @@ export default {
       return new Proxy(
         {},
         {
-          get: function(target, method) {
-            return function() {
-              if (vm.device && !options.rpc)
-                return;
+          get: function (target, method) {
+            return function () {
+              if (vm.device && !options.rpc) return;
               var parameters = Array.prototype.slice.call(arguments);
               if (append) {
                 vm.lazyValue.rpc.push({
                   method,
                   parameters,
-                  varargs
+                  varargs,
                 });
               } else {
                 vm.lazyValue.rpc = {
                   method,
                   parameters,
-                  varargs
+                  varargs,
                 };
               }
               vm.onInput();
             };
-          }
+          },
         }
       );
-    }
-  }
+    },
+  },
 };
 </script>

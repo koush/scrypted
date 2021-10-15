@@ -34,7 +34,7 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
         versions.unshift(spliced);
     }
     return {
-        updateAvailable: undefined,
+        updateAvailable,
         versions,
     };
 }
