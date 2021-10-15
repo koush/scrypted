@@ -369,7 +369,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
             async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions) {
                 const zip = new AdmZip(zipData);
-                events?.emit('zip', zip);
+                events?.emit('zip', zip, pluginId);
                 const main = zip.getEntry('main.nodejs.js');
                 const script = main.getData().toString();
                 const window: any = {};

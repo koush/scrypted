@@ -160,8 +160,10 @@ export class PluginHost {
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
 
+
+        const remotePromise = setupPluginRemote(this.peer, this.api, self.pluginId);
         const init = (async () => {
-            const remote = await setupPluginRemote(this.peer, this.api, self.pluginId);
+            const remote = await remotePromise;
 
             for (const pluginDevice of scrypted.findPluginDevices(self.pluginId)) {
                 await remote.setNativeId(pluginDevice.nativeId, pluginDevice._id, pluginDevice.storage || {});
@@ -186,7 +188,7 @@ export class PluginHost {
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
                     // if debugging, use a normalized path for sourcemap resolution, otherwise
                     // prefix with module path.
-                    filename: pluginDebug ? '/plugin/main.nodejs.js' : `/${this.pluginId}/main.node.js`,
+                    filename: pluginDebug ? '/plugin/main.nodejs.js' : `/${this.pluginId}/main.nodejs.js`,
                 };
                 const module = await remote.loadZip(plugin.packageJson, zipBuffer, loadZipOptions);
                 logger.log('i', `loaded ${this.pluginName}`);
@@ -204,7 +206,7 @@ export class PluginHost {
         init.catch(e => console.error('plugin failed to load', e));
 
         this.module = init.then(({ module }) => module);
-        this.remote = new LazyRemote(init.then(({ remote }) => remote));
+        this.remote = new LazyRemote(remotePromise, init.then(({ remote }) => remote));
 
         this.listener = scrypted.stateManager.listen((id, eventDetails, eventData) => {
             if (eventDetails.property) {
@@ -422,11 +424,11 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
 export function startPluginClusterWorker() {
     const events = new EventEmitter();
 
-    events.once('zip', (zip: AdmZip) => {
+    events.once('zip', (zip: AdmZip, pluginId: string) => {
         installSourceMapSupport({
             environment: 'node',
             retrieveSourceMap(source) {
-                if (source === '/plugin/main.nodejs.js') {
+                if (source === '/plugin/main.nodejs.js' || source === `/${pluginId}/main.nodejs.js`) {
                     const entry = zip.getEntry('main.nodejs.js.map')
                     const map = entry?.getData().toString();
                     if (!map)
@@ -597,56 +599,54 @@ export function startPluginClusterWorker() {
 }
 
 class LazyRemote implements PluginRemote {
-    init: Promise<PluginRemote>;
     remote: PluginRemote;
 
-    constructor(init: Promise<PluginRemote>) {
-        this.init = (async () => {
-            this.remote = await init;
+    constructor(public remotePromise: Promise<PluginRemote>, public remoteReadyPromise: Promise<PluginRemote>) {
+        this.remoteReadyPromise = (async () => {
+            this.remote = await remoteReadyPromise;
             return this.remote;
         })();
     }
 
     async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any> {
         if (!this.remote)
-            await this.init;
+            await this.remoteReadyPromise;
 
         return this.remote.loadZip(packageJson, zipData, options);
     }
     async setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState; }; }): Promise<void> {
         if (!this.remote)
-            await this.init;
+            await this.remoteReadyPromise;
         return this.remote.setSystemState(state);
     }
     async setNativeId(nativeId: ScryptedNativeId, id: string, storage: { [key: string]: any; }): Promise<void> {
         if (!this.remote)
-            await this.init;
+            await this.remoteReadyPromise;
         return this.remote.setNativeId(nativeId, id, storage);
     }
     async updateDescriptor(id: string, state: { [property: string]: SystemDeviceState; }): Promise<void> {
         if (!this.remote)
-            await this.init;
+            await this.remoteReadyPromise;
         return this.remote.updateDescriptor(id, state);
     }
     async notify(id: string, eventTime: number, eventInterface: string, property: string, propertyState: SystemDeviceState, changed?: boolean): Promise<void> {
         if (!this.remote)
-            await this.init;
+            await this.remoteReadyPromise;
         return this.remote.notify(id, eventTime, eventInterface, property, propertyState, changed);
     }
     async ioEvent(id: string, event: string, message?: any): Promise<void> {
         if (!this.remote)
-            await this.init;
+            await this.remoteReadyPromise;
         return this.remote.ioEvent(id, event, message);
     }
     async createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): Promise<any> {
         if (!this.remote)
-            await this.init;
+            await this.remoteReadyPromise;
         return this.remote.createDeviceState(id, setState);
     }
 
     async getServicePort(name: string): Promise<number> {
-        if (!this.remote)
-            await this.init;
-        return this.remote.getServicePort(name);
+        const remote = await this.remotePromise;
+        return remote.getServicePort(name);
     }
 }
