@@ -147,6 +147,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     }
 
     async start() {
+        this.log.clearAlerts();
+
         let defaultIncluded: any;
         try {
             defaultIncluded = JSON.parse(this.storage.getItem('defaultIncluded'));
