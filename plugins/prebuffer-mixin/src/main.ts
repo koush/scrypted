@@ -443,7 +443,11 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     for (const id of ids) {
       let session = this.sessions.get(id);
       if (!session) {
-        const name = msos?.find(mso => mso.id === id)?.name;
+        const mso = msos?.find(mso => mso.id === id);
+        if (mso?.prebuffer) {
+          log.a(`Prebuffer is already available on ${this.name}. If this is a grouped device, disable the Rebroadcast extension.`)
+        }
+        const name = mso?.name;
         session = new PrebufferSession(this, name, id);
         session.ensurePrebufferSession();
         this.sessions.set(id, session);
