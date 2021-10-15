@@ -118,6 +118,7 @@ class PrebufferSession {
         ],
       },
       {
+        key: 'detectedResolution',
         group,
         title: 'Detected Resolution and Bitrate',
         readonly: true,
@@ -125,6 +126,7 @@ class PrebufferSession {
         description: 'Configuring your camera to 1920x1080 is recommended.',
       },
       {
+        key: 'detectedCodec',
         group,
         title: 'Detected Video/Audio Codecs',
         readonly: true,
@@ -132,6 +134,7 @@ class PrebufferSession {
         description: 'Configuring your camera to H264 video (2000Kb/s) and AAC/MP3/MP2 audio is recommended.'
       },
       {
+        key: 'detectedKeyframe',
         group,
         title: 'Detected Keyframe Interval',
         description: "Configuring your camera to 4 seconds is recommended (IDR = FPS * 4 seconds).",
@@ -169,7 +172,11 @@ class PrebufferSession {
     }
     else if (reencodeAudio) {
       // setting no audio codec will allow ffmpeg to do an implicit conversion.
-      acodec = [];
+      acodec = [
+        '-bsf:a', 'aac_adtstoasc',
+        '-acodec', 'libfdk_aac',
+        '-profile:a', 'aac_low'
+      ];
     }
     else {
       // NOTE: if there is no audio track, this will still work fine.
@@ -349,8 +356,13 @@ class PrebufferSession {
     const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
 
     if (reencodeAudio) {
-      // could be anything... as we let the defaults decide. fix this to hardcode aac maybe.
       mediaStreamOptions.audio = {
+        codec: 'aac',
+      }
+    }
+    else {
+      mediaStreamOptions.audio = {
+        codec: session?.inputAudioCodec,
       }
     }
 
@@ -376,7 +388,7 @@ class PrebufferSession {
       )
     }
 
-    this.console.log('prebuffer ffmpeg input', ffmpegInput.inputArguments);
+    this.console.log('prebuffer ffmpeg input', ffmpegInput);
     const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
     return mo;
   }
@@ -445,25 +457,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const msos = await this.mixinDevice.getVideoStreamOptions();
     const enabledStreams = this.getEnabledMediaStreamOptions(msos);
-    if (enabledStreams) {
+    if (enabledStreams && msos?.length > 1) {
       settings.push(
         {
           title: 'Prebuffered Streams',
           description: 'The streams to prebuffer. Enable only as necessary to reduce traffic.',
           key: 'enabledStreams',
-          value: enabledStreams.map(mso => mso.name),
+          value: enabledStreams.map(mso => mso.name || ''),
           choices: msos.map(mso => mso.name),
           multiple: true,
         },
       )
-    }
-
-    for (const id of this.sessions.keys()) {
-      // ignore the default key entry, which will resolve to something else.
-      if (id == null)
-        continue;
-      const session = this.sessions.get(id);
-      settings.push(...await session.getMixinSettings());
     }
 
     settings.push(
@@ -482,6 +486,12 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         value: (this.storage.getItem(SEND_KEYFRAME) !== 'false').toString(),
       },
     );
+
+
+    for (const session of new Set([...this.sessions.values()])) {
+      settings.push(...await session.getMixinSettings());
+    }
+
     return settings;
   }
 
