@@ -10,9 +10,8 @@ import qrcode from 'qrcode';
 import packageJson from "../package.json";
 import { randomPinCode } from './pincode';
 import { EventedHTTPServer } from '../HAP-NodeJS/src/lib/util/eventedhttp';
-import { add } from 'lodash';
 
-const { systemManager } = sdk;
+const { systemManager, deviceManager } = sdk;
 
 HAPStorage.storage();
 class HAPLocalStorage {
@@ -176,10 +175,10 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                     await plugins.setMixins(device.id, mixins);
                     defaultIncluded[device.id] = includeToken;
                 }
-
             }
             catch (e) {
                 console.error('error while checking device if syncable', e);
+                this.log.a('Error while checking device if syncable. See Console.');
                 continue;
             }
 
@@ -312,8 +311,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             return;
         }
         this.console.log('release mixin', id);
-        this.log.a(`${device.name} was removed. Reload the HomeKit plugin to sync these changes.`);
-        // deviceManager.requestRestart();
+        this.log.a(`${device.name} was removed. The HomeKit plugin will reload momentarily to sync these changes.`);
+        deviceManager.requestRestart();
     }
 }
 

@@ -356,46 +356,46 @@ addSupportedType({
             }
         }
 
-        const msos = await device.getVideoStreamOptions();
+        // const msos = await device.getVideoStreamOptions();
 
-        const nativeResolutions: Resolution[] = [];
-        if (msos) {
-            for (const mso of msos) {
-                if (!mso.video)
-                    continue;
-                const { width, height } = mso.video;
-                if (!width || !height)
-                    continue;
-                nativeResolutions.push(
-                    [width, height, mso.video.fps || 30]
-                );
-            }
-        }
+        // const nativeResolutions: Resolution[] = [];
+        // if (msos) {
+        //     for (const mso of msos) {
+        //         if (!mso.video)
+        //             continue;
+        //         const { width, height } = mso.video;
+        //         if (!width || !height)
+        //             continue;
+        //         nativeResolutions.push(
+        //             [width, height, mso.video.fps || 30]
+        //         );
+        //     }
+        // }
 
-        function ensureHasWidthResolution(resolutions: Resolution[], width: number, defaultHeight: number) {
-            if (resolutions.find(res => res[0] === width))
-                return;
-            const topVideo = msos?.[0]?.video;
+        // function ensureHasWidthResolution(resolutions: Resolution[], width: number, defaultHeight: number) {
+        //     if (resolutions.find(res => res[0] === width))
+        //         return;
+        //     const topVideo = msos?.[0]?.video;
 
-            if (!topVideo || !topVideo?.width || !topVideo?.height) {
-                resolutions.push([width, defaultHeight, 30]);
-                return;
-            }
+        //     if (!topVideo || !topVideo?.width || !topVideo?.height) {
+        //         resolutions.unshift([width, defaultHeight, 30]);
+        //         return;
+        //     }
 
-            resolutions.unshift(
-                [
-                    width,
-                    fitHeightToWidth(topVideo.width, topVideo.height, width),
-                    topVideo.fps || 30,
-                ]);
-        }
+        //     resolutions.unshift(
+        //         [
+        //             width,
+        //             fitHeightToWidth(topVideo.width, topVideo.height, width),
+        //             topVideo.fps || 30,
+        //         ]);
+        // }
 
-        const streamingResolutions = [...nativeResolutions];
-        // needed for apple watch
-        ensureHasWidthResolution(streamingResolutions, 320, 240);
-        // i think these are required by homekit?
-        ensureHasWidthResolution(streamingResolutions, 1280, 720);
-        ensureHasWidthResolution(streamingResolutions, 1920, 1080);
+        // const streamingResolutions = [...nativeResolutions];
+        // // needed for apple watch
+        // ensureHasWidthResolution(streamingResolutions, 320, 240);
+        // // i think these are required by homekit?
+        // ensureHasWidthResolution(streamingResolutions, 1280, 720);
+        // ensureHasWidthResolution(streamingResolutions, 1920, 1080);
 
         const streamingOptions: CameraStreamingOptions = {
             video: {
@@ -404,7 +404,16 @@ addSupportedType({
                     profiles: [H264Profile.MAIN],
                 },
 
-                resolutions: streamingResolutions,
+                resolutions: [
+                    // 3840x2160@30 (4k).
+                    [3840, 2160, 30],
+                    // 1920x1080@30 (1080p).
+                    [1920, 1080, 30],
+                    // 1280x720@30 (720p).
+                    [1280, 720, 30],
+                    // 320x240@15 (Apple Watch).
+                    [320, 240, 15],
+                ]
             },
             audio: {
                 codecs,
@@ -454,9 +463,9 @@ addSupportedType({
                 recordingCodecs.push(entry);
             }
 
-            const recordingResolutions = [...nativeResolutions];
-            ensureHasWidthResolution(recordingResolutions, 1280, 720);
-            ensureHasWidthResolution(recordingResolutions, 1920, 1080);
+            // const recordingResolutions = [...nativeResolutions];
+            // ensureHasWidthResolution(recordingResolutions, 1280, 720);
+            // ensureHasWidthResolution(recordingResolutions, 1920, 1080);
 
             recordingOptions = {
                 motionService: true,
@@ -474,7 +483,10 @@ addSupportedType({
                         levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
                         profiles: [H264Profile.BASELINE, H264Profile.MAIN, H264Profile.HIGH],
                     },
-                    resolutions: recordingResolutions,
+                    resolutions: [
+                        [1280, 720, 30],
+                        [1920, 1080, 30],
+                    ],
                 },
                 audio: {
                     codecs: recordingCodecs,
