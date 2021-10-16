@@ -9,6 +9,7 @@ export enum AmcrestEvent {
     AudioStop = "Code=AudioMutation;action=Stop",
     TalkInvite = "Code=_DoTalkAction_;action=Invite",
     TalkHangup = "Code=_DoTalkAction_;action=Hangup",
+    TalkPulse = "Code=_DoTalkAction_;action=Pulse",
     AlarmIPCStart = "Code=AlarmIPC;action=Start",
     AlarmIPCStop = "Code=AlarmIPC;action=Stop",
     PhoneCallDetectStart = "Code=PhoneCallDetect;action=Start",

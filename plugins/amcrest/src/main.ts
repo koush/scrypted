@@ -34,6 +34,8 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
                     events.destroy();
                 };
 
+                let pulseTimeout: NodeJS.Timeout;
+
                 events.on('close', () => ret.emit('error', new Error('close')));
                 events.on('error', e => ret.emit('error', e));
                 events.on('event', (event: AmcrestEvent) => {
@@ -58,6 +60,11 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
                         || event === AmcrestEvent.PhoneCallDetectStop
                         || event === AmcrestEvent.AlarmIPCStop) {
                         this.binaryState = false;
+                    }
+                    else if (event === AmcrestEvent.TalkPulse) {
+                        clearTimeout(pulseTimeout);
+                        pulseTimeout = setTimeout(() => this.binaryState = false, 30000);
+                        this.binaryState = true;
                     }
                 })
             }
