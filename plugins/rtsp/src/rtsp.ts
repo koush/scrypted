@@ -132,7 +132,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
             const vsos = await this.getVideoStreamOptions();
             if (!vsos?.length || vsos?.length === 1)
                 return [];
-            
+
             return vsos.map(channel => ({
                 title: `Disable Stream: ${channel.name}`,
                 key: 'disable-' + channel.id,
@@ -203,7 +203,19 @@ export abstract class RtspSmartCamera extends RtspCamera {
 
     listener: EventEmitter & Destroyable;
 
+    resetSensors(): void {
+        if (this.interfaces.includes(ScryptedInterface.MotionSensor))
+            this.motionDetected = false;
+        if (this.interfaces.includes(ScryptedInterface.AudioSensor))
+            this.audioDetected = false;
+        if (this.interfaces.includes(ScryptedInterface.IntrusionSensor))
+            this.intrusionDetected = false;
+        if (this.interfaces.includes(ScryptedInterface.BinarySensor))
+            this.binaryState = false;
+    }
+
     listenLoop() {
+        this.resetSensors();
         this.lastListen = Date.now();
         this.listener = this.listenEvents();
         this.listener.on('error', e => {
