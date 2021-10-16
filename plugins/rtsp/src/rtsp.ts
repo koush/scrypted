@@ -3,6 +3,7 @@ import { EventEmitter } from "stream";
 import { recommendRebroadcast } from "./recommend";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
+import { randomBytes } from "crypto";
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -322,14 +323,10 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
 
     async putSetting(key: string, value: string | number) {
         // generate a random id
-        const nativeId = Math.random().toString();
+        const nativeId = randomBytes(4).toString('hex');
         const name = value.toString();
 
         this.updateDevice(nativeId, name, this.getInterfaces());
-
-        var text = `New Camera ${name} ready. Check the notification area to complete setup.`;
-        log.a(text);
-        log.clearAlert(text);
     }
 
     async discoverDevices(duration: number) {
