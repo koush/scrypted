@@ -123,7 +123,7 @@ class PrebufferSession {
         title: 'Detected Resolution and Bitrate',
         readonly: true,
         value: `${session?.inputVideoResolution?.[0] || "unknown"} @ ${bitrate || "unknown"} Kb/s`,
-        description: 'Configuring your camera to 1920x1080 is recommended.',
+        description: 'Configuring your camera to 1920x1080, 2000Kb/S, Variable Bit Rate, is recommended.',
       },
       {
         key: 'detectedCodec',
@@ -131,13 +131,13 @@ class PrebufferSession {
         title: 'Detected Video/Audio Codecs',
         readonly: true,
         value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
-        description: 'Configuring your camera to H264 video (2000Kb/s) and AAC/MP3/MP2 audio is recommended.'
+        description: 'Configuring your camera to H264 video and AAC/MP3/MP2 audio is recommended.'
       },
       {
         key: 'detectedKeyframe',
         group,
         title: 'Detected Keyframe Interval',
-        description: "Configuring your camera to 4 seconds is recommended (IDR = FPS * 4 seconds).",
+        description: "Configuring your camera to 4 seconds is recommended (IDR aka Frame Interval = FPS * 4 seconds).",
         readonly: true,
         value: ((this.detectedIdrInterval || 0) / 1000).toString() || 'none',
       },
