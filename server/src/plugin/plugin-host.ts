@@ -40,6 +40,7 @@ export class PluginHost {
     ws: { [id: string]: WebSocket } = {};
     api: PluginHostAPI;
     pluginName: string;
+    packageJson: any;
     listener: EventListenerRegister;
     stats: {
         cpuUsage: NodeJS.CpuUsage,
@@ -85,6 +86,7 @@ export class PluginHost {
         this.scrypted = scrypted;
         this.pluginId = plugin._id;
         this.pluginName = plugin.packageJson?.name;
+        this.packageJson = plugin.packageJson;
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(plugin._id));
 
         if (true) {

@@ -23,11 +23,14 @@ import { once } from 'events';
 import { PassThrough } from 'stream';
 import { PluginDebug } from './plugin/plugin-debug';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import semver from 'semver';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
     proxy: ScryptedDevice;
 }
+
+const MIN_SCRYPTED_CORE_VERSION = '0.0.121';
 
 export class ScryptedRuntime {
     datastore: Level;
@@ -167,12 +170,15 @@ export class ScryptedRuntime {
 
     async getPluginForEndpoint(endpoint: string) {
         let pluginHost = this.plugins[endpoint] ?? this.getPluginHostForDeviceId(endpoint);
-        if (!pluginHost && endpoint === '@scrypted/core') {
-            try {
-                pluginHost = await this.installNpm('@scrypted/core');
-            }
-            catch (e) {
-                console.error('@scrypted/core auto install failed', e);
+        if (endpoint === '@scrypted/core') {
+            // enforce a minimum version on @scrypted/core
+            if (!pluginHost || semver.lt(pluginHost.packageJson.version, MIN_SCRYPTED_CORE_VERSION)) {
+                try {
+                    pluginHost = await this.installNpm('@scrypted/core');
+                }
+                catch (e) {
+                    console.error('@scrypted/core auto install failed', e);
+                }
             }
         }
 
