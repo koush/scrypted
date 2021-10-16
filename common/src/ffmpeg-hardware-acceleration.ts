@@ -57,7 +57,9 @@ export function getH264DecoderArgs(): CodecArgs {
     }
     else if (os.platform() === 'darwin') {
         return {
-            'VideoToolbox': ['-hwaccel', 'videotoolbox']
+            // specifying videotoolbox seems to cause issues with multiple? unclear why.
+            // the ffmpeg process tears down, yet it seems like something is not disposed.
+            'VideoToolbox': ['-hwaccel', 'auto']
         }
     }
 
