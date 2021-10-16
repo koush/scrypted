@@ -451,7 +451,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     peer.evalLocal(script, options?.filename || '/plugin/main.nodejs.js', params);
                     events?.emit('plugin', exports.default);
                     pluginConsole?.log('plugin successfully loaded');
-                    console.log('plugin failed to load');
+                    console.log('plugin successfully');
                     return exports.default;
                 }
                 catch (e) {
