@@ -210,9 +210,26 @@ export interface RawVideoParserOptions {
         height: number
     };
     everyNFrames?: number;
+    pixelFormat?: RawVideoPixelFormat;
+}
+
+export interface RawVideoPixelFormat {
+    name: string;
+    computeLength: (width: number, height: number) => number;
+}
+
+export const PIXEL_FORMAT_YUV420P: RawVideoPixelFormat = {
+    name: 'yuv420p',
+    computeLength: (width, height) => width * height * 1.5,
+}
+
+export const PIXEL_FORMAT_RGB24: RawVideoPixelFormat = {
+    name: 'rgb24',
+    computeLength: (width, height) => width * height * 3,
 }
 
 export function createRawVideoParser(options?: RawVideoParserOptions): StreamParser {
+    const pixelFormat = options?.pixelFormat || PIXEL_FORMAT_YUV420P;
     let filter: string;
     options = options || {};
     const { size, everyNFrames } = options;
@@ -233,7 +250,7 @@ export function createRawVideoParser(options?: RawVideoParserOptions): StreamPar
             ...(filter ? ['-vf', filter] : []),
             '-an',
             '-vcodec', 'rawvideo',
-            '-pix_fmt', 'yuv420p',
+            '-pix_fmt', pixelFormat.name,
             '-f', 'rawvideo',
         ],
         async *parse(socket: Socket, width: number, height: number): AsyncGenerator<StreamChunk> {
@@ -242,7 +259,7 @@ export function createRawVideoParser(options?: RawVideoParserOptions): StreamPar
 
             width = size?.width || width;
             height = size?.height || height
-            const toRead = width * height * 1.5;
+            const toRead = pixelFormat.computeLength(width, height);
             while (true) {
                 const buffer = await readLength(socket, toRead);
                 yield {
