@@ -169,26 +169,28 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       // start the frame grabber if necessary
       const video = await this.realDevice.getVideoStream();
       const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(video, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-      this.rebroadcaster = startRebroadcastSession(ffmpegInput, {
-        console: this.console,
-        parsers: {
-          'rawvideo': createRawVideoParser({
-            pixelFormat: PIXEL_FORMAT_RGB24,
-          })
-        }
-      })
+      if (!this.rebroadcaster) {
+        this.rebroadcaster = startRebroadcastSession(ffmpegInput, {
+          console: this.console,
+          parsers: {
+            'rawvideo': createRawVideoParser({
+              pixelFormat: PIXEL_FORMAT_RGB24,
+            })
+          }
+        })
 
-      this.rebroadcaster.then(session => session.events.on('killed', () => {
-        this.rebroadcaster = undefined;
-      }))
+        this.rebroadcaster.then(session => session.events.on('killed', () => {
+          this.rebroadcaster = undefined;
+        }))
+      }
     }
 
     const session = await this.rebroadcaster;
 
-    // reset/start the frame grabber timeout to quit after
-    // 1 minute of idle.
+    // reset/start the frame grabber timeout to quit after 10 seconds of idle.
+    // various detection loops will keep this alive.
     clearTimeout(this.rebroadcasterTimeout);
-    this.rebroadcasterTimeout = setTimeout(() => session.kill(), 60000);
+    this.rebroadcasterTimeout = setTimeout(() => session.kill(), 10000);
 
     const args = await once(session.events, 'rawvideo-data');
     const chunk: StreamChunk = args[0];
@@ -228,6 +230,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
       let detectionInput = await this.throttledGrab();
 
+      // on motion, watch what happens for 10 seconds.
+      // new objects being found will trigger a longer observation.
       for (let i = 0; i < 10; i++) {
         this.throttledObjectDetect(detectionInput);
         await sleep(1000);
@@ -257,6 +261,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
         }
       }
 
+      // on object detection, watch what happens for 10 seconds.
+      // new people being found will trigger a longer observation.
       for (let i = 0; i < 10; i++) {
         this.throttledFaceDetect(detectionInput);
         await sleep(1000);
@@ -264,13 +270,6 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
         detectionInput = undefined;
       }
     });
-  }
-
-  async extendedFaceDetect() {
-    for (let i = 0; i < 60; i++) {
-      this.throttledFaceDetect(undefined);
-      await sleep(1000);
-    }
   }
 
   reportObjectDetections(detectionInput?: DetectionInput) {
@@ -288,6 +287,13 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       this.detections.set(detectionId, detectionInput);
 
     this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
+  }
+
+  async extendedObjectDetect() {
+    for (let i = 0; i < 60; i++) {
+      this.throttledObjectDetect(undefined);
+      await sleep(1000);
+    }
   }
 
   async objectDetect(detectionInput: DetectionInput) {
@@ -317,6 +323,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     });
     if (found.length) {
       this.console.log('detected', found.map(d => d.detection.className).join(', '));
+      this.extendedObjectDetect();
     }
 
     this.reportObjectDetections(detectionInput);
@@ -340,6 +347,12 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
 
+  async extendedFaceDetect() {
+    for (let i = 0; i < 60; i++) {
+      this.throttledFaceDetect(undefined);
+      await sleep(1000);
+    }
+  }
 
   async faceDetect(detectionInput: DetectionInput) {
     let faces: ObjectDetectionResult[] = [];

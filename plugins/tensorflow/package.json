@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/tensorflow",
-   "version": "0.0.10",
+   "version": "0.0.3",
    "description": "Motion Detection for VideoCameras.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -22,7 +22,11 @@
       "motion",
       "object",
       "detect",
-      "detection"
+      "detection",
+      "face",
+      "recognition",
+      "people",
+      "person"
    ],
    "scrypted": {
       "name": "Object and Face Recognition Plugin",

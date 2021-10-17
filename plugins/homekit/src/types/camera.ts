@@ -547,31 +547,53 @@ addSupportedType({
         catch (e) {
         }
 
-        const sensorMap = new Map<string, ContactSensor>();
+        const objectSensorMap = new Map<string, ContactSensor>();
+        const peopleSensorMap = new Map<string, ContactSensor>();
         for (const ojs of new Set(objectDetectionContactSensors)) {
-            const sensor = new ContactSensor(`${device.name} Object Detection:` + ojs, ojs);
+            const sensor = new ContactSensor(`${device.name}: ` + ojs, ojs);
             sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
             accessory.addService(sensor);
-            sensorMap.set(ojs, sensor);
+            if (ojs.startsWith('Person: ')) {
+                peopleSensorMap.set(ojs, sensor);
+            }
+            else {
+                objectSensorMap.set(ojs, sensor);
+            }
         }
 
-        if (sensorMap.size) {
+        if (objectSensorMap.size || peopleSensorMap.size) {
             device.listen(ScryptedInterface.ObjectDetector, (eventSource, eventDetails, eventData: ObjectDetection) => {
-                const all: string[] = [];
-                if (eventData.detections)
-                    all.push(...eventData.detections.map(d => d.className));
-                if (eventData.people)
-                    all.push(...eventData.people.map(p => p.label));
+                if (eventData.detections) {
+                    const unset = new Set(objectSensorMap.keys());
+                    const objects: string[] = [];
+                    objects.push(...eventData.detections.map(d => d.className));
+                    for (const type of objects) {
+                        const sensor = objectSensorMap.get(type);
+                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
+                        unset.delete(type);
+                    }
 
-                const unset = new Set(sensorMap.keys());
-                for (const type of all) {
-                    const sensor = sensorMap.get(type);
-                    sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-                    unset.delete(type);
+                    for (const type of unset) {
+                        const sensor = objectSensorMap.get(type);
+                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
+                    }
                 }
-                for (const type of unset) {
-                    const sensor = sensorMap.get(type);
-                    sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
+
+                if (eventData.people) {
+                    const unset = new Set(peopleSensorMap.keys());
+                    const people: string[] = [];
+                    people.push(...eventData.people.map(p => p.label));
+                    for (const type of people) {
+                        const personType = 'Person: ' + type;
+                        const sensor = peopleSensorMap.get(personType);
+                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
+                        unset.delete(personType);
+                    }
+
+                    for (const type of unset) {
+                        const sensor = peopleSensorMap.get(type);
+                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
+                    }
                 }
             });
         }
