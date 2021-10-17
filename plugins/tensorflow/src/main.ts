@@ -491,7 +491,11 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       let index: number;
       if (person.detection.label.startsWith('Unknown Person')) {
         // new unknowns may possibly be unrecognizable and thus missing faces this pass
-        index = this.currentPeople.findIndex(check => !check.detection.label.startsWith('Unknown Person') && check.timeout);
+        // first try to resolve with a missing unknown person
+        index = this.currentPeople.findIndex(check => check.detection.label.startsWith('Unknown Person') && check.timeout);
+        // otherwise resolve with a missing known person
+        if (index === -1)
+          index = this.currentPeople.findIndex(check => !check.detection.label.startsWith('Unknown Person') && check.timeout);
       }
       else {
         // new people may possibly be unrecognizable people and thus missing from the previous pass
@@ -507,8 +511,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       }
     }
 
-    if (found.length) {
-      this.console.log('detected', found.map(d => d.detection.label).join(', '));
+    if (actualNew.length) {
+      this.console.log('detected', actualNew.map(d => d.detection.label).join(', '));
       this.extendedFaceDetect()
     }
     this.reportPeopleDetections(faces, detectionInput);
