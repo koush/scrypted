@@ -131,7 +131,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         if (this.interfaces.includes(ScryptedInterface.ObjectDetector)) {
             try {
                 const types = await realDevice.getObjectTypes();
-                const choices = types.people.map(p => `Person: ${p.label}`) || [];
+                const choices = types.people?.map(p => `Person: ${p.label}`) || [];
                 if (types.detections)
                     choices.push(...types.detections);
 
