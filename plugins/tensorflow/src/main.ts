@@ -20,6 +20,7 @@ import { makeBoundingBox, makeBoundingBoxFromFace } from './util';
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '../../../common/src/ffmpeg-rebroadcast';
 import { createRawVideoParser, PIXEL_FORMAT_RGB24, StreamChunk } from '@scrypted/common/src/stream-parser';
 import { once } from 'events';
+import { DenoisedDetectionEntry, denoiseDetections, DetectionInput } from './denoise';
 
 // do not delete this, it makes sure tf is initialized.
 console.log(tf.getBackend());
@@ -135,11 +136,6 @@ class RecognizedPerson extends ScryptedDeviceBase implements Camera, Settings {
   }
 }
 
-interface DetectionInput {
-  buffer: Buffer;
-  input: Tensor3D;
-}
-
 class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
   released = false;
   registerMotion: EventListenerRegister;
@@ -150,8 +146,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
   objectInterval = parseInt(this.storage.getItem('objectInterval')) || defaultObjectInterval;
   recognitionInterval = parseInt(this.storage.getItem('recognitionInterval')) || defaultRecognitionInterval;
   detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
-  currentDetections: string[] = [];
-  currentPeople = new Set<string>();
+  currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
+  currentPeople: DenoisedDetectionEntry<FaceRecognition>[] = [];
   rebroadcaster: Promise<FFMpegRebroadcastSession>;
   rebroadcasterTimeout: NodeJS.Timeout;
 
@@ -162,8 +158,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     1000);
 
   throttledFaceDetect = throttle(
-    async (detectionInput: DetectionInput, detection: ObjectDetection) => {
-      this.faceDetect(detectionInput, detection);
+    async (detectionInput: DetectionInput) => {
+      this.faceDetect(detectionInput);
     },
     1000);
 
@@ -219,7 +215,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     });
 
     this.realDevice = systemManager.getDeviceById<Camera & VideoCamera & ObjectDetector>(this.id);
-    
+
+    this.register();
   }
 
   async register() {
@@ -242,6 +239,12 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       // ignore face/people detection. already processed.
       if (detection.faces || detection.people)
         return;
+
+      // no person, ignore it
+      const person = detection && detection.detections.find(detection => detection.className === 'person');
+      if (!person)
+        return;
+
       let video = await this.realDevice.getDetectionInput(detection.detectionId);
       let detectionInput = this.detections.get(detection.detectionId);
       if (!detectionInput) {
@@ -255,12 +258,36 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       }
 
       for (let i = 0; i < 10; i++) {
-        this.throttledFaceDetect(detectionInput, detection);
+        this.throttledFaceDetect(detectionInput);
         await sleep(1000);
         detectionInput?.input?.dispose();
         detectionInput = undefined;
       }
     });
+  }
+
+  async extendedFaceDetect() {
+    for (let i = 0; i < 60; i++) {
+      this.throttledFaceDetect(undefined);
+      await sleep(1000);
+    }
+  }
+
+  reportObjectDetections(detectionInput?: DetectionInput) {
+    const detectionId = Math.random().toString();
+    const detection: ObjectDetection = {
+      timestamp: Date.now(),
+      detectionId: detectionInput ? detectionId : undefined,
+      inputDimensions: detectionInput
+        ? [detectionInput?.input.shape[1], detectionInput?.input.shape[0]]
+        : undefined,
+      detections: this.currentDetections.map(d => d.detection),
+    }
+
+    if (detectionInput)
+      this.detections.set(detectionId, detectionInput);
+
+    this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
 
   async objectDetect(detectionInput: DetectionInput) {
@@ -272,56 +299,61 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
     const ssd = await ssdPromise;
     const detections: DetectedObject[] = await ssd.detect(input);
-    const detectionId = Math.random().toString();
-    const detection: ObjectDetection = {
-      timestamp: Date.now(),
-      detectionId,
-      inputDimensions: [input.shape[1], input.shape[0]],
-      detections: detections.map(detection => ({
+
+    const found: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
+    denoiseDetections<ObjectDetectionResult>(this.currentDetections, detections.map(detection => ({
+      name: detection.class,
+      detection: {
         className: detection.class,
         score: detection.score,
         boundingBox: detection.bbox,
-      })),
-    }
-
-    this.detections.set(detectionId, detectionInput);
-    setTimeout(() => this.detections.delete(detectionId), 30000);
-
-    this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
-
-    const found: string[] = [];
-    const classNames = detections.map(d => d.class);
-    for (const className of classNames) {
-      const index = this.currentDetections.indexOf(className);
-      if (index === -1) {
-        found.push(className);
+      },
+    })), {
+      added: d => found.push(d),
+      removed: d => {
+        this.console.log('no longer detected', d.name)
+        this.reportObjectDetections()
       }
-      else {
-        this.currentDetections.splice(index, 1);
-      }
-    }
-
-    // anything remaining in currentDetections at this point has left the scene.
-    if (this.currentDetections.length) {
-      this.console.log('no longer detected', this.currentDetections.join(', '))
-    }
+    });
     if (found.length) {
-      this.console.log('detected', found.join(', '));
+      this.console.log('detected', found.map(d => d.detection.className).join(', '));
     }
-    this.currentDetections = [...classNames];
+
+    this.reportObjectDetections(detectionInput);
   }
 
-  async faceDetect(detectionInput: DetectionInput, detection: ObjectDetection) {
-    const person = detection.detections.find(detection => detection.className === 'person');
+  reportPeopleDetections(faces?: ObjectDetectionResult[], detectionInput?: DetectionInput) {
+    const detectionId = Math.random().toString();
+    const detection: ObjectDetection = {
+      timestamp: Date.now(),
+      detectionId: detectionInput ? detectionId : undefined,
+      inputDimensions: detectionInput
+        ? [detectionInput?.input.shape[1], detectionInput?.input.shape[0]]
+        : undefined,
+      people: this.currentPeople.map(d => d.detection),
+      faces,
+    }
 
-    // no people
-    const recognition: ObjectDetection = Object.assign({
-      people: [],
-      faces: [],
-    }, detection);
-    if (!person) {
-      this.onDeviceEvent(ScryptedInterface.ObjectDetector, recognition);
-      return;
+    if (detectionInput)
+      this.detections.set(detectionId, detectionInput);
+
+    this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
+  }
+
+
+  async faceDetect(detectionInput: DetectionInput) {
+    let faces: ObjectDetectionResult[] = [];
+    let people: FaceRecognition[] = [];
+    const report = () => {
+      denoiseDetections(this.currentPeople, [],
+        {
+          removed: d => {
+            this.console.log('no longer detected', d.detection.label)
+            this.reportPeopleDetections(faces, detectionInput);
+          },
+        })
+
+      this.reportPeopleDetections(faces, detectionInput);
     }
 
     if (!detectionInput) {
@@ -337,18 +369,15 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
     // no faces
     if (!facesDetected.length) {
-      this.onDeviceEvent(ScryptedInterface.ObjectDetector, recognition);
+      report();
       return;
     }
 
-    const faces: ObjectDetectionResult[] = facesDetected.map(face => ({
+    faces = facesDetected.map(face => ({
       className: 'face',
       score: face.detection.score,
       boundingBox: makeBoundingBoxFromFace(face),
-    }))
-
-    recognition.people = [];
-    recognition.faces = faces;
+    }));
 
     const unknowns: {
       q: Float32Array,
@@ -376,7 +405,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
           continue;
 
         const nativeId = match.m.label;
-        recognition.people.push({
+        people.push({
           id: nativeId,
           label: deviceManager.getDeviceState(nativeId)?.name,
           score: 1 - match.m.distance,
@@ -392,7 +421,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       for (const unknown of unknowns) {
         const nativeId = 'person:' + Buffer.from(randomBytes(8)).toString('hex');
 
-        recognition.people.push({
+        people.push({
           id: nativeId,
           label: `Unknown Person (${nativeId})`,
           score: unknown.r.score,
@@ -430,28 +459,50 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       this.tensorFlow.reloadFaceMatcher();
     }
 
-    this.onDeviceEvent(ScryptedInterface.ObjectDetector, recognition);
+    const found: DenoisedDetectionEntry<FaceRecognition>[] = [];
+    denoiseDetections(this.currentPeople, people.map(person => ({
+      detection: person,
+      name: person.label,
+    })),
+      {
+        added: d => found.push(d),
+        removed: d => {
+          this.console.log('no longer detected', d.detection.label)
+          report();
+        },
+      });
 
-    const missing: string[] = [];
-    for (const check of recognition.people) {
-      if (!this.currentPeople.has(check.id)) {
-        missing.push(check.id);
+    const actualNew: DenoisedDetectionEntry<FaceRecognition>[] = [];
+    // after denoising, resolve all newly found people against the current list.
+    for (const person of found) {
+      let index: number;
+      if (person.detection.label.startsWith('Unknown Person')) {
+        // new unknowns may possibly be unrecognizable and thus missing faces this pass
+        index = this.currentPeople.findIndex(check => !check.detection.label.startsWith('Unknown Person') && check.timeout);
       }
       else {
-        this.currentPeople.delete(check.id);
+        // new people may possibly be unrecognizable people and thus missing from the previous pass
+        index = this.currentPeople.findIndex(check => check.detection.label.startsWith('Unknown Person') && check.timeout);
+      }
+      // todo: sort by closest bounding box or something
+      if (index !== -1) {
+        clearTimeout(this.currentPeople[index].timeout);
+        this.currentPeople.splice(index, 1);
+      }
+      else {
+        actualNew.push(person);
       }
     }
 
-    if (this.currentPeople.size) {
-      this.console.log('no longer detected', [...this.currentDetections].join(', '))
+    if (found.length) {
+      this.console.log('detected', found.map(d => d.detection.label).join(', '));
+      this.extendedFaceDetect()
     }
-    if (recognition.people.length) {
-      this.console.log('detected', recognition.people.map(p => `${p.label}: ${p.score}`).join(', '));
-    }
+    this.reportPeopleDetections(faces, detectionInput);
 
-    this.currentPeople.clear();
-    for (const add of recognition.people) {
-      this.currentPeople.add(add.id);
+    for (const person of this.currentDetections) {
+      person.detection.boundingBox = undefined;
+      person.detection.score = undefined;
     }
   }
 
