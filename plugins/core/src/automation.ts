@@ -4,6 +4,7 @@ import { AutomationJavascript } from "./builtins/javascript";
 import { Scheduler } from "./builtins/scheduler";
 import { Listen } from "./builtins/listen";
 import { scryptedEval } from "./scrypted-eval";
+import { AutomationShellScript } from "./builtins/shellscript";
 const { systemManager } = sdk;
 
 export class Automation extends ScryptedDeviceBase implements OnOff {
@@ -56,6 +57,10 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
                     if (id === 'scriptable') {
                         const script = new AutomationJavascript(this, eventSource, eventDetails, eventData);
                         script.run(action.model['script.ts'])
+                    }
+                    if (id === 'shell-scriptable') {
+                        const script = new AutomationShellScript(this, eventSource, eventDetails, eventData);
+                        script.run(action.model['script.sh'])
                     }
                     else {
                         const device = systemManager.getDeviceById(id);

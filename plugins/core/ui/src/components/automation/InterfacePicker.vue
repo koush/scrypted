@@ -32,6 +32,7 @@ import Unassigned from "../../interfaces/Unassigned.vue";
 import Condition from "../../interfaces/automation/Condition.vue";
 import Timer from "../../interfaces/automation/Timer.vue";
 import Scriptable from "../../interfaces/automation/Scriptable.vue";
+import ShellScriptable from "../../interfaces/automation/ShellScriptable.vue";
 
 import EventListener from "../../interfaces/EventListener.vue";
 import OnOff from "../../interfaces/OnOff.vue";
@@ -47,7 +48,6 @@ import Program from "../../interfaces/Program.vue";
 import ColorSettingRgb from "../../interfaces/ColorSettingRgb.vue";
 import ColorSettingTemperature from "../../interfaces/ColorSettingTemperature.vue";
 import Brightness from "../../interfaces/Brightness.vue";
-import { actionableInterfaces } from "./interfaces";
 
 import Select2 from "../../common/Select2.vue";
 function unassigned() {
@@ -75,6 +75,7 @@ export default {
     Condition,
     Timer,
     Scriptable,
+    ShellScriptable,
 
     EventListener,
     OnOff,

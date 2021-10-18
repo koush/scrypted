@@ -92,11 +92,11 @@ export default {
   data() {
     return {
       scriptSource: {
-        filename: null,
-        script: null,
+        filename: "script.ts",
+        script: '',
         scriptTitle: "Script",
         language: "typescript",
-        monacoEvalDefaults: null,
+        monacoEvalDefaults: () => monacoEvalDefaults,
       },
     };
   },
@@ -122,10 +122,9 @@ export default {
       } else {
         this.scriptSource.filename =
           Object.keys(this.lazyValue).filter((k) => k !== "rpc")[0] ||
-          "script.ts";
+          this.scriptSource.filename;
         this.scriptSource.script =
           this.lazyValue[this.scriptSource.filename]?.toString();
-        this.scriptSource.monacoEvalDefaults = () => monacoEvalDefaults;
       }
 
       const editor = monaco.editor.create(this.$refs.container, {
@@ -151,7 +150,7 @@ export default {
       });
 
       const f = this.scriptSource.monacoEvalDefaults?.();
-      f(monaco);
+      f?.(monaco);
     },
     eval() {
       this.device.eval({

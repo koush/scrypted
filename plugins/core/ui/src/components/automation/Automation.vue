@@ -220,8 +220,13 @@ export default {
       const ret = [
         {
           id: "scriptable",
-          text: "Run Script",
+          text: "Run Javascript",
           component: "Scriptable",
+        },
+        {
+          id: "shell-scriptable",
+          text: "Run Shell Script",
+          component: "ShellScriptable",
         },
       ];
 
