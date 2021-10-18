@@ -239,7 +239,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         const server: EventedHTTPServer = (this.bridge as any)._server.httpServer;
         server.on('connection-opened', connection => {
             connection.on('authenticated', () => {
-                this.console.log('homekit hub', connection.remoteAddress);
+                this.console.log('HomeKit Connection', connection.remoteAddress);
                 this.homekitConnections.add(connection.remoteAddress);
             })
             connection.on('closed', () => this.homekitConnections.delete(connection.remoteAddress));
