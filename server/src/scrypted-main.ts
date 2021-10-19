@@ -181,7 +181,12 @@ else {
 
                 res.locals.username = username;
             }
-            else if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
+            next();
+        });
+
+        // allow basic auth to deploy plugins
+        app.all('/web/component/*', (req, res, next) => {
+            if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
                 const basicChecker = basicAuth.check((req) => {
                     res.locals.username = req.user;
                     next();
@@ -192,14 +197,9 @@ else {
                 return;
             }
             next();
-        });
+        })
 
-        console.log('#############################################');
-        console.log(`Scrypted Server: https://localhost:${SCRYPTED_SECURE_PORT}/`);
-        console.log('#############################################');
-        const scrypted = new ScryptedRuntime(db, insecure, secure, app);
-        await scrypted.start();
-
+        // verify all plugin related requests have some sort of auth
         app.all('/web/component/*', (req, res, next) => {
             if (!res.locals.username) {
                 res.status(401);
@@ -208,6 +208,12 @@ else {
             }
             next();
         })
+
+        console.log('#############################################');
+        console.log(`Scrypted Server: https://localhost:${SCRYPTED_SECURE_PORT}/`);
+        console.log('#############################################');
+        const scrypted = new ScryptedRuntime(db, insecure, secure, app);
+        await scrypted.start();
 
         app.get(['/web/component/script/npm/:pkg', '/web/component/script/npm/@:owner/:pkg'], async (req, res) => {
             const { owner, pkg } = req.params;

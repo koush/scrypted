@@ -381,7 +381,7 @@ export class ScryptedRuntime {
         }
     }
 
-    async killPlugin(plugin: Plugin) {
+    killPlugin(plugin: Plugin) {
         const existing = this.plugins[plugin._id];
         if (existing) {
             delete this.plugins[plugin._id];
@@ -453,7 +453,7 @@ export class ScryptedRuntime {
     }
 
     async runPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
-        await this.killPlugin(plugin);
+        this.killPlugin(plugin);
 
         const pluginDevices = this.findPluginDevices(plugin._id);
         for (const pluginDevice of pluginDevices) {
