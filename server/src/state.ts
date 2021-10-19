@@ -96,7 +96,7 @@ export class ScryptedStateManager extends EventRegistry {
         if (!device)
             throw new Error(`device not found for id ${id}`);
 
-        this.setPluginDeviceState(device, property, value);
+        return this.setPluginDeviceState(device, property, value);
     }
 
     getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } } {

@@ -24,7 +24,9 @@ export class PluginComponent {
         this.scrypted.stateManager.notifyInterfaceEvent(pluginDevice, 'Storage', undefined);
     }
     async setMixins(id: string, mixins: string[]) {
-        this.scrypted.stateManager.setState(id, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
+        const pluginDevice = this.scrypted.findPluginDeviceById(id);
+        this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
+        await this.scrypted.datastore.upsert(pluginDevice);
         const device = this.scrypted.invalidatePluginDevice(id);
         await device?.handler.ensureProxy();
     }

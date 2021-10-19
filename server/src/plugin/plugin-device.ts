@@ -110,14 +110,8 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                 }
             }
 
-            // mixins may have modified the interfaces by being added, removed, or crashed.
-            // update the interface property only if necessary.
-            const previousInterfaces: ScryptedInterface[] = getState(pluginDevice, ScryptedInterfaceProperty.interfaces) || [];
-            if (!hasSameElements(allInterfaces, previousInterfaces)) {
-                this.scrypted.stateManager.setPluginDeviceState(pluginDevice,
-                    ScryptedInterfaceProperty.interfaces,
-                    [... new Set(allInterfaces)]);
-            }
+            allInterfaces.sort();
+            this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, allInterfaces);
 
             return mixinTable;
         })();
