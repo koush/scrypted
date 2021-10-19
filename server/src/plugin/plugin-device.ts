@@ -110,8 +110,8 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                 }
             }
 
-            allInterfaces.sort();
-            this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, allInterfaces);
+            const mixinInterfaces = [...new Set(allInterfaces)].sort();
+            this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
 
             return mixinTable;
         })();
