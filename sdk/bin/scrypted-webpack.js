@@ -91,10 +91,15 @@ async function pack() {
             };
             config.output.path = out;
             config.output.filename = runtime.output;
-            
+
             webpack(config, (err, stats) => {
                 if (err)
                     return reject(err);
+
+                if (stats.hasErrors()) {
+                    console.error(stats.toJson().errors);
+                    return reject(new Error('webpack failed'));
+                }
 
                 // create a zip that has a main.js in the root, and an fs folder containing a read only virtual file system.
                 // todo: read write file system? seems like a potential sandbox and backup nightmare to do a real fs. scripts should
