@@ -10,6 +10,7 @@ import qrcode from 'qrcode';
 import packageJson from "../package.json";
 import { randomPinCode } from './pincode';
 import { EventedHTTPServer } from '../HAP-NodeJS/src/lib/util/eventedhttp';
+import { AddressInfo } from 'net';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -83,13 +84,15 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
     getHomeKitHubs(): string[] {
         try {
-            return JSON.parse(this.storage.getItem('homekitHubs'));            
+            return JSON.parse(this.storage.getItem('homekitHubs'));
         }
         catch (e) {
         }
     }
 
     async getSettings(): Promise<Setting[]> {
+        const addresses = (Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
+            .flat().map(([, entry]) => entry.address).filter((address: string) => address);
         return [
             {
                 title: "Manual Pairing Code",
@@ -112,7 +115,9 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 title: 'Bridge Address',
                 value: localStorage.getItem('addressOverride'),
                 key: 'addressOverride',
-                description: 'Optional: The network address used by the Scrypted bridge. Set this to the wired address to prevent usage of wireless address.'
+                description: 'Optional: The network address used by the Scrypted bridge. Set this to the wired address to prevent usage of wireless address.',
+                choices: addresses,
+                combobox: true,
             },
             {
                 title: 'HomeKit Hubs',
