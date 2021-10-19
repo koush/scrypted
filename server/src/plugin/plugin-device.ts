@@ -106,7 +106,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                     })
                 }
                 catch (e) {
-                    console.warn("mixing provider failure", e);
+                    console.warn("mixin provider failure", mixinId, e);
                 }
             }
 
