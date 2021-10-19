@@ -11,7 +11,7 @@ import Url from 'url';
 import sdk from "@scrypted/sdk";
 import { once } from 'events';
 
-const {deviceManager, endpointManager } = sdk;
+const { deviceManager, endpointManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
 
@@ -33,31 +33,8 @@ export async function createDefaultRtcManager(): Promise<GcmRtcManager> {
     return manager;
 }
 
-async function whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer | string> {
-    const local = Url.parse(localUrl);
-    const token_info = localStorage.getItem('token_info');
-    const q = qs.stringify({
-        scope: local.path,
-        ttl,
-    })
-    const scope = await axios(`https://home.scrypted.app/_punch/scope?${q}`, {
-        headers: {
-            Authorization: `Bearer ${token_info}`
-        },
-    })
-
-    const { userToken, userTokenSignature } = scope.data;
-    const tokens = qs.stringify({
-        user_token: userToken,
-        user_token_signature: userTokenSignature
-    })
-
-    const url = `${baseUrl}${local.path}?${tokens}`;
-    return url;
-}
-
 class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
-    constructor() {
+    constructor(public cloud: ScryptedCloud) {
         super('push');
 
         this.fromMimeType = ScryptedMimeTypes.PushEndpoint;
@@ -67,7 +44,7 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 
     async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer | string> {
         const url = `http://localhost/push/${data}`;
-        return whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, 'https://home.scrypted.app/_punch/cloudmessage');
+        return this.cloud.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.cloud.getHostname()}/_punch/cloudmessage`);
     }
 }
 
@@ -76,6 +53,36 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     server: Server;
     proxy: HttpProxy;
     push: ScryptedPush;
+
+
+    async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer | string> {
+        const local = Url.parse(localUrl);
+
+        if (this.storage.getItem('hostname')) {
+            return `${baseUrl}${local.path}`;
+        }
+
+        const token_info = this.storage.getItem('token_info');
+        const q = qs.stringify({
+            scope: local.path,
+            ttl,
+        })
+        const scope = await axios(`https://${this.getHostname()}/_punch/scope?${q}`, {
+            headers: {
+                Authorization: `Bearer ${token_info}`
+            },
+        })
+
+        const { userToken, userTokenSignature } = scope.data;
+        const tokens = qs.stringify({
+            user_token: userToken,
+            user_token_signature: userTokenSignature
+        })
+
+        const url = `${baseUrl}${local.path}?${tokens}`;
+        return url;
+    }
+
 
     constructor() {
         super();
@@ -94,31 +101,45 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     interfaces: [ScryptedInterface.BufferConverter],
                 },
             );
-            this.push = new ScryptedPush();
+            this.push = new ScryptedPush(this);
         })();
     }
 
     async discoverDevices(duration: number) {
     }
+
     getDevice(nativeId: string) {
         return this.push;
     }
 
+    getHostname() {
+        const hostname = this.storage.getItem('hostname') || 'home.scrypted.app';
+        return hostname;
+    }
+
     async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer | string> {
-        return whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, 'https://home.scrypted.app');
+        return this.whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}`);
     }
 
     async getSettings(): Promise<Setting[]> {
         return [
             {
-                title: 'Refresh Token',
-                value: this.storage.getItem('token_info'),
-                description: 'Authorization token used by Scrypted Cloud.',
-                readonly: true,
-            }
+                title: 'Hostname',
+                key: 'hostname',
+                value: this.storage.getItem('hostname'),
+                description: 'Optional/Recommended: The hostname to reach this Scrypted server on https port 443. This will bypass usage of Scrypted cloud when possible. You will need to set up SSL termination.',
+                placeholder: 'my-server.dyndns.com'
+            },
+            // {
+            //     title: 'Refresh Token',
+            //     value: this.storage.getItem('token_info'),
+            //     description: 'Authorization token used by Scrypted Cloud.',
+            //     readonly: true,
+            // },
         ]
     }
     async putSetting(key: string, value: string | number | boolean) {
+        this.storage.setItem(key, value.toString());
     }
 
     async getOauthUrl(): Promise<string> {
@@ -126,7 +147,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             registration_id: this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
         })
-        return `https://home.scrypted.app/_punch/login?${args}`
+        return `https://${this.getHostname()}/_punch/login?${args}`
     }
 
     async onOauthCallback(callbackUrl: string) {
@@ -147,15 +168,15 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
                 const query = qs.parse(url.query);
                 if (!query.callback_url && query.token_info && query.user_info) {
-                    localStorage.setItem('token_info', query.token_info as string)
-                    res.setHeader('Location', 'https://home.scrypted.app/endpoint/@scrypted/core/public/');
+                    this.storage.setItem('token_info', query.token_info as string)
+                    res.setHeader('Location', `https://${this.getHostname()}/endpoint/@scrypted/core/public/`);
                     res.writeHead(302);
                     res.end();
                     return;
                 }
             }
             else if (url.path === '/web/') {
-                res.setHeader('Location', 'https://home.scrypted.app/endpoint/@scrypted/core/public/');
+                res.setHeader('Location', `https://${this.getHostname()}/endpoint/@scrypted/core/public/`);
                 res.writeHead(302);
                 res.end();
                 return;
@@ -176,15 +197,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             this.proxy.ws(req, socket, head, { target: wssTarget.toString(), ws: true, secure: false });
         })
 
-        // this.server = net.createServer(conn => console.log('connectionz')) as any;
-
-        // listen(0) does not work in a cluster!!!
-        // https://nodejs.org/api/cluster.html#cluster_how_it_works
-        // server.listen(0) Normally, this will cause servers to listen on a random port.
-        // However, in a cluster, each worker will receive the same "random" port each time they
-        // do listen(0). In essence, the port is random the first time, but predictable thereafter.
-        // To listen on a unique port, generate a port number based on the cluster worker ID.
-        this.server.listen(10081 + Math.round(Math.random() * 10000), '127.0.0.1');
+        this.server.listen(0, '127.0.0.1');
 
         await once(this.server, 'listening');
         const port = (this.server.address() as any).port;
