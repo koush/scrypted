@@ -331,6 +331,13 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     }
 
     async getSettings(): Promise<Setting[]> {
+        let endpoint = 'Error retrieving Cloud Endpoint';
+        try {
+            endpoint = await endpointManager.getPublicCloudEndpoint();
+        }
+        catch (e) {
+        }
+
         return [
             {
                 key: 'projectId',
@@ -350,18 +357,19 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 description: 'Google Device Access Client Secret',
                 value: this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg',
             },
-            // {
-            //     title: "PubSub Address",
-            //     description: "The root web address to reach your web server.",
-            //     key: 'pubsubAddress',
-            //     value: localStorage.getItem('pubsubAddress'),
-            //     placeholder: 'http://somehost.dyndns.org',
-            // }
+            {
+                title: "PubSub Address",
+                description: "The PubSub address to enter in Google Cloud console.",
+                key: 'pubsubAddress',
+                readonly: true,
+                value: endpoint,
+                placeholder: 'http://somehost.dyndns.org',
+            }
         ];
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
-        localStorage.setItem(key, value as string);
+        this.storage.setItem(key, value as string);
         this.updateClient();
         this.token = undefined;
         this.refresh();
@@ -370,7 +378,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     async loadToken() {
         try {
             if (!this.token) {
-                this.token = this.client.createToken(JSON.parse(localStorage.getItem('token')));
+                this.token = this.client.createToken(JSON.parse(this.storage.getItem('token')));
                 this.token.expiresIn(-1000);
             }
         }
@@ -386,7 +394,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     }
 
     saveToken() {
-        localStorage.setItem('token', JSON.stringify(this.token.data));
+        this.storage.setItem('token', JSON.stringify(this.token.data));
     }
 
     async refresh(): Promise<any> {
@@ -448,11 +456,6 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 this.console.error(e);
             }
         }
-
-        (async () => {
-            const endpoint = await endpointManager.getPublicCloudEndpoint();
-            this.console.log('pubsub endpoint:', endpoint);
-        })();
 
         // const structuresResponse = await this.authGet('/structures');
 
