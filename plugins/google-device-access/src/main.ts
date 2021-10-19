@@ -1,4 +1,4 @@
-import sdk, { Camera, DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions } from '@scrypted/sdk';
+import sdk, { Camera, DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -35,7 +35,7 @@ function toNestMode(mode: ThermostatMode): string {
     }
 }
 
-class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor {
+class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor, BinarySensor {
     constructor(public provider: GoogleSmartDeviceAccess, public device: any) {
         super(device.name.split('/').pop());
         this.provider = provider;
@@ -310,17 +310,24 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 if (device.type === 'sdm.devices.types.THERMOSTAT') {
                     new NestThermostat(this, device);
                 }
-                else if (device.type === 'sdm.devices.types.CAMERA') {
+                else if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL') {
                     new NestCamera(this, device);
                 }
             }
 
             if (events) {
-                if (device.type === 'sdm.devices.types.CAMERA') {
+                if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL') {
                     if (events['sdm.devices.events.CameraMotion.Motion']) {
                         const camera = new NestCamera(this, device);
                         camera.motionDetected = true;
                         setTimeout(() => camera.motionDetected = false, 30000);
+                    }
+                }
+                if (device.type === 'sdm.devices.types.DOORBELL') {
+                    if (events['sdm.devices.events.DoorbellChime.Chime']) {
+                        const camera = new NestCamera(this, device);
+                        camera.binaryState = true;
+                        setTimeout(() => camera.binaryState = false, 30000);
                     }
                 }
             }
@@ -480,17 +487,25 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     ]
                 })
             }
-            else if (device.type === 'sdm.devices.types.CAMERA') {
+            else if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL') {
                 this.devices.set(nativeId, device);
+
+                const interfaces = [
+                    ScryptedInterface.VideoCamera,
+                    ScryptedInterface.MotionSensor,
+                ];
+
+                let type = ScryptedDeviceType.Camera;
+                if (device.type === 'sdm.devices.types.DOORBELL') {
+                    interfaces.push(ScryptedInterface.BinarySensor);
+                    type = ScryptedDeviceType.Doorbell;
+                }
 
                 deviceManifest.devices.push({
                     name: device.traits?.['sdm.devices.traits.Info']?.customName || device.parentRelations?.[0]?.displayName,
                     nativeId: nativeId,
-                    type: ScryptedDeviceType.Camera,
-                    interfaces: [
-                        ScryptedInterface.VideoCamera,
-                        ScryptedInterface.MotionSensor,
-                    ]
+                    type,
+                    interfaces,
                 })
             }
         }
@@ -505,7 +520,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         if (device.type === 'sdm.devices.types.THERMOSTAT') {
             return new NestThermostat(this, device);
         }
-        else if (device.type === 'sdm.devices.types.CAMERA') {
+        else if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL') {
             return new NestCamera(this, device);
         }
     }
