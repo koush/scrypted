@@ -51,10 +51,11 @@ export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
         mixins.push(this.id);
         const plugins = await this.pluginsComponent;
         await plugins.setMixins(device.id, mixins);
+        this.setHasEnabledMixin(device.id);
     }
 
     setHasEnabledMixin(id: string) {
-        if (this.hasEnabledMixin[id])
+        if (this.hasEnabledMixin[id] === autoIncludeToken)
             return;
         this.hasEnabledMixin[id] = autoIncludeToken;
         this.storage.setItem('hasEnabledMixin', JSON.stringify(this.hasEnabledMixin));
