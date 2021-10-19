@@ -8,28 +8,6 @@ import throttle from 'lodash/throttle';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
 
-let clientId = localStorage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com';
-let clientSecret = localStorage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg';
-let projectId = localStorage.getItem('projectId') || '778da527-9690-4368-9c96-6872bb29e7a0';
-
-let authorizationUri: string;
-let client: ClientOAuth2;
-
-function updateClient() {
-    authorizationUri = `https://nestservices.google.com/partnerconnections/${projectId}/auth`
-    client = new ClientOAuth2({
-        clientId,
-        clientSecret,
-        accessTokenUri: 'https://www.googleapis.com/oauth2/v4/token',
-        authorizationUri,
-        scopes: [
-            'https://www.googleapis.com/auth/sdm.service',
-        ]
-    });
-}
-
-updateClient();
-
 const refreshFrequency = 60;
 
 function fromNestMode(mode: string): ThermostatMode {
@@ -87,7 +65,8 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
             ]
         })
     }
-    async getVideoStreamOptions(): Promise<void | MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+        return;
     }
 }
 
@@ -266,13 +245,40 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
 class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient, DeviceProvider, Settings, HttpRequestHandler {
     token: ClientOAuth2.Token;
     devices = new Map<string, any>();
+
+    clientId: string;
+    clientSecret: string;
+    projectId: string;
+
+    authorizationUri: string;
+    client: ClientOAuth2;
+
+    updateClient() {
+        this.clientId = this.storage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com';
+        this.clientSecret = this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg';
+        this.projectId = this.storage.getItem('projectId') || '778da527-9690-4368-9c96-6872bb29e7a0';
+
+        this.authorizationUri = `https://nestservices.google.com/partnerconnections/${this.projectId}/auth`
+        this.client = new ClientOAuth2({
+            clientId: this.clientId,
+            clientSecret: this.clientSecret,
+            accessTokenUri: 'https://www.googleapis.com/oauth2/v4/token',
+            authorizationUri: this.authorizationUri,
+            scopes: [
+                'https://www.googleapis.com/auth/sdm.service',
+            ]
+        });
+    }
+
     refreshThrottled = throttle(async () => {
         const response = await this.authGet('/devices');
         const userId = response.headers['user-id'];
         if (userId && this.storage.getItem('userId') !== userId) {
             try {
+                const endpoint = await endpointManager.getPublicCloudEndpoint();
+                this.console.log('pubsub endpoint:', endpoint);
                 await axios.post(`https://scrypted-gda-server.uw.r.appspot.com/register/${userId}`, {
-                    endpoint: await endpointManager.getPublicCloudEndpoint(),
+                    endpoint,
                 });
                 this.storage.setItem('userId', userId);
             }
@@ -285,6 +291,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
     constructor() {
         super();
+        this.updateClient();
         this.discoverDevices(0).catch(() => { });
     }
 
@@ -326,26 +333,36 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     async getSettings(): Promise<Setting[]> {
         return [
             {
+                key: 'projectId',
                 title: 'Project ID',
                 description: 'Google Device Access Project ID',
-                value: localStorage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com',
+                value: this.storage.getItem('projectId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com',
             },
             {
+                key: 'clientId',
                 title: 'Client ID',
                 description: 'Google Device Access Client ID',
-                value: localStorage.getItem('projectId') || '778da527-9690-4368-9c96-6872bb29e7a0',
+                value: this.storage.getItem('clientId') || '778da527-9690-4368-9c96-6872bb29e7a0',
             },
             {
+                key: 'clientSecret',
                 title: 'Client Secret',
                 description: 'Google Device Access Client Secret',
-                value: localStorage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg',
+                value: this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg',
             },
+            // {
+            //     title: "PubSub Address",
+            //     description: "The root web address to reach your web server.",
+            //     key: 'pubsubAddress',
+            //     value: localStorage.getItem('pubsubAddress'),
+            //     placeholder: 'http://somehost.dyndns.org',
+            // }
         ];
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
         localStorage.setItem(key, value as string);
-        updateClient();
+        this.updateClient();
         this.token = undefined;
         this.refresh();
     }
@@ -353,7 +370,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     async loadToken() {
         try {
             if (!this.token) {
-                this.token = client.createToken(JSON.parse(localStorage.getItem('token')));
+                this.token = this.client.createToken(JSON.parse(localStorage.getItem('token')));
                 this.token.expiresIn(-1000);
             }
         }
@@ -378,19 +395,19 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
     async getOauthUrl(): Promise<string> {
         const params = {
-            client_id: clientId,
+            client_id: this.clientId,
             access_type: 'offline',
             prompt: 'consent',
             response_type: 'code',
             scope: 'https://www.googleapis.com/auth/sdm.service',
         }
-        return `${authorizationUri}?${qs.stringify(params)}`;
+        return `${this.authorizationUri}?${qs.stringify(params)}`;
     }
     async onOauthCallback(callbackUrl: string) {
         const cb = new URL(callbackUrl);
         cb.search = '';
         const redirectUri = cb.toString();
-        this.token = await client.code.getToken(callbackUrl, {
+        this.token = await this.client.code.getToken(callbackUrl, {
             redirectUri,
         });
         this.saveToken();
@@ -400,7 +417,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
     async authGet(path: string) {
         await this.loadToken();
-        return axios(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${projectId}${path}`, {
+        return axios(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${this.projectId}${path}`, {
             // validateStatus() {
             //     return true;
             // },
@@ -412,7 +429,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
     async authPost(path: string, data: any) {
         await this.loadToken();
-        return axios.post(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${projectId}${path}`, data, {
+        return axios.post(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${this.projectId}${path}`, data, {
             headers: {
                 Authorization: `Bearer ${this.token.accessToken}`
             }
@@ -431,6 +448,11 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 this.console.error(e);
             }
         }
+
+        (async () => {
+            const endpoint = await endpointManager.getPublicCloudEndpoint();
+            this.console.log('pubsub endpoint:', endpoint);
+        })();
 
         // const structuresResponse = await this.authGet('/structures');
 
