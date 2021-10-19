@@ -19,7 +19,7 @@ Supported accessories:
 
 ## Run on Docker
 
-[Instructions](DOCKER.md)
+[Instructions](https://github.com/koush/scrypted/wiki/Docker)
 
 ## Run Locally
 
