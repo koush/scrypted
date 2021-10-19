@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BufferConverter, DeviceProvider, HttpRequest, OauthClient, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
+import { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
 import qs from 'query-string';
 import { GcmRtcManager, GcmRtcConnection } from './legacy';
 import { Duplex } from 'stream';
@@ -10,6 +10,7 @@ import { Server, createServer } from 'http';
 import Url from 'url';
 import sdk from "@scrypted/sdk";
 import { once } from 'events';
+import path from 'path';
 
 const { deviceManager, endpointManager } = sdk;
 
@@ -33,6 +34,8 @@ export async function createDefaultRtcManager(): Promise<GcmRtcManager> {
     return manager;
 }
 
+const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
+
 class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
     constructor(public cloud: ScryptedCloud) {
         super('push');
@@ -43,17 +46,21 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 
 
     async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer | string> {
+        if (this.cloud.storage.getItem('hostname')) {
+            return `https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`;
+        }
+
         const url = `http://localhost/push/${data}`;
-        return this.cloud.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.cloud.getHostname()}/_punch/cloudmessage`);
+        return this.cloud.whitelist(url, 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.cloud.getHostname()}${SCRYPTED_CLOUD_MESSAGE_PATH}`);
     }
 }
 
-class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider {
+class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
     manager: GcmRtcManager;
     server: Server;
     proxy: HttpProxy;
     push: ScryptedPush;
-
+    cloudMessagePath: Promise<string>;
 
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer | string> {
         const local = Url.parse(localUrl);
@@ -105,6 +112,18 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })();
     }
 
+    async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        response.send('ok');
+
+        const cm = await this.getCloudMessagePath();
+        const { url } = request;
+        if (url.startsWith(cm)) {
+            const endpoint = url.substring(cm.length + 1);
+            request.rootPath = '/';
+            endpointManager.deliverPush(endpoint, request);
+        }
+    }
+
     async discoverDevices(duration: number) {
     }
 
@@ -138,8 +157,20 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             // },
         ]
     }
+
     async putSetting(key: string, value: string | number | boolean) {
         this.storage.setItem(key, value.toString());
+        this.cloudMessagePath = undefined;
+    }
+
+    async getCloudMessagePath() {
+        if (!this.cloudMessagePath) {
+            this.cloudMessagePath = (async () => {
+                const url = new URL(await endpointManager.getPublicLocalEndpoint());
+                return path.join(url.pathname, 'cloudmessage');
+            })()
+        }
+        return this.cloudMessagePath;
     }
 
     async getOauthUrl(): Promise<string> {
@@ -163,7 +194,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         const googleHomeTarget = new URL(httpsTarget);
         googleHomeTarget.pathname = '/endpoint/@scrypted/google-home/public/';
 
-        this.server = createServer((req, res) => {
+        this.server = createServer(async (req, res) => {
             const url = Url.parse(req.url);
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
                 const query = qs.parse(url.query);
@@ -175,6 +206,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     return;
                 }
             }
+
             else if (url.path === '/web/') {
                 res.setHeader('Location', `https://${this.getHostname()}/endpoint/@scrypted/core/public/`);
                 res.writeHead(302);
