@@ -29,7 +29,8 @@ module.exports = {
                 test: /\.(ts|js)x?$/,
                 // unsure if this is correct... need to transpile node modules at times.
                 // exclude: /(node_modules|bower_components)/,
-                exclude: /(core-js)/,
+                // exclude: /(core-js|)/,
+                exclude: /(core-js|node_modules|bower_components)/,
                 use: {
                     loader: 'babel-loader',
                     options: {
