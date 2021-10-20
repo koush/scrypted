@@ -116,6 +116,7 @@ export default {
     return {
       updateAndRestart: false,
       restart: false,
+      restartStatus: undefined,
     }
   },
   // data() {

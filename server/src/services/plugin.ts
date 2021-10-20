@@ -1,4 +1,4 @@
-import { ScryptedInterfaceProperty } from "@scrypted/sdk/types";
+import { ScryptedInterfaceProperty, ScryptedNativeId } from "@scrypted/sdk/types";
 import { ScryptedRuntime } from "../runtime";
 import { Plugin } from '../db-types';
 import { getState } from "../state";
@@ -39,6 +39,9 @@ export class PluginComponent {
     }
     async getIdForPluginId(pluginId: string) {
         return this.scrypted.findPluginDevice(pluginId)?._id;
+    }
+    async getIdForNativeId(pluginId: string, nativeId: ScryptedNativeId) {
+        return this.scrypted.findPluginDevice(pluginId, nativeId)?._id;
     }
     async getPluginId(id: string) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);

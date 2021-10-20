@@ -3,6 +3,7 @@ import BasicComponent from "../BasicComponent.vue";
 import PluginUpdate from "./PluginUpdate.vue";
 import PluginPid from "./PluginPid.vue";
 import PluginStats from "./PluginStats.vue";
+import { getDeviceViewPath } from "../helpers";
 
 export default {
   mixins: [BasicComponent],
@@ -12,6 +13,16 @@ export default {
     },
     getOwnerLink(device) {
       return `https://www.npmjs.com/package/${device.pluginId}`;
+    },
+    async openAutoupdater() {
+      const plugins = await this.$scrypted.systemManager.getComponent(
+        "plugins"
+      );
+      const id = await plugins.getIdForNativeId(
+        "@scrypted/core",
+        "automation:update-plugins"
+      );
+      this.$router.push(getDeviceViewPath(id));
     },
   },
   data() {
@@ -32,7 +43,7 @@ export default {
             {
               title: "Configure Autoupdater",
               click() {
-                self.$router.push(`${self.componentViewPath}/install`);
+                self.openAutoupdater();
               },
             },
           ],
