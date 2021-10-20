@@ -51,6 +51,7 @@
     "@types/mkdirp": "^1.0.2",
     "@types/node-dijkstra": "^2.5.1",
     "@types/pem": "^1.9.5",
+    "@types/rimraf": "^3.0.2",
     "@types/semver": "^7.3.8",
     "@types/source-map-support": "^0.5.4",
     "@types/tar": "^4.0.5",
