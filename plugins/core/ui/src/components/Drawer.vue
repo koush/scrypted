@@ -27,7 +27,7 @@
           :key="item.id"
           link
           :to="getComponentViewPath(item.id)"
-        active-class="deep-purple accent-4 white--text"
+          active-class="deep-purple accent-4 white--text"
         >
           <v-list-item-icon>
             <v-icon small>{{ item.icon }}</v-icon>
@@ -39,7 +39,7 @@
         </v-list-item>
         <v-divider></v-divider>
       </div>
-        <v-subheader>Social</v-subheader>
+      <v-subheader>Social</v-subheader>
       <v-list-item
         link
         href="https://discord.gg/DcFzmBHYGq"
@@ -66,16 +66,16 @@
           <v-list-item-title>Github</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
-        <v-divider></v-divider>
-      <v-list-item
-        active-class="deep-purple accent-4 white--text"
-      >
+      <v-divider></v-divider>
+      <v-list-item active-class="deep-purple accent-4 white--text">
         <v-list-item-icon>
           <v-icon small>fa-code-branch</v-icon>
         </v-list-item-icon>
 
         <v-list-item-content>
-          <v-list-item-title>Version {{ scryptedVersion || "Unknown" }}</v-list-item-title>
+          <v-list-item-title
+            >Version {{ scryptedVersion || "Unknown" }}</v-list-item-title
+          >
         </v-list-item-content>
       </v-list-item>
     </v-list>
@@ -117,12 +117,12 @@ export default {
             category: "Components",
           },
           // { id: "log", name: "Live Log", icon: "list", category: "Utilities" },
-          // {
-          //   id: "settings",
-          //   name: "Settings",
-          //   icon: "fa-cog",
-          //   category: "Utilities"
-          // }
+          {
+            id: "settings",
+            name: "Settings",
+            icon: "fa-cog",
+            category: "Utilities",
+          },
         ];
       },
     },
@@ -130,7 +130,7 @@ export default {
   computed: {
     scryptedVersion() {
       return this.$store.state.version;
-    }
+    },
   },
   methods: {
     getComponentViewPath,
@@ -160,10 +160,7 @@ export default {
           active: false,
         },
       ],
-      categories: [
-        "Components",
-        // "Utilities"
-        ],
+      categories: ["Components", "Utilities"],
     };
   },
 };

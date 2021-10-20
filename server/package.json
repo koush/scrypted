@@ -60,6 +60,8 @@
     "@types/ws": "^7.4.7"
   },
   "scripts": {
+    "pregit-serve": "npm run build",
+    "git-serve": "node --expose-gc dist/git-serve.js",
     "preserve": "npm run build",
     "serve": "node --expose-gc dist/scrypted-main.js",
     "serve-no-build": "node --expose-gc dist/scrypted-main.js",
