@@ -25,7 +25,7 @@ Supported accessories:
 
 ### Prerequisites
 
-* Node v16 (older versions seem to have issues with the cluster module)
+* Node v16 (other versions, including v17, may not work)
 * Windows is not supported, but may work.
 
 ### Linux Prerequisites
