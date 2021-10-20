@@ -59,7 +59,7 @@ npm run git-serve
 Follow the steps for running locally above to set up your environment, but stop short of `npm run`.
 
 ```sh
-# in directory with the scrypted git checkout
+# switch to the server directory
 cd scrypted/server
 # open this directory in VSCode
 code .
