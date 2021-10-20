@@ -19,40 +19,11 @@ Supported accessories:
 
 ## Run on Docker
 
-[Instructions](https://github.com/koush/scrypted/wiki/Docker)
+[Docker Installation Instructions](https://github.com/koush/scrypted/wiki/Docker)
 
 ## Run Locally
 
-### Prerequisites
-
-* Node v16 (other versions, including v17, may not work)
-* Windows is not supported, but may work.
-
-### Linux Prerequisites
-
-```sh
-sudo apt install libavahi-compat-libdnssd-dev
-```
-
-### Run in Terminal
-
-
-```sh
-# Mac M1 (Apple Silicon) should uncomment the nextline to switch to x64 mode
-# arch -x86_64 zsh
-
-# checkout source
-git clone https://github.com/koush/scrypted.git
-
-# switch to the server directory and get dependencies
-cd scrypted/server
-npm install
-
-# run
-npm run git-serve
-
-# visit https://localhost:9443/ in a browser
-```
+[Local Installation Instructions](https://github.com/koush/scrypted/wiki/Local-Installation)
 
 ## Debug in VSCode
 
