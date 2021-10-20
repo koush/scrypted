@@ -2,6 +2,8 @@ import { ScryptedInterfaceProperty } from "@scrypted/sdk/types";
 import { ScryptedRuntime } from "../runtime";
 import { Plugin } from '../db-types';
 import { getState } from "../state";
+import axios from 'axios';
+import semver from 'semver';
 
 export class PluginComponent {
     scrypted: ScryptedRuntime;
@@ -79,6 +81,36 @@ export class PluginComponent {
             packageJson: plugin.packageJson,
             id: this.scrypted.findPluginDevice(pluginId),
         }
+    }
+
+    async installNpm(pkg: string, version?: string) {
+        await this.scrypted.installNpm(pkg, version);
+    }
+
+    async npmInfo(endpoint: string) {
+        const response = await axios(`https://registry.npmjs.org/${endpoint}`);
+        return response.data;
+    }
+
+    async updatePlugins() {
+        console.log('updating plugins');
+        for (const [plugin, host] of Object.entries(this.scrypted.plugins)) {
+            try {
+                const registry = await this.npmInfo(plugin);
+                const version = registry['dist-tags'].latest;
+                if (!semver.gt(version, host.packageJson.version)) {
+                    console.log('plugin up to date:', plugin);
+                    continue;
+                }
+
+                console.log('updating plugin', plugin);
+                await this.installNpm(plugin);
+            }
+            catch (e) {
+                console.warn('plugin update check or installation failed', e);
+            }
+        }
+        console.log('done updating plugins');
     }
 
     async getRemoteServicePort(pluginId: string, name: string): Promise<number> {
