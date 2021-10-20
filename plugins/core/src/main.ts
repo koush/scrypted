@@ -117,9 +117,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             if (!updatePlugins) {
                 await reportAutomation(updatePluginsNativeId, 'Autoupdate Plugins');
                 updatePlugins = new Automation(updatePluginsNativeId);
+                updatePlugins.storage.setItem('data', JSON.stringify(updatePluginsData));
                 this.automations.set(updatePluginsNativeId, updatePlugins);
             }
-            updatePlugins.storage.setItem('data', JSON.stringify(updatePluginsData));
         })();
 
         this.router.post('/api/new/automation', async (req: RoutedHttpRequest, res: HttpResponse) => {
