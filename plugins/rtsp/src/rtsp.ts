@@ -304,7 +304,7 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
         recommendRebroadcast();
     }
 
-    getAdditionalInterfaces() {
+    getAdditionalInterfaces(): string[] {
         return [
         ];
     }
