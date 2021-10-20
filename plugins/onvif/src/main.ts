@@ -1,9 +1,9 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
+import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, MediaStreamOptions, PictureOptions, VideoCamera } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 
-const { mediaManager } = sdk;
+const { mediaManager, systemManager } = sdk;
 
 function computeInterval(fps: number, govLength: number) {
     if (!fps || !govLength)
@@ -129,23 +129,23 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     async getOtherSettings(): Promise<Setting[]> {
-      return [
-        {
-          title: 'Onvif Doorbell',
-          type: 'boolean',
-          description: 'Enable if this device is a doorbell',
-          key: 'onvifDoorbell',
-          value: (!!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor)).toString(),
-        },
-        {
-          title: 'Onvif Doorbell Event Name',
-          type: 'string',
-          description: 'Onvif event name to trigger the doorbell',
-          key: "onvifDoorbellEvent",
-          value: this.storage.getItem('onvifDoorbellEvent'),
-          placeholder: 'EventName'
-        }
-      ]
+        return [
+            {
+                title: 'Onvif Doorbell',
+                type: 'boolean',
+                description: 'Enable if this device is a doorbell',
+                key: 'onvifDoorbell',
+                value: (!!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor)).toString(),
+            },
+            {
+                title: 'Onvif Doorbell Event Name',
+                type: 'string',
+                description: 'Onvif event name to trigger the doorbell',
+                key: "onvifDoorbellEvent",
+                value: this.storage.getItem('onvifDoorbellEvent'),
+                placeholder: 'EventName'
+            }
+        ]
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
@@ -155,7 +155,17 @@ class OnvifCamera extends RtspSmartCamera {
             try {
                 const vsos = await this.getVideoStreamOptions();
                 const vso = vsos.find(vso => this.isChannelEnabled(vso.id));
-                return mediaManager.createMediaObject(client.jpegSnapshot(vso?.id), 'image/jpeg');
+                const snapshot = await client.jpegSnapshot(vso?.id);
+                // it is possible that onvif does not support snapshots, in which case return the video stream
+                if (!snapshot) {
+                    // grab the real device rather than the using this.getVideoStream
+                    // so we can take advantage of the rebroadcast plugin if available.
+                    const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+                    return realDevice.getVideoStream({
+                        id: options.id,
+                    })
+                }
+                return mediaManager.createMediaObject(snapshot, 'image/jpeg');
             }
             catch (e) {
             }
@@ -187,13 +197,13 @@ class OnvifCamera extends RtspSmartCamera {
     async putSetting(key: string, value: string) {
         this.client = undefined;
         if (key !== 'onvifDoorbell')
-          return super.putSetting(key, value);
+            return super.putSetting(key, value);
 
         this.storage.setItem(key, value);
         if (value === 'true')
-          this.provider.updateDevice(this.nativeId, this.name, [...this.provider.getInterfaces(), ScryptedInterface.BinarySensor], ScryptedDeviceType.Doorbell)
+            this.provider.updateDevice(this.nativeId, this.name, [...this.provider.getInterfaces(), ScryptedInterface.BinarySensor], ScryptedDeviceType.Doorbell)
         else
-          this.provider.updateDevice(this.nativeId, this.name, this.provider.getInterfaces())
+            this.provider.updateDevice(this.nativeId, this.name, this.provider.getInterfaces())
     }
 }
 

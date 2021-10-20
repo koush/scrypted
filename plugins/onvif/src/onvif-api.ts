@@ -116,15 +116,27 @@ export class OnvifCameraAPI {
         return this.rtspUrls.get(profileToken);
     }
 
-    async jpegSnapshot(profileToken?: string): Promise<Buffer> {
+    async jpegSnapshot(profileToken?: string): Promise<Buffer|undefined> {
         if (!profileToken)
             profileToken = await this.getMainProfileToken();
         if (!this.snapshotUrls.has(profileToken)) {
-            const result = await promisify(cb => this.cam.getSnapshotUri({ profileToken }, cb)) as any;
-            const url = result.uri;
-            this.snapshotUrls.set(profileToken, url);
+            try {
+                const result = await promisify(cb => this.cam.getSnapshotUri({ profileToken }, cb)) as any;
+                const url = result.uri;
+                this.snapshotUrls.set(profileToken, url);
+            }
+            catch (e) {
+                if (e.message && e.message.indexOf('ActionNotSupported') !== -1) {
+                    this.snapshotUrls.set(profileToken, undefined);
+                }
+                else {
+                    throw e;
+                }
+            }
         }
         const snapshotUri = this.snapshotUrls.get(profileToken);
+        if (!snapshotUri)
+            return;
 
         const response = await this.digestAuth.fetch(snapshotUri);
         const buffer = await response.arrayBuffer();
