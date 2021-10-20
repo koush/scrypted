@@ -6,3 +6,5 @@ volume
 scrypted.db
 out
 scrypted.db.bak
+.exit
+.update

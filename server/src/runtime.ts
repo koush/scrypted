@@ -645,7 +645,19 @@ export class ScryptedRuntime {
         }
     }
 
+    killall() {
+        for (const host of Object.values(this.plugins)) {
+            host?.kill();
+        }
+        process.exit();
+    }
+
     async start() {
+        // catch ctrl-c
+        process.on('SIGINT', () => this.killall());
+        // catch kill
+        process.on('SIGTERM', () => this.killall());
+
         for await (const pluginDevice of this.datastore.getAll(PluginDevice)) {
             this.migrate(pluginDevice);
 
