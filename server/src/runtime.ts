@@ -34,6 +34,7 @@ interface DeviceProxyPair {
 }
 
 const MIN_SCRYPTED_CORE_VERSION = '0.0.121';
+const PLUGIN_DEVICE_STATE_VERSION = 2;
 
 export class ScryptedRuntime {
     datastore: Level;
@@ -549,6 +550,7 @@ export class ScryptedRuntime {
         let pluginDevice = this.findPluginDevice(pluginId, device.nativeId);
         if (!pluginDevice) {
             pluginDevice = new PluginDevice(this.datastore.nextId().toString());
+            pluginDevice.stateVersion = PLUGIN_DEVICE_STATE_VERSION;
             newDevice = true;
         }
         this.pluginDevices[pluginDevice._id] = pluginDevice;
@@ -615,12 +617,12 @@ export class ScryptedRuntime {
     }
 
     async migrate(pluginDevice: PluginDevice) {
-        if (pluginDevice.stateVersion !== 2 || !pluginDevice.state) {
+        if (pluginDevice.stateVersion !== PLUGIN_DEVICE_STATE_VERSION || !pluginDevice.state) {
             if (!pluginDevice.state) {
                 pluginDevice.state = {};
             }
 
-            pluginDevice.stateVersion = 2;
+            pluginDevice.stateVersion = PLUGIN_DEVICE_STATE_VERSION;
             // mixins used to be a non-stateful property on PluginDevice.
             setState(pluginDevice, ScryptedInterfaceProperty.mixins, (pluginDevice as any).mixins);
             this.datastore.upsert(pluginDevice);
