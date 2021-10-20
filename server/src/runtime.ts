@@ -15,7 +15,7 @@ import { LogEntry, Logger, makeAlertId } from './logger';
 import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefault, getProvidedRoomOrDefault, getProvidedTypeOrDefault } from './infer-defaults';
 import { URL } from "url";
 import qs from "query-string";
-import { PluginComponent } from './component/plugin';
+import { PluginComponent } from './services/plugin';
 import { Server as WebSocketServer } from "ws";
 import axios from 'axios';
 import tar from 'tar';
@@ -24,6 +24,9 @@ import { PassThrough } from 'stream';
 import { PluginDebug } from './plugin/plugin-debug';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import semver from 'semver';
+import { ServiceControl } from './services/service-control';
+import { Alerts } from './services/alerts';
+import { Info } from './services/info';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -312,7 +315,6 @@ export class ScryptedRuntime {
     }
 
     async getComponent(componentId: string): Promise<any> {
-        const self = this;
         switch (componentId) {
             case 'SCRYPTED_IP_ADDRESS':
                 return getIpAddress();
@@ -321,35 +323,15 @@ export class ScryptedRuntime {
             case 'SCRYPTED_SECURE_PORT':
                 return SCRYPTED_SECURE_PORT;
             case 'info':
-                class Info {
-                    getVersion() {
-                        return process.env.COMMIT_SHA?.substring(0, 8) || require('../package.json').version;
-                    }
-                }
                 return new Info();
             case 'plugins':
                 return new PluginComponent(this);
+            case 'service-control':
+                return new ServiceControl(this);
             case 'logger':
                 return this.logger;
             case 'alerts':
-                class Alerts {
-                    async getAlerts(): Promise<ScryptedAlert[]> {
-                        const ret = [];
-                        for await (const alert of self.datastore.getAll(ScryptedAlert)) {
-                            ret.push(alert);
-                        }
-                        return ret;
-                    }
-                    async removeAlert(alert: ScryptedAlert) {
-                        await self.datastore.removeId(ScryptedAlert, alert._id);
-                        self.stateManager.notifyInterfaceEvent(null, 'Logger' as any, undefined);
-                    }
-                    async clearAlerts() {
-                        await self.datastore.removeAll(ScryptedAlert);
-                        self.stateManager.notifyInterfaceEvent(null, 'Logger' as any, undefined);
-                    }
-                }
-                return new Alerts();
+                return new Alerts(this);
         }
     }
 
