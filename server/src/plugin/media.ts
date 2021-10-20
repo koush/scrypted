@@ -60,7 +60,7 @@ export class MediaManagerImpl implements MediaManager {
 
     async getFFmpegPath(): Promise<string> {
         const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-        return pathToFfmpeg || defaultPath;
+        return process.env.SCRYPTED_FFMPEG_PATH || pathToFfmpeg || defaultPath;
     }
 
     getConverters(): BufferConverter[] {
