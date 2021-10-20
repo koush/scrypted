@@ -1,5 +1,5 @@
 <template>
-  <Grower v-model="lazyValue" :empty="unassigned" @input="onInput">
+  <Grower v-model="lazyValue" :empty="unassigned" @input="onInput" :left="true" addButton="Add Trigger">
     <template v-slot:default="slotProps">
       <EventPicker
         :events="events"

@@ -29,12 +29,14 @@
         ></EventsPicker>
         <v-tooltip bottom>
           <template v-slot:activator="{ on }">
-            <v-checkbox
-              @input="onChange"
-              v-on="on"
-              v-model="device.denoiseEvents"
-              label="Denoise All Events"
-            ></v-checkbox>
+            <div v-on="on">
+              <v-checkbox
+                dense
+                @input="onChange"
+                v-model="device.denoiseEvents"
+                label="Denoise All Events"
+              ></v-checkbox>
+            </div>
           </template>
           <span
             >Denoising events will suppress events where the same event data is
@@ -47,12 +49,14 @@
 
         <v-tooltip bottom>
           <template v-slot:activator="{ on }">
+            <div v-on="on">
             <v-checkbox
+              dense
               @input="onChange"
-              v-on="on"
               v-model="device.staticEvents"
               label="Reset Automation on All Events"
             ></v-checkbox>
+            </div>
           </template>
           <span
             >By default, running Automation timers will be reset if the same
@@ -63,12 +67,14 @@
 
         <v-tooltip bottom>
           <template v-slot:activator="{ on }">
+            <div v-on="on">
             <v-checkbox
+              dense
               @input="onChange"
-              v-on="on"
               v-model="device.runToCompletion"
               label="Run Automations to Completion"
             ></v-checkbox>
+            </div>
           </template>
           <span
             >By default, autotomations that are executing will reset if
@@ -228,6 +234,16 @@ export default {
           text: "Run Shell Script",
           component: "ShellScriptable",
         },
+        {
+          id: "timer",
+          text: "Wait",
+          component: "Timer",
+        },
+        {
+          id: 'update-plugins',
+          text: 'Update Plugins',
+          component: 'UpdatePlugins',
+        }
       ];
 
       for (const id of Object.keys(

@@ -24,9 +24,13 @@ export default {
           body: null,
           buttons: [
             {
-              method: "GET",
-              path: "install",
               title: "Install Plugin",
+              click() {
+                self.$router.push(`${self.componentViewPath}/install`);
+              },
+            },
+            {
+              title: "Configure Autoupdater",
               click() {
                 self.$router.push(`${self.componentViewPath}/install`);
               },
@@ -58,26 +62,27 @@ export default {
         const ids = Object.keys(this.$store.state.systemState);
 
         const devices = [];
-        const plugins = await this.$scrypted.systemManager.getComponent("plugins");
+        const plugins = await this.$scrypted.systemManager.getComponent(
+          "plugins"
+        );
         const promises = ids.map(async (id) => {
-            const device = this.$scrypted.systemManager.getDeviceById(id);
-            if (device.id !== device.providerId)
-              return;
-            const {name, type} = device;
-            const pluginId = await plugins.getPluginId(device.id);
-            const pluginInfo = await plugins.getPluginInfo(pluginId);
-            const { packageJson, pid, stats, rpcObjects }  = pluginInfo;
-            const npmPackageVersion = packageJson.version;
-            devices.push({
-              id,
-              name,
-              type,
-              pluginId,
-              npmPackageVersion,
-              pid,
-              stats,
-              rpcObjects,
-            })
+          const device = this.$scrypted.systemManager.getDeviceById(id);
+          if (device.id !== device.providerId) return;
+          const { name, type } = device;
+          const pluginId = await plugins.getPluginId(device.id);
+          const pluginInfo = await plugins.getPluginInfo(pluginId);
+          const { packageJson, pid, stats, rpcObjects } = pluginInfo;
+          const npmPackageVersion = packageJson.version;
+          devices.push({
+            id,
+            name,
+            type,
+            pluginId,
+            npmPackageVersion,
+            pid,
+            stats,
+            rpcObjects,
+          });
         });
 
         await Promise.allSettled(promises);

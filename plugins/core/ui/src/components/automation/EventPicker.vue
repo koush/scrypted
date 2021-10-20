@@ -39,7 +39,6 @@ import Select2 from "../../common/Select2.vue";
 import Scheduler from "../../interfaces/automation/Scheduler.vue";
 import CustomValue from "../../common/CustomValue.vue";
 import Webhook from "../../interfaces/automation/Webhook.vue";
-import FaceDetector from "../../interfaces/automation/FaceDetector.vue";
 
 function unassigned() {
   return {
@@ -64,7 +63,6 @@ export default {
     Select2,
     Scheduler,
     Webhook,
-    FaceDetector,
   },
   methods: {
     createLazyValue() {

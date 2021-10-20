@@ -1,7 +1,7 @@
-import { EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, EventListenerOptions, ScryptedDeviceBase } from "@scrypted/sdk";
+import { ScryptedDevice, EventListenerOptions, ScryptedDeviceBase } from "@scrypted/sdk";
 import { Listen } from "./listen";
 
-interface Schedule {
+export interface Schedule {
     clockType: "AM" | "PM" | "24HourClock" | "BeforeSunrise" | "BeforeSunset" | "AfterSunrise" | "AfterSunset";
     friday: boolean;
     hour: number;

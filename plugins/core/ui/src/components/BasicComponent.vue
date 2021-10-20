@@ -5,7 +5,7 @@
         v-for="(card, cardIndex) in cards"
         :key="cardIndex"
         xs12
-        :md6="deviceGroups.length > 1"
+        :md6="cards.length > 1"
       >
         <v-card v-if="!card.hide" raised >
           <v-card-title

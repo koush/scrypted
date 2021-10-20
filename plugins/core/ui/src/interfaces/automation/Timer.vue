@@ -39,7 +39,7 @@ export default {
   computed: {
     hours: {
       get() {
-        return Math.floor(this.lazyValue.seconds / 60 / 60);
+        return Math.floor(this.lazyValue.seconds / 60 / 60) || 0;
       },
       set(value) {
         this.update(value, this.minutes, this.seconds);
@@ -47,7 +47,7 @@ export default {
     },
     minutes: {
       get() {
-        return Math.floor(this.lazyValue.seconds / 60) % 60;
+        return (Math.floor(this.lazyValue.seconds / 60) % 60) || 0;
       },
       set(value) {
         this.update(this.hours, value, this.seconds);
@@ -55,7 +55,7 @@ export default {
     },
     seconds: {
       get() {
-        return this.lazyValue.seconds % 60;
+        return (this.lazyValue.seconds % 60) || 0;
       },
       set(value) {
         this.update(this.hours, this.minutes, value);

@@ -18,6 +18,7 @@ import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { Script } from './script';
 import { addBuiltins } from "../../../common/src/wrtc-converters";
+import { updatePluginsData } from './update-plugins';
 
 addBuiltins(console, mediaManager);
 
@@ -29,9 +30,9 @@ interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
 }
 
-async function reportAutomation(nativeId: string) {
+async function reportAutomation(nativeId: string, name?: string) {
     const device: Device = {
-        name: undefined,
+        name,
         nativeId,
         type: ScryptedDeviceType.Automation,
         interfaces: [ScryptedInterface.OnOff]
@@ -109,6 +110,17 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 reportScript(nativeId);
             }
         }
+
+        (async() => {
+            const updatePluginsNativeId = 'automation:update-plugins'
+            let updatePlugins = this.automations.get(updatePluginsNativeId);
+            if (!updatePlugins) {
+                await reportAutomation(updatePluginsNativeId, 'Autoupdate Plugins');
+                updatePlugins = new Automation(updatePluginsNativeId);
+                this.automations.set(updatePluginsNativeId, updatePlugins);
+            }
+            updatePlugins.storage.setItem('data', JSON.stringify(updatePluginsData));
+        })();
 
         this.router.post('/api/new/automation', async (req: RoutedHttpRequest, res: HttpResponse) => {
             const nativeId = `automation:${Math.random()}`;

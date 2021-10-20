@@ -5,7 +5,7 @@
     </div>
 
     <v-card-actions>
-      <v-spacer></v-spacer>
+      <v-spacer v-if="!left"></v-spacer>
       <v-btn @click="add">{{ addButton }}</v-btn>
       <v-btn v-if="saveButton" @click="$emit('save')">{{ saveButton }}</v-btn>
     </v-card-actions>
@@ -18,6 +18,7 @@ import CustomValue from "./CustomValue.vue";
 
 export default {
   props: {
+    left: false,
     empty: undefined,
     addButton: {
       default: "Add",

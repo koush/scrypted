@@ -7,8 +7,13 @@ import { scryptedEval } from "./scrypted-eval";
 import { AutomationShellScript } from "./builtins/shellscript";
 const { systemManager } = sdk;
 
+interface Abort {
+    aborted: boolean;
+}
+
 export class Automation extends ScryptedDeviceBase implements OnOff {
     registers: EventListenerRegister[] = [];
+    pendings = new Map<string, Abort>();
 
     constructor(nativeId: string) {
         super(nativeId);
@@ -34,7 +39,24 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
         this.bind();
     }
 
+    abort(id?: string) {
+        if (!id) {
+            for (const abort of this.pendings.values()) {
+                abort.aborted = true;
+            }
+            this.pendings.clear();
+        }
+        else {
+            const pending = this.pendings.get(id);
+            if (pending) {
+                this.pendings.delete(id);
+                pending.aborted = true;
+            }
+        }
+    }
+
     bind() {
+        this.abort();
         for (const register of this.registers) {
             register.removeListener();
         }
@@ -48,32 +70,66 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
 
         try {
             const data = JSON.parse(this.storage.getItem('data'));
+            const { denoiseEvents, runToCompletion, staticEvents } = data;
 
-            const runActions = (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => {
-                for (const action of data.actions) {
-                    const parts = action.id.split('#');
-                    const id = parts[0];
+            const runActions = async (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => {
+                const pendingKey = staticEvents ? undefined : eventSource.id + ':' + eventDetails.eventInterface;
+                const pending = this.pendings.get(pendingKey);
+                this.console.log('automation trigger key', pendingKey);
 
-                    if (id === 'scriptable') {
-                        const script = new AutomationJavascript(this, eventSource, eventDetails, eventData);
-                        script.run(action.model['script.ts'])
-                    }
-                    if (id === 'shell-scriptable') {
-                        const script = new AutomationShellScript(this, eventSource, eventDetails, eventData);
-                        script.run(action.model['script.sh'])
-                    }
-                    else {
-                        const device = systemManager.getDeviceById(id);
-                        if (!device)
-                            throw new Error(`unknown trigger ${action.id}`);
+                if (runToCompletion && pending) {
+                    this.console.info('automation already in progress, trigger ignored', pendingKey);
+                    return;
+                }
+                if (pending) {
+                    pending.aborted = true;
+                }
+                const abort: Abort = {
+                    aborted: false,
+                }
+                this.pendings.set(pendingKey, abort);
 
+                try {
+                    for (const action of data.actions) {
+                        if (abort.aborted) {
+                            this.console.log('automation aborted', pendingKey);
+                            return;
+                        }
+    
+                        const parts = action.id.split('#');
+                        const id = parts[0];
+    
+                        if (id === 'scriptable') {
+                            const script = new AutomationJavascript(this, eventSource, eventDetails, eventData);
+                            await script.run(action.model['script.ts'])
+                        }
+                        else if (id === 'shell-scriptable') {
+                            const script = new AutomationShellScript(this, eventSource, eventDetails, eventData);
+                            await script.run(action.model['script.sh'])
+                        }
+                        else if (id === 'timer') {
+                            await new Promise(resolve => setTimeout(resolve, action.model.seconds * 1000));
+                        }
+                        else if (id === 'update-plugins') {
+                            const plugins = await systemManager.getComponent('plugins');
+                            await plugins.updatePlugins();
+                        }
+                        else {
+                            const device = systemManager.getDeviceById(id);
+                            if (!device)
+                                throw new Error(`unknown action ${action.id}`);
+    
                             const { rpc } = action.model;
                             device[rpc.method](...rpc.parameters || []);
+                        }
+                    }
+                }
+                finally {
+                    if (!abort.aborted) {
+                        this.pendings.delete(pendingKey);
                     }
                 }
             }
-
-            const denoise = data.denoiseEvents;
 
             for (const trigger of data.triggers) {
                 const parts = trigger.id.split('#');
@@ -101,7 +157,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
                 }
 
                 register = listen.listen({
-                    denoise,
+                    denoise: denoiseEvents,
                     event,
                 }, (eventSource, eventDetails, eventData) => {
                     this.log.i(`automation triggered by ${eventSource.name}`);

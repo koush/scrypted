@@ -1,5 +1,5 @@
 <template>
-  <Grower v-model="lazyValue" :empty="unassigned" @input="onInput">
+  <Grower v-model="lazyValue" :empty="unassigned" @input="onInput" :left="true" addButton="Add Action">
     <template v-slot:default="slotProps">
       <InterfacePicker :interfaces="interfaces" v-model="slotProps.item" @input="slotProps.onInput"></InterfacePicker>
     </template>

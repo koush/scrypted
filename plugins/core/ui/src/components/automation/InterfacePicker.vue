@@ -29,7 +29,7 @@ import CustomValue from "../../common/CustomValue.vue";
 
 import Unassigned from "../../interfaces/Unassigned.vue";
 
-import Condition from "../../interfaces/automation/Condition.vue";
+import UpdatePlugins from "../../interfaces/automation/UpdatePlugins.vue";
 import Timer from "../../interfaces/automation/Timer.vue";
 import Scriptable from "../../interfaces/automation/Scriptable.vue";
 import ShellScriptable from "../../interfaces/automation/ShellScriptable.vue";
@@ -72,7 +72,7 @@ export default {
     Unassigned,
     CustomValue,
 
-    Condition,
+    UpdatePlugins,
     Timer,
     Scriptable,
     ShellScriptable,
