@@ -44,9 +44,11 @@ sudo apt install libavahi-compat-libdnssd-dev
 # checkout source
 git clone https://github.com/koush/scrypted.git
 
-# npm install and run
+# switch to the server directory and get dependencies
 cd scrypted/server
 npm install
+
+# run
 npm run git-serve
 # visit https://localhost:9443/ in a browser
 ```
