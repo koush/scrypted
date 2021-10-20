@@ -30,6 +30,7 @@ async function runCommandEatError(command: string, ...args: string[]) {
 async function main() {
     process.chdir(path.join(__dirname, '..'));
     console.log('cwd', process.cwd());
+    process.env.SCRYPTED_GIT_SERVE = 'true';
 
     while (true) {
         rimraf.sync(EXIT_FILE);
