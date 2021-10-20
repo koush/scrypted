@@ -97,7 +97,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             if (nativeId?.startsWith('automation:')) {
                 const automation = new Automation(nativeId);
                 this.automations.set(nativeId, automation);
-                reportAutomation(nativeId);
+                reportAutomation(nativeId, automation.providedName);
             }
             else if (nativeId?.startsWith('aggregate:')) {
                 const aggregate = createAggregateDevice(nativeId);
