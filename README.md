@@ -47,7 +47,7 @@ git clone https://github.com/koush/scrypted.git
 # npm install and run
 cd scrypted/server
 npm install
-npm run serve
+npm run git-serve
 # visit https://localhost:9443/ in a browser
 ```
 
