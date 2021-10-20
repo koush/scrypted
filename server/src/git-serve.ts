@@ -2,6 +2,7 @@ import child_process from 'child_process';
 import { once } from 'events';
 import fs from 'fs';
 import rimraf from 'rimraf';
+import path from 'path';
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -27,6 +28,9 @@ async function runCommandEatError(command: string, ...args: string[]) {
 }
 
 async function main() {
+    process.chdir(path.join(__dirname, '..'));
+    console.log('cwd', process.cwd());
+
     while (true) {
         rimraf.sync(EXIT_FILE);
         rimraf.sync(UPDATE_FILE);
