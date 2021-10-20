@@ -617,16 +617,7 @@ export class ScryptedRuntime {
     }
 
     async migrate(pluginDevice: PluginDevice) {
-        if (pluginDevice.stateVersion !== PLUGIN_DEVICE_STATE_VERSION || !pluginDevice.state) {
-            if (!pluginDevice.state) {
-                pluginDevice.state = {};
-            }
-
-            pluginDevice.stateVersion = PLUGIN_DEVICE_STATE_VERSION;
-            // mixins used to be a non-stateful property on PluginDevice.
-            setState(pluginDevice, ScryptedInterfaceProperty.mixins, (pluginDevice as any).mixins);
-            this.datastore.upsert(pluginDevice);
-        }
+        // nothing right now.
     }
 
     killall() {
