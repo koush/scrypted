@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { recommendRebroadcast } from "./recommend";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
@@ -10,6 +10,10 @@ const { log, deviceManager, mediaManager } = sdk;
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
+
+export interface RtspMediaStreamOptions extends MediaStreamOptions {
+    url: string;
+}
 
 export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
     snapshotAuth: AxiosDigestAuth;
@@ -45,18 +49,39 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         return;
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-        return [
-            {
-                video: {
-                },
-                audio: this.isAudioDisabled() ? null : {},
+    async getVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+        let urls: string[] = [];
+        try {
+            urls = JSON.parse(this.storage.getItem('urls'));
+        }
+        catch (e) {
+            const url = this.storage.getItem('url');
+            if (url) {
+                urls.push(url);
+                this.storage.setItem('urls', JSON.stringify(urls));
+                this.storage.removeItem('url');
             }
-        ];
+        }
+
+        // filter out empty strings.
+        const ret = urls.filter(url => !!url).map((url, index) => ({
+            id: `channel${index}`,
+            name: `Channel ${index + 1}`,
+            url,
+            video: {
+            },
+            audio: this.isAudioDisabled() ? null : {},
+        }));
+
+        if (!ret.length)
+            return;
+        return ret;
     }
 
     async getStreamUrl(options?: MediaStreamOptions) {
-        return this.storage.getItem("url");
+        const streams = await this.getVideoStreamOptions();
+        const stream = streams.find(s => s.id === options?.id) || streams[0];
+        return stream;
     }
 
     isAudioDisabled() {
@@ -64,7 +89,8 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
     }
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        const url = new URL(await this.getStreamUrl(options));
+        const vso = await this.getStreamUrl(options);
+        const url = new URL(vso.url);
         this.console.log('rtsp stream url', url.toString());
         const username = this.storage.getItem("username");
         const password = this.storage.getItem("password");
@@ -73,7 +99,6 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         if (password)
             url.password = password;
 
-        const vso = await this.getVideoStreamOptions();
         const ret: FFMpegInput = {
             inputArguments: [
                 "-rtsp_transport",
@@ -87,27 +112,35 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
                 "-i",
                 url.toString(),
             ],
-            mediaStreamOptions: vso?.[0],
+            mediaStreamOptions: vso,
         };
 
         return mediaManager.createFFmpegMediaObject(ret);
     }
 
+    async getRtspUrlSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'urls',
+                title: 'RTSP Stream URL',
+                description: 'An RTSP Stream URL provided by the camera.',
+                placeholder: 'rtsp://192.168.1.100[:554]/channel/101',
+                value: (await this.getVideoStreamOptions())?.map(vso => vso.url),
+                multiple: true,
+            },
+        ];
+    }
+
     async getUrlSettings(): Promise<Setting[]> {
         return [
             {
-                key: 'url',
-                title: 'RTSP Stream URL',
-                placeholder: 'rtsp://192.168.1.100:4567/foo/bar',
-                value: this.storage.getItem('url'),
-            },
-            {
                 key: 'snapshotUrl',
                 title: 'Snapshot URL',
-                placeholder: 'http://192.168.1.100/snapshot.jpg',
+                placeholder: 'http://192.168.1.100[:80]/snapshot.jpg',
                 value: this.storage.getItem('snapshotUrl'),
                 description: 'Optional: The snapshot URL that will returns the current JPEG image.'
             },
+            ...await this.getRtspUrlSettings(),
         ];
     }
 
@@ -162,7 +195,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
             {
                 key: 'noAudio',
                 title: 'No Audio',
-                description: 'Enable this setting if the stream does not have audio or to mute audio.',
+                description: 'Enable this setting if the camera does not have audio or to mute audio.',
                 type: 'boolean',
                 value: (this.isAudioDisabled()).toString(),
             },
@@ -172,8 +205,17 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         ];
     }
 
-    async putSetting(key: string, value: string | number) {
-        this.storage.setItem(key, value.toString());
+    async putRtspUrls(urls: string[]) {
+        this.storage.setItem('urls', JSON.stringify(urls.filter(url => !!url)));
+    }
+
+    async putSetting(key: string, value: SettingValue) {
+        if (key === 'urls') {
+            this.putRtspUrls(value as string[]);
+        }
+        else {
+            this.storage.setItem(key, value.toString());
+        }
 
         this.snapshotAuth = undefined;
 
@@ -233,7 +275,6 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 
     async getUrlSettings() {
-        const constructed = await this.getConstructedStreamUrl();
         const ret: Setting[] = [
             {
                 key: 'ip',
@@ -250,14 +291,14 @@ export abstract class RtspSmartCamera extends RtspCamera {
         ];
 
         if (this.showRtspUrlOverride()) {
+            const legacyOverride = this.storage.getItem('rtspUrlOverride')
+            if (legacyOverride) {
+                await this.putRtspUrls([legacyOverride]);
+                this.storage.removeItem('rtspUrlOverride');
+            }
+
             ret.push(
-                {
-                    key: 'rtspUrlOverride',
-                    title: 'RTSP URL Override',
-                    description: "Override the RTSP URL if your camera is using a non default port, channel, or rebroadcasted through an NVR. Default: " + constructed,
-                    placeholder: constructed,
-                    value: this.storage.getItem('rtspUrlOverride'),
-                },
+                ... await this.getRtspUrlSettings(),
             );
         }
 
@@ -272,21 +313,27 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return `${this.storage.getItem('ip')}:${this.storage.getItem('httpPort') || 80}`;
     }
 
-    getRtspUrlOverride() {
+    getRtspUrlOverride(options?: MediaStreamOptions) {
         if (!this.showRtspUrlOverride())
             return;
         return this.storage.getItem('rtspUrlOverride');
     }
 
-    abstract getConstructedStreamUrl(options?: MediaStreamOptions): Promise<string>;
+    abstract getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]>;
     abstract listenEvents(): EventEmitter & Destroyable;
 
     getRtspAddress() {
         return this.storage.getItem('ip');
     }
 
-    async getStreamUrl(options?: MediaStreamOptions) {
-        return this.getRtspUrlOverride() || await this.getConstructedStreamUrl(options);
+    async getVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+        if (this.showRtspUrlOverride()) {
+            const vso = await super.getVideoStreamOptions();
+            if (vso)
+                return vso;
+        }
+
+        return this.getConstructedVideoStreamOptions();
     }
 }
 
