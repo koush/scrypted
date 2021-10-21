@@ -23,7 +23,7 @@ import mkdirp from 'mkdirp';
 import { install as installSourceMapSupport } from 'source-map-support';
 import httpAuth from 'http-auth';
 import semver from 'semver';
-import { EventEmitter } from 'events';
+import { Info } from './services/info';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -107,7 +107,8 @@ else {
     }
 
     async function start() {
-        const volumeDir = path.join(process.cwd(), 'volume');
+        const volumeDir = process.env.SCRYPTED_VOLUME || path.join(process.cwd(), 'volume');
+        mkdirp.sync(volumeDir);
         const dbPath = path.join(volumeDir, 'scrypted.db');
         const oldDbPath = path.join(process.cwd(), 'scrypted.db');
         if (fs.existsSync(oldDbPath) && !fs.existsSync(dbPath)) {
@@ -211,6 +212,7 @@ else {
 
         console.log('#############################################');
         console.log(`Scrypted Server: https://localhost:${SCRYPTED_SECURE_PORT}/`);
+        console.log(`Version:       : ${await new Info().getVersion()}`);
         console.log('#############################################');
         const scrypted = new ScryptedRuntime(db, insecure, secure, app);
         await scrypted.start();

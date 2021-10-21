@@ -1,12 +1,9 @@
 {
-  "name": "scrypted",
-  "version": "0.0.1",
+  "name": "@scrypted/server",
+  "version": "0.0.32",
   "description": "",
-  "private": true,
   "dependencies": {
-    "@scrypted/sdk": "file:../sdk",
-    "@tensorflow-models/coco-ssd": "^2.2.2",
-    "@tensorflow/tfjs-core": "^3.9.0",
+    "@scrypted/sdk": "^0.0.86",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
@@ -34,6 +31,9 @@
   },
   "optionalDependencies": {
     "@koush/opencv4nodejs": "^5.6.7",
+    "@tensorflow-models/coco-ssd": "^2.2.2",
+    "@tensorflow/tfjs": "^3.9.0",
+    "@tensorflow/tfjs-core": "^3.9.0",
     "@tensorflow/tfjs-node-gpu": "^3.9.0",
     "canvas": "^2.8.0",
     "ffmpeg-for-homebridge": "^0.0.9",
@@ -60,16 +60,15 @@
     "@types/ws": "^7.4.7"
   },
   "scripts": {
-    "pregit-serve": "npm run build",
-    "git-serve": "node --expose-gc dist/git-serve.js",
     "preserve": "npm run build",
     "serve": "node --expose-gc dist/scrypted-main.js",
     "serve-no-build": "node --expose-gc dist/scrypted-main.js",
     "ts-serve": "ts-node --expose-gc src/scrypted-main.ts",
-    "prebuild": "tsc --build --clean",
+    "prebuild": "rimraf dist",
     "build": "tsc --outDir dist",
     "build-opencv": "cd node_modules/@koush/opencv4nodejs && npm run build",
-    "postbuild": "node test/check-build-output.js"
+    "postbuild": "node test/check-build-output.js",
+    "prepublishOnly": "npm run build"
   },
   "author": "",
   "license": "ISC"

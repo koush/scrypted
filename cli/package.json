@@ -1,6 +1,6 @@
 {
   "name": "scrypted",
-  "version": "1.0.20",
+  "version": "1.0.22",
   "description": "",
   "main": "dist/main.js",
   "bin": {
@@ -18,12 +18,14 @@
     "axios": "^0.21.4",
     "mkdirp": "^1.0.4",
     "readline-sync": "^1.4.10",
+    "rimraf": "^3.0.2",
     "ts-node": "^10.2.1",
     "tslib": "^2.3.1",
     "typescript": "^4.4.3"
   },
   "devDependencies": {
     "@types/mkdirp": "^1.0.2",
-    "@types/readline-sync": "^1.4.4"
+    "@types/readline-sync": "^1.4.4",
+    "@types/rimraf": "^3.0.2"
   }
 }

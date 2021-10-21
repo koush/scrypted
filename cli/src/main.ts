@@ -7,6 +7,7 @@ import util from 'util';
 import readline, { BasicOptions } from 'readline-sync';
 import https from 'https';
 import mkdirp from 'mkdirp';
+import { serveMain } from './service';
 
 function getUserHome() {
     const ret = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
@@ -58,7 +59,10 @@ const axiosConfig: AxiosRequestConfig = {
 }
 
 async function main() {
-    if (process.argv[2] === 'login') {
+    if (process.argv[2] === 'serve') {
+        await serveMain();
+    }
+    else if (process.argv[2] === 'login') {
         const ip = process.argv[3] || '127.0.0.1';
         await doLogin(ip);
         console.log('login successful.')
@@ -101,6 +105,7 @@ async function main() {
         console.log('usage:');
         console.log('   npx scrypted install npm-package-name [ip]');
         console.log('   npx scrypted login [ip]');
+        console.log('   npx scrypted serve');
         process.exit(1);
     }
 }

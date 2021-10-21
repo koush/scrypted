@@ -17,5 +17,6 @@ RUN npm link @koush/opencv4nodejs
 
 RUN npm run build
 
-ENV COMMIT_SHA=${GITHUB_SHA}
+ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_CAN_RESTART="true"
 CMD npm run serve-no-build

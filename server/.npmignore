@@ -1,0 +1,9 @@
+node_modules
+.DS_Store
+.gcloud/
+volume
+scrypted.db
+out
+scrypted.db.bak
+.exit
+.update

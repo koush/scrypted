@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "esnext",
+        "noImplicitAny": true,
+        "esModuleInterop": true,
+        "sourceMap": true,
+        "types": [
+            "node"
+        ],
+        "allowJs": true,
+    },
+}
