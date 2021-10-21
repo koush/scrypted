@@ -40,14 +40,17 @@ async function startServer() {
     }
 }
 
-export async function serveMain() {
+export async function serveMain(install: boolean) {
     const installDir = path.join(os.homedir(), '.scrypted');
     const volume = path.join(installDir, 'volume');
-    mkdirp(volume);
+    mkdirp.sync(volume);
     process.chdir(installDir);
     if (!fs.existsSync('node_modules/@scrypted/server')) {
+        install = true;
         console.log('Package @scrypted/server not found. Installing.');
-        await runCommandEatError('npm', 'install', '@scrypted/server@latest');
+    }
+    if (install) {
+        await runCommandEatError('npm', 'install', '--production', '@scrypted/server@latest');
     }
 
     process.env.SCRYPTED_NPM_SERVE = 'true';
@@ -68,7 +71,7 @@ export async function serveMain() {
         }
         else if (fs.existsSync(UPDATE_FILE)) {
             console.log('Update requested. Installing.');
-            await runCommandEatError('npm', 'install', '@scrypted/server@latest');
+            await runCommandEatError('npm', 'install', '--production', '@scrypted/server@latest');
         }
         else {
             console.log(`Service exited. Restarting momentarily.`);

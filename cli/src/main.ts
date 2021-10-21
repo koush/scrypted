@@ -60,7 +60,10 @@ const axiosConfig: AxiosRequestConfig = {
 
 async function main() {
     if (process.argv[2] === 'serve') {
-        await serveMain();
+        await serveMain(false);
+    }
+    if (process.argv[2] === 'serve@latest') {
+        await serveMain(true);
     }
     else if (process.argv[2] === 'login') {
         const ip = process.argv[3] || '127.0.0.1';
@@ -106,6 +109,7 @@ async function main() {
         console.log('   npx scrypted install npm-package-name [ip]');
         console.log('   npx scrypted login [ip]');
         console.log('   npx scrypted serve');
+        console.log('   npx scrypted serve@latest');
         process.exit(1);
     }
 }
