@@ -52,10 +52,12 @@
         >
       </v-flex> -->
 
-      <v-dialog v-model="restart" width="500">
+      <v-dialog v-if="showRestart" v-model="restart" width="500">
         <template v-slot:activator="{ on }">
           <v-flex>
-            <v-btn class="mb-2" block color="red" dark v-on="on">Restart Scrypted</v-btn>
+            <v-btn class="mb-2" block color="red" dark v-on="on"
+              >Restart Scrypted</v-btn
+            >
           </v-flex>
         </template>
 
@@ -77,11 +79,12 @@
         </v-card>
       </v-dialog>
 
-
-      <v-dialog v-model="updateAndRestart" width="500">
+      <v-dialog v-if="showUpdate" v-model="updateAndRestart" width="500">
         <template v-slot:activator="{ on }">
           <v-flex>
-            <v-btn block color="red" dark v-on="on">Update and Restart Scrypted</v-btn>
+            <v-btn block color="red" dark v-on="on"
+              >Update and Restart Scrypted</v-btn
+            >
           </v-flex>
         </template>
 
@@ -117,7 +120,9 @@ export default {
       updateAndRestart: false,
       restart: false,
       restartStatus: undefined,
-    }
+      showRestart: false,
+      showUpdate: false,
+    };
   },
   // data() {
   //   return {
@@ -136,6 +141,7 @@ export default {
   //   },
   // },
   mounted() {
+    this.loadEnv();
     // this.$refs.mapRef.$mapPromise.then(() => {
     //   let element = this.$refs.locationAutocomplete.$el;
     //   element = element.querySelector("input");
@@ -147,14 +153,12 @@ export default {
     //     this.location = place.formatted_address;
     //     this.position.lat = place.geometry.location.lat();
     //     this.position.lng = place.geometry.location.lng();
-
     //     this.debounceUpdate(
     //       place.geometry.location.lat().toString(),
     //       place.geometry.location.lng().toString()
     //     );
     //   });
     // });
-
     // axios
     //   .get(`${this.getComponentWebPath("automation")}/settings`)
     //   .then((response) => {
@@ -164,6 +168,12 @@ export default {
     //   });
   },
   methods: {
+    async loadEnv() {
+      const info = await this.$scrypted.systemManager.getComponent("info");
+      const env = await info.getScryptedEnv();
+      this.showRestart = !!env.SCRYPTED_CAN_RESTART;
+      this.showUpdate = !!(env.SCRYPTED_NPM_SERVE || env.SCRYPTED_GIT_SERVE);
+    },
     // getComponentWebPath,
     // debounceUpdate: throttle(function (latitude, longitude) {
     //   axios.post(
@@ -183,12 +193,16 @@ export default {
     // },
     async doRestart() {
       this.restartStatus = "Restarting...";
-      const serviceControl = await this.$scrypted.systemManager.getComponent("service-control"); 
+      const serviceControl = await this.$scrypted.systemManager.getComponent(
+        "service-control"
+      );
       await serviceControl.restart();
     },
     async doUpdateAndRestart() {
       this.restartStatus = "Restarting...";
-      const serviceControl = await this.$scrypted.systemManager.getComponent("service-control"); 
+      const serviceControl = await this.$scrypted.systemManager.getComponent(
+        "service-control"
+      );
       await serviceControl.update();
     },
     // restore() {
