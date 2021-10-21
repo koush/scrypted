@@ -92,7 +92,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
     async getSettings(): Promise<Setting[]> {
         const addresses = (Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('wlan')) as any)
-            .flat().map(([, entry]) => entry.address).filter((address: string) => address);
+            .flat().map((pair: any) => pair[1].address).filter((address: string) => address);
         return [
             {
                 title: "Manual Pairing Code",

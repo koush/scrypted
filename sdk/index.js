@@ -14,62 +14,6 @@ exports.MixinDeviceBase = exports.ScryptedDeviceBase = void 0;
 __exportStar(require("./types"), exports);
 const types_1 = require("./types");
 class ScryptedDeviceBase {
-    nativeId;
-    id;
-    interfaces;
-    mixins;
-    info;
-    name;
-    providedInterfaces;
-    providedName;
-    providedRoom;
-    providedType;
-    providerId;
-    room;
-    type;
-    on;
-    brightness;
-    colorTemperature;
-    rgb;
-    hsv;
-    running;
-    paused;
-    docked;
-    /**
-     * Get the ambient temperature in Celsius.
-     */
-    temperature;
-    /**
-     * Get the user facing unit of measurement for this thermometer. Note that while this may be Fahrenheit, getTemperatureAmbient will return the temperature in Celsius.
-     */
-    temperatureUnit;
-    humidity;
-    thermostatAvailableModes;
-    thermostatMode;
-    thermostatSetpoint;
-    thermostatSetpointHigh;
-    thermostatSetpointLow;
-    lockState;
-    entryOpen;
-    batteryLevel;
-    online;
-    updateAvailable;
-    fromMimeType;
-    toMimeType;
-    binaryState;
-    intrusionDetected;
-    powerDetected;
-    motionDetected;
-    audioDetected;
-    occupied;
-    flooded;
-    ultraviolet;
-    luminance;
-    position;
-    _storage;
-    _log;
-    _console;
-    _deviceState;
     constructor(nativeId) {
         this.nativeId = nativeId;
     }
@@ -113,64 +57,6 @@ class ScryptedDeviceBase {
 }
 exports.ScryptedDeviceBase = ScryptedDeviceBase;
 class MixinDeviceBase {
-    mixinDevice;
-    mixinDeviceInterfaces;
-    mixinProviderNativeId;
-    id;
-    interfaces;
-    mixins;
-    info;
-    name;
-    providedInterfaces;
-    providedName;
-    providedRoom;
-    providedType;
-    providerId;
-    room;
-    type;
-    on;
-    brightness;
-    colorTemperature;
-    rgb;
-    hsv;
-    running;
-    paused;
-    docked;
-    /**
-     * Get the ambient temperature in Celsius.
-     */
-    temperature;
-    /**
-     * Get the user facing unit of measurement for this thermometer. Note that while this may be Fahrenheit, getTemperatureAmbient will return the temperature in Celsius.
-     */
-    temperatureUnit;
-    humidity;
-    thermostatAvailableModes;
-    thermostatMode;
-    thermostatSetpoint;
-    thermostatSetpointHigh;
-    thermostatSetpointLow;
-    lockState;
-    entryOpen;
-    batteryLevel;
-    online;
-    updateAvailable;
-    fromMimeType;
-    toMimeType;
-    binaryState;
-    intrusionDetected;
-    powerDetected;
-    motionDetected;
-    audioDetected;
-    occupied;
-    flooded;
-    ultraviolet;
-    luminance;
-    position;
-    _storage;
-    _log;
-    _console;
-    _deviceState;
     constructor(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId) {
         this.mixinDevice = mixinDevice;
         this.mixinDeviceInterfaces = mixinDeviceInterfaces;

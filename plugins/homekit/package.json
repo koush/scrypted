@@ -27,7 +27,7 @@
       ]
    },
    "dependencies": {
-      "hap-nodejs": "file:../HAP-NodeJS",
+      "hap-nodejs": "file:./HAP-NodeJS",
       "lodash": "^4.17.21",
       "qrcode": "^1.4.4"
    },

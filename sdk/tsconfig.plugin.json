@@ -1,13 +1,16 @@
 {
     "compilerOptions": {
         "module": "commonjs",
-        "target": "esnext",
-        "noImplicitAny": true,
+        "target": "es2019",
         "esModuleInterop": true,
         "sourceMap": true,
         "types": [
             "node"
         ],
         "allowJs": true,
+        "resolveJsonModule": true,
+        "strictNullChecks": false,
+        "noImplicitAny": false,
+        "strict": false
     },
 }

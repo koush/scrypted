@@ -28,18 +28,16 @@ module.exports = {
             {
                 test: /\.(ts|js)x?$/,
                 // unsure if this is correct... need to transpile node modules at times.
-                // exclude: /(node_modules|bower_components)/,
-                // exclude: /(core-js|)/,
                 exclude: /(core-js|node_modules|bower_components)/,
+                // exclude: /(core-js)/,
                 use: {
                     loader: 'babel-loader',
                     options: {
                         "plugins": [
+                            "@babel/plugin-transform-modules-commonjs",
                             "babel-plugin-const-enum",
                             "@babel/plugin-transform-typescript",
                             "@babel/plugin-proposal-class-properties",
-                            // currently still necessary due to how Quack evaluates expecting commonjs.
-                            "@babel/plugin-transform-modules-commonjs",
                             "@babel/plugin-proposal-optional-chaining",
                             "@babel/plugin-proposal-nullish-coalescing-operator",
                             "@babel/plugin-proposal-numeric-separator",
@@ -56,11 +54,9 @@ module.exports = {
             //     loader: 'ts-loader',
             //     exclude: /node_modules/,
             //     options: {
-            //         configFile : path.join(__dirname, 'tsconfig.json'),
+            //         configFile : path.join(__dirname, 'tsconfig.plugin.json'),
             //     },
-            
             // }
-
         ]
     },
 
@@ -107,11 +103,6 @@ module.exports = {
     ],
 
     optimization: {
-        // can not minimize since duktape only does line based breakpoints
-        // so only minimize in production.
-        // UPDATE: this may not be true. unable to determine cause. could be
-        // some textarea copy paste behavior that occurred while I was testing.
-        // minimize: false,
         minimize: isProduction,
     },
 
