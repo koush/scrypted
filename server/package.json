@@ -1,8 +1,9 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.33",
+  "version": "0.0.41",
   "description": "",
   "dependencies": {
+    "@mapbox/node-pre-gyp": "^1.0.5",
     "@scrypted/sdk": "^0.0.86",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
@@ -23,24 +24,20 @@
     "source-map-support": "^0.5.20",
     "tar": "^6.1.11",
     "tmp": "^0.2.1",
-    "ts-node": "^10.2.1",
-    "typescript": "^4.4.3",
+    "tslib": "^2.3.1",
     "whatwg-mimetype": "^2.3.0",
-    "wrtc": "^0.4.7",
-    "zwave-js": "^8.1.1"
+    "wrtc": "^0.4.7"
   },
   "optionalDependencies": {
+    "ffmpeg-for-homebridge": "^0.0.9",
+    "mdns": "^2.7.2"
+  },
+  "devDependencies": {
     "@koush/opencv4nodejs": "^5.6.7",
     "@tensorflow-models/coco-ssd": "^2.2.2",
     "@tensorflow/tfjs": "^3.9.0",
     "@tensorflow/tfjs-core": "^3.9.0",
     "@tensorflow/tfjs-node-gpu": "^3.9.0",
-    "canvas": "^2.8.0",
-    "ffmpeg-for-homebridge": "^0.0.9",
-    "mdns": "^2.7.2",
-    "serialport": "^9.2.0"
-  },
-  "devDependencies": {
     "@types/adm-zip": "^0.4.33",
     "@types/cookie-parser": "^1.4.2",
     "@types/debug": "^4.1.5",
@@ -57,7 +54,12 @@
     "@types/tar": "^4.0.5",
     "@types/tmp": "^0.2.0",
     "@types/whatwg-mimetype": "^2.1.0",
-    "@types/ws": "^7.4.7"
+    "@types/ws": "^7.4.7",
+    "canvas": "^2.8.0",
+    "serialport": "^9.2.0",
+    "ts-node": "^10.2.1",
+    "typescript": "^4.4.3",
+    "zwave-js": "^8.1.1"
   },
   "scripts": {
     "preserve": "npm run build",

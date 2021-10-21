@@ -24,6 +24,7 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import httpAuth from 'http-auth';
 import semver from 'semver';
 import { Info } from './services/info';
+import {getAddresses} from './addresses';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -210,10 +211,13 @@ else {
             next();
         })
 
-        console.log('#############################################');
-        console.log(`Scrypted Server: https://localhost:${SCRYPTED_SECURE_PORT}/`);
+        console.log('#######################################################');
+        console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
+        for (const address of getAddresses()) {
+            console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
+        }
         console.log(`Version:       : ${await new Info().getVersion()}`);
-        console.log('#############################################');
+        console.log('#######################################################');
         const scrypted = new ScryptedRuntime(db, insecure, secure, app);
         await scrypted.start();
 
