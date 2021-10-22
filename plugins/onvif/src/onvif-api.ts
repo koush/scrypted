@@ -1,5 +1,5 @@
-import { EventEmitter, once } from 'events';
-import DigestClient from './digest-client';
+import { EventEmitter } from 'events';
+import AxiosDigestAuth from '@koush/axios-digest-auth';
 
 const onvif = require('onvif');
 const { Cam } = onvif;
@@ -44,15 +44,18 @@ async function promisify<T>(block: (callback: (err: Error, value: T) => void) =>
 }
 
 export class OnvifCameraAPI {
-    digestAuth: DigestClient;
     snapshotUrls = new Map<string, string>();
     rtspUrls = new Map<string, string>();
     profiles: Promise<any>;
     binaryStateEvent: string;
+    digestAuth: AxiosDigestAuth;
 
     constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string, public debug?: boolean) {
-        this.digestAuth = new DigestClient(username, password);
         this.binaryStateEvent = binaryStateEvent
+        this.digestAuth = new AxiosDigestAuth({
+            username,
+            password,
+        });
     }
 
     listenEvents() {
@@ -138,10 +141,13 @@ export class OnvifCameraAPI {
         if (!snapshotUri)
             return;
 
-        const response = await this.digestAuth.fetch(snapshotUri);
-        const buffer = await response.arrayBuffer();
+        const response = await this.digestAuth.request({
+            method: 'GET',
+            url: snapshotUri,
+            responseType: 'arraybuffer',
+        });
 
-        return Buffer.from(buffer);
+        return Buffer.from(response.data);
     }
 }
 

@@ -1,7 +1,7 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions } from "@scrypted/sdk";
 import { Stream } from "stream";
 import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
-import { RtspSmartCamera, RtspProvider, Destroyable } from "../../rtsp/src/rtsp";
+import { RtspSmartCamera, RtspProvider, Destroyable, RtspMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { EventEmitter } from "stream";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
@@ -87,12 +87,16 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         ];
     }
 
-    async takePicture(): Promise<MediaObject> {
+    async getConstructedStreamUrl() {
+        return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
+    }
+
+    async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
         return mediaManager.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
     }
 
-    async getConstructedStreamUrl() {
-        return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
+    async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+        return [0, 1].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=${subtype}`, subtype));
     }
 
     async putSetting(key: string, value: string) {
@@ -154,9 +158,14 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         this.cp.on('killed', () => this.cp = undefined);
         ffmpegLogInitialOutput(this.console, this.cp);
     }
+
     async stopIntercom(): Promise<void> {
         this.cp?.kill();
         this.cp = undefined;
+    }
+
+    showRtspUrlOverride() {
+        return false;
     }
 }
 

@@ -1,7 +1,7 @@
 import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { HikVisionCameraAPI } from "./hikvision-camera-api";
-import { Destroyable, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
+import { Destroyable, RtspMediaStreamOptions, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
 import { HikVisionCameraEvent } from "./hikvision-camera-api";
 const { mediaManager } = sdk;
 
@@ -23,10 +23,10 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
                 events.on('close', () => ret.emit('error', new Error('close')));
                 events.on('error', e => ret.emit('error', e));
-                events.on('event', (event: HikVisionCameraEvent, channel: string) => {
-                    if (this.getRtspChannel() && channel !== this.getRtspChannel().substr(0, 1)) {
-                        return;
-                    }
+                events.on('event', (event: HikVisionCameraEvent, cameraNumber: string) => {
+                    // if (this.getRtspChannel() && cameraNumber !== this.getCameraNumber()) {
+                    //     return;
+                    // }
                     if (event === HikVisionCameraEvent.MotionDetected
                         || event === HikVisionCameraEvent.LineDetection
                         || event === HikVisionCameraEvent.FieldDetection) {
@@ -62,27 +62,26 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return client;
     }
 
-    async takePicture(): Promise<MediaObject> {
+    async takeSmartCameraPicture(): Promise<MediaObject> {
         const api = this.createClient();
-
         return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
     }
 
     async getUrlSettings() {
         return [
-            ...await super.getUrlSettings(),
             {
                 key: 'rtspChannel',
-                title: 'Channel number',
-                description: "What channel does this camera use?",
-                placeholder: '1/2/3/etc.',
+                title: 'Channel Number',
+                description: "The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
+                placeholder: '101',
                 value: this.storage.getItem('rtspChannel'),
             },
+            ...await super.getUrlSettings(),
             {
                 key: 'rtspUrlParams',
-                title: 'RTSP URL Params Override',
-                description: "Override the RTSP URL parameters - ?transportmode=unicast&...",
-                placeholder: '?transportmode=unicast&...',
+                title: 'RTSP URL Parameters Override',
+                description: "Override the RTSP URL parameters. E.g.: ?transportmode=unicast",
+                placeholder: this.getRtspUrlParams(),
                 value: this.storage.getItem('rtspUrlParams'),
             },
         ]
@@ -92,14 +91,23 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return this.storage.getItem('rtspChannel');
     }
 
-    getRtspUrlParams() {
-        return this.storage.getItem('rtspUrlParams');
+    getCameraNumber() {
+        const channel = this.getRtspChannel();
+        return channel?.substring(0, 1) || '1';
     }
 
-    async getConstructedStreamUrl() {
-        const channel = this.getRtspChannel() || '101';
+    getRtspUrlParams() {
+        return this.storage.getItem('rtspUrlParams') || '?transportmode=unicast';
+    }
+
+    async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+        const cameraNumber = this.getCameraNumber() || '1';
         const params = this.getRtspUrlParams() || '?transportmode=unicast';
-        return `rtsp://${this.getRtspAddress()}/Streaming/Channels/${channel}/${params}`;
+        return ['01', '02'].map((channel, index) => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/Streaming/Channels/${cameraNumber}${channel}/${params}`, index));
+    }
+
+    showRtspUrlOverride() {
+        return false;
     }
 }
 
@@ -121,11 +129,12 @@ class HikVisionProvider extends RtspProvider {
         if (!this.clients)
             this.clients = new Map();
 
-        const check = this.clients.get(address);
+        const key = `${address}#${username}#${password}`;
+        const check = this.clients.get(key);
         if (check)
             return check;
         const client = new HikVisionCameraAPI(address, username, password, undefined, this.console);
-        this.clients.set(address, client);
+        this.clients.set(key, client);
         return client;
     }
 

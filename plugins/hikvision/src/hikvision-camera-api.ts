@@ -1,7 +1,5 @@
-import { once } from 'events';
-import { EventEmitter, PassThrough, Readable } from 'stream';
-import { Form } from 'multiparty';
-import AxiosDigestAuth from '@mhoc/axios-digest-auth';
+import { Readable } from 'stream';
+import AxiosDigestAuth from '@koush/axios-digest-auth';
 
 export enum HikVisionCameraEvent {
     MotionDetected = "<eventType>VMD</eventType>",
@@ -69,9 +67,11 @@ export class HikVisionCameraAPI {
     }
 
     async listenEvents() {
+        const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
+        this.console.log('listener url', url);
         const response = await this.digestAuth.request({
             method: "GET",
-            url: `http://${this.ip}/ISAPI/Event/notification/alertStream`,
+            url,
             responseType: 'stream',
         });
         const stream = response.data as Readable;
@@ -81,12 +81,12 @@ export class HikVisionCameraAPI {
             // this.console.log(data);
             for (const event of Object.values(HikVisionCameraEvent)) {
                 if (data.indexOf(event) !== -1) {
-                    const channel = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
+                    const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
                     if (this.channel
                         && data.indexOf(`<channelID>${this.channel.substr(0, 1)}</channelID>`) === -1) {
                         continue;
                     }
-                    stream.emit('event', event, channel);
+                    stream.emit('event', event, cameraNumber);
                 }
             }
         });
