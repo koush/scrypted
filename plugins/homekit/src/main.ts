@@ -9,7 +9,7 @@ import { randomBytes } from 'crypto';
 import qrcode from 'qrcode';
 import packageJson from "../package.json";
 import { randomPinCode } from './pincode';
-import { EventedHTTPServer } from '../HAP-NodeJS/src/lib/util/eventedhttp';
+import { EventedHTTPServer } from 'hap-nodejs/dist/lib/util/eventedhttp';
 import { getHAPUUID, initializeHapStorage } from './hap-utils';
 
 const { systemManager, deviceManager } = sdk;

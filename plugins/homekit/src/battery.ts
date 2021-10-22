@@ -1,6 +1,6 @@
 import { Battery, ScryptedDevice, ScryptedInterface } from "@scrypted/sdk";
-import { Accessory, Characteristic } from "../HAP-NodeJS/src";
-import { Battery as HAPBattery, BatteryLevel, StatusLowBattery } from "../HAP-NodeJS/src/lib/definitions";
+import { Accessory, Characteristic } from "hap-nodejs";
+import { Battery as HAPBattery, BatteryLevel, StatusLowBattery } from "hap-nodejs/dist/lib/definitions";
 import { bindCharacteristic } from "./common";
 
 export function maybeAddBatteryService(device: ScryptedDevice & Battery, accessory: Accessory) {

@@ -11,12 +11,12 @@ import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import debounce from 'lodash/debounce';
 
-import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue, NodeCallback } from '../../HAP-NodeJS/src';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions } from '../../HAP-NodeJS/src/lib/camera/RecordingManagement';
+import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue, NodeCallback } from 'hap-nodejs';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions } from 'hap-nodejs/dist/lib/camera/RecordingManagement';
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
-import { ContactSensor } from '../../HAP-NodeJS/src/lib/definitions';
+import { ContactSensor } from 'hap-nodejs/dist/lib/definitions';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSnapshotHandler } from './camera/camera-snapshot';
 

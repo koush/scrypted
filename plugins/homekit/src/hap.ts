@@ -1,1 +1,1 @@
-export * from '../HAP-NodeJS/src/index';
+export * from 'hap-nodejs';
