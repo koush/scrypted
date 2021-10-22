@@ -81,7 +81,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                 const wrappedProxy = new Proxy(wrappedHandler, wrappedHandler);
 
                 try {
-                    const interfaces = await (mixinProvider.canMixin(type, allInterfaces) as any) as ScryptedInterface[];
+                    const interfaces = await mixinProvider.canMixin(type, allInterfaces) as any as ScryptedInterface[];
                     if (!interfaces) {
                         console.warn(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
                         const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
@@ -173,6 +173,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         const mixinTable = await this.mixinTable;
         for (const mixin of mixinTable) {
 
+            // this could be null?
             if (mixin.interfaces.includes(iface))
                 return (await mixin.proxy)[method](...argArray);
         }

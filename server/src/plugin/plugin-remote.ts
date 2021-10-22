@@ -422,6 +422,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
 
                 const params: any = {
+                    exports,
                     window,
                     require: (name: string) => {
                         if (name === 'fs' && !packageJson.scrypted.realfs) {
