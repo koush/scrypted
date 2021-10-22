@@ -100,6 +100,7 @@ class OnvifCamera extends RtspSmartCamera {
             return ret;
         }
         catch (e) {
+            this.console.error('error retrieving onvif profiles', e);
         }
     }
 

@@ -13,3 +13,6 @@
 [submodule "plugins/tensorflow/face-api.js"]
 	path = plugins/tensorflow/face-api.js
 	url = git@github.com:koush/face-api.js
+[submodule "external/axios-digest-auth"]
+	path = external/axios-digest-auth
+	url = git@github.com:koush/axios-digest-auth
