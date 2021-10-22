@@ -31,6 +31,7 @@
     "axios": "^0.21.4",
     "babel-loader": "^8.2.3",
     "babel-plugin-const-enum": "^1.1.0",
+    "esbuild": "^0.13.8",
     "raw-loader": "^4.0.2",
     "rimraf": "^3.0.2",
     "ts-loader": "^9.2.6",

@@ -1,8 +1,8 @@
 import { ScryptedDeviceBase } from "@scrypted/sdk";
 import { scryptedEval as scryptedEvalBase } from "../../../common/src/scrypted-eval";
 
-const util = require("!!raw-loader!./api/util.ts");
-const frigate = require("!!raw-loader!./api/frigate.ts");
+const util = require("!!raw-loader!./api/util.ts").default;
+const frigate = require("!!raw-loader!./api/frigate.ts").default;
 const libs = {
     frigate,
     util,

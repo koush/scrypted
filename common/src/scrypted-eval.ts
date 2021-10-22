@@ -20,7 +20,7 @@ function tsCompile(source: string, options: ts.TranspileOptions = null): string 
 export async function scryptedEval(device: ScryptedDeviceBase, script: string, extraLibs: { [lib: string]: string }, params: { [name: string]: any }) {
     try {
         const libs = Object.assign({
-            types: require("!!raw-loader!!@scrypted/sdk/types.d.ts"),
+            types: require("!!raw-loader!!@scrypted/sdk/types.d.ts").default,
         }, extraLibs);
         const allScripts = Object.values(libs).join('\n').toString() + script;
         const compiled = tsCompile(allScripts);
@@ -69,8 +69,8 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
     const libs = Object.assign({
-        types: require("!!raw-loader!@scrypted/sdk/types.d.ts"),
-        sdk: require("!!raw-loader!@scrypted/sdk/index.d.ts"),
+        types: require("!!raw-loader!@scrypted/sdk/types.d.ts").default,
+        sdk: require("!!raw-loader!@scrypted/sdk/index.d.ts").default,
     }, extraLibs);
 
     function monacoEvalDefaultsFunction(monaco, libs) {

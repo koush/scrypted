@@ -1,21 +1,19 @@
 // https://developer.scrypted.app/#getting-started
 // package.json contains the metadata (name, interfaces) about this device
 // under the "scrypted" key.
-import axios from 'axios';
-import { Settings, Setting, DeviceProvider, OnOff, ScryptedDeviceBase, ScryptedInterface, ScryptedDeviceType, Scriptable, ScriptSource, ScryptedInterfaceDescriptors } from '@scrypted/sdk';
+import { Settings, Setting, DeviceProvider, ScryptedDeviceBase, ScryptedInterface, ScryptedDeviceType, Scriptable, ScriptSource, ScryptedInterfaceDescriptors } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { monacoEvalDefaults } from './monaco';
 import { scryptedEval } from './scrypted-eval';
 import { MqttClient, MqttSubscriptions } from './api/mqtt-client';
-import { connect, Client, IClientSubscribeOptions, ClientSubscribeCallback } from 'mqtt';
 import aedes from 'aedes';
 import net from 'net';
 import ws from 'websocket-stream';
 import http from 'http';
 import { MqttDeviceBase } from './api/mqtt-device-base';
-import { MqttAutoDiscoveryDevice, MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
+import { MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
 
-const loopbackLight = require("!!raw-loader!./examples/loopback-light.ts");
+const loopbackLight = require("!!raw-loader!./examples/loopback-light.ts").default;
 
 const methodInterfaces: { [method: string]: string } = {};
 for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
@@ -77,6 +75,9 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
             this.handler = undefined;
 
             const client = this.connectClient();
+            client.on('connect', () => this.console.log('mqtt client connected'));
+            client.on('disconnect', () => this.console.log('mqtt client disconnected'));
+            client.on('error', e => this.console.log('mqtt client error', e));
 
             const allInterfaces: string[] = [
                 ScryptedInterface.Scriptable,
