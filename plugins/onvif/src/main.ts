@@ -26,6 +26,7 @@ function convertAudioCodec(codec: string) {
 class OnvifCamera extends RtspSmartCamera {
     eventStream: Stream;
     client: OnvifCameraAPI;
+    rtspMediaStreamOptions: RtspMediaStreamOptions[];
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         try {
@@ -73,30 +74,43 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+        if (this.rtspMediaStreamOptions)
+            return this.rtspMediaStreamOptions;
+
         try {
             const client = await this.getClient();
             const profiles: any[] = await client.getProfiles();
             const ret: RtspMediaStreamOptions[] = [];
             for (const { $, name, videoEncoderConfiguration, audioEncoderConfiguration } of profiles) {
-                ret.push({
-                    id: $.token,
-                    name: name,
-                    url: await client.getStreamUrl($.token),
-                    video: {
-                        fps: videoEncoderConfiguration?.rateControl?.frameRateLimit,
-                        bitrate: computeBitrate(videoEncoderConfiguration?.rateControl?.bitrateLimit),
-                        width: videoEncoderConfiguration?.resolution?.width,
-                        height: videoEncoderConfiguration?.resolution?.height,
-                        codec: videoEncoderConfiguration?.encoding?.toLowerCase(),
-                        idrIntervalMillis: computeInterval(videoEncoderConfiguration?.rateControl?.frameRateLimit,
-                            videoEncoderConfiguration?.$.GovLength),
-                    },
-                    audio: this.isAudioDisabled() ? null : {
-                        bitrate: computeBitrate(audioEncoderConfiguration?.bitrate),
-                        codec: convertAudioCodec(audioEncoderConfiguration?.encoding),
-                    }
-                })
+                try {
+                    ret.push({
+                        id: $.token,
+                        name: name,
+                        url: await client.getStreamUrl($.token),
+                        video: {
+                            fps: videoEncoderConfiguration?.rateControl?.frameRateLimit,
+                            bitrate: computeBitrate(videoEncoderConfiguration?.rateControl?.bitrateLimit),
+                            width: videoEncoderConfiguration?.resolution?.width,
+                            height: videoEncoderConfiguration?.resolution?.height,
+                            codec: videoEncoderConfiguration?.encoding?.toLowerCase(),
+                            idrIntervalMillis: computeInterval(videoEncoderConfiguration?.rateControl?.frameRateLimit,
+                                videoEncoderConfiguration?.$.GovLength),
+                        },
+                        audio: this.isAudioDisabled() ? null : {
+                            bitrate: computeBitrate(audioEncoderConfiguration?.bitrate),
+                            codec: convertAudioCodec(audioEncoderConfiguration?.encoding),
+                        }
+                    })
+                }
+                catch (e) {
+                    this.console.error('error retrieving onvif profile', $.token, e);
+                }
             }
+
+            if (!ret.length)
+                throw new Error('onvif camera had no profiles.');
+
+            this.rtspMediaStreamOptions = ret;
             return ret;
         }
         catch (e) {
