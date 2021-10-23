@@ -6,7 +6,7 @@ import sdk from '@scrypted/sdk';
 import { monacoEvalDefaults } from './monaco';
 import { scryptedEval } from './scrypted-eval';
 import { MqttClient, MqttSubscriptions } from './api/mqtt-client';
-import aedes from 'aedes';
+import aedes, { AedesOptions } from 'aedes';
 import net from 'net';
 import ws from 'websocket-stream';
 import http from 'http';
@@ -77,7 +77,9 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
             const client = this.connectClient();
             client.on('connect', () => this.console.log('mqtt client connected'));
             client.on('disconnect', () => this.console.log('mqtt client disconnected'));
-            client.on('error', e => this.console.log('mqtt client error', e));
+            client.on('error', e => {
+                this.console.log('mqtt client error', e);
+            });
 
             const allInterfaces: string[] = [
                 ScryptedInterface.Scriptable,
@@ -160,6 +162,8 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
     }
 }
 
+const brokerProperties = ['httpPort', 'tcpPort', 'enableBroker', 'username', 'password'];
+
 class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
     devices = new Map<string, any>();
     netServer: net.Server;
@@ -197,6 +201,21 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
                 value: (this.storage.getItem('enableBroker') === 'true').toString(),
             },
             {
+                group: 'MQTT Broker',
+                title: 'Username',
+                value: this.storage.getItem('username'),
+                key: 'username',
+                description: 'Optional: User name used to authenticate with the MQTT broker.',
+            },
+            {
+                group: 'MQTT Broker',
+                title: 'Password',
+                value: this.storage.getItem('password'),
+                key: 'password',
+                type: 'password',
+                description: 'Optional: Password used to authenticate with the MQTT broker.',
+            },
+            {
                 title: 'TCP Port',
                 key: 'tcpPort',
                 description: 'The port to use for TCP connections',
@@ -223,7 +242,17 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
 
         if (this.storage.getItem('enableBroker') !== 'true')
             return;
-        const instance = aedes();
+        let opts: AedesOptions = undefined;
+        const username = this.storage.getItem('username');
+        const password = this.storage.getItem('password');
+        if (username && password) {
+            opts = {
+                authenticate(client, u, p, done) {
+                    done(undefined, username === u && password === p.toString());
+                }
+            }
+        }
+        const instance = aedes(opts);
         this.netServer = net.createServer(instance.handle);
         const tcpPort = parseInt(this.storage.getItem('tcpPort')) || 1883;
         const httpPort = parseInt(this.storage.getItem('httpPort')) || 8888;
@@ -243,7 +272,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
     async putSetting(key: string, value: string | number) {
         this.storage.setItem(key, value.toString());
 
-        if (key === 'enableBroker') {
+        if (brokerProperties.includes(key)) {
             this.maybeEnableBroker();
             return;
         }

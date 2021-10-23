@@ -29,6 +29,7 @@ export class MqttDeviceBase extends ScryptedDeviceBase implements Settings {
                 title: 'Password',
                 value: this.storage.getItem('password'),
                 key: 'password',
+                type: 'password',
                 description: 'Optional: Password used to authenticate with the MQTT broker.',
             },
         ];
@@ -60,15 +61,13 @@ export class MqttDeviceBase extends ScryptedDeviceBase implements Settings {
         });
         client.setMaxListeners(Infinity);
 
-        setTimeout(() => {
-            client.on('connect', err => {
-                if (err) {
-                    this.console.error('error subscribing to mqtt', err);
-                    return;
-                }
-            })
-        }, 500);
-
+        client.on('connect', err => {
+            if (err) {
+                this.console.error('error subscribing to mqtt', err);
+                return;
+            }
+        })
+        
         return this.client;
     }
 }
