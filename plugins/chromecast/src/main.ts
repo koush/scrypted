@@ -147,8 +147,15 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
 
   async load(media: string | MediaObject, options: MediaPlayerOptions) {
     // check to see if this is url friendly media.
-    if (typeof media === 'string')
-      media = mediaManager.createMediaObject(media, ScryptedMimeTypes.Url);
+    if (typeof media === 'string') {
+      media = await mediaManager.createMediaObjectFromUrl(media);
+    }
+
+    let mimeType: string;
+    if (media.mimeType.startsWith('image/') ||
+      media.mimeType.startsWith('video/')) {
+      mimeType = media.mimeType;
+    }
 
     if (media.mimeType === ScryptedMimeTypes.LocalUrl ||
       media.mimeType === ScryptedMimeTypes.InsecureLocalUrl ||
@@ -163,7 +170,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
       this.sendMediaToClient(options && (options as any).title,
         url,
         // prefer the provided mime type hint, otherwise infer from url.
-        options.mimeType || mime.getType(new URL(url).pathname));
+        mimeType || options.mimeType || mime.getType(new URL(url).pathname));
       return;
     }
 
@@ -441,6 +448,7 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
             // wtf?
             return;
           }
+
           const model = txt.get('md');
           const name = txt.get('fn');;
 
@@ -459,6 +467,12 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
           }
           const ip = arec.data as string;
           const port = (service.data as any).port;
+
+          if (this.devices.has(id)) {
+            const castDevice = this.devices.get(id);
+            castDevice.storage.setItem('host', ip);
+            return;
+          }
 
           this.onDiscover(id, name, model, ip, port);
         }
