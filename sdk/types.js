@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ScryptedInterfaceDescriptors = exports.ScryptedMimeTypes = exports.ScryptedInterfaceProperty = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.ScryptedDeviceType = void 0;
+exports.ScryptedInterfaceDescriptors = exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterfaceProperty = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.ScryptedDeviceType = void 0;
 var ScryptedDeviceType;
 (function (ScryptedDeviceType) {
     ScryptedDeviceType["Builtin"] = "Builtin";
@@ -175,6 +175,7 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["RTCAVOffer"] = "x-scrypted/x-rtc-av-offer";
     ScryptedMimeTypes["RTCAVAnswer"] = "x-scrypted/x-rtc-av-answer";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));
+exports.SCRYPTED_MEDIA_SCHEME = 'scryped-media://';
 exports.ScryptedInterfaceDescriptors = {
     ScryptedDevice: {
         name: "ScryptedDevice",

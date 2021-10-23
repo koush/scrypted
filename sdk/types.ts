@@ -726,6 +726,11 @@ export interface MediaManager {
    */
   createMediaObject(data: string | Buffer | Promise<string | Buffer>, mimeType: string): MediaObject;
 
+  /**
+   * Create a MediaObject from an URL. The mime type should be provided, but it may be inferred from the URL path.
+   */
+   createMediaObjectFromUrl(data: string, mimeType?: string): Promise<MediaObject>;
+
 
   /**
    * Get the path to ffmpeg on the host system.
@@ -1188,6 +1193,8 @@ export enum ScryptedMimeTypes {
   RTCAVOffer = 'x-scrypted/x-rtc-av-offer',
   RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',
 }
+
+export const SCRYPTED_MEDIA_SCHEME = 'scryped-media://';
 
 export interface ScryptedInterfaceDescriptor {
   name: string;
