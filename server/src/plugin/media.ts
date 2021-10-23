@@ -86,7 +86,7 @@ export class MediaManagerImpl implements MediaManager {
         return url.data.toString();
     }
 
-    async convertMediaObjectToBuffer(mediaObject: string | MediaObject, toMimeType: string): Promise<Buffer> {
+    async convertMediaObjectToBuffer(mediaObject: MediaObject, toMimeType: string): Promise<Buffer> {
         const intermediate = await convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
         return ensureBuffer(intermediate.data);
     }
@@ -135,9 +135,9 @@ export class MediaManagerImpl implements MediaManager {
 
     async createMediaObjectFromUrl(data: string, mimeType?: string): Promise<MediaObject> {
         if (!data.startsWith(SCRYPTED_MEDIA_SCHEME))
-            return this.createMediaObject(data, ScryptedMimeTypes.Url);
+            return this.createMediaObject(data, mimeType || ScryptedMimeTypes.Url);
 
-            const url = new URL(data.toString());
+        const url = new URL(data.toString());
         const id = url.hostname;
         const path = url.pathname.split('/')[1];
         let mo: MediaObject;
