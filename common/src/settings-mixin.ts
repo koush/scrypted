@@ -25,8 +25,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
     abstract putMixinSetting(key: string, value: string | number | boolean): Promise<void>;
 
     async getSettings(): Promise<Setting[]> {
-        const settings = (this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings) ?
-            await this.mixinDevice.getSettings() : []) || [];
+        const settingsPromise = this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings) ? this.mixinDevice.getSettings() : undefined;
 
         const mixinSettings = await this.getMixinSettings();
         for (const setting of mixinSettings) {
@@ -34,6 +33,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
             setting.key = this.settingsGroupKey + ':' + setting.key;
         }
 
+        const settings = (await settingsPromise) || [];
         settings.push(...mixinSettings);
 
         return settings;

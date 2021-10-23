@@ -3,13 +3,14 @@ import sdk from "@scrypted/sdk";
 
 const { log, deviceManager } = sdk;
 
-export class InstancedProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
-    constructor(public hubName: string, public pluginClass: (nativeId: string) => ScryptedDeviceBase & DeviceProvider) {
-        super();
+export class AddProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
+    constructor(nativeId: string, public deviceName: string, public defaultType: ScryptedDeviceType, public defaultInterfaces: ScryptedInterface[], public pluginClass: (nativeId: string) => ScryptedDeviceBase) {
+        super(nativeId);
     }
+
     async getSettings(): Promise<Setting[]> {
         return [{
-            title: 'Add New ' + this.hubName,
+            title: 'Add New ' + this.deviceName,
             key: 'add',
         }];
     }
@@ -17,12 +18,12 @@ export class InstancedProvider extends ScryptedDeviceBase implements DeviceProvi
         if (key === 'add') {
             const nativeId = Math.random().toString();
             const name = value.toString();
-    
+
             deviceManager.onDeviceDiscovered({
                 nativeId,
                 name,
-                interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.Settings],
-                type: ScryptedDeviceType.DeviceProvider,
+                interfaces: this.defaultInterfaces,
+                type: this.defaultType,
             });
 
             var text = `${name} ready. Check the notification area to complete setup.`;
@@ -35,6 +36,12 @@ export class InstancedProvider extends ScryptedDeviceBase implements DeviceProvi
     }
     getDevice(nativeId: string) {
         return this.pluginClass(nativeId);
+    }
+}
+
+export class InstancedProvider extends AddProvider {
+    constructor(nativeId: string, hubName: string, public pluginClass: (nativeId: string) => ScryptedDeviceBase & DeviceProvider) {
+        super(nativeId, hubName, ScryptedDeviceType.DeviceProvider, [ScryptedInterface.DeviceProvider, ScryptedInterface.Settings], pluginClass);
     }
 }
 
@@ -79,9 +86,9 @@ export function isInstanceableProviderModeEnabled() {
 }
 
 export function createInstanceableProviderPlugin(name: string, pluginClass: (nativeId: string) => ScryptedDeviceBase & DeviceProvider) {
-    if (!localStorage.getItem('instance-mode'))  {
+    if (!localStorage.getItem('instance-mode')) {
         return pluginClass(undefined);
     }
 
-    return new InstancedProvider(name, pluginClass);
+    return new InstancedProvider(undefined, name, pluginClass);
 }
