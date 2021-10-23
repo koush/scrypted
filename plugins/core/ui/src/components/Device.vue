@@ -42,7 +42,7 @@
     <v-flex xs12 v-if="showRepl" ref="replEl">
       <REPLCard :deviceId="id"></REPLCard>
     </v-flex>
-    <v-flex xs12 :md6="deviceComponent !== 'Automation'">
+    <v-flex xs12 md7>
       <v-layout row wrap>
         <v-flex xs12>
           <v-card raised>
@@ -383,7 +383,7 @@
       </v-layout>
     </v-flex>
 
-    <v-flex xs12 md6 lg6>
+    <v-flex xs12 md5 lg5>
       <v-layout row wrap>
         <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
           <v-card>

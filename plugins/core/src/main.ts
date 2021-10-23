@@ -35,7 +35,7 @@ async function reportAutomation(nativeId: string, name?: string) {
         name,
         nativeId,
         type: ScryptedDeviceType.Automation,
-        interfaces: [ScryptedInterface.OnOff]
+        interfaces: [ScryptedInterface.OnOff, ScryptedInterface.Settings]
     }
     await deviceManager.onDeviceDiscovered(device);
 }

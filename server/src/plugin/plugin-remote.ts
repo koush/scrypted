@@ -188,7 +188,7 @@ class DeviceManagerImpl implements DeviceManager {
 
 class StorageImpl implements Storage {
     api: PluginAPI;
-    [name: string | symbol]: any;
+    [name: string]: any;
 
     private static allowedMethods = [
         'length',
@@ -201,7 +201,7 @@ class StorageImpl implements Storage {
     private static indexedHandler: ProxyHandler<StorageImpl> = {
         get(target, property) {
             if (StorageImpl.allowedMethods.includes(property.toString()))
-                return target[property].bind(target);
+                return target[property.toString()].bind(target);
             return target.getItem(property.toString());
         },
         set(target, property, value): boolean {

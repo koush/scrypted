@@ -1,4 +1,4 @@
-import { EventDetails, EventListenerRegister, OnOff, ScryptedDevice, ScryptedDeviceBase } from "@scrypted/sdk";
+import { EventDetails, EventListenerRegister, OnOff, ScryptedDevice, ScryptedDeviceBase, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import { AutomationJavascript } from "./builtins/javascript";
 import { Scheduler } from "./builtins/scheduler";
@@ -11,7 +11,7 @@ interface Abort {
     aborted: boolean;
 }
 
-export class Automation extends ScryptedDeviceBase implements OnOff {
+export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
     registers: EventListenerRegister[] = [];
     pendings = new Map<string, Abort>();
 
@@ -21,6 +21,37 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
         this.bind();
 
         this.on = this.storage.getItem('enabled') !== 'false';
+    }
+
+    async getSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'denoiseEvents',
+                value: this.storage.getItem('denoiseEvents') === 'true',
+                title: 'Denoise Events',
+                description: 'Denoising events will suppress events where the same event data is sent multiple times in a row. For example, if a sensor sent multiple door open events, only the first event will trigger this automation. The automation will fire again once the door sends a close event.',
+                type: 'boolean',
+            },
+            {
+                key: 'runToCompletion',
+                value: this.storage.getItem('runToCompletion') === 'true',
+                title: 'Run Automations to Completion',
+                description: 'By default, automations that are executing will reset if triggered by a new event. Check this box to require an automation to run to completion before it can be triggered again. This setting can be used in conjunction with a timer to prevent an automation from running too often.',
+                type: 'boolean',
+            },
+            {
+                key: 'staticEvents',
+                value: this.storage.getItem('staticEvents') === 'true',
+                title: 'Reset Automation on All Events',
+                description: 'By default, running Automation timers will be reset if the same device fires the event again. Check this box to reset Automation timers on all of the configured events.',
+                type: 'boolean',
+            },
+        ]
+    }
+
+    async putSetting(key: string, value: SettingValue): Promise<void> {
+        this.storage.setItem(key, value.toString());
+        this.bind();
     }
 
     async eval(script: string, variables: { [name: string]: any }) {
@@ -70,14 +101,14 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
 
         try {
             const data = JSON.parse(this.storage.getItem('data'));
-            const { denoiseEvents, runToCompletion, staticEvents } = data;
+            const { denoiseEvents, runToCompletion, staticEvents } = this.storage;
 
             const runActions = async (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => {
-                const pendingKey = staticEvents ? undefined : eventSource.id + ':' + eventDetails.eventInterface;
+                const pendingKey = staticEvents === 'true' ? undefined : eventSource.id + ':' + eventDetails.eventInterface;
                 const pending = this.pendings.get(pendingKey);
                 this.console.log('automation trigger key', pendingKey);
 
-                if (runToCompletion && pending) {
+                if (runToCompletion === 'true' && pending) {
                     this.console.info('automation already in progress, trigger ignored', pendingKey);
                     return;
                 }
@@ -95,10 +126,10 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
                             this.console.log('automation aborted', pendingKey);
                             return;
                         }
-    
+
                         const parts = action.id.split('#');
                         const id = parts[0];
-    
+
                         if (id === 'scriptable') {
                             const script = new AutomationJavascript(this, eventSource, eventDetails, eventData);
                             await script.run(action.model['script.ts'])
@@ -118,7 +149,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
                             const device = systemManager.getDeviceById(id);
                             if (!device)
                                 throw new Error(`unknown action ${action.id}`);
-    
+
                             const { rpc } = action.model;
                             device[rpc.method](...rpc.parameters || []);
                         }
@@ -157,7 +188,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff {
                 }
 
                 register = listen.listen({
-                    denoise: denoiseEvents,
+                    denoise: denoiseEvents === 'true',
                     event,
                 }, (eventSource, eventDetails, eventData) => {
                     this.log.i(`automation triggered by ${eventSource.name}`);

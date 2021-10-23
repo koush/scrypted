@@ -129,7 +129,7 @@ export default {
     booleanValue: {
       get() {
         return (
-          this.lazyValue.value && this.lazyValue.value.toLowerCase() === "true"
+          this.lazyValue.value && this.lazyValue.value.toString().toLowerCase() === "true"
         );
       },
       set(val) {

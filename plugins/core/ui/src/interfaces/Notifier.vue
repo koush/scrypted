@@ -15,12 +15,15 @@
             v-model="lazyValue.notificationBody"
             @input="onChange"
           ></v-text-field>
-          <v-text-field
+          <v-combobox
+            @select="onSelect"
+            :items="mediaInterfaces"
             label="Notification Media URL"
             outlined
             v-model="lazyValue.notificationMediaUrl"
             @input="onChange"
-          ></v-text-field>
+            :return-object="false"
+          ></v-combobox>
           <v-text-field
             label="Notification Media Mime Type"
             outlined
@@ -40,6 +43,12 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import cloneDeep from "lodash/cloneDeep";
+import { ScryptedInterface, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk/types";
+
+const supportedMediaInterfaces = [
+  ScryptedInterface.VideoCamera,
+  ScryptedInterface.Camera,
+];
 
 export default {
   mixins: [RPCInterface],
@@ -90,6 +99,28 @@ export default {
     },
     send() {
       this.update();
+    },
+    onSelect() {
+      this.lazyValue.notificationMediaMime = '';
+    },
+  },
+  computed: {
+    mediaInterfaces() {
+      const ret = [];
+      for (const id of Object.keys(
+        this.$scrypted.systemManager.getSystemState()
+      )) {
+        const device = this.$scrypted.systemManager.getDeviceById(id);
+        for (const iface of [...new Set(device.interfaces)]) {
+          if (!supportedMediaInterfaces.includes(iface)) continue;
+          ret.push({
+            value: `${SCRYPTED_MEDIA_SCHEME}${id}/${iface}`,
+            text: `${device.name} (${iface})`,
+          });
+        }
+      }
+
+      return ret;
     },
   },
 };

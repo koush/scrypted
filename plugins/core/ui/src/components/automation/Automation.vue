@@ -27,63 +27,6 @@
           v-model="device.triggers"
           @input="onChange"
         ></EventsPicker>
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on }">
-            <div v-on="on">
-              <v-checkbox
-                dense
-                @input="onChange"
-                v-model="device.denoiseEvents"
-                label="Denoise All Events"
-              ></v-checkbox>
-            </div>
-          </template>
-          <span
-            >Denoising events will suppress events where the same event data is
-            sent multiple times in a row. For example, if a sensor sent multiple
-            door open events, only the first event will trigger this automation.
-            The automation will fire again once the door sends a close
-            event.</span
-          >
-        </v-tooltip>
-
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on }">
-            <div v-on="on">
-            <v-checkbox
-              dense
-              @input="onChange"
-              v-model="device.staticEvents"
-              label="Reset Automation on All Events"
-            ></v-checkbox>
-            </div>
-          </template>
-          <span
-            >By default, running Automation timers will be reset if the same
-            device fires the event again. Check this box to reset Automation
-            timers on all of the configured events.</span
-          >
-        </v-tooltip>
-
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on }">
-            <div v-on="on">
-            <v-checkbox
-              dense
-              @input="onChange"
-              v-model="device.runToCompletion"
-              label="Run Automations to Completion"
-            ></v-checkbox>
-            </div>
-          </template>
-          <span
-            >By default, autotomations that are executing will reset if
-            triggered by a new event. Check this box to require an automation to
-            run to completion before it can be triggered again. This setting can
-            be used in conjunction with a timer to prevent an automation from
-            running too often.</span
-          >
-        </v-tooltip>
       </v-flex>
       <v-card-actions>
         <v-spacer></v-spacer>
