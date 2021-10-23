@@ -188,6 +188,27 @@ class DeviceManagerImpl implements DeviceManager {
 
 class StorageImpl implements Storage {
     api: PluginAPI;
+    [name: string | symbol]: any;
+
+    private static allowedMethods = [
+        'length',
+        'clear',
+        'getItem',
+        'setItem',
+        'key',
+        'removeItem',
+    ];
+    private static indexedHandler: ProxyHandler<StorageImpl> = {
+        get(target, property) {
+            if (StorageImpl.allowedMethods.includes(property.toString()))
+                return target[property].bind(target);
+            return target.getItem(property.toString());
+        },
+        set(target, property, value): boolean {
+            target.setItem(property.toString(), value);
+            return true;
+        }
+    };
 
     constructor(public deviceManager: DeviceManagerImpl, public nativeId: ScryptedNativeId, public prefix?: string) {
         this.deviceManager = deviceManager;
@@ -195,6 +216,8 @@ class StorageImpl implements Storage {
         this.nativeId = nativeId;
         if (!this.prefix)
             this.prefix = '';
+
+        return new Proxy(this, StorageImpl.indexedHandler);
     }
 
     get storage(): { [key: string]: any } {

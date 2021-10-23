@@ -16,11 +16,11 @@ function mimeMatches(target: MimeType, candidate: MimeType) {
     return typeMatches(target.type, candidate.type) && typeMatches(target.subtype, candidate.subtype);
 }
 
-const httpsAgent = new https.Agent({  
+const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 })
 
-export async function ensureBuffer(data: Buffer|string): Promise<Buffer> {
+export async function ensureBuffer(data: Buffer | string): Promise<Buffer> {
     if (typeof data === 'string') {
         const ab = await axios.get(data as string, {
             responseType: 'arraybuffer',
@@ -31,9 +31,8 @@ export async function ensureBuffer(data: Buffer|string): Promise<Buffer> {
     return Buffer.from(data);
 }
 
-export async function convert(converters: BufferConverter[], mediaObject: MediaObjectRemote, toMimeType: string): Promise<{data: Buffer|string, mimeType: string}> {
+export async function convert(converters: BufferConverter[], mediaObject: MediaObjectRemote, toMimeType: string): Promise<{ data: Buffer | string, mimeType: string }> {
     // console.log('converting', mediaObject.mimeType, toMimeType);
-    
     const mediaMime = new MimeType(mediaObject.mimeType);
     const outputMime = new MimeType(toMimeType);
 
@@ -43,7 +42,7 @@ export async function convert(converters: BufferConverter[], mediaObject: MediaO
             data: await mediaObject.getData(),
         }
     }
-    
+
     const converterIds = new Map<BufferConverter, string>();
     const converterReverseids = new Map<string, BufferConverter>();
     let id = 0;
@@ -96,6 +95,7 @@ export async function convert(converters: BufferConverter[], mediaObject: MediaO
         const converter = converterReverseids.get(node);
         const targetMime = new MimeType(converter.toMimeType);
         const inputMime = new MimeType(converter.fromMimeType);
+
         if (typeof value === 'string' && !inputMime.parameters.has(ScryptedMimeTypes.AcceptUrlParameter)) {
             value = await ensureBuffer(value);
         }

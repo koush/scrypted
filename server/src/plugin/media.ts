@@ -1,4 +1,4 @@
-import { BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager } from "@scrypted/sdk/types";
+import { VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk/types";
 import { convert, ensureBuffer } from "../convert";
 import { MediaObjectRemote } from "./plugin-api";
 import mimeType from 'mime'
@@ -119,7 +119,7 @@ export class MediaManagerImpl implements MediaManager {
         return new MediaObjectImpl();
     }
 
-    createMediaObject(data: string | Buffer | Promise<string | Buffer>, mimeType: string): MediaObjectRemote {
+    createMediaObject(data: string | Buffer | Promise<string | Buffer>, mimeType?: string): MediaObjectRemote {
         class MediaObjectImpl implements MediaObjectRemote {
             __proxy_props = {
                 mimeType,
@@ -131,5 +131,26 @@ export class MediaManagerImpl implements MediaManager {
             }
         }
         return new MediaObjectImpl();
+    }
+
+    async createMediaObjectFromUrl(data: string, mimeType?: string): Promise<MediaObject> {
+        if (!data.startsWith(SCRYPTED_MEDIA_SCHEME))
+            return this.createMediaObject(data, ScryptedMimeTypes.Url);
+
+            const url = new URL(data.toString());
+        const id = url.hostname;
+        const path = url.pathname.split('/')[1];
+        let mo: MediaObject;
+        if (path === ScryptedInterface.VideoCamera) {
+            mo = await this.systemManager.getDeviceById<VideoCamera>(id).getVideoStream();
+        }
+        else if (path === ScryptedInterface.Camera) {
+            mo = await this.systemManager.getDeviceById<Camera>(id).takePicture() as any;
+        }
+        else {
+            throw new Error('Unrecognized Scrypted Media interface.')
+        }
+
+        return mo;
     }
 }
