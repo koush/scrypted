@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/onvif",
-   "version": "0.0.45",
+   "version": "0.0.46",
    "description": "ONVIF Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -29,7 +29,7 @@
       ]
    },
    "dependencies": {
-      "@koush/axios-digest-auth": "^0.8.3",
+      "@koush/axios-digest-auth": "^0.8.5",
       "@scrypted/sdk": "file:../../sdk",
       "@types/node": "^16.9.1",
       "base-64": "^1.0.0",
