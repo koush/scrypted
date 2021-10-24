@@ -28,7 +28,7 @@ class DeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
         if (handled)
             return handled;
 
-        if (allInterfaceProperties.includes(p))
+        if (allInterfaceProperties.includes(p.toString()))
             return (this.systemManager.state[this.id] as any)?.[p]?.value;
 
         const prop = p.toString();
