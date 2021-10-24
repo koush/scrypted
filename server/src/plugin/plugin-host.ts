@@ -31,7 +31,6 @@ export class PluginHost {
     pluginId: string;
     module: Promise<any>;
     scrypted: ScryptedRuntime;
-    console: Promise<Console>;
     remote: PluginRemote;
     zip: AdmZip;
     io = io(undefined, {
@@ -155,7 +154,6 @@ export class PluginHost {
 
         this.api = new PluginHostAPI(scrypted, plugin, this);
 
-        this.console = this.peer.eval('return console', undefined, undefined, true) as Promise<Console>;
         const zipBuffer = Buffer.from(plugin.zip, 'base64');
         this.zip = new AdmZip(zipBuffer);
 
