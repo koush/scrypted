@@ -14,6 +14,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
+    maxExtraStreams: number;
 
     getClient() {
         if (!this.client)
@@ -96,7 +97,22 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 
     async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
-        return [0, 1].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=${subtype}`, subtype));
+        let mas = this.maxExtraStreams;
+        if (!this.maxExtraStreams) {
+            const client = this.getClient();
+            try {
+                const response = await client.digestAuth.request({
+                    url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`,
+                    responseType: 'text',
+                })
+                this.maxExtraStreams = parseInt(response.data.split('=')[1].trim());
+                mas = this.maxExtraStreams;
+            }
+            catch (e) {
+            }
+        }
+        mas = mas || 1;
+        return [...Array(mas + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=${subtype}`, subtype));
     }
 
     async putSetting(key: string, value: string) {

@@ -65,7 +65,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
     }
 
     async getVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
-        const vsos = this.getRtspVideoStreamOptions().filter(vso => this.isChannelEnabled(vso.id));
+        const vsos = this.getRtspVideoStreamOptions()?.filter(vso => this.isChannelEnabled(vso.id));
         return vsos;
     }
 
