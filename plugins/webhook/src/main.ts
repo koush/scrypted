@@ -8,7 +8,12 @@ import { randomBytes } from 'crypto';
 const allInterfaceMethods: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.methods));
 const allInterfaceProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.properties));
 
-const { systemManager, endpointManager } = sdk;
+const { systemManager, endpointManager, mediaManager } = sdk;
+
+const mediaObjectMethods = [
+    'takePicture',
+    'getVideoStream',
+]
 
 class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
     async getMixinSettings(): Promise<Setting[]> {
@@ -75,6 +80,20 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
         this.console.log("##################################################")
     }
 
+    async maybeSendMediaObject(response: HttpResponse, value: any, method: string) {
+        if (!mediaObjectMethods.includes(method)) {
+            response?.send(value.toString());
+            return;
+        }
+
+        const buffer = await mediaManager.convertMediaObjectToBuffer(value, 'image/jpeg');
+        response?.send(buffer, {
+            headers: {
+                'Content-Type': 'image/jpeg',
+            }
+        });
+    }
+
     async handle(request: HttpRequest, response: HttpResponse, device: ScryptedDevice, pathSegments: string[]) {
         const token = pathSegments[2];
         if (token !== this.storage.getItem('token')) {
@@ -92,13 +111,15 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                 parameters = JSON.parse(p);
             }
 
-            response?.send('ok');
-
             try {
-                await device[methodOrProperty](...parameters);
+                const result = await device[methodOrProperty](...parameters);
+                this.maybeSendMediaObject(response, result, methodOrProperty);
             }
             catch (e) {
                 this.console.error('webhook action error', e);
+                response.send('Internal Error', {
+                    code: 500,
+                })
             }
         }
         else if (allInterfaceProperties.includes(methodOrProperty)) {
@@ -111,7 +132,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
                 });
             }
             else {
-                response?.send(value);
+                response?.send(value.toString());
             }
         }
         else {
