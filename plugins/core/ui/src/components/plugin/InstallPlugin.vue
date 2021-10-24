@@ -1,6 +1,6 @@
 <template>
   <v-flex xs12 md8 lg6>
-    <v-card raised style="margin-bottom: 60px">
+    <v-card raised style="margin-bottom: 30px">
       <v-card-title
         class="orange-gradient subtitle-1 text--white font-weight-light"
       >

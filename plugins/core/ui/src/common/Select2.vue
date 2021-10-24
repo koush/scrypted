@@ -1,5 +1,6 @@
 <template>
   <v-autocomplete
+    dense
     outlined
     :multiple="multiple"
     :chips="multiple"

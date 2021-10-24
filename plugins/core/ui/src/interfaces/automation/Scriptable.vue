@@ -22,7 +22,7 @@
         scriptSource.scriptTitle
       }}</v-toolbar-title>
     </v-toolbar>
-    <div style="height: 300px">
+    <div style="height: 500px">
       <div ref="container" style="width: 100%; height: 100%"></div>
     </div>
   </div>

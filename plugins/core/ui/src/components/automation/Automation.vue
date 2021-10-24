@@ -3,7 +3,7 @@
     <v-card
       raised
       v-if="device.automationType !== 'Scene'"
-      style="margin-bottom: 60px"
+      style="margin-bottom: 30px"
     >
       <v-card-title
         class="green-gradient subtitle-1 text--white font-weight-light"
@@ -14,12 +14,12 @@
         >
       </v-card-title>
 
-      <v-card-text
+      <v-card-subtitle
         >Specify the events (and optional conditions) that will trigger the
-        automation.</v-card-text
+        automation.</v-card-subtitle
       >
 
-      <v-flex xs12>
+      <v-flex xs12 class="pt-0">
         <EventsPicker
           :name="device.triggers.name"
           :events="availableEvents"
@@ -36,7 +36,7 @@
       </v-card-actions>
     </v-card>
 
-    <v-card raised style="margin-bottom: 60px">
+    <v-card raised style="margin-bottom: 30px">
       <v-card-title
         class="green-gradient subtitle-1 text--white font-weight-light"
       >
@@ -47,15 +47,15 @@
         <span v-else>&nbsp;&nbsp;Scene Activation Actions</span>
       </v-card-title>
 
-      <v-card-text v-if="device.automationType !== 'Scene'"
+      <v-card-subtitle v-if="device.automationType !== 'Scene'"
         >Specify action(s) to take when the automation is
-        triggered.</v-card-text
+        triggered.</v-card-subtitle
       >
-      <v-card-text v-else
-        >Specify action(s) to take when the scene is activated.</v-card-text
+      <v-card-subtitle v-else
+        >Specify action(s) to take when the scene is activated.</v-card-subtitle
       >
 
-      <v-flex xs12>
+      <v-flex xs12 class="pt-0">
         <InterfacesPicker
           :name="device.actions.name"
           :interfaces="contextualInterfaces"

@@ -4,18 +4,21 @@
       <v-layout>
         <v-flex xs12>
           <v-text-field
+            dense
             label="Notification Title"
             outlined
             v-model="lazyValue.notificationTitle"
             @input="onChange"
           ></v-text-field>
           <v-text-field
+            dense
             label="Notification Body"
             outlined
             v-model="lazyValue.notificationBody"
             @input="onChange"
           ></v-text-field>
           <v-combobox
+            dense
             @select="onSelect"
             :items="mediaInterfaces"
             label="Notification Media URL"
@@ -25,6 +28,7 @@
             :return-object="false"
           ></v-combobox>
           <v-text-field
+            dense
             label="Notification Media Mime Type"
             outlined
             v-model="lazyValue.notificationMediaMime"
@@ -101,7 +105,7 @@ export default {
       this.update();
     },
     onSelect() {
-      this.lazyValue.notificationMediaMime = '';
+      this.lazyValue.notificationMediaMime = "";
     },
   },
   computed: {

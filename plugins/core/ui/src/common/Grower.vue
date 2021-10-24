@@ -6,8 +6,8 @@
 
     <v-card-actions>
       <v-spacer v-if="!left"></v-spacer>
-      <v-btn @click="add">{{ addButton }}</v-btn>
-      <v-btn v-if="saveButton" @click="$emit('save')">{{ saveButton }}</v-btn>
+      <v-btn small @click="add">{{ addButton }}</v-btn>
+      <v-btn small v-if="saveButton" @click="$emit('save')">{{ saveButton }}</v-btn>
     </v-card-actions>
     <slot name="append-outer"></slot>
   </div>

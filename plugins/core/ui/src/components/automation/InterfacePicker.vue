@@ -5,7 +5,7 @@
       >Action</v-card-title
     >
 
-    <v-flex xs12>
+    <v-flex xs12 class="pt-0">
       <Select2
         v-model="lazyValue.selected"
         :options="interfaces"
