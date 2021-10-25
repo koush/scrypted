@@ -7,7 +7,7 @@ const { mediaManager } = sdk;
 
 class HikVisionCamera extends RtspSmartCamera implements Camera {
     hasCheckedCodec = false;
-    channelIds: string[];
+    channelIds: Promise<string[]>;
     client: HikVisionCameraAPI;
 
     listenEvents() {
@@ -64,11 +64,11 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return client;
     }
 
-    getClient() {
-        if (!this.client)
-            this.client = this.createClient();
-        return this.client;
-    }
+    // getClient() {
+    //     if (!this.client)
+    //         this.client = this.createClient();
+    //     return this.client;
+    // }
 
     async takeSmartCameraPicture(): Promise<MediaObject> {
         const api = this.createClient();
@@ -109,34 +109,46 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
     }
 
     async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
-        const cameraNumber = this.getCameraNumber() || '1';
-        let channelIds: string[];
         if (!this.channelIds) {
-            const client = this.getClient();
-            try {
-                const response = await client.digestAuth.request({
-                    url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
-                    responseType: 'text',
-                });
-                const xml: string = response.data;
-                const matches = xml.matchAll(/<id>(.*?)<\/id>/g);
-                const ids = [];
-                for (const m of matches) {
-                    ids.push(m[1]);
+            const client = this.createClient();
+            this.channelIds = new Promise(async (resolve, reject) => {
+                try {
+
+                    const response = await client.digestAuth.request({
+                        url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
+                        responseType: 'text',
+                    });
+                    const xml: string = response.data;
+                    const matches = xml.matchAll(/<id>(.*?)<\/id>/g);
+                    const ids = [];
+                    for (const m of matches) {
+                        ids.push(m[1]);
+                    }
+                    resolve(ids);
                 }
-                channelIds = ids;
-                this.channelIds = ids;
-            }
-            catch (e) {
-                this.console.error('error retrieving channel ids', e);
-                channelIds = [cameraNumber + '01', cameraNumber + '02'];
-            }
+                catch (e) {
+                    const cameraNumber = this.getCameraNumber() || '1';
+                    this.console.error('error retrieving channel ids', e);
+                    resolve([cameraNumber + '01', cameraNumber + '02']);
+                    this.channelIds = undefined;
+                }
+            })
         }
-        else {
-            channelIds = this.channelIds;
-        }
+        const channelIds = await this.channelIds;
         const params = this.getRtspUrlParams() || '?transportmode=unicast';
-        return channelIds.map((channel, index) => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/Streaming/Channels/${cameraNumber}${channel}/${params}`, index));
+
+        // due to being able to override the channel number, and NVR providing per channel port access,
+        // do not actually use these channel ids, and just use it to determine the number of channels
+        // available for a camera.
+        const ret = [];
+        const cameraNumber = this.getCameraNumber() || '1';
+        for (let index = 0; index < channelIds.length; index++) {
+            const channel = (index + 1).toString().padStart(2, '0');
+            const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/Streaming/Channels/${cameraNumber}${channel}/${params}`, index);
+            ret.push(mso);
+        }
+
+        return ret;
     }
 
     showRtspUrlOverride() {
