@@ -1153,6 +1153,7 @@ export enum ScryptedInterfaceProperty {
   docked = "docked",
   thermostatAvailableModes = "thermostatAvailableModes",
   thermostatMode = "thermostatMode",
+  thermostatActiveMode = "thermostatActiveMode",
   thermostatSetpoint = "thermostatSetpoint",
   thermostatSetpointHigh = "thermostatSetpointHigh",
   thermostatSetpointLow = "thermostatSetpointLow",
