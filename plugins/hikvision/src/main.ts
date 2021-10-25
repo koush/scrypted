@@ -7,6 +7,8 @@ const { mediaManager } = sdk;
 
 class HikVisionCamera extends RtspSmartCamera implements Camera {
     hasCheckedCodec = false;
+    channelIds: string[];
+    client: HikVisionCameraAPI;
 
     listenEvents() {
         let motionTimeout: NodeJS.Timeout;
@@ -62,6 +64,12 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return client;
     }
 
+    getClient() {
+        if (!this.client)
+            this.client = this.createClient();
+        return this.client;
+    }
+
     async takeSmartCameraPicture(): Promise<MediaObject> {
         const api = this.createClient();
         return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
@@ -102,12 +110,43 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
         const cameraNumber = this.getCameraNumber() || '1';
+        let channelIds: string[];
+        if (!this.channelIds) {
+            const client = this.getClient();
+            try {
+                const response = await client.digestAuth.request({
+                    url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
+                    responseType: 'text',
+                });
+                const xml: string = response.data;
+                const matches = xml.matchAll(/<id>(.*?)<\/id>/g);
+                const ids = [];
+                for (const m of matches) {
+                    ids.push(m[1]);
+                }
+                channelIds = ids;
+                this.channelIds = ids;
+            }
+            catch (e) {
+                this.console.error('error retrieving channel ids', e);
+                channelIds = [cameraNumber + '01', cameraNumber + '02'];
+            }
+        }
+        else {
+            channelIds = this.channelIds;
+        }
         const params = this.getRtspUrlParams() || '?transportmode=unicast';
-        return ['01', '02'].map((channel, index) => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/Streaming/Channels/${cameraNumber}${channel}/${params}`, index));
+        return channelIds.map((channel, index) => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/Streaming/Channels/${cameraNumber}${channel}/${params}`, index));
     }
 
     showRtspUrlOverride() {
         return false;
+    }
+
+    async putSetting(key: string, value: string) {
+        this.client = undefined;
+        this.channelIds = undefined;
+        super.putSetting(key, value);
     }
 }
 

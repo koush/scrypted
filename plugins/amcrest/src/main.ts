@@ -116,6 +116,9 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 
     async putSetting(key: string, value: string) {
+        this.client = undefined;
+        this.maxExtraStreams = undefined;
+
         if (key !== 'amcrestDoorbell')
             return super.putSetting(key, value);
 

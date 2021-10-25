@@ -64,9 +64,20 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         };
     }
 
-    async getVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
-        const vsos = this.getRtspVideoStreamOptions()?.filter(vso => this.isChannelEnabled(vso.id));
+    getDefaultOrderedVideoStreamOptions(vsos: RtspMediaStreamOptions[]) {
+        if (!vsos || !vsos.length)
+            return vsos;
+        const defaultStream = this.getDefaultStream(vsos);
+        if (!defaultStream)
+            return vsos;
+        vsos = vsos.filter(vso => vso.id !== defaultStream?.id);
+        vsos.unshift(defaultStream);
         return vsos;
+    }
+
+    async getVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+        let vsos = this.getRtspVideoStreamOptions();
+        return this.getDefaultOrderedVideoStreamOptions(vsos);
     }
 
     getRtspVideoStreamOptions(): RtspMediaStreamOptions[] {
@@ -96,8 +107,8 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
     }
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        const vsos = (await this.getVideoStreamOptions()).filter(vso => this.isChannelEnabled(vso.id));
-        const vso = vsos.find(s => s.id === options?.id) || vsos[0];
+        const vsos = (await this.getVideoStreamOptions());
+        const vso = vsos.find(s => s.id === options?.id) || this.getDefaultStream(vsos);
 
         const url = new URL(vso.url);
         this.console.log('rtsp stream url', url.toString());
@@ -171,23 +182,32 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         return [];
     }
 
-    isChannelEnabled(channelId: string) {
-        return this.storage.getItem('disable-' + channelId) !== 'true';
+    getDefaultStream(vsos: RtspMediaStreamOptions[]) {
+        let defaultStreamIndex = vsos.findIndex(vso => vso.id === this.storage.getItem('defaultStream'));
+        if (defaultStreamIndex === -1)
+            defaultStreamIndex = 0;
+
+        return vsos[defaultStreamIndex];
     }
 
+    
     async getStreamSettings(): Promise<Setting[]> {
         try {
             const vsos = await this.getVideoStreamOptions();
             if (!vsos?.length || vsos?.length === 1)
                 return [];
 
-            return vsos.map(channel => ({
-                title: `Disable Stream: ${channel.name}`,
-                key: 'disable-' + channel.id,
-                value: (!this.isChannelEnabled(channel.id)).toString(),
-                type: 'boolean',
-                description: `Prevent usage of this RTSP channel: ${channel.url}`,
-            }));
+
+            const defaultStream = this.getDefaultStream(vsos);
+            return [
+                {
+                    title: 'Default Stream',
+                    key: 'defaultStream',
+                    value: defaultStream?.name,
+                    choices: vsos.map(vso => vso.name),
+                    description: 'The default stream to use when not specified',
+                }
+            ];
         }
         catch (e) {
             return [];
@@ -228,11 +248,18 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
         if (key === 'urls') {
             this.putRtspUrls(value as string[]);
         }
+        else if (key === 'defaultStream') {
+            const vsos = await this.getVideoStreamOptions();
+            const stream = vsos.find(vso => vso.name === value);
+            this.storage.setItem('defaultStream', stream?.id);
+        }
         else {
             this.storage.setItem(key, value.toString());
         }
 
         this.snapshotAuth = undefined;
+
+        this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
     async putSetting(key: string, value: SettingValue) {
@@ -431,7 +458,8 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 return vso;
         }
 
-        return this.getConstructedVideoStreamOptions();
+        const vsos = await this.getConstructedVideoStreamOptions();
+        return this.getDefaultOrderedVideoStreamOptions(vsos);
     }
 }
 

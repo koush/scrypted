@@ -53,7 +53,7 @@ class OnvifCamera extends RtspSmartCamera {
         if (!options?.id) {
             try {
                 const vsos = await this.getVideoStreamOptions();
-                const vso = vsos.find(vso => this.isChannelEnabled(vso.id));
+                const vso = vsos.find(vso => vso.id === options?.id) || this.getDefaultStream(vsos);
                 const snapshot = await client.jpegSnapshot(vso?.id);
                 // it is possible that onvif does not support snapshots, in which case return the video stream
                 if (!snapshot) {
@@ -201,6 +201,8 @@ class OnvifCamera extends RtspSmartCamera {
 
     async putSetting(key: string, value: string) {
         this.client = undefined;
+        this.rtspMediaStreamOptions = undefined;
+
         if (key !== 'onvifDoorbell')
             return super.putSetting(key, value);
 
