@@ -140,6 +140,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["docked"] = "docked";
     ScryptedInterfaceProperty["thermostatAvailableModes"] = "thermostatAvailableModes";
     ScryptedInterfaceProperty["thermostatMode"] = "thermostatMode";
+    ScryptedInterfaceProperty["thermostatActiveMode"] = "thermostatActiveMode";
     ScryptedInterfaceProperty["thermostatSetpoint"] = "thermostatSetpoint";
     ScryptedInterfaceProperty["thermostatSetpointHigh"] = "thermostatSetpointHigh";
     ScryptedInterfaceProperty["thermostatSetpointLow"] = "thermostatSetpointLow";
