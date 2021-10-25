@@ -30,8 +30,8 @@ class OnvifCamera extends RtspSmartCamera {
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         try {
-            const vso = await this.getVideoStreamOptions();
-            const ret = vso.map(({ id, name, video }) => ({
+            const vsos = await this.getVideoStreamOptions();
+            const ret = vsos.map(({ id, name, video }) => ({
                 id,
                 name,
                 // onvif doesn't actually specify the snapshot dimensions for a profile.
@@ -48,19 +48,21 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     async takeSmartCameraPicture(options?: PictureOptions): Promise<MediaObject> {
-        let vso: RtspMediaStreamOptions;
-
-        if (options?.id) {
+        const client = await this.getClient();
+        let snapshot: Buffer;
+        if (!options?.id) {
             try {
                 const vsos = await this.getVideoStreamOptions();
-                vso = this.getDefaultStream(vsos);
+                const vso = this.getDefaultStream(vsos);
+                snapshot = await client.jpegSnapshot(vso?.id);
             }
             catch (e) {
             }
         }
+        else {
+            snapshot = await client.jpegSnapshot(options?.id);
+        }
 
-        const client = await this.getClient();
-        const snapshot = await client.jpegSnapshot(vso?.id);
         // it is possible that onvif does not support snapshots, in which case return the video stream
         if (!snapshot) {
             // grab the real device rather than the using this.getVideoStream
