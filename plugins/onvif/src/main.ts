@@ -26,7 +26,7 @@ function convertAudioCodec(codec: string) {
 class OnvifCamera extends RtspSmartCamera {
     eventStream: Stream;
     client: OnvifCameraAPI;
-    rtspMediaStreamOptions: RtspMediaStreamOptions[];
+    rtspMediaStreamOptions: Promise<RtspMediaStreamOptions[]>;
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         try {
@@ -48,74 +48,80 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     async takeSmartCameraPicture(options?: PictureOptions): Promise<MediaObject> {
-        const client = await this.getClient();
-        // if no id is provided, choose the first available/enabled profile
-        if (!options?.id) {
+        let vso: RtspMediaStreamOptions;
+
+        if (options?.id) {
             try {
                 const vsos = await this.getVideoStreamOptions();
-                const vso = vsos.find(vso => vso.id === options?.id) || this.getDefaultStream(vsos);
-                const snapshot = await client.jpegSnapshot(vso?.id);
-                // it is possible that onvif does not support snapshots, in which case return the video stream
-                if (!snapshot) {
-                    // grab the real device rather than the using this.getVideoStream
-                    // so we can take advantage of the rebroadcast plugin if available.
-                    const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
-                    return realDevice.getVideoStream({
-                        id: options.id,
-                    })
-                }
-                return mediaManager.createMediaObject(snapshot, 'image/jpeg');
+                vso = this.getDefaultStream(vsos);
             }
             catch (e) {
             }
         }
 
-        return mediaManager.createMediaObject(client.jpegSnapshot(options?.id), 'image/jpeg');
+        const client = await this.getClient();
+        const snapshot = await client.jpegSnapshot(vso?.id);
+        // it is possible that onvif does not support snapshots, in which case return the video stream
+        if (!snapshot) {
+            // grab the real device rather than the using this.getVideoStream
+            // so we can take advantage of the rebroadcast plugin if available.
+            const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+            return realDevice.getVideoStream({
+                id: options.id,
+            });
+
+            // todo: this is bad. just disable camera interface altogether.
+        }
+        return mediaManager.createMediaObject(snapshot, 'image/jpeg');
     }
 
     async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
-        if (this.rtspMediaStreamOptions)
-            return this.rtspMediaStreamOptions;
-
-        try {
-            const client = await this.getClient();
-            const profiles: any[] = await client.getProfiles();
-            const ret: RtspMediaStreamOptions[] = [];
-            for (const { $, name, videoEncoderConfiguration, audioEncoderConfiguration } of profiles) {
+        if (!this.rtspMediaStreamOptions) {
+            this.rtspMediaStreamOptions = new Promise(async (resolve) => {
                 try {
-                    ret.push({
-                        id: $.token,
-                        name: name,
-                        url: await client.getStreamUrl($.token),
-                        video: {
-                            fps: videoEncoderConfiguration?.rateControl?.frameRateLimit,
-                            bitrate: computeBitrate(videoEncoderConfiguration?.rateControl?.bitrateLimit),
-                            width: videoEncoderConfiguration?.resolution?.width,
-                            height: videoEncoderConfiguration?.resolution?.height,
-                            codec: videoEncoderConfiguration?.encoding?.toLowerCase(),
-                            idrIntervalMillis: computeInterval(videoEncoderConfiguration?.rateControl?.frameRateLimit,
-                                videoEncoderConfiguration?.$.GovLength),
-                        },
-                        audio: this.isAudioDisabled() ? null : {
-                            bitrate: computeBitrate(audioEncoderConfiguration?.bitrate),
-                            codec: convertAudioCodec(audioEncoderConfiguration?.encoding),
+                    const client = await this.getClient();
+                    const profiles: any[] = await client.getProfiles();
+                    const ret: RtspMediaStreamOptions[] = [];
+                    for (const { $, name, videoEncoderConfiguration, audioEncoderConfiguration } of profiles) {
+                        try {
+                            ret.push({
+                                id: $.token,
+                                name: name,
+                                url: await client.getStreamUrl($.token),
+                                video: {
+                                    fps: videoEncoderConfiguration?.rateControl?.frameRateLimit,
+                                    bitrate: computeBitrate(videoEncoderConfiguration?.rateControl?.bitrateLimit),
+                                    width: videoEncoderConfiguration?.resolution?.width,
+                                    height: videoEncoderConfiguration?.resolution?.height,
+                                    codec: videoEncoderConfiguration?.encoding?.toLowerCase(),
+                                    idrIntervalMillis: computeInterval(videoEncoderConfiguration?.rateControl?.frameRateLimit,
+                                        videoEncoderConfiguration?.$.GovLength),
+                                },
+                                audio: this.isAudioDisabled() ? null : {
+                                    bitrate: computeBitrate(audioEncoderConfiguration?.bitrate),
+                                    codec: convertAudioCodec(audioEncoderConfiguration?.encoding),
+                                }
+                            })
                         }
-                    })
+                        catch (e) {
+                            this.console.error('error retrieving onvif profile', $.token, e);
+                        }
+                    }
+
+                    if (!ret.length)
+                        throw new Error('onvif camera had no profiles.');
+
+                    resolve(ret);
                 }
                 catch (e) {
-                    this.console.error('error retrieving onvif profile', $.token, e);
+                    this.rtspMediaStreamOptions = undefined;
+                    this.console.error('error retrieving onvif profiles', e);
+                    resolve(undefined);
                 }
-            }
-
-            if (!ret.length)
-                throw new Error('onvif camera had no profiles.');
-
-            this.rtspMediaStreamOptions = ret;
-            return ret;
+            })
         }
-        catch (e) {
-            this.console.error('error retrieving onvif profiles', e);
-        }
+
+        return this.rtspMediaStreamOptions;
     }
 
 
@@ -154,7 +160,7 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     createClient() {
-        return connectCameraAPI(this.getIPAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'), !!this.storage.getItem('debug'));
+        return connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'), !!this.storage.getItem('debug'));
     }
 
     async getClient() {
@@ -172,7 +178,7 @@ class OnvifCamera extends RtspSmartCamera {
     }
 
     showHttpPortOverride() {
-        return false;
+        return true;
     }
 
     showSnapshotUrlOverride() {
