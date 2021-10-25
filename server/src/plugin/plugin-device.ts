@@ -131,7 +131,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             return;
         const prop = p.toString();
 
-        if (allInterfaceProperties.includes(p))
+        if (allInterfaceProperties.includes(prop))
             return getState(pluginDevice, prop);
 
         if (p === RefreshSymbol)
