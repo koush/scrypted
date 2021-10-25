@@ -50,18 +50,15 @@ class OnvifCamera extends RtspSmartCamera {
     async takeSmartCameraPicture(options?: PictureOptions): Promise<MediaObject> {
         const client = await this.getClient();
         let snapshot: Buffer;
-        if (!options?.id) {
-            try {
-                const vsos = await this.getVideoStreamOptions();
-                const vso = this.getDefaultStream(vsos);
-                snapshot = await client.jpegSnapshot(vso?.id);
-            }
-            catch (e) {
-            }
+        let id = options?.id;
+
+        if (!id) {
+            const vsos = await this.getVideoStreamOptions();
+            const vso = this.getDefaultStream(vsos);
+            id = vso.id;
         }
-        else {
-            snapshot = await client.jpegSnapshot(options?.id);
-        }
+
+        snapshot = await client.jpegSnapshot(id);
 
         // it is possible that onvif does not support snapshots, in which case return the video stream
         if (!snapshot) {
