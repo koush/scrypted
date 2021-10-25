@@ -97,6 +97,7 @@ export default {
         });
 
         await Promise.allSettled(promises);
+        devices.sort((d1, d2) => d1.name < d2.name ? -1 : d2.name < d1.name ? 1 : 0);
 
         return [
           {
