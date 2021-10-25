@@ -158,6 +158,7 @@ class Owntracks extends ScryptedDeviceBase implements PushHandler, Settings, Dev
             return;
         }
         const body = JSON.parse(request.body);
+        this.console.log(body);
 
         const userNativeId = `user-${user.name}`;
         if (!deviceManager.getNativeIds().includes(userNativeId)) {
@@ -177,6 +178,8 @@ class Owntracks extends ScryptedDeviceBase implements PushHandler, Settings, Dev
 
         // find all regions this user belongs to, and update them.
         for (const nativeId of deviceManager.getNativeIds()) {
+            if (!nativeId || nativeId.startsWith('user-'))
+                continue;
             let region = new OwntracksRegion(nativeId);
             let value = region.storage.getItem(user.name);
             if (value !== null) {
