@@ -76,7 +76,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
         }
         this.console.log('Webhook Actions can receive parameters via a JSON array query parameter "parameters".');
         this.console.log('For example:');
-        this.console.log(".\tcurl 'http://<your-host-and-port>/endpoint/@scrypted/webhook/<id>/setBrightness?parameters=[30]'");
+        this.console.log(".\tcurl 'http://<your-host-and-port>/endpoint/@scrypted/webhook/<id>/<token>/setBrightness?parameters=[30]'");
         this.console.log("##################################################")
     }
 
@@ -184,6 +184,12 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
+        const set = new Set(interfaces);
+        set.delete(ScryptedInterface.DeviceProvider);
+        set.delete(ScryptedInterface.MixinProvider);
+        set.delete(ScryptedInterface.Settings);
+        if (!set.size)
+            return;
         return [
             ScryptedInterface.Settings,
         ];
