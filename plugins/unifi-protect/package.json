@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/unifi-protect",
-   "version": "0.0.47",
+   "version": "0.0.48",
    "description": "Unifi Protect Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -29,14 +29,13 @@
       "rejectUnauthorized": false
    },
    "devDependencies": {
-      "@types/ws": "^7.4.7",
-      "@scrypted/sdk": "file:../../sdk",
       "@types/lodash": "^4.14.158",
-      "@types/node": "^16.7.1"
+      "@types/node": "^16.7.1",
+      "@types/ws": "^7.4.7"
    },
    "dependencies": {
-      "abort-controller": "^3.0.0",
-      "node-fetch": "^3.0.0",
+      "@scrypted/sdk": "file:../../sdk",
+      "unifi-protect": "^0.0.4",
       "ws": "^8.2.0"
    }
 }

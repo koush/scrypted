@@ -1,7 +1,7 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetection, ObjectDetector, PictureOptions, ObjectDetectionTypes } from "@scrypted/sdk";
-import { ProtectApi } from "./unifi-protect/src/protect-api";
-import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect/src/protect-api-updates";
-import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "./unifi-protect/src/protect-types";
+import { ProtectApi } from "unifi-protect";
+import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "unifi-protect";
+import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
@@ -46,23 +46,49 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         return mediaManager.createMediaObject(await data, 'image/jpeg');
     }
 
-    isChannelEnabled(channel: ProtectCameraChannelConfig) {
-        return this.storage.getItem('disable-' + channel.id) !== 'true';
+    getDefaultOrderedVideoStreamOptions(vsos: MediaStreamOptions[]) {
+        if (!vsos || !vsos.length)
+            return vsos;
+        const defaultStream = this.getDefaultStream(vsos);
+        if (!defaultStream)
+            return vsos;
+        vsos = vsos.filter(vso => vso.id !== defaultStream?.id);
+        vsos.unshift(defaultStream);
+        return vsos;
+    }
+
+    getDefaultStream(vsos: MediaStreamOptions[]) {
+        let defaultStreamIndex = vsos.findIndex(vso => vso.id === this.storage.getItem('defaultStream'));
+        if (defaultStreamIndex === -1)
+            defaultStreamIndex = 0;
+
+        return vsos[defaultStreamIndex];
     }
 
     async getSettings(): Promise<Setting[]> {
-        const channels = this.findCamera().channels || [];
-        return channels.map(channel => ({
-            title: `Disable Stream: ${channel.name}`,
-            key: 'disable-' + channel.id,
-            value: (!this.isChannelEnabled(channel)).toString(),
-            type: 'boolean',
-            description: 'Prevent usage of this Unifi Protect RTSP channel in Scrypted.',
-        }));
+        const vsos = await this.getVideoStreamOptions();
+        const defaultStream = this.getDefaultStream(vsos);
+        return [
+            {
+                title: 'Default Stream',
+                key: 'defaultStream',
+                value: defaultStream?.name,
+                choices: vsos.map(vso => vso.name),
+                description: 'The default stream to use when not specified',
+            }
+        ];
     }
 
     async putSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem(key, value?.toString());
+        if (key === 'defaultStream') {
+            const vsos = await this.getVideoStreamOptions();
+            const stream = vsos.find(vso => vso.name === value);
+            this.storage.setItem('defaultStream', stream?.id);
+        }
+        else {
+            this.storage.setItem(key, value?.toString());
+        }
+        this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
     resetMotionTimeout() {
@@ -113,10 +139,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const camera = this.findCamera();
-        const rtspChannels = camera.channels
-            .filter(channel => channel.isRtspEnabled && this.isChannelEnabled(channel));
+        const vsos = await this.getVideoStreamOptions();
+        const vso = vsos.find(check => check.id === options?.id) || this.getDefaultStream(vsos);
 
-        const rtspChannel = camera.channels.find(channel => channel.id === options?.id) || rtspChannels[0];
+        const rtspChannel = camera.channels.find(check => check.id === vso.id);
 
         const { rtspAlias } = rtspChannel;
         const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
@@ -162,10 +188,9 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         const camera = this.findCamera();
         const video: MediaStreamOptions[] = camera.channels
-            .filter(channel => channel.isRtspEnabled && this.isChannelEnabled(channel))
             .map(channel => this.createMediaStreamOptions(channel));
 
-        return video;
+        return this.getDefaultOrderedVideoStreamOptions(video);
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
