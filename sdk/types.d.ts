@@ -35,6 +35,7 @@ export interface DeviceState {
     humidity?: number;
     thermostatAvailableModes?: ThermostatMode[];
     thermostatMode?: ThermostatMode;
+    thermostatActiveMode?: ThermostatMode;
     thermostatSetpoint?: number;
     thermostatSetpointHigh?: number;
     thermostatSetpointLow?: number;
@@ -634,7 +635,7 @@ export interface MediaManager {
     /**
      * Convert a media object to a Buffer of the given mime type.
      */
-    convertMediaObjectToBuffer(mediaObject: string | MediaObject, toMimeType: string): Promise<Buffer>;
+    convertMediaObjectToBuffer(mediaObject: MediaObject, toMimeType: string): Promise<Buffer>;
     /**
      * Convert a media object to a locally accessible URL that serves a media file of the given mime type. If the media object is an externally accessible URL, that will be returned.
      */

@@ -35,6 +35,7 @@ export interface DeviceState {
   humidity?: number;
   thermostatAvailableModes?: ThermostatMode[];
   thermostatMode?: ThermostatMode;
+  thermostatActiveMode?: ThermostatMode;
   thermostatSetpoint?: number;
   thermostatSetpointHigh?: number;
   thermostatSetpointLow?: number;
@@ -1316,6 +1317,7 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     properties: [
       "thermostatAvailableModes",
       "thermostatMode",
+      "thermostatActiveMode",
       "thermostatSetpoint",
       "thermostatSetpointHigh",
       "thermostatSetpointLow",

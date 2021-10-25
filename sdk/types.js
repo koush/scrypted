@@ -289,6 +289,7 @@ exports.ScryptedInterfaceDescriptors = {
         properties: [
             "thermostatAvailableModes",
             "thermostatMode",
+            "thermostatActiveMode",
             "thermostatSetpoint",
             "thermostatSetpointHigh",
             "thermostatSetpointLow",

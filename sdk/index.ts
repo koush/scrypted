@@ -35,6 +35,7 @@ export class ScryptedDeviceBase implements DeviceState {
   humidity?: number;
   thermostatAvailableModes?: ThermostatMode[];
   thermostatMode?: ThermostatMode;
+  thermostatActiveMode?: ThermostatMode;
   thermostatSetpoint?: number;
   thermostatSetpointHigh?: number;
   thermostatSetpointLow?: number;
