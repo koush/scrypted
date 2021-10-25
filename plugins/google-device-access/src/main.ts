@@ -22,6 +22,16 @@ function fromNestMode(mode: string): ThermostatMode {
             return ThermostatMode.Off;
     }
 }
+function fromNestStatus(status: string): ThermostatMode {
+    switch (status) {
+        case 'HEATING':
+            return ThermostatMode.Heat;
+        case 'COOLING':
+            return ThermostatMode.Cool;
+        case 'OFF':
+            return ThermostatMode.Off;
+    }
+}
 function toNestMode(mode: ThermostatMode): string {
     switch (mode) {
         case ThermostatMode.Heat:
@@ -135,6 +145,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         }
         this.thermostatAvailableModes = modes;
         this.thermostatMode = fromNestMode(device.traits['sdm.devices.traits.ThermostatMode'].mode);
+        this.thermostatActiveMode = fromNestStatus(device.traits['sdm.devices.traits.ThermostatHvac'].status);
         // round the temperature to 1 digit to prevent state noise.
         this.temperature = Math.round(10 * device.traits['sdm.devices.traits.Temperature'].ambientTemperatureCelsius) / 10;
         this.humidity = Math.round(10 * device.traits["sdm.devices.traits.Humidity"].ambientHumidityPercent) / 10;

@@ -56,20 +56,17 @@ addSupportedType({
 
         service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
             .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, toCurrentMode(device.thermostatMode));
+                callback(null, toCurrentMode(device.thermostatActiveMode));
             });
 
 
-        let targetMode = toTargetMode(device.thermostatMode);
-
         service.getCharacteristic(Characteristic.TargetHeatingCoolingState)
             .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, targetMode);
+                callback(null, toTargetMode(device.thermostatMode));
             })
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                targetMode = value as number;
                 callback();
-                device.setThermostatMode(fromTargetMode(targetMode));
+                device.setThermostatMode(fromTargetMode(value as number));
             })
 
 
@@ -95,11 +92,8 @@ addSupportedType({
             event: ScryptedInterface.TemperatureSetting,
             watch: true,
         }, (source, details, data) => {
-            if (details.property === ScryptedInterfaceProperty.thermostatMode) {
-                targetMode = toTargetMode(device.thermostatMode);
-                service.updateCharacteristic(Characteristic.TargetHeatingCoolingState, targetMode);
-            }
-            service.updateCharacteristic(Characteristic.CurrentHeatingCoolingState, toCurrentMode(device.thermostatMode));
+            service.updateCharacteristic(Characteristic.TargetHeatingCoolingState, toTargetMode(device.thermostatMode));
+            service.updateCharacteristic(Characteristic.CurrentHeatingCoolingState, toCurrentMode(device.thermostatActiveMode));
             service.updateCharacteristic(Characteristic.TargetTemperature, getTargetTemperature());
             service.updateCharacteristic(Characteristic.TemperatureDisplayUnits, device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
         });
