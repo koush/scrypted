@@ -252,6 +252,7 @@ export interface TemperatureSetting extends Thermometer, HumiditySensor {
     setThermostatSetpointLow(low: number): Promise<void>;
     thermostatAvailableModes?: ThermostatMode[];
     thermostatMode?: ThermostatMode;
+    thermostatActiveMode?: ThermostatMode;
     thermostatSetpoint?: number;
     thermostatSetpointHigh?: number;
     thermostatSetpointLow?: number;

@@ -276,6 +276,7 @@ export interface TemperatureSetting extends Thermometer, HumiditySensor {
 
   thermostatAvailableModes?: ThermostatMode[];
   thermostatMode?: ThermostatMode;
+  thermostatActiveMode?: ThermostatMode;
   thermostatSetpoint?: number;
   thermostatSetpointHigh?: number;
   thermostatSetpointLow?: number;
