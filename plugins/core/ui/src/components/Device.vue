@@ -791,7 +791,7 @@ export default {
         ).filter((device) => !mixins.includes(device.id));
 
         const allMixins = [
-          ...mixins.map((id) => this.$scrypted.systemManager.getDeviceById(id)),
+          ...mixins.map((id) => this.$scrypted.systemManager.getDeviceById(id)).filter(device => !!device),
           ...availableMixins,
         ];
 
