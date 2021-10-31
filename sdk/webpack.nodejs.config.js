@@ -1,5 +1,6 @@
 const path = require('path');
 const webpack = require('webpack');
+const TerserPlugin = require("terser-webpack-plugin");
 
 var out;
 const cwd = process.cwd();
@@ -104,6 +105,13 @@ module.exports = {
 
     optimization: {
         minimize: isProduction,
+        minimizer: [
+            new TerserPlugin({
+                terserOptions: {
+                    keep_classnames: true,
+                }
+            }),
+        ],
     },
 
     devtool: 'source-map',
