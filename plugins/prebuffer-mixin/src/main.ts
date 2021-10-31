@@ -1,7 +1,7 @@
 
 import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import EventEmitter from 'events';
+import EventEmitter, { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { createRebroadcaster, FFMpegRebroadcastOptions, FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
@@ -449,8 +449,25 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         }
         const name = mso?.name;
         session = new PrebufferSession(this, name, id);
-        session.ensurePrebufferSession();
         this.sessions.set(id, session);
+
+        (async() => {
+          while (this.sessions.get(id) === session && !this.released) {
+            this.console.log('monitoring prebuffer session');
+            session.ensurePrebufferSession();
+            try {
+              const ps = await session.parserSessionPromise;
+              await once(ps.events, 'killed');
+              this.console.error('prebuffer session ended');
+            }
+            catch (e) {
+              this.console.error('prebuffer session ended with error', e);
+            }
+            this.console.log('restarting prebuffer session in 5 seconds');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          this.console.log('exiting prebuffer session (released or restarted with new configuration)');
+        })();
       }
     }
     deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
