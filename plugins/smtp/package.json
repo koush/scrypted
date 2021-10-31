@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/smtp",
-   "description": "Mail (SMTP) for Scrypted. Turn devices on and off via a mail endpoint.",
+   "description": "Mail (SMTP) for Scrypted. Turn devices on and off via a mail endpoint. Use in combination with the Dummy Switch plugin to create mail activated motion sensors.",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -37,5 +37,5 @@
       "@types/mailparser": "^3.0.3",
       "@types/smtp-server": "^3.5.7"
    },
-   "version": "0.0.2"
+   "version": "0.0.3"
 }
