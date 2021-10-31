@@ -56,7 +56,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
     createRtspMediaStreamOptions(url: string, index: number) {
         return {
             id: `channel${index}`,
-            name: `Channel ${index + 1}`,
+            name: `Stream ${index + 1}`,
             url,
             video: {
             },

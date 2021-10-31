@@ -1,6 +1,6 @@
 import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions } from "@scrypted/sdk";
 import { Stream } from "stream";
-import { AmcrestCameraClient, AmcrestEvent } from "./amcrest-api";
+import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
 import { RtspSmartCamera, RtspProvider, Destroyable, RtspMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { EventEmitter } from "stream";
 import child_process, { ChildProcess } from 'child_process';
@@ -88,14 +88,27 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         ];
     }
 
-    async getConstructedStreamUrl() {
-        return `rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=0`;
-    }
-
     async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
         return mediaManager.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
     }
 
+    async getUrlSettings() {
+        return [
+            ...await super.getUrlSettings(),
+            {
+                key: 'rtspChannel',
+                title: 'Channel Number Override',
+                description: "The channel number to use for snapshots and video. E.g., 1, 2, etc.",
+                placeholder: '1',
+                value: this.storage.getItem('rtspChannel'),
+            },
+        ]
+    }
+
+    getRtspChannel() {
+        return this.storage.getItem('rtspChannel');
+    }
+    
     async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
         let mas = this.maxExtraStreams;
         if (!this.maxExtraStreams) {
@@ -104,15 +117,18 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
                 const response = await client.digestAuth.request({
                     url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`,
                     responseType: 'text',
+                    httpsAgent: amcrestHttpsAgent,
                 })
                 this.maxExtraStreams = parseInt(response.data.split('=')[1].trim());
                 mas = this.maxExtraStreams;
             }
             catch (e) {
+                this.console.error('error retrieving max extra streams', e);
             }
         }
         mas = mas || 1;
-        return [...Array(mas + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=1&subtype=${subtype}`, subtype));
+        const channel = this.getRtspChannel() || '1';
+        return [...Array(mas + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
     }
 
     async putSetting(key: string, value: string) {
@@ -132,6 +148,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     async startIntercom(media: MediaObject): Promise<void> {
         // not sure if this all works, since i don't actually have a doorbell.
         // good luck!
+        const channel = this.getRtspChannel() || '1';
 
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
         const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
@@ -142,7 +159,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         const server = new net.Server(async (socket) => {
             server.close();
 
-            const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=1`;
+            const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=${channel}`;
             this.console.log('posting audio data to', url);
 
             try {
@@ -153,6 +170,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
                         'Content-Type': 'Audio/AAC',
                         'Content-Length': '9999999'
                     },
+                    httpsAgent: amcrestHttpsAgent,
                     data: socket
                 });
             }

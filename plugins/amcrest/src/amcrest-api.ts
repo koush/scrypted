@@ -16,7 +16,7 @@ export enum AmcrestEvent {
     PhoneCallDetectStop = "Code=PhoneCallDetect;action=Stop",
 }
 
-const httpsAgent = new https.Agent({
+export const amcrestHttpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
 
@@ -33,7 +33,7 @@ export class AmcrestCameraClient {
     async jpegSnapshot(): Promise<Buffer> {
 
         const response = await this.digestAuth.request({
-            httpsAgent,
+            httpsAgent: amcrestHttpsAgent,
             method: "GET",
             responseType: 'arraybuffer',
             url: `http://${this.ip}/cgi-bin/snapshot.cgi`,
@@ -47,7 +47,7 @@ export class AmcrestCameraClient {
         console.log('preparing event listener', url);
 
         const response = await this.digestAuth.request({
-            httpsAgent,
+            httpsAgent: amcrestHttpsAgent,
             method: "GET",
             responseType: 'stream',
             url,

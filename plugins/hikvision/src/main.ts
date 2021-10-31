@@ -80,7 +80,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
             {
                 key: 'rtspChannel',
                 title: 'Channel Number',
-                description: "The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
+                description: "Optional: The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
                 placeholder: '101',
                 value: this.storage.getItem('rtspChannel'),
             },
@@ -88,7 +88,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
             {
                 key: 'rtspUrlParams',
                 title: 'RTSP URL Parameters Override',
-                description: "Override the RTSP URL parameters. E.g.: ?transportmode=unicast",
+                description: "Optional: Override the RTSP URL parameters. E.g.: ?transportmode=unicast",
                 placeholder: this.getRtspUrlParams(),
                 value: this.storage.getItem('rtspUrlParams'),
             },
