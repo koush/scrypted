@@ -36,21 +36,27 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, Motio
         this.storage.setItem(key, value.toString());
         clearTimeout(this.timeout);
     }
+
+    evalSource() {
+        try {
+            const source = JSON.parse(this.storage.getItem('source'));
+            return this.eval(source);
+        }
+        catch (e) {
+        }
+    }
     async turnOff(): Promise<void> {
         clearTimeout(this.timeout);
         this.on = false;
         this.motionDetected = false;
         this.binaryState = false;
-        const source = JSON.parse(this.storage.getItem('source'));
-        this.eval(source);
+        this.evalSource();
     }
     async turnOn(): Promise<void> {
         clearTimeout(this.timeout);
         this.on = true;
         this.motionDetected = true;
         this.binaryState = true;
-        const source = JSON.parse(this.storage.getItem('source'));
-        this.eval(source);
 
         let reset = parseInt(this.storage.getItem('reset'));
         if (!reset && reset !== 0)
@@ -58,6 +64,8 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, Motio
         if (reset) {
             this.timeout = setTimeout(() => this.turnOff(), reset * 1000);
         }
+
+        this.evalSource();
     }
     async saveScript(script: ScriptSource): Promise<void> {
         this.storage.setItem('source', JSON.stringify(script));
