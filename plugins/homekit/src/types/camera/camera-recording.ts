@@ -7,8 +7,6 @@ import sdk from '@scrypted/sdk';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from 'hap-nodejs/dist/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { evalRequest } from './camera-transcode';
-import { StartStreamRequest, StreamRequest } from 'hap-nodejs';
-import { createConnection } from 'net';
 
 const { log, mediaManager, deviceManager } = sdk;
 
