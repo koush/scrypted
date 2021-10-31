@@ -13,6 +13,7 @@ const { log, deviceManager, mediaManager } = sdk;
 class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings, ObjectDetector {
     protect: UnifiProtect;
     motionTimeout: NodeJS.Timeout;
+    detectionTimeout: NodeJS.Timeout;
     ringTimeout: NodeJS.Timeout;
     lastMotion: number;
     lastRing: number;
@@ -75,6 +76,12 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
                 value: defaultStream?.name,
                 choices: vsos.map(vso => vso.name),
                 description: 'The default stream to use when not specified',
+            },
+            {
+                title: 'Sensor Timeout',
+                key: 'sensorTimeout',
+                value: this.storage.getItem('sensorTimeout') || 30,
+                description: 'Time to wait in seconds before clearing the motion, doorbell button, or object detection state.',
             }
         ];
     }
@@ -91,18 +98,33 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
+    getSensorTimeout() {
+        return (parseInt(this.storage.getItem('sensorTimeout')) || 10) * 1000;
+    }
+
     resetMotionTimeout() {
         clearTimeout(this.motionTimeout);
         this.motionTimeout = setTimeout(() => {
             this.motionDetected = false;
-        }, 30000);
+        }, this.getSensorTimeout());
+    }
+
+    resetDetectionTimeout() {
+        clearTimeout(this.detectionTimeout);
+        this.detectionTimeout = setTimeout(() => {
+            const detect: ObjectDetection = {
+                timestamp: Date.now(),
+                detections: []
+            }
+            this.onDeviceEvent(ScryptedInterface.ObjectDetector, detect);
+        }, this.getSensorTimeout());
     }
 
     resetRingTimeout() {
         clearTimeout(this.ringTimeout);
         this.ringTimeout = setTimeout(() => {
             this.binaryState = false;
-        }, 30000);
+        }, this.getSensorTimeout());
     }
 
     async getSnapshot(options?: PictureOptions): Promise<Buffer> {
@@ -286,7 +308,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     rtsp.lastMotion = payload.lastMotion;
                     rtsp.resetMotionTimeout();
                 }
-                else if (rtsp.motionDetected && payload.lastSeen > payload.lastMotion + 30000) {
+                else if (rtsp.motionDetected && payload.lastSeen > payload.lastMotion + rtsp.getSensorTimeout()) {
                     rtsp.motionDetected = false;
                 }
 
@@ -296,7 +318,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     rtsp.binaryState = true;
                     rtsp.resetRingTimeout();
                 }
-                else if (rtsp.binaryState && payload.lastSeen > payload.lastRing + 30000) {
+                else if (rtsp.binaryState && payload.lastSeen > payload.lastRing + rtsp.getSensorTimeout()) {
                     rtsp.binaryState = false;
                 }
 
@@ -335,9 +357,11 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     rtsp.lastMotion = payload.start;
                     rtsp.resetMotionTimeout();
                 }
-                else if (rtsp.motionDetected && rtsp.lastSeen > payload.start + 30000) {
+                else if (rtsp.motionDetected && rtsp.lastSeen > payload.start + rtsp.getSensorTimeout()) {
                     rtsp.motionDetected = false;
                 }
+
+                rtsp.resetDetectionTimeout();
 
                 const detectionId = Math.random().toString();
                 const camera = rtsp.findCamera();
@@ -471,6 +495,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 await deviceManager.onDeviceDiscovered(d);
             }
 
+            // todo: this was done, october 31st. remove sometime later.
             // todo: uncomment after implementing per providerNativeId onDevicesChanged.
             // await deviceManager.onDevicesChanged({
             //     providerNativeId: this.nativeId,
