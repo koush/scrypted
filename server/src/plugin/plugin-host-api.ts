@@ -93,7 +93,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     }
 
     async onDevicesChanged(deviceManifest: DeviceManifest) {
-        const existing = this.scrypted.findPluginDevices(this.pluginId);
+        const existing = this.scrypted.findPluginDevices(this.pluginId).filter(p => p.nativeId == deviceManifest.providerNativeId);
         const newIds = deviceManifest.devices.map(device => device.nativeId);
         const toRemove = existing.filter(e => e.nativeId && !newIds.includes(e.nativeId));
 
