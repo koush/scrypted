@@ -25,6 +25,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
   area: number;
   threshold: number;
   released = false;
+  sessionPromise: Promise<FFMpegRebroadcastSession>;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
     super(mixinDevice, mixinDeviceState, {
@@ -42,7 +43,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     }
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
-    this.console.log('session starting in 10 seconds');
+    this.console.log('session starting in 5 seconds');
     setTimeout(async () => {
       while (!this.released) {
         try {
@@ -50,21 +51,34 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
           this.console.log('shut down gracefully');
         }
         catch (e) {
-          this.console.error(this.name, 'session unexpectedly terminated, restarting in 10 seconds', e);
-          await new Promise(resolve => setTimeout(resolve, 10000));
+          this.console.error(this.name, 'session unexpectedly terminated, restarting in 5 seconds', e);
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
       }
-    }, 10000);
+    }, 5000);
   }
 
   async start() {
-    const realDevice = await systemManager.getDeviceById<VideoCamera>(this.id);
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-    if (!ffmpegInput.mediaStreamOptions?.video?.width || !ffmpegInput.mediaStreamOptions?.video?.height) {
-      throw new Error("Width and Height were not provided. Install and enable the rebroadcast plugin.");
+    const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+
+    let selectedStream: MediaStreamOptions;
+    const motionChannel = this.storage.getItem('motionChannel');
+    if (motionChannel) {
+      const msos = await realDevice.getVideoStreamOptions();
+      selectedStream = msos.find(mso => mso.name === motionChannel);
     }
 
-    let {width, height} = ffmpegInput.mediaStreamOptions?.video;
+    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    let video = ffmpegInput.mediaStreamOptions?.video;
+    if (!video?.width || !video?.height) {
+      this.console.error("Width and Height were not provided. Defaulting to 1920x1080.");
+      video = {
+        width: 1920,
+        height: 1080,
+      };
+    }
+
+    let { width, height } = video;
     // we'll use an image 1/6 of the dimension in size for motion.
     // however, opencv also expects that input images are modulo 6.
     // so make sure both are satisfied.
@@ -86,7 +100,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     width = Math.floor(width / 6) * 6;
     height = Math.floor(height / 6) * 6;
 
-    const session = await startRebroadcastSession(ffmpegInput, {
+    this.sessionPromise = startRebroadcastSession(ffmpegInput, {
       console: this.console,
       parsers: {
         rawvideo: createRawVideoParser({
@@ -98,6 +112,25 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
         }),
       }
     });
+
+    const session = await this.sessionPromise;
+
+    let watchdog: NodeJS.Timeout;
+    const restartWatchdog = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        this.console.error('watchdog for raw video parser timed out... killing ffmpeg session');
+        session.kill();
+      }, 60000);
+    }
+    session.events.on('rawvideo-data', restartWatchdog);
+
+    session.events.once('killed', () => {
+      clearTimeout(watchdog);
+    });
+
+    restartWatchdog();
+
     try {
       await this.startWrapped(session);
     }
@@ -108,7 +141,6 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
 
   async startWrapped(session: FFMpegRebroadcastSession) {
     let previousFrame: Mat;
-
     let timeout: NodeJS.Timeout;
 
     const triggerMotion = () => {
@@ -158,7 +190,28 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
   }
 
   async getMixinSettings(): Promise<Setting[]> {
-    return [
+    const settings: Setting[] = [];
+    const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+
+    let msos: MediaStreamOptions[] = [];
+    try {
+      msos = await realDevice.getVideoStreamOptions();
+    }
+    catch (e) {
+    }
+
+
+    if (msos?.length) {
+      settings.push({
+        title: 'Motion Stream',
+        key: 'motionChannel',
+        value: this.storage.getItem('motionChannel') || msos[0].name,
+        description: 'The stream to use for detecting motion. Using the lowest resolution stream is recommended.',
+        choices: msos.map(mso => mso.name),
+      });
+    }
+
+    settings.push(
       {
         title: "Motion Area",
         description: "The area size required to trigger motion. Higher values (larger areas) are less sensitive.",
@@ -183,7 +236,9 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
         placeholder: defaultInterval.toString(),
         type: 'number',
       },
-    ];
+    );
+
+    return settings;
   }
 
   async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
@@ -192,6 +247,10 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
       this.area = parseInt(value.toString()) || defaultArea;
     if (key === 'threshold')
       this.threshold = parseInt(value.toString()) || defaultThreshold;
+
+    if (key === 'motionChannel') {
+      this.sessionPromise?.then(session => session.kill());
+    }
   }
 
   release() {

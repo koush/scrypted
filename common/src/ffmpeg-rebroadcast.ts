@@ -98,6 +98,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
     function kill() {
         if (isActive) {
             events.emit('killed');
+            events.emit('error', new Error('killed'));
         }
         isActive = false;
         cp?.kill();
