@@ -245,7 +245,31 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
 
   async turnOff(): Promise<void> {
     this.console.log(`fanOff`)
-    // TODO: would need to resume program
+    // resume program
+    // https://www.ecobee.com/home/developer/api/documentation/v1/functions/ResumeProgram.shtml
+    const data = {
+      selection: {
+        selectionType:"registered",
+        selectionMatch: this.nativeId,
+      },
+      functions: [
+        {
+          type:"resumeProgram",
+          params:{
+            resumeAll: "false",
+          }
+        }
+      ]
+    }
+
+    var resp = await this.provider.req('post', 'thermostat', data, { format: "json" })
+    if (resp.status.code == 0) {
+      this.console.log("fanOff success")
+      await this.reload();
+      return;
+    }
+
+    this.console.log(`fanOff failed: ${resp}`)
   }
 
   async turnOn(): Promise<void> {
