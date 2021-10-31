@@ -24,8 +24,7 @@
       "interfaces": [
          "MixinProvider",
          "HttpRequestHandler",
-         "PushHandler",
-         "Settings"
+         "PushHandler"
       ]
    },
    "dependencies": {
@@ -34,5 +33,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.6"
+   "version": "0.0.7"
 }
