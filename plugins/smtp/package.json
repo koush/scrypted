@@ -1,0 +1,41 @@
+{
+   "name": "@scrypted/smtp",
+   "description": "Mail (SMTP) for Scrypted. Turn devices on and off via a mail endpoint.",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "smtp",
+      "mail",
+      "push"
+   ],
+   "scrypted": {
+      "name": "Mail (SMTP) Plugin",
+      "type": "API",
+      "interfaces": [
+         "MixinProvider",
+         "Settings"
+      ]
+   },
+   "dependencies": {
+      "@types/node": "^16.6.1",
+      "mailparser": "^3.4.0",
+      "smtp-server": "^3.9.0"
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/mailparser": "^3.0.3",
+      "@types/smtp-server": "^3.5.7"
+   },
+   "version": "0.0.2"
+}
