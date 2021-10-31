@@ -24,7 +24,7 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import httpAuth from 'http-auth';
 import semver from 'semver';
 import { Info } from './services/info';
-import {getAddresses} from './addresses';
+import { getAddresses } from './addresses';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -39,7 +39,7 @@ process.on('unhandledRejection', error => {
 });
 
 function listenServerPort(env: string, port: number, server: any) {
-    server.listen(port, );
+    server.listen(port,);
     server.on('error', (e: Error) => {
         console.error(`Failed to listen on port ${port}. It may be in use.`);
         console.error(`Use the environment variable ${env} to change the port.`);
@@ -241,10 +241,16 @@ else {
             let endpoint = pkg;
             if (owner)
                 endpoint = `@${owner}/${endpoint}`;
-            const plugin = await scrypted.installNpm(endpoint, tag);
-            res.send({
-                id: scrypted.findPluginDevice(plugin.pluginId)._id,
-            });
+            try {
+                const plugin = await scrypted.installNpm(endpoint, tag);
+                res.send({
+                    id: scrypted.findPluginDevice(plugin.pluginId)._id,
+                });
+            }
+            catch (e) {
+                res.status(500);
+                res.end();
+            }
         });
 
         app.get('/web/component/script/search', async (req, res) => {
