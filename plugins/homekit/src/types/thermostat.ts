@@ -1,9 +1,8 @@
 
-import { HumiditySensor, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
-import { access } from 'fs';
-import { Fanv2 } from 'hap-nodejs/dist/lib/definitions';
+import { HumiditySensor, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
+import { Accessory } from 'hap-nodejs';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
-import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
+import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
 
 addSupportedType({
@@ -66,7 +65,7 @@ addSupportedType({
             })
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetHeatingCoolingState,
-            () => toTargetMode(device.thermostatActiveMode));
+            () => toTargetMode(device.thermostatMode));
 
         function getTargetTemperature() {
             return device.thermostatSetpoint ||
@@ -96,11 +95,19 @@ addSupportedType({
         }
 
         if (device.interfaces.includes(ScryptedInterface.OnOff)) {
-            const fanService = accessory.addService(Fanv2);
-            bindCharacteristic(device, ScryptedInterface.OnOff, fanService, Characteristic.Active,
-                () => device.on ? Characteristic.Active.ACTIVE : Characteristic.Active.INACTIVE);
+            const fanService = accessory.addService(Service.Fan);
+            bindCharacteristic(device, ScryptedInterface.OnOff, fanService, Characteristic.On,
+                () => !!device.on);
+
+            fanService.getCharacteristic(Characteristic.On).on(CharacteristicEventTypes.SET, (value, callback) => {
+                callback();
+                if (value)
+                    device.turnOn();
+                else
+                    device.turnOff();
+            });
         }
 
         return accessory;
-    }
+    },
 });

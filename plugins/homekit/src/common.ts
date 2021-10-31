@@ -36,7 +36,6 @@ export function bindCharacteristic(device: ScryptedDevice, event: ScryptedInterf
     service.getCharacteristic(characteristic).on(CharacteristicEventTypes.GET, callback => {
         try {
             if (device.interfaces.includes(ScryptedInterface.Refresh)) {
-                console.log('refreshing', device.name);
                 (device as ScryptedDevice & Refresh).refresh(event, true);
             }
             callback(null, map());
