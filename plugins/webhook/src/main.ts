@@ -187,6 +187,8 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
         const set = new Set(interfaces);
         set.delete(ScryptedInterface.DeviceProvider);
         set.delete(ScryptedInterface.MixinProvider);
+        set.delete(ScryptedInterface.PushHandler);
+        set.delete(ScryptedInterface.HttpRequestHandler);
         set.delete(ScryptedInterface.Settings);
         if (!set.size)
             return;
