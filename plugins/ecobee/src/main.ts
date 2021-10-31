@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios'
+import axios from 'axios'
 import sdk, { Device, ScryptedDeviceBase, OnOff, DeviceProvider, ScryptedDeviceType, ThermostatMode, Thermometer, HumiditySensor, TemperatureSetting, Settings, Setting, ScryptedInterface, Refresh, TemperatureUnit } from '@scrypted/sdk';
 const { deviceManager, log } = sdk;
 
@@ -40,10 +40,11 @@ function thermostatModeToEcobee(mode: ThermostatMode) {
   }
 }
 
-class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Refresh {
+class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Refresh, OnOff {
   device: any;
   revisionList: string[];
   provider: EcobeeController;
+  on: boolean;
 
   constructor(nativeId: string, provider: EcobeeController) {
     super(nativeId);
@@ -73,10 +74,10 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     *
     */
    async refresh(refreshInterface: string, userInitiated: boolean): Promise<void> {
+    this.console.log(`refresh(${refreshInterface}, ${userInitiated}): ${new Date()}`)
     this._refresh();
    }
    
-
   /* _refresh(): Poll from API '/thermostatSummary' endpoint for timestamp of last changes and compare to last check
    *             Updates equipmentStatus on each call
    *
@@ -97,7 +98,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
    */
    _updateEquipmentStatus(equipmentStatus: string): void {
     equipmentStatus = equipmentStatus.toLowerCase()
-    this.console.log(`_updateEquipmentStatus ${equipmentStatus}`);
+    this.console.log(`Equipment status: ${equipmentStatus}`);
     if (equipmentStatus.includes("heat"))
       // values: heatPump, heatPump[2-3], auxHeat[1-3]
       this.thermostatActiveMode = ThermostatMode.Heat;
@@ -106,6 +107,13 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
       this.thermostatActiveMode = ThermostatMode.Cool;
     else
       this.thermostatActiveMode = ThermostatMode.Off;
+
+    // fan status
+    if (equipmentStatus.includes('fan')) {
+      this.on = true;
+    } else {
+      this.on = false;
+    }
   }
 
   /* revisionListChanged(): Compare a new revision list to the stored list, return true if changed
@@ -115,7 +123,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     const listItems = ["tId", "tName", "connected", "thermostat", "alerts", "runtime", "interval"];
     const oldList = this.revisionList;
     this.revisionList = listStr.split(':');
-
+    
     if (!oldList)
       return true;
 
@@ -138,7 +146,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     var data = (await this.provider.req('get', 'thermostat', {}, {
       json: `\{"selection":\{"selectionType":"registered","selectionMatch":"${this.nativeId}","includeSettings": "true", "includeRuntime": "true", "includeEquipmentStatus": "true"\}\}`
     })).thermostatList[0];
-    
+
     // Set runtime values
     this.temperature = convertFtoC(Number(data.runtime.actualTemperature)/10)
     this.humidity = Number(data.runtime.actualHumidity);
@@ -227,6 +235,39 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     return;
   }
 
+  async turnOff(): Promise<void> {
+    this.console.log(`fanOff`)
+    // TODO: would need to resume program
+  }
+
+  async turnOn(): Promise<void> {
+    this.console.log(`fanOn`)
+
+    const data = {
+      selection: {
+        selectionType:"registered",
+        selectionMatch: this.nativeId,
+      },
+      functions: [
+        {
+          type:"setHold",
+          params:{
+            holdType: "nextTransition",
+            fan: "on",
+          }
+        }
+      ]
+    }
+
+    var resp = await this.provider.req('post', 'thermostat', data, { format: "json" })
+    if (resp.status.code == 0) {
+      this.console.log("fanOn success")
+      await this.reload();
+      return;
+    }
+
+    this.console.log(`fanOn failed: ${resp}`)
+  }
 }
 
 class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Settings {
@@ -396,7 +437,8 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
           ScryptedInterface.HumiditySensor,
           ScryptedInterface.Thermometer,
           ScryptedInterface.TemperatureSetting,
-          ScryptedInterface.Refresh
+          ScryptedInterface.Refresh,
+          ScryptedInterface.OnOff,
         ]
       })
       let device = this.devices.get(devices[i].identifier);
