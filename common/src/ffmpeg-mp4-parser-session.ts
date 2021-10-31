@@ -15,7 +15,7 @@ export interface FFMpegFragmentedMP4Session {
     generator: AsyncGenerator<MP4Atom>;
 }
 
-export async function startFFMPegFragmetedMP4Session(ffmpegInput: FFMpegInput, audioOutputArgs: string[], videoOutputArgs: string[], console: Console): Promise<FFMpegFragmentedMP4Session> {
+export async function startFFMPegFragmetedMP4Session(inputArguments: string[], audioOutputArgs: string[], videoOutputArgs: string[], console: Console): Promise<FFMpegFragmentedMP4Session> {
     return new Promise(async (resolve) => {
         const server = createServer(socket => {
             server.close();
@@ -28,7 +28,7 @@ export async function startFFMPegFragmetedMP4Session(ffmpegInput: FFMpegInput, a
         });
         const serverPort = await listenZeroCluster(server);
 
-        const args = ffmpegInput.inputArguments.slice();
+        const args = inputArguments.slice();
         args.push(
             '-f', 'mp4',
             ...videoOutputArgs,
