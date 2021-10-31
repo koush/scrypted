@@ -2,14 +2,16 @@ import axios from 'axios'
 import sdk, { Device, ScryptedDeviceBase, OnOff, DeviceProvider, ScryptedDeviceType, ThermostatMode, Thermometer, HumiditySensor, TemperatureSetting, Settings, Setting, ScryptedInterface, Refresh, TemperatureUnit } from '@scrypted/sdk';
 const { deviceManager, log } = sdk;
 
-// Convert Fahrenheit to Celsius
+// Convert Fahrenheit to Celsius, round to 2 decimal places
 function convertFtoC(f: number) {
-  return (5/9) * (f - 32)
+  let c = (5/9) * (f - 32)
+  return Math.round(c*100)/100
 }
 
-// Convert Celsius to Fahrenheit
+// Convert Celsius to Fahrenheit, round to 1 decimal place
 function convertCtoF(c: number) {
-  return (c * 1.8) + 32
+  let f = (c * 1.8) + 32
+  return Math.round(f*10)/10
 }
 
 function ecobeeToThermostatMode(mode: string) {
@@ -203,7 +205,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
   }
 
   async setThermostatSetpoint(degrees: number): Promise<void> {
-    const degF = Math.round(convertCtoF(degrees)*10);
+    const degF = convertCtoF(degrees)*10;
     this.console.log(`setThermostatSetpoint ${degrees}C/${degF}F`)
 
     const data = {
