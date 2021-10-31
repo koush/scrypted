@@ -18,6 +18,7 @@ import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
 import { ContactSensor } from 'hap-nodejs/dist/lib/definitions';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSnapshotHandler } from './camera/camera-snapshot';
+import { evalRequest } from './camera/camera-transcode';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -32,13 +33,6 @@ async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket,
 }
 
 const numberPrebufferSegments = 1;
-
-// request is used by the eval, do not remove.
-function evalRequest(value: string, request: any) {
-    if (value.startsWith('`'))
-        value = eval(value) as string;
-    return value.split(' ');
-}
 
 addSupportedType({
     type: ScryptedDeviceType.Camera,
@@ -208,10 +202,16 @@ addSupportedType({
                         '-hide_banner',
                     ];
 
-                    // decoder arguments
-                    const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
-                    if (videoDecoderArguments) {
-                        args.push(...evalRequest(videoDecoderArguments, request));
+                    const transcodeStreaming = isHomeKitHub
+                        ? storage.getItem('transcodeStreamingHub') === 'true'
+                        : storage.getItem('transcodeStreaming') === 'true';
+
+                    if (transcodeStreaming) {
+                        // decoder arguments
+                        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
+                        if (videoDecoderArguments) {
+                            args.push(...evalRequest(videoDecoderArguments, request));
+                        }
                     }
 
                     // ffmpeg input for decoder
@@ -229,10 +229,6 @@ addSupportedType({
                     args.push(
                         "-an", '-sn', '-dn',
                     );
-
-                    const transcodeStreaming = isHomeKitHub
-                        ? storage.getItem('transcodeStreamingHub') === 'true'
-                        : storage.getItem('transcodeStreaming') === 'true';
 
                     if (transcodeStreaming) {
                         const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';

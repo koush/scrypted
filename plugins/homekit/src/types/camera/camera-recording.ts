@@ -6,6 +6,9 @@ import sdk from '@scrypted/sdk';
 
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from 'hap-nodejs/dist/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { evalRequest } from './camera-transcode';
+import { StartStreamRequest, StreamRequest } from 'hap-nodejs';
+import { createConnection } from 'net';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -36,7 +39,26 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         log.a(`${device.name} is not prebuffered. Please install and enable the Rebroadcast plugin.`);
     }
 
+    const inputArguments: string[] = [];
     const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
+    const request: any = {
+        video: {
+            width: configuration.videoCodec.resolution[0],
+            height: configuration.videoCodec.resolution[1],
+            fps: configuration.videoCodec.resolution[2],
+            max_bit_rate: configuration.videoCodec.bitrate,
+        }
+    }
+
+    if (transcodeRecording) {
+        // decoder arguments
+        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
+        if (videoDecoderArguments) {
+            inputArguments.push(...evalRequest(videoDecoderArguments, request));
+        }
+    }
+
+    inputArguments.push(...ffmpegInput.inputArguments)
 
     const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
 
@@ -45,7 +67,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         // create a dummy audio track if none actually exists.
         // this track will only be used if no audio track is available.
         // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        ffmpegInput.inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+        inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
     }
 
     let audioArgs: string[];
@@ -78,17 +100,18 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     const level = configuration.videoCodec.level === H264Level.LEVEL4_0 ? '4.0'
         : configuration.videoCodec.level === H264Level.LEVEL3_2 ? '3.2' : '3.1';
 
-
     let videoArgs: string[];
     if (transcodeRecording) {
-        videoArgs = [
-            '-profile:v', profile,
-            '-level:v', level,
-            '-b:v', `${configuration.videoCodec.bitrate}k`,
-            '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
-            '-r', configuration.videoCodec.resolution[2].toString(),
-            '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
-        ];
+        const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
+        videoArgs = h264EncoderArguments
+            ? evalRequest(h264EncoderArguments, request) : [
+                '-profile:v', profile,
+                '-level:v', level,
+                '-b:v', `${configuration.videoCodec.bitrate}k`,
+                '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
+                '-r', configuration.videoCodec.resolution[2].toString(),
+                '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
+            ];
     }
     else {
         videoArgs = [
@@ -96,10 +119,10 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         ];
     }
 
-    log.i(`${device.name} motion recording starting`);
-    const session = await startFFMPegFragmetedMP4Session(ffmpegInput, audioArgs, videoArgs, console);
+    console.log(`motion recording starting`);
+    const session = await startFFMPegFragmetedMP4Session(inputArguments, audioArgs, videoArgs, console);
 
-    log.i(`${device.name} motion recording started`);
+    console.log(`motion recording started`);
     const { socket, cp, generator } = session;
     let pending: Buffer[] = [];
     try {
@@ -118,7 +141,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         }
     }
     catch (e) {
-        log.i(`${device.name} motion recording complete ${e}`);
+        console.log(`motion recording complete ${e}`);
     }
     finally {
         socket.destroy();
