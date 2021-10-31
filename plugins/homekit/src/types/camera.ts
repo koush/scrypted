@@ -527,41 +527,44 @@ addSupportedType({
             }
         }
 
-        const objectDetectionContactSensorsValue = storage.getItem('objectDetectionContactSensors');
-        const objectDetectionContactSensors: string[] = [];
-        try {
-            objectDetectionContactSensors.push(...JSON.parse(objectDetectionContactSensorsValue));
-        }
-        catch (e) {
-        }
 
-        for (const ojs of new Set(objectDetectionContactSensors)) {
-            const sensor = new ContactSensor(`${device.name}: ` + ojs, ojs);
-            accessory.addService(sensor);
-            const isPerson = ojs.startsWith('Person: ');
-
-            let contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
-            bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.ContactSensorState, (source, details, data) => {
-                if (!source)
-                    return contactState;
-
-                const ed: ObjectDetection = data;
-                if (!isPerson) {
-                    if (!ed.detections)
+        if (device.interfaces.includes(ScryptedInterface.ObjectDetector)) {
+            const objectDetectionContactSensorsValue = storage.getItem('objectDetectionContactSensors');
+            const objectDetectionContactSensors: string[] = [];
+            try {
+                objectDetectionContactSensors.push(...JSON.parse(objectDetectionContactSensorsValue));
+            }
+            catch (e) {
+            }
+    
+            for (const ojs of new Set(objectDetectionContactSensors)) {
+                const sensor = new ContactSensor(`${device.name}: ` + ojs, ojs);
+                accessory.addService(sensor);
+                const isPerson = ojs.startsWith('Person: ');
+    
+                let contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+                bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.ContactSensorState, (source, details, data) => {
+                    if (!source)
                         return contactState;
-                    const objects = ed.detections.map(d => d.className);
-                    contactState = objects.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
+    
+                    const ed: ObjectDetection = data;
+                    if (!isPerson) {
+                        if (!ed.detections)
+                            return contactState;
+                        const objects = ed.detections.map(d => d.className);
+                        contactState = objects.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
+                        return contactState;
+                    }
+    
+                    if (!ed.people)
+                        return contactState;
+    
+                    const people = ed.people.map(d => 'Person: ' + d.label);
+                    contactState = people.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+    
                     return contactState;
-                }
-
-                if (!ed.people)
-                    return contactState;
-
-                const people = ed.people.map(d => 'Person: ' + d.label);
-                contactState = people.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
-
-                return contactState;
-            }, true);
+                }, true);
+            }
         }
 
         return accessory;
