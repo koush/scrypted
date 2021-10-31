@@ -57,10 +57,18 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
   /* initialconfig(): set initial device characteristics
    *
    */
-  initialconfig(): void {
+  initialconfig(data): void {
     this.temperatureUnit = TemperatureUnit.F
     var modes: ThermostatMode[] = [ThermostatMode.Cool, ThermostatMode.Heat, ThermostatMode.Auto, ThermostatMode.Off];
     this.thermostatAvailableModes = modes;
+
+    this.console.log(data);
+    // set device info
+    this.info = {
+      model: data.brand,
+      manufacturer: data.modelNumber,
+      serialNumber: data.identifier,
+    }
   }
 
   /*
@@ -445,7 +453,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
       if (!device) {
         device = new EcobeeThermostat(devices[i].identifier, this)
         this.devices.set(devices[i].identifier, device)
-        device.initialconfig()
+        device.initialconfig(devices[i])
       }
     }
 
