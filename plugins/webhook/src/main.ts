@@ -1,7 +1,5 @@
-import { HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MixinDeviceBase, MixinProvider, Notifier, PushHandler, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, PushHandler, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, Setting, Settings, SettingValue } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { AddProvider } from "../../../common/src/provider-plugin";
-import { getCredentials, getCredentialsSettings } from "../../../common/src/credentials-settings";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { randomBytes } from 'crypto';
 
@@ -188,6 +186,7 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
         set.delete(ScryptedInterface.DeviceProvider);
         set.delete(ScryptedInterface.MixinProvider);
         set.delete(ScryptedInterface.PushHandler);
+        set.delete(ScryptedInterface.EngineIOHandler);
         set.delete(ScryptedInterface.HttpRequestHandler);
         set.delete(ScryptedInterface.Settings);
         if (!set.size)
