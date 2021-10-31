@@ -1,6 +1,6 @@
 
 import { VideoCamera, MediaPlayer, MediaPlayerState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice } from '../common'
+import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Categories, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 import sdk from '@scrypted/sdk';
@@ -18,34 +18,26 @@ addSupportedType({
         const service = accessory.addService(Service.Television, "Television", "Television");
         // service.setPrimaryService(true);
 
-        let active = false;
         let activeIdentifier = 0;
         const allowedIdentifiers = new Set<string>();
         service.getCharacteristic(Characteristic.Active)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-                active = value === Characteristic.Active.ACTIVE;
-                if (!active)
+                if (value !== Characteristic.Active.ACTIVE)
                     device.stop();
                 callback();
-            })
-            .on(CharacteristicEventTypes.GET, async (callback: NodeCallback<CharacteristicValue>) => {
-                try {
-                    if (active) {
-                        callback(null, Characteristic.Active.ACTIVE);
-                        return;
-                    }
-                    const mediaStatus = await device.getMediaStatus();
-                    if (!mediaStatus || mediaStatus.mediaPlayerState === MediaPlayerState.Idle) {
-                        callback(null, Characteristic.Active.INACTIVE);
-                        return;
-                    }
-                    active = true;
-                    callback(null, Characteristic.Active.ACTIVE);
-                }
-                catch (e) {
-                    callback(e);
-                }
             });
+
+            let active = false;
+        bindCharacteristic(device, ScryptedInterface.MediaPlayer, service, Characteristic.Active,
+            () => {
+                // trigger an actual fetch here but return something cached immediately.
+                (async() => {
+                    const mediaStatus = await device.getMediaStatus();
+                    active = mediaStatus && mediaStatus.mediaPlayerState !== MediaPlayerState.Idle;
+                    service.updateCharacteristic(Characteristic.Active, active ? Characteristic.Active.ACTIVE : Characteristic.Active.INACTIVE);
+                })();
+                return active ? Characteristic.Active.ACTIVE : Characteristic.Active.INACTIVE;
+            })
 
         service.getCharacteristic(Characteristic.ActiveIdentifier)
             .on(CharacteristicEventTypes.SET, async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -76,18 +68,17 @@ addSupportedType({
                 callback(null, activeIdentifier);
             });
 
-
-        service.setCharacteristic(Characteristic.ConfiguredName, device.name);
+        service.updateCharacteristic(Characteristic.ConfiguredName, device.name);
 
         service.getCharacteristic(Characteristic.RemoteKey)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
             });
 
-        service.setCharacteristic(Characteristic.SleepDiscoveryMode, Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
+        service.updateCharacteristic(Characteristic.SleepDiscoveryMode, Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
 
         const speaker = accessory.addService(Service.TelevisionSpeaker);
-        speaker.setCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
+        speaker.updateCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
 
         speaker.getCharacteristic(Characteristic.Mute)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -97,15 +88,12 @@ addSupportedType({
                 callback(null, false);
             });
 
-
-
         const idle = accessory.addService(Service.InputSource, 'idle', 'Idle');
-        idle.setCharacteristic(Characteristic.Identifier, 0)
-            .setCharacteristic(Characteristic.ConfiguredName, 'Idle')
-            .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
-            .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION);
+        idle.updateCharacteristic(Characteristic.Identifier, 0)
+            .updateCharacteristic(Characteristic.ConfiguredName, 'Idle')
+            .updateCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
+            .updateCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION);
         service.addLinkedService(idle);
-
 
         for (const id of Object.keys(systemManager.getSystemState())) {
             const check = systemManager.getDeviceById(id);
@@ -115,10 +103,10 @@ addSupportedType({
             allowedIdentifiers.add(check.id);
 
             const input = accessory.addService(Service.InputSource, check.name, `input-${check.id}`);
-            input.setCharacteristic(Characteristic.Identifier, check.id)
-                .setCharacteristic(Characteristic.ConfiguredName, check.name)
-                .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
-                .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION);
+            input.updateCharacteristic(Characteristic.Identifier, check.id)
+                .updateCharacteristic(Characteristic.ConfiguredName, check.name)
+                .updateCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
+                .updateCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION);
 
             service.addLinkedService(input);
         }

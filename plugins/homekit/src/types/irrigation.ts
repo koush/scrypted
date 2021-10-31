@@ -28,7 +28,7 @@ addSupportedType({
             () => !!device.running ? Characteristic.InUse.IN_USE : Characteristic.InUse.NOT_IN_USE);
 
         // todo: fix this.
-        service.setCharacteristic(Characteristic.RemainingDuration, 1800)
+        service.updateCharacteristic(Characteristic.RemainingDuration, 1800)
 
         return accessory;
     }

@@ -35,9 +35,6 @@ addSupportedType({
                     callback();
                     h = value as number;
                     delaySet();
-                })
-                .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                    callback(null, device.hsv?.h || 0);
                 });
 
             service.addCharacteristic(Characteristic.Saturation)
@@ -45,11 +42,13 @@ addSupportedType({
                     callback();
                     s = value as number;
                     delaySet();
-                })
-                .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                    callback(null, (device.hsv?.s || 0) * 100);
                 });
 
+            bindCharacteristic(device, ScryptedInterface.ColorSettingHsv, service, Characteristic.Hue,
+                () => device.hsv?.h || 0);
+
+            bindCharacteristic(device, ScryptedInterface.ColorSettingHsv, service, Characteristic.Saturation,
+                () => (device.hsv?.s || 0) * 100);
         }
 
         return accessory;

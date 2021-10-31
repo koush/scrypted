@@ -1,8 +1,7 @@
 import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectDetection } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice, HomeKitSession } from '../common'
-import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes, Resolution } from '../hap';
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
+import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
-import { fitHeightToWidth } from "../../../../common/src/resolution-utils";
 
 import sdk from '@scrypted/sdk';
 import child_process from 'child_process';
@@ -11,7 +10,7 @@ import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import debounce from 'lodash/debounce';
 
-import { CameraRecordingDelegate, CharacteristicEventTypes, CharacteristicValue, NodeCallback } from 'hap-nodejs';
+import { CameraRecordingDelegate } from 'hap-nodejs';
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions } from 'hap-nodejs/dist/lib/camera/RecordingManagement';
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
@@ -517,25 +516,18 @@ addSupportedType({
                 () => !!motionDevice.motionDetected;
 
             const service = controller.motionService;
-            service.getCharacteristic(Characteristic.MotionDetected)
-                .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                    callback(null, motionDetected());
-                });
-
-            motionDevice.listen({
-                event: ScryptedInterface.MotionSensor,
-                watch: false,
-            }, (eventSource, eventDetails, data) => {
-                service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
-            });
+            bindCharacteristic(motionDevice,
+                ScryptedInterface.MotionSensor,
+                service,
+                Characteristic.MotionDetected,
+                () => motionDetected(), true)
 
             if (needAudioMotionService) {
-                motionDevice.listen({
-                    event: ScryptedInterface.AudioSensor,
-                    watch: false,
-                }, (eventSource, eventDetails, data) => {
-                    service.updateCharacteristic(Characteristic.MotionDetected, motionDetected());
-                });
+                bindCharacteristic(motionDevice,
+                    ScryptedInterface.AudioSensor,
+                    service,
+                    Characteristic.MotionDetected,
+                    () => motionDetected(), true)
             }
         }
 
@@ -547,55 +539,33 @@ addSupportedType({
         catch (e) {
         }
 
-        const objectSensorMap = new Map<string, ContactSensor>();
-        const peopleSensorMap = new Map<string, ContactSensor>();
         for (const ojs of new Set(objectDetectionContactSensors)) {
             const sensor = new ContactSensor(`${device.name}: ` + ojs, ojs);
-            sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
             accessory.addService(sensor);
-            if (ojs.startsWith('Person: ')) {
-                peopleSensorMap.set(ojs, sensor);
-            }
-            else {
-                objectSensorMap.set(ojs, sensor);
-            }
-        }
+            const isPerson = ojs.startsWith('Person: ');
 
-        if (objectSensorMap.size || peopleSensorMap.size) {
-            device.listen(ScryptedInterface.ObjectDetector, (eventSource, eventDetails, eventData: ObjectDetection) => {
-                if (eventData.detections) {
-                    const unset = new Set(objectSensorMap.keys());
-                    const objects: string[] = [];
-                    objects.push(...eventData.detections.map(d => d.className));
-                    for (const type of objects) {
-                        const sensor = objectSensorMap.get(type);
-                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-                        unset.delete(type);
-                    }
+            let contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+            bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.ContactSensorState, (source, details, data) => {
+                if (!source)
+                    return contactState;
 
-                    for (const type of unset) {
-                        const sensor = objectSensorMap.get(type);
-                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
-                    }
+                const ed: ObjectDetection = data;
+                if (!isPerson) {
+                    if (!ed.detections)
+                        return contactState;
+                    const objects = ed.detections.map(d => d.className);
+                    contactState = objects.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
+                    return contactState;
                 }
 
-                if (eventData.people) {
-                    const unset = new Set(peopleSensorMap.keys());
-                    const people: string[] = [];
-                    people.push(...eventData.people.map(p => p.label));
-                    for (const type of people) {
-                        const personType = 'Person: ' + type;
-                        const sensor = peopleSensorMap.get(personType);
-                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-                        unset.delete(personType);
-                    }
+                if (!ed.people)
+                    return contactState;
 
-                    for (const type of unset) {
-                        const sensor = peopleSensorMap.get(type);
-                        sensor?.updateCharacteristic(Characteristic.ContactSensorState, Characteristic.ContactSensorState.CONTACT_DETECTED);
-                    }
-                }
-            });
+                const people = ed.people.map(d => 'Person: ' + d.label);
+                contactState = people.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+
+                return contactState;
+            }, true);
         }
 
         return accessory;

@@ -184,15 +184,15 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 if (deviceInfo) {
                     const info = accessory.getService(Service.AccessoryInformation)!;
                     if (deviceInfo.manufacturer)
-                        info.setCharacteristic(Characteristic.Manufacturer, deviceInfo.manufacturer);
+                        info.updateCharacteristic(Characteristic.Manufacturer, deviceInfo.manufacturer);
                     if (deviceInfo.model)
-                        info.setCharacteristic(Characteristic.Model, deviceInfo.model);
+                        info.updateCharacteristic(Characteristic.Model, deviceInfo.model);
                     if (deviceInfo.serialNumber)
-                        info.setCharacteristic(Characteristic.SerialNumber, deviceInfo.serialNumber);
+                        info.updateCharacteristic(Characteristic.SerialNumber, deviceInfo.serialNumber);
                     if (deviceInfo.firmware)
-                        info.setCharacteristic(Characteristic.FirmwareRevision, deviceInfo.firmware);
+                        info.updateCharacteristic(Characteristic.FirmwareRevision, deviceInfo.firmware);
                     if (deviceInfo.version)
-                        info.setCharacteristic(Characteristic.HardwareRevision, deviceInfo.version);
+                        info.updateCharacteristic(Characteristic.HardwareRevision, deviceInfo.version);
                 }
 
                 if (supportedType.noBridge) {
@@ -214,10 +214,10 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         const username = this.getUsername();
 
         const info = this.bridge.getService(Service.AccessoryInformation)!;
-        info.setCharacteristic(Characteristic.Manufacturer, "scrypted.app");
-        info.setCharacteristic(Characteristic.Model, "scrypted");
-        info.setCharacteristic(Characteristic.SerialNumber, username);
-        info.setCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
+        info.updateCharacteristic(Characteristic.Manufacturer, "scrypted.app");
+        info.updateCharacteristic(Characteristic.Model, "scrypted");
+        info.updateCharacteristic(Characteristic.SerialNumber, username);
+        info.updateCharacteristic(Characteristic.FirmwareRevision, packageJson.version);
 
         const publishInfo: PublishInfo = {
             username: username,

@@ -15,24 +15,16 @@ addSupportedType({
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
             const contactSensorService = accessory.addService(Service.ContactSensor, device.name);
             contactSensorService.getCharacteristic(Characteristic.ContactSensorState)
-    
+
             bindCharacteristic(device, ScryptedInterface.BinarySensor, contactSensorService, Characteristic.ContactSensorState,
                 () => !!device.binaryState);
         }
 
         if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
             const motionSensorService = accessory.addService(Service.MotionSensor, device.name);
-            motionSensorService.getCharacteristic(Characteristic.MotionDetected)
-                .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                    callback(null, !!device.motionDetected);
-                });
-    
-                device.listen({
-                event: ScryptedInterface.MotionSensor,
-                watch: false,
-            }, (eventSource, eventDetails, data) => {
-                motionSensorService.updateCharacteristic(Characteristic.MotionDetected, !!device.motionDetected);
-            });
+
+            bindCharacteristic(device, ScryptedInterface.MotionSensor, motionSensorService, Characteristic.MotionDetected,
+                () => !!device.motionDetected, true);
         }
 
         // todo: more sensors.

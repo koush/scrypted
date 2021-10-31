@@ -1,5 +1,6 @@
 
-import { EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { EventDetails, EventListener, EventListenerRegister, Refresh, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { CharacteristicEventTypes } from 'hap-nodejs';
 import { Accessory, Service, SnapshotRequest } from './hap';
 
 export interface DummyDevice {
@@ -29,11 +30,24 @@ export function addSupportedType(type: SupportedType) {
     supportedTypes[type.type] = type;
 }
 
-export function bindCharacteristic(device: ScryptedDevice, event: ScryptedInterface, service: Service, characteristic: any, map: () => any, refresh?: boolean): EventListenerRegister {
+export function bindCharacteristic(device: ScryptedDevice, event: ScryptedInterface, service: Service, characteristic: any, map: (eventSource?: any, eventDetails?: EventDetails, eventData?: any) => any, refresh?: boolean): EventListenerRegister {
     service.updateCharacteristic(characteristic, map());
+
+    service.getCharacteristic(characteristic).on(CharacteristicEventTypes.GET, callback => {
+        try {
+            if (device.interfaces.includes(ScryptedInterface.Refresh)) {
+                console.log('refreshing', device.name);
+                (device as ScryptedDevice & Refresh).refresh(event, true);
+            }
+            callback(null, map());
+        }
+        catch (e) {
+            callback(e);
+        }
+    });
 
     return device.listen({
         event,
         watch: !refresh,
-    }, () =>  service.updateCharacteristic(characteristic, map()));
+    }, (source, details, data) =>  service.updateCharacteristic(characteristic, map(source, details, data)));
 }

@@ -1,5 +1,7 @@
 
-import { HumiditySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
+import { HumiditySensor, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
+import { access } from 'fs';
+import { Fanv2 } from 'hap-nodejs/dist/lib/definitions';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -11,7 +13,7 @@ addSupportedType({
             return false;
         return true;
     },
-    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor) => {
+    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff) => {
         const accessory = makeAccessory(device);
         const service = accessory.addService(Service.Thermostat, device.name);
 
@@ -54,21 +56,17 @@ addSupportedType({
             }
         }
 
-        service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, toCurrentMode(device.thermostatActiveMode));
-            });
-
+        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CurrentHeatingCoolingState,
+            () => toCurrentMode(device.thermostatActiveMode));
 
         service.getCharacteristic(Characteristic.TargetHeatingCoolingState)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, toTargetMode(device.thermostatMode));
-            })
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
                 device.setThermostatMode(fromTargetMode(value as number));
             })
 
+        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetHeatingCoolingState,
+            () => toTargetMode(device.thermostatActiveMode));
 
         function getTargetTemperature() {
             return device.thermostatSetpoint ||
@@ -77,26 +75,17 @@ addSupportedType({
         }
 
         service.getCharacteristic(Characteristic.TargetTemperature)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, getTargetTemperature());
-            })
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
                 device.setThermostatSetpoint(value as number);
-            })
+            });
 
-        service.setCharacteristic(Characteristic.TemperatureDisplayUnits,
-            device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
+        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetTemperature,
+            () => getTargetTemperature());
 
-        device.listen({
-            event: ScryptedInterface.TemperatureSetting,
-            watch: true,
-        }, (source, details, data) => {
-            service.updateCharacteristic(Characteristic.TargetHeatingCoolingState, toTargetMode(device.thermostatMode));
-            service.updateCharacteristic(Characteristic.CurrentHeatingCoolingState, toCurrentMode(device.thermostatActiveMode));
-            service.updateCharacteristic(Characteristic.TargetTemperature, getTargetTemperature());
-            service.updateCharacteristic(Characteristic.TemperatureDisplayUnits, device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
-        });
+
+        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TemperatureDisplayUnits,
+            () => device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
 
         bindCharacteristic(device, ScryptedInterface.Thermometer, service, Characteristic.CurrentTemperature,
             () => device.temperature || 0);
@@ -104,6 +93,12 @@ addSupportedType({
         if (device.interfaces.includes(ScryptedInterface.HumiditySensor)) {
             bindCharacteristic(device, ScryptedInterface.HumiditySensor, service, Characteristic.CurrentRelativeHumidity,
                 () => device.humidity || 0);
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.OnOff)) {
+            const fanService = accessory.addService(Fanv2);
+            bindCharacteristic(device, ScryptedInterface.OnOff, fanService, Characteristic.Active,
+                () => device.on ? Characteristic.Active.ACTIVE : Characteristic.Active.INACTIVE);
         }
 
         return accessory;

@@ -1,6 +1,6 @@
 
 import { Lock, LockState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { addSupportedType, DummyDevice } from '../common'
+import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 
@@ -33,18 +33,9 @@ addSupportedType({
             }
         }
 
-        service.getCharacteristic(Characteristic.LockCurrentState)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, toCurrentState(device.lockState));
-            });
-
-
         let targetState = toTargetState(device.lockState);
 
         service.getCharacteristic(Characteristic.LockTargetState)
-            .on(CharacteristicEventTypes.GET, (callback: NodeCallback<CharacteristicValue>) => {
-                callback(null, targetState);
-            })
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 targetState = value as number;
                 callback();
@@ -56,17 +47,15 @@ addSupportedType({
                         device.lock();
                         break;
                 }
-            })
+            });
 
+        bindCharacteristic(device, ScryptedInterface.Lock, service, Characteristic.LockTargetState, () => {
+            targetState = toTargetState(device.lockState);
+            return targetState;
+        })
 
-        device.listen({
-            event: ScryptedInterface.Lock,
-            watch: true,
-        }, (source, details, data) => {
-            targetState = toTargetState(data);
-            service.updateCharacteristic(Characteristic.LockTargetState, targetState);
-            service.updateCharacteristic(Characteristic.LockCurrentState, toCurrentState(data));
-        });
+        bindCharacteristic(device, ScryptedInterface.Lock, service, Characteristic.LockCurrentState,
+            () => toCurrentState(device.lockState));
 
         return accessory;
     }
