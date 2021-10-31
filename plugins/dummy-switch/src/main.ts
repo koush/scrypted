@@ -1,12 +1,14 @@
-import { DeviceProvider, OnOff, Scriptable, ScriptSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from '@scrypted/sdk';
+import { BinarySensor, DeviceProvider, MotionSensor, OnOff, Scriptable, ScriptSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { createMonacoEvalDefaults, scryptedEval } from '../../../common/src/scrypted-eval';
 import child_process from 'child_process';
 
 const { log, deviceManager } = sdk;
 
-class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable {
+class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, MotionSensor, BinarySensor, Settings {
     language: string;
+    timeout: NodeJS.Timeout;
+
     constructor(nativeId: string) {
         super(nativeId);
 
@@ -14,16 +16,48 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable {
             this.language = 'typescript';
         else
             this.language = 'shell';
+
+        this.motionDetected = this.motionDetected || false;
+        this.binaryState = this.binaryState || false;
+        this.on = this.on || false;
+    }
+    async getSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'reset',
+                title: 'Reset Sensor',
+                description: 'Reset the motion sensor and binary sensor after the given seconds. Enter 0 to never reset.',
+                value: this.storage.getItem('reset') || '10',
+                placeholder: '10',
+            }
+        ]
+    }
+    async putSetting(key: string, value: SettingValue): Promise<void> {
+        this.storage.setItem(key, value.toString());
+        clearTimeout(this.timeout);
     }
     async turnOff(): Promise<void> {
+        clearTimeout(this.timeout);
         this.on = false;
+        this.motionDetected = false;
+        this.binaryState = false;
         const source = JSON.parse(this.storage.getItem('source'));
         this.eval(source);
     }
     async turnOn(): Promise<void> {
+        clearTimeout(this.timeout);
         this.on = true;
+        this.motionDetected = true;
+        this.binaryState = true;
         const source = JSON.parse(this.storage.getItem('source'));
         this.eval(source);
+
+        let reset = parseInt(this.storage.getItem('reset'));
+        if (!reset && reset !== 0)
+            reset = 10;
+        if (reset) {
+            this.timeout = setTimeout(() => this.turnOff(), reset * 1000);
+        }
     }
     async saveScript(script: ScriptSource): Promise<void> {
         this.storage.setItem('source', JSON.stringify(script));
@@ -100,7 +134,13 @@ class DummySwitchProvider extends ScryptedDeviceBase implements DeviceProvider, 
         deviceManager.onDeviceDiscovered({
             nativeId,
             name,
-            interfaces: [ScryptedInterface.OnOff, ScryptedInterface.Scriptable],
+            interfaces: [
+                ScryptedInterface.OnOff,
+                ScryptedInterface.Scriptable,
+                ScryptedInterface.MotionSensor,
+                ScryptedInterface.BinarySensor,
+                ScryptedInterface.Settings,
+            ],
             type: ScryptedDeviceType.Switch,
         });
 
