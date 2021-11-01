@@ -35,7 +35,7 @@ interface DeviceProxyPair {
     proxy: ScryptedDevice;
 }
 
-const MIN_SCRYPTED_CORE_VERSION = '0.0.121';
+const MIN_SCRYPTED_CORE_VERSION = '0.0.135';
 const PLUGIN_DEVICE_STATE_VERSION = 2;
 
 export class ScryptedRuntime {

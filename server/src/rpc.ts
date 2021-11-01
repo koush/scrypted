@@ -125,7 +125,7 @@ class RpcProxy implements ProxyHandler<any> {
             method,
         };
 
-        if (this.proxyOneWayMethods?.includes(method)) {
+        if (this.proxyOneWayMethods?.includes?.(method)) {
             rpcApply.oneway = true;
             this.peer.send(rpcApply, e => new RPCResultError(e.message, e));
             return Promise.resolve();
