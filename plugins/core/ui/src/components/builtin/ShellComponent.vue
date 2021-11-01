@@ -1,7 +1,7 @@
 <template>
   <v-card raised>
     <v-toolbar dark color="blue"> Terminal </v-toolbar>
-    <div ref="terminal"></div>
+    <div ref="terminal" style="height: 700px;"></div>
   </v-card>
 </template>
 <script>
@@ -27,7 +27,7 @@ export default {
     this.socket = eio(rootLocation, options);
 
     this.socket.on('message', data => {
-        term.write(new Uint8Array(data));
+        term.write(new Uint8Array(Buffer.from(data)));
     });
 
     term.onData(data => {

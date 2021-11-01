@@ -28,7 +28,7 @@ import { ServiceControl } from './services/service-control';
 import { Alerts } from './services/alerts';
 import { Info } from './services/info';
 import io from 'engine.io';
-import child_process from 'child_process';
+import {spawn as ptySpawn} from 'node-pty';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -86,12 +86,11 @@ export class ScryptedRuntime {
             this.shellHandler(req, res);
         });
         this.shellio.on('connection', connection => {
-            const cp = child_process.spawn(process.env.SHELL, {
-                stdio: 'pipe',
+            const cp = ptySpawn(process.env.SHELL, [], {
+
             });
-            cp.stdout.on('data', data => connection.send(data));
-            cp.stderr.on('data', data => connection.send(data));
-            connection.on('message', message => cp.stdin.write(message));
+            cp.onData(data => connection.send(data));
+            connection.on('message', message => cp.write(message.toString()));
             connection.on('close', () => cp.kill());
         })
 
