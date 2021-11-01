@@ -261,6 +261,7 @@ export class PluginHost {
                 reject(new Error('peer disconnected'));
             }
         });
+        this.peer.peerName = this.pluginId;
 
         this.peer.onOob = (oob: any) => {
             if (oob.type === 'stats') {
@@ -548,6 +549,7 @@ export function startPluginClusterWorker() {
         if (e)
             reject(e);
     }));
+    peer.peerName = 'host';
     process.on('message', message => peer.handleMessage(message as RpcMessage));
 
     let lastCpuUsage: NodeJS.CpuUsage;

@@ -37,6 +37,10 @@ export interface PluginAPI {
 }
 
 class EventListenerRegisterProxy implements EventListenerRegister {
+    __proxy_oneway_methods = [
+        'removeListener',
+    ];
+
     removeListener() {
         this.listeners.delete(this);
         this.listener.removeListener();
@@ -132,6 +136,7 @@ export interface PluginRemoteLoadZipOptions {
 }
 
 export interface PluginRemote {
+    __proxy_oneway_methods?: string[],
     loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any>;
     setSystemState(state: {[id: string]: {[property: string]: SystemDeviceState}}): Promise<void>;
     setNativeId(nativeId: ScryptedNativeId, id: string, storage: {[key: string]: any}): Promise<void>;

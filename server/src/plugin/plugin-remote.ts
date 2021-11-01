@@ -327,6 +327,13 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const localStorage = new StorageImpl(deviceManager, undefined);
 
         const remote: PluginRemote = {
+            __proxy_oneway_methods: [
+                'notify',
+                'updateDescriptor',
+                'setSystemState',
+                'ioEvent',
+                'setNativeId',
+            ],
             getServicePort,
             createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>) {
                 const handler = new DeviceStateProxyHandler(deviceManager, id, setState);

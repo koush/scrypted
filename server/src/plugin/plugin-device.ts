@@ -2,10 +2,9 @@ import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegist
 import { ScryptedRuntime } from "../runtime";
 import { PluginDevice } from "../db-types";
 import { MixinProvider } from "@scrypted/sdk/types";
-import { handleFunctionInvocations } from "../rpc";
-import { getState, setState } from "../state";
-import { getDisplayType, getProvidedTypeOrDefault } from "../infer-defaults";
-import { hasSameElements } from "../collection";
+import { handleFunctionInvocations, PROPERTY_PROXY_ONEWAY_METHODS } from "../rpc";
+import { getState } from "../state";
+import { getDisplayType } from "../infer-defaults";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
 
 interface MixinTable {

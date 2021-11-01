@@ -25,6 +25,7 @@ interface RpcApply extends RpcMessage {
     proxyId: string;
     argArray: any;
     method: string;
+    oneway?: boolean;
 }
 
 interface RpcResult extends RpcMessage {
@@ -42,6 +43,7 @@ interface RpcRemoteProxyValue {
     __remote_proxy_id: string;
     __remote_constructor_name: string;
     __remote_proxy_props: any;
+    __remote_proxy_oneway_methods: string[];
     __serialized_value?: any;
 }
 
@@ -71,17 +73,18 @@ export function handleFunctionInvocations(thiz: ProxyHandler<any>, target: any, 
     }
 }
 
-class RpcProxy implements ProxyHandler<any> {
-    peer: RpcPeer;
-    id: string;
-    constructorName: string;
-    props: any;
+export const PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
 
-    constructor(peer: RpcPeer, id: string, constructorName: string, proxyProps: any) {
+class RpcProxy implements ProxyHandler<any> {
+    constructor(public peer: RpcPeer,
+        public id: string,
+        public constructorName: string,
+        public proxyProps: any,
+        public proxyOneWayMethods: string[]) {
         this.peer = peer;
         this.id = id;
         this.constructorName = constructorName;
-        this.props = proxyProps;
+        this.proxyProps = proxyProps;
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {
@@ -92,13 +95,15 @@ class RpcProxy implements ProxyHandler<any> {
         if (p === '__proxy_peer')
             return this.peer;
         if (p === '__proxy_props')
-            return this.props;
+            return this.proxyProps;
+        if (p === PROPERTY_PROXY_ONEWAY_METHODS)
+            return this.proxyOneWayMethods;
         if (p === 'then')
             return;
         if (p === 'constructor')
             return;
-        if (this.props?.[p] !== undefined)
-            return this.props?.[p];
+        if (this.proxyProps?.[p] !== undefined)
+            return this.proxyProps?.[p];
         const handled = handleFunctionInvocations(this, target, p, receiver);
         if (handled)
             return handled;
@@ -112,15 +117,22 @@ class RpcProxy implements ProxyHandler<any> {
             args.push(this.peer.serialize(arg));
         }
 
-        return this.peer.createPendingResult(id => {
-            const rpcApply: RpcApply = {
-                type: "apply",
-                id,
-                proxyId: this.id,
-                argArray: args,
-                method,
-            };
+        const rpcApply: RpcApply = {
+            type: "apply",
+            id: undefined,
+            proxyId: this.id,
+            argArray: args,
+            method,
+        };
 
+        if (this.proxyOneWayMethods?.includes(method)) {
+            rpcApply.oneway = true;
+            this.peer.send(rpcApply, e => new RPCResultError(e.message, e));
+            return Promise.resolve();
+        }
+
+        return this.peer.createPendingResult(id => {
+            rpcApply.id = id;
             this.peer.send(rpcApply, e => new RPCResultError(e.message, e));
         })
     }
@@ -165,6 +177,7 @@ export interface RpcSerializer {
 }
 
 export class RpcPeer {
+    peerName = 'Unnamed Peer';
     idCounter = 1;
     onOob: (oob: any) => void;
     params: { [name: string]: any } = {};
@@ -269,9 +282,9 @@ export class RpcPeer {
     deserialize(value: any): any {
         if (!value)
             return value;
-        const { __remote_proxy_id, __local_proxy_id, __remote_constructor_name, __serialized_value, __remote_proxy_props } = value;
+        const { __remote_proxy_id, __local_proxy_id, __remote_constructor_name, __serialized_value, __remote_proxy_props, __remote_proxy_oneway_methods } = value;
         if (__remote_proxy_id) {
-            const proxy = this.remoteWeakProxies[__remote_proxy_id]?.deref() || this.newProxy(__remote_proxy_id, __remote_constructor_name, __remote_proxy_props);
+            const proxy = this.remoteWeakProxies[__remote_proxy_id]?.deref() || this.newProxy(__remote_proxy_id, __remote_constructor_name, __remote_proxy_props, __remote_proxy_oneway_methods);
             return proxy;
         }
 
@@ -302,6 +315,7 @@ export class RpcPeer {
                 __remote_proxy_id: proxyId,
                 __remote_constructor_name,
                 __remote_proxy_props: value?.__proxy_props,
+                __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
             }
             return ret;
         }
@@ -324,6 +338,7 @@ export class RpcPeer {
                     __remote_proxy_id: undefined,
                     __remote_constructor_name,
                     __remote_proxy_props: value?.__proxy_props,
+                    __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
                     __serialized_value: value,
                 }
                 return ret;
@@ -338,13 +353,14 @@ export class RpcPeer {
             __remote_proxy_id: proxyId,
             __remote_constructor_name,
             __remote_proxy_props: value?.__proxy_props,
+            __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
         }
 
         return ret;
     }
 
-    newProxy(proxyId: string, proxyConstructorName: string, proxyProps: any) {
-        const rpc = new RpcProxy(this, proxyId, proxyConstructorName, proxyProps);
+    newProxy(proxyId: string, proxyConstructorName: string, proxyProps: any, proxyOneWayMethods: string[]) {
+        const rpc = new RpcProxy(this, proxyId, proxyConstructorName, proxyProps, proxyOneWayMethods);
         const wrapped = this.remoteProxyWrapper[proxyConstructorName]?.(rpc) || rpc;
         const target = proxyConstructorName === 'Function' || proxyConstructorName === 'AsyncFunction' ? function () { } : wrapped;
         const proxy = new Proxy(target, wrapped);
@@ -417,7 +433,8 @@ export class RpcPeer {
                         this.createErrorResult(result, e);
                     }
 
-                    this.send(result);
+                    if (!rpcApply.oneway)
+                        this.send(result);
                     break;
                 }
                 case 'result': {
@@ -453,7 +470,7 @@ export class RpcPeer {
             }
         }
         catch (e) {
-            console.error('unhandled rpc error', e);
+            console.error('unhandled rpc error', this.peerName, e);
             return;
         }
     }
