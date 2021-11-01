@@ -27,6 +27,8 @@ import semver from 'semver';
 import { ServiceControl } from './services/service-control';
 import { Alerts } from './services/alerts';
 import { Info } from './services/info';
+import io from 'engine.io';
+import child_process from 'child_process';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -47,6 +49,9 @@ export class ScryptedRuntime {
     devicesLogger = this.logger.getLogger('device', 'Devices');
     wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
+    shellio = io(undefined, {
+        pingTimeout: 120000,
+    });
 
     constructor(datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
         this.datastore = datastore;
@@ -76,6 +81,19 @@ export class ScryptedRuntime {
         app.get('/web/oauth/callback', (req, res) => {
             this.oauthCallback(req, res);
         });
+
+        app.all('/engine.io/shell', (req, res) => {
+            this.shellHandler(req, res);
+        });
+        this.shellio.on('connection', connection => {
+            const cp = child_process.spawn(process.env.SHELL, {
+                stdio: 'pipe',
+            });
+            cp.stdout.on('data', data => connection.send(data));
+            cp.stderr.on('data', data => connection.send(data));
+            connection.on('message', message => cp.stdin.write(message));
+            connection.on('close', () => cp.kill());
+        })
 
         insecure.on('upgrade', (req, socket, upgradeHead) => {
             (req as any).upgradeHead = upgradeHead;
@@ -207,6 +225,33 @@ export class ScryptedRuntime {
 
         const handler = this.getDevice<PushHandler>(pluginDevice._id);
         return handler.onPush(request);
+    }
+
+    async shellHandler(req: Request, res: Response) {
+        const isUpgrade = req.headers.connection?.toLowerCase() === 'upgrade';
+
+        const end = (code: number, message: string) => {
+            if (isUpgrade) {
+                const socket = res.socket;
+                socket.write(`HTTP/1.1 ${code} ${message}\r\n` +
+                    '\r\n');
+                socket.destroy();
+            }
+            else {
+                res.status(code);
+                res.send(message);
+            }
+        };
+
+        if (!res.locals.username) {
+            end(401, 'Not Authorized');
+            return;
+        }
+
+        if ((req as any).upgradeHead)
+            this.shellio.handleUpgrade(req, res.socket, (req as any).upgradeHead)
+        else
+            this.shellio.handleRequest(req, res);
     }
 
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,

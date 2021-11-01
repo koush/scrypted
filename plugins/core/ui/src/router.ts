@@ -9,6 +9,7 @@ import PluginComponent from "./components/plugin/PluginComponent.vue";
 import InstallPlugin from "./components/plugin/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";
 import SettingsComponent from "./components/builtin/SettingsComponent.vue";
+import ShellComponent from "./components/builtin/ShellComponent.vue";
 import Dashboard from "./components/dashboard/Dashboard.vue";
 
 let router = new VueRouter({
@@ -28,6 +29,10 @@ let router = new VueRouter({
       {
         path: "/component/automation",
         component: AutomationComponent
+      },
+      {
+        path: "/component/shell",
+        component: ShellComponent,
       },
       {
         path: "/component/plugin",

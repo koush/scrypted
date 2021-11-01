@@ -118,6 +118,12 @@ export default {
           },
           // { id: "log", name: "Live Log", icon: "list", category: "Utilities" },
           {
+            id: "shell",
+            name: "Terminal",
+            icon: "fa-terminal",
+            category: "Utilities",
+          },
+          {
             id: "settings",
             name: "Settings",
             icon: "fa-cog",

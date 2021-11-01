@@ -96,7 +96,7 @@ module.exports = {
     port: 8081,
     progress: false,
     proxy: {
-      '^/(login|logout|static|endpoint|whitelist|web)': proxyOpts,
+      '^/(login|logout|static|endpoint|whitelist|web|engine.io)': proxyOpts,
     }
   }
 }
