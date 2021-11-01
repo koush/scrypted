@@ -417,7 +417,13 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
         try {
             this.api.eventListener?.removeListener('message', this.listener);
-            await this.api.refreshDevices();
+            if (!await this.api.refreshDevices()) {
+                this.console.log('refresh failed, trying again in 10 seconds.');
+                setTimeout(() => {
+                    this.discoverDevices(0);
+                }, 10000);
+                return;
+            }
             this.api.eventListener?.on('message', this.listener);
             this.api.eventListener?.on('close', async () => {
                 this.console.error('Event Listener closed. Reconnecting in 10 seconds.');
