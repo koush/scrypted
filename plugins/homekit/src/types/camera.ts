@@ -542,7 +542,7 @@ addSupportedType({
                 accessory.addService(sensor);
                 const isPerson = ojs.startsWith('Person: ');
     
-                let contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+                let contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
                 bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.ContactSensorState, (source, details, data) => {
                     if (!source)
                         return contactState;
@@ -552,7 +552,7 @@ addSupportedType({
                         if (!ed.detections)
                             return contactState;
                         const objects = ed.detections.map(d => d.className);
-                        contactState = objects.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
+                        contactState = objects.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED
                         return contactState;
                     }
     
@@ -560,7 +560,7 @@ addSupportedType({
                         return contactState;
     
                     const people = ed.people.map(d => 'Person: ' + d.label);
-                    contactState = people.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_DETECTED : Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+                    contactState = people.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED;
     
                     return contactState;
                 }, true);
