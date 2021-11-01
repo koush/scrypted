@@ -118,8 +118,6 @@ export function getH264EncoderArgs() {
         encoderArgs[name] = [
             '-c:v',
             encoder,
-            '-b:v',
-            '${request.video.max_bit_rate * 10}k',
         ]
     }
     return encoderArgs;

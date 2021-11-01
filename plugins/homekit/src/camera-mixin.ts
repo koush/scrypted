@@ -4,6 +4,11 @@ import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmp
 
 const { log, systemManager, deviceManager } = sdk;
 
+const extraEncoderArgs = [
+    '-b:v',
+    '${request.video.max_bit_rate * 2}k',
+];
+
 export class CameraMixin extends SettingsMixinDeviceBase<any> implements Settings {
     constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
         super(mixinDevice, mixinDeviceState, {
@@ -84,8 +89,8 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         }
 
         if (showTranscodeArgs) {
-            const encoderArgs = getH264EncoderArgs();
             const decoderArgs = getH264DecoderArgs();
+            const encoderArgs = getH264EncoderArgs();
 
             settings.push({
                 title: 'Video Decoder Arguments',
@@ -167,7 +172,10 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
 
         if (key === 'h264EncoderArguments') {
             const encoderArgs = getH264EncoderArgs();
-            const substitute = encoderArgs[value.toString()]?.join(' ');
+            const args = encoderArgs[value.toString()];
+            if (args)
+                args.push(...extraEncoderArgs);
+            const substitute = args?.join(' ');
             value = substitute ? `\`${substitute}\`` : value;
         }
 

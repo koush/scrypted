@@ -36,7 +36,9 @@ export function bindCharacteristic(device: ScryptedDevice, event: ScryptedInterf
     service.getCharacteristic(characteristic).on(CharacteristicEventTypes.GET, callback => {
         try {
             if (device.interfaces.includes(ScryptedInterface.Refresh)) {
-                (device as ScryptedDevice & Refresh).refresh(event, true);
+                // it's not possible to determine if this is user initiated.
+                // homekit seems to aggressively call get...
+                (device as ScryptedDevice & Refresh).refresh(event, false);
             }
             callback(null, map());
         }
