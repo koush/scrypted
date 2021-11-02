@@ -6,6 +6,14 @@ RUN apt-get -y install libavahi-compat-libdnssd-dev build-essential libcairo2-de
 WORKDIR /
 COPY . .
 
+# grab raspbian (omx) ffmpeg, since we don't know at build time whether this is
+# a raspbian system.
+RUN mkdir -p /raspbian && cd /raspbian \
+    && curl -O -L https://github.com/homebridge/ffmpeg-for-homebridge/releases/latest/download/ffmpeg-raspbian-armv6l.tar.gz \
+    && tar -m xzvf ffmpeg-raspbian-armv6l.tar.gz \
+    && rm ffmpeg-raspbian-armv6l.tar.gz
+ENV SCRYPTED_RASPBIAN_FFMPEG_PATH="/raspbian/usr/local/bin/ffmpeg"
+
 WORKDIR /server
 ENV OPENCV4NODEJS_DISABLE_AUTOBUILD=true
 RUN npm install
