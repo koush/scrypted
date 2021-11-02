@@ -457,6 +457,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
 
                 const params: any = {
+                    __filename: undefined,
                     exports,
                     window,
                     require: (name: string) => {

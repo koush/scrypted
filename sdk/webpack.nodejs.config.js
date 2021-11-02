@@ -78,13 +78,6 @@ module.exports = {
         alias: {
             "realfs": path.resolve(__dirname, 'polyfill/realfs'),
             "canvas": path.resolve(__dirname, 'polyfill/canvas'),
-            "@tensorflow/tfjs": path.resolve(__dirname, 'polyfill/tfjs'),
-            "@tensorflow/tfjs-core": path.resolve(__dirname, 'polyfill/tfjs-core'),
-            "@tensorflow/tfjs-core/dist/public/chained_ops/register_all_chained_ops": path.resolve(__dirname, 'polyfill/tfjs-core/dist/public/chained_ops/register_all_chained_ops'),
-            "@tensorflow/tfjs-node": path.resolve(__dirname, 'polyfill/tfjs-node'),
-            "@tensorflow/tfjs-node-gpu": path.resolve(__dirname, 'polyfill/tfjs-node-gpu'),
-            "@tensorflow-models/coco-ssd": path.resolve(__dirname, 'polyfill/coco-ssd'),
-
             wrtc: path.resolve(__dirname, 'polyfill/wrtc'),
             mdns: path.resolve(__dirname, 'polyfill/mdns'),
             serialport: path.resolve(__dirname, 'polyfill/serialport'),

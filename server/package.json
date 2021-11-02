@@ -31,10 +31,6 @@
     "ws": "^8.2.3"
   },
   "optionalDependencies": {
-    "@tensorflow-models/coco-ssd": "^2.2.2",
-    "@tensorflow/tfjs": "^3.9.0",
-    "@tensorflow/tfjs-core": "^3.9.0",
-    "@tensorflow/tfjs-node-gpu": "^3.9.0",
     "canvas": "^2.8.0",
     "ffmpeg-for-homebridge": "^0.0.9",
     "mdns": "^2.7.2",

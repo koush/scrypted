@@ -93,7 +93,7 @@ else {
     app.use(bodyParser.json())
 
     // parse some custom thing into a Buffer
-    app.use(bodyParser.raw({ type: 'application/zip', limit: 20000000 }) as any)
+    app.use(bodyParser.raw({ type: 'application/zip', limit: 100000000 }) as any)
 
     async function createCertificate(options: pem.CertificateCreationOptions): Promise<pem.CertificateCreationResult> {
         return new Promise((resolve, reject) => {
