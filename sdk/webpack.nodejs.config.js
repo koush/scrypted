@@ -90,7 +90,6 @@ module.exports = {
             serialport: path.resolve(__dirname, 'polyfill/serialport'),
             'zwave-js': path.resolve(__dirname, 'polyfill/zwave-js'),
             typescript: path.resolve(__dirname, 'polyfill/typescript'),
-            '@koush/opencv4nodejs': path.resolve(__dirname, 'polyfill/opencv4nodejs'),
         },
 
         extensions: ['.tsx', '.ts', '.js']

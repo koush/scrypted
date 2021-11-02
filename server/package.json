@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.49",
+  "version": "0.0.50",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.5",
@@ -31,7 +31,6 @@
     "ws": "^8.2.3"
   },
   "optionalDependencies": {
-    "@koush/opencv4nodejs": "^5.6.7",
     "@tensorflow-models/coco-ssd": "^2.2.2",
     "@tensorflow/tfjs": "^3.9.0",
     "@tensorflow/tfjs-core": "^3.9.0",
@@ -70,7 +69,6 @@
     "ts-serve": "ts-node --expose-gc src/scrypted-main.ts",
     "prebuild": "rimraf dist",
     "build": "tsc --outDir dist",
-    "build-opencv": "cd node_modules/@koush/opencv4nodejs && npm run build",
     "postbuild": "node test/check-build-output.js",
     "prepublishOnly": "npm run build"
   },
