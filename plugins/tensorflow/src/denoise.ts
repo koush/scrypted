@@ -1,7 +1,7 @@
 import { Tensor3D } from "@tensorflow/tfjs-core";
 
 export interface DetectionInput {
-    buffer?: Buffer;
+    jpegBuffer?: Buffer;
     input: Tensor3D;
 }
 

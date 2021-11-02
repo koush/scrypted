@@ -42,11 +42,10 @@
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@tensorflow-models/coco-ssd": "^2.2.2",
-      "@tensorflow/tfjs-node": "^3.9.0",
-      "@tensorflow/tfjs-node-gpu": "^3.9.0",
+      "@tensorflow/tfjs": "^3.11.0",
+      "@tensorflow/tfjs-backend-wasm": "^3.11.0",
       "canvas": "^2.8.0",
       "face-api.js": "file:./face-api.js",
-      "google-protobuf": "^3.18.1",
       "jpeg-js": "^0.4.3",
       "lodash": "^4.17.21"
    },

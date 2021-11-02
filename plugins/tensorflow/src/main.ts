@@ -2,12 +2,12 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import * as tf from '@tensorflow/tfjs-node-gpu';
-import type { DetectedObject } from '@tensorflow-models/coco-ssd'
+import * as tf from '@tensorflow/tfjs-core';
+import { ENV, tensor3d } from '@tensorflow/tfjs-core';
+import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 import * as coco from '@tensorflow-models/coco-ssd';
 import path from 'path';
 import fetch from 'node-fetch';
-import { ENV, rfft, string, Tensor, tensor, Tensor3D, tensor3d, Tensor4D } from '@tensorflow/tfjs-core';
 import * as faceapi from 'face-api.js';
 import { FaceDetection, FaceMatcher, LabeledFaceDescriptors } from 'face-api.js';
 import canvas, { createCanvas } from 'canvas';
@@ -21,6 +21,12 @@ import { FFMpegRebroadcastSession, startRebroadcastSession } from '../../../comm
 import { createRawVideoParser, PIXEL_FORMAT_RGB24, StreamChunk } from '@scrypted/common/src/stream-parser';
 import { once } from 'events';
 import { DenoisedDetectionEntry, denoiseDetections, DetectionInput } from './denoise';
+import { decodeJpeg, encodeJpeg } from './jpeg';
+import fs from 'fs';
+import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
+import { Server } from 'http';
+
+const DISPOSE_TIMEOUT = 10000;
 
 // do not delete this, it makes sure tf is initialized.
 console.log(tf.getBackend());
@@ -35,14 +41,47 @@ function observeLoadError(promise: Promise<any>) {
   promise.catch(e => console.error('load error', e));
 }
 
-const ssdPromise = coco.load();
-observeLoadError(ssdPromise);
-const fdnPromise = faceapi.nets.ssdMobilenetv1.loadFromDisk('./');
-observeLoadError(fdnPromise);
-const flnPromise = faceapi.nets.faceLandmark68Net.loadFromDisk('./');
-observeLoadError(flnPromise);
-const frnPromise = faceapi.nets.faceRecognitionNet.loadFromDisk('./');
-observeLoadError(frnPromise);
+const ssdPromise = (async () => {
+  setWasmPaths('wasm/')
+
+  await tf.setBackend('wasm');
+  const fdnPromise = faceapi.nets.ssdMobilenetv1.loadFromDisk('./');
+  observeLoadError(fdnPromise);
+  const flnPromise = faceapi.nets.faceLandmark68Net.loadFromDisk('./');
+  observeLoadError(flnPromise);
+  const frnPromise = faceapi.nets.faceRecognitionNet.loadFromDisk('./');
+  observeLoadError(frnPromise);
+
+  const server = new Server();
+  server.on('request', async (req, res) => {
+    try {
+      const check = path.join(process.env.SCRYPTED_PLUGIN_VOLUME, req.url);
+      const realfs = require('realfs');
+      let buffer: Buffer;
+      if (realfs.existsSync(check)) {
+        buffer = realfs.readFileSync(check);
+      }
+      else {
+        const url = 'https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2' + req.url;
+        const response = await fetch(url);
+        buffer = await response.buffer();
+        realfs.writeFileSync(check, buffer);
+      }
+      res.write(buffer);
+      res.end();
+    }
+    catch (e) {
+      res.statusCode = 404;
+      res.write('');
+      res.end();
+    }
+  });
+  const port = await listenZeroCluster(server);
+
+  return coco.load({
+    modelUrl: `http://127.0.0.1:${port}/model.json`,
+  });
+})();
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
@@ -153,13 +192,17 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
   throttledObjectDetect = throttle(
     async (detectionInput: DetectionInput) => {
-      this.objectDetect(detectionInput);
+      const ret = this.objectDetect(detectionInput);
+      ret.catch(e => this.console.error('object detect error', e));
+      return ret;
     },
     1000);
 
   throttledFaceDetect = throttle(
     async (detectionInput: DetectionInput) => {
-      this.faceDetect(detectionInput);
+      const ret = this.faceDetect(detectionInput);
+      ret.catch(e => this.console.error('face detect error', e));
+      return ret;
     },
     1000);
 
@@ -179,9 +222,12 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
           }
         })
 
-        this.rebroadcaster.then(session => session.events.on('killed', () => {
-          this.rebroadcaster = undefined;
-        }))
+        this.rebroadcaster.then(session => {
+          session.events.on('killed', () => {
+            this.rebroadcaster = undefined;
+          })
+          session.events.on('error', e => this.console.log('ffmpeg error', e))
+        })
       }
     }
 
@@ -195,17 +241,16 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     const args = await once(session.events, 'rawvideo-data');
     const chunk: StreamChunk = args[0];
 
-    const buffer = undefined;
     const input = tensor3d(Buffer.concat(chunk.chunks), [
       session.ffmpegInputs.rawvideo.mediaStreamOptions.video.height,
       session.ffmpegInputs.rawvideo.mediaStreamOptions.video.width,
       3,
     ]);
 
-    setTimeout(() => input.dispose(), 30000);
+    setTimeout(() => input.dispose(), DISPOSE_TIMEOUT);
     return {
-      buffer, input,
-    }
+      jpegBuffer: undefined, input,
+    } as DetectionInput
   }, 500);
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, public tensorFlow: TensorFlow) {
@@ -233,7 +278,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       // on motion, watch what happens for 10 seconds.
       // new objects being found will trigger a longer observation.
       for (let i = 0; i < 10; i++) {
-        this.throttledObjectDetect(detectionInput);
+        await this.throttledObjectDetect(detectionInput);
         await sleep(1000);
         detectionInput = undefined;
       }
@@ -249,14 +294,14 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       if (!person)
         return;
 
-      let video = await this.realDevice.getDetectionInput(detection.detectionId);
       let detectionInput = this.detections.get(detection.detectionId);
       if (!detectionInput) {
+        let video = await this.realDevice.getDetectionInput(detection.detectionId);
         const buffer = video ? await mediaManager.convertMediaObjectToBuffer(video, 'image/jpeg') : undefined;
         if (buffer) {
-          const input = tf.node.decodeJpeg(buffer, 3);
+          const input = decodeJpeg(buffer, 3);
           detectionInput = {
-            input, buffer,
+            input, jpegBuffer: buffer,
           }
         }
       }
@@ -264,7 +309,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       // on object detection, watch what happens for 10 seconds.
       // new people being found will trigger a longer observation.
       for (let i = 0; i < 10; i++) {
-        this.throttledFaceDetect(detectionInput);
+        await this.throttledFaceDetect(detectionInput);
         await sleep(1000);
         detectionInput?.input?.dispose();
         detectionInput = undefined;
@@ -284,14 +329,14 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     }
 
     if (detectionInput)
-      this.detections.set(detectionId, detectionInput);
+      this.setDetection(detectionId, detectionInput);
 
     this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
 
   async extendedObjectDetect() {
     for (let i = 0; i < 60; i++) {
-      this.throttledObjectDetect(undefined);
+      await this.throttledObjectDetect(undefined);
       await sleep(1000);
     }
   }
@@ -304,7 +349,8 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     const { input } = detectionInput;
 
     const ssd = await ssdPromise;
-    const detections: DetectedObject[] = await ssd.detect(input);
+    const detections = await ssd.detect(input);
+    // this.console.log('memory', tf.memory());
 
     const found: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
     denoiseDetections<ObjectDetectionResult>(this.currentDetections, detections.map(detection => ({
@@ -329,6 +375,14 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     this.reportObjectDetections(detectionInput);
   }
 
+  setDetection(detectionId: string, detectionInput: DetectionInput) {
+    this.detections.set(detectionId, detectionInput);
+    setTimeout(() => {
+      this.detections.delete(detectionId);
+      detectionInput?.input?.dispose();
+    }, DISPOSE_TIMEOUT);
+  }
+
   reportPeopleDetections(faces?: ObjectDetectionResult[], detectionInput?: DetectionInput) {
     const detectionId = Math.random().toString();
     const detection: ObjectDetection = {
@@ -342,14 +396,14 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
     }
 
     if (detectionInput)
-      this.detections.set(detectionId, detectionInput);
+      this.setDetection(detectionId, detectionInput);
 
     this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
 
   async extendedFaceDetect() {
     for (let i = 0; i < 60; i++) {
-      this.throttledFaceDetect(undefined);
+      await this.throttledFaceDetect(undefined);
       await sleep(1000);
     }
   }
@@ -445,9 +499,9 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
           continue;
 
         if (!fullPromise) {
-          const buffer = detectionInput.buffer || Buffer.from(await tf.node.encodeJpeg(input));
-          if (!detectionInput.buffer)
-            detectionInput.buffer = buffer;
+          const buffer = detectionInput.jpegBuffer || Buffer.from(await encodeJpeg(input));
+          if (!detectionInput.jpegBuffer)
+            detectionInput.jpegBuffer = buffer;
           fullPromise = canvas.loadImage(buffer);
         }
 
@@ -547,10 +601,10 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
         return this.mixinDevice.getDetectionInput(detectionId);
       return;
     }
-    if (!detection.buffer) {
-      detection.buffer = Buffer.from(await tf.node.encodeJpeg(detection.input));
+    if (!detection.jpegBuffer) {
+      detection.jpegBuffer = Buffer.from(await encodeJpeg(detection.input));
     }
-    return mediaManager.createMediaObject(detection.buffer, 'image/jpeg');
+    return mediaManager.createMediaObject(detection.jpegBuffer, 'image/jpeg');
   }
 
   async getMixinSettings(): Promise<Setting[]> {
