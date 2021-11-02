@@ -22,7 +22,10 @@ module.exports = {
         },
 
         // export everything to a var "window" which will be an alias for "exports" in Scrypted
-        libraryTarget: "window",
+        library: {
+            name: 'exports',
+            type: 'assign-properties',
+          },
     },
     module: {
         rules: [
