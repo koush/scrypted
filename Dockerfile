@@ -10,7 +10,7 @@ COPY . .
 # a raspbian system.
 RUN mkdir -p /raspbian && cd /raspbian \
     && curl -O -L https://github.com/homebridge/ffmpeg-for-homebridge/releases/latest/download/ffmpeg-raspbian-armv6l.tar.gz \
-    && tar -m xzvf ffmpeg-raspbian-armv6l.tar.gz \
+    && tar xzvfm ffmpeg-raspbian-armv6l.tar.gz \
     && rm ffmpeg-raspbian-armv6l.tar.gz
 ENV SCRYPTED_RASPBIAN_FFMPEG_PATH="/raspbian/usr/local/bin/ffmpeg"
 
