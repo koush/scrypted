@@ -1,15 +1,17 @@
-
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, MotionSensor } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, MotionSensor } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { Server } from 'net';
-import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
-import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk, createRawVideoParser } from '@scrypted/common/src/stream-parser';
+import { StreamChunk, createRawVideoParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import cv, { Mat, Size } from "@koush/opencv4nodejs";
+
+// necessary for opencv wasm to not crap itself due to webpack.
+global.__filename = undefined;
+// todo: remove this.
+window = undefined;
+// import { cv }  from 'opencv-wasm';
+const { cv } =  require('./opencv');
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -140,7 +142,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
   }
 
   async startWrapped(session: FFMpegRebroadcastSession) {
-    let previousFrame: Mat;
+    let previousFrame: any;
     let timeout: NodeJS.Timeout;
 
     const triggerMotion = () => {
@@ -163,25 +165,43 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
       const chunk: StreamChunk = args[0];
       // should be one chunk from the parser, but let's not assume that.
       const raw = chunk.chunks.length === 1 ? chunk.chunks[0] : Buffer.concat(chunk.chunks);
-      const mat = new Mat(raw, chunk.height * 3 / 2, chunk.width, cv.CV_8U);
+      const mat = new cv.Mat(chunk.height * 3 / 2, chunk.width, cv.CV_8U);
+      mat.data.set(raw);
 
-      const gray = await mat.cvtColorAsync(cv.COLOR_YUV420p2GRAY);
-      const curFrame = await gray.gaussianBlurAsync(new Size(21, 21), 0);
+      const gray = new cv.Mat();
+      cv.cvtColor(mat, gray, cv.COLOR_YUV420p2GRAY);
+      const curFrame = new cv.Mat();
+      cv.GaussianBlur(gray, curFrame, new cv.Size(21, 21), 0);
 
       try {
         if (!previousFrame) {
           continue;
         }
 
-        const frameDelta = previousFrame.absdiff(curFrame);
-        const thresh = await frameDelta.thresholdAsync(this.threshold, 255, cv.THRESH_BINARY);
-        const dilated = await thresh.dilateAsync(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(4, 4)), new cv.Point2(-1, -1), 2)
-        const contours = await dilated.findContoursAsync(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-        const filteredContours = contours.filter(cnt => cnt.area > this.area).map(cnt => cnt.area);
+        const frameDelta = new cv.Mat();
+        cv.absdiff(previousFrame, curFrame, frameDelta);
+        const thresh = new cv.Mat();
+        cv.threshold(frameDelta, thresh, this.threshold, 255, cv.THRESH_BINARY);
+        const dilated = new cv.Mat();
+        cv.dilate(thresh, dilated, cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(4, 4)), new cv.Point(-1, -1), 2);
+        const contours = new cv.MatVector();
+        const hierarchy = new cv.Mat();
+        cv.findContours(dilated, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        const filteredContours: number[] = [];
+        for (let i = 0; i < contours.size(); i++) {
+          const contourArea = cv.contourArea(contours.get(i));
+          if (contourArea > this.area) {
+            filteredContours.push(contourArea);
+          }
+        }
         if (filteredContours.length) {
           this.console.log('motion triggered by area(s)', filteredContours.join(','));
           triggerMotion();
         }
+      }
+      catch (e) {
+        this.console.log('cv error', e);
+        throw e;
       }
       finally {
         previousFrame = curFrame;
