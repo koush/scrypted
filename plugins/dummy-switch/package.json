@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/dummy-switch",
-   "description": "Scrypted Dummy Switch plugin. Create virtual switches in HomeKit that run scripts, trigger motion, and press buttons when toggled.",
+   "description": "Scrypted Dummy Switch plugin. Create virtual switches, locks, and start/stops that run scripts, trigger motion, and press buttons when toggled.",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -35,5 +35,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.7"
+   "version": "0.0.8"
 }

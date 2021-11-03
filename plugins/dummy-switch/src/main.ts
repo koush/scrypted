@@ -1,11 +1,11 @@
-import { BinarySensor, DeviceProvider, MotionSensor, OnOff, Scriptable, ScriptSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import { BinarySensor, DeviceProvider, Lock, LockState, MotionSensor, OnOff, Scriptable, ScriptSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { createMonacoEvalDefaults, scryptedEval } from '../../../common/src/scrypted-eval';
 import child_process from 'child_process';
 
 const { log, deviceManager } = sdk;
 
-class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, MotionSensor, BinarySensor, Settings {
+class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, Scriptable, MotionSensor, BinarySensor, Settings {
     language: string;
     timeout: NodeJS.Timeout;
 
@@ -20,6 +20,19 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, Motio
         this.motionDetected = this.motionDetected || false;
         this.binaryState = this.binaryState || false;
         this.on = this.on || false;
+    }
+
+    lock(): Promise<void> {
+        return this.turnOff();
+    }
+    unlock(): Promise<void> {
+        return this.turnOn();
+    }
+    start(): Promise<void> {
+        return this.turnOn();
+    }
+    stop(): Promise<void> {
+        return this.turnOff();
     }
     async getSettings(): Promise<Setting[]> {
         return [
@@ -45,9 +58,15 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, Motio
         catch (e) {
         }
     }
+    // note that turnOff locks the lock
+    // this is because, the turnOff should put everything into a "safe"
+    // state that does not get attention in the UI.
+    // devices that are on, running, or unlocked are generally highlighted.
     async turnOff(): Promise<void> {
         clearTimeout(this.timeout);
         this.on = false;
+        this.lockState = LockState.Locked;
+        this.running = false;
         this.motionDetected = false;
         this.binaryState = false;
         this.evalSource();
@@ -55,6 +74,8 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, Motio
     async turnOn(): Promise<void> {
         clearTimeout(this.timeout);
         this.on = true;
+        this.lockState = LockState.Unlocked;
+        this.running = true;
         this.motionDetected = true;
         this.binaryState = true;
 
@@ -107,7 +128,7 @@ class DummySwitch extends ScryptedDeviceBase implements OnOff, Scriptable, Motio
     }
 }
 
-class DummySwitchProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
+class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
     devices = new Map<string, any>();
 
     constructor(nativeId?: string) {
@@ -123,12 +144,12 @@ class DummySwitchProvider extends ScryptedDeviceBase implements DeviceProvider, 
         return [
             {
                 key: 'shell:',
-                title: 'Add Switch (Shell Script)',
+                title: 'Add Dummy Device (Shell Script)',
                 placeholder: 'Switch Name',
             },
             {
                 key: 'typescript:',
-                title: 'Add Switch (Typescript)',
+                title: 'Add Dummy Device (Typescript)',
                 placeholder: 'Switch Name',
             },
         ]
@@ -144,6 +165,8 @@ class DummySwitchProvider extends ScryptedDeviceBase implements DeviceProvider, 
             name,
             interfaces: [
                 ScryptedInterface.OnOff,
+                ScryptedInterface.StartStop,
+                ScryptedInterface.Lock,
                 ScryptedInterface.Scriptable,
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.BinarySensor,
@@ -153,7 +176,7 @@ class DummySwitchProvider extends ScryptedDeviceBase implements DeviceProvider, 
         });
 
 
-        var text = `New Switch ${name} ready. Check the notification area to complete setup.`;
+        var text = `New Dummy Device ${name} ready. Check the notification area to complete setup.`;
         log.a(text);
         log.clearAlert(text);
     }
@@ -164,7 +187,7 @@ class DummySwitchProvider extends ScryptedDeviceBase implements DeviceProvider, 
     getDevice(nativeId: string) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
-            ret = new DummySwitch(nativeId);
+            ret = new DummyDevice(nativeId);
             if (ret)
                 this.devices.set(nativeId, ret);
         }
@@ -172,4 +195,4 @@ class DummySwitchProvider extends ScryptedDeviceBase implements DeviceProvider, 
     }
 }
 
-export default new DummySwitchProvider();
+export default new DummyDeviceProvider();
