@@ -1,6 +1,4 @@
 import os from 'os';
-import fs from 'fs';
-import { CodeActionCommand } from 'typescript';
 
 const PI_MODEL_NO = [
     // https://www.raspberrypi.org/documentation/hardware/raspberrypi/
