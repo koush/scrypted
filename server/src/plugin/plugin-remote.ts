@@ -272,13 +272,8 @@ interface WebSocketCallbacks {
 
 export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string): Promise<PluginRemote> {
     peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
-
-    const ret = await peer.eval('return getRemote(api, pluginId)', undefined, {
-        api,
-        pluginId,
-    }, true) as PluginRemote;
-
-    return ret;
+    const getRemote = await peer.getParam('getRemote');
+    return getRemote(api, pluginId);
 }
 
 export interface PluginRemoteAttachOptions {
@@ -326,7 +321,8 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
         const localStorage = new StorageImpl(deviceManager, undefined);
 
-        const remote: PluginRemote = {
+        const remote: PluginRemote & { __proxy_required: boolean } = {
+            __proxy_required: true,
             __proxy_oneway_methods: [
                 'notify',
                 'updateDescriptor',

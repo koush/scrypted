@@ -12,12 +12,9 @@ export interface RpcMessage {
     type: string;
 }
 
-interface RpcEval extends RpcMessage {
+interface RpcParam extends RpcMessage {
     id: string;
-    script: string;
-    filename: string;
-    params: { [name: string]: any };
-    requireProxy: boolean;
+    param: string;
 }
 
 interface RpcApply extends RpcMessage {
@@ -127,13 +124,13 @@ class RpcProxy implements ProxyHandler<any> {
 
         if (this.proxyOneWayMethods?.includes?.(method)) {
             rpcApply.oneway = true;
-            this.peer.send(rpcApply, e => new RPCResultError(e.message, e));
+            this.peer.send(rpcApply);
             return Promise.resolve();
         }
 
-        return this.peer.createPendingResult(id => {
+        return this.peer.createPendingResult((id, reject) => {
             rpcApply.id = id;
-            this.peer.send(rpcApply, e => new RPCResultError(e.message, e));
+            this.peer.send(rpcApply, reject);
         })
     }
 }
@@ -186,7 +183,6 @@ export class RpcPeer {
     localProxied = new Map<any, string>();
     localProxyMap: { [id: string]: any } = {};
     remoteWeakProxies: { [id: string]: WeakRef<any> } = {};
-    remoteProxyWrapper: { [constructorName: string]: (proxy: any) => any } = {};
     finalizers = new FinalizationRegistry(id => this.finalize(id as string));
     nameDeserializerMap = new Map<string, RpcSerializer>();
     constructorSerializerMap = new Map<string, string>();
@@ -194,7 +190,7 @@ export class RpcPeer {
     constructor(public send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
     }
 
-    createPendingResult(cb: (id: string) => void): Promise<any> {
+    createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
         if (Object.isFrozen(this.pendingResults))
             return Promise.reject(new RPCResultError('RpcPeer has been killed'));
 
@@ -202,7 +198,7 @@ export class RpcPeer {
             const id = (this.idCounter++).toString();
             this.pendingResults[id] = { resolve, reject };
 
-            cb(id);
+            cb(id, e => reject(new RPCResultError(e.message, e)));
         });
 
         // todo: make this an option so rpc doesn't nuke the process if uncaught?
@@ -237,23 +233,15 @@ export class RpcPeer {
         this.send(rpcFinalize);
     }
 
-    eval(script: string, filename?: string, params?: { [name: string]: any }, requireProxy?: boolean): Promise<any> {
-        return this.createPendingResult(id => {
-            const coercedParams: { [name: string]: any } = {};
-            for (const key of Object.keys(params || {})) {
-                coercedParams[key] = this.serialize(params[key]);
-            }
-
-            const evalMessage: RpcEval = {
-                type: 'eval',
+    async getParam(param: string) {
+        return this.createPendingResult((id, reject) => {
+            const paramMessage: RpcParam = {
                 id,
-                script,
-                filename,
-                params: coercedParams,
-                requireProxy,
+                type: 'param',
+                param,
             };
 
-            this.send(evalMessage, e => new RPCResultError(e.message, e));
+            this.send(paramMessage, reject);
         });
     }
 
@@ -291,7 +279,7 @@ export class RpcPeer {
         if (__local_proxy_id) {
             const ret = this.localProxyMap[__local_proxy_id];
             if (!ret)
-                throw new Error(`invalid local proxy id ${__local_proxy_id}`);
+                throw new RPCResultError(`invalid local proxy id ${__local_proxy_id}`);
             return ret;
         }
 
@@ -302,8 +290,8 @@ export class RpcPeer {
         return value;
     }
 
-    serialize(value: any, requireProxy?: boolean): any {
-        if (!value || (!requireProxy && jsonSerializable.has(value.constructor?.name))) {
+    serialize(value: any): any {
+        if (!value || (!value.__proxy_required && jsonSerializable.has(value.constructor?.name))) {
             return value;
         }
 
@@ -333,7 +321,7 @@ export class RpcPeer {
             __remote_constructor_name = serializerMapName;
             const serializer = this.nameDeserializerMap.get(serializerMapName);
             const serialized = serializer.serialize(value);
-            if (!serialized || (!requireProxy && jsonSerializable.has(serialized.constructor?.name))) {
+            if (!serialized || (!value.__proxy_required && jsonSerializable.has(serialized.constructor?.name))) {
                 const ret: RpcRemoteProxyValue = {
                     __remote_proxy_id: undefined,
                     __remote_constructor_name,
@@ -361,9 +349,8 @@ export class RpcPeer {
 
     newProxy(proxyId: string, proxyConstructorName: string, proxyProps: any, proxyOneWayMethods: string[]) {
         const rpc = new RpcProxy(this, proxyId, proxyConstructorName, proxyProps, proxyOneWayMethods);
-        const wrapped = this.remoteProxyWrapper[proxyConstructorName]?.(rpc) || rpc;
-        const target = proxyConstructorName === 'Function' || proxyConstructorName === 'AsyncFunction' ? function () { } : wrapped;
-        const proxy = new Proxy(target, wrapped);
+        const target = proxyConstructorName === 'Function' || proxyConstructorName === 'AsyncFunction' ? function () { } : rpc;
+        const proxy = new Proxy(target, rpc);
         const weakref = new WeakRef(proxy);
         this.remoteWeakProxies[proxyId] = weakref;
         this.finalizers.register(rpc, proxyId);
@@ -374,26 +361,13 @@ export class RpcPeer {
     async handleMessage(message: RpcMessage) {
         try {
             switch (message.type) {
-                case 'eval': {
-                    const rpcEval = message as RpcEval;
+                case 'param': {
+                    const rpcParam = message as RpcParam;
                     const result: RpcResult = {
                         type: 'result',
-                        id: rpcEval.id,
+                        id: rpcParam.id,
+                        result: this.serialize(this.params[rpcParam.param])
                     };
-                    try {
-                        const coercedParams: { [name: string]: any } = {};
-                        for (const key of Object.keys(rpcEval.params || {})) {
-                            coercedParams[key] = this.deserialize(rpcEval.params[key]);
-                        }
-                        const params = Object.assign({}, this.params, coercedParams);
-                        const value = await this.evalLocal(rpcEval.script, rpcEval.filename, params);
-
-                        result.result = this.serialize(value, rpcEval.requireProxy);
-                    }
-                    catch (e) {
-                        this.createErrorResult(result, e);
-                    }
-
                     this.send(result);
                     break;
                 }
@@ -414,7 +388,6 @@ export class RpcPeer {
                             args.push(this.deserialize(arg));
                         }
 
-                        // const value = rpcApply.method ? await target[rpcApply.method](...args) : await target(...args);
                         let value: any;
                         if (rpcApply.method) {
                             const method = target[rpcApply.method];
