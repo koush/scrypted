@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/rpc.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
         },
         {
             "type": "pwa-node",

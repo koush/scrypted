@@ -25,6 +25,7 @@ import httpAuth from 'http-auth';
 import semver from 'semver';
 import { Info } from './services/info';
 import { getAddresses } from './addresses';
+import { sleep } from './sleep';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -64,23 +65,41 @@ else {
 
     let workerInspectPort: number = undefined;
 
-    const debugServer = net.createServer(socket => {
+    async function doconnect(): Promise<net.Socket> {
+        return new Promise((resolve, reject) => {
+            const target = net.connect(workerInspectPort);
+            target.once('error', reject)
+            target.once('connect', () => resolve(target))
+        })
+    }
+
+    const debugServer = net.createServer(async (socket) => {
         if (!workerInspectPort) {
             socket.destroy();
             return;
         }
 
-        const target = net.connect(workerInspectPort);
-        socket.pipe(target).pipe(socket);
-        socket.on('error', () => {
-            socket.destroy();
-            target.destroy();
-        });
-        target.on('error', e => {
-            console.error('debugger target error', e);
-            socket.destroy();
-            target.destroy();
-        });
+        for (let i = 0; i < 10; i++) {
+            try {
+                const target = await doconnect();
+                socket.pipe(target).pipe(socket);
+                socket.on('error', () => {
+                    socket.destroy();
+                    target.destroy();
+                });
+                target.on('error', e => {
+                    console.error('debugger target error', e);
+                    socket.destroy();
+                    target.destroy();
+                });
+                return;
+            }
+            catch (e) {
+                await sleep(500);
+            }
+        }
+        console.warn('debugger connect timed out');
+        socket.destroy();
     })
     listenServerPort('SCRYPTED_DEBUG_PORT', SCRYPTED_DEBUG_PORT, debugServer);
 

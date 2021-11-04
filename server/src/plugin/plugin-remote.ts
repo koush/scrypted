@@ -4,7 +4,7 @@ import path from 'path';
 import { ScryptedNativeId, DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
 import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { SystemManagerImpl } from './system';
-import { RpcPeer } from '../rpc';
+import { RpcPeer, RPCResultError } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { EventEmitter } from 'events';
 import { createWebSocketClass } from './plugin-remote-websocket';
@@ -271,9 +271,14 @@ interface WebSocketCallbacks {
 
 
 export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string): Promise<PluginRemote> {
-    peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
-    const getRemote = await peer.getParam('getRemote');
-    return getRemote(api, pluginId);
+    try {
+        peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
+        const getRemote = await peer.getParam('getRemote');
+        return await getRemote(api, pluginId);
+    }
+    catch (e) {
+        throw new RPCResultError('error while retrieving PluginRemote', e);
+    }
 }
 
 export interface PluginRemoteAttachOptions {
@@ -325,7 +330,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             __proxy_required: true,
             __proxy_oneway_methods: [
                 'notify',
-                'updateDescriptor',
+                'updateDeviceState',
                 'setSystemState',
                 'ioEvent',
                 'setNativeId',
@@ -367,7 +372,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 }
             },
 
-            async updateDescriptor(id: string, state: { [property: string]: SystemDeviceState }) {
+            async updateDeviceState(id: string, state: { [property: string]: SystemDeviceState }) {
                 if (!state) {
                     delete systemManager.state[id];
                     systemManager.events.notify(id, Date.now(), ScryptedInterface.ScryptedDevice, ScryptedInterfaceProperty.id, id, true);

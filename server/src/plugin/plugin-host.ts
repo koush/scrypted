@@ -24,6 +24,8 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import net from 'net'
 import child_process from 'child_process';
 import { PluginDebug } from './plugin-debug';
+import readline from 'readline';
+import { Readable, Writable } from 'stream';
 
 export class PluginHost {
     worker: child_process.ChildProcess;
@@ -88,44 +90,16 @@ export class PluginHost {
         this.packageJson = plugin.packageJson;
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(plugin._id));
 
-        if (true) {
-            const cwd = path.join(process.cwd(), 'volume', 'plugins', this.pluginId);
-            try {
-                mkdirp.sync(cwd);
-            }
-            catch (e) {
-            }
-
-            this.startPluginClusterHost(logger, {
-                SCRYPTED_PLUGIN_VOLUME: cwd,
-            });
+        const cwd = path.join(process.cwd(), 'volume', 'plugins', this.pluginId);
+        try {
+            mkdirp.sync(cwd);
         }
-        else {
-            const remote = new RpcPeer((message, reject) => {
-                try {
-                    this.peer.handleMessage(message);
-                }
-                catch (e) {
-                    if (reject && reject)
-                        reject(e);
-                }
-            });
-
-            this.peer = new RpcPeer((message, reject) => {
-                try {
-                    remote.handleMessage(message);
-                }
-                catch (e) {
-                    if (reject)
-                        reject(e);
-                }
-            });
-
-            attachPluginRemote(remote, {
-                createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager, console),
-            });
+        catch (e) {
         }
 
+        this.startPluginClusterHost(logger, {
+            SCRYPTED_PLUGIN_VOLUME: cwd,
+        }, plugin.packageJson.scrypted.runtime);
 
         this.io.on('connection', async (socket) => {
             try {
@@ -219,23 +193,82 @@ export class PluginHost {
         });
     }
 
-    startPluginClusterHost(logger: Logger, env?: any) {
-        const execArgv: string[] = process.execArgv.slice();
-        if (this.pluginDebug) {
-            execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
+    startPluginClusterHost(logger: Logger, env?: any, runtime?: string) {
+        let connected = true;
+
+        if (runtime === 'python') {
+            const args: string[] = [];
+            if (this.pluginDebug) {
+                args.push(
+                    '-m',
+                    'debugpy',
+                    '--listen',
+                    `0.0.0.0:${this.pluginDebug.inspectPort}`,
+                    '--wait-for-client',
+                    path.join(__dirname, '../../python', 'plugin-remote.py'),
+                )
+            }
+
+            this.worker = child_process.spawn('python', args, {
+                // stdin, stdout, stderr, peer in, peer out
+                stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+            });
+
+            const peerin = this.worker.stdio[3] as Writable;
+            const peerout = this.worker.stdio[4] as Readable;
+            peerout.on('data', data => {
+                console.log(data.toString());
+            })
+
+            this.peer = new RpcPeer((message, reject) => {
+                if (connected) {
+                    peerin.write(JSON.stringify(message) + '\n', e => e && reject?.(e));
+                }
+                else if (reject) {
+                    reject(new Error('peer disconnected'));
+                }
+            });
+
+            const readInterface = readline.createInterface({
+                input: peerout,
+                terminal: false,
+            });
+            readInterface.on('line', line => {
+                this.peer.handleMessage(JSON.parse(line));
+            });
         }
-        this.worker = child_process.fork(require.main.filename, ['child', JSON.stringify(env)], {
-            stdio: 'pipe',
-            serialization: 'advanced',
-            execArgv,
-        });
+        else {
+            const execArgv: string[] = process.execArgv.slice();
+            if (this.pluginDebug) {
+                execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
+            }
+
+            this.worker = child_process.fork(require.main.filename, ['child', JSON.stringify(env)], {
+                stdio: 'pipe',
+                serialization: 'advanced',
+                execArgv,
+            });
+
+            this.peer = new RpcPeer((message, reject) => {
+                if (connected) {
+                    this.worker.send(message, undefined, e => {
+                        if (e && reject)
+                            reject(e);
+                    });
+                }
+                else if (reject) {
+                    reject(new Error('peer disconnected'));
+                }
+            });
+
+            this.worker.on('message', message => this.peer.handleMessage(message as any));
+        }
 
         this.worker.stdout.on('data', data => {
             process.stdout.write(data);
         });
         this.worker.stderr.on('data', data => process.stderr.write(data));
 
-        let connected = true;
         this.worker.on('disconnect', () => {
             connected = false;
             logger.log('e', `${this.pluginName} disconnected`);
@@ -248,19 +281,7 @@ export class PluginHost {
             connected = false;
             logger.log('e', `${this.pluginName} error ${e}`);
         });
-        this.worker.on('message', message => this.peer.handleMessage(message as any));
 
-        this.peer = new RpcPeer((message, reject) => {
-            if (connected) {
-                this.worker.send(message, undefined, e => {
-                    if (e && reject)
-                        reject(e);
-                });
-            }
-            else if (reject) {
-                reject(new Error('peer disconnected'));
-            }
-        });
         this.peer.peerName = this.pluginId;
 
         this.peer.onOob = (oob: any) => {
@@ -519,7 +540,7 @@ export function startPluginClusterWorker() {
                     // deleted?
                     return;
                 }
-                const {pluginId, nativeId: mixinNativeId} = await plugins.getDeviceInfo(mixinId);
+                const { pluginId, nativeId: mixinNativeId } = await plugins.getDeviceInfo(mixinId);
                 const port = await plugins.getRemoteServicePort(pluginId, 'console-writer');
                 const socket = net.connect(port);
                 socket.write(mixinNativeId + '\n');
@@ -626,10 +647,10 @@ class LazyRemote implements PluginRemote {
             await this.remoteReadyPromise;
         return this.remote.setNativeId(nativeId, id, storage);
     }
-    async updateDescriptor(id: string, state: { [property: string]: SystemDeviceState; }): Promise<void> {
+    async updateDeviceState(id: string, state: { [property: string]: SystemDeviceState; }): Promise<void> {
         if (!this.remote)
             await this.remoteReadyPromise;
-        return this.remote.updateDescriptor(id, state);
+        return this.remote.updateDeviceState(id, state);
     }
     async notify(id: string, eventTime: number, eventInterface: string, property: string, propertyState: SystemDeviceState, changed?: boolean): Promise<void> {
         if (!this.remote)

@@ -17,8 +17,26 @@ const rimraf = require('rimraf');
 const webpack = require('webpack');
 const esbuild = require('esbuild');
 
+if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
 
-if (false) {
+    let out;
+    if (process.env.NODE_ENV == 'production')
+        out = path.resolve(cwd, 'dist');
+    else
+        out = path.resolve(cwd, 'out');
+
+    const resolved = path.resolve(cwd, 'src/main.py');
+
+    const zip = new AdmZip();
+
+    zip.addLocalFile(resolved);
+
+    const zipfs = path.join(cwd, 'fs');
+    if (fs.existsSync(zipfs))
+        zip.addLocalFolder(zipfs, 'fs');
+    zip.writeZip(path.join(out, 'plugin.zip'));
+}
+else if (false) {
 
     let out;
     if (process.env.NODE_ENV == 'production')

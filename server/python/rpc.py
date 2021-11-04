@@ -1,8 +1,6 @@
-import debugpy
 from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
 from typing import Callable
-import aiofiles
 import asyncio
 import json
 import traceback
@@ -21,7 +19,7 @@ jsonSerializable.add(list)
 
 
 async def maybe_await(value):
-    if (inspect.iscoroutinefunction(value)):
+    if (inspect.iscoroutinefunction(value) or inspect.iscoroutine(value)):
         return await value
     return value
 
@@ -83,7 +81,7 @@ class RpcPeer:
     proxyCounter = 1
     pendingResults: Mapping[str, Future] = {}
     remoteWeakProxies: Mapping[str, any] = {}
-    nameDeserializerMap: Mapping[str, RpcSerializer]
+    nameDeserializerMap: Mapping[str, RpcSerializer] = {}
 
     def __init__(self, send: Callable[[object, Callable[[Exception], None]], None]) -> None:
         self.send = send
@@ -101,23 +99,25 @@ class RpcPeer:
             'method': method,
         }
 
-        if oneWayMethods and method in oneWayMethods:
+        if not oneWayMethods or method not in oneWayMethods:
             rpcApply['oneway'] = True
-            self.send(rpcApply, None)
+            self.send(rpcApply)
             future = Future()
             future.set_result(None)
             return future
 
         async def send(id: str, reject: Callable[[Exception], None]):
             rpcApply['id'] = id
-            await self.send(rpcApply, reject)
+            self.send(rpcApply, reject)
         return self.createPendingResult(send)
 
     def kill(self):
         self.killed = True
 
     def createErrorResult(self, result: any, name: str, message: str, tb: str):
-        pass
+        result['stack'] = tb if tb else 'no stack'
+        result['result'] = name if name else 'no name'
+        result['message'] = message if message else 'no message'
 
     def serialize(self, value, requireProxy):
         if (not value or (not requireProxy and type(value) in jsonSerializable)):
@@ -224,82 +224,84 @@ class RpcPeer:
     async def handleMessage(self, message: any):
         try:
             type = message['type']
-            match type:
-                case 'param':
-                    result = {
-                        'type': 'result',
-                        'id': message['id'],
-                    }
+            if type == 'param':
+                result = {
+                    'type': 'result',
+                    'id': message['id'],
+                }
 
-                    try:
-                        value = self.params.get(message['param'], None)
-                        value = await maybe_await(value)
-                        result['result'] = self.serialize(
-                            value, message.get('requireProxy', None))
-                    except Exception as e:
-                        tb = traceback.format_exc()
-                        self.createErrorResult(
-                            result, type(e).__name, str(e), tb)
+                try:
+                    value = self.params.get(message['param'], None)
+                    value = await maybe_await(value)
+                    result['result'] = self.serialize(
+                        value, message.get('requireProxy', None))
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    self.createErrorResult(
+                        result, type(e).__name, str(e), tb)
 
-                    await self.send(result, None)
+                self.send(result)
 
-                case 'apply':
-                    result = {
-                        'type': 'result',
-                        'id': message['id'],
-                    }
-                    method = message.get('method', None)
+            elif type == 'apply':
+                result = {
+                    'type': 'result',
+                    'id': message['id'],
+                }
+                method = message.get('method', None)
 
-                    try:
-                        target = self.localProxyMap.get(
-                            message['proxyId'], None)
-                        if not target:
-                            raise Exception('proxy id %s not found' %
-                                            message['proxyId'])
+                try:
+                    target = self.localProxyMap.get(
+                        message['proxyId'], None)
+                    if not target:
+                        raise Exception('proxy id %s not found' %
+                                        message['proxyId'])
 
-                        args = []
-                        for arg in (message['argArray'] or []):
-                            args.append(self.deserialize(arg))
+                    args = []
+                    for arg in (message['argArray'] or []):
+                        args.append(self.deserialize(arg))
 
-                        value = None
-                        if method:
-                            if not hasattr(target, method):
-                                raise Exception(
-                                    'target %s does not have method %s' % (type(target), method))
-                            value = await maybe_await(target[method](*args))
-                        else:
-                            value = await maybe_await(target(*args))
+                    value = None
+                    if method:
+                        if not hasattr(target, method):
+                            raise Exception(
+                                'target %s does not have method %s' % (type(target), method))
+                        invoke = getattr(target, method)
+                        value = await maybe_await(invoke(*args))
+                    else:
+                        value = await maybe_await(target(*args))
 
-                        result['result'] = self.serialize(value, False)
-                    except Exception as e:
-                        print('failure', method, e)
-                        self.createErrorResult(result, e)
+                    result['result'] = self.serialize(value, False)
+                except Exception as e:
+                    print('failure', method, e)
+                    tb = traceback.format_exc()
+                    self.createErrorResult(
+                        result, type(e).__name, str(e), tb)
 
-                    if message.get('oneway', False):
-                        self.send(result)
+                if not message.get('oneway', False):
+                    self.send(result)
 
-                case 'result':
-                    future = self.pendingResults.get(message['id'], None)
-                    if not future:
-                        raise RpcResultException(
-                            None, 'unknown result %s' % message['id'])
-                    del message['id']
-                    if hasattr(message, 'message') or hasattr(message, 'stack'):
-                        e = RpcResultException(
-                            None, message.get('message', None))
-                        e.stack = message.get('stack', None)
-                        e.name = message.get('name', None)
-                        future.set_exception(e)
-                        return
-                    future.set_result(self.deserialize(
-                        message.get('result', None)))
-                case 'finalize':
-                    local = self.localProxyMap.pop(
-                        message['__local_proxy_id'], None)
-                    self.localProxied.pop(local, None)
-                case _:
+            elif type == 'result':
+                future = self.pendingResults.get(message['id'], None)
+                if not future:
                     raise RpcResultException(
-                        None, 'unknown rpc message type %s' % type)
+                        None, 'unknown result %s' % message['id'])
+                del message['id']
+                if hasattr(message, 'message') or hasattr(message, 'stack'):
+                    e = RpcResultException(
+                        None, message.get('message', None))
+                    e.stack = message.get('stack', None)
+                    e.name = message.get('name', None)
+                    future.set_exception(e)
+                    return
+                future.set_result(self.deserialize(
+                    message.get('result', None)))
+            elif type == 'finalize':
+                local = self.localProxyMap.pop(
+                    message['__local_proxy_id'], None)
+                self.localProxied.pop(local, None)
+            else:
+                raise RpcResultException(
+                    None, 'unknown rpc message type %s' % type)
         except Exception as e:
             print("unhandled rpc error", self.peerName, e)
             pass
@@ -322,7 +324,7 @@ class RpcPeer:
                 'type': 'param',
                 'param': param,
             }
-            await self.send(paramMessage, reject)
+            self.send(paramMessage, reject)
         return await self.createPendingResult(send)
 
 # c = RpcPeer()

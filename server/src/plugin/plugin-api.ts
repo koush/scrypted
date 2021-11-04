@@ -140,7 +140,7 @@ export interface PluginRemote {
     loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any>;
     setSystemState(state: {[id: string]: {[property: string]: SystemDeviceState}}): Promise<void>;
     setNativeId(nativeId: ScryptedNativeId, id: string, storage: {[key: string]: any}): Promise<void>;
-    updateDescriptor(id: string, state: {[property: string]: SystemDeviceState}): Promise<void>;
+    updateDeviceState(id: string, state: {[property: string]: SystemDeviceState}): Promise<void>;
     notify(id: string, eventTime: number, eventInterface: string, property: string|undefined, value: SystemDeviceState|any, changed?: boolean): Promise<void>;
 
     ioEvent(id: string, event: string, message?: any): Promise<void>;
