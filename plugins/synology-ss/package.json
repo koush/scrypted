@@ -1,0 +1,39 @@
+{
+   "name": "@scrypted/synology-ss",
+   "version": "0.0.1",
+   "description": "A Synology Surveillance Station plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "synology",
+      "surveillance station"
+   ],
+   "scrypted": {
+      "name": "Synology Surveillance Station",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ]
+   },
+   "dependencies": {
+      "axios": "^0.24.0"
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/node": "^16.6.1"
+   }
+}
