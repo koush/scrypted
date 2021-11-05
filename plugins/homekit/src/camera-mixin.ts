@@ -47,7 +47,9 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                 choices: msos.map(mso => mso.name),
             });
         }
-        if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
+
+        const hasMotionSensor = this.storage.getItem('linkedMotionSensor') || this.interfaces.includes(ScryptedInterface.MotionSensor);
+        if (hasMotionSensor) {
             if (msos?.length) {
                 settings.push({
                     title: 'Recording Stream',
@@ -76,7 +78,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true'
             || this.storage.getItem('transcodeStreamingHub') === 'true';
 
-        if (this.interfaces.includes(ScryptedInterface.MotionSensor)) {
+        if (hasMotionSensor) {
             settings.push({
                 title: 'Transcode Recording',
                 key: 'transcodeRecording',
