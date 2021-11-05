@@ -148,15 +148,14 @@ class RpcPeer:
             __remote_constructor_name = serializerMapName
             serializer = self.nameDeserializerMap.get(serializerMapName, None)
             serialized = serializer.serialize(value)
-            if not serialized or (not requireProxy and type(serialized).__name in jsonSerializable):
-                ret = {
-                    '__remote_proxy_id': None,
-                    '__remote_constructor_name': __remote_constructor_name,
-                    '__remote_proxy_props': getattr(value, '__proxy_props', None),
-                    '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
-                    '__serialized_value': value,
-                }
-                return ret
+            ret = {
+                '__remote_proxy_id': None,
+                '__remote_constructor_name': __remote_constructor_name,
+                '__remote_proxy_props': getattr(value, '__proxy_props', None),
+                '__remote_proxy_oneway_methods': getattr(value, '__proxy_oneway_methods', None),
+                '__serialized_value': serialized,
+            }
+            return ret
 
         proxyId = str(self.proxyCounter)
         self.proxyCounter = self.proxyCounter + 1
@@ -173,7 +172,12 @@ class RpcPeer:
         return ret
 
     def finalize(self, id: str):
-        pass
+        self.remoteWeakProxies.pop(id, None)
+        rpcFinalize = {
+            '__local_proxy_id': id,
+            'type': 'finalize',
+        }
+        self.send(rpcFinalize)
 
     def newProxy(self, proxyId: str, proxyConstructorName: str, proxyProps: any, proxyOneWayMethods: list[str]):
         proxy = RpcProxy(self, proxyId, proxyConstructorName,

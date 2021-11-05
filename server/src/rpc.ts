@@ -1,12 +1,14 @@
 import vm from 'vm';
 
-const jsonSerializable = new Set<string>();
-jsonSerializable.add(Number.name);
-jsonSerializable.add(String.name);
-jsonSerializable.add(Object.name);
-jsonSerializable.add(Boolean.name);
-jsonSerializable.add(Array.name);
-
+function getDefaultTransportSafeArgumentTypes() {
+    const jsonSerializable = new Set<string>();
+    jsonSerializable.add(Number.name);
+    jsonSerializable.add(String.name);
+    jsonSerializable.add(Object.name);
+    jsonSerializable.add(Boolean.name);
+    jsonSerializable.add(Array.name);
+    return jsonSerializable;
+}
 
 export interface RpcMessage {
     type: string;
@@ -186,6 +188,7 @@ export class RpcPeer {
     finalizers = new FinalizationRegistry(id => this.finalize(id as string));
     nameDeserializerMap = new Map<string, RpcSerializer>();
     constructorSerializerMap = new Map<string, string>();
+    transportSafeArgumentTypes = getDefaultTransportSafeArgumentTypes();
 
     constructor(public send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
     }
@@ -291,7 +294,7 @@ export class RpcPeer {
     }
 
     serialize(value: any): any {
-        if (!value || (!value.__proxy_required && jsonSerializable.has(value.constructor?.name))) {
+        if (!value || (!value.__proxy_required && this.transportSafeArgumentTypes.has(value.constructor?.name))) {
             return value;
         }
 
@@ -321,16 +324,14 @@ export class RpcPeer {
             __remote_constructor_name = serializerMapName;
             const serializer = this.nameDeserializerMap.get(serializerMapName);
             const serialized = serializer.serialize(value);
-            if (!serialized || (!value.__proxy_required && jsonSerializable.has(serialized.constructor?.name))) {
-                const ret: RpcRemoteProxyValue = {
-                    __remote_proxy_id: undefined,
-                    __remote_constructor_name,
-                    __remote_proxy_props: value?.__proxy_props,
-                    __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
-                    __serialized_value: value,
-                }
-                return ret;
+            const ret: RpcRemoteProxyValue = {
+                __remote_proxy_id: undefined,
+                __remote_constructor_name,
+                __remote_proxy_props: value?.__proxy_props,
+                __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
+                __serialized_value: serialized,
             }
+            return ret;
         }
 
         proxyId = (this.proxyCounter++).toString();

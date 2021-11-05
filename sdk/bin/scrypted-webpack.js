@@ -25,11 +25,12 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
     else
         out = path.resolve(cwd, 'out');
 
-    const resolved = path.resolve(cwd, 'src/main.py');
+    const resolved = path.resolve(cwd, 'src');
 
     const zip = new AdmZip();
 
-    zip.addLocalFile(resolved);
+    zip.addLocalFolder(resolved, 'plugin');
+    zip.addFile('plugin/__init__.py', Buffer.from("from plugin.main import plugin_main"));
 
     const zipfs = path.join(cwd, 'fs');
     if (fs.existsSync(zipfs))

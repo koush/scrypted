@@ -272,6 +272,10 @@ interface WebSocketCallbacks {
 
 export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string): Promise<PluginRemote> {
     try {
+        // the host/remote connection can be from server to plugin (node to node),
+        // core plugin to web (node to browser).
+        // always add the BufferSerializer, so serialization is gauranteed to work.
+        // but in plugin-host, mark Buffer as transport safe.
         peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
         const getRemote = await peer.getParam('getRemote');
         return await getRemote(api, pluginId);

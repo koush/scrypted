@@ -90,7 +90,8 @@ export class PluginHost {
         this.packageJson = plugin.packageJson;
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(plugin._id));
 
-        const cwd = path.join(process.cwd(), 'volume', 'plugins', this.pluginId);
+        const volume = path.join(process.cwd(), 'volume');
+        const cwd = path.join(volume, 'plugins', this.pluginId);
         try {
             mkdirp.sync(cwd);
         }
@@ -157,12 +158,19 @@ export class PluginHost {
                 }
             }
 
+            const { runtime } = this.packageJson.scrypted;
             const fail = 'Plugin failed to load. Console for more information.';
             try {
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
                     // if debugging, use a normalized path for sourcemap resolution, otherwise
                     // prefix with module path.
-                    filename: pluginDebug ? '/plugin/main.nodejs.js' : `/${this.pluginId}/main.nodejs.js`,
+                    filename: runtime === 'python'
+                        ? pluginDebug
+                            ? `${volume}/plugin.zip`
+                            : `${cwd}/plugin.zip`
+                        : pluginDebug
+                            ? '/plugin/main.nodejs.js'
+                            : `/${this.pluginId}/main.nodejs.js`,
                 };
                 const module = await remote.loadZip(plugin.packageJson, zipBuffer, loadZipOptions);
                 logger.log('i', `loaded ${this.pluginName}`);
@@ -212,6 +220,7 @@ export class PluginHost {
             this.worker = child_process.spawn('python', args, {
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+                env: Object.assign({}, process.env, env),
             });
 
             const peerin = this.worker.stdio[3] as Writable;
@@ -243,8 +252,9 @@ export class PluginHost {
                 execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
             }
 
-            this.worker = child_process.fork(require.main.filename, ['child', JSON.stringify(env)], {
+            this.worker = child_process.fork(require.main.filename, ['child'], {
                 stdio: 'pipe',
+                env: Object.assign({}, process.env, env),
                 serialization: 'advanced',
                 execArgv,
             });
@@ -260,6 +270,7 @@ export class PluginHost {
                     reject(new Error('peer disconnected'));
                 }
             });
+            this.peer.transportSafeArgumentTypes.add(Buffer.name);
 
             this.worker.on('message', message => this.peer.handleMessage(message as any));
         }
@@ -571,6 +582,7 @@ export function startPluginClusterWorker() {
             reject(e);
     }));
     peer.peerName = 'host';
+    peer.transportSafeArgumentTypes.add(Buffer.name);
     process.on('message', message => peer.handleMessage(message as RpcMessage));
 
     let lastCpuUsage: NodeJS.CpuUsage;

@@ -52,10 +52,6 @@ if (!cluster.isMaster) {
     startPluginRemoteClusterWorker();
 }
 else if (process.argv[2] === 'child') {
-    const env = JSON.parse(process.argv[3]);
-    for (const [k, v] of Object.entries(env)) {
-        process.env[k] = v.toString();
-    }
     startPluginRemoteClusterWorker();
 }
 else {

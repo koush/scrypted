@@ -1,17 +1,27 @@
-from collections.abc import Mapping, Sequence
-from rpc import RpcPeer, readLoop
+from collections.abc import Mapping
+from rpc import RpcPeer, readLoop, RpcSerializer
 import asyncio
 from asyncio.events import AbstractEventLoop
 import json
 import aiofiles
 import os
 from typing import TypedDict
+import base64
+import zipimport
+
+
+class BufferSerializer(RpcSerializer):
+    def serialize(self, value):
+        return base64.b64encode(value)
+
+    def deserialize(self, value):
+        return base64.b64decode(value)
 
 
 class SystemDeviceState(TypedDict):
-  lastEventTime: int
-  stateTime: int
-  value: any
+    lastEventTime: int
+    stateTime: int
+    value: any
 
 
 class DeviceStorage:
@@ -30,7 +40,15 @@ class PluginRemote:
         self.pluginId = pluginId
 
     async def loadZip(self, packageJson, zipData, options=None):
-        pass
+        zipPath = options['filename']
+        f = open(zipPath, 'wb')
+        f.write(zipData)
+        f.close()
+
+        z = zipimport.zipimporter(zipPath)
+        m = z.load_module('plugin')
+        from plugin import plugin_main
+        plugin_main()
 
     async def setSystemState(self, state):
         self.systemState = state
@@ -50,7 +68,7 @@ class PluginRemote:
         else:
             self.systemState[id] = state
 
-    async def notify(self, id, eventTime, eventInterface, property, value, changed = False):
+    async def notify(self, id, eventTime, eventInterface, property, value, changed=False):
         if property:
             state = None
             if self.systemState:
@@ -64,7 +82,7 @@ class PluginRemote:
             # systemManager.events.notify(id, eventTime, eventInterface, property, value, changed);
             pass
 
-    async def ioEvent(self, id, event, message = None):
+    async def ioEvent(self, id, event, message=None):
         pass
 
     async def createDeviceState(self, id, setState):
@@ -73,11 +91,12 @@ class PluginRemote:
     async def getServicePort(self, name):
         pass
 
+
 async def async_main(loop: AbstractEventLoop):
     reader = await aiofiles.open(3, mode='r')
     # writer = open(4, 'r+')
 
-    def send(message, reject = None):
+    def send(message, reject=None):
         jsonString = json.dumps(message)
         try:
             os.write(4, bytes(jsonString + '\n', 'utf8'))
@@ -86,8 +105,10 @@ async def async_main(loop: AbstractEventLoop):
                 reject(e)
 
     peer = RpcPeer(send)
+    peer.nameDeserializerMap['Buffer'] = BufferSerializer()
     peer.params['print'] = print
-    peer.params['getRemote'] = lambda api, pluginId: PluginRemote(api, pluginId)
+    peer.params['getRemote'] = lambda api, pluginId: PluginRemote(
+        api, pluginId)
 
     async def consoleTest():
         console = await peer.getParam('console')
@@ -97,8 +118,6 @@ async def async_main(loop: AbstractEventLoop):
     print('done')
 
     # print("line %s" % line)
-
-
 
 
 def main():
