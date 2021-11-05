@@ -1,4 +1,5 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
+import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
 import { recommendRebroadcast } from "../../rtsp/src/recommend";
 import {SynologyApiClient, SynologyCameraStream, SynologyCamera} from "./api/synology-api-client";
 
@@ -12,16 +13,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
         super(nativeId);
         this.provider = provider;
 
-        this.streams = [
-            { ...camera.stream1, id: '1' },
-            { ...camera.stream2, id: '2' },
-            { ...camera.stream3, id: '3' },
-        ].filter(s => !!s.resolution);
-
-        this.motionDetected = false;
-        if (this.interfaces.includes(ScryptedInterface.BinarySensor)) {
-            this.binaryState = false;
-        }
+        this.streams = SynologyCameraDevice.identifyStreams(camera);
     }
 
     private getDefaultOrderedVideoStreamOptions(vsos: MediaStreamOptions[]) {
@@ -134,6 +126,21 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
     public async getPictureOptions(): Promise<PictureOptions[]> {
         return;
     }
+
+    /**
+     * Identify and return available streams on the provided camera.
+     */
+    private static identifyStreams(camera: SynologyCamera): SynologyCameraStream[] {
+        // Instead of an array of enabled streams, Synology uses separately named fields.
+        // A disabled stream's object is empty (not undefined).
+        // This combines them all, puts IDs on them, and filters out disabled ones.
+        // Synology has a higher level abstraction, low vs medium vs high profile streams, but more indirection would likely not be helpful here.
+        return [
+            { ...camera.stream1, id: '1' },
+            { ...camera.stream2, id: '2' },
+            { ...camera.stream3, id: '3' },
+        ].filter(s => !!s.resolution);
+    }
 }
 
 class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings, DeviceProvider {
@@ -142,8 +149,8 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
     api: SynologyApiClient;
     private startup: Promise<void>;
 
-    constructor() {
-        super();
+    constructor(nativeId?: string) {
+        super(nativeId);
 
         this.startup = this.discoverDevices(0);
         recommendRebroadcast();
@@ -271,13 +278,29 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
             },
         ];
 
+        if (!isInstanceableProviderModeEnabled()) {
+            ret.push({
+                key: 'instance-mode',
+                title: 'Multiple Synology Surveillance Station NVRs',
+                value: '',
+                description: 'To add more than one Synology Surveillance Station NVR, you will need to migrate the plugin to multi-application mode. Type "MIGRATE" in the textbox to confirm.',
+                placeholder: 'MIGRATE',
+            });
+        }
+
         return ret;
     }
 
     async putSetting(key: string, value: string | number) {
+        if (key === 'instance-mode') {
+            if (value === 'MIGRATE') {
+                await enableInstanceableProviderMode();
+            }
+            return;
+        }
         this.storage.setItem(key, value.toString());
         this.discoverDevices(0);
     }
 }
 
-export default new SynologySurveillanceStation();
+export default createInstanceableProviderPlugin("Synology Surveillance Station NVR", nativeid => new SynologySurveillanceStation(nativeid));
