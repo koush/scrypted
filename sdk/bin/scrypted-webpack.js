@@ -16,26 +16,31 @@ const os = require('os');
 const rimraf = require('rimraf');
 const webpack = require('webpack');
 const esbuild = require('esbuild');
+const ncp = require('ncp');
 
 if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
-
     let out;
     if (process.env.NODE_ENV == 'production')
         out = path.resolve(cwd, 'dist');
     else
         out = path.resolve(cwd, 'out');
 
-    const resolved = path.resolve(cwd, 'src');
+    const src = path.join(__dirname, '../python');
+    const dst = path.join(cwd, 'src', 'scrypted_sdk');
+    rimraf.sync(dst);
+    console.log(src, dst);
+    ncp(src, dst, () => {
+        const resolved = path.resolve(cwd, 'src');
 
-    const zip = new AdmZip();
+        const zip = new AdmZip();
 
-    zip.addLocalFolder(resolved, 'plugin');
-    zip.addFile('plugin/__init__.py', Buffer.from("from plugin.main import plugin_main"));
+        zip.addLocalFolder(resolved);
 
-    const zipfs = path.join(cwd, 'fs');
-    if (fs.existsSync(zipfs))
-        zip.addLocalFolder(zipfs, 'fs');
-    zip.writeZip(path.join(out, 'plugin.zip'));
+        const zipfs = path.join(cwd, 'fs');
+        if (fs.existsSync(zipfs))
+            zip.addLocalFolder(zipfs, 'fs');
+        zip.writeZip(path.join(out, 'plugin.zip'));
+    });
 }
 else if (false) {
 

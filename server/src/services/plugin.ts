@@ -48,6 +48,8 @@ export class PluginComponent {
         return pluginDevice.pluginId;
     }
     async getPluginProcessId(pluginId: string) {
+        if (this.scrypted.plugins[pluginId]?.worker?.killed)
+            return 'killed';
         return this.scrypted.plugins[pluginId]?.worker?.pid;
     }
     async reload(pluginId: string) {

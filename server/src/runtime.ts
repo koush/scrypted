@@ -487,7 +487,9 @@ export class ScryptedRuntime {
             this.invalidatePluginDevice(pluginDevice._id);
         }
 
-        const execArgv = ['--expose-gc'];
+        const execArgv = [
+            '--expose-gc',
+        ];
         if (process.argv[0].endsWith('ts-node'))
             execArgv.push('-r', 'ts-node/register');
 

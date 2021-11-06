@@ -7,8 +7,9 @@ import aiofiles
 import os
 from typing import TypedDict
 import base64
-import zipimport
-
+from os import sys
+import zipfile
+import subprocess
 
 class BufferSerializer(RpcSerializer):
     def serialize(self, value):
@@ -41,13 +42,30 @@ class PluginRemote:
 
     async def loadZip(self, packageJson, zipData, options=None):
         zipPath = options['filename']
+
         f = open(zipPath, 'wb')
         f.write(zipData)
         f.close()
 
-        z = zipimport.zipimporter(zipPath)
-        m = z.load_module('plugin')
-        from plugin import plugin_main
+        zip = zipfile.ZipFile(zipPath)
+        requirements = zip.open('requirements.txt').read()
+
+        python_modules = os.path.join(os.environ.get('SCRYPTED_PLUGIN_VOLUME'), 'python', 'modules')
+        if not os.path.exists(python_modules):
+            os.makedirs(python_modules)
+        requirementstxt = os.path.join(python_modules, 'requirements.txt')
+
+        f = open(requirementstxt, 'wb')
+        f.write(requirements)
+        f.close()
+
+        # os.system('pip install -r %s --target %s' % (requirementstxt, python_modules))
+        result = subprocess.check_output(['pip', 'install', '-r', requirementstxt, '--target', python_modules], stderr=subprocess.STDOUT, text=True)
+        print(result)
+
+        sys.path.insert(0, zipPath)
+        sys.path.insert(0, python_modules)
+        from main import plugin_main
         plugin_main()
 
     async def setSystemState(self, state):

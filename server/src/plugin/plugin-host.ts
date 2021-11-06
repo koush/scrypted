@@ -213,9 +213,11 @@ export class PluginHost {
                     '--listen',
                     `0.0.0.0:${this.pluginDebug.inspectPort}`,
                     '--wait-for-client',
-                    path.join(__dirname, '../../python', 'plugin-remote.py'),
                 )
             }
+            args.push(
+                path.join(__dirname, '../../python', 'plugin-remote.py'),
+            )
 
             this.worker = child_process.spawn('python', args, {
                 // stdin, stdout, stderr, peer in, peer out
@@ -225,9 +227,6 @@ export class PluginHost {
 
             const peerin = this.worker.stdio[3] as Writable;
             const peerout = this.worker.stdio[4] as Readable;
-            peerout.on('data', data => {
-                console.log(data.toString());
-            })
 
             this.peer = new RpcPeer((message, reject) => {
                 if (connected) {
