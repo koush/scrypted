@@ -8,7 +8,7 @@ import throttle from 'lodash/throttle';
 const { deviceManager } = sdk;
 
 function isValidGarageDoor(device_type: string) {
-  return device_type === 'wifigaragedooropener' || device_type === 'virtualgaragedooropener';
+  return device_type === 'wifigaragedooropener' || device_type === 'virtualgaragedooropener' || device_type === 'garagedooropener';
 }
 
 class GarageController extends ScryptedDeviceBase implements DeviceProvider, Settings {
