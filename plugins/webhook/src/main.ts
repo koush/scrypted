@@ -80,7 +80,7 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
 
     async maybeSendMediaObject(response: HttpResponse, value: any, method: string) {
         if (!mediaObjectMethods.includes(method)) {
-            response?.send(value.toString());
+            response?.send(value?.toString());
             return;
         }
 
@@ -149,7 +149,7 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
         const pathSegments = relPath.split('/');
         const id = pathSegments[1];
 
-        const device = systemManager.getDeviceById<ScryptedDevice>(id);
+        const device = systemManager.getDeviceById<ScryptedDevice & Settings>(id);
         this.console.log('device', id, device.name);
 
         if (!device.mixins.includes(this.id)) {
@@ -160,6 +160,9 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
             return;
         }
 
+        if (!this.createdMixins.has(id)) {
+            await device.getSettings();
+        }
         const mixin = this.createdMixins.get(id);
         mixin.handle(request, response, device, pathSegments);
     }
