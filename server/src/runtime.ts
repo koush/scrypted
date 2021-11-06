@@ -1,5 +1,5 @@
 import { Level } from './level';
-import { PluginHost } from './plugin/plugin-host';
+import { ensurePluginVolume, PluginHost } from './plugin/plugin-host';
 import cluster from 'cluster';
 import { ScryptedNativeId, Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
@@ -29,6 +29,9 @@ import { Alerts } from './services/alerts';
 import { Info } from './services/info';
 import io from 'engine.io';
 import {spawn as ptySpawn} from 'node-pty';
+import child_process from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -424,6 +427,31 @@ export class ScryptedRuntime {
         return proxyPair;
     }
 
+    async installOptionalDependencies(packageJson: any, currentPackageJson: any) {
+        const { optionalDependencies } = packageJson;
+        if (!optionalDependencies)
+            return;
+        if (!Object.keys(packageJson).length)
+            return;
+        const currentOptionalDependencies = currentPackageJson?.optionalDependencies || {};
+
+        if (JSON.stringify(optionalDependencies) === JSON.stringify(currentOptionalDependencies))
+            return;
+        
+        const reduced = Object.assign({}, packageJson);
+        delete reduced.dependencies;
+        delete reduced.devDependencies;
+
+        const pluginVolume = ensurePluginVolume(reduced.name);
+        const optPj = path.join(pluginVolume, 'package.json');
+        fs.writeFileSync(optPj, JSON.stringify(reduced));
+        const cp = child_process.spawn('npm', ['install'], {
+            cwd: pluginVolume,
+        });
+
+        await once(cp, 'exit');
+    }
+
     async installNpm(pkg: string, version?: string): Promise<PluginHost> {
         const registry = (await axios(`https://registry.npmjs.org/${pkg}`)).data;
         if (!version) {
@@ -458,6 +486,7 @@ export class ScryptedRuntime {
             const packageJson = JSON.parse(packageJsonEntry.toString());
             const npmPackage = packageJson.name;
             const plugin = await this.datastore.tryGet(Plugin, npmPackage) || new Plugin();
+            await this.installOptionalDependencies(packageJson, plugin.packageJson);
 
             plugin._id = npmPackage;
             plugin.packageJson = packageJson;

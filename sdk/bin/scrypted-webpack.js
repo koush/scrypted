@@ -17,6 +17,7 @@ const rimraf = require('rimraf');
 const webpack = require('webpack');
 const esbuild = require('esbuild');
 const ncp = require('ncp');
+const tmp = require('tmp');
 
 if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
     let out;
@@ -91,6 +92,9 @@ else {
         }
     }
 
+    const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').toString()));
+    const optionalDependencies = Object.keys(packageJson.optionalDependencies || {});
+
     const runtimes = [
         // {
         //     config: 'webpack.duktape.config.js',
@@ -157,6 +161,19 @@ else {
                 };
                 config.output.path = out;
                 config.output.filename = runtime.output;
+
+
+                for (const opt of optionalDependencies) {
+                    const t = tmp.tmpNameSync({
+                        postfix: '.js',
+                    });
+                    console.log(t);
+                    fs.writeFileSync(t, `
+                        const e = __non_webpack_require__('${opt}');
+                        module.exports = e;
+                    `);
+                    config.resolve.alias[opt] = t;
+                }
 
                 webpack(config, (err, stats) => {
                     if (err)

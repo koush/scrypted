@@ -27,6 +27,17 @@ import { PluginDebug } from './plugin-debug';
 import readline from 'readline';
 import { Readable, Writable } from 'stream';
 
+export function ensurePluginVolume(pluginId: string) {
+    const volume = path.join(process.cwd(), 'volume');
+    const pluginVolume = path.join(volume, 'plugins', pluginId);
+    try {
+        mkdirp.sync(pluginVolume);
+    }
+    catch (e) {
+    }
+    return pluginVolume;
+}
+
 export class PluginHost {
     worker: child_process.ChildProcess;
     peer: RpcPeer;
@@ -91,14 +102,10 @@ export class PluginHost {
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(plugin._id));
 
         const volume = path.join(process.cwd(), 'volume');
-        const cwd = path.join(volume, 'plugins', this.pluginId);
-        try {
-            mkdirp.sync(cwd);
-        }
-        catch (e) {
-        }
+        const cwd = ensurePluginVolume(this.pluginId);
 
         this.startPluginClusterHost(logger, {
+            NODE_PATH: path.join(cwd, 'node_modules'),
             SCRYPTED_PLUGIN_VOLUME: cwd,
         }, plugin.packageJson.scrypted.runtime);
 

@@ -1,3 +1,4 @@
+
 import { MixinProvider, ScryptedDeviceType, ScryptedInterface, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, MotionSensor } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
@@ -5,15 +6,7 @@ import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { StreamChunk, createRawVideoParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration"
-import { HeapScope } from './heap';
-
-// necessary for opencv wasm to not crap itself due to webpack.
-global.__filename = undefined;
-// todo: remove this.
-window = undefined;
-// import { cv }  from 'opencv-wasm';
-const { cv } = require('./opencv');
+import cv, { Mat, Size } from "@koush/opencv4nodejs";
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -104,11 +97,6 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     width = Math.floor(width / 6) * 6;
     height = Math.floor(height / 6) * 6;
 
-    const videoDecoderArguments = this.storage.getItem('videoDecoderArguments') || '';
-    if (videoDecoderArguments) {
-      ffmpegInput.inputArguments.unshift(...videoDecoderArguments.split(' '));
-    }
-
     this.sessionPromise = startRebroadcastSession(ffmpegInput, {
       console: this.console,
       parsers: {
@@ -123,7 +111,6 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     });
 
     const session = await this.sessionPromise;
-    session.events.on('error', e => this.console.log('ffmpeg error', e));
 
     let watchdog: NodeJS.Timeout;
     const restartWatchdog = () => {
@@ -145,88 +132,57 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
       await this.startWrapped(session);
     }
     finally {
-      clearTimeout(watchdog);
       session.kill();
     }
   }
 
   async startWrapped(session: FFMpegRebroadcastSession) {
-    let previousFrame: any;
-    try {
-      let timeout: NodeJS.Timeout;
+    let previousFrame: Mat;
+    let timeout: NodeJS.Timeout;
 
-      const triggerMotion = () => {
-        this.motionDetected = true;
-        clearTimeout(timeout);
-        setTimeout(() => this.motionDetected = false, 10000);
+    const triggerMotion = () => {
+      this.motionDetected = true;
+      clearTimeout(timeout);
+      setTimeout(() => this.motionDetected = false, 10000);
+    }
+
+    this.motionDetected = false;
+
+    while (!this.released) {
+      if (this.motionDetected) {
+        // during motion just eat the frames.
+        previousFrame = undefined;
+        await sleep(1000);
+        continue;
       }
 
-      this.motionDetected = false;
+      const args = await once(session.events, 'rawvideo-data');
+      const chunk: StreamChunk = args[0];
+      // should be one chunk from the parser, but let's not assume that.
+      const raw = chunk.chunks.length === 1 ? chunk.chunks[0] : Buffer.concat(chunk.chunks);
+      const mat = new Mat(raw, chunk.height * 3 / 2, chunk.width, cv.CV_8U);
 
-      while (!this.released && session.isActive()) {
-        if (this.motionDetected) {
-          // during motion just eat the frames.
-          previousFrame = undefined;
-          await sleep(1000);
+      const gray = await mat.cvtColorAsync(cv.COLOR_YUV420p2GRAY);
+      const curFrame = await gray.gaussianBlurAsync(new Size(21, 21), 0);
+
+      try {
+        if (!previousFrame) {
           continue;
         }
 
-        const args = await once(session.events, 'rawvideo-data');
-        const chunk: StreamChunk = args[0];
-        // should be one chunk from the parser, but let's not assume that.
-        const raw = chunk.chunks.length === 1 ? chunk.chunks[0] : Buffer.concat(chunk.chunks);
-
-        const scope = new HeapScope();
-        const mat = scope.new(cv.Mat, chunk.height * 3 / 2, chunk.width, cv.CV_8U);
-        mat.data.set(raw);
-
-        const gray = scope.new(cv.Mat);
-        cv.cvtColor(mat, gray, cv.COLOR_YUV420p2GRAY);
-        const curFrame = new cv.Mat();
-        cv.GaussianBlur(gray, curFrame, new cv.Size(21, 21), 0);
-
-        try {
-          if (!previousFrame) {
-            continue;
-          }
-
-          const frameDelta = scope.new(cv.Mat);
-          cv.absdiff(previousFrame, curFrame, frameDelta);
-          const thresh = scope.new(cv.Mat);
-          cv.threshold(frameDelta, thresh, this.threshold, 255, cv.THRESH_BINARY);
-          const dilated = scope.new(cv.Mat);
-          const structuringElement = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(4, 4));
-          scope.tracking.push(structuringElement);
-          cv.dilate(thresh, dilated, structuringElement, new cv.Point(-1, -1), 2);
-          const contours = scope.new(cv.MatVector);
-          const hierarchy = scope.new(cv.Mat);
-          cv.findContours(dilated, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-          const filteredContours: number[] = [];
-          for (let i = 0; i < contours.size(); i++) {
-            const contourArea = cv.contourArea(contours.get(i));
-            if (contourArea > this.area) {
-              filteredContours.push(contourArea);
-            }
-          }
-          if (filteredContours.length) {
-            this.console.log('motion triggered by area(s)', filteredContours.join(','));
-            triggerMotion();
-          }
-        }
-        catch (e) {
-          this.console.log('cv error', e);
-          throw e;
-        }
-        finally {
-          previousFrame?.delete();
-          previousFrame = curFrame;
-
-          scope.dispose();
+        const frameDelta = previousFrame.absdiff(curFrame);
+        const thresh = await frameDelta.thresholdAsync(this.threshold, 255, cv.THRESH_BINARY);
+        const dilated = await thresh.dilateAsync(cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(4, 4)), new cv.Point2(-1, -1), 2)
+        const contours = await dilated.findContoursAsync(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        const filteredContours = contours.filter(cnt => cnt.area > this.area).map(cnt => cnt.area);
+        if (filteredContours.length) {
+          this.console.log('motion triggered by area(s)', filteredContours.join(','));
+          triggerMotion();
         }
       }
-    }
-    finally {
-      previousFrame?.delete();
+      finally {
+        previousFrame = curFrame;
+      }
     }
   }
 
@@ -252,18 +208,7 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
       });
     }
 
-    const decoderArgs = getH264DecoderArgs();
-
     settings.push(
-      {
-        title: 'Video Decoder Arguments',
-        key: "videoDecoderArguments",
-        value: this.storage.getItem('videoDecoderArguments'),
-        description: 'FFmpeg arguments used to decode input video.',
-        placeholder: '-hwaccel auto',
-        choices: Object.keys(decoderArgs),
-        combobox: true,
-      },
       {
         title: "Motion Area",
         description: "The area size required to trigger motion. Higher values (larger areas) are less sensitive.",
@@ -294,26 +239,19 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
   }
 
   async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
+    this.storage.setItem(key, value.toString());
     if (key === 'area')
       this.area = parseInt(value.toString()) || defaultArea;
     if (key === 'threshold')
       this.threshold = parseInt(value.toString()) || defaultThreshold;
-    if (key === 'videoDecoderArguments') {
-      const decoderArgs = getH264DecoderArgs();
-      value = decoderArgs[value.toString()]?.join(' ') || value;
-    }
 
-    if (key === 'motionChannel' || key === 'videoDecoderArguments') {
+    if (key === 'motionChannel') {
       this.sessionPromise?.then(session => session.kill());
     }
-
-    this.storage.setItem(key, value.toString());
-    deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
   }
 
   release() {
     this.released = true;
-    this.sessionPromise?.then(session => session.kill());
   }
 }
 

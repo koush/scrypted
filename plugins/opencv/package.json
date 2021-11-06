@@ -5,16 +5,15 @@
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {
-      "prepublishOnly": "npm run opencv-deps && NODE_ENV=production scrypted-webpack",
-      "prescrypted-vscode-launch": "npm run opencv-deps && scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
       "scrypted-vscode-launch": "scrypted-deploy-debug",
       "scrypted-deploy-debug": "scrypted-deploy-debug",
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
       "scrypted-readme": "scrypted-readme",
       "scrypted-package-json": "scrypted-package-json",
-      "opencv-deps": "cp node_modules/opencv-wasm/index.js src/opencv && cp node_modules/opencv-wasm/opencv.js src/opencv && sed -i '' 's/this, function/exports, function/g' src/opencv/opencv.js",
-      "scrypted-webpack": "npm run opencv-deps && scrypted-webpack"
+      "scrypted-webpack": "scrypted-webpack"
    },
    "keywords": [
       "scrypted",
@@ -31,12 +30,15 @@
       "type": "API",
       "interfaces": [
          "MixinProvider"
-      ]
+      ],
+      "realfs": true
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "opencv-wasm": "^4.3.0-10"
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "optionalDependencies": {
+      "@koush/opencv4nodejs": "^5.6.6"
    },
    "devDependencies": {
       "@types/node": "^14.17.11"
