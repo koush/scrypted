@@ -389,6 +389,11 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
     };
 
+    debugLog(message: string, ...parameters: any[]) {
+        if (this.storage.getItem('debug'))
+            this.console.log(message, ...parameters);
+    }
+
     async discoverDevices(duration: number) {
         const ip = this.getSetting('ip');
         const username = this.getSetting('username');
@@ -412,7 +417,8 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         }
 
         if (!this.api) {
-            this.api = new ProtectApi(() => { }, this.console, ip, username, password);
+            this.api = new ProtectApi((message, ...parameters) =>
+                this.debugLog(message, ...parameters), this.console, ip, username, password);
         }
 
         try {
