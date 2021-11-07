@@ -2,8 +2,10 @@ import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, Pictu
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable, RtspMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
+import xml2js from 'xml2js';
+import onvif from 'onvif';
 
-const { mediaManager, systemManager } = sdk;
+const { mediaManager, systemManager, deviceManager } = sdk;
 
 function computeInterval(fps: number, govLength: number) {
     if (!fps || !govLength)
@@ -220,6 +222,62 @@ class OnvifCamera extends RtspSmartCamera {
 }
 
 class OnvifProvider extends RtspProvider {
+    constructor(nativeId?: string) {
+        super(nativeId);
+
+        this.discoverDevices(10000);
+
+        onvif.Discovery.on('device', (cam: any, rinfo: any, xml: any) => {
+            // Function will be called as soon as the NVT responses
+               
+            // Parsing of Discovery responses taken from my ONVIF-Audit project, part of the 2018 ONVIF Open Source Challenge
+            // Filter out xml name spaces
+            xml = xml.replace(/xmlns([^=]*?)=(".*?")/g, '');
+        
+            let parser = new xml2js.Parser({
+                attrkey: 'attr',
+                charkey: 'payload',                // this ensures the payload is called .payload regardless of whether the XML Tags have Attributes or not
+                explicitCharkey: true,
+                tagNameProcessors: [xml2js.processors.stripPrefix]   // strip namespace eg tt:Data -> Data
+            });
+            parser.parseString(xml,
+                async (err: Error, result: any) => {
+                    if (err) {
+                        this.console.error('discovery error', err);
+                        return;
+                    }
+                    let urn = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['EndpointReference'][0]['Address'][0].payload;
+                    let xaddrs = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['XAddrs'][0].payload;
+                    let scopes = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['Scopes'][0].payload;
+                    scopes = scopes.split(" ");
+        
+                    let hardware = "";
+                    let name = "";
+                    for (let i = 0; i < scopes.length; i++) {
+                        if (scopes[i].includes('onvif://www.onvif.org/name')) {name = decodeURI(scopes[i].substring(27));}
+                        if (scopes[i].includes('onvif://www.onvif.org/hardware')) {hardware = decodeURI(scopes[i].substring(31));}
+                    }
+                    let msg = 'Discovery Reply from ' + rinfo.address + ' (' + name + ') (' + hardware + ') (' + xaddrs + ') (' + urn + ')';
+                    this.console.log(msg);
+
+                    const isNew = !deviceManager.getNativeIds().includes(urn);
+                    if (!isNew)
+                        return;
+
+                    await deviceManager.onDeviceDiscovered({
+                        name,
+                        nativeId: urn,
+                        type: ScryptedDeviceType.Camera,
+                        interfaces: this.getInterfaces(),
+                    });
+                    const device = await this.getDevice(urn) as OnvifCamera;
+                    device.setIPAddress(rinfo.address);
+                    this.log.a('Discovered ONVIF Camera. Complete setup by providing login credentials.');
+                }
+            );
+        })
+    }
+
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Camera,
@@ -228,8 +286,12 @@ class OnvifProvider extends RtspProvider {
         ];
     }
 
-    getDevice(nativeId: string): object {
+    createCamera(nativeId: string): OnvifCamera {
         return new OnvifCamera(nativeId, this);
+    }
+
+    async discoverDevices(duration: number) {
+        onvif.Discovery.probe();
     }
 }
 
