@@ -56,10 +56,22 @@ export class AmcrestCameraClient {
 
         stream.on('data', (buffer: Buffer) => {
             const data = buffer.toString();
+            const parts = data.split(';');
+            let index: string;
+            try {
+                for (const part of parts) {
+                    if (part.startsWith('index')) {
+                        index = part.split('=')[1]?.trim();
+                    }
+                }
+            }
+            catch (e) {
+                this.console.error('error parsing index', data);
+            }
             // this.console?.log('event', data);
             for (const event of Object.values(AmcrestEvent)) {
                 if (data.indexOf(event) !== -1) {
-                    stream.emit('event', event);
+                    stream.emit('event', event, index);
                 }
             }
         });

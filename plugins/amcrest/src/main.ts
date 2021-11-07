@@ -39,7 +39,13 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
 
                 events.on('close', () => ret.emit('error', new Error('close')));
                 events.on('error', e => ret.emit('error', e));
-                events.on('event', (event: AmcrestEvent) => {
+                events.on('event', (event: AmcrestEvent, index: string) => {
+                    const channelNumber = this.getRtspChannel();
+                    if (channelNumber) {
+                        const idx = parseInt(index) + 1;
+                        if (idx.toString() !== channelNumber)
+                            return;
+                    }
                     if (event === AmcrestEvent.MotionStart) {
                         this.motionDetected = true;
                     }
