@@ -139,8 +139,15 @@ class RpcProxy implements ProxyHandler<any> {
 
 // todo: error constructor adds a "cause" variable in Chrome 93, Node v??
 export class RPCResultError extends Error {
-    constructor(message: string, public cause?: Error) {
-        super(message);
+    constructor(peer: RpcPeer, message: string, public cause?: Error, options?: { name: string, stack: string}) {
+        super(`${peer.selfName}:${peer.peerName}: ${message}`);
+
+        if (options?.name) {
+            this.name = options?.name;
+        }
+        if (options?.stack) {
+            this.stack = `${peer.peerName}:${peer.selfName}\n${options.stack.split('\n').slice(1).join('\n')}`;
+        }
     }
 }
 
@@ -176,7 +183,6 @@ export interface RpcSerializer {
 }
 
 export class RpcPeer {
-    peerName = 'Unnamed Peer';
     idCounter = 1;
     onOob: (oob: any) => void;
     params: { [name: string]: any } = {};
@@ -190,18 +196,18 @@ export class RpcPeer {
     constructorSerializerMap = new Map<string, string>();
     transportSafeArgumentTypes = getDefaultTransportSafeArgumentTypes();
 
-    constructor(public send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
+    constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
     }
 
     createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
         if (Object.isFrozen(this.pendingResults))
-            return Promise.reject(new RPCResultError('RpcPeer has been killed'));
+            return Promise.reject(new RPCResultError(this, 'RpcPeer has been killed'));
 
         const promise = new Promise((resolve, reject) => {
             const id = (this.idCounter++).toString();
             this.pendingResults[id] = { resolve, reject };
 
-            cb(id, e => reject(new RPCResultError(e.message, e)));
+            cb(id, e => reject(new RPCResultError(this, e.message, e)));
         });
 
         // todo: make this an option so rpc doesn't nuke the process if uncaught?
@@ -211,7 +217,7 @@ export class RpcPeer {
     }
 
     kill(message?: string) {
-        const error = new RPCResultError(message || 'peer was killed');
+        const error = new RPCResultError(this, message || 'peer was killed');
         for (const result of Object.values(this.pendingResults)) {
             result.reject(error);
         }
@@ -282,7 +288,7 @@ export class RpcPeer {
         if (__local_proxy_id) {
             const ret = this.localProxyMap[__local_proxy_id];
             if (!ret)
-                throw new RPCResultError(`invalid local proxy id ${__local_proxy_id}`);
+                throw new RPCResultError(this, `invalid local proxy id ${__local_proxy_id}`);
             return ret;
         }
 
@@ -418,9 +424,10 @@ export class RpcPeer {
                     if (!deferred)
                         throw new Error(`unknown result ${rpcResult.id}`);
                     if (rpcResult.message || rpcResult.stack) {
-                        const e = new RPCResultError(rpcResult.message)
-                        e.name = rpcResult.result;
-                        e.stack = rpcResult.stack;
+                        const e = new RPCResultError(this, rpcResult.message, undefined, {
+                            name: rpcResult.result,
+                            stack: rpcResult.stack,
+                        });
                         deferred.reject(e);
                         return;
                     }

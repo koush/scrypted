@@ -281,7 +281,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         return await getRemote(api, pluginId);
     }
     catch (e) {
-        throw new RPCResultError('error while retrieving PluginRemote', e);
+        throw new RPCResultError(peer, 'error while retrieving PluginRemote', e);
     }
 }
 

@@ -235,7 +235,7 @@ export class PluginHost {
             const peerin = this.worker.stdio[3] as Writable;
             const peerout = this.worker.stdio[4] as Readable;
 
-            this.peer = new RpcPeer((message, reject) => {
+            this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
                 if (connected) {
                     peerin.write(JSON.stringify(message) + '\n', e => e && reject?.(e));
                 }
@@ -265,7 +265,7 @@ export class PluginHost {
                 execArgv,
             });
 
-            this.peer = new RpcPeer((message, reject) => {
+            this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
                 if (connected) {
                     this.worker.send(message, undefined, e => {
                         if (e && reject)
@@ -298,8 +298,6 @@ export class PluginHost {
             connected = false;
             logger.log('e', `${this.pluginName} error ${e}`);
         });
-
-        this.peer.peerName = this.pluginId;
 
         this.peer.onOob = (oob: any) => {
             if (oob.type === 'stats') {
@@ -461,9 +459,20 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
 }
 
 export function startPluginClusterWorker() {
+    const peer = new RpcPeer('unknown', 'host', (message, reject) => process.send(message, undefined, {
+        swallowErrors: !reject,
+    }, e => {
+        if (e)
+            reject(e);
+    }));
+    peer.transportSafeArgumentTypes.add(Buffer.name);
+    process.on('message', message => peer.handleMessage(message as RpcMessage));
+
     const events = new EventEmitter();
 
     events.once('zip', (zip: AdmZip, pluginId: string) => {
+        peer.selfName = pluginId;
+
         installSourceMapSupport({
             environment: 'node',
             retrieveSourceMap(source) {
@@ -580,16 +589,6 @@ export function startPluginClusterWorker() {
             connect();
         }, getDeviceConsole(nativeId), `[${systemManager.getDeviceById(mixinId)?.name}]`);
     }
-
-    const peer = new RpcPeer((message, reject) => process.send(message, undefined, {
-        swallowErrors: !reject,
-    }, e => {
-        if (e)
-            reject(e);
-    }));
-    peer.peerName = 'host';
-    peer.transportSafeArgumentTypes.add(Buffer.name);
-    process.on('message', message => peer.handleMessage(message as RpcMessage));
 
     let lastCpuUsage: NodeJS.CpuUsage;
     setInterval(() => {
