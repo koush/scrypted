@@ -41,7 +41,6 @@
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "canvas": "^2.8.0",
       "@koush/face-api.js": "^0.22.3",
       "jpeg-js": "^0.4.3",
       "lodash": "^4.17.21"
@@ -54,6 +53,7 @@
       "@tensorflow-models/coco-ssd": "^2.2.2",
       "@tensorflow/tfjs": "^3.11.0",
       "@tensorflow/tfjs-core": "^3.9.0",
-      "@tensorflow/tfjs-node-gpu": "^3.11.0"
+      "@tensorflow/tfjs-node-gpu": "^3.11.0",
+      "canvas": "^2.8.0"
    }
 }

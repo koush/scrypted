@@ -31,13 +31,10 @@
     "ws": "^8.2.3"
   },
   "optionalDependencies": {
-    "canvas": "^2.8.0",
     "ffmpeg-for-homebridge": "^0.0.9",
     "mdns": "^2.7.2",
-    "serialport": "^9.2.0",
     "ts-node": "^10.2.1",
-    "typescript": "^4.4.3",
-    "zwave-js": "^8.1.1"
+    "typescript": "^4.4.3"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.4.33",

@@ -77,11 +77,8 @@ module.exports = {
 
         alias: {
             "realfs": path.resolve(__dirname, 'polyfill/realfs'),
-            "canvas": path.resolve(__dirname, 'polyfill/canvas'),
             wrtc: path.resolve(__dirname, 'polyfill/wrtc'),
             mdns: path.resolve(__dirname, 'polyfill/mdns'),
-            serialport: path.resolve(__dirname, 'polyfill/serialport'),
-            'zwave-js': path.resolve(__dirname, 'polyfill/zwave-js'),
             typescript: path.resolve(__dirname, 'polyfill/typescript'),
         },
 

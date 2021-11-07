@@ -7,7 +7,7 @@ import debounce from "lodash/debounce";
 import { Driver, Endpoint, ZWaveController, ZWaveNode, CommandClass } from "zwave-js";
 import { ValueID, CommandClasses } from "@zwave-js/core"
 import { randomBytes } from "crypto";
-import path from "path/posix";
+import path from "path";
 
 const { log, deviceManager } = sdk;
 
@@ -192,6 +192,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 name,
                 interfaces: [],
                 nativeId,
+                type: undefined,
             };
         }
 
