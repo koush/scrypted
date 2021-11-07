@@ -291,6 +291,30 @@ class OnvifProvider extends RtspProvider {
     }
 
     async discoverDevices(duration: number) {
+        const ad = this.storage.getItem('autodiscovery');
+        const cameraCount = deviceManager.getNativeIds().filter(nid => !!nid).length
+        if (ad == null) {
+            // no auto discovery state yet, but disable it if legacy cameras are found.
+            if (cameraCount) {
+                this.storage.setItem('autodiscovery', 'false');
+                this.console.log('autodiscovery bypassed. legacy cameras already exist.');
+                return;
+            }
+
+            this.storage.setItem('autodiscovery', 'true');
+        }
+        else if(ad === 'false') {
+            // auto discovery is disabled, but maybe we can reenable it.
+            if (!cameraCount) {
+                this.console.log('autodiscovery reenabled, no cameras found');
+                this.storage.setItem('autodiscovery', 'true');
+            }
+            else {
+                this.console.log('autodiscovery bypassed. running in legacy mode. set it to "true" in storage to override this (and possibly duplicate cameras). Or delete all your cameras and reload the plugin.');
+                return;
+            }
+        }
+
         onvif.Discovery.probe();
     }
 }

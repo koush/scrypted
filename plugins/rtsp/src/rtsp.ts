@@ -447,6 +447,10 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return this.storage.getItem('ip');
     }
 
+    setIPAddress(ip: string) {
+        return this.storage.setItem('ip', ip);
+    }
+
     getRtspAddress() {
         return `${this.getIPAddress()}:${this.storage.getItem('rtspPort') || 554}`;
     }
