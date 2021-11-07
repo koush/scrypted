@@ -2,14 +2,13 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import * as tf from '@tensorflow/tfjs-core';
-import { ENV, tensor3d } from '@tensorflow/tfjs-core';
-import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
+import * as tf from '@tensorflow/tfjs-node-gpu';
+import { ENV, tensor3d } from '@tensorflow/tfjs-node-gpu';
 import * as coco from '@tensorflow-models/coco-ssd';
 import path from 'path';
 import fetch from 'node-fetch';
-import * as faceapi from 'face-api.js';
-import { FaceDetection, FaceMatcher, LabeledFaceDescriptors } from 'face-api.js';
+import * as faceapi from '@koush/face-api.js';
+import { FaceDetection, FaceMatcher, LabeledFaceDescriptors } from '@koush/face-api.js';
 import canvas, { createCanvas } from 'canvas';
 import { Canvas, Image, ImageData } from 'canvas';
 import { randomBytes } from 'crypto';
@@ -42,9 +41,9 @@ function observeLoadError(promise: Promise<any>) {
 }
 
 const ssdPromise = (async () => {
-  setWasmPaths('wasm/')
+  // setWasmPaths('wasm/')
 
-  await tf.setBackend('wasm');
+  // await tf.setBackend('wasm');
   const fdnPromise = faceapi.nets.ssdMobilenetv1.loadFromDisk('./');
   observeLoadError(fdnPromise);
   const flnPromise = faceapi.nets.faceLandmark68Net.loadFromDisk('./');
