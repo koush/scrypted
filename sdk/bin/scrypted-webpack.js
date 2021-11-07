@@ -167,7 +167,6 @@ else {
                     const t = tmp.tmpNameSync({
                         postfix: '.js',
                     });
-                    console.log(t);
                     fs.writeFileSync(t, `
                         const e = __non_webpack_require__('${opt}');
                         module.exports = e;
