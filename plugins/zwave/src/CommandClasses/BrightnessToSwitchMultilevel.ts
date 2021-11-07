@@ -4,15 +4,15 @@ import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
 
 export class BrightnessToSwitchMultilevel extends ZwaveDeviceBase implements OnOff, Brightness {
     async turnOff() {
-        this.setBrightnessInternal(0);
+        await this.setBrightnessInternal(0);
     }
 
     async turnOn() {
-        this.setBrightnessInternal(255);
+        await this.setBrightnessInternal(255);
     }
 
     async setBrightness(brightness: number) {
-        this.setBrightnessInternal(Math.min(Math.max(brightness, 0), 99));
+        await this.setBrightnessInternal(Math.min(Math.max(brightness, 0), 99));
     }
 
     async setBrightnessInternal(brightness: number): Promise<void> {
@@ -26,7 +26,8 @@ export class BrightnessToSwitchMultilevel extends ZwaveDeviceBase implements OnO
 
     _refresh() {
         setTimeout(() => {
-            this.instance.getNodeUnsafe().refreshCCValues(CommandClasses["Multilevel Switch"]);
+            this.instance.getNodeUnsafe().refreshCCValues(CommandClasses["Multilevel Switch"])
+            .catch(_ => {});
         }, 5000);
     }
 
