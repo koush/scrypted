@@ -264,15 +264,17 @@ export declare enum HumidityMode {
     Auto = "Auto"
 }
 export interface HumidityCommand {
-    mode?: HumidityMode;
-    setpoint?: number;
+    mode: HumidityMode;
+    setpoint: number;
 }
-export interface HumiditySettingStatus extends HumidityCommand {
-    activeMode?: HumidityMode;
-    availableModes?: HumidityMode[];
+export interface HumiditySettingStatus {
+    mode: HumidityMode;
+    setpoint: number;
+    activeMode: HumidityMode;
+    availableModes: HumidityMode[];
 }
 export interface HumiditySetting {
-    humiditySetting: HumiditySettingStatus;
+    humiditySetting?: HumiditySettingStatus;
     setHumidity(humidity: HumidityCommand): Promise<void>;
 }
 export interface FanStatus {
