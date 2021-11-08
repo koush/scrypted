@@ -132,7 +132,7 @@ export class ScryptedRuntime {
 
         // purge logs older than 2 hours every hour
         setInterval(() => {
-            this.logger.purge(Date.now() - 2 * 60 * 60 * 1000);
+            this.logger.purge(Date.now() - 48 * 60 * 60 * 1000);
         }, 60 * 60 * 1000);
     }
 
