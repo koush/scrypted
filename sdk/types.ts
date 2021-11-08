@@ -300,6 +300,12 @@ export interface HumiditySetting {
   setHumidity(humidity: HumidityCommand): Promise<void>;
 }
 export interface FanStatus {
+  /**
+   * RPM. Negative numbers are valid to indicate fan direction,
+   * if it rotates in both directions.
+   * A fan speed of zero indicates it is active, but currently off.
+   * A fan speed of null or undefined indicates the fan is off.
+   */
   speed?: number;
   /**
    * Available fan speed range in RPM.
@@ -307,12 +313,6 @@ export interface FanStatus {
   availableSpeeds: [number, number];
 }
 export interface Fan {
-  /**
-   * RPM. Negative numbers are valid to indicate fan direction,
-   * if it rotates in both directions.
-   * A fan speed of zero indicates it is active, but currently off.
-   * A fan speed of null or undefined indicates the fan is off.
-   */
   fan?: FanStatus;
   setFanSpeed(speed: number): Promise<void>;
 }
@@ -1124,6 +1124,8 @@ export enum ScryptedInterface {
   Pause = "Pause",
   Dock = "Dock",
   TemperatureSetting = "TemperatureSetting",
+  HumiditySetting = "HumiditySetting",
+  Fan = "Fan",
   Thermometer = "Thermometer",
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",

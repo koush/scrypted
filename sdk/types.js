@@ -83,6 +83,8 @@ var ScryptedInterface;
     ScryptedInterface["Pause"] = "Pause";
     ScryptedInterface["Dock"] = "Dock";
     ScryptedInterface["TemperatureSetting"] = "TemperatureSetting";
+    ScryptedInterface["HumiditySetting"] = "HumiditySetting";
+    ScryptedInterface["Fan"] = "Fan";
     ScryptedInterface["Thermometer"] = "Thermometer";
     ScryptedInterface["HumiditySensor"] = "HumiditySensor";
     ScryptedInterface["Camera"] = "Camera";
