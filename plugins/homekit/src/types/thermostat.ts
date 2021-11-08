@@ -93,7 +93,7 @@ addSupportedType({
             bindCharacteristic(device, ScryptedInterface.HumiditySensor, service, Characteristic.CurrentRelativeHumidity,
                 () => device.humidity || 0);
         }
-        
+
         if (device.interfaces.includes(ScryptedInterface.HumiditySetting) && device.interfaces.includes(ScryptedInterface.HumiditySensor)) {
             const humidityService = accessory.addService(Service.HumidifierDehumidifier);
 
@@ -116,7 +116,7 @@ addSupportedType({
                 () => device.humidity || 0);
 
             bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.CurrentHumidifierDehumidifierState,
-                () => !device.humiditySetting?.activeMode || device.humiditySetting?.activeMode === HumidityMode.Off
+                () => !device.humiditySetting?.activeMode
                     ? Characteristic.CurrentHumidifierDehumidifierState.INACTIVE
                     : device.humiditySetting.activeMode === HumidityMode.Dehumidify
                         ? Characteristic.CurrentHumidifierDehumidifierState.DEHUMIDIFYING
@@ -138,6 +138,24 @@ addSupportedType({
                         : value === Characteristic.TargetHumidifierDehumidifierState.DEHUMIDIFIER
                             ? HumidityMode.Dehumidify
                             : HumidityMode.Auto
+                });
+            });
+
+            bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.RelativeHumidityHumidifierThreshold,
+                () => device.humiditySetting?.humidiferSetpoint || 0);
+            humidityService.getCharacteristic(Characteristic.RelativeHumidityHumidifierThreshold).on(CharacteristicEventTypes.SET, (value, callback) => {
+                callback();
+                device.setHumidity({
+                    humidiferSetpoint: value as number,
+                });
+            });
+
+            bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.RelativeHumidityDehumidifierThreshold,
+                () => device.humiditySetting?.dehumidiferSetpoint || 0);
+            humidityService.getCharacteristic(Characteristic.RelativeHumidityDehumidifierThreshold).on(CharacteristicEventTypes.SET, (value, callback) => {
+                callback();
+                device.setHumidity({
+                    dehumidiferSetpoint: value as number,
                 });
             });
         }
