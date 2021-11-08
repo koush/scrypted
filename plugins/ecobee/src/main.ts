@@ -466,43 +466,43 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     }
 
     // Get a list of all accessible devices
-    const devices = (await this.req('get', 'thermostat', null, {
+    const apiDevices = (await this.req('get', 'thermostat', null, {
       json: `\{"selection":\{"selectionType":"registered","selectionMatch":""\}\}`
     })).thermostatList
-    this.console.log(`Discovered ${devices.length} devices.`)
+    this.console.log(`Discovered ${apiDevices.length} devices.`)
 
-    let deviceList = [];
-    for (let i = 0; i < devices.length; i++) {
-      var info: DeviceInformation = {
-        model: devices[i].brand,
-        manufacturer: devices[i].modelNumber,
-        serialNumber: devices[i].identifier,
-      }
-
-      deviceList.push({
-        nativeId: devices[i].identifier,
-        name: `${devices[i].modelNumber} thermostat`,
+    // Create a list of devices found from the API
+    const devices: Device[] = [];
+    for (let apiDevice of apiDevices) {
+      const device: Device = {
+        nativeId: apiDevice.identifier,
+        name: `${apiDevice.modelNumber} thermostat`,
         type: ScryptedDeviceType.Thermostat,
-        info: info,
+        info: {
+          model: apiDevice.brand,
+          manufacturer: apiDevice.modelNumber,
+          serialNumber: apiDevice.identifier,
+        },
         interfaces: [
           ScryptedInterface.HumiditySensor,
           ScryptedInterface.Thermometer,
           ScryptedInterface.TemperatureSetting,
           ScryptedInterface.Refresh,
           ScryptedInterface.OnOff,
-        ]
-      })
-      let device = this.devices.get(devices[i].identifier);
-      if (!device) {
-        // set device info
-        device = new EcobeeThermostat(devices[i].identifier, this, info)
-        this.devices.set(devices[i].identifier, device)
+        ],
+      }
+      devices.push(device);
+
+      let providerDevice = this.devices.get(device.nativeId);
+      if (!providerDevice) {
+        providerDevice = new EcobeeThermostat(device.nativeId, this, device.info)
+        this.devices.set(apiDevice.identifier, providerDevice)
       }
     }
 
     // Sync full device list
     await deviceManager.onDevicesChanged({
-        devices: deviceList,
+        devices,
     });
   }
 
