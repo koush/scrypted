@@ -4,7 +4,7 @@ import { H264Level, H264Profile } from '../../hap';
 
 import sdk from '@scrypted/sdk';
 
-import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from 'hap-nodejs/dist/lib/camera/RecordingManagement';
+import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from 'hap-nodejs/src/lib/camera/RecordingManagement';
 import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { evalRequest } from './camera-transcode';
 

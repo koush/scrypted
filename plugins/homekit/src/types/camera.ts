@@ -10,15 +10,17 @@ import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import debounce from 'lodash/debounce';
 
-import { CameraRecordingDelegate } from 'hap-nodejs';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions } from 'hap-nodejs/dist/lib/camera/RecordingManagement';
+import { CameraRecordingDelegate } from '../hap';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions } from 'hap-nodejs/src/lib/camera/RecordingManagement';
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
-import { ContactSensor } from 'hap-nodejs/dist/lib/definitions';
+import { Active, ContactSensor } from 'hap-nodejs/src/lib/definitions';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSnapshotHandler } from './camera/camera-snapshot';
 import { evalRequest } from './camera/camera-transcode';
+import { CharacteristicEventTypes, Service, WithUUID } from 'hap-nodejs/src';
+import { RecordingManagement } from 'hap-nodejs/src/lib/camera';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -432,12 +434,12 @@ addSupportedType({
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
         const linkedMotionSensor = storage.getItem('linkedMotionSensor');
 
+        const storageKeySelectedRecordingConfiguration = 'selectedRecordingConfiguration';
+
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
-                prepareRecording(recording) {
-                    console.log('prepareRecording', recording);
-                },
-                handleFragmentsRequests(configuration): AsyncGenerator<Buffer, void, unknown> {
+                handleFragmentsRequests(): AsyncGenerator<Buffer, void, unknown> {
+                    const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
                     return handleFragmentsRequests(device, configuration, console)
                 }
             };
@@ -511,20 +513,49 @@ addSupportedType({
                 () => motionDevice.audioDetected || motionDevice.motionDetected :
                 () => !!motionDevice.motionDetected;
 
-            const service = controller.motionService;
+            const { motionService } = controller;
             bindCharacteristic(motionDevice,
                 ScryptedInterface.MotionSensor,
-                service,
+                motionService,
                 Characteristic.MotionDetected,
                 () => motionDetected(), true)
 
             if (needAudioMotionService) {
                 bindCharacteristic(motionDevice,
                     ScryptedInterface.AudioSensor,
-                    service,
+                    motionService,
                     Characteristic.MotionDetected,
                     () => motionDetected(), true)
             }
+
+            const { recordingManagement } = controller;
+
+            const persistBooleanCharacteristic = (service: Service, characteristic: WithUUID<{ new(): Characteristic }>) => {
+                const property = `characteristic-v2-${characteristic.UUID}`
+                service.getCharacteristic(characteristic)
+                    .on(CharacteristicEventTypes.GET, callback => callback(null, storage.getItem(property) === 'true'))
+                    .on(CharacteristicEventTypes.SET, (value, callback) => {
+                        callback();
+                        storage.setItem(property, (!!value).toString());
+                    });
+            }
+
+            persistBooleanCharacteristic(recordingManagement.getService(), Characteristic.Active);
+            persistBooleanCharacteristic(recordingManagement.getService(), Characteristic.RecordingAudioActive);
+            persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.EventSnapshotsActive);
+            persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.HomeKitCameraActive);
+            persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.PeriodicSnapshotsActive);
+
+
+            recordingManagement.getService().getCharacteristic(Characteristic.SelectedCameraRecordingConfiguration)
+                .on(CharacteristicEventTypes.GET, callback => {
+                    callback(null, storage.getItem(storageKeySelectedRecordingConfiguration) || '');
+                })
+                .on(CharacteristicEventTypes.SET, (value, callback) => {
+                    // prepare recording here if necessary.
+                    storage.setItem(storageKeySelectedRecordingConfiguration, value.toString());
+                    callback();
+                });
         }
 
 
@@ -536,17 +567,17 @@ addSupportedType({
             }
             catch (e) {
             }
-    
+
             for (const ojs of new Set(objectDetectionContactSensors)) {
                 const sensor = new ContactSensor(`${device.name}: ` + ojs, ojs);
                 accessory.addService(sensor);
                 const isPerson = ojs.startsWith('Person: ');
-    
+
                 let contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
                 bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.ContactSensorState, (source, details, data) => {
                     if (!source)
                         return contactState;
-    
+
                     const ed: ObjectDetection = data;
                     if (!isPerson) {
                         if (!ed.detections)
@@ -555,13 +586,13 @@ addSupportedType({
                         contactState = objects.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED
                         return contactState;
                     }
-    
+
                     if (!ed.people)
                         return contactState;
-    
+
                     const people = ed.people.map(d => 'Person: ' + d.label);
                     contactState = people.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED;
-    
+
                     return contactState;
                 }, true);
             }
