@@ -1,9 +1,10 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.0.103",
+  "version": "0.0.104",
   "description": "",
   "main": "index.js",
   "scripts": {
+    "prepublishOnly": "npm run build",
     "build": "tsc",
     "webpack": "webpack-cli --config webpack.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -34,10 +34,10 @@ var ScryptedDeviceType;
 })(ScryptedDeviceType = exports.ScryptedDeviceType || (exports.ScryptedDeviceType = {}));
 var HumidityMode;
 (function (HumidityMode) {
-    HumidityMode["Off"] = "Off";
     HumidityMode["Humidify"] = "Humidify";
     HumidityMode["Dehumidify"] = "Dehumidify";
     HumidityMode["Auto"] = "Auto";
+    HumidityMode["Off"] = "Off";
 })(HumidityMode = exports.HumidityMode || (exports.HumidityMode = {}));
 var FanMode;
 (function (FanMode) {

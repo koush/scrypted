@@ -258,19 +258,19 @@ export interface TemperatureSetting {
     thermostatSetpointLow?: number;
 }
 export declare enum HumidityMode {
-    Off = "Off",
     Humidify = "Humidify",
     Dehumidify = "Dehumidify",
-    Auto = "Auto"
+    Auto = "Auto",
+    Off = "Off"
 }
 export interface HumidityCommand {
-    mode: HumidityMode;
-    setpoint: number;
+    mode?: HumidityMode;
+    setpoint?: number;
 }
 export interface HumiditySettingStatus {
     mode: HumidityMode;
     setpoint: number;
-    activeMode: HumidityMode;
+    activeMode?: HumidityMode;
     availableModes: HumidityMode[];
 }
 export interface HumiditySetting {
