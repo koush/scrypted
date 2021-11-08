@@ -269,6 +269,8 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     listener = (event: Buffer) => {
         const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
 
+        this.debugLog('event', updatePacket);
+
         if (!updatePacket) {
             this.console.error("%s: Unable to process message from the realtime update events API.", this.api.getNvrName());
             return;
@@ -292,6 +294,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
                 // Now filter out payloads we aren't interested in. We only want motion detection and doorbell rings for now.
                 if (!payload.isMotionDetected && !payload.lastRing && !payload.lcdMessage) {
+                    this.debugLog('not a motion event');
                     return;
                 }
 
@@ -300,6 +303,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
                 // We don't know about this camera - we're done.
                 if (!rtsp) {
+                    this.debugLog('unknown camera');
                     return;
                 }
 
