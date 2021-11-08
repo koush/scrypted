@@ -100,7 +100,13 @@ addSupportedType({
             const humidityService = accessory.addService(Service.HumidifierDehumidifier);
 
             bindCharacteristic(device, ScryptedInterface.HumiditySensor, humidityService, Characteristic.Active,
-                () => !!device.humiditySetting?.activeMode);
+                () => {
+                    if (!device.humiditySetting?.activeMode)
+                        return false;
+                    if (device.humiditySetting.activeMode === HumidityMode.Off)
+                        return false;
+                    return true;
+                });
             humidityService.getCharacteristic(Characteristic.Active).on(CharacteristicEventTypes.SET, (value, callback) => {
                 callback();
                 device.setHumidity({
