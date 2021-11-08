@@ -46,7 +46,6 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
   device: any;
   revisionList: string[];
   provider: EcobeeController;
-  information: DeviceInformation;
   on: boolean;
   humOn: boolean;
 
