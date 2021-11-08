@@ -1,7 +1,7 @@
 export * from './types'
 import { ScryptedInterfaceProperty } from './types';
 import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager } from './types';
-import type { DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, ScryptedDevice } from './types';
+import type { HumiditySettingStatus, DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, FanStatus } from './types';
 
 export class ScryptedDeviceBase implements DeviceState {
   id?: string;
@@ -39,6 +39,8 @@ export class ScryptedDeviceBase implements DeviceState {
   thermostatSetpoint?: number;
   thermostatSetpointHigh?: number;
   thermostatSetpointLow?: number;
+  humiditySetting?: HumiditySettingStatus;
+  fan?: FanStatus;
   lockState?: LockState;
   entryOpen?: boolean;
   batteryLevel?: number;

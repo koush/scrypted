@@ -265,7 +265,7 @@ export interface Dock {
 /**
  * TemperatureSetting represents a thermostat device.
  */
-export interface TemperatureSetting extends Thermometer, HumiditySensor {
+export interface TemperatureSetting {
   setThermostatMode(mode: ThermostatMode): Promise<void>;
 
   setThermostatSetpoint(degrees: number): Promise<void>;
@@ -280,6 +280,41 @@ export interface TemperatureSetting extends Thermometer, HumiditySensor {
   thermostatSetpoint?: number;
   thermostatSetpointHigh?: number;
   thermostatSetpointLow?: number;
+}
+export enum HumidityMode {
+  Off = "Off",
+  Humidify = "Humidify",
+  Dehumidify = "Dehumidify",
+  Auto = "Auto",
+}
+export interface HumidityCommand {
+  mode?: HumidityMode;
+  setpoint?: number;
+}
+export interface HumiditySettingStatus extends HumidityCommand {
+  activeMode?: HumidityMode;
+  availableModes?: HumidityMode[];
+}
+export interface HumiditySetting {
+  humiditySetting: HumiditySettingStatus;
+  setHumidity(humidity: HumidityCommand): Promise<void>;
+}
+export interface FanStatus {
+  speed?: number;
+  /**
+   * Available fan speed range in RPM.
+   */
+  availableSpeeds: [number, number];
+}
+export interface Fan {
+  /**
+   * RPM. Negative numbers are valid to indicate fan direction,
+   * if it rotates in both directions.
+   * A fan speed of zero indicates it is active, but currently off.
+   * A fan speed of null or undefined indicates the fan is off.
+   */
+  fan?: FanStatus;
+  setFanSpeed(speed: number): Promise<void>;
 }
 export interface Thermometer {
   /**
@@ -1668,6 +1703,24 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       "getDetectionInput",
       "getObjectTypes",
     ]
+  },
+  HumiditySetting: {
+    name: "HumiditySetting",
+    properties: [
+      "humiditySetting",
+    ],
+    methods: [
+      "setHumidity",
+    ]
+  },
+  Fan: {
+    name: "Fan",
+    properties: [
+      "fan",
+    ],
+    methods: [
+      "setFanSpeed",
+    ],
   }
 } as any;
 

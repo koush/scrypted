@@ -1,6 +1,6 @@
 export * from './types';
 import type { ScryptedNativeId } from './types';
-import type { DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position } from './types';
+import type { HumiditySettingStatus, DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, FanStatus } from './types';
 export declare class ScryptedDeviceBase implements DeviceState {
     nativeId?: string;
     id?: string;
@@ -38,6 +38,8 @@ export declare class ScryptedDeviceBase implements DeviceState {
     thermostatSetpoint?: number;
     thermostatSetpointHigh?: number;
     thermostatSetpointLow?: number;
+    humiditySetting?: HumiditySettingStatus;
+    fan?: FanStatus;
     lockState?: LockState;
     entryOpen?: boolean;
     batteryLevel?: number;

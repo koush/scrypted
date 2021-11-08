@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ScryptedInterfaceDescriptors = exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterfaceProperty = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.ScryptedDeviceType = void 0;
+exports.ScryptedInterfaceDescriptors = exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterfaceProperty = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.HumidityMode = exports.ScryptedDeviceType = void 0;
 var ScryptedDeviceType;
 (function (ScryptedDeviceType) {
     ScryptedDeviceType["Builtin"] = "Builtin";
@@ -32,6 +32,13 @@ var ScryptedDeviceType;
     ScryptedDeviceType["Person"] = "Person";
     ScryptedDeviceType["Unknown"] = "Unknown";
 })(ScryptedDeviceType = exports.ScryptedDeviceType || (exports.ScryptedDeviceType = {}));
+var HumidityMode;
+(function (HumidityMode) {
+    HumidityMode["Off"] = "Off";
+    HumidityMode["Humidify"] = "Humidify";
+    HumidityMode["Dehumidify"] = "Dehumidify";
+    HumidityMode["Auto"] = "Auto";
+})(HumidityMode = exports.HumidityMode || (exports.HumidityMode = {}));
 var TemperatureUnit;
 (function (TemperatureUnit) {
     TemperatureUnit["C"] = "C";
@@ -602,6 +609,24 @@ exports.ScryptedInterfaceDescriptors = {
             "getDetectionInput",
             "getObjectTypes",
         ]
+    },
+    HumiditySetting: {
+        name: "HumiditySetting",
+        properties: [
+            "humiditySetting",
+        ],
+        methods: [
+            "setHumidity",
+        ]
+    },
+    Fan: {
+        name: "Fan",
+        properties: [
+            "fan",
+        ],
+        methods: [
+            "setFanSpeed",
+        ],
     }
 };
 //# sourceMappingURL=types.js.map

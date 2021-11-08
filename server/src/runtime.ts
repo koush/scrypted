@@ -601,7 +601,7 @@ export class ScryptedRuntime {
         await this.datastore.remove(device);
         if (providerId == null || providerId === device._id) {
             const plugin = await this.datastore.tryGet(Plugin, device.pluginId);
-            await this.killPlugin(plugin);
+            this.killPlugin(plugin);
             await this.datastore.remove(plugin);
         }
         this.stateManager.removeDevice(device._id);
@@ -665,7 +665,6 @@ export class ScryptedRuntime {
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedRoom, providedRoom);
         if (isUsingDefaultRoom)
             this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.room, getProvidedRoomOrDefault(pluginDevice));
-        // pluginDevice.state.model = device.model;
 
         const ret = this.notifyPluginDeviceDescriptorChanged(pluginDevice);
 
