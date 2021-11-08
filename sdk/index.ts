@@ -1,5 +1,5 @@
 export * from './types'
-import { ScryptedInterfaceProperty } from './types';
+import { ScryptedInterfaceProperty } from './properties.gen';
 import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager } from './types';
 import type { HumiditySettingStatus, DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, FanStatus } from './types';
 

@@ -5,6 +5,9 @@
         "noImplicitAny": true,
         "esModuleInterop": true,
         "sourceMap": true,
-        "declaration": true
+        "declaration": true,
     },
+    "exclude": [
+        "gen"
+    ]
 }

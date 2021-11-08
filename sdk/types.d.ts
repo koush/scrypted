@@ -1064,54 +1064,6 @@ export declare enum ScryptedInterface {
     Scriptable = "Scriptable",
     ObjectDetector = "ObjectDetector"
 }
-export declare enum ScryptedInterfaceProperty {
-    id = "id",
-    interfaces = "interfaces",
-    mixins = "mixins",
-    info = "info",
-    name = "name",
-    providedInterfaces = "providedInterfaces",
-    providedName = "providedName",
-    providedRoom = "providedRoom",
-    providedType = "providedType",
-    providerId = "providerId",
-    room = "room",
-    type = "type",
-    on = "on",
-    brightness = "brightness",
-    colorTemperature = "colorTemperature",
-    rgb = "rgb",
-    hsv = "hsv",
-    running = "running",
-    paused = "paused",
-    docked = "docked",
-    thermostatAvailableModes = "thermostatAvailableModes",
-    thermostatMode = "thermostatMode",
-    thermostatActiveMode = "thermostatActiveMode",
-    thermostatSetpoint = "thermostatSetpoint",
-    thermostatSetpointHigh = "thermostatSetpointHigh",
-    thermostatSetpointLow = "thermostatSetpointLow",
-    temperature = "temperature",
-    temperatureUnit = "temperatureUnit",
-    humidity = "humidity",
-    lockState = "lockState",
-    entryOpen = "entryOpen",
-    batteryLevel = "batteryLevel",
-    online = "online",
-    updateAvailable = "updateAvailable",
-    fromMimeType = "fromMimeType",
-    toMimeType = "toMimeType",
-    binaryState = "binaryState",
-    intrusionDetected = "intrusionDetected",
-    powerDetected = "powerDetected",
-    motionDetected = "motionDetected",
-    audioDetected = "audioDetected",
-    occupied = "occupied",
-    flooded = "flooded",
-    ultraviolet = "ultraviolet",
-    luminance = "luminance",
-    position = "position"
-}
 export interface RTCAVMessage {
     id: string;
     description: RTCSessionDescriptionInit;
@@ -1128,15 +1080,9 @@ export declare enum ScryptedMimeTypes {
     RTCAVOffer = "x-scrypted/x-rtc-av-offer",
     RTCAVAnswer = "x-scrypted/x-rtc-av-answer"
 }
+export * from './descriptor';
+export * from './properties.gen';
 export declare const SCRYPTED_MEDIA_SCHEME = "scryped-media://";
-export interface ScryptedInterfaceDescriptor {
-    name: string;
-    properties: ScryptedInterfaceProperty[];
-    methods: string[];
-}
-export declare const ScryptedInterfaceDescriptors: {
-    [scryptedInterface: string]: ScryptedInterfaceDescriptor;
-};
 export interface ScryptedStatic {
     /**
      * @deprecated

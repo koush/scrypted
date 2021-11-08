@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -7,6 +7,8 @@ import axios from 'axios';
 import throttle from 'lodash/throttle';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
+
+console.log(ScryptedInterfaceProperty)
 
 const refreshFrequency = 60;
 
