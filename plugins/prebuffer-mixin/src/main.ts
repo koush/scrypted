@@ -313,28 +313,37 @@ class PrebufferSession {
           server.close();
           const now = Date.now();
 
+
+          const safeWriteData = (chunk: StreamChunk) => {
+            const buffered = writeData(chunk);
+            if (buffered > 100000000) {
+              this.console.log('more than 100MB has been buffered, did downstream die? killing connection.');
+              cleanup();
+            }
+          }
+
           const cleanup = () => {
             destroy();
             this.console.log('prebuffer request ended');
-            this.events.removeListener(eventName, writeData);
+            this.events.removeListener(eventName, safeWriteData);
             session.events.removeListener('killed', cleanup);
           }
 
-          this.events.on(eventName, writeData);
+          this.events.on(eventName, safeWriteData);
           session.events.once('killed', cleanup);
 
           for (const prebuffer of prebufferContainer) {
             if (prebuffer.time < now - requestedPrebuffer)
               continue;
 
-            writeData(prebuffer.chunk);
+              safeWriteData(prebuffer.chunk);
           }
 
           // for some reason this doesn't work as well as simply guessing and dumping.
           // const parser = this.parsers[container];
           // const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
           // for (const prebuffer of availablePrebuffers) {
-          //   writeData(prebuffer);
+          //   safeWriteData(prebuffer);
           // }
           return cleanup;
         }

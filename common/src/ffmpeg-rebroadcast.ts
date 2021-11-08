@@ -227,7 +227,7 @@ export interface RebroadcastSessionCleanup {
 }
 
 export interface RebroadcasterOptions {
-    connect?: (writeData: (data: StreamChunk) => void, cleanup: () => void) => RebroadcastSessionCleanup|undefined;
+    connect?: (writeData: (data: StreamChunk) => number, cleanup: () => void) => RebroadcastSessionCleanup|undefined;
 }
 
 export async function createRebroadcaster(options?: RebroadcasterOptions): Promise<Rebroadcaster> {
@@ -243,6 +243,8 @@ export async function createRebroadcaster(options?: RebroadcasterOptions): Promi
             for (const chunk of data.chunks) {
                 socket.write(chunk);
             }
+
+            return socket.writableLength;
         };
 
         const cleanup = () => {
