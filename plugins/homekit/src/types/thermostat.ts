@@ -1,5 +1,6 @@
 
-import { Fan, FanMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
+import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
+import { access } from 'fs';
 import { Accessory } from 'hap-nodejs';
 import { ROTATION_DIRECTION_CTYPE } from 'hap-nodejs/src/accessories/types';
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
@@ -93,6 +94,48 @@ addSupportedType({
         if (device.interfaces.includes(ScryptedInterface.HumiditySensor)) {
             bindCharacteristic(device, ScryptedInterface.HumiditySensor, service, Characteristic.CurrentRelativeHumidity,
                 () => device.humidity || 0);
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.HumiditySetting) && device.interfaces.includes(ScryptedInterface.HumiditySensor)) {
+            const humidityService = accessory.addService(Service.HumidifierDehumidifier);
+
+            bindCharacteristic(device, ScryptedInterface.HumiditySensor, humidityService, Characteristic.Active,
+                () => !!device.humiditySetting?.activeMode);
+            humidityService.getCharacteristic(Characteristic.Active).on(CharacteristicEventTypes.SET, (value, callback) => {
+                callback();
+                device.setHumidity({
+                    mode: value ? HumidityMode.Auto : HumidityMode.Off
+                });
+            });
+
+            bindCharacteristic(device, ScryptedInterface.HumiditySensor, humidityService, Characteristic.CurrentRelativeHumidity,
+                () => device.humidity || 0);
+
+            bindCharacteristic(device, ScryptedInterface.HumiditySensor, humidityService, Characteristic.CurrentHumidifierDehumidifierState,
+                () => !device.humiditySetting?.activeMode || device.humiditySetting?.activeMode === HumidityMode.Off
+                    ? Characteristic.CurrentHumidifierDehumidifierState.INACTIVE
+                    : device.humiditySetting.activeMode === HumidityMode.Dehumidify
+                        ? Characteristic.CurrentHumidifierDehumidifierState.DEHUMIDIFYING
+                        : device.humiditySetting.activeMode === HumidityMode.Humidify
+                            ? Characteristic.CurrentHumidifierDehumidifierState.HUMIDIFYING
+                            : Characteristic.CurrentHumidifierDehumidifierState.IDLE);
+
+            bindCharacteristic(device, ScryptedInterface.HumiditySensor, humidityService, Characteristic.TargetHumidifierDehumidifierState,
+                () => !device.humiditySetting?.mode || device.humiditySetting?.mode === HumidityMode.Auto
+                    ? Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER_OR_DEHUMIDIFIER
+                    : device.humiditySetting?.mode === HumidityMode.Dehumidify
+                        ? Characteristic.TargetHumidifierDehumidifierState.DEHUMIDIFIER
+                        : Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER);
+            humidityService.getCharacteristic(Characteristic.TargetHumidifierDehumidifierState).on(CharacteristicEventTypes.SET, (value, callback) => {
+                callback();
+                device.setHumidity({
+                    mode: value === Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER
+                        ? HumidityMode.Humidify
+                        : value === Characteristic.TargetHumidifierDehumidifierState.DEHUMIDIFIER
+                            ? HumidityMode.Dehumidify
+                            : HumidityMode.Auto
+                });
+            });
         }
 
         if (device.interfaces.includes(ScryptedInterface.Fan)) {
