@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ScryptedInterfaceDescriptors = exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterfaceProperty = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.HumidityMode = exports.ScryptedDeviceType = void 0;
+exports.ScryptedInterfaceDescriptors = exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterfaceProperty = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = void 0;
 var ScryptedDeviceType;
 (function (ScryptedDeviceType) {
     ScryptedDeviceType["Builtin"] = "Builtin";
@@ -39,6 +39,11 @@ var HumidityMode;
     HumidityMode["Dehumidify"] = "Dehumidify";
     HumidityMode["Auto"] = "Auto";
 })(HumidityMode = exports.HumidityMode || (exports.HumidityMode = {}));
+var FanMode;
+(function (FanMode) {
+    FanMode["Auto"] = "Auto";
+    FanMode["Manual"] = "Manual";
+})(FanMode = exports.FanMode || (exports.FanMode = {}));
 var TemperatureUnit;
 (function (TemperatureUnit) {
     TemperatureUnit["C"] = "C";
@@ -627,7 +632,7 @@ exports.ScryptedInterfaceDescriptors = {
             "fan",
         ],
         methods: [
-            "setFanSpeed",
+            "setFan",
         ],
     }
 };

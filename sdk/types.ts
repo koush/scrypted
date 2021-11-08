@@ -301,22 +301,32 @@ export interface HumiditySetting {
   humiditySetting?: HumiditySettingStatus;
   setHumidity(humidity: HumidityCommand): Promise<void>;
 }
+export enum FanMode {
+  Auto = "Auto",
+  Manual = "Manual",
+}
 export interface FanStatus {
   /**
-   * RPM. Negative numbers are valid to indicate fan direction,
-   * if it rotates in both directions.
-   * A fan speed of zero indicates it is active, but currently off.
-   * A fan speed of null or undefined indicates the fan is off.
+   * Rotations per minute, if available, otherwise 0 or 1.
    */
-  speed?: number;
+  speed: number;
+  mode?: FanMode;
+  active?: boolean;
   /**
-   * Available fan speed range in RPM.
+   * Rotations per minute, if available.
    */
-  availableSpeeds: [number, number];
+  maxSpeed?: number;
+  counterClockwise?: boolean;
+  availableModes?: FanMode[];
+}
+export interface FanState {
+  speed?: number;
+  mode?: FanMode;
+  counterClockwise?: boolean;
 }
 export interface Fan {
   fan?: FanStatus;
-  setFanSpeed(speed: number): Promise<void>;
+  setFan(fan: FanState): Promise<void>;
 }
 export interface Thermometer {
   /**
@@ -1723,7 +1733,7 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       "fan",
     ],
     methods: [
-      "setFanSpeed",
+      "setFan",
     ],
   }
 } as any;
