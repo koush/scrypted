@@ -31,7 +31,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
     getUsername() {
         let username = this.storage.getItem("mac");
-
         // the HAP sample uses the mac address, but this is problematic if running
         // side by side with homebridge, multi instance, etc.
         if (!username) {
@@ -40,8 +39,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 buffers.push(randomBytes(1).toString('hex'));
             }
             username = buffers.join(':');
+            this.storage.setItem('mac', username);
         }
-        this.storage.setItem('mac', username);
         return username;
     }
 
