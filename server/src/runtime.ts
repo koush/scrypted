@@ -439,14 +439,16 @@ export class ScryptedRuntime {
             return;
         
         const reduced = Object.assign({}, packageJson);
-        delete reduced.dependencies;
+        reduced.dependencies = reduced.optionalDependencies;
+        delete reduced.optionalDependencies;
         delete reduced.devDependencies;
 
         const pluginVolume = ensurePluginVolume(reduced.name);
         const optPj = path.join(pluginVolume, 'package.json');
         fs.writeFileSync(optPj, JSON.stringify(reduced));
-        const cp = child_process.spawn('npm', ['install'], {
+        const cp = child_process.spawn('npm', ['--prefix', pluginVolume, 'install'], {
             cwd: pluginVolume,
+            stdio: 'inherit',
         });
 
         await once(cp, 'exit');
