@@ -15,6 +15,7 @@ const EXIT_FILE = '.exit';
 const UPDATE_FILE = '.update';
 
 async function runCommand(command: string, ...args: string[]) {
+    console.log('running', command, ...args);
     const cp = child_process.spawn(command, args, {
         stdio: 'inherit'
     });
@@ -50,7 +51,7 @@ export async function serveMain(install: boolean) {
         console.log('Package @scrypted/server not found. Installing.');
     }
     if (install) {
-        await runCommandEatError('npm', 'install', '--production', '@scrypted/server@latest');
+        await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
     }
 
     process.env.SCRYPTED_NPM_SERVE = 'true';
@@ -71,7 +72,7 @@ export async function serveMain(install: boolean) {
         }
         else if (fs.existsSync(UPDATE_FILE)) {
             console.log('Update requested. Installing.');
-            await runCommandEatError('npm', 'install', '--production', '@scrypted/server@latest');
+            await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
         }
         else {
             console.log(`Service exited. Restarting momentarily.`);
