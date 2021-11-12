@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.65",
+  "version": "0.0.66",
   "description": "",
   "dependencies": {
     "@scrypted/sdk": "^0.0.110",
@@ -31,10 +31,10 @@
   },
   "optionalDependencies": {
     "@koush/wrtc": "^0.5.0",
-    "wrtc": "^0.4.7",
     "ffmpeg-for-homebridge": "^0.0.9",
     "mdns": "^2.7.2",
-    "ts-node": "^10.2.1"
+    "ts-node": "^10.2.1",
+    "wrtc": "^0.4.7"
   },
   "devDependencies": {
     "@mapbox/node-pre-gyp": "^1.0.5",

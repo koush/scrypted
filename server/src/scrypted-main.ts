@@ -233,6 +233,16 @@ else {
         }
         console.log(`Version:       : ${await new Info().getVersion()}`);
         console.log('#######################################################');
+        console.log('Chrome Users: You may need to type "thisisunsafe" into')
+        console.log('              the window to bypass the warning. There')
+        console.log('              may be no button to continue, type the')
+        console.log('              letters "thisisunsafe" and it will proceed.')
+        console.log('#######################################################');
+        console.log('Scrypted insecure http service port:', SCRYPTED_INSECURE_PORT);
+        console.log('Ports can be changed with environment variables.')
+        console.log('https: $SCRYPTED_SECURE_PORT')
+        console.log('http : $SCRYPTED_INSECURE_PORT')
+        console.log('#######################################################');
         const scrypted = new ScryptedRuntime(db, insecure, secure, app);
         await scrypted.start();
 
