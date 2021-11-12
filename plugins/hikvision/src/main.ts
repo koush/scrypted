@@ -101,6 +101,8 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     getCameraNumber() {
         const channel = this.getRtspChannel();
+        if (channel?.length > 3)
+            return channel.substring(0, channel.length - 2);
         return channel?.substring(0, 1) || '1';
     }
 
