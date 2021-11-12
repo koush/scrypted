@@ -4,7 +4,14 @@ import net from 'net';
 import { listenZeroCluster } from "./listen-cluster";
 import { ffmpegLogInitialOutput } from "./media-helpers";
 
-const wrtc = require('wrtc');
+let wrtc: any;
+try {
+    wrtc = require('@koush/wrtc');
+}
+catch (e) {
+    console.warn('loading @koush/wrtc failed. is your scrypted server out of date?');
+    wrtc = require('wrtc');
+}
 Object.assign(global, wrtc);
 const { RTCVideoSource, RTCAudioSource } = wrtc.nonstandard;
 

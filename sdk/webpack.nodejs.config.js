@@ -78,6 +78,7 @@ module.exports = {
         alias: {
             "realfs": path.resolve(__dirname, 'polyfill/realfs'),
             wrtc: path.resolve(__dirname, 'polyfill/wrtc'),
+            '@koush/wrtc': path.resolve(__dirname, 'polyfill/koush-wrtc'),
             mdns: path.resolve(__dirname, 'polyfill/mdns'),
             typescript: path.resolve(__dirname, 'polyfill/typescript'),
         },

@@ -202,7 +202,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return;
         }
 
-        const peer = new RpcPeer(message => ws.send(JSON.stringify(message)));
+        const peer = new RpcPeer("core", "web", message => ws.send(JSON.stringify(message)));
         ws.onmessage = message => peer.handleMessage(JSON.parse(message.data));
         const userStorage = new UserStorage(request.username);
         peer.params.userStorage = userStorage;
@@ -218,13 +218,13 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             const eventSource = systemManager.getDeviceById(id);
             if (eventDetails.eventInterface === ScryptedInterface.ScryptedDevice) {
                 if (eventDetails.property === ScryptedInterfaceProperty.id) {
-                    remote.updateDescriptor(eventData, undefined);
+                    remote.updateDeviceState(eventData, undefined);
                 }
                 else if (!eventSource) {
                     console.warn('unknown event source', eventData);
                 }
                 else {
-                    remote.updateDescriptor(eventSource.id, systemManager.getDeviceState(eventSource.id));
+                    remote.updateDeviceState(eventSource.id, systemManager.getDeviceState(eventSource.id));
                 }
                 return;
             }

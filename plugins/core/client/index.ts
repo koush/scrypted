@@ -25,7 +25,7 @@ export default {
 
             socket.on('open', async function () {
                 try {
-                    const rpcPeer = new RpcPeer(message => socket.send(JSON.stringify(message)));
+                    const rpcPeer = new RpcPeer("web", "core", message => socket.send(JSON.stringify(message)));
                     socket.on('message', data => rpcPeer.handleMessage(JSON.parse(data as string)));
                     
                     const scrypted = await attachPluginRemote(rpcPeer, undefined);
@@ -36,7 +36,7 @@ export default {
                         mediaManager,
                     } = scrypted;
 
-                    const userStorage = await rpcPeer.eval('return userStorage');
+                    const userStorage = await rpcPeer.getParam('userStorage');
 
                     const info = await systemManager.getComponent('info');
                     let version = 'unknown';
