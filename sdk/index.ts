@@ -3,7 +3,7 @@ import { ScryptedInterfaceProperty } from './types';
 import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager } from './types';
 import type { HumiditySettingStatus, DeviceInformation, ScryptedInterface, ScryptedStatic, ScryptedDeviceType, Logger, ColorRgb, ColorHsv, DeviceState, TemperatureUnit, LockState, ThermostatMode, Position, FanStatus } from './types';
 
-export class ScryptedDeviceBase implements DeviceState {
+export class DeviceBase {
   id?: string;
   interfaces?: string[];
   mixins?: string[];
@@ -24,13 +24,7 @@ export class ScryptedDeviceBase implements DeviceState {
   running?: boolean;
   paused?: boolean;
   docked?: boolean;
-  /**
-   * Get the ambient temperature in Celsius.
-   */
   temperature?: number;
-  /**
-   * Get the user facing unit of measurement for this thermometer. Note that while this may be Fahrenheit, getTemperatureAmbient will return the temperature in Celsius.
-   */
   temperatureUnit?: TemperatureUnit;
   humidity?: number;
   thermostatAvailableModes?: ThermostatMode[];
@@ -58,14 +52,16 @@ export class ScryptedDeviceBase implements DeviceState {
   ultraviolet?: number;
   luminance?: number;
   position?: Position;
+}
 
-
+export class ScryptedDeviceBase extends DeviceBase implements DeviceState {
   private _storage: Storage;
   private _log: Logger;
   private _console: Console;
   private _deviceState: DeviceState;
 
   constructor(public nativeId?: string) {
+    super();
   }
 
   get storage() {
@@ -113,65 +109,14 @@ export class ScryptedDeviceBase implements DeviceState {
 }
 
 
-export class MixinDeviceBase<T> implements DeviceState {
-  id?: string;
-  interfaces?: string[];
-  mixins?: string[];
-  info?: DeviceInformation;
-  name?: string;
-  providedInterfaces?: string[];
-  providedName?: ScryptedDeviceType;
-  providedRoom?: string;
-  providedType?: ScryptedDeviceType;
-  providerId?: string;
-  room?: string;
-  type?: ScryptedDeviceType;
-  on?: boolean;
-  brightness?: number;
-  colorTemperature?: number;
-  rgb?: ColorRgb;
-  hsv?: ColorHsv;
-  running?: boolean;
-  paused?: boolean;
-  docked?: boolean;
-  /**
-   * Get the ambient temperature in Celsius.
-   */
-  temperature?: number;
-  /**
-   * Get the user facing unit of measurement for this thermometer. Note that while this may be Fahrenheit, getTemperatureAmbient will return the temperature in Celsius.
-   */
-  temperatureUnit?: TemperatureUnit;
-  humidity?: number;
-  thermostatAvailableModes?: ThermostatMode[];
-  thermostatMode?: ThermostatMode;
-  thermostatSetpoint?: number;
-  thermostatSetpointHigh?: number;
-  thermostatSetpointLow?: number;
-  lockState?: LockState;
-  entryOpen?: boolean;
-  batteryLevel?: number;
-  online?: boolean;
-  updateAvailable?: boolean;
-  fromMimeType?: string;
-  toMimeType?: string;
-  binaryState?: boolean;
-  intrusionDetected?: boolean;
-  powerDetected?: boolean;
-  motionDetected?: boolean;
-  audioDetected?: boolean;
-  occupied?: boolean;
-  flooded?: boolean;
-  ultraviolet?: number;
-  luminance?: number;
-  position?: Position;
-
+export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   private _storage: Storage;
   private _log: Logger;
   private _console: Console;
   private _deviceState: DeviceState;
 
   constructor(public mixinDevice: T, public mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public mixinProviderNativeId: ScryptedNativeId) {
+    super();
     this._deviceState = mixinDeviceState;
   }
 
