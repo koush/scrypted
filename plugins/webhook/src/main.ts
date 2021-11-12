@@ -27,7 +27,6 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
     }
 
     async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
-        this.storage.setItem(key, value.toString());
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
 
         let token = this.storage.getItem('token');
@@ -135,6 +134,9 @@ class WebhookMixin extends SettingsMixinDeviceBase<Settings> {
         }
         else {
             this.console.error('Unknown method or property', methodOrProperty);
+            response.send('Not Found', {
+                code: 404,
+            })
         }
     }
 }
