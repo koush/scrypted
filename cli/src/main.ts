@@ -114,8 +114,8 @@ async function main() {
     }
     else {
         console.log('usage:');
-        console.log('   npx scrypted install npm-package-name [ip[:port]]');
-        console.log('   npx scrypted login [ip[:port]]');
+        console.log('   npx scrypted install npm-package-name [127.0.0.1[:10443]]');
+        console.log('   npx scrypted login [127.0.0.1[:10443]]');
         console.log('   npx scrypted serve');
         console.log('   npx scrypted serve@latest');
         process.exit(1);
