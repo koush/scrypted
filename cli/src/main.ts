@@ -19,13 +19,21 @@ function getUserHome() {
 const scryptedHome = path.join(getUserHome(), '.scrypted');
 const loginPath = path.join(scryptedHome, 'login.json');
 
+function toIpAndPort(ip: string) {
+    if (ip.indexOf(':') === -1)
+        ip += ':10443'
+    return ip;
+}
+
 async function doLogin(ip: string) {
+    ip = toIpAndPort(ip);
+
     const username = readline.question('username: ');
     const password = readline.question('password: ', {
         hideEchoBack: true,
     });
 
-    const url = `https://${ip}:9443/login`;
+    const url = `https://${ip}/login`;
     const response = await axios(Object.assign({
         method: 'GET',
         auth: {
@@ -71,7 +79,7 @@ async function main() {
         console.log('login successful.')
     }
     else if (process.argv[2] === 'install') {
-        const ip = process.argv[4] || '127.0.0.1';
+        const ip = toIpAndPort(process.argv[4] || '127.0.0.1');
         const pkg = process.argv[3];
 
         if (!pkg) {
@@ -92,7 +100,7 @@ async function main() {
             login = await doLogin(ip);
         }
 
-        const url = `https://${ip}:9443/web/component/script/install/${pkg}`;
+        const url = `https://${ip}/web/component/script/install/${pkg}`;
         const response = await axios(Object.assign({
             method: 'POST',
             auth: {
@@ -106,8 +114,8 @@ async function main() {
     }
     else {
         console.log('usage:');
-        console.log('   npx scrypted install npm-package-name [ip]');
-        console.log('   npx scrypted login [ip]');
+        console.log('   npx scrypted install npm-package-name [ip[:port]]');
+        console.log('   npx scrypted login [ip[:port]]');
         console.log('   npx scrypted serve');
         console.log('   npx scrypted serve@latest');
         process.exit(1);

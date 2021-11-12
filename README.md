@@ -45,7 +45,7 @@ https://developer.scrypted.app
 ## HomeKit Secure Video Setup
 
 1. Install Scrypted
-2. Open https://localhost:9443/
+2. Open https://localhost:10443/
 3. Install the HomeKit Plugin from the available plugins tab
 4. Install the Unifi, HikVision, ONVIF, or Amcrest camera plugin
    * HKSV requires a plugin with hardware motion detect support. If there's no plugin for your camera, you can install the generic RTSP and the OpenCV motion detector plugin. This will use the processing power on your server to detect camera motion.

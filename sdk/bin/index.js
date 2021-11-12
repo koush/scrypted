@@ -44,6 +44,13 @@ function showLoginError() {
     console.error('     npx scrypted login [ip]');
 }
 
+function toIpAndPort(ip) {
+    if (ip.indexOf(':') === -1)
+        ip += ':10443'
+    console.log(ip);
+    return ip;
+}
+
 exports.deploy = function (debugHost, noRebind) {
     return new Promise((resolve, reject) => {
         var out;
@@ -66,8 +73,8 @@ exports.deploy = function (debugHost, noRebind) {
 
         var rebindQuery = noRebind ? 'no-rebind' : '';
 
-        const deployUrl = `https://${debugHost}:9443/web/component/script/deploy?${rebindQuery}&npmPackage=${npmPackage}`
-        const setupUrl = `https://${debugHost}:9443/web/component/script/setup?${rebindQuery}&npmPackage=${npmPackage}`
+        const deployUrl = `https://${toIpAndPort(debugHost)}/web/component/script/deploy?${rebindQuery}&npmPackage=${npmPackage}`
+        const setupUrl = `https://${toIpAndPort(debugHost)}/web/component/script/setup?${rebindQuery}&npmPackage=${npmPackage}`
 
         const fileContents = fs.readFileSync(main);
         console.log(`deploying to ${debugHost}`);
@@ -131,7 +138,7 @@ exports.debug = function (debugHost, entryPoint) {
         packageJson = JSON.parse(fs.readFileSync(packageJson));
         const npmPackage = packageJson.name || '';
 
-        const debugUrl = `https://${debugHost}:9443/web/component/script/debug?filename=${outFilename}&npmPackage=${npmPackage}`
+        const debugUrl = `https://${toIpAndPort(debugHost)}/web/component/script/debug?filename=${outFilename}&npmPackage=${npmPackage}`
         console.log(`initiating debugger on ${debugHost}`);
 
         axios.post(debugUrl, undefined, {
