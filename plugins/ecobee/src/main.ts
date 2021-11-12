@@ -1,5 +1,5 @@
 import axios from 'axios'
-import sdk, { Device, DeviceInformation, ScryptedDeviceBase, OnOff, DeviceProvider, ScryptedDeviceType, ThermostatMode, Thermometer, HumiditySensor, TemperatureSetting, Settings, Setting, ScryptedInterface, Refresh, TemperatureUnit } from '@scrypted/sdk';
+import sdk, { Device, DeviceInformation, ScryptedDeviceBase, OnOff, DeviceProvider, ScryptedDeviceType, ThermostatMode, Thermometer, HumiditySensor, TemperatureSetting, Settings, Setting, ScryptedInterface, Refresh, TemperatureUnit, HumidityCommand, HumidityMode, HumiditySetting } from '@scrypted/sdk';
 const { deviceManager, log } = sdk;
 
 // Convert Fahrenheit to Celsius, round to 2 decimal places
@@ -42,12 +42,23 @@ function thermostatModeToEcobee(mode: ThermostatMode) {
   }
 }
 
-class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Refresh, OnOff {
+function humModeFromEcobee(mode: string): HumidityMode {
+  // Values: auto, manual, off
+  switch(mode) {
+    case 'auto':
+      return HumidityMode.Auto;
+    case "manual":
+      return HumidityMode.Humidify;
+  }
+
+  return HumidityMode.Off
+}
+
+class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, Thermometer, TemperatureSetting, Refresh, OnOff, HumiditySetting, Settings {
   device: any;
   revisionList: string[];
   provider: EcobeeController;
   on: boolean;
-  humOn: boolean;
 
   constructor(nativeId: string, provider: EcobeeController, info: DeviceInformation) {
     super(nativeId);
@@ -59,7 +70,30 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     var modes: ThermostatMode[] = [ThermostatMode.Cool, ThermostatMode.Heat, ThermostatMode.Auto, ThermostatMode.Off];
     this.thermostatAvailableModes = modes;
 
+    let humModes: HumidityMode[] = [HumidityMode.Auto, HumidityMode.Humidify, HumidityMode.Off];
+    this.humiditySetting = {
+      mode: HumidityMode.Off,
+      availableModes: humModes,
+    }
+
     setImmediate(() => this.refresh("constructor", false));
+  }
+
+  async getSettings(): Promise<Setting[]> {
+    return [
+      {
+        title: 'Additional Devices',
+        key: 'additional_devices',
+        value: this.storage.getItem("additional_devices"),
+        choices: ['Fan', 'Humidifier'],
+        description: 'Display additional devices for components',
+        multiple: true,
+      }
+    ]
+  }
+
+  async putSetting(key: string, value: string): Promise<void> {
+    this.storage.setItem(key, value.toString());
   }
 
   /*
@@ -120,11 +154,11 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     }
 
     // humidifier status
+    let activeMode = HumidityMode.Off
     if (equipmentStatus.includes('humidifier')) {
-      this.humOn = true;
-    } else {
-      this.humOn = false;
+      activeMode = HumidityMode.Humidify
     }
+    this.humiditySetting = Object.assign(this.humiditySetting, { activeMode });
   }
 
   /* revisionListChanged(): Compare a new revision list to the stored list, return true if changed
@@ -178,6 +212,16 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
         this.thermostatSetpoint = convertFtoC(Number(data.runtime.desiredHeat)/10)
         break;
     }
+
+    // update humidifier based on mode
+    this.humiditySetting = Object.assign(this.humiditySetting, {
+      mode: humModeFromEcobee(data.settings.humidifierMode),
+      humidifierSetpoint: Number(data.settings.humidity),
+    });
+  }
+
+  async setHumidity(humidity: HumidityCommand): Promise<void> {
+    this.console.log(`setHumidity ${humidity.mode} ${humidity.humidifierSetpoint}: not yet supported`);
   }
   
   async setThermostatMode(mode: ThermostatMode): Promise<void> {
@@ -466,13 +510,26 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
 
     // Get a list of all accessible devices
     const apiDevices = (await this.req('get', 'thermostat', null, {
-      json: `\{"selection":\{"selectionType":"registered","selectionMatch":""\}\}`
+      json: `\{"selection":\{"selectionType":"registered","selectionMatch":"","includeSettings": "true"\}\}`
     })).thermostatList
     this.console.log(`Discovered ${apiDevices.length} devices.`)
 
     // Create a list of devices found from the API
     const devices: Device[] = [];
     for (let apiDevice of apiDevices) {
+      this.console.log(apiDevice);
+
+      const interfaces: ScryptedInterface[] = [
+        ScryptedInterface.Thermometer,
+        ScryptedInterface.TemperatureSetting,
+        ScryptedInterface.Refresh,
+        ScryptedInterface.HumiditySensor,
+        ScryptedInterface.OnOff,
+        ScryptedInterface.Settings,
+      ]
+      if (apiDevice.settings.hasHumidifier)
+        interfaces.push(ScryptedInterface.HumiditySetting);
+
       const device: Device = {
         nativeId: apiDevice.identifier,
         name: `${apiDevice.modelNumber} thermostat`,
@@ -482,13 +539,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
           manufacturer: apiDevice.modelNumber,
           serialNumber: apiDevice.identifier,
         },
-        interfaces: [
-          ScryptedInterface.HumiditySensor,
-          ScryptedInterface.Thermometer,
-          ScryptedInterface.TemperatureSetting,
-          ScryptedInterface.Refresh,
-          ScryptedInterface.OnOff,
-        ],
+        interfaces,
       }
       devices.push(device);
 
