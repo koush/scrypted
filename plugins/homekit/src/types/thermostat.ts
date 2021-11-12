@@ -142,20 +142,20 @@ addSupportedType({
             });
 
             bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.RelativeHumidityHumidifierThreshold,
-                () => device.humiditySetting?.humidiferSetpoint || 0);
+                () => device.humiditySetting?.humidifierSetpoint || 0);
             humidityService.getCharacteristic(Characteristic.RelativeHumidityHumidifierThreshold).on(CharacteristicEventTypes.SET, (value, callback) => {
                 callback();
                 device.setHumidity({
-                    humidiferSetpoint: value as number,
+                    humidifierSetpoint: value as number,
                 });
             });
 
             bindCharacteristic(device, ScryptedInterface.HumiditySetting, humidityService, Characteristic.RelativeHumidityDehumidifierThreshold,
-                () => device.humiditySetting?.dehumidiferSetpoint || 0);
+                () => device.humiditySetting?.dehumidifierSetpoint || 0);
             humidityService.getCharacteristic(Characteristic.RelativeHumidityDehumidifierThreshold).on(CharacteristicEventTypes.SET, (value, callback) => {
                 callback();
                 device.setHumidity({
-                    dehumidiferSetpoint: value as number,
+                    dehumidifierSetpoint: value as number,
                 });
             });
         }

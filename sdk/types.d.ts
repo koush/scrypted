@@ -369,15 +369,15 @@ export declare enum HumidityMode {
 }
 export interface HumidityCommand {
     mode?: HumidityMode;
-    humidiferSetpoint?: number;
-    dehumidiferSetpoint?: number;
+    humidifierSetpoint?: number;
+    dehumidifierSetpoint?: number;
 }
 export interface HumiditySettingStatus {
     mode: HumidityMode;
     activeMode?: HumidityMode;
     availableModes: HumidityMode[];
-    humidiferSetpoint?: number;
-    dehumidiferSetpoint?: number;
+    humidifierSetpoint?: number;
+    dehumidifierSetpoint?: number;
 }
 export interface HumiditySetting {
     humiditySetting?: HumiditySettingStatus;
