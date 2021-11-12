@@ -12,7 +12,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MixinDeviceBase = exports.ScryptedDeviceBase = void 0;
 __exportStar(require("./types"), exports);
-const properties_gen_1 = require("./properties.gen");
+const types_1 = require("./types");
 class ScryptedDeviceBase {
     constructor(nativeId) {
         this.nativeId = nativeId;
@@ -103,7 +103,7 @@ exports.MixinDeviceBase = MixinDeviceBase;
             this._deviceState[state] = value;
         };
     }
-    for (var field of Object.values(properties_gen_1.ScryptedInterfaceProperty)) {
+    for (var field of Object.values(types_1.ScryptedInterfaceProperty)) {
         Object.defineProperty(ScryptedDeviceBase.prototype, field, {
             set: _createSetState(field),
             get: _createGetState(field),
