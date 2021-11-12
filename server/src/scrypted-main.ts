@@ -172,6 +172,23 @@ else {
         const insecure = http.createServer(app);
         listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
 
+        // legacy secure port 9443 is now in use by portainer.
+        let shownLegacyPortAlert = false
+        const legacySecure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, (req, res) => {
+            if (!shownLegacyPortAlert) {
+                shownLegacyPortAlert = true;
+                const host = (req.headers.host || 'localhost').split(':')[0];
+                const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice('@scrypted/core'));
+                const newUrl = `https://${host}:${SCRYPTED_SECURE_PORT}`;
+                logger.log('a', `Due to a port conflict with Portainer, the default Scrypted URL has changed to ${newUrl}`);
+            }
+            app(req, res);
+        });
+        legacySecure.listen(9443);
+        legacySecure.on('error', () => {
+            // can ignore.
+        });
+
         // use a hash of the private key as the cookie secret.
         app.use(cookieParser(crypto.createHash('sha256').update(certSetting.value.clientKey).digest().toString('hex')));
 

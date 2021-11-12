@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/tensorflow",
    "version": "0.0.13",
-   "description": "Motion Detection for VideoCameras.",
+   "description": "Object Detection for VideoCameras.",
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {

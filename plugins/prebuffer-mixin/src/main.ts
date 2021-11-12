@@ -206,7 +206,9 @@ class PrebufferSession {
       parseOnly: true,
     };
 
-    if (pcmAudio) {
+    // if pcm prebuffer is requested, create the the parser. don't do it if
+    // the camera wants to mute the audio though.
+    if (!probe.noAudio && pcmAudio) {
       rbo.parsers.s16le = createPCMParser();
     }
 
@@ -239,7 +241,7 @@ class PrebufferSession {
     else if (!compatibleAudio.includes(session.inputAudioCodec)) {
       this.console.error('Detected audio codec was not AAC.', session.inputAudioCodec);
       // show an alert if no audio config was explicitly specified. Force the user to choose/experiment.
-      if (!audioConfig) {
+      if (!audioConfig && !probe.noAudio) {
         log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable Reencode Audio in Rebroadcast Settings Audio Configuration to disable this alert.`);
         this.incompatibleDetected = true;
         this.allowImmediateRestart = true;

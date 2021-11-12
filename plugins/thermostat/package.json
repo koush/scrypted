@@ -21,22 +21,14 @@
       "plugin"
    ],
    "scrypted": {
-      "variables": {
-         "sensor": [
-            "Thermometer",
-            "Humidity"
-         ],
-         "heater": "OnOff",
-         "cooler": "OnOff"
-      },
       "name": "Virtual Thermostat",
       "interfaces": [
-         "TemperatureSetting"
+         "Thermometer",
+         "TemperatureSetting",
+         "HumiditySensor",
+         "HumiditySetting"
       ],
-      "events": [
-         "TemperatureSetting"
-      ],
-      "type": "Device"
+      "type": "Thermostat"
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
