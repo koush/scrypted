@@ -26,22 +26,19 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
     else
         out = path.resolve(cwd, 'out');
 
-    const src = path.join(__dirname, '../python/scrypted_sdk');
-    const dst = path.join(cwd, 'src', 'scrypted_sdk');
-    rimraf.sync(dst);
-    console.log(src, dst);
-    ncp(src, dst, () => {
-        const resolved = path.resolve(cwd, 'src');
+    const resolved = path.resolve(cwd, 'src');
 
-        const zip = new AdmZip();
+    const zip = new AdmZip();
 
-        zip.addLocalFolder(resolved);
+    zip.addLocalFolder(resolved);
 
-        const zipfs = path.join(cwd, 'fs');
-        if (fs.existsSync(zipfs))
-            zip.addLocalFolder(zipfs, 'fs');
-        zip.writeZip(path.join(out, 'plugin.zip'));
-    });
+    const sdk = path.join(__dirname, '../scrypted_python/scrypted_sdk');
+    zip.addLocalFolder(sdk, 'scrypted_sdk');
+
+    const zipfs = path.join(cwd, 'fs');
+    if (fs.existsSync(zipfs))
+        zip.addLocalFolder(zipfs, 'fs');
+    zip.writeZip(path.join(out, 'plugin.zip'));
 }
 else if (false) {
 

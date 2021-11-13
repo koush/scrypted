@@ -2,10 +2,17 @@ import stringifyObject from 'stringify-object';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 import path from 'path';
 import fs from "fs";
-import { isPropertySignature } from 'typescript';
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schema.json')).toString());
 const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {};
+
+const allProperties: {[property: string]: any} = {};
+
+function toTypescriptType(type: any): string {
+    if (type.type === 'array')
+        return `${toTypescriptType(type.elementType)}[]`;
+    return type.name;
+}
 
 for (const name of Object.values(ScryptedInterface)) {
     const td = schema.children.find((child: any) => child.name === name);
@@ -16,17 +23,32 @@ for (const name of Object.values(ScryptedInterface)) {
         methods,
         properties,
     };
+
+    for (const p of td.children.filter((child: any) => child.kindString === 'Property')) {
+        allProperties[p.name] = p.type;
+    }
 }
 
 const properties = Object.values(ScryptedInterfaceDescriptors).map(d => d.properties).flat();
+
+const deviceStateContents = `
+export interface DeviceState {
+${Object.entries(allProperties).map(([property, type]) => `  ${property}?: ${toTypescriptType(type)}`).join('\n')}
+}
+
+export class DeviceBase implements DeviceState {
+${Object.entries(allProperties).map(([property, type]) => `  ${property}?: ${toTypescriptType(type)}`).join('\n')}
+}
+`;
 
 const propertyContents = `
 export enum ScryptedInterfaceProperty {
 ${properties.map(property => '  ' + property + ' = \"' + property + '",\n').join('')}
 }
-`
+`;
 
 const contents = `
+${deviceStateContents}
 ${propertyContents}
 
 export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = ${stringifyObject(ScryptedInterfaceDescriptors, { indent: '  ' })}
@@ -36,12 +58,8 @@ ${fs.readFileSync(path.join(__dirname, './types.input.ts'))}
 
 fs.writeFileSync(path.join(__dirname, '../types.ts'), contents);
 
-const enums = schema.children.filter((child: any) => child.kindString === 'Enumeration');
-const interfaces = schema.children.filter((child: any) => Object.values(ScryptedInterface).includes(child.name));
-let python = '';
-
-const unknownTypes = new Set<string>();
-unknownTypes.add('EventDetails');
+const dictionaryTypes = new Set<string>();
+dictionaryTypes.add('EventDetails');
 
 function toPythonType(type: any): string {
     if (type.type === 'array')
@@ -69,12 +87,35 @@ function toPythonType(type: any): string {
 
     if (typeof type !== 'string')
         return 'Any';
-    unknownTypes.add(type);
+    dictionaryTypes.add(type);
     return type;
 }
 
 function toPythonParameter(param: any) {
-    return `${param.name}: ${toPythonType(param.type)}`
+    const ret = `${param.name}: ${toPythonType(param.type)}`
+    if (param.flags?.isOptional)
+        return `${ret} = None`;
+    return ret;
+}
+
+function toPythonMethodDeclaration(method: any) {
+    if (method.signatures[0].type.name === 'Promise')
+        return 'async def';
+    return 'def';
+}
+
+function selfSignature(method: any) {
+    const params = (method.signatures[0].parameters || []).map((p: any) => toPythonParameter(p));
+    params.unshift('self');
+    return params.join(', ');
+}
+
+const enums = schema.children.filter((child: any) => child.kindString === 'Enumeration');
+const interfaces = schema.children.filter((child: any) => Object.values(ScryptedInterface).includes(child.name));
+let python = '';
+
+for (const iface of ['DeviceManager', 'SystemManager']) {
+    interfaces.push(schema.children.find((child: any) => child.name === iface));
 }
 
 for (const td of interfaces) {
@@ -89,7 +130,7 @@ class ${td.name}:
 `
     }
     for (const method of methods) {
-        python += `    def ${method.name}(${(method.signatures[0].parameters || []).map((p: any) => toPythonParameter(p)).join(', ')}) -> ${toPythonType(method.signatures[0].type)}:
+        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonType(method.signatures[0].type)}:
         pass
 `
     }
@@ -108,13 +149,42 @@ class ${e.name}(Enum):
     }
 }
 
+python += `
+class ScryptedInterfaceProperty(Enum):
+`
+    for (const val of properties) {
+        python += `    ${val} = "${val}"
+`;
+}
+
+
+python += `
+class DeviceState:
+    def getScryptedProperty(self, property: str) -> Any:
+        pass
+    def setScryptedProperty(self, property: str, value: Any):
+        pass
+`
+    for (const [val, type] of Object.entries(allProperties)) {
+        python += `
+    @property
+    def ${val}(self) -> ${toPythonType(type)}:
+        self.getScryptedProperty("${val}")
+    @${val}.setter
+    def ${val}(self, value: ${toPythonType(type)}):
+        self.setScryptedProperty("${val}", value)
+`;
+}
+
 
 let seen = new Set<string>();
-while (unknownTypes.size) {
-    const unknowns = schema.children.filter((child: any) => unknownTypes.has(child.name) && !enums.find((e: any) => e.name === child.name));
+seen.add('DeviceState');
 
-    const newSeen = new Set([...seen, ...unknownTypes]);
-    unknownTypes.clear();
+while (dictionaryTypes.size) {
+    const unknowns = schema.children.filter((child: any) => dictionaryTypes.has(child.name) && !enums.find((e: any) => e.name === child.name));
+
+    const newSeen = new Set([...seen, ...dictionaryTypes]);
+    dictionaryTypes.clear();
 
     let pythonUnknowns = '';
 
@@ -127,7 +197,7 @@ while (unknownTypes.size) {
 class ${td.name}(TypedDict):
 `;
 
-    const properties = td.children.filter((child: any) => child.kindString === 'Property');
+    const properties = td.children?.filter((child: any) => child.kindString === 'Property') || [];
     for (const property of properties) {
         pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}
 `
@@ -141,15 +211,14 @@ class ${td.name}(TypedDict):
 }
 
 
-fs.writeFileSync(path.join(__dirname, '../python/scrypted_sdk/types.py'),
+fs.writeFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/types.py'),
     `from __future__ import annotations
 from enum import Enum
 from typing import TypedDict
 from typing import Any
 from typing import Callable
 
-SettingValue = str
-EventListener = Callable[[Any, Any, Any], None]
+from .other import *
 
 ${pythonEnums}
 ${python}

@@ -10,13 +10,10 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MixinDeviceBase = exports.ScryptedDeviceBase = exports.DeviceBase = void 0;
+exports.MixinDeviceBase = exports.ScryptedDeviceBase = void 0;
 __exportStar(require("./types"), exports);
 const types_1 = require("./types");
-class DeviceBase {
-}
-exports.DeviceBase = DeviceBase;
-class ScryptedDeviceBase extends DeviceBase {
+class ScryptedDeviceBase extends types_1.DeviceBase {
     constructor(nativeId) {
         super();
         this.nativeId = nativeId;
@@ -27,9 +24,6 @@ class ScryptedDeviceBase extends DeviceBase {
         }
         return this._storage;
     }
-    /**
-     * @deprecated
-     */
     get log() {
         if (!this._log) {
             this._log = deviceManager.getDeviceLogger(this.nativeId);
@@ -60,7 +54,7 @@ class ScryptedDeviceBase extends DeviceBase {
     }
 }
 exports.ScryptedDeviceBase = ScryptedDeviceBase;
-class MixinDeviceBase extends DeviceBase {
+class MixinDeviceBase extends types_1.DeviceBase {
     constructor(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId) {
         super();
         this.mixinDevice = mixinDevice;

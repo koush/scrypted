@@ -1,6 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = void 0;
+exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
+class DeviceBase {
+}
+exports.DeviceBase = DeviceBase;
 var ScryptedInterfaceProperty;
 (function (ScryptedInterfaceProperty) {
     ScryptedInterfaceProperty["id"] = "id";

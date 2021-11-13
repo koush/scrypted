@@ -1,5 +1,108 @@
 
 
+export interface DeviceState {
+  id?: string
+  info?: DeviceInformation
+  interfaces?: string[]
+  mixins?: string[]
+  name?: string
+  providedInterfaces?: string[]
+  providedName?: ScryptedDeviceType
+  providedRoom?: string
+  providedType?: ScryptedDeviceType
+  providerId?: string
+  room?: string
+  type?: ScryptedDeviceType
+  on?: boolean
+  brightness?: number
+  colorTemperature?: number
+  rgb?: ColorRgb
+  hsv?: ColorHsv
+  running?: boolean
+  paused?: boolean
+  docked?: boolean
+  thermostatActiveMode?: ThermostatMode
+  thermostatAvailableModes?: ThermostatMode[]
+  thermostatMode?: ThermostatMode
+  thermostatSetpoint?: number
+  thermostatSetpointHigh?: number
+  thermostatSetpointLow?: number
+  temperature?: number
+  temperatureUnit?: TemperatureUnit
+  humidity?: number
+  lockState?: LockState
+  entryOpen?: boolean
+  batteryLevel?: number
+  online?: boolean
+  updateAvailable?: boolean
+  fromMimeType?: string
+  toMimeType?: string
+  binaryState?: boolean
+  intrusionDetected?: boolean
+  powerDetected?: boolean
+  audioDetected?: boolean
+  motionDetected?: boolean
+  occupied?: boolean
+  flooded?: boolean
+  ultraviolet?: number
+  luminance?: number
+  position?: Position
+  humiditySetting?: HumiditySettingStatus
+  fan?: FanStatus
+}
+
+export class DeviceBase implements DeviceState {
+  id?: string
+  info?: DeviceInformation
+  interfaces?: string[]
+  mixins?: string[]
+  name?: string
+  providedInterfaces?: string[]
+  providedName?: ScryptedDeviceType
+  providedRoom?: string
+  providedType?: ScryptedDeviceType
+  providerId?: string
+  room?: string
+  type?: ScryptedDeviceType
+  on?: boolean
+  brightness?: number
+  colorTemperature?: number
+  rgb?: ColorRgb
+  hsv?: ColorHsv
+  running?: boolean
+  paused?: boolean
+  docked?: boolean
+  thermostatActiveMode?: ThermostatMode
+  thermostatAvailableModes?: ThermostatMode[]
+  thermostatMode?: ThermostatMode
+  thermostatSetpoint?: number
+  thermostatSetpointHigh?: number
+  thermostatSetpointLow?: number
+  temperature?: number
+  temperatureUnit?: TemperatureUnit
+  humidity?: number
+  lockState?: LockState
+  entryOpen?: boolean
+  batteryLevel?: number
+  online?: boolean
+  updateAvailable?: boolean
+  fromMimeType?: string
+  toMimeType?: string
+  binaryState?: boolean
+  intrusionDetected?: boolean
+  powerDetected?: boolean
+  audioDetected?: boolean
+  motionDetected?: boolean
+  occupied?: boolean
+  flooded?: boolean
+  ultraviolet?: number
+  luminance?: number
+  position?: Position
+  humiditySetting?: HumiditySettingStatus
+  fan?: FanStatus
+}
+
+
 export enum ScryptedInterfaceProperty {
   id = "id",
   info = "info",
@@ -497,63 +600,6 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
 
 export type ScryptedNativeId = string | undefined;
 
-/**
- * DeviceState is returned by DeviceManager.getDeviceState, and allows getting/setting of a device provided by a DeviceProvider.
- */
-export interface DeviceState {
-  id?: string;
-  interfaces?: string[];
-  mixins?: string[];
-  info?: DeviceInformation;
-  name?: string;
-  providedInterfaces?: string[];
-  providedName?: ScryptedDeviceType;
-  providedRoom?: string;
-  providedType?: ScryptedDeviceType;
-  providerId?: string;
-  room?: string;
-  type?: ScryptedDeviceType;
-  on?: boolean;
-  brightness?: number;
-  colorTemperature?: number;
-  rgb?: ColorRgb;
-  hsv?: ColorHsv;
-  running?: boolean;
-  paused?: boolean;
-  docked?: boolean;
-  /**
-   * Get the ambient temperature in Celsius.
-   */
-  temperature?: number;
-  /**
-   * Get the user facing unit of measurement for this thermometer. Note that while this may be Fahrenheit, getTemperatureAmbient will return the temperature in Celsius.
-   */
-  temperatureUnit?: TemperatureUnit;
-  humidity?: number;
-  thermostatAvailableModes?: ThermostatMode[];
-  thermostatMode?: ThermostatMode;
-  thermostatActiveMode?: ThermostatMode;
-  thermostatSetpoint?: number;
-  thermostatSetpointHigh?: number;
-  thermostatSetpointLow?: number;
-  lockState?: LockState;
-  entryOpen?: boolean;
-  batteryLevel?: number;
-  online?: boolean;
-  updateAvailable?: boolean;
-  fromMimeType?: string;
-  toMimeType?: string;
-  binaryState?: boolean;
-  intrusionDetected?: boolean;
-  powerDetected?: boolean;
-  motionDetected?: boolean;
-  audioDetected?: boolean;
-  occupied?: boolean;
-  flooded?: boolean;
-  ultraviolet?: number;
-  luminance?: number;
-  position?: Position;
-}
 /**
  * All devices in Scrypted implement ScryptedDevice, which contains the id, name, and type. Add listeners to subscribe to events from that device.
  */
@@ -1710,6 +1756,9 @@ export interface ScryptedStatic {
   systemManager: SystemManager,
 
   pluginHostAPI?: any;
+}
+
+export declare interface DeviceState {
 }
 
 export interface ScryptedInterfaceDescriptor {
