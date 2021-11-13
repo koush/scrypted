@@ -26,7 +26,7 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
     else
         out = path.resolve(cwd, 'out');
 
-    const src = path.join(__dirname, '../python');
+    const src = path.join(__dirname, '../python/scrypted_sdk');
     const dst = path.join(cwd, 'src', 'scrypted_sdk');
     rimraf.sync(dst);
     console.log(src, dst);

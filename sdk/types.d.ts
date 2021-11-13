@@ -1,9 +1,9 @@
 /// <reference types="node" />
 export declare enum ScryptedInterfaceProperty {
     id = "id",
+    info = "info",
     interfaces = "interfaces",
     mixins = "mixins",
-    info = "info",
     name = "name",
     providedInterfaces = "providedInterfaces",
     providedName = "providedName",
@@ -20,9 +20,9 @@ export declare enum ScryptedInterfaceProperty {
     running = "running",
     paused = "paused",
     docked = "docked",
+    thermostatActiveMode = "thermostatActiveMode",
     thermostatAvailableModes = "thermostatAvailableModes",
     thermostatMode = "thermostatMode",
-    thermostatActiveMode = "thermostatActiveMode",
     thermostatSetpoint = "thermostatSetpoint",
     thermostatSetpointHigh = "thermostatSetpointHigh",
     thermostatSetpointLow = "thermostatSetpointLow",
@@ -49,60 +49,9 @@ export declare enum ScryptedInterfaceProperty {
     humiditySetting = "humiditySetting",
     fan = "fan"
 }
-export declare enum ScryptedInterface {
-    ScryptedDevice = "ScryptedDevice",
-    OnOff = "OnOff",
-    Brightness = "Brightness",
-    ColorSettingTemperature = "ColorSettingTemperature",
-    ColorSettingRgb = "ColorSettingRgb",
-    ColorSettingHsv = "ColorSettingHsv",
-    Notifier = "Notifier",
-    StartStop = "StartStop",
-    Pause = "Pause",
-    Dock = "Dock",
-    TemperatureSetting = "TemperatureSetting",
-    Thermometer = "Thermometer",
-    HumiditySensor = "HumiditySensor",
-    Camera = "Camera",
-    VideoCamera = "VideoCamera",
-    Intercom = "Intercom",
-    Lock = "Lock",
-    PasswordStore = "PasswordStore",
-    Authenticator = "Authenticator",
-    Scene = "Scene",
-    Entry = "Entry",
-    EntrySensor = "EntrySensor",
-    DeviceProvider = "DeviceProvider",
-    Battery = "Battery",
-    Refresh = "Refresh",
-    MediaPlayer = "MediaPlayer",
-    Online = "Online",
-    SoftwareUpdate = "SoftwareUpdate",
-    BufferConverter = "BufferConverter",
-    Settings = "Settings",
-    BinarySensor = "BinarySensor",
-    IntrusionSensor = "IntrusionSensor",
-    PowerSensor = "PowerSensor",
-    AudioSensor = "AudioSensor",
-    MotionSensor = "MotionSensor",
-    OccupancySensor = "OccupancySensor",
-    FloodSensor = "FloodSensor",
-    UltravioletSensor = "UltravioletSensor",
-    LuminanceSensor = "LuminanceSensor",
-    PositionSensor = "PositionSensor",
-    MediaSource = "MediaSource",
-    MessagingEndpoint = "MessagingEndpoint",
-    OauthClient = "OauthClient",
-    MixinProvider = "MixinProvider",
-    HttpRequestHandler = "HttpRequestHandler",
-    EngineIOHandler = "EngineIOHandler",
-    PushHandler = "PushHandler",
-    Program = "Program",
-    Scriptable = "Scriptable",
-    ObjectDetector = "ObjectDetector",
-    HumiditySetting = "HumiditySetting",
-    Fan = "Fan"
-}
+export declare const ScryptedInterfaceDescriptors: {
+    [scryptedInterface: string]: ScryptedInterfaceDescriptor;
+};
 export declare type ScryptedNativeId = string | undefined;
 /**
  * DeviceState is returned by DeviceManager.getDeviceState, and allows getting/setting of a device provided by a DeviceProvider.
@@ -518,7 +467,7 @@ export declare enum LockState {
 /**
  * PasswordControl represents devices that authorize users via a passcode or pin code.
  */
-export interface PasswordStore extends Authenticator {
+export interface PasswordStore {
     addPassword(password: string): Promise<void>;
     getPasswords(): Promise<string[]>;
     removePassword(password: string): Promise<void>;
@@ -543,7 +492,7 @@ export interface Scene {
 /**
  * Entry represents devices that can open and close barriers, such as garage doors.
  */
-export interface Entry extends EntrySensor {
+export interface Entry {
     closeEntry(): Promise<void>;
     openEntry(): Promise<void>;
 }
@@ -585,7 +534,7 @@ export interface Refresh {
 /**
  * MediaPlayer allows media playback on screen or speaker devices, such as Chromecasts or TVs.
  */
-export interface MediaPlayer extends StartStop, Pause {
+export interface MediaPlayer {
     getMediaStatus(): Promise<MediaStatus>;
     load(media: string | MediaObject, options?: MediaPlayerOptions): Promise<void>;
     seek(milliseconds: number): Promise<void>;
@@ -1117,6 +1066,57 @@ export interface Setting {
     value?: SettingValue;
 }
 export declare enum ScryptedInterface {
+    ScryptedDevice = "ScryptedDevice",
+    OnOff = "OnOff",
+    Brightness = "Brightness",
+    ColorSettingTemperature = "ColorSettingTemperature",
+    ColorSettingRgb = "ColorSettingRgb",
+    ColorSettingHsv = "ColorSettingHsv",
+    Notifier = "Notifier",
+    StartStop = "StartStop",
+    Pause = "Pause",
+    Dock = "Dock",
+    TemperatureSetting = "TemperatureSetting",
+    Thermometer = "Thermometer",
+    HumiditySensor = "HumiditySensor",
+    Camera = "Camera",
+    VideoCamera = "VideoCamera",
+    Intercom = "Intercom",
+    Lock = "Lock",
+    PasswordStore = "PasswordStore",
+    Authenticator = "Authenticator",
+    Scene = "Scene",
+    Entry = "Entry",
+    EntrySensor = "EntrySensor",
+    DeviceProvider = "DeviceProvider",
+    Battery = "Battery",
+    Refresh = "Refresh",
+    MediaPlayer = "MediaPlayer",
+    Online = "Online",
+    SoftwareUpdate = "SoftwareUpdate",
+    BufferConverter = "BufferConverter",
+    Settings = "Settings",
+    BinarySensor = "BinarySensor",
+    IntrusionSensor = "IntrusionSensor",
+    PowerSensor = "PowerSensor",
+    AudioSensor = "AudioSensor",
+    MotionSensor = "MotionSensor",
+    OccupancySensor = "OccupancySensor",
+    FloodSensor = "FloodSensor",
+    UltravioletSensor = "UltravioletSensor",
+    LuminanceSensor = "LuminanceSensor",
+    PositionSensor = "PositionSensor",
+    MediaSource = "MediaSource",
+    OauthClient = "OauthClient",
+    MixinProvider = "MixinProvider",
+    HttpRequestHandler = "HttpRequestHandler",
+    EngineIOHandler = "EngineIOHandler",
+    PushHandler = "PushHandler",
+    Program = "Program",
+    Scriptable = "Scriptable",
+    ObjectDetector = "ObjectDetector",
+    HumiditySetting = "HumiditySetting",
+    Fan = "Fan"
 }
 export interface RTCAVMessage {
     id: string;
@@ -1151,6 +1151,3 @@ export interface ScryptedInterfaceDescriptor {
     properties: string[];
     methods: string[];
 }
-export declare const ScryptedInterfaceDescriptors: {
-    [scryptedInterface: string]: ScryptedInterfaceDescriptor;
-};
