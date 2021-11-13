@@ -107,8 +107,8 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
     }
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        const vsos = (await this.getVideoStreamOptions());
-        const vso = vsos.find(s => s.id === options?.id) || this.getDefaultStream(vsos);
+        const vsos = await this.getVideoStreamOptions();
+        const vso = vsos?.find(s => s.id === options?.id) || this.getDefaultStream(vsos);
 
         const url = new URL(vso.url);
         this.console.log('rtsp stream url', url.toString());
