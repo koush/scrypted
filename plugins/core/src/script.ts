@@ -43,7 +43,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program {
     run(variables?: { [name: string]: any; }): Promise<any> {
         try {
             const data = JSON.parse(this.storage.getItem('data'));
-            return scryptedEval(this, data.script, variables);
+            return scryptedEval(this, data['script.ts'], variables);
         }
         catch (e) {
             this.log.e('error loading script');
