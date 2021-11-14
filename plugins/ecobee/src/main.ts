@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosRequestConfig } from 'axios'
 import sdk, { Device, DeviceInformation, ScryptedDeviceBase, OnOff, DeviceProvider, ScryptedDeviceType, ThermostatMode, Thermometer, HumiditySensor, TemperatureSetting, Settings, Setting, ScryptedInterface, Refresh, TemperatureUnit, HumidityCommand, HumidityMode, HumiditySetting } from '@scrypted/sdk';
 const { deviceManager, log } = sdk;
 
@@ -117,7 +117,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
         includeEquipmentStatus: true,
       }
     }
-    const data = await this.provider.req('get', 'thermostatSummary', null, { json });
+    const data = await this.provider.req('get', 'thermostatSummary', json)
 
     // Update equipmentStatus, trigger reload if changes detected
     this._updateEquipmentStatus(data.statusList[0].split(":")[1]);
@@ -196,7 +196,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
         includeEquipmentStatus: true,
       }
     }
-    var data = (await this.provider.req('get', 'thermostat', {}, { json })).thermostatList[0];
+    const data = (await this.provider.req('get', 'thermostat', json)).thermostatList[0];
 
     // Set runtime values
     this.temperature = convertFtoC(Number(data.runtime.actualTemperature)/10)
@@ -245,7 +245,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
       }
     }
 
-    var resp = await this.provider.req('post', 'thermostat', data, { format: "json" })
+    const resp = await this.provider.req('post', 'thermostat', undefined, data);
     if (resp.status.code == 0) {
       this.console.log("setThermostatMode success")
       await this.reload();
@@ -276,7 +276,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
       ]
     }
 
-    var resp = await this.provider.req('post', 'thermostat', data, { format: "json" })
+    const resp = await this.provider.req('post', 'thermostat', undefined, data)
     if (resp.status.code == 0) {
       this.console.log("setThermostatSetpoint success")
       await this.reload();
@@ -319,7 +319,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
       ]
     }
 
-    var resp = await this.provider.req('post', 'thermostat', data, { format: "json" })
+    const resp = await this.provider.req('post', 'thermostat', undefined, data);
     if (resp.status.code == 0) {
       this.console.log("fanOff success")
       await this.reload();
@@ -352,7 +352,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
       ]
     }
 
-    var resp = await this.provider.req('post', 'thermostat', data, { format: "json" })
+    const resp = await this.provider.req('post', 'thermostat', undefined, data);
     if (resp.status.code == 0) {
       this.console.log("fanOn success")
       await this.reload();
@@ -476,28 +476,38 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
   }
 
   // Generic API request
-  async req(method, endpoint, data, params) {
-    const url = `https://${this.apiBaseUrl}/api/1/${endpoint}`
-    const options = {
+  async req(
+    method: string,
+    endpoint: string,
+    json?: any,
+    data?: any,
+    attempt?: number,
+  ): Promise<any> {
+    if (attempt > 2) {
+      throw new Error(` request to ${method}:${endpoint} failed after ${attempt} retries`);
+    }
+
+    // Configure API request
+    const config: AxiosRequestConfig = {
+      method,
+      url: `https://${this.apiBaseUrl}/api/1/${endpoint}`,
       headers: {
         Authorization: `Bearer ${this.access_token}`,
       },
-      params: params
+      data,
     }
-    let resp
+    if (json)
+      config.params = { json };
+
+    // Make API request, recursively retry after token refresh
     try {
-      if (method === "post") {
-        resp = await axios.post(url, data, options)
-      } else { 
-        resp = await axios[method](url, options);
-      }
+      return (await axios.request(config)).data;
     } catch (e) {
-      // really simple retry on failure
-      this.console.log("failed req(), refreshing token")
+      this.console.log(`req failed ${e}`)
+      // refresh token and retry request
       await this.refreshToken();
-      resp = await axios[method](url, options);
+      return await this.req(method, endpoint, json, data, attempt++);
     }
-    return resp.data;
   }
 
   async discoverDevices(): Promise<void> {
@@ -522,7 +532,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
         includeSettings: true,
       }
     }
-    const apiDevices = (await this.req('get', 'thermostat', null, { json })).thermostatList
+    const apiDevices = (await this.req('get', 'thermostat', json)).thermostatList;
     this.console.log(`Discovered ${apiDevices.length} devices.`);
 
     // Create a list of devices found from the API
