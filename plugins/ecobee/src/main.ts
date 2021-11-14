@@ -2,6 +2,8 @@ import axios, { AxiosRequestConfig } from 'axios'
 import sdk, { Device, DeviceInformation, ScryptedDeviceBase, OnOff, DeviceProvider, ScryptedDeviceType, ThermostatMode, Thermometer, HumiditySensor, TemperatureSetting, Settings, Setting, ScryptedInterface, Refresh, TemperatureUnit, HumidityCommand, HumidityMode, HumiditySetting } from '@scrypted/sdk';
 const { deviceManager, log } = sdk;
 
+const API_RETRY = 2;
+
 // Convert Fahrenheit to Celsius, round to 2 decimal places
 function convertFtoC(f: number) {
   let c = (5/9) * (f - 32)
@@ -483,18 +485,20 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     data?: any,
     attempt?: number,
   ): Promise<any> {
-    if (attempt > 2) {
+    if (attempt > API_RETRY) {
       throw new Error(` request to ${method}:${endpoint} failed after ${attempt} retries`);
     }
 
     // Configure API request
     const config: AxiosRequestConfig = {
       method,
-      url: `https://${this.apiBaseUrl}/api/1/${endpoint}`,
+      baseURL: `https://${this.apiBaseUrl}/api/1/`,
+      url: endpoint,
       headers: {
         Authorization: `Bearer ${this.access_token}`,
       },
       data,
+      timeout: 10000,
     }
     if (json)
       config.params = { json };
