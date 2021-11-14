@@ -796,6 +796,7 @@ export interface MediaManager {
     convertMediaObjectToUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string>;
     /**
      * Create a MediaObject. The media will be created from the provided FFmpeg input arguments.
+     * @deprecated
      */
     createFFmpegMediaObject(ffmpegInput: FFMpegInput): MediaObject;
     /**
@@ -813,6 +814,10 @@ export interface MediaManager {
 }
 export interface FFMpegInput {
     inputArguments?: string[];
+    mediaStreamOptions?: MediaStreamOptions;
+}
+export interface MediaStreamUrl {
+    url: string;
     mediaStreamOptions?: MediaStreamOptions;
 }
 /**
@@ -1173,6 +1178,7 @@ export declare enum ScryptedMimeTypes {
     InsecureLocalUrl = "text/x-insecure-local-uri",
     LocalUrl = "text/x-local-uri",
     PushEndpoint = "text/x-push-endpoint",
+    MediaStreamUrl = "text/x-media-url",
     FFmpegInput = "x-scrypted/x-ffmpeg-input",
     RTCAVOffer = "x-scrypted/x-rtc-av-offer",
     RTCAVAnswer = "x-scrypted/x-rtc-av-answer"

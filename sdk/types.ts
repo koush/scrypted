@@ -1312,6 +1312,7 @@ export interface MediaManager {
 
   /**
    * Create a MediaObject. The media will be created from the provided FFmpeg input arguments.
+   * @deprecated
    */
   createFFmpegMediaObject(ffmpegInput: FFMpegInput): MediaObject;
 
@@ -1323,8 +1324,7 @@ export interface MediaManager {
   /**
    * Create a MediaObject from an URL. The mime type should be provided, but it may be inferred from the URL path.
    */
-   createMediaObjectFromUrl(data: string, mimeType?: string): Promise<MediaObject>;
-
+  createMediaObjectFromUrl(data: string, mimeType?: string): Promise<MediaObject>;
 
   /**
    * Get the path to ffmpeg on the host system.
@@ -1334,6 +1334,10 @@ export interface MediaManager {
 }
 export interface FFMpegInput {
   inputArguments?: string[];
+  mediaStreamOptions?: MediaStreamOptions;
+}
+export interface MediaStreamUrl {
+  url: string;
   mediaStreamOptions?: MediaStreamOptions;
 }
 /**
@@ -1653,7 +1657,7 @@ export enum MediaPlayerState {
   Paused = "Paused",
   Buffering = "Buffering",
 }
-export type SettingValue = string|number|boolean|string[]|number[];
+export type SettingValue = string | number | boolean | string[] | number[];
 export interface Setting {
   key?: string;
   title?: string;
@@ -1737,6 +1741,7 @@ export enum ScryptedMimeTypes {
   InsecureLocalUrl = 'text/x-insecure-local-uri',
   LocalUrl = 'text/x-local-uri',
   PushEndpoint = 'text/x-push-endpoint',
+  MediaStreamUrl = 'text/x-media-url',
   FFmpegInput = 'x-scrypted/x-ffmpeg-input',
   RTCAVOffer = 'x-scrypted/x-rtc-av-offer',
   RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',

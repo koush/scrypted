@@ -631,6 +631,7 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["InsecureLocalUrl"] = "text/x-insecure-local-uri";
     ScryptedMimeTypes["LocalUrl"] = "text/x-local-uri";
     ScryptedMimeTypes["PushEndpoint"] = "text/x-push-endpoint";
+    ScryptedMimeTypes["MediaStreamUrl"] = "text/x-media-url";
     ScryptedMimeTypes["FFmpegInput"] = "x-scrypted/x-ffmpeg-input";
     ScryptedMimeTypes["RTCAVOffer"] = "x-scrypted/x-rtc-av-offer";
     ScryptedMimeTypes["RTCAVAnswer"] = "x-scrypted/x-rtc-av-answer";
