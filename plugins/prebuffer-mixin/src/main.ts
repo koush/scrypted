@@ -5,7 +5,7 @@ import EventEmitter, { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { createRebroadcaster, FFMpegRebroadcastOptions, FFMpegRebroadcastSession, startRebroadcastSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
-import { createMpegTsParser, createFragmentedMp4Parser, MP4Atom, StreamChunk, createPCMParser, StreamParser } from '@scrypted/common/src/stream-parser';
+import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, createPCMParser, StreamParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
@@ -66,6 +66,7 @@ class PrebufferSession {
       return;
     this.console.log('prebuffer session started', this.streamId);
     this.parserSessionPromise = this.startPrebufferSession();
+    this.parserSessionPromise.catch(() => this.parserSessionPromise = undefined);
   }
 
   getAudioConfig(): {
@@ -161,7 +162,8 @@ class PrebufferSession {
     if (this.incompatibleDetected)
       this.console.warn('configure your camera to output aac, mp3, or mp2 audio. incompatibl audio codec detected', probeAudioCodec);
 
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await this.mixinDevice.getVideoStream(mso), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const mo = await this.mixinDevice.getVideoStream(mso);
+    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
     const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
 
