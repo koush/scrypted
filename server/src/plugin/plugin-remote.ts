@@ -96,12 +96,6 @@ class EndpointManagerImpl implements EndpointManager {
     }
 }
 
-const disallowedScryptedDeviceProperties = new Set<string>([
-    ScryptedInterfaceProperty.id,
-    ScryptedInterfaceProperty.interfaces,
-    ScryptedInterfaceProperty.mixins,
-]);
-
 class DeviceStateProxyHandler implements ProxyHandler<any> {
     constructor(public deviceManager: DeviceManagerImpl, public id: string,
         public setState: (property: string, value: any) => Promise<void>) {

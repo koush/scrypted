@@ -7,3 +7,4 @@ out
 scrypted.db.bak
 .exit
 .update
+__pycache__
