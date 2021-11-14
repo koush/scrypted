@@ -163,7 +163,8 @@ class PrebufferSession {
       this.console.warn('configure your camera to output aac, mp3, or mp2 audio. incompatibl audio codec detected', probeAudioCodec);
 
     const mo = await this.mixinDevice.getVideoStream(mso);
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
+    const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
 
     const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
 
