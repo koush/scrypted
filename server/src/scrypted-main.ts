@@ -176,11 +176,14 @@ else {
         let shownLegacyPortAlert = false
         const legacySecure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, (req, res) => {
             if (!shownLegacyPortAlert) {
-                shownLegacyPortAlert = true;
-                const host = (req.headers.host || 'localhost').split(':')[0];
-                const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice('@scrypted/core'));
-                const newUrl = `https://${host}:${SCRYPTED_SECURE_PORT}`;
-                logger.log('a', `Due to a port conflict with Portainer, the default Scrypted URL has changed to ${newUrl}`);
+                const core = scrypted.findPluginDevice('@scrypted/core');
+                if (core) {
+                    const logger = scrypted.getDeviceLogger(core);
+                    shownLegacyPortAlert = true;
+                    const host = (req.headers.host || 'localhost').split(':')[0];
+                    const newUrl = `https://${host}:${SCRYPTED_SECURE_PORT}`;
+                    logger.log('a', `Due to a port conflict with Portainer, the default Scrypted URL has changed to ${newUrl}`);
+                }
             }
             app(req, res);
         });
