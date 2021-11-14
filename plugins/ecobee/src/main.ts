@@ -104,34 +104,26 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
    }
 
    /* refresh(): Request from Scrypted to refresh data from device 
-    *
+    *            Poll from API '/thermostatSummary' endpoint for timestamp of last changes and compare to last check
+    *            Updates equipmentStatus on each call
     */
    async refresh(refreshInterface: string, userInitiated: boolean): Promise<void> {
-    this.console.log(`refresh(${refreshInterface}, ${userInitiated}): ${new Date()}`)
-    this._refresh();
-   }
-   
-  /* _refresh(): Poll from API '/thermostatSummary' endpoint for timestamp of last changes and compare to last check
-   *             Updates equipmentStatus on each call
-   *
-   */
-   async _refresh(): Promise<void> {
-      const json = {
-        selection: {
-          selectionType: "registered",
-          selectionMatch: this.nativeId,
-          includeSettings: "true",
-          includeRuntime: "true",
-          includeEquipmentStatus: "true",
-        }
+    this.console.log(`${refreshInterface} requested refresh\n ${new Date()}`)
+    
+    const json = {
+      selection: {
+        selectionType: "registered",
+        selectionMatch: this.nativeId,
+        includeEquipmentStatus: true,
       }
-      const data = await this.provider.req('get', 'thermostatSummary', null, { json });
+    }
+    const data = await this.provider.req('get', 'thermostatSummary', null, { json });
 
-      // Update equipmentStatus, trigger reload if changes detected
-      this._updateEquipmentStatus(data.statusList[0].split(":")[1]);
-      if (this._updateRevisionList(data.revisionList[0]))
-        await this.reload()
-  }
+    // Update equipmentStatus, trigger reload if changes detected
+    this._updateEquipmentStatus(data.statusList[0].split(":")[1]);
+    if (this._updateRevisionList(data.revisionList[0]))
+      await this.reload()
+   }
 
   /*
    * Set characteristics based on equipmentStatus from API
@@ -143,7 +135,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
    */
    _updateEquipmentStatus(equipmentStatus: string): void {
     equipmentStatus = equipmentStatus.toLowerCase()
-    this.console.log(`Equipment status: ${equipmentStatus}`);
+    this.console.log(` Current status: ${equipmentStatus}`);
     if (equipmentStatus.includes("heat"))
       // values: heatPump, heatPump[2-3], auxHeat[1-3]
       this.thermostatActiveMode = ThermostatMode.Heat;
@@ -182,12 +174,12 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     // Compare each element, skip first 3
     for (let i = 3; i < listItems.length; i++) {
       if (this.revisionList[i] !== oldList[i]) {
-        this.console.log(`Change detected: ${listItems[i]}`)
+        this.console.log(` Changes detected: ${listItems[i]}`)
         return true;
       }
     }
 
-    this.console.log("No changes detected");
+    this.console.log(" Changes detected: none");
     return false;
   }
 
@@ -199,9 +191,9 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
       selection: {
         selectionType: "registered",
         selectionMatch: this.nativeId,
-        includeSettings: "true",
-        includeRuntime: "true",
-        includeEquipmentStatus: "true"
+        includeSettings: true,
+        includeRuntime: true,
+        includeEquipmentStatus: true,
       }
     }
     var data = (await this.provider.req('get', 'thermostat', {}, { json })).thermostatList[0];
@@ -527,7 +519,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
       selection: {
         selectionType: "registered",
         selectionMatch: "",
-        includeSettings: "true",
+        includeSettings: true,
       }
     }
     const apiDevices = (await this.req('get', 'thermostat', null, { json })).thermostatList
@@ -536,7 +528,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     // Create a list of devices found from the API
     const devices: Device[] = [];
     for (let apiDevice of apiDevices) {
-      this.console.log(apiDevice);
+      this.console.log(` Discovered ${apiDevice.brand} ${apiDevice.modelNumber} ${apiDevice.name} (${apiDevice.identifier})`);
 
       const interfaces: ScryptedInterface[] = [
         ScryptedInterface.Thermometer,
