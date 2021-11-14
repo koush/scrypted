@@ -1,4 +1,4 @@
-import { VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk/types";
+import { MediaStreamUrl, VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk/types";
 import { convert, ensureBuffer } from "../convert";
 import { MediaObjectRemote } from "./plugin-api";
 import mimeType from 'mime'
@@ -22,6 +22,44 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
             return Buffer.from(JSON.stringify(args));
         }
     });
+
+    mediaManager.builtinConverters.push({
+        fromMimeType: ScryptedMimeTypes.MediaStreamUrl,
+        toMimeType: ScryptedMimeTypes.FFmpegInput,
+        async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer | string> {
+            const mediaUrl: MediaStreamUrl = JSON.parse(data.toString());
+
+            const inputArguments: string[] = [
+                '-i',
+                mediaUrl.url,
+            ];
+
+            if (mediaUrl.url.startsWith('rtsp://')) {
+                inputArguments.unshift(
+                    // should this be set here? configurable?
+                    // do we ever want udp?
+                    "-rtsp_transport",
+                    "tcp",
+                    // 10 seconds
+                    '-analyzeduration', '10000000',
+                    // 20mb
+                    '-probesize', '20000000',
+                    "-reorder_queue_size",
+                    "1024",
+                    "-max_delay",
+                    // 10 second delay
+                    "10000000",
+                )
+            }
+
+            const ret: FFMpegInput = {
+                inputArguments,
+                mediaStreamOptions: mediaUrl.mediaStreamOptions,
+            }
+
+            return Buffer.from(JSON.stringify(ret));
+        }
+    })
 
     mediaManager.builtinConverters.push({
         fromMimeType: ScryptedMimeTypes.FFmpegInput,
@@ -119,21 +157,9 @@ export class MediaManagerImpl implements MediaManager {
         const url = await convert(this.getConverters(), converted, ScryptedMimeTypes.Url);
         return url.data.toString();
     }
+
     createFFmpegMediaObject(ffMpegInput: FFMpegInput): MediaObject {
-        const mimeType = ScryptedMimeTypes.FFmpegInput;
-        const json = JSON.stringify(ffMpegInput);
-
-        class MediaObjectImpl implements MediaObjectRemote {
-            __proxy_props = {
-                mimeType,
-            }
-
-            mimeType = mimeType;
-            async getData(): Promise<Buffer> {
-                return Buffer.from(json);
-            }
-        }
-        return new MediaObjectImpl();
+        return this.createMediaObject(Buffer.from(JSON.stringify(ffMpegInput)), ScryptedMimeTypes.FFmpegInput);
     }
 
     createMediaObject(data: string | Buffer | Promise<string | Buffer>, mimeType?: string): MediaObjectRemote {
