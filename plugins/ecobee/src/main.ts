@@ -116,9 +116,16 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
    *
    */
    async _refresh(): Promise<void> {
-      const data = await this.provider.req('get', 'thermostatSummary', null, {
-        json: `\{"selection":\{"selectionType":"registered","selectionMatch":"${this.nativeId}","includeSettings": "true", "includeRuntime": "true", "includeEquipmentStatus": "true"\}\}`
-      });
+      const json = {
+        selection: {
+          selectionType: "registered",
+          selectionMatch: this.nativeId,
+          includeSettings: "true",
+          includeRuntime: "true",
+          includeEquipmentStatus: "true",
+        }
+      }
+      const data = await this.provider.req('get', 'thermostatSummary', null, { json });
 
       // Update equipmentStatus, trigger reload if changes detected
       this._updateEquipmentStatus(data.statusList[0].split(":")[1]);
@@ -188,9 +195,16 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
    *
    */
   async reload(): Promise<void> {
-    var data = (await this.provider.req('get', 'thermostat', {}, {
-      json: `\{"selection":\{"selectionType":"registered","selectionMatch":"${this.nativeId}","includeSettings": "true", "includeRuntime": "true", "includeEquipmentStatus": "true"\}\}`
-    })).thermostatList[0];
+    const json = {
+      selection: {
+        selectionType: "registered",
+        selectionMatch: this.nativeId,
+        includeSettings: "true",
+        includeRuntime: "true",
+        includeEquipmentStatus: "true"
+      }
+    }
+    var data = (await this.provider.req('get', 'thermostat', {}, { json })).thermostatList[0];
 
     // Set runtime values
     this.temperature = convertFtoC(Number(data.runtime.actualTemperature)/10)
@@ -509,10 +523,15 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     }
 
     // Get a list of all accessible devices
-    const apiDevices = (await this.req('get', 'thermostat', null, {
-      json: `\{"selection":\{"selectionType":"registered","selectionMatch":"","includeSettings": "true"\}\}`
-    })).thermostatList
-    this.console.log(`Discovered ${apiDevices.length} devices.`)
+    const json = {
+      selection: {
+        selectionType: "registered",
+        selectionMatch: "",
+        includeSettings: "true",
+      }
+    }
+    const apiDevices = (await this.req('get', 'thermostat', null, { json })).thermostatList
+    this.console.log(`Discovered ${apiDevices.length} devices.`);
 
     // Create a list of devices found from the API
     const devices: Device[] = [];
