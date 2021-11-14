@@ -1,4 +1,4 @@
-import { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
+import { MediaStreamUrl, BufferConverter, FFMpegInput, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import mimeTypes from "mime-types";
 

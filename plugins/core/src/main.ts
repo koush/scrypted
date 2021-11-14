@@ -17,7 +17,7 @@ import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { Script } from './script';
-import { addBuiltins } from "../../../common/src/wrtc-converters";
+import { addBuiltins } from "../../../common/src/wrtc-convertors";
 import { updatePluginsData } from './update-plugins';
 
 addBuiltins(console, mediaManager);
