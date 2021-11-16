@@ -74,7 +74,7 @@ addSupportedType({
             });
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetTemperature,
-            () => device.thermostatSetpoint || 0);
+            () => Math.max(device.thermostatSetpoint || 0, 10));
 
         service.getCharacteristic(Characteristic.HeatingThresholdTemperature)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -83,7 +83,7 @@ addSupportedType({
             });
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.HeatingThresholdTemperature,
-            () => device.thermostatSetpointLow || 0);
+            () => Math.max(device.thermostatSetpointLow || 0, 10));
 
         service.getCharacteristic(Characteristic.CoolingThresholdTemperature)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -92,7 +92,7 @@ addSupportedType({
             });
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CoolingThresholdTemperature,
-            () => device.thermostatSetpointHigh || 0);
+            () => Math.max(device.thermostatSetpointHigh || 0, 10));
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TemperatureDisplayUnits,
             () => device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
@@ -173,16 +173,6 @@ addSupportedType({
 
         if (device.interfaces.includes(ScryptedInterface.Fan)) {
             const fanService = accessory.addService(Service.Fanv2);
-
-            bindCharacteristic(device, ScryptedInterface.Fan, fanService, Characteristic.On,
-                () => !!device.fan?.speed);
-            fanService.getCharacteristic(Characteristic.On).on(CharacteristicEventTypes.SET, (value, callback) => {
-                callback();
-                device.setFan({
-                    speed: value ? device.fan?.maxSpeed || 1 : 0,
-                    mode: FanMode.Manual,
-                });
-            });
 
             if (device.fan?.counterClockwise != null) {
                 bindCharacteristic(device, ScryptedInterface.Fan, fanService, Characteristic.RotationDirection,
