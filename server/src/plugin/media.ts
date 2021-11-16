@@ -1,4 +1,4 @@
-import { MediaStreamUrl, VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk/types";
+import { ScryptedInterfaceProperty, SystemDeviceState, MediaStreamUrl, VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk/types";
 import { convert, ensureBuffer } from "../convert";
 import { MediaObjectRemote } from "./plugin-api";
 import mimeType from 'mime'
@@ -20,6 +20,14 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
             }
 
             return Buffer.from(JSON.stringify(args));
+        }
+    });
+
+    mediaManager.builtinConverters.push({
+        fromMimeType: ScryptedMimeTypes.FFmpegInput,
+        toMimeType: ScryptedMimeTypes.MediaStreamUrl,
+        async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer | string> {
+            return data;
         }
     });
 
@@ -87,14 +95,15 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
     });
 }
 
-export class MediaManagerImpl implements MediaManager {
-    systemManager: SystemManager;
+export abstract class MediaManagerBase implements MediaManager {
     builtinConverters: BufferConverter[] = [];
 
-    constructor(systemManager: SystemManager, public console: Console) {
-        this.systemManager = systemManager;
+    constructor(public console: Console) {
         addBuiltins(this.console, this);
     }
+
+    abstract getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } };
+    abstract getDeviceById<T>(id: string): T;
 
     async getFFmpegPath(): Promise<string> {
         // try to get the ffmpeg path as a value of another variable
@@ -119,9 +128,9 @@ export class MediaManagerImpl implements MediaManager {
     }
 
     getConverters(): BufferConverter[] {
-        const devices = Object.keys(this.systemManager.getSystemState()).map(id => this.systemManager.getDeviceById(id));
-        const converters: BufferConverter[] = Object.values(devices).filter(device => device.interfaces?.includes(ScryptedInterface.BufferConverter))
-            .map(device => device as ScryptedDevice & BufferConverter);
+        const converters = Object.entries(this.getSystemState())
+            .filter(([id, state]) => state[ScryptedInterfaceProperty.interfaces]?.value?.includes(ScryptedInterface.BufferConverter))
+            .map(([id]) => this.getDeviceById<BufferConverter>(id));
         converters.push(...this.builtinConverters);
         return converters;
     }
@@ -185,15 +194,41 @@ export class MediaManagerImpl implements MediaManager {
         const path = url.pathname.split('/')[1];
         let mo: MediaObject;
         if (path === ScryptedInterface.VideoCamera) {
-            mo = await this.systemManager.getDeviceById<VideoCamera>(id).getVideoStream();
+            mo = await this.getDeviceById<VideoCamera>(id).getVideoStream();
         }
         else if (path === ScryptedInterface.Camera) {
-            mo = await this.systemManager.getDeviceById<Camera>(id).takePicture() as any;
+            mo = await this.getDeviceById<Camera>(id).takePicture() as any;
         }
         else {
             throw new Error('Unrecognized Scrypted Media interface.')
         }
 
         return mo;
+    }
+}
+
+export class MediaManagerImpl extends MediaManagerBase {
+    constructor(public systemManager: SystemManager, console: Console) {
+        super(console);
+    }
+
+    getSystemState(): { [id: string]: { [property: string]: SystemDeviceState; }; } {
+        return this.systemManager.getSystemState();
+    }
+
+    getDeviceById<T>(id: string): T {
+        return this.systemManager.getDeviceById<T>(id);
+    }
+}
+
+export class MediaManagerHostImpl extends MediaManagerBase {
+    constructor(public systemState: { [id: string]: { [property: string]: SystemDeviceState } },
+        public getDeviceById: (id: string) => any,
+        console: Console) {
+        super(console);
+    }
+
+    getSystemState(): { [id: string]: { [property: string]: SystemDeviceState; }; } {
+        return this.systemState;
     }
 }

@@ -7,7 +7,7 @@ import io from 'engine.io';
 import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
 import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { Logger } from '../logger';
-import { MediaManagerImpl } from './media';
+import { MediaManagerHostImpl, MediaManagerImpl } from './media';
 import { getState } from '../state';
 import WebSocket, { EventEmitter } from 'ws';
 import { listenZero } from './listen-zero';
@@ -124,7 +124,12 @@ export class PluginHost {
 
         const self = this;
 
-        this.api = new PluginHostAPI(scrypted, plugin, this);
+        const { runtime } = this.packageJson.scrypted;
+        const mediaManager = runtime === 'python'
+            ? new MediaManagerHostImpl(scrypted.stateManager.getSystemState(), id => scrypted.getDevice(id), console)
+            : undefined;
+
+        this.api = new PluginHostAPI(scrypted, plugin, this, mediaManager);
 
         const zipBuffer = Buffer.from(plugin.zip, 'base64');
         this.zip = new AdmZip(zipBuffer);
@@ -155,7 +160,6 @@ export class PluginHost {
                 }
             }
 
-            const { runtime } = this.packageJson.scrypted;
             const fail = 'Plugin failed to load. Console for more information.';
             try {
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
@@ -224,6 +228,9 @@ export class PluginHost {
 
             const peerin = this.worker.stdio[3] as Writable;
             const peerout = this.worker.stdio[4] as Readable;
+
+            peerin.on('error', e => connected = false);
+            peerout.on('error', e => connected = false);
 
             this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
                 if (connected) {

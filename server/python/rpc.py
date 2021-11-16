@@ -46,17 +46,19 @@ class RpcProxyMethod:
         return self.__proxy.__apply__(self.__proxy_method_name, args)
 
 
-class RpcProxy:
+class RpcProxy(object):
     def __init__(self, peer, proxyId: str, proxyConstructorName: str, proxyProps: any, proxyOneWayMethods: list[str]):
-        self.__proxy_id = proxyId
-        self.__proxy_constructor = proxyConstructorName
-        self.__proxy_peer = peer
-        self.__proxy_props = proxyProps
-        self.__proxy_oneway_methods = proxyOneWayMethods
+        self.__dict__['__proxy_id'] = proxyId
+        self.__dict__['__proxy_constructor'] = proxyConstructorName
+        self.__dict__['__proxy_peer'] = peer
+        self.__dict__['__proxy_props'] = proxyProps
+        self.__dict__['__proxy_oneway_methods'] = proxyOneWayMethods
 
     def __getattr__(self, name):
-        if self.__proxy_props and hasattr(self.__proxy_props, name):
-            return self.__proxy_props[name]
+        if name in self.__dict__:
+            return self.__dict__[name]
+        if self.__dict__['__proxy_props'] and name in self.__dict__['__proxy_props']:
+            return self.__dict__['__proxy_props'][name]
         return RpcProxyMethod(self, name)
 
     def __call__(self, *args, **kwargs):
@@ -64,7 +66,7 @@ class RpcProxy:
         pass
 
     def __apply__(self, method: str, args: list):
-        return self.__proxy_peer.__apply__(self.__proxy_id, self.__proxy_oneway_methods, method, args)
+        return self.__dict__['__proxy_peer'].__apply__(self.__dict__['__proxy_id'], self.__dict__['__proxy_oneway_methods'], method, args)
 
 
 class RpcPeer:
@@ -95,7 +97,7 @@ class RpcPeer:
             'method': method,
         }
 
-        if not oneWayMethods or method not in oneWayMethods:
+        if oneWayMethods and method in oneWayMethods:
             rpcApply['oneway'] = True
             self.send(rpcApply)
             future = Future()
@@ -223,8 +225,8 @@ class RpcPeer:
 
     async def handleMessage(self, message: any):
         try:
-            type = message['type']
-            if type == 'param':
+            messageType = message['type']
+            if messageType == 'param':
                 result = {
                     'type': 'result',
                     'id': message['id'],
@@ -242,7 +244,7 @@ class RpcPeer:
 
                 self.send(result)
 
-            elif type == 'apply':
+            elif messageType == 'apply':
                 result = {
                     'type': 'result',
                     'id': message['id'],
@@ -280,7 +282,7 @@ class RpcPeer:
                 if not message.get('oneway', False):
                     self.send(result)
 
-            elif type == 'result':
+            elif messageType == 'result':
                 future = self.pendingResults.get(message['id'], None)
                 if not future:
                     raise RpcResultException(
@@ -295,7 +297,7 @@ class RpcPeer:
                     return
                 future.set_result(self.deserialize(
                     message.get('result', None)))
-            elif type == 'finalize':
+            elif messageType == 'finalize':
                 local = self.localProxyMap.pop(
                     message['__local_proxy_id'], None)
                 self.localProxied.pop(local, None)

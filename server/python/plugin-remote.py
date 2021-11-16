@@ -1,8 +1,10 @@
 from __future__ import annotations
+import os
+from os import sys
 more = os.path.join(os.getcwd(), 'node_modules/@scrypted/sdk')
 sys.path.insert(0, more)
 import scrypted_python.scrypted_sdk
-from scrypted_python.scrypted_sdk.types import MediaObject, ScryptedInterfaceProperty
+from scrypted_python.scrypted_sdk.types import MediaManager, MediaObject, ScryptedInterfaceProperty
 
 from collections.abc import Mapping
 from genericpath import exists
@@ -11,10 +13,8 @@ import asyncio
 from asyncio.events import AbstractEventLoop
 import json
 import aiofiles
-import os
 from typing import TypedDict
 import base64
-from os import sys
 import time
 import zipfile
 import subprocess
@@ -94,6 +94,7 @@ class PluginRemote:
     systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
     nativeIds: Mapping[str, DeviceStorage] = {}
     pluginId: str
+    mediaManager: MediaManager
 
     def __init__(self, api, pluginId):
         self.api = api
@@ -145,7 +146,8 @@ class PluginRemote:
         from scrypted_sdk import sdk_init # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
-        sdk_init(zip, self.systemManager, self.deviceManager)
+        self.mediaManager = await self.api.getMediaManager()
+        sdk_init(zip, self.systemManager, self.deviceManager, self.mediaManager)
         from main import create_scrypted_plugin # type: ignore
         return create_scrypted_plugin()
 

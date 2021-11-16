@@ -23,7 +23,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         this.scrypted.runPlugin(plugin);
     }, 15000);
 
-    constructor(public scrypted: ScryptedRuntime, plugin: Plugin, public pluginHost: PluginHost) {
+    constructor(public scrypted: ScryptedRuntime, plugin: Plugin, public pluginHost: PluginHost, public mediaManager: MediaManager) {
         super();
         this.pluginId = plugin._id;
     }
@@ -40,8 +40,8 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
     }
 
-    getMediaManager(): Promise<MediaManager> {
-        return null;
+    async getMediaManager(): Promise<MediaManager> {
+        return this.mediaManager;
     }
 
     async deliverPush(endpoint: string, httpRequest: HttpRequest) {
