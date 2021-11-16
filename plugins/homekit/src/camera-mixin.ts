@@ -62,7 +62,16 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         }
 
         settings.push({
+            title: 'HomeKit Transcoding',
+            group: 'HomeKit Transcoding',
+            key: 'transcodingNotices',
+            value: 'WARNING',
+            readonly: true,
+            description: 'Transcoding audio and video for HomeKit is not recommended. Configure your camera using the camera web portal or app to output the correct HomeKit compatible codecs (h264/aac/2000kbps).',
+        })
+        settings.push({
             title: 'Transcode Streaming',
+            group: 'HomeKit Transcoding',
             type: 'boolean',
             key: 'transcodeStreaming',
             value: (this.storage.getItem('transcodeStreaming') === 'true').toString(),
@@ -70,6 +79,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         });
         settings.push({
             title: 'Transcode Streaming (Hub)',
+            group: 'HomeKit Transcoding',
             type: 'boolean',
             key: 'transcodeStreamingHub',
             value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
@@ -81,6 +91,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         if (hasMotionSensor) {
             settings.push({
                 title: 'Transcode Recording',
+                group: 'HomeKit Transcoding',
                 key: 'transcodeRecording',
                 type: 'boolean',
                 value: (this.storage.getItem('transcodeRecording') === 'true').toString(),
@@ -96,6 +107,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
 
             settings.push({
                 title: 'Video Decoder Arguments',
+                group: 'HomeKit Transcoding',
                 key: "videoDecoderArguments",
                 value: this.storage.getItem('videoDecoderArguments'),
                 description: 'FFmpeg arguments used to decode input video.',
@@ -105,6 +117,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             });
             settings.push({
                 title: 'H264 Encoder Arguments',
+                group: 'HomeKit Transcoding',
                 key: "h264EncoderArguments",
                 value: this.storage.getItem('h264EncoderArguments'),
                 description: 'FFmpeg arguments used to encode h264 video.',
