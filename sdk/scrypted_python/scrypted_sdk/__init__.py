@@ -4,14 +4,17 @@ import zipfile
 
 deviceManager: DeviceManager = None
 systemManager: SystemManager = None
+mediaManager: MediaManager = None
 zip: zipfile.ZipFile = None
 
-def sdk_init(z: zipfile.ZipFile, sm: DeviceManager, dm: SystemManager):
+def sdk_init(z: zipfile.ZipFile, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
     global zip
     global systemManager
     global deviceManager
+    global mediaManager
     systemManager = sm
     deviceManager = dm
+    mediaManager = mm
     zip = z
 
 class ScryptedDeviceBase(DeviceState):

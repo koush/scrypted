@@ -179,6 +179,7 @@ class DeviceState:
 
 let seen = new Set<string>();
 seen.add('DeviceState');
+seen.add('MediaObject');
 
 while (dictionaryTypes.size) {
     const unknowns = schema.children.filter((child: any) => dictionaryTypes.has(child.name) && !enums.find((e: any) => e.name === child.name));

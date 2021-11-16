@@ -387,10 +387,13 @@ class PrebufferSession {
       })
     }
 
+    const url = `tcp://127.0.0.1:${await createContainerServer(container)}`;
     const ffmpegInput: FFMpegInput = {
+      url,
+      container,
       inputArguments: [
         '-f', container,
-        '-i', `tcp://127.0.0.1:${await createContainerServer(container)}`,
+        '-i', url,
       ],
       mediaStreamOptions,
     }

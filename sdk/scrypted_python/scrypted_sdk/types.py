@@ -232,8 +232,10 @@ class EventListenerRegister(TypedDict):
     pass
 
 class FFMpegInput(TypedDict):
+    container: str
     inputArguments: list(str)
     mediaStreamOptions: MediaStreamOptions
+    url: str
     pass
 
 class FanState(TypedDict):
@@ -281,10 +283,6 @@ class HumiditySettingStatus(TypedDict):
 class Logger(TypedDict):
     pass
 
-class MediaObject(TypedDict):
-    mimeType: str
-    pass
-
 class MediaPlayerOptions(TypedDict):
     autoplay: bool
     mimeType: str
@@ -305,6 +303,11 @@ class MediaStreamOptions(TypedDict):
     name: str
     prebuffer: float
     video: VideoStreamOptions
+    pass
+
+class ObjectDetectionSession(TypedDict):
+    detectionId: str
+    duration: float
     pass
 
 class ObjectDetectionTypes(TypedDict):
@@ -354,10 +357,6 @@ class ScryptedDevice(TypedDict):
     providerId: str
     room: str
     type: ScryptedDeviceType
-    pass
-
-class TensorInfo(TypedDict):
-    shape: list(float)
     pass
 
 class AudioSensor:
@@ -540,7 +539,7 @@ class OauthClient:
     pass
 
 class ObjectDetection:
-    async def detectObjects(self, tensor: bytearray, info: TensorInfo) -> ObjectsDetected:
+    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
     pass
 

@@ -12,3 +12,5 @@ class Console:
 class Storage:
     pass
 
+class MediaObject:
+    mimeType: str

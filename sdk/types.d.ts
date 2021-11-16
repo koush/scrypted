@@ -717,8 +717,12 @@ export interface ObjectDetector {
 export interface TensorInfo {
     shape: number[];
 }
+export interface ObjectDetectionSession {
+    detectionId: string;
+    duration: number;
+}
 export interface ObjectDetection {
-    detectObjects(tensor: Buffer, info: TensorInfo): Promise<ObjectsDetected>;
+    detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -821,13 +825,13 @@ export interface MediaManager {
      */
     getFFmpegPath(): Promise<string>;
 }
-export interface FFMpegInput {
-    inputArguments?: string[];
-    mediaStreamOptions?: MediaStreamOptions;
-}
 export interface MediaStreamUrl {
     url: string;
+    container: string;
     mediaStreamOptions?: MediaStreamOptions;
+}
+export interface FFMpegInput extends MediaStreamUrl {
+    inputArguments?: string[];
 }
 /**
  * DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted.

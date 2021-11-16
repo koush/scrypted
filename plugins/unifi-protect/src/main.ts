@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetection, ObjectDetector, PictureOptions, ObjectDetectionTypes } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected } from "@scrypted/sdk";
 import { ProtectApi } from "unifi-protect";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "unifi-protect";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "unifi-protect";
@@ -112,7 +112,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     resetDetectionTimeout() {
         clearTimeout(this.detectionTimeout);
         this.detectionTimeout = setTimeout(() => {
-            const detect: ObjectDetection = {
+            const detect: ObjectsDetected = {
                 timestamp: Date.now(),
                 detections: []
             }
@@ -170,6 +170,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
 
         return mediaManager.createFFmpegMediaObject({
+            url: u,
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -180,7 +181,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
                 "-max_delay",
                 "20000000",
                 "-i",
-                u.toString(),
+                u,
             ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
         });
@@ -371,7 +372,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 const camera = rtsp.findCamera();
                 const snapshotChannel = camera.channels[0];
 
-                const detection: ObjectDetection = {
+                const detection: ObjectsDetected = {
                     detectionId,
                     timestamp: Date.now(),
                     detections: payload.smartDetectTypes.map(type => ({
