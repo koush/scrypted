@@ -316,9 +316,6 @@ else {
             const npmPackage = req.query.npmPackage as string;
             const plugin = await db.tryGet(Plugin, npmPackage) || new Plugin();
 
-            const packageJson = req.body;
-            await scrypted.installOptionalDependencies(packageJson, plugin.packageJson);
-
             plugin._id = npmPackage;
             plugin.packageJson = req.body;
 

@@ -136,7 +136,6 @@ export interface PluginRemoteLoadZipOptions {
 }
 
 export interface PluginRemote {
-    __proxy_oneway_methods?: string[],
     loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any>;
     setSystemState(state: {[id: string]: {[property: string]: SystemDeviceState}}): Promise<void>;
     setNativeId(nativeId: ScryptedNativeId, id: string, storage: {[key: string]: any}): Promise<void>;

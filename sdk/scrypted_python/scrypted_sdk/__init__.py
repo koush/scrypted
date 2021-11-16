@@ -1,14 +1,18 @@
 from __future__ import annotations
 from .types import *
+import zipfile
 
 deviceManager: DeviceManager = None
 systemManager: SystemManager = None
+zip: zipfile.ZipFile = None
 
-def sdk_init(sm: DeviceManager, dm: SystemManager):
+def sdk_init(z: zipfile.ZipFile, sm: DeviceManager, dm: SystemManager):
+    global zip
     global systemManager
     global deviceManager
     systemManager = sm
     deviceManager = dm
+    zip = z
 
 class ScryptedDeviceBase(DeviceState):
     nativeId: str | None

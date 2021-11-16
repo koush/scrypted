@@ -89,6 +89,7 @@ class ScryptedInterface(Enum):
     MotionSensor = "MotionSensor"
     Notifier = "Notifier"
     OauthClient = "OauthClient"
+    ObjectDetection = "ObjectDetection"
     ObjectDetector = "ObjectDetector"
     OccupancySensor = "OccupancySensor"
     OnOff = "OnOff"
@@ -139,11 +140,43 @@ class ThermostatMode(Enum):
     Purifier = "Purifier"
 
 
+class AudioStreamOptions(TypedDict):
+    bitrate: float
+    codec: str
+    pass
+
 class FaceRecognition(TypedDict):
     boundingBox: Any
     id: str
     label: str
     score: float
+    pass
+
+class ObjectDetectionResult(TypedDict):
+    boundingBox: Any
+    className: str
+    score: float
+    pass
+
+class PictureDimensions(TypedDict):
+    height: float
+    width: float
+    pass
+
+class VideoStreamOptions(TypedDict):
+    bitrate: float
+    codec: str
+    fps: float
+    height: float
+    idrIntervalMillis: float
+    maxBitrate: float
+    minBitrate: float
+    width: float
+    pass
+
+class BufferConverter(TypedDict):
+    fromMimeType: str
+    toMimeType: str
     pass
 
 class ColorHsv(TypedDict):
@@ -196,6 +229,11 @@ class EventListenerOptions(TypedDict):
     pass
 
 class EventListenerRegister(TypedDict):
+    pass
+
+class FFMpegInput(TypedDict):
+    inputArguments: list(str)
+    mediaStreamOptions: MediaStreamOptions
     pass
 
 class FanState(TypedDict):
@@ -261,12 +299,12 @@ class MediaStatus(TypedDict):
     pass
 
 class MediaStreamOptions(TypedDict):
-    audio: Any
+    audio: AudioStreamOptions
     container: str
     id: str
     name: str
     prebuffer: float
-    video: Any
+    video: VideoStreamOptions
     pass
 
 class ObjectDetectionTypes(TypedDict):
@@ -275,10 +313,19 @@ class ObjectDetectionTypes(TypedDict):
     people: list(FaceRecognition)
     pass
 
+class ObjectsDetected(TypedDict):
+    detectionId: Any
+    detections: list(ObjectDetectionResult)
+    faces: list(ObjectDetectionResult)
+    inputDimensions: Any
+    people: list(FaceRecognition)
+    timestamp: float
+    pass
+
 class PictureOptions(TypedDict):
     id: str
     name: str
-    picture: Any
+    picture: PictureDimensions
     pass
 
 class Position(TypedDict):
@@ -307,6 +354,10 @@ class ScryptedDevice(TypedDict):
     providerId: str
     room: str
     type: ScryptedDeviceType
+    pass
+
+class TensorInfo(TypedDict):
+    shape: list(float)
     pass
 
 class AudioSensor:
@@ -485,6 +536,11 @@ class OauthClient:
     async def getOauthUrl(self) -> str:
         pass
     async def onOauthCallback(self, callbackUrl: str) -> None:
+        pass
+    pass
+
+class ObjectDetection:
+    async def detectObjects(self, tensor: bytearray, info: TensorInfo) -> ObjectsDetected:
         pass
     pass
 
@@ -695,6 +751,41 @@ class SystemManager:
     def listenDevice(self, id: str, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
         pass
     async def removeDevice(self, id: str) -> None:
+        pass
+    pass
+
+class MediaManager:
+    builtinConverters: list(BufferConverter)
+    async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:
+        pass
+    async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
+        pass
+    async def convertMediaObjectToLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
+        pass
+    async def convertMediaObjectToUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
+        pass
+    def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput) -> MediaObject:
+        pass
+    def createMediaObject(self, data: str | bytearray | None, mimeType: str) -> MediaObject:
+        pass
+    async def createMediaObjectFromUrl(self, data: str, mimeType: str = None) -> MediaObject:
+        pass
+    async def getFFmpegPath(self) -> str:
+        pass
+    pass
+
+class EndpointManager:
+    async def deliverPush(self, endpoint: str, request: HttpRequest) -> None:
+        pass
+    async def getAuthenticatedPath(self) -> str:
+        pass
+    async def getInsecurePublicLocalEndpoint(self) -> str:
+        pass
+    async def getPublicCloudEndpoint(self) -> str:
+        pass
+    async def getPublicLocalEndpoint(self) -> str:
+        pass
+    async def getPublicPushEndpoint(self) -> str:
         pass
     pass
 

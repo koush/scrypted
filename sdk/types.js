@@ -477,6 +477,13 @@ exports.ScryptedInterfaceDescriptors = {
         ],
         properties: []
     },
+    ObjectDetection: {
+        name: 'ObjectDetection',
+        methods: [
+            'detectObjects'
+        ],
+        properties: []
+    },
     HumiditySetting: {
         name: 'HumiditySetting',
         methods: [
@@ -621,6 +628,7 @@ var ScryptedInterface;
     ScryptedInterface["Program"] = "Program";
     ScryptedInterface["Scriptable"] = "Scriptable";
     ScryptedInterface["ObjectDetector"] = "ObjectDetector";
+    ScryptedInterface["ObjectDetection"] = "ObjectDetection";
     ScryptedInterface["HumiditySetting"] = "HumiditySetting";
     ScryptedInterface["Fan"] = "Fan";
 })(ScryptedInterface = exports.ScryptedInterface || (exports.ScryptedInterface = {}));

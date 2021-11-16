@@ -6,12 +6,13 @@ import { ffmpegLogInitialOutput } from "./media-helpers";
 
 let wrtc: any;
 try {
-    wrtc = require('@koush/wrtc');
-}
-catch (e) {
-    console.warn('loading @koush/wrtc failed. is your scrypted server out of date?');
     wrtc = require('wrtc');
 }
+catch (e) {
+    console.warn('loading wrtc failed. trying @koush/wrtc fallback.');
+    wrtc = require('@koush/wrtc');
+}
+
 Object.assign(global, wrtc);
 const { RTCVideoSource, RTCAudioSource } = wrtc.nonstandard;
 

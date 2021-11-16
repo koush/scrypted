@@ -4,7 +4,7 @@ import path from 'path';
 import { ScryptedNativeId, DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
 import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { SystemManagerImpl } from './system';
-import { RpcPeer, RPCResultError } from '../rpc';
+import { RpcPeer, RPCResultError, PROPERTY_PROXY_ONEWAY_METHODS, PROPERTY_JSON_DISABLE_SERIALIZATION  } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { EventEmitter } from 'events';
 import { createWebSocketClass } from './plugin-remote-websocket';
@@ -285,6 +285,7 @@ export interface PluginRemoteAttachOptions {
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
     events?: EventEmitter;
+    beforeLoadZip?: (zip: AdmZip, packageJson: any) => Promise<void>;
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
@@ -324,9 +325,9 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
         const localStorage = new StorageImpl(deviceManager, undefined);
 
-        const remote: PluginRemote & { __proxy_required: boolean } = {
-            __proxy_required: true,
-            __proxy_oneway_methods: [
+        const remote: PluginRemote & { [PROPERTY_JSON_DISABLE_SERIALIZATION]: boolean, [PROPERTY_PROXY_ONEWAY_METHODS]: string[] } = {
+            [PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
+            [PROPERTY_PROXY_ONEWAY_METHODS]: [
                 'notify',
                 'updateDeviceState',
                 'setSystemState',
@@ -401,11 +402,11 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 done(ret);
             },
 
-            async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions) {
+            async loadZip(packageJson: any, zipData: Buffer, zipOptions?: PluginRemoteLoadZipOptions) {
                 const pluginConsole = getDeviceConsole?.(undefined);
                 pluginConsole?.log('starting plugin', pluginId, packageJson.version);
                 const zip = new AdmZip(zipData);
-                events?.emit('zip', zip, pluginId);
+                await options?.beforeLoadZip?.(zip, packageJson);
                 const main = zip.getEntry('main.nodejs.js');
                 const script = main.getData().toString();
                 const window: any = {};
@@ -484,7 +485,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 events?.emit('params', params);
 
                 try {
-                    peer.evalLocal(script, options?.filename || '/plugin/main.nodejs.js', params);
+                    peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
                     events?.emit('plugin', exports.default);
                     pluginConsole?.log('plugin successfully loaded');
                     return exports.default;

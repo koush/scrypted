@@ -18,7 +18,6 @@ import { PassThrough } from 'stream';
 import { Console } from 'console'
 import { sleep } from '../sleep';
 import { PluginHostAPI } from './plugin-host-api';
-import mkdirp from 'mkdirp';
 import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import net from 'net'
@@ -26,17 +25,8 @@ import child_process from 'child_process';
 import { PluginDebug } from './plugin-debug';
 import readline from 'readline';
 import { Readable, Writable } from 'stream';
-
-export function ensurePluginVolume(pluginId: string) {
-    const volume = path.join(process.cwd(), 'volume');
-    const pluginVolume = path.join(volume, 'plugins', pluginId);
-    try {
-        mkdirp.sync(pluginVolume);
-    }
-    catch (e) {
-    }
-    return pluginVolume;
-}
+import { ensurePluginVolume } from './plugin-volume';
+import { installOptionalDependencies } from './plugin-npm-dependencies';
 
 export class PluginHost {
     worker: child_process.ChildProcess;
@@ -470,28 +460,6 @@ export function startPluginClusterWorker() {
 
     const events = new EventEmitter();
 
-    events.once('zip', (zip: AdmZip, pluginId: string) => {
-        peer.selfName = pluginId;
-
-        installSourceMapSupport({
-            environment: 'node',
-            retrieveSourceMap(source) {
-                if (source === '/plugin/main.nodejs.js' || source === `/${pluginId}/main.nodejs.js`) {
-                    const entry = zip.getEntry('main.nodejs.js.map')
-                    const map = entry?.getData().toString();
-                    if (!map)
-                        return null;
-
-                    return {
-                        url: '/plugin/main.nodejs.js',
-                        map,
-                    }
-                }
-                return null;
-            }
-        })
-    });
-
     let systemManager: SystemManager;
     let deviceManager: DeviceManager;
 
@@ -620,6 +588,36 @@ export function startPluginClusterWorker() {
             if (name === 'console-writer')
                 return (await consolePorts)[1];
             throw new Error(`unknown service ${name}`);
+        },
+        async beforeLoadZip(zip: AdmZip, packageJson: any) {
+            const pluginId = packageJson.name;
+            peer.selfName = pluginId;
+            installSourceMapSupport({
+                environment: 'node',
+                retrieveSourceMap(source) {
+                    if (source === '/plugin/main.nodejs.js' || source === `/${pluginId}/main.nodejs.js`) {
+                        const entry = zip.getEntry('main.nodejs.js.map')
+                        const map = entry?.getData().toString();
+                        if (!map)
+                            return null;
+                        return {
+                            url: '/plugin/main.nodejs.js',
+                            map,
+                        }
+                    }
+                    return null;
+                }
+            });
+            const cp = await consolePorts;
+            const writer = cp[1];
+            const socket = net.connect(writer);
+            await once(socket, 'connect');
+            try {
+                await installOptionalDependencies(pluginConsole, socket, packageJson);
+            }
+            finally {
+                socket.destroy();
+            }
         }
     }).then(scrypted => {
         systemManager = scrypted.systemManager;

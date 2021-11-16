@@ -22,7 +22,7 @@ interface RpcParam extends RpcMessage {
 interface RpcApply extends RpcMessage {
     id: string;
     proxyId: string;
-    argArray: any;
+    args: any[];
     method: string;
     oneway?: boolean;
 }
@@ -73,6 +73,9 @@ export function handleFunctionInvocations(thiz: ProxyHandler<any>, target: any, 
 }
 
 export const PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
+export const PROPERTY_JSON_DISABLE_SERIALIZATION = '__json_disable_serialization';
+export const PROPERTY_PROXY_PROPERTIES = '__proxy_props';
+export const PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children';
 
 class RpcProxy implements ProxyHandler<any> {
     constructor(public peer: RpcPeer,
@@ -93,10 +96,12 @@ class RpcProxy implements ProxyHandler<any> {
             return this.constructorName;
         if (p === '__proxy_peer')
             return this.peer;
-        if (p === '__proxy_props')
+        if (p === PROPERTY_PROXY_PROPERTIES)
             return this.proxyProps;
         if (p === PROPERTY_PROXY_ONEWAY_METHODS)
             return this.proxyOneWayMethods;
+        if (p === PROPERTY_JSON_DISABLE_SERIALIZATION || p === PROPERTY_JSON_COPY_SERIALIZE_CHILDREN)
+            return;
         if (p === 'then')
             return;
         if (p === 'constructor')
@@ -120,7 +125,7 @@ class RpcProxy implements ProxyHandler<any> {
             type: "apply",
             id: undefined,
             proxyId: this.id,
-            argArray: args,
+            args,
             method,
         };
 
@@ -146,7 +151,7 @@ export class RPCResultError extends Error {
             this.name = options?.name;
         }
         if (options?.stack) {
-            this.stack = `${peer.peerName}:${peer.selfName}\n${options.stack.split('\n').slice(1).join('\n')}`;
+            this.stack = `${peer.peerName}:${peer.selfName}\n${cause?.stack || options.stack}`;
         }
     }
 }
@@ -279,6 +284,16 @@ export class RpcPeer {
     deserialize(value: any): any {
         if (!value)
             return value;
+
+        const copySerializeChildren = value[PROPERTY_JSON_COPY_SERIALIZE_CHILDREN];
+        if (copySerializeChildren) {
+            const ret: any = {};
+            for (const [key, val] of Object.entries(value)) {
+                ret[key] = this.deserialize(val);
+            }
+            return ret;
+        }
+
         const { __remote_proxy_id, __local_proxy_id, __remote_constructor_name, __serialized_value, __remote_proxy_props, __remote_proxy_oneway_methods } = value;
         if (__remote_proxy_id) {
             const proxy = this.remoteWeakProxies[__remote_proxy_id]?.deref() || this.newProxy(__remote_proxy_id, __remote_constructor_name, __remote_proxy_props, __remote_proxy_oneway_methods);
@@ -300,7 +315,15 @@ export class RpcPeer {
     }
 
     serialize(value: any): any {
-        if (!value || (!value.__proxy_required && this.transportSafeArgumentTypes.has(value.constructor?.name))) {
+        if (value?.[PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] === true) {
+            const ret: any = {};
+            for (const [key, val] of Object.entries(value)) {
+                ret[key] = this.serialize(val);
+            }
+            return ret;
+        }
+
+        if (!value || (!value[PROPERTY_JSON_DISABLE_SERIALIZATION] && this.transportSafeArgumentTypes.has(value.constructor?.name))) {
             return value;
         }
 
@@ -311,7 +334,7 @@ export class RpcPeer {
             const ret: RpcRemoteProxyValue = {
                 __remote_proxy_id: proxyId,
                 __remote_constructor_name,
-                __remote_proxy_props: value?.__proxy_props,
+                __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
                 __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
             }
             return ret;
@@ -333,7 +356,7 @@ export class RpcPeer {
             const ret: RpcRemoteProxyValue = {
                 __remote_proxy_id: undefined,
                 __remote_constructor_name,
-                __remote_proxy_props: value?.__proxy_props,
+                __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
                 __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
                 __serialized_value: serialized,
             }
@@ -347,7 +370,7 @@ export class RpcPeer {
         const ret: RpcRemoteProxyValue = {
             __remote_proxy_id: proxyId,
             __remote_constructor_name,
-            __remote_proxy_props: value?.__proxy_props,
+            __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
             __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
         }
 
@@ -391,7 +414,7 @@ export class RpcPeer {
                             throw new Error(`proxy id ${rpcApply.proxyId} not found`);
 
                         const args = [];
-                        for (const arg of (rpcApply.argArray || [])) {
+                        for (const arg of (rpcApply.args || [])) {
                             args.push(this.deserialize(arg));
                         }
 

@@ -1,11 +1,7 @@
-from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
 from typing import Callable
-import asyncio
-import json
 import traceback
 import inspect
-import json
 from collections.abc import Mapping, Sequence
 import weakref
 
@@ -86,16 +82,16 @@ class RpcPeer:
     def __init__(self, send: Callable[[object, Callable[[Exception], None]], None]) -> None:
         self.send = send
 
-    def __apply__(self, proxyId: str, oneWayMethods: list[str], method: str, argArray: list):
-        args = []
-        for arg in argArray:
-            args.append(self.serialize(arg, False))
+    def __apply__(self, proxyId: str, oneWayMethods: list[str], method: str, args: list):
+        serializedArgs = []
+        for arg in args:
+            serializedArgs.append(self.serialize(arg, False))
 
         rpcApply = {
             'type': 'apply',
             'id': None,
             'proxyId': proxyId,
-            'argArray': args,
+            'args': serializedArgs,
             'method': method,
         }
 
@@ -261,7 +257,7 @@ class RpcPeer:
                                         message['proxyId'])
 
                     args = []
-                    for arg in (message['argArray'] or []):
+                    for arg in (message['args'] or []):
                         args.append(self.deserialize(arg))
 
                     value = None
@@ -330,57 +326,3 @@ class RpcPeer:
             }
             self.send(paramMessage, reject)
         return await self.createPendingResult(send)
-
-# c = RpcPeer()
-
-
-async def readLoop(loop, peer, reader):
-    async for line in reader:
-        try:
-            message = json.loads(line)
-            asyncio.run_coroutine_threadsafe(peer.handleMessage(message), loop)
-        except Exception as e:
-            print('read loop error', e)
-            pass
-
-
-async def async_main(loop: AbstractEventLoop):
-    reader, writer = await asyncio.open_connection(
-        '127.0.0.1', 3033)
-
-    async def send(message, reject):
-        jsonString = json.dumps(message)
-        writer.write(bytes(jsonString + '\n', 'utf8'))
-        try:
-            await writer.drain()
-        except Exception as e:
-            if reject:
-                reject(e)
-
-    peer = RpcPeer(send)
-    peer.params['print'] = print
-
-    async def consoleTest():
-        console = await peer.getParam('console')
-        await console.log('test', 'poops', 'peddeps')
-
-    await asyncio.gather(readLoop(loop, peer, reader), consoleTest())
-    print('done')
-
-    # print("line %s" % line)
-
-    # async with aiofiles.open(0, mode='r') as f:
-    #     async for line in f:
-    #         print("line %s" % line)
-    # # pokemon = json.loads(contents)
-    # # print(pokemon['name'])
-
-
-def main():
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(async_main(loop))
-    loop.close()
-
-
-if __name__ == "__main__":
-    main()

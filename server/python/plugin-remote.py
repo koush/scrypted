@@ -1,6 +1,12 @@
 from __future__ import annotations
+more = os.path.join(os.getcwd(), 'node_modules/@scrypted/sdk')
+sys.path.insert(0, more)
+import scrypted_python.scrypted_sdk
+from scrypted_python.scrypted_sdk.types import MediaObject, ScryptedInterfaceProperty
+
 from collections.abc import Mapping
-from python.rpc import RpcPeer, readLoop, RpcSerializer
+from genericpath import exists
+from python.rpc import RpcPeer, RpcSerializer
 import asyncio
 from asyncio.events import AbstractEventLoop
 import json
@@ -13,12 +19,6 @@ import time
 import zipfile
 import subprocess
 from typing import Any
-
-more = os.path.join(os.getcwd(), 'node_modules/@scrypted/sdk')
-sys.path.insert(0, more)
-import scrypted_python.scrypted_sdk
-from scrypted_python.scrypted_sdk.types import ScryptedInterfaceProperty
-
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -114,23 +114,38 @@ class PluginRemote:
 
         if 'requirements.txt' in zip.namelist():
             requirements = zip.open('requirements.txt').read()
+            str_requirements = requirements.decode('utf8');
 
             requirementstxt = os.path.join(python_modules, 'requirements.txt')
 
-            f = open(requirementstxt, 'wb')
-            f.write(requirements)
-            f.close()
+            need_pip = True
+            try:
+                existing = open(requirementstxt).read()
+                need_pip = existing != str_requirements
+            except:
+                pass
 
-            # os.system('pip install -r %s --target %s' % (requirementstxt, python_modules))
-            result = subprocess.check_output(['pip', 'install', '-r', requirementstxt, '--target', python_modules], stderr=subprocess.STDOUT, text=True)
-            print(result)
+            if need_pip:
+                print('requirements.txt (outdated)')
+                print(str_requirements)
+
+                f = open(requirementstxt, 'wb')
+                f.write(requirements)
+                f.close()
+
+                # os.system('pip install -r %s --target %s' % (requirementstxt, python_modules))
+                result = subprocess.check_output(['pip', 'install', '-r', requirementstxt, '--target', python_modules], stderr=subprocess.STDOUT, text=True)
+                print(result)
+            else:
+                print('requirements.txt (up to date)')
+                print(str_requirements)
 
         sys.path.insert(0, zipPath)
         sys.path.insert(0, python_modules)
         from scrypted_sdk import sdk_init # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
-        sdk_init(self.systemManager, self.deviceManager)
+        sdk_init(zip, self.systemManager, self.deviceManager)
         from main import create_scrypted_plugin # type: ignore
         return create_scrypted_plugin()
 
@@ -176,6 +191,15 @@ class PluginRemote:
         pass
 
 
+async def readLoop(loop, peer, reader):
+    async for line in reader:
+        try:
+            message = json.loads(line)
+            asyncio.run_coroutine_threadsafe(peer.handleMessage(message), loop)
+        except Exception as e:
+            print('read loop error', e)
+            pass
+
 async def async_main(loop: AbstractEventLoop):
     reader = await aiofiles.open(3, mode='r')
     # writer = open(4, 'r+')
@@ -194,15 +218,7 @@ async def async_main(loop: AbstractEventLoop):
     peer.params['getRemote'] = lambda api, pluginId: PluginRemote(
         api, pluginId)
 
-    async def consoleTest():
-        console = await peer.getParam('console')
-        # await console.log('test', 'poops', 'peddeps')
-
-    await asyncio.gather(readLoop(loop, peer, reader), consoleTest())
-    print('done')
-
-    # print("line %s" % line)
-
+    await readLoop(loop, peer, reader)
 
 def main():
     loop = asyncio.get_event_loop()

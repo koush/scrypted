@@ -578,6 +578,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     ],
     properties: []
   },
+  ObjectDetection: {
+    name: 'ObjectDetection',
+    methods: [
+      'detectObjects'
+    ],
+    properties: []
+  },
   HumiditySetting: {
     name: 'HumiditySetting',
     methods: [
@@ -902,13 +909,14 @@ export enum ThermostatMode {
   Dry = "Dry",
   On = "On",
 }
+export interface PictureDimensions {
+  width: number;
+  height: number;
+}
 export interface PictureOptions {
   id?: string;
   name?: string;
-  picture?: {
-    width?: number;
-    height?: number;
-  }
+  picture?: PictureDimensions;
 }
 /**
  * Camera devices can take still photos.
@@ -919,6 +927,20 @@ export interface Camera {
 
 }
 
+export interface VideoStreamOptions {
+  codec?: string;
+  width?: number;
+  height?: number;
+  bitrate?: number;
+  minBitrate?: number;
+  maxBitrate?: number;
+  fps?: number;
+  idrIntervalMillis?: number;
+}
+export interface AudioStreamOptions {
+  codec?: string;
+  bitrate?: number;
+}
 /**
  * Options passed to VideoCamera.getVideoStream to
  * request specific media formats.
@@ -936,21 +958,8 @@ export interface MediaStreamOptions {
   prebuffer?: number;
   container?: string;
 
-  video?: {
-    codec?: string;
-    width?: number;
-    height?: number;
-    bitrate?: number;
-    minBitrate?: number;
-    maxBitrate?: number;
-    fps?: number;
-    idrIntervalMillis?: number;
-  }
-
-  audio?: {
-    codec?: string;
-    bitrate?: number;
-  }
+  video?: VideoStreamOptions;
+  audio?: AudioStreamOptions;
 }
 
 /**
@@ -1189,7 +1198,7 @@ export interface FaceRecognition {
   score?: number,
   boundingBox?: [number, number, number, number];
 }
-export interface ObjectDetection {
+export interface ObjectsDetected {
   detections?: ObjectDetectionResult[];
   faces?: ObjectDetectionResult[];
   people?: FaceRecognition[];
@@ -1209,6 +1218,12 @@ export interface ObjectDetector {
    */
   getDetectionInput(detectionId: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
+}
+export interface TensorInfo {
+  shape: number[];
+}
+export interface ObjectDetection {
+  detectObjects(tensor: Buffer, info: TensorInfo): Promise<ObjectsDetected>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -1723,6 +1738,7 @@ export enum ScryptedInterface {
   Program = "Program",
   Scriptable = "Scriptable",
   ObjectDetector = "ObjectDetector",
+  ObjectDetection = "ObjectDetection",
   HumiditySetting = "HumiditySetting",
   Fan = "Fan",
 
