@@ -16,7 +16,6 @@
       "runtime": "python",
       "type": "Light",
       "interfaces": [
-         "OnOff",
          "ObjectDetection"
       ]
    },

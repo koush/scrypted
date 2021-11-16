@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from asyncio.futures import Future
 import sys
 import threading
 
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstBase', '1.0')
-gi.require_version('Gtk', '3.0')
-from gi.repository import GLib, GObject, Gst, GstBase, Gtk
+from gi.repository import GLib, Gst
 
 Gst.init(None)
 
 class GstPipeline:
-    def __init__(self, pipeline, user_function, src_size):
+    def __init__(self, finished: Future, pipeline, user_function, src_size):
+        self.finished = finished
         self.user_function = user_function
         self.running = False
         self.gstsample = None
@@ -47,10 +48,7 @@ class GstPipeline:
         bus.add_signal_watch()
         bus.connect('message', self.on_bus_message)
 
-        # Set up a full screen window on Coral, no-op otherwise.
-        self.setup_window()
-
-    def run(self):
+    async def run(self):
         # Start inference worker.
         self.running = True
         worker = threading.Thread(target=self.inference_loop)
@@ -59,7 +57,7 @@ class GstPipeline:
         # Run pipeline.
         self.pipeline.set_state(Gst.State.PLAYING)
         try:
-            Gtk.main()
+            await self.finished
         except:
             pass
 
@@ -75,14 +73,14 @@ class GstPipeline:
     def on_bus_message(self, bus, message):
         t = message.type
         if t == Gst.MessageType.EOS:
-            Gtk.main_quit()
+            self.finished.set_result(None)
         elif t == Gst.MessageType.WARNING:
             err, debug = message.parse_warning()
             sys.stderr.write('Warning: %s: %s\n' % (err, debug))
         elif t == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
             sys.stderr.write('Error: %s: %s\n' % (err, debug))
-            Gtk.main_quit()
+            self.finished.set_result(None)
         return True
 
     def on_new_sample(self, sink, preroll):
@@ -133,65 +131,6 @@ class GstPipeline:
                 if self.overlaysink:
                     self.overlaysink.set_property('svg', svg)
 
-    def setup_window(self):
-        # Only set up our own window if we have Coral overlay sink in the pipeline.
-        if not self.overlaysink:
-            return
-
-        gi.require_version('GstGL', '1.0')
-        gi.require_version('GstVideo', '1.0')
-        from gi.repository import GstGL, GstVideo
-
-        # Needed to commit the wayland sub-surface.
-        def on_gl_draw(sink, widget):
-            widget.queue_draw()
-
-        # Needed to account for window chrome etc.
-        def on_widget_configure(widget, event, overlaysink):
-            allocation = widget.get_allocation()
-            overlaysink.set_render_rectangle(allocation.x, allocation.y,
-                    allocation.width, allocation.height)
-            return False
-
-        window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
-        window.fullscreen()
-
-        drawing_area = Gtk.DrawingArea()
-        window.add(drawing_area)
-        drawing_area.realize()
-
-        self.overlaysink.connect('drawn', on_gl_draw, drawing_area)
-
-        # Wayland window handle.
-        wl_handle = self.overlaysink.get_wayland_window_handle(drawing_area)
-        self.overlaysink.set_window_handle(wl_handle)
-
-        # Wayland display context wrapped as a GStreamer context.
-        wl_display = self.overlaysink.get_default_wayland_display_context()
-        self.overlaysink.set_context(wl_display)
-
-        drawing_area.connect('configure-event', on_widget_configure, self.overlaysink)
-        window.connect('delete-event', Gtk.main_quit)
-        window.show_all()
-
-        # The appsink pipeline branch must use the same GL display as the screen
-        # rendering so they get the same GL context. This isn't automatically handled
-        # by GStreamer as we're the ones setting an external display handle.
-        def on_bus_message_sync(bus, message, overlaysink):
-            if message.type == Gst.MessageType.NEED_CONTEXT:
-                _, context_type = message.parse_context_type()
-                if context_type == GstGL.GL_DISPLAY_CONTEXT_TYPE:
-                    sinkelement = overlaysink.get_by_interface(GstVideo.VideoOverlay)
-                    gl_context = sinkelement.get_property('context')
-                    if gl_context:
-                        display_context = Gst.Context.new(GstGL.GL_DISPLAY_CONTEXT_TYPE, True)
-                        GstGL.context_set_gl_display(display_context, gl_context.get_display())
-                        message.src.set_context(display_context)
-            return Gst.BusSyncReply.PASS
-
-        bus = self.pipeline.get_bus()
-        bus.set_sync_handler(on_bus_message_sync, self.overlaysink)
-
 def get_dev_board_model():
   try:
     model = open('/sys/firmware/devicetree/base/model').read().lower()
@@ -202,12 +141,12 @@ def get_dev_board_model():
   except: pass
   return None
 
-def run_pipeline(user_function,
+def run_pipeline(finished,
+                 user_function,
                  src_size,
                  appsink_size,
                  videosrc='/dev/video1',
-                 videofmt='raw',
-                 headless=False):
+                 videofmt='raw'):
     if videofmt == 'h264':
         SRC_CAPS = 'video/x-h264,width={width},height={height},framerate=30/1'
     elif videofmt == 'jpeg':
@@ -228,39 +167,12 @@ def run_pipeline(user_function,
                     ! {src_caps} ! {leaky_q} """ % (videosrc, demux)
 
     coral = get_dev_board_model()
-    if headless:
-        scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
-        scale = tuple(int(x * scale) for x in src_size)
-        scale_caps = 'video/x-raw,width={width},height={height}'.format(width=scale[0], height=scale[1])
-        PIPELINE += """ ! decodebin ! queue ! videoconvert ! videoscale
-        ! {scale_caps} ! videobox name=box autocrop=true ! {sink_caps} ! {sink_element}
-        """
-    elif coral:
-        if 'mt8167' in coral:
-            PIPELINE += """ ! decodebin ! queue ! v4l2convert ! {scale_caps} !
-              glupload ! glcolorconvert ! video/x-raw(memory:GLMemory),format=RGBA !
-              tee name=t
-                t. ! queue ! glfilterbin filter=glbox name=glbox ! queue ! {sink_caps} ! {sink_element}
-                t. ! queue ! glsvgoverlay name=gloverlay sync=false ! glimagesink fullscreen=true
-                     qos=false sync=false
-            """
-            scale_caps = 'video/x-raw,format=BGRA,width={w},height={h}'.format(w=src_size[0], h=src_size[1])
-        else:
-            PIPELINE += """ ! decodebin ! glupload ! tee name=t
-                t. ! queue ! glfilterbin filter=glbox name=glbox ! {sink_caps} ! {sink_element}
-                t. ! queue ! glsvgoverlaysink name=overlaysink
-            """
-            scale_caps = None
-    else:
-        scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
-        scale = tuple(int(x * scale) for x in src_size)
-        scale_caps = 'video/x-raw,width={width},height={height}'.format(width=scale[0], height=scale[1])
-        PIPELINE += """ ! tee name=t
-            t. ! {leaky_q} ! videoconvert ! videoscale ! {scale_caps} ! videobox name=box autocrop=true
-               ! {sink_caps} ! {sink_element}
-            t. ! {leaky_q} ! videoconvert
-               ! rsvgoverlay name=overlay ! videoconvert ! ximagesink sync=false
-            """
+    scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
+    scale = tuple(int(x * scale) for x in src_size)
+    scale_caps = 'video/x-raw,width={width},height={height}'.format(width=scale[0], height=scale[1])
+    PIPELINE += """ ! decodebin ! queue ! videoconvert ! videoscale
+    ! {scale_caps} ! videobox name=box autocrop=true ! {sink_caps} ! {sink_element}
+    """
 
     SINK_ELEMENT = 'appsink name=appsink emit-signals=true max-buffers=1 drop=true'
     SINK_CAPS = 'video/x-raw,format=RGB,width={width},height={height}'
@@ -274,5 +186,5 @@ def run_pipeline(user_function,
 
     print('Gstreamer pipeline:\n', pipeline)
 
-    pipeline = GstPipeline(pipeline, user_function, src_size)
-    pipeline.run()
+    pipeline = GstPipeline(finished, pipeline, user_function, src_size)
+    return pipeline

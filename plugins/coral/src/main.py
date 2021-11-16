@@ -13,6 +13,7 @@ import common
 import io
 import gstreamer
 import json
+import asyncio
 
 from scrypted_sdk.types import FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedMimeTypes
 
@@ -28,7 +29,7 @@ def parse_label_contents(contents: str):
     return ret
 
 
-class PythonLight(scrypted_sdk.ScryptedDeviceBase, OnOff, ObjectDetection):
+class PythonLight(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
         labels_contents = scrypted_sdk.zip.open('fs/coco_labels.txt').read().decode('utf8')
@@ -39,15 +40,6 @@ class PythonLight(scrypted_sdk.ScryptedDeviceBase, OnOff, ObjectDetection):
 
         _, height, width, channels = self.interpreter.get_input_details()[0]['shape']
         print("%s, %s, %s" % (width, height, channels))
-
-
-    async def turnOff(self) -> None:
-        print("turned off!")
-        self.on = False
-
-    async def turnOn(self) -> None:
-        print("turned on!")
-        self.on = True
 
     async def detectObjectsImage(self, image: Image) -> ObjectsDetected:
         _, scale = common.set_resized_input(self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))        
@@ -103,11 +95,15 @@ class PythonLight(scrypted_sdk.ScryptedDeviceBase, OnOff, ObjectDetection):
 
             # print(input_tensor)
 
-        result = gstreamer.run_pipeline(user_callback,
+        future = asyncio.Future()
+        asyncio.get_event_loop().call_later(10, lambda: future.set_result(None))
+
+        pipeline = gstreamer.run_pipeline(future, user_callback,
                                         src_size=(size['width'], size['height']),
                                         appsink_size=inference_size,
-                                        videosrc=j['url'],
-                                        headless=True)
+                                        videosrc=j['url'])
+        task = pipeline.run()
+        asyncio.ensure_future(task)
         # gstreamer.run_pipeline(user_callback, (size['width'], size['height']), inference_size, j['url'], headless = True)
 
         # # run_inference(self.interpreter, reshaped)
