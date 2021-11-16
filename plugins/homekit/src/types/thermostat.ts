@@ -67,12 +67,6 @@ addSupportedType({
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetHeatingCoolingState,
             () => toTargetMode(device.thermostatMode));
 
-        function getTargetTemperature() {
-            return device.thermostatSetpoint ||
-                ((device.thermostatSetpointHigh + device.thermostatSetpointLow) / 2) ||
-                device.temperature;
-        }
-
         service.getCharacteristic(Characteristic.TargetTemperature)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
                 callback();
@@ -80,8 +74,25 @@ addSupportedType({
             });
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetTemperature,
-            () => getTargetTemperature());
+            () => device.thermostatSetpoint || 0);
 
+        service.getCharacteristic(Characteristic.HeatingThresholdTemperature)
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                callback();
+                device.setThermostatSetpointLow(value as number);
+            });
+
+        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.HeatingThresholdTemperature,
+            () => device.thermostatSetpointLow || 0);
+
+        service.getCharacteristic(Characteristic.CoolingThresholdTemperature)
+            .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                callback();
+                device.setThermostatSetpointHigh(value as number);
+            });
+
+        bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.CoolingThresholdTemperature,
+            () => device.thermostatSetpointHigh || 0);
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TemperatureDisplayUnits,
             () => device.temperatureUnit === TemperatureUnit.C ? Characteristic.TemperatureDisplayUnits.CELSIUS : Characteristic.TemperatureDisplayUnits.FAHRENHEIT);
