@@ -209,10 +209,10 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
 
     // update based on mode
     this.thermostatMode = ecobeeToThermostatMode(data.settings.hvacMode);
+
+    this.thermostatSetpointHigh = convertFtoC(Number(data.runtime.desiredCool)/10)
+    this.thermostatSetpointLow = convertFtoC(Number(data.runtime.desiredHeat)/10)
     switch(data.settings.hvacMode) {
-      case 'auto':
-        // TODO: need scrypted support for setpoint range?
-        break;
       case 'cool':
         this.thermostatSetpoint = convertFtoC(Number(data.runtime.desiredCool)/10)
         break;
@@ -258,8 +258,13 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
   }
 
   async setThermostatSetpoint(degrees: number): Promise<void> {
-    const degF = convertCtoF(degrees)*10;
+    const degF = convertCtoF(degrees);
     this.console.log(`setThermostatSetpoint ${degrees}C/${degF}F`)
+
+    if (this.thermostatMode === ThermostatMode.Auto) {
+      this.console.log(`setThermostatSetpoint not running in auto mode`)
+      return;
+    }
 
     const data = {
       selection: {
@@ -271,8 +276,8 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
           type:"setHold",
           params:{
             holdType: "nextTransition",
-            heatHoldTemp: degF,
-            coolHoldTemp: degF,
+            heatHoldTemp: degF*10,
+            coolHoldTemp: degF*10,
           }
         }
       ]
@@ -289,13 +294,67 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
   }
 
   async setThermostatSetpointHigh(high: number): Promise<void> {
-    this.console.log(`setThermostatSetpointHigh ${high}`)
-    return;
+    const degFLow = convertCtoF(this.thermostatSetpointLow);
+    const degFHigh = convertCtoF(high);
+    this.console.log(`setThermostatSetpointHigh ${high}C/${degFHigh}F`)
+
+    const data = {
+      selection: {
+        selectionType:"registered",
+        selectionMatch: this.nativeId,
+      },
+      functions: [
+        {
+          type:"setHold",
+          params:{
+            holdType: "nextTransition",
+            heatHoldTemp: degFLow*10,
+            coolHoldTemp: degFHigh*10,
+          }
+        }
+      ]
+    }
+
+    const resp = await this.provider.req('post', 'thermostat', undefined, data)
+    if (resp.status.code == 0) {
+      this.console.log("setThermostatSetpointHigh success")
+      await this.reload();
+      return;
+    }
+
+    this.console.log(`setThermostatSetpointHigh failed: ${resp}`)
   }
   
   async setThermostatSetpointLow(low: number): Promise<void> {
-    this.console.log(`setThermostatSetpointLow ${low}`)
-    return;
+    const degFLow = convertCtoF(low);
+    const degFHigh = convertCtoF(this.thermostatSetpointHigh);
+    this.console.log(`setThermostatSetpointLow ${low}C/${degFLow}F`)
+
+    const data = {
+      selection: {
+        selectionType:"registered",
+        selectionMatch: this.nativeId,
+      },
+      functions: [
+        {
+          type:"setHold",
+          params:{
+            holdType: "nextTransition",
+            heatHoldTemp: degFLow*10,
+            coolHoldTemp: degFHigh*10,
+          }
+        }
+      ]
+    }
+
+    const resp = await this.provider.req('post', 'thermostat', undefined, data)
+    if (resp.status.code == 0) {
+      this.console.log("setThermostatSetpointLow success")
+      await this.reload();
+      return;
+    }
+
+    this.console.log(`setThermostatSetpointLow failed: ${resp}`)
   }
 
   async turnOff(): Promise<void> {
