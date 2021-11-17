@@ -271,7 +271,9 @@ class OnvifProvider extends RtspProvider {
                         interfaces: this.getInterfaces(),
                     });
                     const device = await this.getDevice(urn) as OnvifCamera;
+                    const onvifUrl = new URL(xaddrs)
                     device.setIPAddress(rinfo.address);
+                    device.setHttpPortOverride(onvifUrl.port);
                     this.log.a('Discovered ONVIF Camera. Complete setup by providing login credentials.');
                 }
             );

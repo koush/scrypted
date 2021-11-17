@@ -120,6 +120,7 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
             url.password = password;
 
         const ret: FFMpegInput = {
+            url: url.toString(),
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -432,6 +433,10 @@ export abstract class RtspSmartCamera extends RtspCamera {
 
     getHttpAddress() {
         return `${this.getIPAddress()}:${this.storage.getItem('httpPort') || 80}`;
+    }
+
+    setHttpPortOverride(port: string) {
+        this.storage.setItem('httpPort', port);
     }
 
     getRtspUrlOverride(options?: MediaStreamOptions) {
