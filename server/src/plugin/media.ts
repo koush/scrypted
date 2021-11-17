@@ -15,8 +15,13 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
         fromMimeType: ScryptedMimeTypes.Url + ';' + ScryptedMimeTypes.AcceptUrlParameter,
         toMimeType: ScryptedMimeTypes.FFmpegInput,
         async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer | string> {
+            const url = data.toString();
             const args: FFMpegInput = {
-                inputArguments: ['-i', data.toString()]
+                url,
+                inputArguments: [
+                    '-i',
+                    url,
+                ],
             }
 
             return Buffer.from(JSON.stringify(args));
@@ -60,10 +65,9 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
                 )
             }
 
-            const ret: FFMpegInput = {
+            const ret: FFMpegInput = Object.assign({
                 inputArguments,
-                mediaStreamOptions: mediaUrl.mediaStreamOptions,
-            }
+            }, mediaUrl);
 
             return Buffer.from(JSON.stringify(ret));
         }
