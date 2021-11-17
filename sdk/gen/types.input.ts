@@ -585,32 +585,49 @@ export interface ObjectDetectionResult {
   score: number;
   boundingBox?: [number, number, number, number],
 }
-export interface FaceRecognition {
+export interface FaceRecognitionCandidate {
   id: string;
   label: string;
+}
+export interface FaceRecognitionResult extends FaceRecognitionCandidate {
   score?: number,
   boundingBox?: [number, number, number, number];
 }
 export interface ObjectsDetected {
+  /**
+   * Object detection session state. Will be true if processing video, until
+   * the video ends or is timed out.
+   */
   running?: boolean;
   detections?: ObjectDetectionResult[];
   faces?: ObjectDetectionResult[];
-  people?: FaceRecognition[];
+  people?: FaceRecognitionResult[];
+  /**
+   * The id for the detection session.
+   */
   detectionId?: any;
+  /**
+   * The id for this specific event/frame within a detection video session.
+   * Will be undefined for single image detections.
+   */
+  eventId?: any;
   inputDimensions?: [number, number],
   timestamp: number;
 }
 export interface ObjectDetectionTypes {
-  detections?: string[];
+  classes?: string[];
   faces?: boolean;
-  people?: FaceRecognition[];
+  people?: FaceRecognitionCandidate[];
 }
+/**
+ * ObjectDetector is found on Cameras that have smart detection capabilities.
+ */
 export interface ObjectDetector {
   /**
    * Get the media (image or video) that contains this detection.
    * @param detectionId
    */
-  getDetectionInput(detectionId: any): Promise<MediaObject>;
+  getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
 export interface TensorInfo {
@@ -620,8 +637,17 @@ export interface ObjectDetectionSession {
   detectionId?: string;
   duration?: number;
 }
+export interface ObjectDetectionModel extends ObjectDetectionTypes {
+  id: string;
+  name: string;
+}
+/**
+ * ObjectDetection can run classification models on arbitrary media sources.
+ * E.g. TensorFlow or a Coral TPU.
+ */
 export interface ObjectDetection {
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
+  getInferenceModels(): Promise<ObjectDetectionModel[]>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.

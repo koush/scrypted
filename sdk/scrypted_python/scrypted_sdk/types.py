@@ -145,7 +145,12 @@ class AudioStreamOptions(TypedDict):
     codec: str
     pass
 
-class FaceRecognition(TypedDict):
+class FaceRecognitionCandidate(TypedDict):
+    id: str
+    label: str
+    pass
+
+class FaceRecognitionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     id: str
     label: str
@@ -311,17 +316,18 @@ class ObjectDetectionSession(TypedDict):
     pass
 
 class ObjectDetectionTypes(TypedDict):
-    detections: list(str)
+    classes: list(str)
     faces: bool
-    people: list(FaceRecognition)
+    people: list(FaceRecognitionCandidate)
     pass
 
 class ObjectsDetected(TypedDict):
     detectionId: Any
     detections: list(ObjectDetectionResult)
+    eventId: Any
     faces: list(ObjectDetectionResult)
     inputDimensions: tuple[float, float]
-    people: list(FaceRecognition)
+    people: list(FaceRecognitionResult)
     running: bool
     timestamp: float
     pass
@@ -542,10 +548,12 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
+    async def getInferenceModels(self) -> None:
+        pass
     pass
 
 class ObjectDetector:
-    async def getDetectionInput(self, detectionId: Any) -> MediaObject:
+    async def getDetectionInput(self, detectionId: Any, eventId: Any = None) -> MediaObject:
         pass
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass
