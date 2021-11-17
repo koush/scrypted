@@ -12,7 +12,7 @@
       "scrypted-webpack": "scrypted-webpack"
    },
    "scrypted": {
-      "name": "Coral TPU",
+      "name": "Coral TPU Plugin",
       "runtime": "python",
       "type": "Light",
       "interfaces": [

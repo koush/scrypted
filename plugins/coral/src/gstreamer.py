@@ -17,6 +17,8 @@ import sys
 import threading
 
 import gi
+
+from safe_set_result import safe_set_result
 gi.require_version('Gst', '1.0')
 gi.require_version('GstBase', '1.0')
 from gi.repository import GLib, Gst
@@ -73,14 +75,14 @@ class GstPipeline:
     def on_bus_message(self, bus, message):
         t = message.type
         if t == Gst.MessageType.EOS:
-            self.finished.set_result(None)
+            safe_set_result(self.finished)
         elif t == Gst.MessageType.WARNING:
             err, debug = message.parse_warning()
             sys.stderr.write('Warning: %s: %s\n' % (err, debug))
         elif t == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
             sys.stderr.write('Error: %s: %s\n' % (err, debug))
-            self.finished.set_result(None)
+            safe_set_result(self.finished)
         return True
 
     def on_new_sample(self, sink, preroll):
@@ -166,7 +168,9 @@ def run_pipeline(finished,
                     ! videoconvert n-threads=4 ! videoscale n-threads=4
                     ! {src_caps} ! {leaky_q} """ % (videosrc, demux)
 
-    coral = get_dev_board_model()
+    if videofmt == 'gst':
+        PIPELINE = videosrc
+
     scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
     scale = tuple(int(x * scale) for x in src_size)
     scale_caps = 'video/x-raw,width={width},height={height}'.format(width=scale[0], height=scale[1])
