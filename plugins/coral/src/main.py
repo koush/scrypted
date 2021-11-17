@@ -23,8 +23,9 @@ import os
 import binascii
 from urllib.parse import urlparse
 from gi.repository import Gst
+import multiprocessing
 
-from scrypted_sdk.types import FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionResult, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+from scrypted_sdk.types import FFMpegInput, Lock, MediaObject, ObjectDetection, ObjectDetectionResult, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
 
 def parse_label_contents(contents: str):
@@ -67,6 +68,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
         self.interpreter = make_interpreter(model)
         self.interpreter.allocate_tensors()
+        self.mutex = multiprocessing.Lock()
 
         _, height, width, channels = self.interpreter.get_input_details()[
             0]['shape']
@@ -93,7 +95,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
     def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, event_buffer: bytes = None):
         detection_result['detectionId'] = detection_session.id
-        detection_session.loop.create_task(self.onDeviceEvent(ScryptedInterface.ObjectDetection.value, detection_result, event_buffer))
+        detection_session.loop.create_task(self.onDeviceEvent(ScryptedInterface.ObjectDetection.value, detection_result))
 
     def end_session(self, detection_session: DetectionSession):
         detection_session.cancel()
@@ -164,7 +166,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             return
 
         def user_callback(input_tensor, src_size, inference_box):
-            run_inference(self.interpreter, input_tensor)
+            with self.mutex:
+                run_inference(self.interpreter, input_tensor)
 
             (result, mapinfo) = input_tensor.map(Gst.MapFlags.READ)
 
