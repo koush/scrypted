@@ -63,7 +63,7 @@ dictionaryTypes.add('EventDetails');
 
 function toPythonType(type: any): string {
     if (type.type === 'array')
-        return `list(${toPythonType(type.elementType)})`;
+        return `list[${toPythonType(type.elementType)}]`;
     if (type.type === 'tuple')
         return `tuple[${type.elements.map((et: any) => toPythonType(et)).join(', ')}]`;
     if (type.type === 'union')
@@ -84,13 +84,16 @@ function toPythonType(type: any): string {
             return 'bytearray';
     }
 
-    if (type === 'Promise')
-        return 'None';
-
     if (typeof type !== 'string')
         return 'Any';
     dictionaryTypes.add(type);
     return type;
+}
+
+function toPythonReturnType(type: any): string {
+    if (type.name === 'Promise')
+        return toPythonReturnType(type.typeArguments[0]);
+    return toPythonType(type);
 }
 
 function toPythonParameter(param: any) {
@@ -132,7 +135,7 @@ class ${td.name}:
 `
     }
     for (const method of methods) {
-        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonType(method.signatures[0].type)}:
+        python += `    ${toPythonMethodDeclaration(method)} ${method.name}(${selfSignature(method)}) -> ${toPythonReturnType(method.signatures[0].type)}:
         pass
 `
     }

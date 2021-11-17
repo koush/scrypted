@@ -198,7 +198,7 @@ class ColorRgb(TypedDict):
 
 class Device(TypedDict):
     info: DeviceInformation
-    interfaces: list(str)
+    interfaces: list[str]
     name: str
     nativeId: str
     providerNativeId: str
@@ -216,7 +216,7 @@ class DeviceInformation(TypedDict):
     pass
 
 class DeviceManifest(TypedDict):
-    devices: list(Device)
+    devices: list[Device]
     providerNativeId: str
     pass
 
@@ -238,7 +238,7 @@ class EventListenerRegister(TypedDict):
 
 class FFMpegInput(TypedDict):
     container: str
-    inputArguments: list(str)
+    inputArguments: list[str]
     mediaStreamOptions: MediaStreamOptions
     url: str
     pass
@@ -251,7 +251,7 @@ class FanState(TypedDict):
 
 class FanStatus(TypedDict):
     active: bool
-    availableModes: list(FanMode)
+    availableModes: list[FanMode]
     counterClockwise: bool
     maxSpeed: float
     mode: FanMode
@@ -279,7 +279,7 @@ class HumidityCommand(TypedDict):
 
 class HumiditySettingStatus(TypedDict):
     activeMode: HumidityMode
-    availableModes: list(HumidityMode)
+    availableModes: list[HumidityMode]
     dehumidifierSetpoint: float
     humidifierSetpoint: float
     mode: HumidityMode
@@ -310,24 +310,32 @@ class MediaStreamOptions(TypedDict):
     video: VideoStreamOptions
     pass
 
+class ObjectDetectionModel(TypedDict):
+    classes: list[str]
+    faces: bool
+    id: str
+    name: str
+    people: list[FaceRecognitionCandidate]
+    pass
+
 class ObjectDetectionSession(TypedDict):
     detectionId: str
     duration: float
     pass
 
 class ObjectDetectionTypes(TypedDict):
-    classes: list(str)
+    classes: list[str]
     faces: bool
-    people: list(FaceRecognitionCandidate)
+    people: list[FaceRecognitionCandidate]
     pass
 
 class ObjectsDetected(TypedDict):
     detectionId: Any
-    detections: list(ObjectDetectionResult)
+    detections: list[ObjectDetectionResult]
     eventId: Any
-    faces: list(ObjectDetectionResult)
+    faces: list[ObjectDetectionResult]
     inputDimensions: tuple[float, float]
-    people: list(FaceRecognitionResult)
+    people: list[FaceRecognitionResult]
     running: bool
     timestamp: float
     pass
@@ -354,16 +362,31 @@ class ScriptSource(TypedDict):
 class ScryptedDevice(TypedDict):
     id: str
     info: DeviceInformation
-    interfaces: list(str)
-    mixins: list(str)
+    interfaces: list[str]
+    mixins: list[str]
     name: str
-    providedInterfaces: list(str)
+    providedInterfaces: list[str]
     providedName: ScryptedDeviceType
     providedRoom: str
     providedType: ScryptedDeviceType
     providerId: str
     room: str
     type: ScryptedDeviceType
+    pass
+
+class Setting(TypedDict):
+    choices: list[str]
+    combobox: bool
+    description: str
+    deviceFilter: str
+    group: str
+    key: str
+    multiple: bool
+    placeholder: str
+    readonly: bool
+    title: str
+    type: Any | Any | Any | Any | Any | Any
+    value: SettingValue
     pass
 
 class AudioSensor:
@@ -392,12 +415,12 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: str | bytearray, fromMimeType: str) -> None:
+    async def convert(self, data: str | bytearray, fromMimeType: str) -> str | bytearray:
         pass
     pass
 
 class Camera:
-    async def getPictureOptions(self) -> None:
+    async def getPictureOptions(self) -> list[PictureOptions]:
         pass
     async def takePicture(self, options: PictureOptions = None) -> MediaObject:
         pass
@@ -521,9 +544,9 @@ class MediaSource:
     pass
 
 class MixinProvider:
-    async def canMixin(self, type: ScryptedDeviceType, interfaces: list(str)) -> None:
+    async def canMixin(self, type: ScryptedDeviceType, interfaces: list[str]) -> list[str]:
         pass
-    async def getMixin(self, mixinDevice: Any, mixinDeviceInterfaces: list(ScryptedInterface), mixinDeviceState: Any) -> Any:
+    async def getMixin(self, mixinDevice: Any, mixinDeviceInterfaces: list[ScryptedInterface], mixinDeviceState: Any) -> Any:
         pass
     async def releaseMixin(self, id: str, mixinDevice: Any) -> None:
         pass
@@ -548,7 +571,7 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
-    async def getInferenceModels(self) -> None:
+    async def getInferenceModels(self) -> list[ObjectDetectionModel]:
         pass
     pass
 
@@ -578,7 +601,7 @@ class Online:
 class PasswordStore:
     async def addPassword(self, password: str) -> None:
         pass
-    async def getPasswords(self) -> None:
+    async def getPasswords(self) -> list[str]:
         pass
     async def removePassword(self, password: str) -> None:
         pass
@@ -629,7 +652,7 @@ class Scene:
 class Scriptable:
     async def eval(self, source: ScriptSource, variables: Any = None) -> Any:
         pass
-    async def loadScripts(self) -> None:
+    async def loadScripts(self) -> Any:
         pass
     async def saveScript(self, script: ScriptSource) -> None:
         pass
@@ -638,10 +661,10 @@ class Scriptable:
 class ScryptedDevice:
     id: str
     info: DeviceInformation
-    interfaces: list(str)
-    mixins: list(str)
+    interfaces: list[str]
+    mixins: list[str]
     name: str
-    providedInterfaces: list(str)
+    providedInterfaces: list[str]
     providedName: ScryptedDeviceType
     providedRoom: str
     providedType: ScryptedDeviceType
@@ -659,7 +682,7 @@ class ScryptedDevice:
     pass
 
 class Settings:
-    async def getSettings(self) -> None:
+    async def getSettings(self) -> list[Setting]:
         pass
     async def putSetting(self, key: str, value: SettingValue) -> None:
         pass
@@ -683,7 +706,7 @@ class StartStop:
 
 class TemperatureSetting:
     thermostatActiveMode: ThermostatMode
-    thermostatAvailableModes: list(ThermostatMode)
+    thermostatAvailableModes: list[ThermostatMode]
     thermostatMode: ThermostatMode
     thermostatSetpoint: float
     thermostatSetpointHigh: float
@@ -710,7 +733,7 @@ class UltravioletSensor:
 class VideoCamera:
     async def getVideoStream(self, options: MediaStreamOptions = None) -> MediaObject:
         pass
-    async def getVideoStreamOptions(self) -> None:
+    async def getVideoStreamOptions(self) -> list[MediaStreamOptions]:
         pass
     pass
 
@@ -727,7 +750,7 @@ class DeviceManager:
         pass
     def getMixinStorage(self, id: str, nativeId: str = None) -> Storage:
         pass
-    def getNativeIds(self) -> list(str):
+    def getNativeIds(self) -> list[str]:
         pass
     async def onDeviceDiscovered(self, device: Device) -> None:
         pass
@@ -763,7 +786,7 @@ class SystemManager:
     pass
 
 class MediaManager:
-    builtinConverters: list(BufferConverter)
+    builtinConverters: list[BufferConverter]
     async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:
         pass
     async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
@@ -774,7 +797,7 @@ class MediaManager:
         pass
     def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput) -> MediaObject:
         pass
-    def createMediaObject(self, data: str | bytearray | None, mimeType: str) -> MediaObject:
+    def createMediaObject(self, data: str | bytearray, mimeType: str) -> MediaObject:
         pass
     async def createMediaObjectFromUrl(self, data: str, mimeType: str = None) -> MediaObject:
         pass
@@ -868,17 +891,17 @@ class DeviceState:
         self.setScryptedProperty("info", value)
 
     @property
-    def interfaces(self) -> list(str):
+    def interfaces(self) -> list[str]:
         self.getScryptedProperty("interfaces")
     @interfaces.setter
-    def interfaces(self, value: list(str)):
+    def interfaces(self, value: list[str]):
         self.setScryptedProperty("interfaces", value)
 
     @property
-    def mixins(self) -> list(str):
+    def mixins(self) -> list[str]:
         self.getScryptedProperty("mixins")
     @mixins.setter
-    def mixins(self, value: list(str)):
+    def mixins(self, value: list[str]):
         self.setScryptedProperty("mixins", value)
 
     @property
@@ -889,10 +912,10 @@ class DeviceState:
         self.setScryptedProperty("name", value)
 
     @property
-    def providedInterfaces(self) -> list(str):
+    def providedInterfaces(self) -> list[str]:
         self.getScryptedProperty("providedInterfaces")
     @providedInterfaces.setter
-    def providedInterfaces(self, value: list(str)):
+    def providedInterfaces(self, value: list[str]):
         self.setScryptedProperty("providedInterfaces", value)
 
     @property
@@ -1001,10 +1024,10 @@ class DeviceState:
         self.setScryptedProperty("thermostatActiveMode", value)
 
     @property
-    def thermostatAvailableModes(self) -> list(ThermostatMode):
+    def thermostatAvailableModes(self) -> list[ThermostatMode]:
         self.getScryptedProperty("thermostatAvailableModes")
     @thermostatAvailableModes.setter
-    def thermostatAvailableModes(self, value: list(ThermostatMode)):
+    def thermostatAvailableModes(self, value: list[ThermostatMode]):
         self.setScryptedProperty("thermostatAvailableModes", value)
 
     @property

@@ -1366,7 +1366,7 @@ export interface MediaManager {
   /**
    * Create a MediaObject. The mime type needs to be provided up front, but the data can be a URL string, Buffer, or a Promise for a URL string or Buffer.
    */
-  createMediaObject(data: string | Buffer | Promise<string | Buffer>, mimeType: string): MediaObject;
+  createMediaObject(data: string | Buffer, mimeType: string): MediaObject;
 
   /**
    * Create a MediaObject from an URL. The mime type should be provided, but it may be inferred from the URL path.
