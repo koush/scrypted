@@ -48,8 +48,10 @@ export class PluginHost {
         cpuUsage: NodeJS.CpuUsage,
         memoryUsage: NodeJS.MemoryUsage,
     };
+    killed = false;
 
     kill() {
+        this.killed = true;
         this.listener.removeListener();
         this.api.removeListeners();
         this.worker.kill();
@@ -186,8 +188,6 @@ export class PluginHost {
             }
         })();
 
-        init.catch(e => console.error('plugin failed to load', e));
-
         this.module = init.then(({ module }) => module);
         this.remote = new LazyRemote(remotePromise, init.then(({ remote }) => remote));
 
@@ -200,13 +200,20 @@ export class PluginHost {
                 this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed);
             }
         });
+
+        init.catch(e => {
+            console.error('plugin failed to load', e);
+            this.listener.removeListener();
+        });
     }
 
     startPluginClusterHost(logger: Logger, env?: any, runtime?: string) {
         let connected = true;
 
         if (runtime === 'python') {
-            const args: string[] = [];
+            const args: string[] = [
+                '-u',
+            ];
             if (this.pluginDebug) {
                 args.push(
                     '-m',
@@ -278,10 +285,8 @@ export class PluginHost {
             this.worker.on('message', message => this.peer.handleMessage(message as any));
         }
 
-        this.worker.stdout.on('data', data => {
-            process.stdout.write(data);
-        });
-        this.worker.stderr.on('data', data => process.stderr.write(data));
+        this.worker.stdout.on('data', data => console.log(data.toString()));
+        this.worker.stderr.on('data', data => console.error(data.toString()));
 
         this.worker.on('disconnect', () => {
             connected = false;
@@ -653,10 +658,20 @@ class LazyRemote implements PluginRemote {
         })();
     }
 
+    async ensureRemote() {
+        try {
+            if (!this.remote)
+                await this.remoteReadyPromise;
+        }
+        catch (e) {
+            return;
+        }
+        return true;
+    }
+
     async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any> {
         if (!this.remote)
             await this.remoteReadyPromise;
-
         return this.remote.loadZip(packageJson, zipData, options);
     }
     async setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState; }; }): Promise<void> {
@@ -670,13 +685,13 @@ class LazyRemote implements PluginRemote {
         return this.remote.setNativeId(nativeId, id, storage);
     }
     async updateDeviceState(id: string, state: { [property: string]: SystemDeviceState; }): Promise<void> {
-        if (!this.remote)
-            await this.remoteReadyPromise;
+        if (!await this.ensureRemote())
+            return;
         return this.remote.updateDeviceState(id, state);
     }
     async notify(id: string, eventTime: number, eventInterface: string, property: string, propertyState: SystemDeviceState, changed?: boolean): Promise<void> {
-        if (!this.remote)
-            await this.remoteReadyPromise;
+        if (!await this.ensureRemote())
+            return;
         return this.remote.notify(id, eventTime, eventInterface, property, propertyState, changed);
     }
     async ioEvent(id: string, event: string, message?: any): Promise<void> {

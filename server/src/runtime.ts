@@ -515,6 +515,27 @@ export class ScryptedRuntime {
         }
 
         const pluginHost = new PluginHost(this, plugin, pluginDebug);
+        pluginHost.worker.once('exit', () => {
+            if (pluginHost.killed)
+                return;
+            pluginHost.kill();
+            console.error('plugin unexpectedly exited, restarting in 1 minute', pluginHost.pluginId);
+            setTimeout(async () => {
+                const existing = this.plugins[pluginHost.pluginId];
+                if (existing !== pluginHost) {
+                    console.log('scheduled plugin restart cancelled, plugin was restarted by user', pluginHost.pluginId);
+                    return;
+                }
+
+                const plugin = await this.datastore.tryGet(Plugin, pluginHost.pluginId);
+                if (!plugin) {
+                    console.log('scheduled plugin restart cancelled, plugin no longer exists', pluginHost.pluginId);
+                    return;
+                }
+
+                this.runPlugin(plugin).catch(e => console.error('error restarting plugin', plugin._id, e));
+            }, 60000);
+        })
         this.plugins[plugin._id] = pluginHost;
 
         return pluginHost;

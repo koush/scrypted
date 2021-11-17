@@ -1,5 +1,6 @@
 {
     "python.analysis.extraPaths": [
-        "./node_modules/@scrypted/sdk"
+        "./node_modules/@scrypted/sdk",
+        "./python",
     ]
 }

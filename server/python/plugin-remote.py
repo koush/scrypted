@@ -8,7 +8,7 @@ from scrypted_python.scrypted_sdk.types import MediaManager, MediaObject, Scrypt
 
 from collections.abc import Mapping
 from genericpath import exists
-from python.rpc import RpcPeer, RpcSerializer
+import rpc
 import asyncio
 from asyncio.events import AbstractEventLoop
 import json
@@ -75,8 +75,11 @@ class DeviceManager(scrypted_python.scrypted_sdk.DeviceManager):
         id = self.nativeIds[nativeId].id
         return DeviceState(id, nativeId, self.systemManager, self)
 
+    async def onDeviceEvent(self, nativeId: str, eventInterface: str, eventData: Any = None) -> None:
+        await self.systemManager.api.onDeviceEvent(nativeId, eventInterface, eventData)
 
-class BufferSerializer(RpcSerializer):
+
+class BufferSerializer(rpc.RpcSerializer):
     def serialize(self, value):
         return base64.b64encode(value)
 
@@ -214,7 +217,7 @@ async def async_main(loop: AbstractEventLoop):
             if reject:
                 reject(e)
 
-    peer = RpcPeer(send)
+    peer = rpc.RpcPeer(send)
     peer.nameDeserializerMap['Buffer'] = BufferSerializer()
     peer.params['print'] = print
     peer.params['getRemote'] = lambda api, pluginId: PluginRemote(

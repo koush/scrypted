@@ -64,6 +64,8 @@ dictionaryTypes.add('EventDetails');
 function toPythonType(type: any): string {
     if (type.type === 'array')
         return `list(${toPythonType(type.elementType)})`;
+    if (type.type === 'tuple')
+        return `tuple[${type.elements.map((et: any) => toPythonType(et)).join(', ')}]`;
     if (type.type === 'union')
         return type.types.map((type: any) => toPythonType(type)).join(' | ')
     type = type.typeArguments?.[0]?.name || type.name || type;

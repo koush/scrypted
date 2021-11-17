@@ -45,7 +45,7 @@ class DeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
         const method = target();
         if (!this.device)
             this.device = await this.systemManager.api.getDeviceById(this.id);
-        if (method === 'refresh') {
+        if (false && method === 'refresh') {
             const name = this.systemManager.state[this.id]?.[ScryptedInterfaceProperty.name].value;
             this.systemManager.log.i(`requested refresh ${name}`);
         }

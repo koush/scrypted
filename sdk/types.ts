@@ -1199,6 +1199,7 @@ export interface FaceRecognition {
   boundingBox?: [number, number, number, number];
 }
 export interface ObjectsDetected {
+  running?: boolean;
   detections?: ObjectDetectionResult[];
   faces?: ObjectDetectionResult[];
   people?: FaceRecognition[];
@@ -1223,8 +1224,8 @@ export interface TensorInfo {
   shape: number[];
 }
 export interface ObjectDetectionSession {
-  detectionId: string;
-  duration: number;
+  detectionId?: string;
+  duration?: number;
 }
 export interface ObjectDetection {
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;

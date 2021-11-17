@@ -146,14 +146,14 @@ class AudioStreamOptions(TypedDict):
     pass
 
 class FaceRecognition(TypedDict):
-    boundingBox: Any
+    boundingBox: tuple[float, float, float, float]
     id: str
     label: str
     score: float
     pass
 
 class ObjectDetectionResult(TypedDict):
-    boundingBox: Any
+    boundingBox: tuple[float, float, float, float]
     className: str
     score: float
     pass
@@ -320,8 +320,9 @@ class ObjectsDetected(TypedDict):
     detectionId: Any
     detections: list(ObjectDetectionResult)
     faces: list(ObjectDetectionResult)
-    inputDimensions: Any
+    inputDimensions: tuple[float, float]
     people: list(FaceRecognition)
+    running: bool
     timestamp: float
     pass
 

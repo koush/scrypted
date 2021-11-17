@@ -35,3 +35,6 @@ class ScryptedDeviceBase(DeviceState):
             global deviceManager
             self.deviceState = deviceManager.getDeviceState(self.nativeId)
         setattr(self.deviceState, property, value)
+
+    async def onDeviceEvent(self, interface: ScryptedInterface, eventData: Any):
+        await deviceManager.onDeviceEvent(self.nativeId, interface, eventData)
