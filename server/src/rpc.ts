@@ -335,7 +335,7 @@ export class RpcPeer {
                 __remote_proxy_id: proxyId,
                 __remote_constructor_name,
                 __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
-                __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
+                __remote_proxy_oneway_methods: value?.[PROPERTY_PROXY_ONEWAY_METHODS],
             }
             return ret;
         }
@@ -357,7 +357,7 @@ export class RpcPeer {
                 __remote_proxy_id: undefined,
                 __remote_constructor_name,
                 __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
-                __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
+                __remote_proxy_oneway_methods: value?.[PROPERTY_PROXY_ONEWAY_METHODS],
                 __serialized_value: serialized,
             }
             return ret;
@@ -371,7 +371,7 @@ export class RpcPeer {
             __remote_proxy_id: proxyId,
             __remote_constructor_name,
             __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
-            __remote_proxy_oneway_methods: value?.__proxy_oneway_methods,
+            __remote_proxy_oneway_methods: value?.[PROPERTY_PROXY_ONEWAY_METHODS],
         }
 
         return ret;

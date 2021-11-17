@@ -6,10 +6,22 @@ import { Logger } from '../logger';
 import { getState } from '../state';
 import { PluginHost } from './plugin-host';
 import debounce from 'lodash/debounce';
+import { PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
 
 
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;
+
+    [PROPERTY_PROXY_ONEWAY_METHODS]: [
+        'onMixinEvent',
+        'onDeviceEvent',
+        'setStorage',
+        'ioSend',
+        'ioClose',
+        'setDeviceProperty',
+        'deliverPush',
+        'requestRestart',
+    ];
 
     restartDebounced = debounce(async () => {
         const host = this.scrypted.plugins[this.pluginId];
