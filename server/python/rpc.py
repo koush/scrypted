@@ -140,8 +140,7 @@ class RpcPeer:
             }
             return ret
 
-        serializerMapName = self.constructorSerializerMap.get(
-            type(value).__name__)
+        serializerMapName = self.constructorSerializerMap.get(type(value), None)
         if serializerMapName:
             __remote_constructor_name = serializerMapName
             serializer = self.nameDeserializerMap.get(serializerMapName, None)

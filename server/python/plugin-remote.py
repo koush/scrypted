@@ -81,7 +81,7 @@ class DeviceManager(scrypted_python.scrypted_sdk.DeviceManager):
 
 class BufferSerializer(rpc.RpcSerializer):
     def serialize(self, value):
-        return base64.b64encode(value)
+        return base64.b64encode(value).decode('utf8')
 
     def deserialize(self, value):
         return base64.b64decode(value)
@@ -219,6 +219,8 @@ async def async_main(loop: AbstractEventLoop):
 
     peer = rpc.RpcPeer(send)
     peer.nameDeserializerMap['Buffer'] = BufferSerializer()
+    peer.constructorSerializerMap[bytes] = 'Buffer'
+    peer.constructorSerializerMap[bytearray] = 'Buffer'
     peer.params['print'] = print
     peer.params['getRemote'] = lambda api, pluginId: PluginRemote(
         api, pluginId)
