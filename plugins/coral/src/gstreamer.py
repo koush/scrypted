@@ -75,6 +75,7 @@ class GstPipeline:
     def on_bus_message(self, bus, message):
         t = message.type
         if t == Gst.MessageType.EOS:
+            print('gstreamer eos')
             safe_set_result(self.finished)
         elif t == Gst.MessageType.WARNING:
             err, debug = message.parse_warning()
@@ -82,6 +83,7 @@ class GstPipeline:
         elif t == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
             sys.stderr.write('Error: %s: %s\n' % (err, debug))
+            print('gstreamer error')
             safe_set_result(self.finished)
         return True
 

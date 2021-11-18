@@ -25,7 +25,7 @@ from urllib.parse import urlparse
 from gi.repository import Gst
 import multiprocessing
 
-from scrypted_sdk.types import FFMpegInput, Lock, MediaObject, ObjectDetection, ObjectDetectionResult, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+from scrypted_sdk.types import FFMpegInput, Lock, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
 
 def parse_label_contents(contents: str):
@@ -51,13 +51,17 @@ class DetectionSession:
             self.timerHandle.cancel()
             self.timerHandle = None
 
+    def timedOut(self):
+        safe_set_result(self.future)
+
     def setTimeout(self, duration: float):
         self.cancel()
-        self.loop.call_later(duration, lambda: safe_set_result(self.future))
+        self.loop.call_later(duration, lambda: self.timedOut())
 
 
 class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     detection_sessions: Mapping[str, DetectionSession] = {}
+    session_mutex = multiprocessing.Lock()
 
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
@@ -74,10 +78,18 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             0]['shape']
         print("%s, %s, %s" % (width, height, channels))
 
+    async def getInferenceModels(self) -> list[ObjectDetectionModel]:
+        ret = list[ObjectDetectionModel]()
+        d = {
+            'classes': list(self.labels.values())
+        }
+        ret.append(d)
+        return ret
+
     def create_detection_result(self, size, scale):
         objs = detect.get_objects(self.interpreter, .4, scale)
 
-        detections: list(ObjectDetectionResult) = list()
+        detections = list[ObjectDetectionResult]()
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = size
@@ -99,7 +111,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
     def end_session(self, detection_session: DetectionSession):
         detection_session.cancel()
-        del self.detection_sessions[detection_session.id]
+        with self.session_mutex:
+            del self.detection_sessions[detection_session.id]
 
         detection_result: ObjectsDetected = {}
         detection_result['running'] = False
@@ -149,15 +162,16 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if not detection_id:
             detection_id = binascii.b2a_hex(os.urandom(15)).decode('utf8')
 
-        detection_session = self.detection_sessions.get(detection_id)
-        if not detection_session:
-            detection_session = DetectionSession()
-            detection_session.id = detection_id
-            detection_session.loop = loop
-            self.detection_sessions[detection_id] = detection_session
-            new_session = True
+        with self.session_mutex:
+            detection_session = self.detection_sessions.get(detection_id, None)
+            if not detection_session:
+                detection_session = DetectionSession()
+                detection_session.id = detection_id
+                detection_session.loop = loop
+                self.detection_sessions[detection_id] = detection_session
+                new_session = True
 
-            detection_session.future.add_done_callback(lambda _: self.end_session(detection_session))
+                detection_session.future.add_done_callback(lambda _: self.end_session(detection_session))
 
         if duration:
             detection_session.setTimeout(duration / 1000)
@@ -177,14 +191,12 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 self.detection_event(detection_session, detection_result, mapinfo.data.tobytes())
 
                 if not session or not duration:
-                    safe_set_result(future)
+                    safe_set_result(detection_session.future)
             finally:
                 input_tensor.unmap(mapinfo)
 
-        future = asyncio.Future()
-        loop.call_later(10, lambda: safe_set_result(future))
-
-        pipeline = gstreamer.run_pipeline(future, user_callback,
+        print("creating pipeline %s", detection_id)
+        pipeline = gstreamer.run_pipeline(detection_session.future, user_callback,
                                           src_size=(
                                               size['width'], size['height']),
                                           appsink_size=inference_size,
