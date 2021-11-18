@@ -152,8 +152,8 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             try {
                 const types = await realDevice.getObjectTypes();
                 const choices = types.people?.map(p => `Person: ${p.label}`) || [];
-                if (types.detections)
-                    choices.push(...types.detections);
+                if (types.classes)
+                    choices.push(...types.classes);
 
                 const value: string[] = [];
                 try {
