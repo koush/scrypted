@@ -1,7 +1,6 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice, ObjectDetectionResult, FaceRecognitionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDeviceBase, ScryptedDevice, ObjectDetectionResult, FaceRecognitionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import path from 'path';
 import { randomBytes } from 'crypto';
 import { DenoisedDetectionEntry, denoiseDetections } from './denoise';
 
@@ -12,97 +11,12 @@ export interface DetectionInput {
 
 const DISPOSE_TIMEOUT = 10000;
 
-const { deviceManager, mediaManager, systemManager, log } = sdk;
+const { mediaManager, systemManager, log } = sdk;
 
-const defaultMaxRetained = 15;
 const defaultMinConfidence = 0.5;
 const defaultObjectInterval = 1000;
 const defaultRecognitionInterval = 1000;
 const defaultDetectionDuration = 10000;
-
-class RecognizedPerson extends ScryptedDeviceBase implements Camera, Settings {
-  maxRetained = parseInt(this.storage.getItem('maxRetained')) || defaultMaxRetained;
-
-  constructor(public objectDetectionPlugin: ObjectDetectionPlugin, nativeId: string) {
-    super(nativeId);
-
-    // systemManager.listenDevice(this.id, ScryptedInterface.ScryptedDevice, () => tensorFlow.reloadFaceMatcher());
-  }
-
-  async getSettings(): Promise<Setting[]> {
-    const settings: Setting[] = [
-      {
-        title: 'Max Retained Faces',
-        description: 'The number of faces to keep for matching',
-        type: 'number',
-        key: 'maxRetained',
-        value: this.maxRetained.toString(),
-      }
-    ];
-
-    const people = this.objectDetectionPlugin.getAllPeople();
-    if (!people.length)
-      return settings;
-
-    const merge: Setting = {
-      title: 'Merge With...',
-      description: 'Merge this person with a different person. This will remove the other person.',
-      key: 'merge',
-      type: 'string',
-      choices: people.filter(person => person.nativeId !== this.nativeId).map(person => person.name + ` (${person.nativeId})`),
-    }
-    settings.push(merge);
-
-    return settings;
-  }
-
-  setMaxRetained() {
-    this.storage.setItem('maxRetained', this.maxRetained.toString());
-  }
-
-  async putSetting(key: string, value: string | number | boolean): Promise<void> {
-    if (key === 'maxRetained') {
-      this.maxRetained = parseInt(value.toString()) || defaultMaxRetained;
-      this.setMaxRetained();
-      return;
-    }
-
-    if (key !== 'merge')
-      return;
-
-    const person = this.objectDetectionPlugin.getAllPeople().find(person => value === person.name + ` (${person.nativeId})`)
-    if (!person)
-      return;
-
-    const other = this.objectDetectionPlugin.getAllDescriptors(person);
-    const mine = this.objectDetectionPlugin.getAllDescriptors(this);
-    const all = [...other, ...mine];
-
-    while (all.length > this.maxRetained) {
-      const r = Math.round(Math.random() * all.length);
-      all.splice(r, 1);
-    }
-
-    this.storage.clear();
-    this.setMaxRetained();
-
-    all.forEach((d, i) => {
-      this.storage.setItem('descriptor-' + i, Buffer.from(d.buffer, d.byteOffset, d.byteLength).toString('base64'))
-    });
-
-    await deviceManager.onDeviceRemoved(person.nativeId);
-    // this.tensorFlow.reloadFaceMatcher();
-  }
-
-  async takePicture(options?: PictureOptions): Promise<MediaObject> {
-    const jpeg = require('realfs').readFileSync(path.join(process.env.SCRYPTED_PLUGIN_VOLUME, this.nativeId + '.jpg'));
-    return mediaManager.createMediaObject(jpeg, 'image/jpeg');
-  }
-
-  async getPictureOptions(): Promise<PictureOptions[]> {
-    return;
-  }
-}
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
   released = false;
@@ -286,10 +200,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     return {
       classes: models?.[0]?.classes || [],
       faces: true,
-      people: this.objectDetectionPlugin.getAllPeople().map(person => ({
-        id: person.nativeId,
-        label: person.name,
-      })),
+      people: models?.[0]?.people,
     }
   }
 
@@ -375,7 +286,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 }
 
-class ObjectDetectionPlugin extends ScryptedDeviceBase implements MixinProvider, DeviceProvider, Settings {
+class ObjectDetectionPlugin extends ScryptedDeviceBase implements MixinProvider {
   constructor(nativeId?: string) {
     super(nativeId);
 
@@ -386,67 +297,6 @@ class ObjectDetectionPlugin extends ScryptedDeviceBase implements MixinProvider,
         continue;
       device.getSettings();
     }
-
-    for (const person of this.getAllPeople()) {
-      this.discoverPerson(person.nativeId);
-    }
-
-    // this.reloadFaceMatcher();
-  }
-
-  discoverPerson(nativeId: string) {
-    return deviceManager.onDeviceDiscovered({
-      nativeId,
-      name: 'Unknown Person',
-      type: ScryptedDeviceType.Person,
-      interfaces: [ScryptedInterface.Camera, ScryptedInterface.Settings],
-    });
-  }
-
-  async getSettings(): Promise<Setting[]> {
-    return [
-      {
-        title: 'Automatically Add New Faces',
-        description: 'Automatically new faces to Scrypted when found. It is recommended to disable this once the people in your household have been added.',
-        value: (this.storage.getItem('autoAdd') !== 'false').toString(),
-        type: 'boolean',
-        key: 'autoAdd',
-      }
-    ]
-  }
-
-  async putSetting(key: string, value: string | number | boolean): Promise<void> {
-    this.storage.setItem(key, value.toString());
-  }
-
-  async discoverDevices(duration: number): Promise<void> {
-  }
-
-  getAllDescriptors(device: ScryptedDeviceBase) {
-    const descriptors: Float32Array[] = [];
-    for (let i = 0; i < device.storage.length; i++) {
-      const key = device.storage.key(i);
-      if (!key.startsWith('descriptor-'))
-        continue;
-      try {
-        const buffer = Buffer.from(device.storage.getItem(key), 'base64');
-        const descriptor = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
-        descriptors.push(descriptor);
-      }
-      catch (e) {
-      }
-    }
-    return descriptors;
-  }
-
-  getAllPeople(): ScryptedDeviceBase[] {
-    return deviceManager.getNativeIds().filter(nativeId => nativeId?.startsWith('person:'))
-      .map(nativeId => new ScryptedDeviceBase(nativeId));
-  }
-
-  async getDevice(nativeId: string) {
-    if (nativeId.startsWith('person:'))
-      return new RecognizedPerson(this, nativeId);
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
