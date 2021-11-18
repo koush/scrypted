@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.74",
+  "version": "0.0.75",
   "description": "",
   "dependencies": {
     "@scrypted/sdk": "^0.0.121",
@@ -17,8 +17,8 @@
     "memfs": "^3.2.2",
     "mkdirp": "^1.0.4",
     "node-dijkstra": "^2.5.0",
+    "node-forge": "^0.10.0",
     "node-pty": "^0.10.1",
-    "pem": "^1.14.4",
     "query-string": "^6.14.1",
     "semver": "^7.3.5",
     "source-map-support": "^0.5.20",
@@ -47,6 +47,7 @@
     "@types/lodash": "^4.14.168",
     "@types/mkdirp": "^1.0.2",
     "@types/node-dijkstra": "^2.5.1",
+    "@types/node-forge": "^0.10.10",
     "@types/pem": "^1.9.5",
     "@types/rimraf": "^3.0.2",
     "@types/semver": "^7.3.8",

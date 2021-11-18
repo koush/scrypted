@@ -2,7 +2,7 @@ import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegist
 import { ScryptedRuntime } from "../runtime";
 import { PluginDevice } from "../db-types";
 import { MixinProvider } from "@scrypted/sdk/types";
-import { handleFunctionInvocations, PROPERTY_PROXY_ONEWAY_METHODS } from "../rpc";
+import { handleFunctionInvocations } from "../rpc";
 import { getState } from "../state";
 import { getDisplayType } from "../infer-defaults";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";

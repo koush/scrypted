@@ -1,7 +1,5 @@
 import path from 'path';
 import process from 'process';
-import pem from 'pem';
-import { CertificateCreationResult } from 'pem';
 import http from 'http';
 import https from 'https';
 import express from 'express';
@@ -26,11 +24,11 @@ import semver from 'semver';
 import { Info } from './services/info';
 import { getAddresses } from './addresses';
 import { sleep } from './sleep';
+import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
 }
-
 
 process.on('unhandledRejection', error => {
     if (error?.constructor !== RPCResultError) {
@@ -110,18 +108,6 @@ else {
     // parse some custom thing into a Buffer
     app.use(bodyParser.raw({ type: 'application/zip', limit: 100000000 }) as any)
 
-    async function createCertificate(options: pem.CertificateCreationOptions): Promise<pem.CertificateCreationResult> {
-        return new Promise((resolve, reject) => {
-            pem.createCertificate(options, (err: Error, keys: CertificateCreationResult) => {
-                if (err) {
-                    reject(err);
-                    return;
-                }
-                resolve(keys);
-            })
-        })
-    }
-
     async function start() {
         const volumeDir = process.env.SCRYPTED_VOLUME || path.join(process.cwd(), 'volume');
         mkdirp.sync(volumeDir);
@@ -136,11 +122,8 @@ else {
 
         let certSetting = await db.tryGet(Settings, 'certificate') as Settings;
 
-        if (!certSetting) {
-            const cert = await createCertificate({
-                selfSigned: true,
-            });
-
+        if (certSetting?.value?.version !== CURRENT_SELF_SIGNED_CERTIFICATE_VERSION) {
+            const cert = createSelfSignedCertificate();
 
             certSetting = new Settings();
             certSetting._id = 'certificate';
@@ -167,6 +150,7 @@ else {
         });
 
         const keys = certSetting.value;
+
         const secure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, app);
         listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
         const insecure = http.createServer(app);
@@ -193,7 +177,7 @@ else {
         });
 
         // use a hash of the private key as the cookie secret.
-        app.use(cookieParser(crypto.createHash('sha256').update(certSetting.value.clientKey).digest().toString('hex')));
+        app.use(cookieParser(crypto.createHash('sha256').update(certSetting.value.serviceKey).digest().toString('hex')));
 
         app.all('*', async (req, res, next) => {
             // this is a trap for all auth.
