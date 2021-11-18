@@ -123,16 +123,17 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
     const servers = [];
 
     let resolve: any;
-    const socketPromise = new Promise(r => resolve = r);
+    let reject: any;
+    const socketPromise = new Promise((r, rj) => {
+        resolve = r;
+        reject = rj;
+    });
+    setTimeout(() => reject(new Error('timed out waiting for incoming initiate ffmpeg tcp connection')), 10000);
 
     for (const container of Object.keys(options.parsers)) {
         const parser = options.parsers[container];
 
         const eventName = container + '-data';
-
-        ffmpegInputs[container] = {
-            mediaStreamOptions: ffmpegInput.mediaStreamOptions,
-        };
 
         if (!options.parseOnly) {
             const {server: rebroadcast, port: rebroadcastPort } = await createRebroadcaster({
@@ -157,10 +158,22 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
             })
 
             servers.push(rebroadcast);
-            ffmpegInput.inputArguments = [
-                '-f', container,
-                '-i', `tcp://127.0.0.1:${rebroadcastPort}`
-            ];
+
+            const url = `tcp://127.0.0.1:${rebroadcastPort}`;
+            ffmpegInputs[container] = {
+                url,
+                mediaStreamOptions: ffmpegInput.mediaStreamOptions,
+                inputArguments: [
+                    '-f', container,
+                    '-i', url,
+                ],
+            };
+        }
+        else {
+            ffmpegInputs[container] = {
+                url: undefined,
+                mediaStreamOptions: ffmpegInput.mediaStreamOptions,
+            };
         }
 
         const server = createServer(async (socket) => {
