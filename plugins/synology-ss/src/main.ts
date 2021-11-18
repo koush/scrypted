@@ -1,11 +1,14 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
 import { recommendRebroadcast } from "../../rtsp/src/recommend";
 import {SynologyApiClient, SynologyCameraStream, SynologyCamera} from "./api/synology-api-client";
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Settings, VideoCamera {
+class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpRequestHandler, MotionSensor, Settings, VideoCamera {
+    private static readonly DefaultSensorTimeoutSecs: number = 30;
+
+    private motionTimeout?: NodeJS.Timeout;
     private provider: SynologySurveillanceStation;
     private streams: SynologyCameraStream[];
 
@@ -13,6 +16,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
         super(nativeId);
         this.provider = provider;
 
+        this.motionDetected = false;
         this.streams = SynologyCameraDevice.identifyStreams(camera);
     }
 
@@ -38,6 +42,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
     public async getSettings(): Promise<Setting[]> {
         const vsos = await this.getVideoStreamOptions();
         const defaultStream = this.getDefaultStream(vsos);
+
         return [
             {
                 title: 'Default Stream',
@@ -45,6 +50,20 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
                 value: defaultStream?.name,
                 choices: vsos.map(vso => vso.name),
                 description: 'The default stream to use when not specified',
+            },
+            {
+                title: 'Motion Sensor Timeout',
+                key: 'sensorTimeout',
+                type: 'integer',
+                value: this.storage.getItem('sensorTimeout') || SynologyCameraDevice.DefaultSensorTimeoutSecs,
+                description: 'Time to wait in seconds before clearing the motion detected state.',
+            },
+            {
+                title: 'Motion Sensor Webhook',
+                type: 'string',
+                readonly: true,
+                value: await this.getMotionDetectedWebhookUrl(),
+                description: 'To get motion alerts, create an alert rule in Surveillance Station that POSTs to this webhook URL upon motion detected.',
             }
         ];
     }
@@ -59,6 +78,17 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
             this.storage.setItem(key, value?.toString());
         }
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+    }
+
+    getSensorTimeout() {
+        return (parseInt(this.storage.getItem('sensorTimeout')) || SynologyCameraDevice.DefaultSensorTimeoutSecs) * 1000;
+    }
+
+    resetMotionTimeout() {
+        clearTimeout(this.motionTimeout);
+        this.motionTimeout = setTimeout(() => {
+            this.motionDetected = false;
+        }, this.getSensorTimeout());
     }
 
     private async getSnapshot(options?: PictureOptions): Promise<Buffer> {
@@ -83,6 +113,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
             throw new Error(`Unable to locate RTSP stream for camera ${this.nativeId}`);
 
         return mediaManager.createFFmpegMediaObject({
+            url: liveViewPaths[0].rtspPath,
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -125,6 +156,26 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, Setting
 
     public async getPictureOptions(): Promise<PictureOptions[]> {
         return;
+    }
+
+    public async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        if (request.url.endsWith('/motionDetected')) {
+            this.motionDetected = true;
+            this.resetMotionTimeout();
+
+            response.send('Success', {
+                code: 200,
+            });
+        } else {
+            response.send('Unsupported operation', {
+                code: 400,
+            });
+        }
+    }
+
+    private async getMotionDetectedWebhookUrl(): Promise<string> {
+        const webhookUrl = await sdk.endpointManager.getInsecurePublicLocalEndpoint(this.nativeId);
+        return `${webhookUrl}motionDetected`;
     }
 
     /**
@@ -207,11 +258,13 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
                         manufacturer: camera.vendor,
                         model: camera.model,
                         firmware: camera.firmware,
-                        serialNumber: '' + camera.id
+                        serialNumber: `Camera-${camera.id}`,
                     },
                     interfaces: [
-                        ScryptedInterface.Settings,
                         ScryptedInterface.Camera,
+                        ScryptedInterface.HttpRequestHandler,
+                        ScryptedInterface.MotionSensor,
+                        ScryptedInterface.Settings,
                         ScryptedInterface.VideoCamera,
                     ],
                     type: ScryptedDeviceType.Camera
