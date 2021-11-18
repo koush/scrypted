@@ -35,7 +35,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
 
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
         return {
-            detections: this.findCamera().featureFlags.smartDetectTypes,
+            classes: this.findCamera().featureFlags.smartDetectTypes,
         }
     }
 
