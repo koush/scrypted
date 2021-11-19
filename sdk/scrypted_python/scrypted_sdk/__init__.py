@@ -1,14 +1,28 @@
 from __future__ import annotations
 from .types import *
-import zipfile
+from typing import Optional
+from zipfile import ZipFile
+import sys
 
 deviceManager: DeviceManager = None
 systemManager: SystemManager = None
 mediaManager: MediaManager = None
-zip: zipfile.ZipFile = None
+zip: ZipFile = None
+remote: Any = None
 
-def sdk_init(z: zipfile.ZipFile, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
+_print = print
+
+def print(*values: object, sep: Optional[str] = ' ',
+          end: Optional[str] = '\n',
+          file = sys.stdout,
+          flush: bool = True):
+    _print(*values, sep=sep, end=end, file=file, flush=flush)
+    remote.print(None, *values, sep=sep, end=end, flush=flush)
+
+
+def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
     global zip
+    global remote
     global systemManager
     global deviceManager
     global mediaManager
@@ -16,11 +30,12 @@ def sdk_init(z: zipfile.ZipFile, sm: DeviceManager, dm: SystemManager, mm: Media
     deviceManager = dm
     mediaManager = mm
     zip = z
+    remote = r
 
 class ScryptedDeviceBase(DeviceState):
     nativeId: str | None
     deviceState: DeviceState = None
-    
+
     def __init__(self, nativeId: str | None = None):
         self.nativeId = nativeId
 

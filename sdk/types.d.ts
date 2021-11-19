@@ -164,6 +164,10 @@ export interface ScryptedDevice {
     setName(name: string): Promise<void>;
     setRoom(room: string): Promise<void>;
     setType(type: ScryptedDeviceType): Promise<void>;
+    /**
+     * Probes the device, ensuring creation of it and any mixins.
+     */
+    probe(): Promise<boolean>;
     id?: string;
     interfaces?: string[];
     mixins?: string[];
@@ -898,6 +902,9 @@ export interface DeviceManager {
     * Get the per device Storage object.
     */
     getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
+    /**
+     * Get all the native ids that have been reported by this plugin. This always includes "undefined", the plugin itself.
+     */
     getNativeIds(): string[];
     /**
      * onDeviceDiscovered is used to report new devices that are trickle discovered, one by one, such as via a network broadcast.

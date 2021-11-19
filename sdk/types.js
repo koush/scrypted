@@ -60,6 +60,7 @@ exports.ScryptedInterfaceDescriptors = {
         name: 'ScryptedDevice',
         methods: [
             'listen',
+            'probe',
             'setName',
             'setRoom',
             'setType'

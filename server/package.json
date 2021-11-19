@@ -1,9 +1,9 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.75",
+  "version": "0.0.77",
   "description": "",
   "dependencies": {
-    "@scrypted/sdk": "^0.0.121",
+    "@scrypted/sdk": "^0.0.122",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",

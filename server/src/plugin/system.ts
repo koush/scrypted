@@ -41,10 +41,14 @@ class DeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
         return new Proxy(() => p, this);
     }
 
-    async apply(target: any, thisArg: any, argArray?: any) {
-        const method = target();
+    async ensureDevice() {
         if (!this.device)
             this.device = await this.systemManager.api.getDeviceById(this.id);
+    }
+
+    async apply(target: any, thisArg: any, argArray?: any) {
+        const method = target();
+        await this.ensureDevice();
         if (false && method === 'refresh') {
             const name = this.systemManager.state[this.id]?.[ScryptedInterfaceProperty.name].value;
             this.systemManager.log.i(`requested refresh ${name}`);
@@ -64,6 +68,10 @@ class DeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
     }
     async setType(type: ScryptedDeviceType): Promise<void> {
         return this.systemManager.api.setDeviceProperty(this.id, ScryptedInterfaceProperty.type, type);
+    }
+
+    async probe(): Promise<boolean> {
+        return this.apply(() => 'probe', undefined, []);
     }
 }
 

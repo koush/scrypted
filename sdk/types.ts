@@ -161,6 +161,7 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     name: 'ScryptedDevice',
     methods: [
       'listen',
+      'probe',
       'setName',
       'setRoom',
       'setType'
@@ -622,6 +623,11 @@ export interface ScryptedDevice {
   setRoom(room: string): Promise<void>;
 
   setType(type: ScryptedDeviceType): Promise<void>;
+
+  /**
+   * Probes the device, ensuring creation of it and any mixins.
+   */
+  probe(): Promise<boolean>;
 
   id?: string;
   interfaces?: string[];
@@ -1433,6 +1439,9 @@ export interface DeviceManager {
   */
   getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
 
+  /**
+   * Get all the native ids that have been reported by this plugin. This always includes "undefined", the plugin itself.
+   */
   getNativeIds(): string[];
 
   /**

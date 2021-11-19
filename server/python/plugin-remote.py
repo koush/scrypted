@@ -19,6 +19,8 @@ import time
 import zipfile
 import subprocess
 from typing import Any
+from io import StringIO
+from typing import Optional
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -98,10 +100,22 @@ class PluginRemote:
     nativeIds: Mapping[str, DeviceStorage] = {}
     pluginId: str
     mediaManager: MediaManager
+    loop: AbstractEventLoop
+    consoles: Mapping[str, StringIO] = {}
 
-    def __init__(self, api, pluginId):
+    def __init__(self, api, pluginId, loop: AbstractEventLoop):
         self.api = api
         self.pluginId = pluginId
+        self.loop = loop
+
+    def print(self, nativeId: str, *values: object, sep: Optional[str] = ...,
+            end: Optional[str] = ...,
+            flush: bool = ...,):
+        console = self.consoles.get(nativeId)
+        if not console:
+            console = StringIO()
+            self.consoles[nativeId] = console
+        print(*values, sep = sep, end = end, file = console, flush = flush)
 
     async def loadZip(self, packageJson, zipData, options=None):
         zipPath = options['filename']
@@ -150,7 +164,7 @@ class PluginRemote:
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
         self.mediaManager = await self.api.getMediaManager()
-        sdk_init(zip, self.systemManager, self.deviceManager, self.mediaManager)
+        sdk_init(zip, self, self.systemManager, self.deviceManager, self.mediaManager)
         from main import create_scrypted_plugin # type: ignore
         return create_scrypted_plugin()
 
@@ -223,7 +237,7 @@ async def async_main(loop: AbstractEventLoop):
     peer.constructorSerializerMap[bytearray] = 'Buffer'
     peer.params['print'] = print
     peer.params['getRemote'] = lambda api, pluginId: PluginRemote(
-        api, pluginId)
+        api, pluginId, loop)
 
     await readLoop(loop, peer, reader)
 

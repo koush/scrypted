@@ -39,6 +39,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         })().catch(() => { });;
     }
 
+    // this must not be async, because it potentially changes execution order.
     ensureProxy(): Promise<PluginDevice> {
         const pluginDevice = this.scrypted.findPluginDeviceById(this.id);
         if (!pluginDevice)
@@ -115,7 +116,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             return mixinTable;
         })();
 
-        return this.mixinTable.then(mixinTable => pluginDevice);
+        return this.mixinTable.then(_ => pluginDevice);
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {
@@ -162,6 +163,16 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         const device = this.scrypted.findPluginDeviceById(this.id);
         this.scrypted.stateManager.setPluginDeviceState(device, ScryptedInterfaceProperty.type, type);
         this.scrypted.stateManager.updateDescriptor(device);
+    }
+
+    async probe(): Promise<boolean> {
+        try {
+            await this.ensureProxy();
+            return true;
+        }
+        catch (e) {
+            return false;
+        }
     }
 
     async applyMixin(method: string, argArray?: any): Promise<any> {

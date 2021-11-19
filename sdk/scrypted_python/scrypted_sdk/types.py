@@ -673,6 +673,8 @@ class ScryptedDevice:
     type: ScryptedDeviceType
     def listen(self, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
         pass
+    async def probe(self) -> bool:
+        pass
     async def setName(self, name: str) -> None:
         pass
     async def setRoom(self, room: str) -> None:
