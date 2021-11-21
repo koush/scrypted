@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/synology-ss",
-   "version": "0.0.3",
+   "version": "0.0.4",
    "description": "A Synology Surveillance Station plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
