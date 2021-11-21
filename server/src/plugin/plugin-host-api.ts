@@ -12,7 +12,7 @@ import { PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;
 
-    [PROPERTY_PROXY_ONEWAY_METHODS]: [
+    [PROPERTY_PROXY_ONEWAY_METHODS] = [
         'onMixinEvent',
         'onDeviceEvent',
         'setStorage',
