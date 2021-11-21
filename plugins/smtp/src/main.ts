@@ -78,6 +78,12 @@ class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
         super(nativeId);
 
         this.createServer();
+
+        for (const id of Object.keys(systemManager.getSystemState())) {
+            const realDevice = systemManager.getDeviceById(id);
+            if (realDevice.mixins?.includes(this.id))
+                realDevice.probe().catch(e => {});
+        }
     }
 
     createServer() {
