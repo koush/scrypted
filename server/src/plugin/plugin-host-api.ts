@@ -21,6 +21,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         'setDeviceProperty',
         'deliverPush',
         'requestRestart',
+        "setState",
     ];
 
     restartDebounced = debounce(async () => {

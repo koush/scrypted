@@ -648,6 +648,10 @@ export function startPluginClusterWorker() {
     })
 }
 
+/**
+ * Warning: do not await in any of these methods unless necessary, otherwise
+ * execution order of state reporting may fail.
+ */
 class LazyRemote implements PluginRemote {
     remote: PluginRemote;
 
@@ -656,17 +660,6 @@ class LazyRemote implements PluginRemote {
             this.remote = await remoteReadyPromise;
             return this.remote;
         })();
-    }
-
-    async ensureRemote() {
-        try {
-            if (!this.remote)
-                await this.remoteReadyPromise;
-        }
-        catch (e) {
-            return;
-        }
-        return true;
     }
 
     async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any> {
@@ -685,13 +678,23 @@ class LazyRemote implements PluginRemote {
         return this.remote.setNativeId(nativeId, id, storage);
     }
     async updateDeviceState(id: string, state: { [property: string]: SystemDeviceState; }): Promise<void> {
-        if (!await this.ensureRemote())
+        try {
+            if (!this.remote)
+                await this.remoteReadyPromise;
+        }
+        catch (e) {
             return;
+        }
         return this.remote.updateDeviceState(id, state);
     }
     async notify(id: string, eventTime: number, eventInterface: string, property: string, propertyState: SystemDeviceState, changed?: boolean): Promise<void> {
-        if (!await this.ensureRemote())
+        try {
+            if (!this.remote)
+                await this.remoteReadyPromise;
+        }
+        catch (e) {
             return;
+        }
         return this.remote.notify(id, eventTime, eventInterface, property, propertyState, changed);
     }
     async ioEvent(id: string, event: string, message?: any): Promise<void> {
