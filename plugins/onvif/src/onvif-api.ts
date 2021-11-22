@@ -14,6 +14,7 @@ export enum OnvifEvent {
     AudioStop,
     BinaryStart,
     BinaryStop,
+    CellMotion,
 }
 
 function stripNamespaces(topic: string) {
@@ -89,6 +90,12 @@ export class OnvifCameraAPI {
                     else
                         ret.emit('event', OnvifEvent.BinaryStop)
                 }
+                else if (eventTopic.includes('RuleEngine/CellMotionDetector/Motion')) {
+                    // unclear if the IsMotion false is indicative of motion stop?
+                    if (event.message.message.data.simpleItem.$.Name === 'IsMotion' && dataValue) {
+                        ret.emit('event', OnvifEvent.MotionBuggy);
+                    }
+                }
             }
         });
         return ret;
@@ -108,6 +115,37 @@ export class OnvifCameraAPI {
         return token;
     }
 
+    async supportsEvents(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.cam.getCapabilities((err: Error, data: any, xml: string) => {
+                if (err) {
+                    this.console.log('supportsEvents error', err);
+                    return reject(err);
+                }
+                if (!err && data.events && data.events.WSPullPointSupport && data.events.WSPullPointSupport == true) {
+                    this.console.log('Camera supports WSPullPoint', xml);
+                } else {
+                    this.console.log('Camera does not show WSPullPoint support, but trying anyway', xml);
+                }
+
+                resolve(undefined);
+            });
+        })
+    }
+
+    async createSubscription(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.cam.createPullPointSubscription((err: Error, data: any, xml: string) => {
+                if (err) {
+                    this.console.log('createSubscription error', err);
+                    return reject(err);
+                }
+
+                resolve(undefined);
+            });
+        })
+    }
+
     async getStreamUrl(profileToken?: string): Promise<string> {
         if (!profileToken)
             profileToken = await this.getMainProfileToken();
@@ -119,7 +157,7 @@ export class OnvifCameraAPI {
         return this.rtspUrls.get(profileToken);
     }
 
-    async jpegSnapshot(profileToken?: string): Promise<Buffer|undefined> {
+    async jpegSnapshot(profileToken?: string): Promise<Buffer | undefined> {
         if (!profileToken)
             profileToken = await this.getMainProfileToken();
         if (!this.snapshotUrls.has(profileToken)) {

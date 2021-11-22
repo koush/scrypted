@@ -128,9 +128,23 @@ class OnvifCamera extends RtspSmartCamera {
 
     listenEvents(): EventEmitter & Destroyable {
         let motionTimeout: NodeJS.Timeout;
+        const ret: any = new EventEmitter();
 
         (async () => {
             const client = await this.createClient();
+            try {
+                await client.supportsEvents();
+            }
+            catch (e) {
+            }
+            try {
+                await client.createSubscription();
+            }
+            catch (e) {
+                ret.emit('error', e);
+                return;
+            }
+            this.console.log('listening events');
             const events = client.listenEvents();
             events.on('event', event => {
                 if (event === OnvifEvent.MotionBuggy) {
@@ -154,7 +168,6 @@ class OnvifCamera extends RtspSmartCamera {
                     this.binaryState = false;
             })
         })();
-        const ret: any = new EventEmitter();
         ret.destroy = () => {
         };
         return ret;
