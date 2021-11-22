@@ -16,7 +16,7 @@ def print(*values: object, sep: Optional[str] = ' ',
           end: Optional[str] = '\n',
           file = sys.stdout,
           flush: bool = True):
-    _print(*values, sep=sep, end=end, file=file, flush=flush)
+    _print(*values, sep=sep, end=end, file=file, flush=True)
     remote.print(None, *values, sep=sep, end=end, flush=flush)
 
 

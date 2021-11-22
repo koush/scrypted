@@ -314,6 +314,7 @@ class ObjectDetectionModel(TypedDict):
     classes: list[str]
     faces: bool
     id: str
+    inputShape: list[float]
     name: str
     people: list[FaceRecognitionCandidate]
     pass

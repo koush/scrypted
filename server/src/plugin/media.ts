@@ -92,7 +92,12 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
             cp.on('error', (code) => {
                 console.error('ffmpeg error code', code);
             })
+            const to = setTimeout(() => {
+                console.log('ffmpeg stream to image convesion timed out.');
+                cp.kill();
+            }, 10000);
             await once(cp, 'exit');
+            clearTimeout(to);
             const ret = fs.readFileSync(tmpfile.name);
             return ret;
         }

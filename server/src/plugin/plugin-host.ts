@@ -229,7 +229,7 @@ export class PluginHost {
 
             this.worker = child_process.spawn('python', args, {
                 // stdin, stdout, stderr, peer in, peer out
-                stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+                stdio: ['pipe', 'inherit', 'inherit', 'pipe', 'pipe'],
                 env: Object.assign({}, process.env, env),
             });
 
@@ -263,7 +263,7 @@ export class PluginHost {
             }
 
             this.worker = child_process.fork(require.main.filename, ['child'], {
-                stdio: 'pipe',
+                stdio: ['pipe', 'inherit', 'inherit', 'ipc'],
                 env: Object.assign({}, process.env, env),
                 serialization: 'advanced',
                 execArgv,
@@ -285,8 +285,8 @@ export class PluginHost {
             this.worker.on('message', message => this.peer.handleMessage(message as any));
         }
 
-        this.worker.stdout.on('data', data => console.log(data.toString()));
-        this.worker.stderr.on('data', data => console.error(data.toString()));
+        // this.worker.stdout.on('data', data => console.log(data.toString()));
+        // this.worker.stderr.on('data', data => console.error(data.toString()));
 
         this.worker.on('disconnect', () => {
             connected = false;

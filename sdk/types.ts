@@ -1244,9 +1244,6 @@ export interface ObjectDetector {
   getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
-export interface TensorInfo {
-  shape: number[];
-}
 export interface ObjectDetectionSession {
   detectionId?: string;
   duration?: number;
@@ -1254,6 +1251,7 @@ export interface ObjectDetectionSession {
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   id: string;
   name: string;
+  inputShape?: number[];
 }
 /**
  * ObjectDetection can run classification models on arbitrary media sources.

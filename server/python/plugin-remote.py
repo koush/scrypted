@@ -107,6 +107,13 @@ class PluginRemote:
         self.api = api
         self.pluginId = pluginId
         self.loop = loop
+        self.__dict__['__proxy_oneway_methods'] = [
+            'notify',
+            'updateDeviceState',
+            'setSystemState',
+            'ioEvent',
+            'setNativeId',
+        ]
 
     def print(self, nativeId: str, *values: object, sep: Optional[str] = ...,
             end: Optional[str] = ...,
@@ -221,7 +228,6 @@ async def readLoop(loop, peer, reader):
 
 async def async_main(loop: AbstractEventLoop):
     reader = await aiofiles.open(3, mode='r')
-    # writer = open(4, 'r+')
 
     def send(message, reject=None):
         jsonString = json.dumps(message)

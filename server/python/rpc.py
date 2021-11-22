@@ -246,7 +246,7 @@ class RpcPeer:
             elif messageType == 'apply':
                 result = {
                     'type': 'result',
-                    'id': message['id'],
+                    'id': message.get('id', None),
                 }
                 method = message.get('method', None)
 
