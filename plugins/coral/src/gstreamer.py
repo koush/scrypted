@@ -178,9 +178,9 @@ def run_pipeline(finished,
     ! {scale_caps} ! videobox name=box autocrop=true ! {sink_caps} ! {sink_element}
     """
 
-    SINK_ELEMENT = 'appsink name=appsink emit-signals=true max-buffers=1 drop=true'
+    SINK_ELEMENT = 'appsink name=appsink emit-signals=true max-buffers=1 drop=true sync=false'
     SINK_CAPS = 'video/x-raw,format=RGB,width={width},height={height}'
-    LEAKY_Q = 'queue max-size-buffers=1 leaky=downstream'
+    LEAKY_Q = 'queue max-size-buffers=100 leaky=upstream'
 
     src_caps = SRC_CAPS.format(width=src_size[0], height=src_size[1])
     sink_caps = SINK_CAPS.format(width=appsink_size[0], height=appsink_size[1])
