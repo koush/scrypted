@@ -16,7 +16,7 @@ const { mediaManager, systemManager, log } = sdk;
 const defaultMinConfidence = 0.5;
 const defaultObjectInterval = 1000;
 const defaultRecognitionInterval = 1000;
-const defaultDetectionDuration = 10000;
+const defaultDetectionDuration = 30000;
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
   released = false;
@@ -79,7 +79,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         return;
       this.objectDetection?.detectObjects(await this.realDevice.getVideoStream(), {
         detectionId: this.detectionId,
-        duration: 10000,
+        duration: defaultDetectionDuration,
       });
     });
   }
@@ -102,7 +102,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 
   async extendedObjectDetect() {
-    this.objectDetection?.detectObjects(await this.realDevice.getVideoStream(), {
+    this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
       duration: 60000,
     });
@@ -112,6 +112,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     if (!detectionResult?.detections) {
       return;
     }
+
+    // this.console.log('detected', Date.now() - detectionResult.timestamp)
 
     const found: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
     denoiseDetections<ObjectDetectionResult>(this.currentDetections, detectionResult.detections.map(detection => ({
@@ -175,7 +177,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 
   async extendedFaceDetect() {
-    this.objectDetection?.detectObjects(await this.realDevice.getVideoStream(), {
+    this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
       duration: 60000,
     });
