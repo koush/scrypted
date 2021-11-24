@@ -1,42 +1,41 @@
 {
     "name": "@scrypted/ecobee",
-    "version": "0.0.6",
-    "description": "Ecobee API plugin",
+    "version": "0.0.8",
+    "description": "Ecobee Plugin for Scrypted",
     "author": "Scrypted",
     "license": "Apache",
     "scripts": {
-       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
-       "prescrypted-vscode-launch": "scrypted-webpack",
-       "scrypted-vscode-launch": "scrypted-deploy-debug",
-       "scrypted-deploy-debug": "scrypted-deploy-debug",
-       "scrypted-debug": "scrypted-debug",
-       "scrypted-deploy": "scrypted-deploy",
-       "scrypted-readme": "scrypted-readme",
-       "scrypted-package-json": "scrypted-package-json",
-       "scrypted-webpack": "scrypted-webpack"
+        "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+        "prescrypted-vscode-launch": "scrypted-webpack",
+        "scrypted-vscode-launch": "scrypted-deploy-debug",
+        "scrypted-deploy-debug": "scrypted-deploy-debug",
+        "scrypted-debug": "scrypted-debug",
+        "scrypted-deploy": "scrypted-deploy",
+        "scrypted-readme": "scrypted-readme",
+        "scrypted-package-json": "scrypted-package-json",
+        "scrypted-webpack": "scrypted-webpack"
     },
     "keywords": [
-       "ecobee",
-       "bryant",
-       "scrypted",
-       "plugin"
+        "ecobee",
+        "bryant",
+        "scrypted",
+        "plugin"
     ],
     "scrypted": {
-       "name": "Ecobee Controller",
-       "singleInstance": true,
-       "type": "DeviceProvider",
-       "interfaces": [
-          "DeviceProvider",
-          "Settings"
-       ]
+        "name": "Ecobee Plugin",
+        "singleInstance": true,
+        "type": "DeviceProvider",
+        "interfaces": [
+            "DeviceProvider",
+            "Settings"
+        ]
     },
     "devDependencies": {
-       "@scrypted/sdk": "file:../../sdk",
-       "@types/node": "^16.7.1"
+        "@scrypted/sdk": "file:../../sdk",
+        "@types/node": "^16.7.1"
     },
     "dependencies": {
-       "axios": "^0.18.0",
-       "terser": "^3.14.1"
+        "axios": "^0.24.0",
+        "terser": "^3.14.1"
     }
- }
- 
+}
