@@ -69,7 +69,7 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
     this.info = info;
 
     this.temperatureUnit = TemperatureUnit.F
-    var modes: ThermostatMode[] = [ThermostatMode.Cool, ThermostatMode.Heat, ThermostatMode.Auto, ThermostatMode.Off];
+    const modes: ThermostatMode[] = [ThermostatMode.Cool, ThermostatMode.Heat, ThermostatMode.Auto, ThermostatMode.Off];
     this.thermostatAvailableModes = modes;
 
     let humModes: HumidityMode[] = [HumidityMode.Auto, HumidityMode.Humidify, HumidityMode.Off];
