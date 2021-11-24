@@ -584,6 +584,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
 
     if (!this.clientId) {
       this.log.a("You must specify a client ID.")
+      this.console.log("Enter a client ID for this app from the Ecobee developer portal. Then, collect the PIN and enter in Ecobee 'My Apps'. Restart this app to complete.")
       return;
     }
 
