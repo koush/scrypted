@@ -52,6 +52,8 @@ function toIpAndPort(ip) {
 }
 
 exports.deploy = function (debugHost, noRebind) {
+    debugHost = toIpAndPort(debugHost);
+
     return new Promise((resolve, reject) => {
         var out;
         if (process.env.NODE_ENV == 'production')
@@ -73,8 +75,8 @@ exports.deploy = function (debugHost, noRebind) {
 
         var rebindQuery = noRebind ? 'no-rebind' : '';
 
-        const deployUrl = `https://${toIpAndPort(debugHost)}/web/component/script/deploy?${rebindQuery}&npmPackage=${npmPackage}`
-        const setupUrl = `https://${toIpAndPort(debugHost)}/web/component/script/setup?${rebindQuery}&npmPackage=${npmPackage}`
+        const deployUrl = `https://${debugHost}/web/component/script/deploy?${rebindQuery}&npmPackage=${npmPackage}`
+        const setupUrl = `https://${debugHost}/web/component/script/setup?${rebindQuery}&npmPackage=${npmPackage}`
 
         const fileContents = fs.readFileSync(main);
         console.log(`deploying to ${debugHost}`);
@@ -84,6 +86,7 @@ exports.deploy = function (debugHost, noRebind) {
             auth = getLogin(debugHost);
         }
         catch (e) {
+            console.error(e);
             showLoginError();
             process.exit(1);
         }
@@ -132,13 +135,15 @@ exports.deploy = function (debugHost, noRebind) {
 }
 
 exports.debug = function (debugHost, entryPoint) {
+    debugHost = toIpAndPort(debugHost);
+
     return new Promise((resolve, reject) => {
         const outFilename = entryPoint || 'main.nodejs.js';
         var packageJson = path.resolve(process.cwd(), 'package.json');
         packageJson = JSON.parse(fs.readFileSync(packageJson));
         const npmPackage = packageJson.name || '';
 
-        const debugUrl = `https://${toIpAndPort(debugHost)}/web/component/script/debug?filename=${outFilename}&npmPackage=${npmPackage}`
+        const debugUrl = `https://${debugHost}/web/component/script/debug?filename=${outFilename}&npmPackage=${npmPackage}`
         console.log(`initiating debugger on ${debugHost}`);
 
         axios.post(debugUrl, undefined, {
