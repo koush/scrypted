@@ -426,20 +426,32 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
 
 class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Settings {
   devices = new Map<string, any>();
-  clientId: string;
-  apiBaseUrl: string;
-  ecobeeCode: string;
   access_token: string;
-  refresh_token: string;
 
   constructor() {
     super()
-    this.clientId = this.storage.getItem("client_id");
-    this.apiBaseUrl = this.storage.getItem("api_base") || "api.ecobee.com";
-    this.access_token = this.storage.getItem("access_token");
-    this.refresh_token = this.storage.getItem("refresh_token");
+    this.log.clearAlerts();
+    if (!this.storage.getItem("api_base"))
+      this.storage.setItem("api_base", "api.ecobee.com");
 
-    this.discoverDevices()
+    this.initialize();
+  }
+
+  async initialize(): Promise<void> {
+    // If no clientId, request clientId to start authentication process
+    if (!this.storage.getItem("client_id")) {
+      this.log.a("You must specify a client ID.")
+      this.console.log("Enter a client ID for this app from the Ecobee developer portal. Then, collect the PIN and enter in Ecobee 'My Apps'. Restart this app to complete.")
+      return;
+    }
+
+    if (!this.storage.getItem("refresh_token"))
+      // If no refresh_token, try to get token
+      await this.getToken();
+    else if (!this.access_token)
+      await this.refreshToken();
+
+    this.discoverDevices();
   }
 
   async getSettings(): Promise<Setting[]> {
@@ -449,95 +461,78 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
         title: "API Base URL",
         key: "api_base",
         description: "Customize the API base URL",
-        value: this.apiBaseUrl,
+        value: this.storage.getItem("api_base"),
       },
       {
         group: "API",
         title: "API Client ID",
         key: "client_id",
         description: "Your Client ID from the Ecboee developer portal",
-        value: this.clientId,
-      },
-      {
-        group: "API Detail",
-        title: "Access Token",
-        key: "access_token",
-        readonly: true,
-        value: this.access_token || "You must complete the authentication process",
-      },
-      {
-        group: "API Detail",
-        title: "Refresh Token",
-        key: "refresh_token",
-        readonly: true,
-        value: this.refresh_token || "You must complete the authentication process",
+        value: this.storage.getItem("client_id"),
       }
     ]
   }
 
   async putSetting(key: string, value: string): Promise<void> {
+    this.storage.setItem(key, value.toString());
+
     // Try to get a code when a client ID is saved
     if (key === "client_id") {
       await this.getCode();
     }
-
-    this.storage.setItem(key, value.toString());
   }
 
   // Get a code from Ecobee API for user verification
   async getCode() {
     // GET https://api.ecobee.com/authorize?response_type=ecobeePin&client_id=APP_KEY&scope=SCOPE
-    const authUrl = `https://${this.apiBaseUrl}/authorize`
+    const authUrl = `https://${this.storage.getItem("api_base")}/authorize`
     const authParams = {
       response_type:'ecobeePin',
       scope: "smartWrite",
-      client_id: this.clientId,
+      client_id: this.storage.getItem("client_id"),
     }
     let authData = (await axios.get(authUrl, {
       params: authParams,
     })).data
     
+    this.log.clearAlerts();
     this.log.a(`Got code ${authData.ecobeePin}. Enter this in 'My Apps' Ecobee portal. Then restart this app.`)
-    this.ecobeeCode = authData.code;
+    this.storage.setItem("ecobee_code", authData.code);
   }
 
   // Trade the validated code for an access token
   async getToken() {
     // POST https://api.ecobee.com/token?grant_type=ecobeePin&code=AUTHORIZATION_TOKEN&client_id=APP_KEY&ecobee_type=jwt
-    const tokenUrl = `https://${this.apiBaseUrl}/token`
+    const tokenUrl = `https://${this.storage.getItem("api_base")}/token`
     const tokenParams = {
       grant_type:'ecobeePin',
-      code: this.ecobeeCode,
-      client_id: this.clientId,
+      code: this.storage.getItem("ecobee_code"),
+      client_id: this.storage.getItem("client_id"),
       ecobee_type: "jwt",
     };
     let tokenData = (await axios.post(tokenUrl, null, {
       params: tokenParams
     })).data;
     this.access_token = tokenData.access_token;
-    this.refresh_token = tokenData.refresh_token;
-    this.storage.setItem("access_token", this.access_token);
-    this.storage.setItem("refresh_token", this.refresh_token);
+    this.storage.setItem("refresh_token", tokenData.refresh_token);
     console.log(`Stored access/refresh token`)
   }
 
   // Refresh the tokens
   async refreshToken() {
     // POST https://api.ecobee.com/token?grant_type=refresh_token&refresh_token=REFRESH_TOKEN&client_id=APP_KEY&ecobee_type=jwt
-    const tokenUrl = `https://${this.apiBaseUrl}/token`
+    const tokenUrl = `https://${this.storage.getItem("api_base")}/token`
     const tokenParams = {
       grant_type:'refresh_token',
-      refresh_token: this.refresh_token,
-      client_id: this.clientId,
+      refresh_token: this.storage.getItem("refresh_token"),
+      client_id: this.storage.getItem("client_id"),
       ecobee_type: "jwt",
     };
     let tokenData = (await axios.post(tokenUrl, null, {
       params: tokenParams
     })).data;
     this.access_token = tokenData.access_token;
-    this.refresh_token = tokenData.refresh_token;
-    this.storage.setItem("access_token", this.access_token);
-    this.storage.setItem("refresh_token", this.refresh_token);
+    this.storage.setItem("refresh_token", tokenData.refresh_token);
     console.log(`Refreshed access/refresh token`)
   }
 
@@ -556,7 +551,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     // Configure API request
     const config: AxiosRequestConfig = {
       method,
-      baseURL: `https://${this.apiBaseUrl}/api/1/`,
+      baseURL: `https://${this.storage.getItem("api_base")}/api/1/`,
       url: endpoint,
       headers: {
         Authorization: `Bearer ${this.access_token}`,
@@ -579,20 +574,6 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
   }
 
   async discoverDevices(): Promise<void> {
-    // Check that required properties exist
-    this.log.clearAlerts();
-
-    if (!this.clientId) {
-      this.log.a("You must specify a client ID.")
-      this.console.log("Enter a client ID for this app from the Ecobee developer portal. Then, collect the PIN and enter in Ecobee 'My Apps'. Restart this app to complete.")
-      return;
-    }
-
-    if (!this.access_token) {
-      await this.getToken();
-      return;
-    }
-
     // Get a list of all accessible devices
     const json = {
       selection: {
@@ -619,7 +600,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
       ]
       if (apiDevice.settings.hasHumidifier)
         interfaces.push(ScryptedInterface.HumiditySetting);
-
+      
       const device: Device = {
         nativeId: apiDevice.identifier,
         name: `${apiDevice.modelNumber} thermostat`,
@@ -632,18 +613,20 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
         interfaces,
       }
       devices.push(device);
-
-      let providerDevice = this.devices.get(device.nativeId);
-      if (!providerDevice) {
-        providerDevice = new EcobeeThermostat(device.nativeId, this, device.info)
-        this.devices.set(apiDevice.identifier, providerDevice)
-      }
     }
 
     // Sync full device list
     await deviceManager.onDevicesChanged({
         devices,
     });
+
+    for (let device of devices) {
+      let providerDevice = this.devices.get(device.nativeId);
+      if (!providerDevice) {
+        providerDevice = new EcobeeThermostat(device.nativeId, this, device.info)
+        this.devices.set(device.nativeId, providerDevice)
+      }
+    }
   }
 
   getDevice(nativeId: string) {
