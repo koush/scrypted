@@ -29,10 +29,6 @@ import { Alerts } from './services/alerts';
 import { Info } from './services/info';
 import io from 'engine.io';
 import {spawn as ptySpawn} from 'node-pty';
-import child_process from 'child_process';
-import fs from 'fs';
-import path from 'path';
-import { ensurePluginVolume } from './plugin/plugin-volume';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;

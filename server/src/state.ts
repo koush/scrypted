@@ -236,7 +236,7 @@ export function setState(pluginDevice: PluginDevice, property: string, value: an
 }
 
 export function getState(pluginDevice: PluginDevice, property: string): any {
-    const ret = pluginDevice.state[property]?.value;
+    const ret = pluginDevice.state?.[property]?.value;
     if (typeof ret === 'object')
         return JSON.parse(JSON.stringify(ret));
     return ret;
