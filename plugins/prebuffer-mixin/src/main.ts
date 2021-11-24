@@ -14,6 +14,7 @@ const defaultPrebufferDuration = 10000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
 const AUDIO_CONFIGURATION_TEMPLATE = 'audioConfiguration';
+const AUDIO_CONFIGURATION_PARAMS_TEMPLATE = 'audioConfigurationParameters';
 const COMPATIBLE_AUDIO = 'MPEG-TS/MP4 Compatible or No Audio (Copy)';
 const OTHER_AUDIO = 'Other Audio';
 const OTHER_AUDIO_DESCRIPTION = `${OTHER_AUDIO} (Transcode)`;
@@ -54,6 +55,7 @@ class PrebufferSession {
   storage: Storage;
 
   AUDIO_CONFIGURATION = AUDIO_CONFIGURATION_TEMPLATE + '-' + this.streamId;
+  AUDIO_CONFIGURATION_PARAMS = AUDIO_CONFIGURATION_PARAMS_TEMPLATE + '-' + this.streamId;
 
   constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string) {
     this.storage = mixin.storage;
@@ -119,6 +121,14 @@ class PrebufferSession {
         ],
       },
       {
+        title: 'Advanced Audio Parameters ',
+        group,
+        description: 'Additional parameters to add to ffmpeg audio.',
+        type: 'string',
+        key: this.AUDIO_CONFIGURATION_PARAMS,
+        value: this.storage.getItem(this.AUDIO_CONFIGURATION_PARAMS),
+      },
+      {
         key: 'detectedResolution',
         group,
         title: 'Detected Resolution and Bitrate',
@@ -171,7 +181,9 @@ class PrebufferSession {
     let acodec: string[];
     if (probe.noAudio || pcmAudio) {
       // no audio? explicitly disable it.
-      acodec = ['-an'];
+      acodec = [
+        '-an'
+      ];
     }
     else if (reencodeAudio) {
       // setting no audio codec will allow ffmpeg to do an implicit conversion.
@@ -184,9 +196,12 @@ class PrebufferSession {
     else {
       // NOTE: if there is no audio track, this will still work fine.
       acodec = [
-        '-acodec',
-        'copy',
+        '-acodec', 'copy'
       ];
+    }
+
+    if( typeof this.storage.getItem(this.AUDIO_CONFIGURATION_PARAMS) != 'undefined' ){
+      acodec.push( ...this.storage.getItem(this.AUDIO_CONFIGURATION_PARAMS).split(' ') );
     }
 
     const vcodec = [
