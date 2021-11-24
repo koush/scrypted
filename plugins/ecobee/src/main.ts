@@ -476,6 +476,11 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
   }
 
   async putSetting(key: string, value: string): Promise<void> {
+    // Try to get a code when a client ID is saved
+    if (key === "client_id") {
+      await this.getCode();
+    }
+
     this.storage.setItem(key, value.toString());
   }
 
@@ -492,7 +497,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
       params: authParams,
     })).data
     
-    this.console.log(`Got code ${authData.ecobeePin}. Enter this in 'My Apps'.`)
+    this.log.a(`Got code ${authData.ecobeePin}. Enter this in 'My Apps' Ecobee portal. Then restart this app.`)
     this.ecobeeCode = authData.code;
   }
 
@@ -583,7 +588,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     }
 
     if (!this.access_token) {
-      this.log.a("You must complete the authentication process.")
+      await this.getToken();
       return;
     }
 
