@@ -176,9 +176,12 @@ class PrebufferSession {
     else if (reencodeAudio) {
       // setting no audio codec will allow ffmpeg to do an implicit conversion.
       acodec = [
-        '-bsf:a', 'aac_adtstoasc',
         '-acodec', 'libfdk_aac',
-        '-profile:a', 'aac_low'
+        '-profile:a', 'aac_low',
+        '-flags', '+global_header',
+        '-ar', `8k`,
+        '-b:a', `100k`,
+        '-ac', `1`,
       ];
     }
     else {
