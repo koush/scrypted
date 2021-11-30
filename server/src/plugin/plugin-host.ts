@@ -465,7 +465,7 @@ export function startPluginClusterWorker() {
         swallowErrors: !reject,
     }, e => {
         if (e)
-            reject(e);
+            reject?.(e);
     }));
     peer.transportSafeArgumentTypes.add(Buffer.name);
     process.on('message', message => peer.handleMessage(message as RpcMessage));
