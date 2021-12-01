@@ -69,6 +69,8 @@ class ScryptedInterface(Enum):
     ColorSettingHsv = "ColorSettingHsv"
     ColorSettingRgb = "ColorSettingRgb"
     ColorSettingTemperature = "ColorSettingTemperature"
+    DeviceCreator = "DeviceCreator"
+    DeviceDiscovery = "DeviceDiscovery"
     DeviceProvider = "DeviceProvider"
     Dock = "Dock"
     EngineIOHandler = "EngineIOHandler"
@@ -449,9 +451,19 @@ class ColorSettingTemperature:
         pass
     pass
 
-class DeviceProvider:
+class DeviceCreator:
+    async def createDevice(self) -> str:
+        pass
+    async def getCreateDeviceSettings(self) -> list[Setting]:
+        pass
+    pass
+
+class DeviceDiscovery:
     async def discoverDevices(self, duration: float) -> None:
         pass
+    pass
+
+class DeviceProvider:
     def getDevice(self, nativeId: str) -> Any:
         pass
     pass

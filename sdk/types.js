@@ -273,8 +273,22 @@ exports.ScryptedInterfaceDescriptors = {
     DeviceProvider: {
         name: 'DeviceProvider',
         methods: [
-            'discoverDevices',
             'getDevice'
+        ],
+        properties: []
+    },
+    DeviceDiscovery: {
+        name: 'DeviceDiscovery',
+        methods: [
+            'discoverDevices'
+        ],
+        properties: []
+    },
+    DeviceCreator: {
+        name: 'DeviceCreator',
+        methods: [
+            'createDevice',
+            'getCreateDeviceSettings'
         ],
         properties: []
     },
@@ -604,6 +618,8 @@ var ScryptedInterface;
     ScryptedInterface["Entry"] = "Entry";
     ScryptedInterface["EntrySensor"] = "EntrySensor";
     ScryptedInterface["DeviceProvider"] = "DeviceProvider";
+    ScryptedInterface["DeviceDiscovery"] = "DeviceDiscovery";
+    ScryptedInterface["DeviceCreator"] = "DeviceCreator";
     ScryptedInterface["Battery"] = "Battery";
     ScryptedInterface["Refresh"] = "Refresh";
     ScryptedInterface["MediaPlayer"] = "MediaPlayer";

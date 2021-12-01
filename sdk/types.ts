@@ -374,8 +374,22 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
   DeviceProvider: {
     name: 'DeviceProvider',
     methods: [
-      'discoverDevices',
       'getDevice'
+    ],
+    properties: []
+  },
+  DeviceDiscovery: {
+    name: 'DeviceDiscovery',
+    methods: [
+      'discoverDevices'
+    ],
+    properties: []
+  },
+  DeviceCreator: {
+    name: 'DeviceCreator',
+    methods: [
+      'createDevice',
+      'getCreateDeviceSettings'
     ],
     properties: []
   },
@@ -1053,15 +1067,30 @@ export interface EntrySensor {
  */
 export interface DeviceProvider {
   /**
-   * Perform device discovery for the specified duration in seconds.
-   */
-  discoverDevices(duration: number): Promise<void>;
-
-  /**
    * Get an instance of a previously discovered device that was reported to the device manager.
    */
   getDevice(nativeId: ScryptedNativeId): any;
 
+}
+/**
+ * A DeviceProvider that allows the user to create a device.
+ */
+export interface DeviceCreator {
+  getCreateDeviceSettings(): Promise<Setting[]>;
+  /**
+   * Implementation should return the native id of the created device.
+   * Callers will receive the id of the created device.
+   */
+  createDevice(): Promise<string>;
+}
+/**
+ * A DeviceProvider that has a device discovery mechanism.
+ */
+export interface DeviceDiscovery {
+  /**
+   * Perform device discovery for the specified duration in seconds.
+   */
+   discoverDevices(duration: number): Promise<void>;
 }
 /**
  * Battery retrieves the battery level of battery powered devices.
@@ -1751,6 +1780,8 @@ export enum ScryptedInterface {
   Entry = "Entry",
   EntrySensor = "EntrySensor",
   DeviceProvider = "DeviceProvider",
+  DeviceDiscovery = "DeviceDiscovery",
+  DeviceCreator = "DeviceCreator",
   Battery = "Battery",
   Refresh = "Refresh",
   MediaPlayer = "MediaPlayer",
