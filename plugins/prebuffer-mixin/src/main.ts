@@ -14,11 +14,15 @@ const defaultPrebufferDuration = 10000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
 const AUDIO_CONFIGURATION_TEMPLATE = 'audioConfiguration';
-const COMPATIBLE_AUDIO = 'MPEG-TS/MP4 Compatible or No Audio (Copy)';
+const DEFAULT_AUDIO = 'Default';
+const COMPATIBLE_AUDIO = 'AAC or No Audio';
+const COMPATIBLE_AUDIO_DESCRIPTION = `${COMPATIBLE_AUDIO} (Copy)`;
+const LEGACY_AUDIO = 'MP2/MP3 Audio'
+const LEGACY_AUDIO_DESCRIPTION = `${LEGACY_AUDIO} (Copy)`;
 const OTHER_AUDIO = 'Other Audio';
 const OTHER_AUDIO_DESCRIPTION = `${OTHER_AUDIO} (Transcode)`;
-const PCM_AUDIO = 'PCM Audio';
-const PCM_AUDIO_DESCRIPTION = `${PCM_AUDIO} (Copy, !Experimental!)`;
+const PCM_AUDIO = 'PCM or G.711 Audio';
+const PCM_AUDIO_DESCRIPTION = `${PCM_AUDIO} (Copy, Unstable)`;
 const compatibleAudio = ['aac', 'mp3', 'mp2', '', undefined, null];
 
 interface PrebufferStreamChunk {
@@ -47,6 +51,7 @@ class PrebufferSession {
   detectedIdrInterval = 0;
   prevIdr = 0;
   incompatibleDetected = false;
+  legacyDetected = false;
   allowImmediateRestart = false;
 
   mixinDevice: VideoCamera;
@@ -72,16 +77,19 @@ class PrebufferSession {
   getAudioConfig(): {
     audioConfig: string,
     pcmAudio: boolean,
+    legacyAudio: boolean,
     reencodeAudio: boolean,
   } {
     const audioConfig = this.storage.getItem(this.AUDIO_CONFIGURATION) || '';
     // pcm audio only used when explicitly set.
     const pcmAudio = audioConfig.indexOf(PCM_AUDIO) !== -1;
+    const legacyAudio = audioConfig.indexOf(LEGACY_AUDIO) !== -1;
     // reencode audio will be used if explicitly set, OR an incompatible codec was detected, PCM audio was not explicitly set
     const reencodeAudio = audioConfig.indexOf(OTHER_AUDIO) !== -1 || (!pcmAudio && this.incompatibleDetected);
     return {
       audioConfig,
       pcmAudio,
+      legacyAudio,
       reencodeAudio,
     }
   }
@@ -111,9 +119,11 @@ class PrebufferSession {
         description: 'Configuring your camera to output AAC, MP3, or MP2 is recommended. PCM/G711 cameras should set this to Reencode.',
         type: 'string',
         key: this.AUDIO_CONFIGURATION,
-        value: this.storage.getItem(this.AUDIO_CONFIGURATION) || COMPATIBLE_AUDIO,
+        value: this.storage.getItem(this.AUDIO_CONFIGURATION) || DEFAULT_AUDIO,
         choices: [
-          COMPATIBLE_AUDIO,
+          DEFAULT_AUDIO,
+          COMPATIBLE_AUDIO_DESCRIPTION,
+          LEGACY_AUDIO_DESCRIPTION,
           OTHER_AUDIO_DESCRIPTION,
           PCM_AUDIO_DESCRIPTION,
         ],
@@ -160,13 +170,13 @@ class PrebufferSession {
     const probeAudioCodec = probe?.options?.[0]?.audio?.codec;
     this.incompatibleDetected = this.incompatibleDetected || (probeAudioCodec && !compatibleAudio.includes(probeAudioCodec));
     if (this.incompatibleDetected)
-      this.console.warn('configure your camera to output aac, mp3, or mp2 audio. incompatibl audio codec detected', probeAudioCodec);
+      this.console.warn('configure your camera to output aac, mp3, or mp2 audio. incompatible audio codec detected', probeAudioCodec);
 
     const mo = await this.mixinDevice.getVideoStream(mso);
     const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
     const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
 
-    const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
+    const { audioConfig, pcmAudio, reencodeAudio, legacyAudio } = this.getAudioConfig();
 
     let acodec: string[];
     if (probe.noAudio || pcmAudio) {
@@ -176,6 +186,7 @@ class PrebufferSession {
     else if (reencodeAudio) {
       // setting no audio codec will allow ffmpeg to do an implicit conversion.
       acodec = [
+        '-bsf:a', 'aac_adtstoasc',
         '-acodec', 'libfdk_aac',
         '-profile:a', 'aac_low',
         '-flags', '+global_header',
@@ -189,6 +200,7 @@ class PrebufferSession {
       acodec = [
         '-acodec',
         'copy',
+        ...(legacyAudio || this.legacyDetected ? [] : ['-bsf:a', 'aac_adtstoasc']),
       ];
     }
 
@@ -245,14 +257,24 @@ class PrebufferSession {
       this.console.warn('no audio detected.');
     }
     else if (!compatibleAudio.includes(session.inputAudioCodec)) {
-      this.console.error('Detected audio codec was not AAC.', session.inputAudioCodec);
+      this.console.error('Detected audio codec is not mp4/mpegts compatible.', session.inputAudioCodec);
       // show an alert if no audio config was explicitly specified. Force the user to choose/experiment.
       if (!audioConfig && !probe.noAudio) {
-        log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable Reencode Audio in Rebroadcast Settings Audio Configuration to disable this alert.`);
+        log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable Reencode Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
         this.incompatibleDetected = true;
         this.allowImmediateRestart = true;
         // this will probably crash ffmpeg due to mp4/mpegts not being a valid container for pcm,
         // and then it will automatically restart with pcm handling.
+      }
+    }
+    else if (session.inputAudioCodec !== 'aac') {
+      this.console.error('Detected audio codec was not AAC.', session.inputAudioCodec);
+      if (!legacyAudio) {
+        log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable MP2/MP3 Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
+        this.legacyDetected = true;
+        this.allowImmediateRestart = true;
+        // this will probably crash ffmpeg due to mp2/mp3 not supporting the aac bit stream filters,
+        // and then it will automatically restart with legacy handling.
       }
     }
 
@@ -344,7 +366,7 @@ class PrebufferSession {
             if (prebuffer.time < now - requestedPrebuffer)
               continue;
 
-              safeWriteData(prebuffer.chunk);
+            safeWriteData(prebuffer.chunk);
           }
 
           // for some reason this doesn't work as well as simply guessing and dumping.
@@ -471,7 +493,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         session = new PrebufferSession(this, name, id);
         this.sessions.set(id, session);
 
-        (async() => {
+        (async () => {
           while (this.sessions.get(id) === session && !this.released) {
             this.console.log('monitoring prebuffer session');
             session.ensurePrebufferSession();

@@ -95,7 +95,6 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
         outputArguments: [
             ...(options?.vcodec || []),
             ...(options?.acodec || []),
-            '-bsf:a', 'aac_adtstoasc',
             '-f', 'mpegts',
         ],
         parse: createLengthParser(188, concat => {
@@ -175,7 +174,6 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
             ...(options?.vcodec || []),
             ...(options?.acodec || []),
             '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-            '-bsf:a', 'aac_adtstoasc',
             '-f', 'mp4',
         ],
         async *parse(socket: Socket): AsyncGenerator<StreamChunk> {
