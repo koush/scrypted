@@ -245,7 +245,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             this.console.log(code);
         })
 
-        systemManager.listen((eventSource, eventDetails, eventData) => {
+        systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
                 return;
 
@@ -255,15 +255,24 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             if (!eventDetails.property)
                 return;
 
-            if (eventDetails.property !== ScryptedInterfaceProperty.id) {
-                if (!accessoryIds.has(eventSource?.id))
-                    return;
+            if (eventDetails.property === ScryptedInterfaceProperty.id)
+                return;
+
+            const canMixin = await this.canMixin(eventSource.type, eventSource.interfaces);
+            const includes = eventSource?.mixins?.includes(this.id);
+            const has = accessoryIds.has(eventSource?.id);
+            if (has && !canMixin) {
+                this.console.log('restart event', eventSource?.id, eventDetails.property, eventData);
+                this.log.a(`${eventSource.name} can no longer be synced. Reload the HomeKit plugin to apply these changes.`);
+                return;
             }
 
-            const device = systemManager.getDeviceById(eventSource?.id);
-            this.console.log('restart event', eventSource?.id, eventDetails.property, eventData);
-            this.log.a(`${device.name} was updated. Reload the HomeKit plugin to sync these changes.`);
-            // deviceManager.requestRestart();
+            if (!has && includes) {
+                this.console.log('restart event', eventSource?.id, eventDetails.property, eventData);
+                this.log.a(`${eventSource.name} was added. HomeKit plugin will reload momentarily.`);
+                deviceManager.requestRestart();
+                return;
+            }
         });
     }
 
@@ -316,7 +325,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             return;
         }
         this.console.log('release mixin', id);
-        this.log.a(`${device.name} was removed. The HomeKit plugin will reload momentarily to sync these changes.`);
+        this.log.a(`${device.name} was removed. The HomeKit plugin will reload momentarily.`);
         deviceManager.requestRestart();
     }
 }
