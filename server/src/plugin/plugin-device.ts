@@ -16,7 +16,6 @@ interface MixinTable {
 export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
     scrypted: ScryptedRuntime;
     id: string;
-    // proxy: Promise<any>;
     mixinTable: Promise<MixinTable[]>;
 
     constructor(scrypted: ScryptedRuntime, id: string) {
@@ -24,6 +23,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         this.id = id;
     }
 
+    // should this be async?
     invalidate() {
         const mixinTable = this.mixinTable;
         this.mixinTable = undefined;

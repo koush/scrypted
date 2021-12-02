@@ -416,6 +416,7 @@ export class ScryptedRuntime {
         }
     }
 
+    // should this be async?
     invalidatePluginDevice(id: string) {
         const proxyPair = this.devices[id];
         if (!proxyPair)
@@ -589,6 +590,7 @@ export class ScryptedRuntime {
         }
         device.state = undefined;
 
+        this.invalidatePluginDevice(device._id);
         delete this.pluginDevices[device._id];
         await this.datastore.remove(device);
         if (providerId == null || providerId === device._id) {
