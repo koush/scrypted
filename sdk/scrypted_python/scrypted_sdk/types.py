@@ -208,6 +208,9 @@ class Device(TypedDict):
     type: ScryptedDeviceType
     pass
 
+class DeviceCreatorSettings(TypedDict):
+    pass
+
 class DeviceInformation(TypedDict):
     firmware: str
     manufacturer: str
@@ -452,7 +455,7 @@ class ColorSettingTemperature:
     pass
 
 class DeviceCreator:
-    async def createDevice(self) -> str:
+    async def createDevice(self, settings: DeviceCreatorSettings) -> str:
         pass
     async def getCreateDeviceSettings(self) -> list[Setting]:
         pass
@@ -767,7 +770,7 @@ class DeviceManager:
         pass
     def getNativeIds(self) -> list[str]:
         pass
-    async def onDeviceDiscovered(self, device: Device) -> None:
+    async def onDeviceDiscovered(self, device: Device) -> str:
         pass
     async def onDeviceEvent(self, nativeId: str, eventInterface: str, eventData: Any) -> None:
         pass

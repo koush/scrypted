@@ -1072,6 +1072,9 @@ export interface DeviceProvider {
   getDevice(nativeId: ScryptedNativeId): any;
 
 }
+export interface DeviceCreatorSettings {
+  [key: string]: SettingValue;
+}
 /**
  * A DeviceProvider that allows the user to create a device.
  */
@@ -1081,7 +1084,7 @@ export interface DeviceCreator {
    * Implementation should return the native id of the created device.
    * Callers will receive the id of the created device.
    */
-  createDevice(): Promise<string>;
+  createDevice(settings: DeviceCreatorSettings): Promise<string>;
 }
 /**
  * A DeviceProvider that has a device discovery mechanism.
@@ -1474,7 +1477,7 @@ export interface DeviceManager {
   /**
    * onDeviceDiscovered is used to report new devices that are trickle discovered, one by one, such as via a network broadcast.
    */
-  onDeviceDiscovered(device: Device): Promise<void>;
+  onDeviceDiscovered(device: Device): Promise<string>;
 
   /**
    * Fire an event for a device provided by this plugin.
