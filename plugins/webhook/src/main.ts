@@ -188,6 +188,9 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         const set = new Set(interfaces);
+        set.delete(ScryptedInterface.ObjectDetection);
+        set.delete(ScryptedInterface.DeviceDiscovery);
+        set.delete(ScryptedInterface.DeviceCreator);
         set.delete(ScryptedInterface.DeviceProvider);
         set.delete(ScryptedInterface.MixinProvider);
         set.delete(ScryptedInterface.PushHandler);
