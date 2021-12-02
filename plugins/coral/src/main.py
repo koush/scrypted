@@ -106,7 +106,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         return ret
 
     def create_detection_result(self, size, scale):
-        objs = detect.get_objects(self.interpreter, .4, scale)
+        objs = detect.get_objects(self.interpreter,image_scale = scale)
 
         detections = list[ObjectDetectionResult]()
         detection_result: ObjectsDetected = {}

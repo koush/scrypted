@@ -170,7 +170,15 @@ else {
 
         const keys = certSetting.value;
 
-        const secure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, app);
+        const httpsServerOptions = process.env.SCRYPTED_HTTPS_OPTIONS_FILE
+            ? JSON.parse(fs.readFileSync(process.env.SCRYPTED_HTTPS_OPTIONS_FILE).toString())
+            : {};
+
+        const mergedHttpsServerOptions = Object.assign({
+            key: keys.serviceKey,
+            cert: keys.certificate
+        }, httpsServerOptions);
+        const secure = https.createServer(mergedHttpsServerOptions, app);
         listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
         const insecure = http.createServer(app);
         listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
@@ -247,7 +255,7 @@ else {
                 return;
             }
             next();
-        })
+        });
 
         console.log('#######################################################');
         console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
@@ -265,6 +273,10 @@ else {
         console.log('Ports can be changed with environment variables.')
         console.log('https: $SCRYPTED_SECURE_PORT')
         console.log('http : $SCRYPTED_INSECURE_PORT')
+        console.log('Certificate can be by providing tls.createSecureContext options')
+        console.log('JSON file in the SCRYPTED_HTTPS_OPTIONS_FILE environment variable:');
+        console.log('export SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/options.json');
+        console.log('https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions')
         console.log('#######################################################');
         const scrypted = new ScryptedRuntime(db, insecure, secure, app);
         await scrypted.start();
