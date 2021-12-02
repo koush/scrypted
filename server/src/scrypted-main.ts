@@ -4,9 +4,8 @@ import http from 'http';
 import https from 'https';
 import express from 'express';
 import bodyParser from 'body-parser';
-import cluster from 'cluster';
 import net from 'net';
-import { startPluginClusterWorker as startPluginRemoteClusterWorker } from './plugin/plugin-host';
+import { startPluginRemote } from './plugin/plugin-host';
 import { ScryptedRuntime } from './runtime';
 import level from './level';
 import { Plugin, ScryptedUser, Settings } from './db-types';
@@ -46,11 +45,8 @@ function listenServerPort(env: string, port: number, server: any) {
     })
 }
 
-if (!cluster.isMaster) {
-    startPluginRemoteClusterWorker();
-}
-else if (process.argv[2] === 'child') {
-    startPluginRemoteClusterWorker();
+if (process.argv[2] === 'child') {
+    startPluginRemote();
 }
 else {
     installSourceMapSupport({

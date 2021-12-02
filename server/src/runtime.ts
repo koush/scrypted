@@ -1,6 +1,5 @@
 import { Level } from './level';
 import { PluginHost } from './plugin/plugin-host';
-import cluster from 'cluster';
 import { ScryptedNativeId, Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { Plugin, PluginDevice, ScryptedAlert } from './db-types';
@@ -486,29 +485,6 @@ export class ScryptedRuntime {
         const pluginDevices = this.findPluginDevices(plugin._id);
         for (const pluginDevice of pluginDevices) {
             this.invalidatePluginDevice(pluginDevice._id);
-        }
-
-        const execArgv = [
-            '--expose-gc',
-        ];
-        if (process.argv[0].endsWith('ts-node'))
-            execArgv.push('-r', 'ts-node/register');
-
-        if (pluginDebug) {
-            console.log('plugin inspect port', pluginDebug.inspectPort)
-            execArgv.push('--inspect');
-
-            cluster.setupMaster({
-                silent: true,
-                inspectPort: pluginDebug.inspectPort,
-                execArgv,
-            });
-        }
-        else {
-            cluster.setupMaster({
-                silent: true,
-                execArgv,
-            });
         }
 
         const pluginHost = new PluginHost(this, plugin, pluginDebug);

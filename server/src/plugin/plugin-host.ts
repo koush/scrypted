@@ -97,7 +97,7 @@ export class PluginHost {
         const volume = path.join(process.cwd(), 'volume');
         const cwd = ensurePluginVolume(this.pluginId);
 
-        this.startPluginClusterHost(logger, {
+        this.startPluginHost(logger, {
             NODE_PATH: path.join(cwd, 'node_modules'),
             SCRYPTED_PLUGIN_VOLUME: cwd,
         }, plugin.packageJson.scrypted.runtime);
@@ -208,7 +208,7 @@ export class PluginHost {
         });
     }
 
-    startPluginClusterHost(logger: Logger, env?: any, runtime?: string) {
+    startPluginHost(logger: Logger, env?: any, runtime?: string) {
         let connected = true;
 
         if (runtime === 'python') {
@@ -461,7 +461,7 @@ async function createREPLServer(events: EventEmitter): Promise<number> {
     return listenZero(server);
 }
 
-export function startPluginClusterWorker() {
+export function startPluginRemote() {
     const peer = new RpcPeer('unknown', 'host', (message, reject) => process.send(message, undefined, {
         swallowErrors: !reject,
     }, e => {
