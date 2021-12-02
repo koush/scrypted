@@ -9,13 +9,11 @@ export interface DetectionInput {
   input: any;
 }
 
-const DISPOSE_TIMEOUT = 10000;
-
 const { mediaManager, systemManager, log } = sdk;
 
 const defaultMinConfidence = 0.7;
-const defaultRecognitionInterval = 1000;
-const defaultDetectionDuration = 60000;
+const defaultDetectionDuration = 60;
+const defaultDetectionInterval = 60;
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
   released = false;
@@ -24,6 +22,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   realDevice: ScryptedDevice & Camera & VideoCamera & ObjectDetector & MotionSensor;
   minConfidence = parseFloat(this.storage.getItem('minConfidence')) || defaultMinConfidence;
   detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
+  detectionInterval = parseInt(this.storage.getItem('detectionInterval')) || defaultDetectionInterval;
+  detectionIntervalTimeout: NodeJS.Timeout;
   currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
   currentPeople: DenoisedDetectionEntry<FaceRecognitionResult>[] = [];
   objectDetection: ObjectDetection & ScryptedDevice;
@@ -42,6 +42,27 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
 
     this.bindObjectDetection();
     this.register();
+    this.resetDetectionTimeout();
+
+    this.detectPicture();
+  }
+
+  clearDetectionTimeout() {
+    clearTimeout(this.detectionIntervalTimeout);
+    this.detectionIntervalTimeout = undefined;
+  }
+
+  resetDetectionTimeout() {
+    this.clearDetectionTimeout();
+    this.detectionIntervalTimeout = setInterval(() => this.detectPicture(), this.detectionInterval * 1000);
+  }
+
+  async detectPicture() {
+    const picture = await this.realDevice.takePicture();
+    const detections = await this.objectDetection.detectObjects(picture, {
+      minScore: this.minConfidence,
+    });
+    this.objectsDetected(detections, true);
   }
 
   bindObjectDetection() {
@@ -74,9 +95,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     this.registerMotion = this.realDevice.listen(ScryptedInterface.MotionSensor, async () => {
       if (!this.realDevice.motionDetected)
         return;
+      this.resetDetectionTimeout();
       this.objectDetection?.detectObjects(await this.realDevice.getVideoStream(), {
         detectionId: this.detectionId,
-        duration: this.detectionDuration,
+        duration: this.detectionDuration * 1000,
         minScore: this.minConfidence,
       });
     });
@@ -100,14 +122,21 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 
   async extendedObjectDetect() {
-    this.objectDetection?.detectObjects(undefined, {
-      detectionId: this.detectionId,
-      duration: this.detectionDuration,
-    });
+    try {
+      await this.objectDetection?.detectObjects(undefined, {
+        detectionId: this.detectionId,
+        duration: this.detectionDuration * 1000,
+      });
+    }
+    catch (e) {
+      // ignore any
+    }
   }
 
-  async objectsDetected(detectionResult: ObjectsDetected) {
+  async objectsDetected(detectionResult: ObjectsDetected, idle?: boolean) {
+    this.resetDetectionTimeout();
     if (!detectionResult?.detections) {
+      // detection session ended.
       return;
     }
 
@@ -236,10 +265,17 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       },
       {
         title: 'Detection Duration',
-        description: 'The duration to process video when an event occurs.',
+        description: 'The duration in seconds to analyze video when motion occurs.',
         key: 'detectionDuration',
         type: 'number',
         value: this.detectionDuration.toString(),
+      },
+      {
+        title: 'Idle Detection Interval',
+        description: 'The interval in seconds to analyze snapshots when there is no motion.',
+        key: 'detectionInterval',
+        type: 'number',
+        value: this.detectionInterval.toString(),
       },
     ];
   }
@@ -253,6 +289,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     else if (key === 'detectionDuration') {
       this.detectionDuration = parseInt(vs) || defaultDetectionDuration;
     }
+    else if (key === 'detectionInterval') {
+      this.detectionInterval = parseInt(vs) || defaultDetectionInterval;
+    }
     else if (key === 'objectDetection') {
       this.bindObjectDetection();
     }
@@ -260,6 +299,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
 
   release() {
     this.released = true;
+    this.clearDetectionTimeout();
     this.registerMotion?.removeListener();
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
@@ -276,7 +316,7 @@ class ObjectDetectionPlugin extends ScryptedDeviceBase implements MixinProvider 
       const device = systemManager.getDeviceById<VideoCamera & Settings>(id);
       if (!device.mixins?.includes(this.id))
         continue;
-      device.getSettings();
+      device.probe();
     }
   }
 
