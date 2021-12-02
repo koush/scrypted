@@ -13,19 +13,16 @@ const DISPOSE_TIMEOUT = 10000;
 
 const { mediaManager, systemManager, log } = sdk;
 
-const defaultMinConfidence = 0.5;
-const defaultObjectInterval = 1000;
+const defaultMinConfidence = 0.7;
 const defaultRecognitionInterval = 1000;
-const defaultDetectionDuration = 30000;
+const defaultDetectionDuration = 60000;
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
   released = false;
   registerMotion: EventListenerRegister;
   detections = new Map<string, DetectionInput>();
   realDevice: ScryptedDevice & Camera & VideoCamera & ObjectDetector & MotionSensor;
-  minConfidence = parseInt(this.storage.getItem('minConfidence')) || defaultMinConfidence;
-  objectInterval = parseInt(this.storage.getItem('objectInterval')) || defaultObjectInterval;
-  recognitionInterval = parseInt(this.storage.getItem('recognitionInterval')) || defaultRecognitionInterval;
+  minConfidence = parseFloat(this.storage.getItem('minConfidence')) || defaultMinConfidence;
   detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
   currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
   currentPeople: DenoisedDetectionEntry<FaceRecognitionResult>[] = [];
@@ -79,7 +76,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         return;
       this.objectDetection?.detectObjects(await this.realDevice.getVideoStream(), {
         detectionId: this.detectionId,
-        duration: defaultDetectionDuration,
+        duration: this.detectionDuration,
+        minScore: this.minConfidence,
       });
     });
   }
@@ -104,7 +102,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   async extendedObjectDetect() {
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
-      duration: 60000,
+      duration: this.detectionDuration,
     });
   }
 
@@ -113,21 +111,22 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       return;
     }
 
-    // this.console.log('detected', Date.now() - detectionResult.timestamp)
+    const detections = detectionResult.detections.filter(d => d.score >= this.minConfidence);
 
     const found: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
-    denoiseDetections<ObjectDetectionResult>(this.currentDetections, detectionResult.detections.map(detection => ({
+    denoiseDetections<ObjectDetectionResult>(this.currentDetections, detections.map(detection => ({
       name: detection.className,
       detection,
     })), {
       added: d => found.push(d),
       removed: d => {
-        this.console.log('no longer detected', d.name)
+        this.console.log('detection no longer present:', d.name)
         this.reportObjectDetections()
       }
     });
     if (found.length) {
-      this.console.log('detected', found.map(d => d.detection.className).join(', '));
+      this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
+      this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
       this.extendedObjectDetect();
     }
 
@@ -229,7 +228,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         value: this.storage.getItem('objectDetection'),
       },
       {
-        title: 'Minimum Face Detection Confidence',
+        title: 'Minimum Detection Confidence',
         description: 'Higher values eliminate false positives and low quality recognition candidates.',
         key: 'minConfidence',
         type: 'number',
@@ -242,20 +241,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         type: 'number',
         value: this.detectionDuration.toString(),
       },
-      {
-        title: 'Object Detection Interval',
-        description: 'The interval used to detect objects when motion is detected',
-        key: 'objectInterval',
-        type: 'number',
-        value: this.objectInterval.toString(),
-      },
-      {
-        title: 'Face Recognition Interval',
-        description: 'The interval used to recognize faces when a person is detected',
-        key: 'recognitionInterval',
-        type: 'number',
-        value: this.recognitionInterval.toString(),
-      },
     ];
   }
 
@@ -263,16 +248,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     const vs = value.toString();
     this.storage.setItem(key, vs);
     if (key === 'minConfidence') {
-      this.minConfidence = parseInt(vs) || 0.5;
+      this.minConfidence = parseFloat(vs) || defaultMinConfidence;
     }
     else if (key === 'detectionDuration') {
       this.detectionDuration = parseInt(vs) || defaultDetectionDuration;
-    }
-    else if (key === 'objectInterval') {
-      this.objectInterval = parseInt(vs) || defaultObjectInterval;
-    }
-    else if (key === 'recognitionInterval') {
-      this.recognitionInterval = parseInt(vs) || defaultRecognitionInterval;
     }
     else if (key === 'objectDetection') {
       this.bindObjectDetection();

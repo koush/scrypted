@@ -185,7 +185,7 @@ else {
 
         // legacy secure port 9443 is now in use by portainer.
         let shownLegacyPortAlert = false
-        const legacySecure = https.createServer({ key: keys.serviceKey, cert: keys.certificate }, (req, res) => {
+        const legacySecure = https.createServer(mergedHttpsServerOptions, (req, res) => {
             if (!shownLegacyPortAlert) {
                 const core = scrypted.findPluginDevice('@scrypted/core');
                 if (core) {
@@ -273,8 +273,8 @@ else {
         console.log('Ports can be changed with environment variables.')
         console.log('https: $SCRYPTED_SECURE_PORT')
         console.log('http : $SCRYPTED_INSECURE_PORT')
-        console.log('Certificate can be by providing tls.createSecureContext options')
-        console.log('JSON file in the SCRYPTED_HTTPS_OPTIONS_FILE environment variable:');
+        console.log('Certificate can be modified via tls.createSecureContext options in')
+        console.log('JSON file located at SCRYPTED_HTTPS_OPTIONS_FILE environment variable:');
         console.log('export SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/options.json');
         console.log('https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions')
         console.log('#######################################################');
