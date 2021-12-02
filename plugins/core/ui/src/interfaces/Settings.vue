@@ -1,39 +1,46 @@
 <template>
-  <div>
-    <v-card>
-      <v-card-title class="subtitle-1 font-weight-light">Settings</v-card-title>
-      <v-flex xs12 v-if="showChips" class="pt-0">
-        <v-chip-group
-          mandatory
-          active-class="deep-purple accent-4 white--text"
-          column
-          v-model="settingsIndex"
+  <v-card>
+    <v-card-title v-if="!noTitle" class="subtitle-1 font-weight-light"
+      >Settings</v-card-title
+    >
+    <v-flex xs12 v-if="showChips" class="pt-0">
+      <v-chip-group
+        mandatory
+        active-class="deep-purple accent-4 white--text"
+        column
+        v-model="settingsIndex"
+      >
+        <v-chip
+          small
+          v-for="([key], index) of Object.entries(settingsGroups)"
+          :key="index"
         >
-          <v-chip
-            small
-            v-for="([key], index) of Object.entries(settingsGroups)"
-            :key="index"
-          >
-            {{ key.replace("Settings", "") || "General" }}
-          </v-chip>
-        </v-chip-group>
-      </v-flex>
+          {{ key.replace("Settings", "") || "General" }}
+        </v-chip>
+      </v-chip-group>
+    </v-flex>
 
-      <v-divider v-if="showChips"></v-divider>
+    <v-divider v-if="showChips"></v-divider>
 
-      <v-flex xs12>
-        <div v-for="setting in settingsGroup" :key="setting.key">
-          <Setting
-            v-if="setting.value.choices || setting.value.type === 'device' || !setting.value.multiple"
-            :device="device"
-            v-model="setting.value"
-          ></Setting>
-          <SettingMultiple v-else v-model="setting.value" :device="device">
-          </SettingMultiple>
-        </div>
-      </v-flex>
-    </v-card>
-  </div>
+    <v-flex xs12>
+      <div v-for="setting in settingsGroup" :key="setting.key">
+        <Setting
+          v-if="
+            setting.value.choices ||
+            setting.value.type === 'device' ||
+            !setting.value.multiple
+          "
+          :device="device"
+          v-model="setting.value"
+          @input="onInput"
+        ></Setting>
+        <SettingMultiple v-else v-model="setting.value" :device="device">
+        </SettingMultiple>
+      </div>
+    </v-flex>
+
+    <slot name="append"></slot>
+  </v-card>
 </template>
 <script>
 import RPCInterface from "./RPCInterface.vue";
@@ -46,6 +53,7 @@ export default {
     SettingMultiple,
   },
   mixins: [RPCInterface],
+  props: ["noTitle"],
   data() {
     return {
       settingsIndex: 0,
@@ -82,10 +90,21 @@ export default {
     },
   },
   methods: {
+    onChange() {
+    },
+    createInputValue(v) {
+      return {
+        settings: this.settings.map(setting => setting.value),
+      };
+    },
     async refresh() {
-      const blub = this.rpc().getSettings();
-      var settings = await blub;
-      this.settings = this.settings = settings.map((setting) => ({
+      let settings;
+      if (!this.device) {
+        settings = this.value.settings;
+      } else {
+        settings = await this.rpc().getSettings();
+      }
+      this.settings = settings.map((setting) => ({
         key: setting.key,
         value: setting,
       }));
