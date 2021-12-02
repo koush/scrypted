@@ -1,5 +1,10 @@
 import { EventEmitter } from 'events';
 import AxiosDigestAuth from '@koush/axios-digest-auth';
+import https from 'https';
+
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false,
+})
 
 const onvif = require('onvif');
 const { Cam } = onvif;
@@ -183,6 +188,7 @@ export class OnvifCameraAPI {
             method: 'GET',
             url: snapshotUri,
             responseType: 'arraybuffer',
+            httpsAgent,
         });
 
         return Buffer.from(response.data);
