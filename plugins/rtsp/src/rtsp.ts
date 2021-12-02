@@ -17,6 +17,7 @@ export interface RtspMediaStreamOptions extends MediaStreamOptions {
 
 export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
     snapshotAuth: AxiosDigestAuth;
+    pendingPicture: Promise<MediaObject>;
 
     constructor(nativeId: string, public provider: RtspProvider) {
         super(nativeId);
@@ -27,6 +28,15 @@ export class RtspCamera extends ScryptedDeviceBase implements Camera, VideoCamer
     }
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {
+        if (!this.pendingPicture) {
+            this.pendingPicture = this.takeRtspSnapshot(option);
+            this.pendingPicture.finally(() => this.pendingPicture = undefined);
+        }
+
+        return this.pendingPicture;
+    }
+
+    async takeRtspSnapshot(option?: PictureOptions): Promise<MediaObject> {
         const snapshotUrl = this.getSnapshotUrl();
         if (!snapshotUrl) {
             throw new Error('RTSP Camera has no snapshot URL');
@@ -319,12 +329,12 @@ export abstract class RtspSmartCamera extends RtspCamera {
         this.listener.emit('error', new Error("new settings"));
     }
 
-    async takePicture(option?: PictureOptions) {
+    async takeRtspSnapshot(option?: PictureOptions) {
         if (this.showSnapshotUrlOverride() && this.getSnapshotUrl()) {
-            return super.takePicture(option);
+            return super.takeRtspSnapshot(option);
         }
 
-        return this.takeSmartCameraPicture(option);
+        return this.takeSmartCameraPicture(option);;
     }
 
     abstract takeSmartCameraPicture(options?: PictureOptions): Promise<MediaObject>;
