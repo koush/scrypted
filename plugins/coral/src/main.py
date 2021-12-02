@@ -59,6 +59,7 @@ class DetectionSession:
     timerHandle: TimerHandle = None
     future: Future
     loop: AbstractEventLoop
+    score_threshold: float
 
     def __init__(self) -> None:
         self.future = Future()
@@ -105,8 +106,9 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         ret.append(d)
         return ret
 
-    def create_detection_result(self, size, scale):
-        objs = detect.get_objects(self.interpreter,image_scale = scale)
+    def create_detection_result(self, size, score_threshold, scale):
+        objs = detect.get_objects(
+            self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
         detections = list[ObjectDetectionResult]()
         detection_result: ObjectsDetected = {}
@@ -126,7 +128,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, event_buffer: bytes = None):
         detection_result['detectionId'] = detection_session.id
         detection_result['timestamp'] = int(time.time() * 1000)
-        asyncio.run_coroutine_threadsafe(self.onDeviceEvent(ScryptedInterface.ObjectDetection.value, detection_result), loop=detection_session.loop)
+        asyncio.run_coroutine_threadsafe(self.onDeviceEvent(
+            ScryptedInterface.ObjectDetection.value, detection_result), loop=detection_session.loop)
 
     def end_session(self, detection_session: DetectionSession):
         print('detection ended', detection_session.id)
@@ -140,6 +143,15 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         self.detection_event(detection_session, detection_result)
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
+        score_threshold = -float('inf')
+        duration = None
+        detection_id = None
+
+        if session:
+            detection_id = session.get('detectionId', -float('inf'))
+            duration = session.get('duration', None)
+            score_threshold = session.get('minScore', score_threshold)
+            
         if mediaObject and mediaObject.mimeType.startswith('image/'):
             stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
             image = Image.open(stream)
@@ -149,16 +161,9 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
             self.interpreter.invoke()
 
-            return self.create_detection_result(image.size, scale)
+            return self.create_detection_result(image.size, score_threshold, scale)
 
-
-        duration = None
-        detection_id = None
         new_session = False
-
-        if session:
-            detection_id = session.get('detectionId', None)
-            duration = session.get('duration', None)
 
         if not detection_id:
             detection_id = binascii.b2a_hex(os.urandom(15)).decode('utf8')
@@ -168,12 +173,14 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             if not detection_session:
                 detection_session = DetectionSession()
                 detection_session.id = detection_id
+                detection_session.score_threshold = score_threshold
                 loop = asyncio.get_event_loop()
                 detection_session.loop = loop
                 self.detection_sessions[detection_id] = detection_session
                 new_session = True
 
-                detection_session.future.add_done_callback(lambda _: self.end_session(detection_session))
+                detection_session.future.add_done_callback(
+                    lambda _: self.end_session(detection_session))
             elif not duration:
                 self.end_session(detection_session)
                 return
@@ -206,7 +213,6 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         fps_counter = avg_fps_counter(30)
 
-
         def user_callback(input_tensor, src_size, inference_box):
             nonlocal fps_counter
 
@@ -217,7 +223,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
             try:
                 detection_result = self.create_detection_result(
-                    src_size, (scale, scale))
+                    src_size, score_threshold, (scale, scale))
                 # self.detection_event(detection_session, detection_result, mapinfo.data.tobytes())
                 self.detection_event(detection_session, detection_result)
 
@@ -245,4 +251,4 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
 def create_scrypted_plugin():
     return CoralPlugin()
-# 
+#
