@@ -159,7 +159,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             _, scale = common.set_resized_input(
                 self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
 
-            self.interpreter.invoke()
+            with self.mutex:
+                self.interpreter.invoke()
 
             return self.create_detection_result(image.size, score_threshold, scale)
 
@@ -171,6 +172,9 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         with self.session_mutex:
             detection_session = self.detection_sessions.get(detection_id, None)
             if not detection_session:
+                if not mediaObject:
+                    raise Exception('session %s inactive and no mediaObject provided' % detection_id)
+
                 detection_session = DetectionSession()
                 detection_session.id = detection_id
                 detection_session.score_threshold = score_threshold
@@ -193,6 +197,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if not new_session:
             return
 
+        print('detection starting', detection_id)
         b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.MediaStreamUrl.value)
         s = b.decode('utf8')
         j: FFMpegInput = json.loads(s)
@@ -233,7 +238,6 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 # input_tensor.unmap(mapinfo)
                 pass
 
-        print('detection starting', detection_id)
         pipeline = gstreamer.run_pipeline(detection_session.future, user_callback,
                                           src_size=(
                                               size['width'], size['height']),
