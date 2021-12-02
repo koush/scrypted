@@ -18,14 +18,16 @@
    "keywords": [
       "scrypted",
       "plugin",
-      "onvif"
+      "onvif",
+      "camera"
    ],
    "scrypted": {
-      "name": "ONVIF Plugin",
+      "name": "ONVIF Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
-         "Settings"
+         "DeviceCreator",
+         "DeviceDiscovery"
       ]
    },
    "dependencies": {

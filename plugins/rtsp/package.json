@@ -17,14 +17,16 @@
    },
    "keywords": [
       "scrypted",
-      "plugin"
+      "plugin",
+      "rtsp",
+      "camera"
    ],
    "scrypted": {
-      "name": "RTSP Camera Controller",
+      "name": "RTSP Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
-         "Settings"
+         "DeviceCreator"
       ]
    },
    "devDependencies": {

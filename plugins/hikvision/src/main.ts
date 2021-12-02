@@ -72,7 +72,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     async takeSmartCameraPicture(): Promise<MediaObject> {
         const api = this.createClient();
-        return mediaManager.createMediaObject(api.jpegSnapshot(), 'image/jpeg');
+        return mediaManager.createMediaObject(await api.jpegSnapshot(), 'image/jpeg');
     }
 
     async getUrlSettings() {

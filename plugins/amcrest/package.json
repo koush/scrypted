@@ -18,14 +18,15 @@
    "keywords": [
       "scrypted",
       "plugin",
-      "amcrest"
+      "amcrest",
+      "camera"
    ],
    "scrypted": {
-      "name": "Amcrest Camera Controller",
+      "name": "Amcrest Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
-         "Settings"
+         "DeviceCreator"
       ]
    },
    "dependencies": {

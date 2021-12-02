@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { recommendRebroadcast } from "./recommend";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
@@ -472,7 +472,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 }
 
-export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
+export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
     devices = new Map<string, any>();
 
     constructor(nativeId?: string) {
@@ -486,19 +486,26 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
         recommendRebroadcast();
     }
 
-    getAdditionalInterfaces(): string[] {
-        return [
-        ];
+    async createDevice(settings: DeviceCreatorSettings): Promise<string> {
+        const nativeId = randomBytes(4).toString('hex');
+        const name = settings.newCamera.toString();
+        await this.updateDevice(nativeId, name, this.getInterfaces());
+        return nativeId;
     }
 
-    async getSettings(): Promise<Setting[]> {
+    async getCreateDeviceSettings(): Promise<Setting[]> {
         return [
             {
-                key: 'new-camera',
-                title: 'Add RTSP Camera',
+                key: 'newCamera',
+                title: 'Add Camera',
                 placeholder: 'Camera name, e.g.: Back Yard Camera, Baby Camera, etc',
             }
         ]
+    }
+
+    getAdditionalInterfaces(): string[] {
+        return [
+        ];
     }
 
     getInterfaces() {
@@ -507,7 +514,7 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
     }
 
     updateDevice(nativeId: string, name: string, interfaces: string[], type?: ScryptedDeviceType) {
-        deviceManager.onDeviceDiscovered({
+        return deviceManager.onDeviceDiscovered({
             nativeId,
             name,
             interfaces,
@@ -521,9 +528,6 @@ export class RtspProvider extends ScryptedDeviceBase implements DeviceProvider, 
         const name = value.toString();
 
         this.updateDevice(nativeId, name, this.getInterfaces());
-    }
-
-    async discoverDevices(duration: number) {
     }
 
     createCamera(nativeId: string, provider: RtspProvider): RtspCamera {

@@ -1,4 +1,4 @@
-import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera } from "@scrypted/sdk";
+import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable, RtspMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
@@ -234,7 +234,7 @@ class OnvifCamera extends RtspSmartCamera {
     }
 }
 
-class OnvifProvider extends RtspProvider {
+class OnvifProvider extends RtspProvider implements DeviceDiscovery {
     constructor(nativeId?: string) {
         super(nativeId);
 

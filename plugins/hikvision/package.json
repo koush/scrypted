@@ -18,14 +18,15 @@
    "keywords": [
       "scrypted",
       "plugin",
-      "hikvision"
+      "hikvision",
+      "camera"
    ],
    "scrypted": {
-      "name": "HikVision Camera Controller",
+      "name": "HikVision Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
-         "Settings"
+         "DeviceCreator"
       ]
    },
    "dependencies": {
