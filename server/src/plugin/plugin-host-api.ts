@@ -120,7 +120,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     }
 
     async onDeviceDiscovered(device: Device) {
-        await this.pluginHost.upsertDevice(device);
+        return this.pluginHost.upsertDevice(device);
     }
 
     async onDeviceRemoved(nativeId: string) {

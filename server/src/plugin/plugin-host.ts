@@ -84,6 +84,7 @@ export class PluginHost {
     async upsertDevice(upsert: Device) {
         const pi = await this.scrypted.upsertDevice(this.pluginId, upsert, true);
         await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
+        return pi._id;
     }
 
     constructor(scrypted: ScryptedRuntime, plugin: Plugin, public pluginDebug?: PluginDebug) {

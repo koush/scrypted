@@ -208,6 +208,12 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             return this.scrypted.stateManager.refresh(this.id, refreshInterface, userInitiated);
         }
 
+        if (method === 'createDevice') {
+            const nativeId = await this.applyMixin(method, argArray);
+            const newDevice = this.scrypted.findPluginDevice(pluginDevice.pluginId, nativeId);
+            return newDevice._id;
+        }
+
         return this.applyMixin(method, argArray);
     }
 }
