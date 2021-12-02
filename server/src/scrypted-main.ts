@@ -63,25 +63,48 @@ else {
         })
     }
 
+    const debuggers = new Map<number, net.Socket[]>();
     const debugServer = net.createServer(async (socket) => {
         if (!workerInspectPort) {
             socket.destroy();
             return;
         }
 
+        const entry = debuggers.get(workerInspectPort);
+        if (!entry) {
+            debuggers.set(workerInspectPort, [socket]);
+        }
+        else {
+            entry.push(socket);
+        }
+
         for (let i = 0; i < 10; i++) {
             try {
                 const target = await doconnect();
                 socket.pipe(target).pipe(socket);
-                socket.on('error', () => {
+                const destroy = () => {
+                    socket.end();
                     socket.destroy();
+                    target.end();
                     target.destroy();
-                });
-                target.on('error', e => {
-                    console.error('debugger target error', e);
-                    socket.destroy();
-                    target.destroy();
-                });
+
+                    if (!entry) {
+                        const sockets = debuggers.get(workerInspectPort);
+                        if (!debuggers.delete(workerInspectPort))
+                            return;
+                        setTimeout(() => {
+                            if (debuggers.has(workerInspectPort))
+                                return;
+                            for (const s of sockets) {
+                                s.destroy();
+                            }
+                        }, 500)
+                    }
+                }
+                socket.on('error', destroy);
+                target.on('error', destroy);
+                socket.on('close', destroy);
+                target.on('close', destroy);
                 return;
             }
             catch (e) {
