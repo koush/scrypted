@@ -5,15 +5,11 @@ import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
 import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
-import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginAPI, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { Logger } from '../logger';
 import { MediaManagerHostImpl, MediaManagerImpl } from './media';
 import { getState } from '../state';
 import WebSocket, { EventEmitter } from 'ws';
-import { listenZero } from './listen-zero';
-import { Server } from 'net';
-import repl from 'repl';
-import { once } from 'events';
 import { PassThrough } from 'stream';
 import { Console } from 'console'
 import { sleep } from '../sleep';
@@ -27,6 +23,8 @@ import readline from 'readline';
 import { Readable, Writable } from 'stream';
 import { ensurePluginVolume } from './plugin-volume';
 import { installOptionalDependencies } from './plugin-npm-dependencies';
+import { ConsoleServer, createConsoleServer } from './plugin-console';
+import { createREPLServer } from './plugin-repl';
 
 export class PluginHost {
     worker: child_process.ChildProcess;
@@ -49,6 +47,7 @@ export class PluginHost {
         memoryUsage: NodeJS.MemoryUsage,
     };
     killed = false;
+    consoleServer: Promise<ConsoleServer>;
 
     kill() {
         this.killed = true;
@@ -73,6 +72,14 @@ export class PluginHost {
                 }
             }
         }
+
+        this.consoleServer?.then(server => {
+            server.readServer.close();
+            server.writeServer.close();
+            for (const s of server.sockets) {
+                s.destroy();
+            }
+        });
         setTimeout(() => this.peer.kill('plugin killed'), 500);
     }
 
@@ -230,7 +237,7 @@ export class PluginHost {
 
             this.worker = child_process.spawn('python', args, {
                 // stdin, stdout, stderr, peer in, peer out
-                stdio: ['pipe', 'inherit', 'inherit', 'pipe', 'pipe'],
+                stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                 env: Object.assign({}, process.env, env),
             });
 
@@ -264,7 +271,7 @@ export class PluginHost {
             }
 
             this.worker = child_process.fork(require.main.filename, ['child'], {
-                stdio: ['pipe', 'inherit', 'inherit', 'ipc'],
+                stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
                 env: Object.assign({}, process.env, env),
                 serialization: 'advanced',
                 execArgv,
@@ -286,8 +293,9 @@ export class PluginHost {
             this.worker.on('message', message => this.peer.handleMessage(message as any));
         }
 
-        // this.worker.stdout.on('data', data => console.log(data.toString()));
-        // this.worker.stderr.on('data', data => console.error(data.toString()));
+        this.worker.stdout.on('data', data => console.log(data.toString()));
+        this.worker.stderr.on('data', data => console.error(data.toString()));
+        this.consoleServer = createConsoleServer(this.worker.stdout, this.worker.stderr);
 
         this.worker.on('disconnect', () => {
             connected = false;
@@ -310,157 +318,6 @@ export class PluginHost {
     }
 }
 
-async function createConsoleServer(events: EventEmitter): Promise<number[]> {
-    const outputs = new Map<string, Buffer[]>();
-    const appendOutput = (data: Buffer, nativeId: ScryptedNativeId) => {
-        if (!nativeId)
-            nativeId = undefined;
-        let buffers = outputs.get(nativeId);
-        if (!buffers) {
-            buffers = [];
-            outputs.set(nativeId, buffers);
-        }
-        buffers.push(data);
-        // when we're over 4000 lines or whatever these buffer are,
-        // truncate down to 2000.
-        if (buffers.length > 4000)
-            outputs.set(nativeId, buffers.slice(buffers.length - 2000))
-    };
-    events.on('stdout', appendOutput);
-    events.on('stderr', appendOutput);
-
-    const server = new Server(async (socket) => {
-        let [filter] = await once(socket, 'data');
-        filter = filter.toString().trim();
-        if (filter === 'undefined')
-            filter = undefined;
-
-        const buffers = outputs.get(filter);
-        if (buffers) {
-            const concat = Buffer.concat(buffers);
-            outputs.set(filter, [concat]);
-            socket.write(concat);
-        }
-
-        const cb = (data: Buffer, nativeId: ScryptedNativeId) => {
-            if (nativeId !== filter)
-                return;
-            socket.write(data);
-        };
-        events.on('stdout', cb)
-        events.on('stderr', cb)
-
-        const cleanup = () => {
-            events.removeListener('stdout', cb);
-            events.removeListener('stderr', cb);
-        };
-
-        socket.on('close', cleanup);
-        socket.on('error', cleanup);
-        socket.on('end', cleanup);
-    });
-
-
-    const writeServer = new Server(async (socket) => {
-        const [data] = await once(socket, 'data');
-        let filter: string = data.toString();
-        const newline = filter.indexOf('\n');
-        if (newline !== -1) {
-            socket.unshift(Buffer.from(filter.substring(newline + 1)));
-        }
-        filter = filter.substring(0, newline);
-
-        if (filter === 'undefined')
-            filter = undefined;
-
-        const cb = (data: Buffer) => events.emit('stdout', data, filter);
-
-        socket.on('data', cb);
-
-        const cleanup = () => {
-            events.removeListener('data', cb);
-        };
-
-        socket.on('close', cleanup);
-        socket.on('error', cleanup);
-        socket.on('end', cleanup);
-    });
-    const consoleReader = await listenZero(server);
-    const consoleWriter = await listenZero(writeServer);
-
-    return [consoleReader, consoleWriter];
-}
-
-async function createREPLServer(events: EventEmitter): Promise<number> {
-    const [[scrypted], [params], [plugin]] = await Promise.all([once(events, 'scrypted'), once(events, 'params'), once(events, 'plugin')]);
-    const { deviceManager, systemManager } = scrypted;
-    const server = new Server(async (socket) => {
-        let [filter] = await once(socket, 'data');
-        filter = filter.toString().trim();
-        if (filter === 'undefined')
-            filter = undefined;
-
-        const chain: string[] = [];
-        const nativeIds: Map<string, any> = deviceManager.nativeIds;
-        const reversed = new Map<string, string>();
-        for (const nativeId of nativeIds.keys()) {
-            reversed.set(nativeIds.get(nativeId).id, nativeId);
-        }
-
-        while (filter) {
-            const { id } = nativeIds.get(filter);
-            const d = await systemManager.getDeviceById(id);
-            chain.push(filter);
-            filter = reversed.get(d.providerId);
-        }
-
-        chain.reverse();
-        let device = plugin;
-        for (const c of chain) {
-            device = await device.getDevice(c);
-        }
-
-
-        const ctx = Object.assign(params, {
-            device
-        });
-        delete ctx.console;
-        delete ctx.window;
-        delete ctx.WebSocket;
-        delete ctx.pluginHostAPI;
-
-        const replFilter = new Set<string>(['require', 'localStorage'])
-        const replVariables = Object.keys(ctx).filter(key => !replFilter.has(key));
-
-        const welcome = `JavaScript REPL variables:\n${replVariables.map(key => '  ' + key).join('\n')}\n\n`;
-        socket.write(welcome);
-
-        const r = repl.start({
-            terminal: true,
-            input: socket,
-            output: socket,
-            // writer(this: REPLServer, obj: any) {
-            //     const ret = util.inspect(obj, {
-            //         colors: true,
-            //     });
-            //     return ret;//.replaceAll('\n', '\r\n');
-            // },
-            preview: false,
-        });
-
-        Object.assign(r.context, ctx);
-
-        const cleanup = () => {
-            r.close();
-        };
-
-        socket.on('close', cleanup);
-        socket.on('error', cleanup);
-        socket.on('end', cleanup);
-    });
-    return listenZero(server);
-}
-
 export function startPluginRemote() {
     const peer = new RpcPeer('unknown', 'host', (message, reject) => process.send(message, undefined, {
         swallowErrors: !reject,
@@ -471,10 +328,10 @@ export function startPluginRemote() {
     peer.transportSafeArgumentTypes.add(Buffer.name);
     process.on('message', message => peer.handleMessage(message as RpcMessage));
 
-    const events = new EventEmitter();
-
     let systemManager: SystemManager;
     let deviceManager: DeviceManager;
+    let api: PluginAPI;
+    let pluginId: string;
 
     function idForNativeId(nativeId: ScryptedNativeId) {
         if (!deviceManager)
@@ -528,16 +385,31 @@ export function startPluginRemote() {
 
     const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
         return getConsole(async (stdout, stderr) => {
-            stdout.on('data', data => events.emit('stdout', data, nativeId));
-            stderr.on('data', data => events.emit('stderr', data, nativeId));
+            const plugins = await api.getComponent('plugins');
+            const connect = async () => {
+                const port = await plugins.getRemoteServicePort(peer.selfName, 'console-writer');
+                const socket = net.connect(port);
+                socket.write(nativeId + '\n');
+                const writer = (data: Buffer) => {
+                    socket.write(data);
+                };
+                stdout.on('data', writer);
+                stderr.on('data', writer);
+                socket.on('error', () => {
+                    stdout.removeAllListeners();
+                    stderr.removeAllListeners();
+                    stdout.pause();
+                    stderr.pause();
+                    setTimeout(connect, 10000);
+                });
+            };
+            connect();
         }, undefined, undefined);
     }
 
     const getMixinConsole = (mixinId: string, nativeId?: ScryptedNativeId) => {
         return getConsole(async (stdout, stderr) => {
             if (!mixinId || !systemManager.getDeviceById(mixinId).mixins.includes(idForNativeId(nativeId))) {
-                stdout.on('data', data => events.emit('stdout', data, nativeId));
-                stderr.on('data', data => events.emit('stderr', data, nativeId));
                 return;
             }
             const plugins = await systemManager.getComponent('plugins');
@@ -583,28 +455,40 @@ export function startPluginRemote() {
         global?.gc();
     }, 10000);
 
-    const consolePorts = createConsoleServer(events);
-    const replPort = createREPLServer(events);
+    let replPort: Promise<number>;
 
-    const pluginConsole = getDeviceConsole(undefined);
+    let _pluginConsole: Console;
+    const getPluginConsole = () => {
+        if (_pluginConsole)
+            return _pluginConsole;
+        _pluginConsole = getDeviceConsole(undefined);
+    }
 
     attachPluginRemote(peer, {
-        createMediaManager: async (systemManager) => new MediaManagerImpl(systemManager, pluginConsole),
-        events,
+        createMediaManager: async (sm) => {
+            systemManager = sm;
+            return new MediaManagerImpl(systemManager, getPluginConsole());
+        },
+        onGetRemote: async (_api, _pluginId) => {
+            api = _api;
+            pluginId = _pluginId;
+            peer.selfName = pluginId;
+        },
+        onPluginReady: async(scrypted, params, plugin) => {
+            replPort = createREPLServer(scrypted, params, plugin);
+        },
+        getPluginConsole,
         getDeviceConsole,
         getMixinConsole,
         async getServicePort(name) {
-            if (name === 'repl')
+            if (name === 'repl') {
+                if (!replPort)
+                    throw new Error('REPL unavailable: Plugin not loaded.')
                 return replPort;
-            if (name === 'console')
-                return (await consolePorts)[0];
-            if (name === 'console-writer')
-                return (await consolePorts)[1];
+            }
             throw new Error(`unknown service ${name}`);
         },
-        async beforeLoadZip(zip: AdmZip, packageJson: any) {
-            const pluginId = packageJson.name;
-            peer.selfName = pluginId;
+        async onLoadZip(zip: AdmZip, packageJson: any) {
             installSourceMapSupport({
                 environment: 'node',
                 retrieveSourceMap(source) {
@@ -621,29 +505,18 @@ export function startPluginRemote() {
                     return null;
                 }
             });
-            const cp = await consolePorts;
-            const writer = cp[1];
-            const socket = net.connect(writer);
-            await once(socket, 'connect');
-            try {
-                await installOptionalDependencies(pluginConsole, socket, packageJson);
-            }
-            finally {
-                socket.destroy();
-            }
+            await installOptionalDependencies(getPluginConsole(), packageJson);
         }
     }).then(scrypted => {
         systemManager = scrypted.systemManager;
         deviceManager = scrypted.deviceManager;
 
-        events.emit('scrypted', scrypted);
-
         process.on('uncaughtException', e => {
-            pluginConsole.error('uncaughtException', e);
+            getPluginConsole().error('uncaughtException', e);
             scrypted.log.e('uncaughtException ' + e?.toString());
         });
         process.on('unhandledRejection', e => {
-            pluginConsole.error('unhandledRejection', e);
+            getPluginConsole().error('unhandledRejection', e);
             scrypted.log.e('unhandledRejection ' + e?.toString());
         });
     })

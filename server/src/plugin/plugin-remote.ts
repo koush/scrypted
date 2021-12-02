@@ -135,7 +135,6 @@ class DeviceManagerImpl implements DeviceManager {
     nativeIds = new Map<string, DeviceManagerDevice>();
 
     constructor(public systemManager: SystemManagerImpl,
-        public events?: EventEmitter,
         public getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console,
         public getMixinConsole?: (mixinId: string, nativeId?: ScryptedNativeId) => Console) {
     }
@@ -283,13 +282,15 @@ export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
     getServicePort?: (name: string) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
+    getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
-    events?: EventEmitter;
-    beforeLoadZip?: (zip: AdmZip, packageJson: any) => Promise<void>;
+    onLoadZip?: (zip: AdmZip, packageJson: any) => Promise<void>;
+    onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
+    onPluginReady?: (scrypted: ScryptedStatic, params: any, plugin: any) => Promise<void>;
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
-    const { createMediaManager, getServicePort, events, getDeviceConsole, getMixinConsole } = options || {};
+    const { createMediaManager, getServicePort, getDeviceConsole, getMixinConsole, getPluginConsole } = options || {};
 
     peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
 
@@ -297,8 +298,10 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
     const retPromise = new Promise<ScryptedStatic>(resolve => done = resolve);
 
     peer.params.getRemote = async (api: PluginAPI, pluginId: string) => {
+        await options?.onGetRemote?.(api, pluginId);
+
         const systemManager = new SystemManagerImpl();
-        const deviceManager = new DeviceManagerImpl(systemManager, events, getDeviceConsole, getMixinConsole);
+        const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
         const ioSockets: { [id: string]: WebSocketCallbacks } = {};
         const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager);
@@ -403,10 +406,10 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             },
 
             async loadZip(packageJson: any, zipData: Buffer, zipOptions?: PluginRemoteLoadZipOptions) {
-                const pluginConsole = getDeviceConsole?.(undefined);
+                const pluginConsole = getPluginConsole?.();
                 pluginConsole?.log('starting plugin', pluginId, packageJson.version);
                 const zip = new AdmZip(zipData);
-                await options?.beforeLoadZip?.(zip, packageJson);
+                await options?.onLoadZip?.(zip, packageJson);
                 const main = zip.getEntry('main.nodejs.js');
                 const script = main.getData().toString();
                 const window: any = {};
@@ -482,12 +485,10 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
                 params.console = pluginConsole;
 
-                events?.emit('params', params);
-
                 try {
                     peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
-                    events?.emit('plugin', exports.default);
                     pluginConsole?.log('plugin successfully loaded');
+                    await options?.onPluginReady?.(ret, params, exports.default);
                     return exports.default;
                 }
                 catch (e) {

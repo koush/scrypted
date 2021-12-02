@@ -3,9 +3,8 @@ import fs from 'fs';
 import child_process from 'child_process';
 import path from 'path';
 import { once } from 'events';
-import { Socket } from "net";
 
-export async function installOptionalDependencies(console: Console, socket: Socket, packageJson: any) {
+export async function installOptionalDependencies(console: Console, packageJson: any) {
     const pluginVolume = ensurePluginVolume(packageJson.name);
     const optPj = path.join(pluginVolume, 'package.json');
 
@@ -40,7 +39,7 @@ export async function installOptionalDependencies(console: Console, socket: Sock
 
         const cp = child_process.spawn('npm', ['--prefix', pluginVolume, 'install'], {
             cwd: pluginVolume,
-            stdio: ['inherit', socket, socket],
+            stdio: 'inherit',
         });
     
         await once(cp, 'exit');

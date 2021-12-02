@@ -119,6 +119,14 @@ export class PluginComponent {
     }
 
     async getRemoteServicePort(pluginId: string, name: string): Promise<number> {
+        if (name === 'console') {
+            const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
+            return consoleServer.readPort;
+        }
+        if (name === 'console-writer') {
+            const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
+            return consoleServer.writePort;
+        }
         return this.scrypted.plugins[pluginId].remote.getServicePort(name);
     }
 }

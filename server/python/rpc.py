@@ -276,7 +276,7 @@ class RpcPeer:
                     print('failure', method, e)
                     tb = traceback.format_exc()
                     self.createErrorResult(
-                        result, type(e).__name, str(e), tb)
+                        result, type(e).__name__, str(e), tb)
 
                 if not message.get('oneway', False):
                     self.send(result)
