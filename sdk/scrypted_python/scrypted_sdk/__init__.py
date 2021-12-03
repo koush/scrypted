@@ -10,16 +10,6 @@ mediaManager: MediaManager = None
 zip: ZipFile = None
 remote: Any = None
 
-_print = print
-
-def print(*values: object, sep: Optional[str] = ' ',
-          end: Optional[str] = '\n',
-          file = sys.stdout,
-          flush: bool = True):
-    _print(*values, sep=sep, end=end, file=file, flush=True)
-    remote.print(None, *values, sep=sep, end=end, flush=flush)
-
-
 def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
     global zip
     global remote
@@ -53,3 +43,9 @@ class ScryptedDeviceBase(DeviceState):
 
     async def onDeviceEvent(self, interface: ScryptedInterface, eventData: Any):
         await deviceManager.onDeviceEvent(self.nativeId, interface, eventData)
+
+    def print(self, *values: object, sep: Optional[str] = ' ',
+            end: Optional[str] = '\n',
+            flush: bool = True):
+        print(*values, sep=sep, end=end, flush=True)
+        remote.print(self.nativeId, *values, sep=sep, end=end, flush=flush)

@@ -162,6 +162,7 @@ class FaceRecognitionResult(TypedDict):
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
+    id: str
     score: float
     pass
 

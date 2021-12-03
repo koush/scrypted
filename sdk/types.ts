@@ -1227,6 +1227,7 @@ export interface Position {
   longitude?: number;
 }
 export interface ObjectDetectionResult {
+  id?: string;
   className: string;
   score: number;
   boundingBox?: [number, number, number, number],
