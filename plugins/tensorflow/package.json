@@ -34,7 +34,7 @@
       "type": "API",
       "interfaces": [
          "DeviceProvider",
-         "MixinProvider",
+         "ObjectDetection",
          "Settings"
       ]
    },

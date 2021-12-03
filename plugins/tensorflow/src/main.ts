@@ -1,4 +1,4 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice, ObjectDetectionResult, FaceRecognition, ObjectDetectionTypes, ScryptedMimeTypes, FFMpegInput } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice, ObjectDetectionResult, FaceRecognition, ObjectDetectionTypes, ScryptedMimeTypes, FFMpegInput, ObjectsDetected, ObjectDetectionModel, ObjectDetectionSession } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
@@ -283,7 +283,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
       }
     });
 
-    this.registerObject = this.realDevice.listen(ScryptedInterface.ObjectDetector, async (es, ed, detection: ObjectDetection) => {
+    this.registerObject = this.realDevice.listen(ScryptedInterface.ObjectDetector, async (es, ed, detection: ObjectsDetected) => {
       // ignore face/people detection. already processed.
       if (detection.faces || detection.people)
         return;
@@ -318,7 +318,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
   reportObjectDetections(detectionInput?: DetectionInput) {
     const detectionId = Math.random().toString();
-    const detection: ObjectDetection = {
+    const detection: ObjectsDetected = {
       timestamp: Date.now(),
       detectionId: detectionInput ? detectionId : undefined,
       inputDimensions: detectionInput
@@ -384,7 +384,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
 
   reportPeopleDetections(faces?: ObjectDetectionResult[], detectionInput?: DetectionInput) {
     const detectionId = Math.random().toString();
-    const detection: ObjectDetection = {
+    const detection: ObjectsDetected = {
       timestamp: Date.now(),
       detectionId: detectionInput ? detectionId : undefined,
       inputDimensions: detectionInput
@@ -663,7 +663,7 @@ class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements
   }
 }
 
-class TensorFlow extends AutoenableMixinProvider implements MixinProvider, DeviceProvider, Settings {
+class TensorFlow extends AutoenableMixinProvider implements ObjectDetection, DeviceProvider, Settings {
   faceMatcher: FaceMatcher;
 
   constructor(nativeId?: string) {
@@ -682,6 +682,24 @@ class TensorFlow extends AutoenableMixinProvider implements MixinProvider, Devic
     }
 
     this.reloadFaceMatcher();
+  }
+
+  detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected> {
+    throw new Error('Method not implemented.');
+  }
+
+  async getInferenceModels(): Promise<ObjectDetectionModel[]> {
+    return [
+      {
+        id: 'coco-ssd',
+        name: 'Coco SSD',
+        classes: Object.values(CLASSES).map(c => c.displayName),
+        people: this.getAllPeople().map(person => ({
+          id: person.nativeId,
+          label: person.name,
+        }))
+      }
+    ]
   }
 
   discoverPerson(nativeId: string) {
