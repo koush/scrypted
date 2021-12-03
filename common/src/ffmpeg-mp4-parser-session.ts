@@ -38,7 +38,7 @@ export async function startFFMPegFragmetedMP4Session(inputArguments: string[], a
         );
 
         args.unshift('-hide_banner');
-        console.log(args);
+        console.log(args.join(' '));
 
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
             // stdio: 'ignore',

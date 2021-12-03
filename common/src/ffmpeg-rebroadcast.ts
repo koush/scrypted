@@ -203,7 +203,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
     }
 
     args.unshift('-hide_banner');
-    console.log(args);
+    console.log(args.join(' '));
     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
     ffmpegLogInitialOutput(console, cp);
 
