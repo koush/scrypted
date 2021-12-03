@@ -9,6 +9,8 @@ const extraEncoderArgs = [
     '${request.video.max_bit_rate * 2}k',
 ];
 
+export const defaultObjectDetectionContactSensorTimeout = 60;
+
 export class CameraMixin extends SettingsMixinDeviceBase<any> implements Settings {
     constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
         super(mixinDevice, mixinDeviceState, {
@@ -170,7 +172,15 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                     key: 'objectDetectionContactSensors',
                     description: 'Create HomeKit contact sensors that detect specific people or objects.',
                     value,
-                })
+                });
+
+                settings.push({
+                    title: 'Object Detection Contact Sensor Timeout',
+                    type: 'number',
+                    key: 'objectDetectionContactSensorTimeout',
+                    description: 'Duration in seconds to keep the contact sensor open.',
+                    value: this.storage.getItem('objectDetectionContactSensorTimeout') || defaultObjectDetectionContactSensorTimeout,
+                });
             }
             catch (e) {
             }

@@ -21,6 +21,7 @@ import { createSnapshotHandler } from './camera/camera-snapshot';
 import { evalRequest } from './camera/camera-transcode';
 import { CharacteristicEventTypes, Service, WithUUID } from 'hap-nodejs/src';
 import { RecordingManagement } from 'hap-nodejs/src/lib/camera';
+import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -574,6 +575,15 @@ addSupportedType({
                 const isPerson = ojs.startsWith('Person: ');
 
                 let contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
+                let timeout: NodeJS.Timeout;
+
+                const resetSensorTimeout = () => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => {
+                        sensor.updateCharacteristic(Characteristic.ContactSensorState, contactState);
+                    }, (parseInt(storage.getItem('objectDetectionContactSensorTimeout')) || defaultObjectDetectionContactSensorTimeout) * 1000)
+                }
+
                 bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.ContactSensorState, (source, details, data) => {
                     if (!source)
                         return contactState;
@@ -583,7 +593,14 @@ addSupportedType({
                         if (!ed.detections)
                             return contactState;
                         const objects = ed.detections.map(d => d.className);
-                        contactState = objects.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED
+                        if (objects.includes(ojs)) {
+                            contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+                            resetSensorTimeout();
+                        }
+                        else {
+                            contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
+                        }
+
                         return contactState;
                     }
 
