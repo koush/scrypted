@@ -62,6 +62,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   async detectPicture() {
     const picture = await this.realDevice.takePicture();
     const detections = await this.objectDetection.detectObjects(picture, {
+      detectionId: this.detectionId,
       minScore: this.minConfidence,
     });
     this.objectsDetected(detections, true);
@@ -146,6 +147,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
 
     const found: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
     denoiseDetections<ObjectDetectionResult>(this.currentDetections, detections.map(detection => ({
+      id: detection.id,
       name: detection.className,
       detection,
     })), {
@@ -157,7 +159,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       }
     });
     if (found.length) {
-      this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
+      this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
       this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
       if (detectionResult.running)
         this.extendedObjectDetect();
@@ -191,7 +193,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
 
     const found: DenoisedDetectionEntry<FaceRecognitionResult>[] = [];
     denoiseDetections<FaceRecognitionResult>(this.currentPeople, detectionResult.people.map(detection => ({
-      name: detection.id,
+      id: detection.id,
+      name: detection.label,
       detection,
     })), {
       timeout: this.detectionTimeout * 1000,

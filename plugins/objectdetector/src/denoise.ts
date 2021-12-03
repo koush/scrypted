@@ -1,4 +1,5 @@
 export class DenoisedDetectionEntry<T> {
+    id: string;
     name: string;
     detection: T;
     timeout?: NodeJS.Timeout;
@@ -16,7 +17,11 @@ export function denoiseDetections<T>(previousDetections: DenoisedDetectionEntry<
 ) {
     const newAndExisting: DenoisedDetectionEntry<T>[] = [];
     for (const cd of currentDetections) {
-        const index = previousDetections.findIndex(d => d.name === cd.name);
+        let index = -1;
+        if (cd.id)
+            index = previousDetections.findIndex(d => d.id === cd.id);
+        if (index === -1)
+            index = previousDetections.findIndex(d => d.name === cd.name);
         if (index === -1) {
             newAndExisting.push(cd);
             options?.added?.(cd);
@@ -27,7 +32,7 @@ export function denoiseDetections<T>(previousDetections: DenoisedDetectionEntry<
                 clearTimeout(found.timeout);
                 found.timeout = undefined;
             }
-            newAndExisting.push(found);
+            newAndExisting.push(cd);
         }
     }
 

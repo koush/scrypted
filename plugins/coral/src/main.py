@@ -46,11 +46,13 @@ class DetectionSession:
     future: Future
     loop: AbstractEventLoop
     score_threshold: float
+    running: bool
 
     def __init__(self) -> None:
         self.timerHandle = None
         self.future = Future()
         self.tracker = Sort()
+        self.running = False
 
     def cancel(self):
         if self.timerHandle:
@@ -109,13 +111,6 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         tracker_detections = []
 
         for obj in objs:
-            detection: ObjectDetectionResult = {}
-            detection['boundingBox'] = (
-                obj.bbox.xmin, obj.bbox.ymin, obj.bbox.ymax, obj.bbox.ymax)
-            detection['className'] = self.labels.get(obj.id, obj.id)
-            detection['score'] = obj.score
-            detections.append(detection)
-
             element = []  # np.array([])
             element.append(obj.bbox.xmin)
             element.append(obj.bbox.ymin)
@@ -189,28 +184,20 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             duration = session.get('duration', None)
             score_threshold = session.get('minScore', score_threshold)
 
-        if mediaObject and mediaObject.mimeType.startswith('image/'):
-            stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
-            image = Image.open(stream)
-
-            _, scale = common.set_resized_input(
-                self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
-
-            with self.mutex:
-                self.interpreter.invoke()
-                objs = detect.get_objects(
-                    self.interpreter, score_threshold=score_threshold, image_scale=scale)
-
-            return self.create_detection_result(objs, image.size)
-
-        new_session = False
-
-        if not detection_id:
-            detection_id = binascii.b2a_hex(os.urandom(15)).decode('utf8')
+        is_image = mediaObject and mediaObject.mimeType.startswith('image/')
 
         with self.session_mutex:
-            detection_session = self.detection_sessions.get(detection_id, None)
-            if not detection_session:
+            if not is_image and not detection_id:
+                detection_id = binascii.b2a_hex(os.urandom(15)).decode('utf8')
+
+            if detection_id:
+                detection_session = self.detection_sessions.get(detection_id, None)
+
+            if not duration and not is_image:
+                if detection_session:
+                    self.end_session(detection_session)
+                return
+            elif detection_id and not detection_session:
                 if not mediaObject:
                     raise Exception(
                         'session %s inactive and no mediaObject provided' % detection_id)
@@ -221,16 +208,31 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 loop = asyncio.get_event_loop()
                 detection_session.loop = loop
                 self.detection_sessions[detection_id] = detection_session
-                new_session = True
 
                 detection_session.future.add_done_callback(
                     lambda _: self.end_session(detection_session))
-            elif not duration:
-                self.end_session(detection_session)
-                return
 
-        if not duration:
-            return
+        if is_image:
+            stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
+            image = Image.open(stream)
+
+            _, scale = common.set_resized_input(
+                self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
+
+            tracker = None
+            if detection_session:
+                tracker = detection_session.tracker
+
+            with self.mutex:
+                self.interpreter.invoke()
+                objs = detect.get_objects(
+                    self.interpreter, score_threshold=score_threshold, image_scale=scale)
+
+            return self.create_detection_result(objs, image.size, tracker = tracker)
+
+        new_session = not detection_session.running
+        if new_session:
+            detection_session.running = True
 
         detection_session.setTimeout(duration / 1000)
 
