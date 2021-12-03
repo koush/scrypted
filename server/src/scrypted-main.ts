@@ -346,15 +346,22 @@ else {
             }
 
             const waitDebug = new Promise<void>((resolve, reject) => {
-                setTimeout(() => reject(new Error('timed out waiting for debug session')), 10000);
+                setTimeout(() => reject(new Error('timed out waiting for debug session')), 30000);
                 debugServer.on('connection', resolve);
             });
 
             workerInspectPort = Math.round(Math.random() * 10000) + 30000;
-            const pluginHost = await scrypted.installPlugin(plugin, {
-                waitDebug,
-                inspectPort: workerInspectPort,
-            });
+            try {
+                await scrypted.installPlugin(plugin, {
+                    waitDebug,
+                    inspectPort: workerInspectPort,
+                });
+            }
+            catch (e) {
+                res.status(500);
+                res.send(e.toString());
+                return
+            }
 
             res.send({
                 workerInspectPort,

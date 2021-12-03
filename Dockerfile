@@ -1,7 +1,9 @@
 FROM koush/opencv4nodejs
 RUN apt-get -y update
 RUN apt-get -y upgrade
-RUN apt-get -y install libavahi-compat-libdnssd-dev build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+RUN apt-get -y install libavahi-compat-libdnssd-dev build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev python3
+
+RUN pip install aiofiles
 
 WORKDIR /
 COPY . .
