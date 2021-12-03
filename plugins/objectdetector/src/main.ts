@@ -14,6 +14,7 @@ const { mediaManager, systemManager, log } = sdk;
 const defaultMinConfidence = 0.7;
 const defaultDetectionDuration = 60;
 const defaultDetectionInterval = 60;
+const defaultDetectionTimeout = 10;
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
   released = false;
@@ -21,6 +22,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   detections = new Map<string, DetectionInput>();
   realDevice: ScryptedDevice & Camera & VideoCamera & ObjectDetector & MotionSensor;
   minConfidence = parseFloat(this.storage.getItem('minConfidence')) || defaultMinConfidence;
+  detectionTimeout = parseInt(this.storage.getItem('detectionTimeout')) || defaultDetectionTimeout;
   detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
   detectionInterval = parseInt(this.storage.getItem('detectionInterval')) || defaultDetectionInterval;
   detectionIntervalTimeout: NodeJS.Timeout;
@@ -147,6 +149,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       name: detection.className,
       detection,
     })), {
+      timeout: this.detectionTimeout * 1000,
       added: d => found.push(d),
       removed: d => {
         this.console.log('detection no longer present:', d.name)
@@ -155,8 +158,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     });
     if (found.length) {
       this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
-      this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
-      this.extendedObjectDetect();
+      this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
+      if (detectionResult.running)
+        this.extendedObjectDetect();
     }
 
     this.reportObjectDetections(undefined);
@@ -190,6 +194,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       name: detection.id,
       detection,
     })), {
+      timeout: this.detectionTimeout * 1000,
       added: d => found.push(d),
       removed: d => {
         this.console.log('no longer detected', d.name)
@@ -277,6 +282,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         type: 'number',
         value: this.detectionInterval.toString(),
       },
+      {
+        title: 'Detection Timeout',
+        description: 'Timeout in seconds before removing an object that is no longer detected.',
+        key: 'detectionTimeout',
+        type: 'number',
+        value: this.detectionTimeout.toString(),
+      },
     ];
   }
 
@@ -291,6 +303,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     }
     else if (key === 'detectionInterval') {
       this.detectionInterval = parseInt(vs) || defaultDetectionInterval;
+    }
+    else if (key === 'detectionTimeout') {
+      this.detectionTimeout = parseInt(vs) || defaultDetectionTimeout;
     }
     else if (key === 'objectDetection') {
       this.bindObjectDetection();

@@ -5,8 +5,9 @@ export class DenoisedDetectionEntry<T> {
 }
 
 export interface DenoisedDetectionOptions<T> {
-    added?: (detection: DenoisedDetectionEntry<T>) => void
-    removed?: (detection: DenoisedDetectionEntry<T>) => void
+    added?: (detection: DenoisedDetectionEntry<T>) => void;
+    removed?: (detection: DenoisedDetectionEntry<T>) => void;
+    timeout?: number;
 }
 
 export function denoiseDetections<T>(previousDetections: DenoisedDetectionEntry<T>[],
@@ -38,7 +39,7 @@ export function denoiseDetections<T>(previousDetections: DenoisedDetectionEntry<
                 if (index !== -1)
                     previousDetections.splice(index, 1);
                 options?.removed?.(cd);
-            }, 10000);
+            }, options?.timeout || 10000);
         }
     }
 
