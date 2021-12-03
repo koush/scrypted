@@ -6,11 +6,11 @@ from safe_set_result import safe_set_result
 import scrypted_sdk
 import numpy as np
 import re
-from pycoral.utils.dataset import read_label_file
+import tflite_runtime.interpreter as tflite
 from pycoral.utils.edgetpu import make_interpreter
+from pycoral.utils.edgetpu import list_edge_tpus
 from pycoral.utils.edgetpu import run_inference
 from pycoral.adapters.common import input_size
-from pycoral.adapters.classify import get_classes
 from pycoral.adapters import detect
 from PIL import Image
 import common
@@ -24,23 +24,9 @@ import binascii
 from urllib.parse import urlparse
 from gi.repository import Gst
 import multiprocessing
-import collections
+from third_party.sort import Sort
 
 from scrypted_sdk.types import FFMpegInput, Lock, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
-from scrypted_sdk import print
-
-
-def avg_fps_counter(window_size):
-    window = collections.deque(maxlen=window_size)
-    prev = time.monotonic()
-    yield 0.0  # First fps value.
-
-    while True:
-        curr = time.monotonic()
-        window.append(curr - prev)
-        prev = curr
-        yield len(window) / sum(window)
-
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -56,13 +42,15 @@ def parse_label_contents(contents: str):
 
 class DetectionSession:
     id: str
-    timerHandle: TimerHandle = None
+    timerHandle: TimerHandle
     future: Future
     loop: AbstractEventLoop
     score_threshold: float
 
     def __init__(self) -> None:
+        self.timerHandle = None
         self.future = Future()
+        self.tracker = Sort()
 
     def cancel(self):
         if self.timerHandle:
@@ -86,9 +74,15 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         labels_contents = scrypted_sdk.zip.open(
             'fs/coco_labels.txt').read().decode('utf8')
         self.labels = parse_label_contents(labels_contents)
-        model = scrypted_sdk.zip.open(
-            'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
-        self.interpreter = make_interpreter(model)
+        edge_tpus = list_edge_tpus()
+        if len(edge_tpus):
+            model = scrypted_sdk.zip.open(
+                'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
+            self.interpreter = make_interpreter(model)
+        else:
+            model = scrypted_sdk.zip.open(
+            'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
+            self.interpreter = tflite.Interpreter(model_content=model)
         self.interpreter.allocate_tensors()
         self.mutex = multiprocessing.Lock()
 
@@ -106,14 +100,13 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         ret.append(d)
         return ret
 
-    def create_detection_result(self, size, score_threshold, scale):
-        objs = detect.get_objects(
-            self.interpreter, score_threshold=score_threshold, image_scale=scale)
-
+    def create_detection_result(self, objs, size, tracker: Sort = None):
         detections = list[ObjectDetectionResult]()
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = size
+
+        tracker_detections = []
 
         for obj in objs:
             detection: ObjectDetectionResult = {}
@@ -122,6 +115,50 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             detection['className'] = self.labels.get(obj.id, obj.id)
             detection['score'] = obj.score
             detections.append(detection)
+
+            element = []  # np.array([])
+            element.append(obj.bbox.xmin)
+            element.append(obj.bbox.ymin)
+            element.append(obj.bbox.xmax)
+            element.append(obj.bbox.ymax)
+            element.append(obj.score)  # print('element= ',element)
+            tracker_detections.append(element)
+
+        tracker_detections = np.array(tracker_detections)
+        trdata = []
+        trackerFlag = False
+        if tracker and tracker_detections.any():
+            trdata = tracker.update(tracker_detections)
+            trackerFlag = True
+
+        if trackerFlag and (np.array(trdata)).size:
+            for td in trdata:
+                x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
+                ), td[2].item(), td[3].item(), td[4].item()
+                overlap = 0
+                for ob in objs:
+                    dx0, dy0, dx1, dy1 = ob.bbox.xmin, ob.bbox.ymin, ob.bbox.xmax, ob.bbox.ymax
+                    area = (min(dx1, x1)-max(dx0, x0)) * \
+                        (min(dy1, y1)-max(dy0, y0))
+                    if (area > overlap):
+                        overlap = area
+                        obj = ob
+
+                detection: ObjectDetectionResult = {}
+                detection['id'] = str(trackID)
+                detection['boundingBox'] = (
+                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.ymax, obj.bbox.ymax)
+                detection['className'] = self.labels.get(obj.id, obj.id)
+                detection['score'] = obj.score
+                detections.append(detection)
+        else:
+            for obj in objs:
+                detection: ObjectDetectionResult = {}
+                detection['boundingBox'] = (
+                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.ymax, obj.bbox.ymax)
+                detection['className'] = self.labels.get(obj.id, obj.id)
+                detection['score'] = obj.score
+                detections.append(detection)
 
         return detection_result
 
@@ -151,7 +188,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             detection_id = session.get('detectionId', -float('inf'))
             duration = session.get('duration', None)
             score_threshold = session.get('minScore', score_threshold)
-            
+
         if mediaObject and mediaObject.mimeType.startswith('image/'):
             stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
             image = Image.open(stream)
@@ -161,8 +198,10 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
             with self.mutex:
                 self.interpreter.invoke()
+                objs = detect.get_objects(
+                    self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
-            return self.create_detection_result(image.size, score_threshold, scale)
+            return self.create_detection_result(objs, image.size)
 
         new_session = False
 
@@ -173,7 +212,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             detection_session = self.detection_sessions.get(detection_id, None)
             if not detection_session:
                 if not mediaObject:
-                    raise Exception('session %s inactive and no mediaObject provided' % detection_id)
+                    raise Exception(
+                        'session %s inactive and no mediaObject provided' % detection_id)
 
                 detection_session = DetectionSession()
                 detection_session.id = detection_id
@@ -216,19 +256,17 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         w, h = (size['width'], size['height'])
         scale = min(width / w, height / h)
 
-        fps_counter = avg_fps_counter(30)
-
         def user_callback(input_tensor, src_size, inference_box):
-            nonlocal fps_counter
-
             with self.mutex:
                 run_inference(self.interpreter, input_tensor)
+                objs = detect.get_objects(
+                    self.interpreter, score_threshold=score_threshold, image_scale=(scale, scale))
 
             # (result, mapinfo) = input_tensor.map(Gst.MapFlags.READ)
 
             try:
-                detection_result = self.create_detection_result(
-                    src_size, score_threshold, (scale, scale))
+                detection_result = self.create_detection_result(objs,
+                                                                src_size, detection_session.tracker)
                 # self.detection_event(detection_session, detection_result, mapinfo.data.tobytes())
                 self.detection_event(detection_session, detection_result)
 

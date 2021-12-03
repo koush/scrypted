@@ -1,6 +1,14 @@
+--extra-index-url https://google-coral.github.io/py-repo/
+
+# plugin
 numpy==1.21.4
 Pillow==8.4.0
 pycairo==1.20.1
 pycoral==2.0.0
 PyGObject==3.42.0
 tflite-runtime==2.5.0.post1
+
+# SORT tracker
+filterpy==1.4.5
+scikit-image==0.18.3
+lap==0.4.0

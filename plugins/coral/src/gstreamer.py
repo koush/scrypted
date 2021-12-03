@@ -188,7 +188,7 @@ def run_pipeline(finished,
         src_caps=src_caps, sink_caps=sink_caps,
         sink_element=SINK_ELEMENT, scale_caps=scale_caps)
 
-    print('Gstreamer pipeline:\n', pipeline)
+    # print('Gstreamer pipeline:\n', pipeline)
 
     pipeline = GstPipeline(finished, pipeline, user_function, src_size)
     return pipeline
