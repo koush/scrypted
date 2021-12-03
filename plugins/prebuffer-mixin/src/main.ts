@@ -430,7 +430,7 @@ class PrebufferSession {
       )
     }
 
-    this.console.log('prebuffer ffmpeg input', ffmpegInput);
+    // this.console.log('prebuffer ffmpeg input', ffmpegInput);
     const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
     return mo;
   }
@@ -495,7 +495,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
         (async () => {
           while (this.sessions.get(id) === session && !this.released) {
-            this.console.log('monitoring prebuffer session');
             session.ensurePrebufferSession();
             try {
               const ps = await session.parserSessionPromise;
