@@ -3,6 +3,7 @@ from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
 import os
 from os import sys
+from sys import stderr, stdout
 more = os.path.join(os.getcwd(), 'node_modules/@scrypted/sdk')
 sys.path.insert(0, more)
 import scrypted_python.scrypted_sdk
@@ -164,13 +165,14 @@ class PluginRemote:
 
         if 'requirements.txt' in zip.namelist():
             requirements = zip.open('requirements.txt').read()
-            str_requirements = requirements.decode('utf8');
+            str_requirements = requirements.decode('utf8')
 
             requirementstxt = os.path.join(python_modules, 'requirements.txt')
+            installed_requirementstxt = os.path.join(python_modules, 'installed-requirements.txt')
 
             need_pip = True
             try:
-                existing = open(requirementstxt).read()
+                existing = open(installed_requirementstxt).read()
                 need_pip = existing != str_requirements
             except:
                 pass
@@ -184,8 +186,21 @@ class PluginRemote:
                 f.close()
 
                 # os.system('pip install -r %s --target %s' % (requirementstxt, python_modules))
-                result = subprocess.check_output(['pip', 'install', '-r', requirementstxt, '--target', python_modules], stderr=subprocess.STDOUT, text=True)
-                print(result)
+                p = subprocess.Popen(['pip', 'install', '-r', requirementstxt, '--target', python_modules], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                while True:
+                    line = p.stdout.readline()
+                    if not line:
+                        break
+                    line = line.decode('utf8').rstrip('\r\n')
+                    print(line)
+                result = p.wait()
+                print('pip install result %s' % result)
+                if result:
+                    raise Exception('non-zero result from pip %s' % result)
+
+                f = open(installed_requirementstxt, 'wb')
+                f.write(requirements)
+                f.close()
             else:
                 print('requirements.txt (up to date)')
                 print(str_requirements)
