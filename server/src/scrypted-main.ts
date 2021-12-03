@@ -63,19 +63,10 @@ else {
         })
     }
 
-    const debuggers = new Map<number, net.Socket[]>();
     const debugServer = net.createServer(async (socket) => {
         if (!workerInspectPort) {
             socket.destroy();
             return;
-        }
-
-        const entry = debuggers.get(workerInspectPort);
-        if (!entry) {
-            debuggers.set(workerInspectPort, [socket]);
-        }
-        else {
-            entry.push(socket);
         }
 
         for (let i = 0; i < 10; i++) {
@@ -83,23 +74,8 @@ else {
                 const target = await doconnect();
                 socket.pipe(target).pipe(socket);
                 const destroy = () => {
-                    socket.end();
                     socket.destroy();
-                    target.end();
                     target.destroy();
-
-                    if (!entry) {
-                        const sockets = debuggers.get(workerInspectPort);
-                        if (!debuggers.delete(workerInspectPort))
-                            return;
-                        setTimeout(() => {
-                            if (debuggers.has(workerInspectPort))
-                                return;
-                            for (const s of sockets) {
-                                s.destroy();
-                            }
-                        }, 500)
-                    }
                 }
                 socket.on('error', destroy);
                 target.on('error', destroy);
