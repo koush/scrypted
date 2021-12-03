@@ -23,7 +23,6 @@
                     "localRoot": "${workspaceFolder}/src",
                     "remoteRoot": "${config:scrypted.pythonRemoteRoot}"
                 },
-
             ]
         }
     ]

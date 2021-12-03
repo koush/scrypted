@@ -12,11 +12,11 @@
       "scrypted-webpack": "scrypted-webpack"
    },
    "scrypted": {
-      "name": "Python Light",
+      "name": "Python DeviceProvider",
       "runtime": "python",
-      "type": "Light",
+      "type": "DeviceProvider",
       "interfaces": [
-         "OnOff"
+         "DeviceProvider"
       ]
    },
    "dependencies": {
