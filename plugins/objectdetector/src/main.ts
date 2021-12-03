@@ -65,7 +65,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       detectionId: this.detectionId,
       minScore: this.minConfidence,
     });
-    this.objectsDetected(detections, true);
+    this.objectsDetected(detections);
   }
 
   bindObjectDetection() {
@@ -107,19 +107,18 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     });
   }
 
-  reportObjectDetections(detectionInput?: DetectionInput) {
-    const detectionId = Math.random().toString();
+  reportObjectDetections(detections: ObjectDetectionResult[], detectionInput?: DetectionInput) {
     const detection: ObjectsDetected = {
       timestamp: Date.now(),
-      detectionId: detectionInput ? detectionId : undefined,
+      detectionId: detectionInput ? this.detectionId : undefined,
       inputDimensions: detectionInput
         ? [detectionInput?.input.shape[1], detectionInput?.input.shape[0]]
         : undefined,
-      detections: this.currentDetections.map(d => d.detection),
+      detections,
     }
 
     if (detectionInput)
-      this.setDetection(detectionId, detectionInput);
+      this.setDetection(this.detectionId, detectionInput);
 
     this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
@@ -136,7 +135,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     }
   }
 
-  async objectsDetected(detectionResult: ObjectsDetected, idle?: boolean) {
+  async objectsDetected(detectionResult: ObjectsDetected) {
     this.resetDetectionTimeout();
     if (!detectionResult?.detections) {
       // detection session ended.
@@ -154,8 +153,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       timeout: this.detectionTimeout * 1000,
       added: d => found.push(d),
       removed: d => {
-        this.console.log('detection no longer present:', d.name)
-        this.reportObjectDetections()
+        this.console.log('expired detection:', `${d.detection.className} (${d.detection.score}, ${d.detection.id})`);
+        if (detectionResult.running)
+          this.extendedObjectDetect();
       }
     });
     if (found.length) {
@@ -165,7 +165,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         this.extendedObjectDetect();
     }
 
-    this.reportObjectDetections(undefined);
+    this.reportObjectDetections(detectionResult.detections, undefined);
   }
 
   reportPeopleDetections(faces?: ObjectDetectionResult[], detectionInput?: DetectionInput) {
