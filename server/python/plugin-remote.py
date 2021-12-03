@@ -1,10 +1,12 @@
 from __future__ import annotations
+from asyncio.futures import Future
+from asyncio.streams import StreamReader, StreamWriter
 import os
 from os import sys
 more = os.path.join(os.getcwd(), 'node_modules/@scrypted/sdk')
 sys.path.insert(0, more)
 import scrypted_python.scrypted_sdk
-from scrypted_python.scrypted_sdk.types import MediaManager, MediaObject, ScryptedInterfaceProperty
+from scrypted_python.scrypted_sdk.types import DeviceManifest, MediaManager, MediaObject, ScryptedInterfaceProperty
 
 from collections.abc import Mapping
 from genericpath import exists
@@ -13,7 +15,7 @@ import asyncio
 from asyncio.events import AbstractEventLoop
 import json
 import aiofiles
-from typing import TypedDict
+from typing import Tuple, TypedDict
 import base64
 import time
 import zipfile
@@ -50,9 +52,9 @@ class DeviceState(scrypted_python.scrypted_sdk.DeviceState):
 
     def setScryptedProperty(self, property: str, value: Any):
         if property == ScryptedInterfaceProperty.id.value:
-            raise Exception("id is read only");
+            raise Exception("id is read only")
         if property == ScryptedInterfaceProperty.mixins.value:
-            raise Exception("mixins is read only");
+            raise Exception("mixins is read only")
         if property == ScryptedInterfaceProperty.interfaces.value:
             raise Exception("interfaces is a read only post-mixin computed property, use providedInterfaces");
 
@@ -65,6 +67,11 @@ class DeviceState(scrypted_python.scrypted_sdk.DeviceState):
 
         self.systemManager.api.setState(self.nativeId, property, value)
 
+
+class DeviceStorage:
+    id: str
+    nativeId: str
+    storage: Mapping[str, str] = {}
 
 class DeviceManager(scrypted_python.scrypted_sdk.DeviceManager):
     def __init__(self, nativeIds: Mapping[str, DeviceStorage], systemManager: SystemManager) -> None:
@@ -80,6 +87,9 @@ class DeviceManager(scrypted_python.scrypted_sdk.DeviceManager):
     async def onDeviceEvent(self, nativeId: str, eventInterface: str, eventData: Any = None) -> None:
         await self.systemManager.api.onDeviceEvent(nativeId, eventInterface, eventData)
 
+    async def onDevicesChanged(self, devices: DeviceManifest) -> None:
+        return await self.systemManager.api.onDevicesChanged(devices)
+
 
 class BufferSerializer(rpc.RpcSerializer):
     def serialize(self, value):
@@ -88,20 +98,13 @@ class BufferSerializer(rpc.RpcSerializer):
     def deserialize(self, value):
         return base64.b64decode(value)
 
-
-class DeviceStorage:
-    id: str
-    nativeId: str
-    storage: Mapping[str, str] = {}
-
-
 class PluginRemote:
     systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
     nativeIds: Mapping[str, DeviceStorage] = {}
     pluginId: str
     mediaManager: MediaManager
     loop: AbstractEventLoop
-    consoles: Mapping[str, StringIO] = {}
+    consoles: Mapping[str, Future[Tuple[StreamReader, StreamWriter]]] = {}
 
     def __init__(self, api, pluginId, loop: AbstractEventLoop):
         self.api = api
@@ -115,14 +118,36 @@ class PluginRemote:
             'setNativeId',
         ]
 
-    def print(self, nativeId: str, *values: object, sep: Optional[str] = ...,
-            end: Optional[str] = ...,
-            flush: bool = ...,):
-        console = self.consoles.get(nativeId)
-        if not console:
-            console = StringIO()
-            self.consoles[nativeId] = console
-        print(*values, sep = sep, end = end, file = console, flush = flush)
+    async def print_async(self, nativeId: str, *values: object, sep: Optional[str] = ' ',
+            end: Optional[str] = '\n',
+            flush: bool = False,):
+        consoleFuture = self.consoles.get(nativeId)
+        if not consoleFuture:
+            consoleFuture = Future()
+            self.consoles[nativeId] = consoleFuture
+            plugins = await self.api.getComponent('plugins')
+            port = await plugins.getRemoteServicePort(self.pluginId, 'console-writer')
+            connection = await asyncio.open_connection(port = port)
+            _, writer = connection
+            if not nativeId:
+                nid = 'undefined'
+            else:
+                nid = nativeId
+            nid += '\n'
+            writer.write(nid.encode('utf8'))
+            consoleFuture.set_result(connection)
+        _, writer = await consoleFuture
+        strio = StringIO()
+        print(*values, sep=sep, end=end, flush=flush, file=strio)
+        strio.seek(0)
+        b = strio.read().encode('utf8')
+        writer.write(b)
+
+
+    def print(self, nativeId: str, *values: object, sep: Optional[str] = ' ',
+            end: Optional[str] = '\n',
+            flush: bool = False,):
+        asyncio.run_coroutine_threadsafe(self.print_async(nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
     async def loadZip(self, packageJson, zipData, options=None):
         zipPath = options['filename']
