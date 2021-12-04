@@ -16,6 +16,3 @@
 [submodule "external/axios-digest-auth"]
 	path = external/axios-digest-auth
 	url = git@github.com:koush/axios-digest-auth
-[submodule "external/sort"]
-	path = external/sort
-	url = git@github.com:koush/sort.git
