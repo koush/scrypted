@@ -1,21 +1,21 @@
-FROM koush/opencv4nodejs
+FROM koush/node-16-bullseye-opencv
 
-# edge TPU
+# Coral Edge TPU sources.list
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 
 RUN apt-get -y update
 RUN apt-get -y upgrade
+RUN apt-get -y install software-properties-common
+RUN apt-get -y update
 
-RUN apt-get -y install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
-
+# base development stuff
 RUN apt-get -y install \
     build-essential \
     gcc \
     gir1.2-gtk-3.0 \
     libavahi-compat-libdnssd-dev \
     libcairo2-dev \
-    libedgetpu1-std \
     libgirepository1.0-dev \
     libglib2.0-dev \
     libjpeg-dev \
@@ -23,8 +23,11 @@ RUN apt-get -y install \
     libopenjp2-7 \
     libpango1.0-dev \
     librsvg2-dev \
-    pkg-config \
-    python3 \
+    pkg-config
+
+# python native
+RUN apt-get -y install \
+    python3.9 \
     python3-dev \
     python3-matplotlib \
     python3-numpy \
@@ -32,11 +35,24 @@ RUN apt-get -y install \
     python3-gi \
     python3-gst-1.0
 
+# python pip
 RUN python3 -m pip install aiofiles debugpy
 
-WORKDIR /
-COPY . .
+# gstreamer native
+RUN apt-get -y install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
 
+# Coral Edge TPU
+RUN apt-get -y install libedgetpu1-std
+
+# opencv
+# RUN apt-get -y install libopencv-dev
+# sanity check
+# RUN pkg-config opencv4 --libs
+
+# sanity check
+RUN python3.9 -v
+
+# TODO: I don't think this even works anymore on latest raspbian. should maybe switch to v4l2.
 # grab raspbian (omx) ffmpeg, since we don't know at build time whether this is
 # a raspbian system.
 RUN mkdir -p /raspbian && cd /raspbian \
@@ -45,10 +61,7 @@ RUN mkdir -p /raspbian && cd /raspbian \
     && rm ffmpeg-raspbian-armv6l.tar.gz
 ENV SCRYPTED_RASPBIAN_FFMPEG_PATH="/raspbian/usr/local/bin/ffmpeg"
 
-WORKDIR /server
-RUN npm install
-RUN npm run build
-
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"
-CMD npm run serve-no-build
+ENV SCRYPTED_VOLUME=/server/volume
+
