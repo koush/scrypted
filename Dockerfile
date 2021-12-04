@@ -1,4 +1,4 @@
-FROM koush/opencv4nodejs
+FROM koush/node-opencv
 
 # edge TPU
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
