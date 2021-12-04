@@ -35,7 +35,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build and push Docker image
+      - name: Build and push Docker image (scrypted-common)
         uses: docker/build-push-action@v2
         with:
           build-args: GITHUB_SHA=${{ env.GITHUB_SHA }}
@@ -47,7 +47,7 @@ jobs:
             koush/scrypted-common:latest
             ghcr.io/koush/scrypted-common:latest
       
-      - name: Build and push Docker image
+      - name: Build and push Docker image (scrypted)
         uses: docker/build-push-action@v2
         with:
           build-args: GITHUB_SHA=${{ env.GITHUB_SHA }}
