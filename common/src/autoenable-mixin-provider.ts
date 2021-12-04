@@ -35,6 +35,10 @@ export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
         }
     }
 
+    async shouldEnableMixin(device: ScryptedDevice) {
+        return true;
+    }
+
     async maybeEnableMixin(device: ScryptedDevice) {
         if (!device || device.mixins?.includes(this.id))
             return;
@@ -46,6 +50,9 @@ export abstract class AutoenableMixinProvider extends ScryptedDeviceBase {
         if (!match)
             return;
 
+        if (!await this.shouldEnableMixin(device))
+            return;
+            
         this.log.i('auto enabling mixin for ' + device.name)
         const mixins = (device.mixins || []).slice();
         mixins.push(this.id);
