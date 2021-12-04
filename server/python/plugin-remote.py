@@ -159,16 +159,16 @@ class PluginRemote:
 
         zip = zipfile.ZipFile(zipPath)
 
-        python_modules = os.path.join(os.environ.get('SCRYPTED_PLUGIN_VOLUME'), 'python', 'modules')
-        if not os.path.exists(python_modules):
-            os.makedirs(python_modules)
+        python_prefix = os.path.join(os.environ.get('SCRYPTED_PLUGIN_VOLUME'), 'python')
+        if not os.path.exists(python_prefix):
+            os.makedirs(python_prefix)
 
         if 'requirements.txt' in zip.namelist():
             requirements = zip.open('requirements.txt').read()
             str_requirements = requirements.decode('utf8')
 
-            requirementstxt = os.path.join(python_modules, 'requirements.txt')
-            installed_requirementstxt = os.path.join(python_modules, 'installed-requirements.txt')
+            requirementstxt = os.path.join(python_prefix, 'requirements.txt')
+            installed_requirementstxt = os.path.join(python_prefix, 'installed-requirements.txt')
 
             need_pip = True
             try:
@@ -185,8 +185,7 @@ class PluginRemote:
                 f.write(requirements)
                 f.close()
 
-                # os.system('pip install -r %s --target %s' % (requirementstxt, python_modules))
-                p = subprocess.Popen(['pip', 'install', '-r', requirementstxt, '--target', python_modules], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                p = subprocess.Popen(['pip', 'install', '-r', requirementstxt, '--prefix', python_prefix], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 while True:
                     line = p.stdout.readline()
                     if not line:
@@ -206,7 +205,8 @@ class PluginRemote:
                 print(str_requirements)
 
         sys.path.insert(0, zipPath)
-        sys.path.insert(0, python_modules)
+        site_packages = os.path.join(python_prefix, 'lib/python3.9/site-packages')
+        sys.path.insert(0, site_packages)
         from scrypted_sdk import sdk_init # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
