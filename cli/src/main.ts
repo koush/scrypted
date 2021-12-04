@@ -7,7 +7,7 @@ import util from 'util';
 import readline, { BasicOptions } from 'readline-sync';
 import https from 'https';
 import mkdirp from 'mkdirp';
-import { serveMain } from './service';
+import { cwdInstallDir, getInstallDir, getRunServerArguments, installServe, runServer, serveMain } from './service';
 
 function getUserHome() {
     const ret = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
@@ -70,8 +70,25 @@ async function main() {
     if (process.argv[2] === 'serve') {
         await serveMain(false);
     }
-    if (process.argv[2] === 'serve@latest') {
+    else if (process.argv[2] === 'serve@latest') {
         await serveMain(true);
+    }
+    else if (process.argv[2] === 'install-server') {
+        const installDir = await installServe();
+        console.log('server installation successful:', installDir);
+    }
+    else if (process.argv[2] === 'run-server') {
+        cwdInstallDir();
+        await runServer();
+    }
+    else if (process.argv[2] === 'create-run-server-script') {
+        if (!process.argv[3])
+            throw new Error('no output file specified');
+        const args = getRunServerArguments();
+        const node = process.argv[0];
+        const script = `cd ${getInstallDir()} && ${node} ${args.join(' ')}\n`;
+        fs.writeFileSync(process.argv[3], script);
+        console.log(script);
     }
     else if (process.argv[2] === 'login') {
         const ip = process.argv[3] || '127.0.0.1';

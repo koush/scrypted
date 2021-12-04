@@ -31,27 +31,50 @@ async function runCommandEatError(command: string, ...args: string[]) {
     }
 }
 
+export function getRunServerArguments() {
+    return ['--expose-gc', 'node_modules/@scrypted/server/dist/scrypted-main.js'];
+}
+
+export async function runServer() {
+    console.log('Starting scrypted main...');
+    await runCommand(process.argv[0], ...getRunServerArguments());
+}
+
 async function startServer() {
     try {
-        console.log('Starting scrypted main...');
-        await runCommand(process.argv[0], '--expose-gc', 'node_modules/@scrypted/server/dist/scrypted-main.js');
+        await runServer();
     }
     catch (e) {
         console.error('scrypted server exited with error', e);
     }
 }
 
-export async function serveMain(install: boolean) {
-    const installDir = path.join(os.homedir(), '.scrypted');
+export function getInstallDir() {
+    return path.join(os.homedir(), '.scrypted');
+}
+
+export function cwdInstallDir(): { volume: string, installDir: string } {
+    const installDir = getInstallDir();
     const volume = path.join(installDir, 'volume');
     mkdirp.sync(volume);
     process.chdir(installDir);
+    return { volume, installDir };
+}
+
+export async function installServe() {
+    const { installDir } = cwdInstallDir();
+    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
+    return installDir;
+}
+
+export async function serveMain(install: boolean) {
+    const { installDir, volume } = cwdInstallDir();
     if (!fs.existsSync('node_modules/@scrypted/server')) {
         install = true;
         console.log('Package @scrypted/server not found. Installing.');
     }
     if (install) {
-        await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
+        await installServe();
     }
 
     process.env.SCRYPTED_NPM_SERVE = 'true';
