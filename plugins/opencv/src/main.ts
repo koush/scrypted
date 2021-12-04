@@ -1,5 +1,5 @@
 
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, MotionSensor } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, MotionSensor, ScryptedDevice } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
@@ -34,10 +34,6 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
 
     this.area = parseInt(localStorage.getItem('area')) || defaultArea;
     this.threshold = parseInt(localStorage.getItem('threshold')) || defaultThreshold;
-    if (this.providedInterfaces.includes(ScryptedInterface.MotionSensor)) {
-      log.a(`${this.name} has a built in MotionSensor. OpenCV motion processing cancelled. Pleaes disable this extension.`);
-      return;
-    }
 
     // to prevent noisy startup/reload/shutdown, delay the prebuffer starting.
     this.console.log('session starting in 5 seconds');
@@ -198,6 +194,16 @@ class OpenCVMixin extends SettingsMixinDeviceBase<VideoCamera> implements Motion
     }
 
 
+    if (this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor)) {
+      settings.push({
+        title: 'Existing Motion Sensor',
+        description: 'This camera has a built in motion sensor. Using OpenCV Motion Sensing may be unnecessary and will use additional CPU.',
+        readonly: true,
+        value: 'WARNING',
+        key: 'existingMotionSensor',
+      })
+    }
+
     if (msos?.length) {
       settings.push({
         title: 'Motion Stream',
@@ -266,11 +272,14 @@ class OpenCVProvider extends AutoenableMixinProvider implements MixinProvider {
         continue;
       device.getVideoStreamOptions();
     }
+  }
 
+  async shouldEnableMixin(device: ScryptedDevice) {
+    return !device.interfaces.includes(ScryptedInterface.MotionSensor);
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-    if (!interfaces.includes(ScryptedInterface.VideoCamera) || interfaces.includes(ScryptedInterface.MotionSensor))
+    if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
     return [ScryptedInterface.MotionSensor, ScryptedInterface.Settings];
   }
