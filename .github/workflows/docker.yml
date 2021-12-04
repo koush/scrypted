@@ -56,5 +56,5 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            koush/scrypted:latest
-            ghcr.io/koush/scrypted:latest
+            koush/scrypted:test
+            ghcr.io/koush/scrypted:test
