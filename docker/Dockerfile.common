@@ -41,7 +41,7 @@ RUN apt-get -y install \
 RUN python3 -m pip install aiofiles debugpy
 
 # gstreamer native
-RUN apt-get -y install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
+RUN apt-get -y install gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
 
 # Coral Edge TPU
 RUN apt-get -y install libedgetpu1-std
