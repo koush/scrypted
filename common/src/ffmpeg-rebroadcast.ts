@@ -86,7 +86,8 @@ export async function parseAudioCodec(cp: ChildProcess) {
 
 export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options: FFMpegRebroadcastOptions): Promise<FFMpegRebroadcastSession> {
     let clients = 0;
-    let timeout: any;
+    let dataTimeout: NodeJS.Timeout;
+    let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;
     let isActive = true;
     const events = new EventEmitter();
     const { console } = options;
@@ -94,6 +95,13 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
     let inputAudioCodec: string;
     let inputVideoCodec: string;
     let inputVideoResolution: string[];
+
+    let resolve: any;
+    let reject: any;
+    const socketPromise = new Promise((r, rj) => {
+        resolve = r;
+        reject = rj;
+    });
 
     function kill() {
         if (isActive) {
@@ -105,13 +113,16 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
         for (const server of servers) {
             server?.close();
         }
+        reject(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
+        clearTimeout(dataTimeout);
+        clearTimeout(ffmpegIncomingConnectionTimeout);
     }
 
     function resetActivityTimer() {
         if (!options.timeout)
             return;
-        clearTimeout(timeout);
-        timeout = setTimeout(kill, options.timeout);
+        clearTimeout(dataTimeout);
+        dataTimeout = setTimeout(kill, options.timeout);
     }
 
     resetActivityTimer();
@@ -122,13 +133,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
     const servers = [];
 
-    let resolve: any;
-    let reject: any;
-    const socketPromise = new Promise((r, rj) => {
-        resolve = r;
-        reject = rj;
-    });
-    setTimeout(() => reject(new Error('timed out waiting for incoming initiate ffmpeg tcp connection')), 10000);
+    ffmpegIncomingConnectionTimeout = setTimeout(() => reject(new Error('timed out waiting for incoming initiate ffmpeg tcp connection')), 30000);
 
     for (const container of Object.keys(options.parsers)) {
         const parser = options.parsers[container];
@@ -139,7 +144,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
             const {server: rebroadcast, port: rebroadcastPort } = await createRebroadcaster({
                 connect: (writeData, destroy) => {
                     clients++;
-                    clearTimeout(timeout);
+                    clearTimeout(dataTimeout);
 
                     const cleanup = () => {
                         events.removeListener(eventName, writeData);
