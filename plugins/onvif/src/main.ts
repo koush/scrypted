@@ -22,7 +22,7 @@ function computeBitrate(bitrate: number) {
 function convertAudioCodec(codec: string) {
     if (codec === 'MP4A-LATM')
         return 'aac';
-    return codec;
+    return codec?.toLowerCase();
 }
 
 class OnvifCamera extends RtspSmartCamera {

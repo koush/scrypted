@@ -23,7 +23,7 @@ const OTHER_AUDIO = 'Other Audio';
 const OTHER_AUDIO_DESCRIPTION = `${OTHER_AUDIO} (Transcode)`;
 const PCM_AUDIO = 'PCM or G.711 Audio';
 const PCM_AUDIO_DESCRIPTION = `${PCM_AUDIO} (Copy, Unstable)`;
-const compatibleAudio = ['aac', 'mp3', 'mp2', '', undefined, null];
+const compatibleAudio = ['aac', 'mp3', 'mp2', 'AAC', 'MP3', 'MP2', '', undefined, null];
 
 interface PrebufferStreamChunk {
   chunk: StreamChunk;
@@ -267,7 +267,7 @@ class PrebufferSession {
         // and then it will automatically restart with pcm handling.
       }
     }
-    else if (session.inputAudioCodec !== 'aac') {
+    else if (session.inputAudioCodec?.toLowerCase() !== 'aac') {
       this.console.error('Detected audio codec was not AAC.', session.inputAudioCodec);
       if (!legacyAudio) {
         log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable MP2/MP3 Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
