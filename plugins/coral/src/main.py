@@ -79,6 +79,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             'fs/coco_labels.txt').read().decode('utf8')
         self.labels = parse_label_contents(labels_contents)
         edge_tpus = list_edge_tpus()
+        print('edge tpu', edge_tpus)
         if len(edge_tpus):
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
@@ -188,6 +189,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         is_image = mediaObject and mediaObject.mimeType.startswith('image/')
 
+        ending = False
         with self.session_mutex:
             if not is_image and not detection_id:
                 detection_id = binascii.b2a_hex(os.urandom(15)).decode('utf8')
@@ -196,9 +198,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection_session = self.detection_sessions.get(detection_id, None)
 
             if not duration and not is_image:
-                if detection_session:
-                    self.end_session(detection_session)
-                return
+                ending = True
             elif detection_id and not detection_session:
                 if not mediaObject:
                     raise Exception(
@@ -213,6 +213,11 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
                 detection_session.future.add_done_callback(
                     lambda _: self.end_session(detection_session))
+
+        if ending:
+            if detection_session:
+                self.end_session(detection_session)
+            return
 
         if is_image:
             stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
