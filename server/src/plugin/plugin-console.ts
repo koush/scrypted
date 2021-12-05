@@ -4,40 +4,67 @@ import { listenZero } from './listen-zero';
 import { Server } from 'net';
 import { once } from 'events';
 import net from 'net'
-import { Readable } from 'stream';
+import { Readable, PassThrough } from 'stream';
+import { Console } from 'console';
 
 export interface ConsoleServer {
+    pluginConsole: Console;
     readPort: number,
     writePort: number,
     readServer: net.Server,
     writeServer: net.Server,
     sockets: Set<net.Socket>;
 }
-export async function createConsoleServer(stdout: Readable, stderr: Readable) {
-    const outputs = new Map<string, Buffer[]>();
-    const appendOutput = (data: Buffer, nativeId: ScryptedNativeId) => {
+
+export interface StdPassThroughs {
+    stdout: PassThrough;
+    stderr: PassThrough;
+    buffers: Buffer[];
+}
+
+export async function createConsoleServer(remoteStdout: Readable, remoteStderr: Readable) {
+    const outputs = new Map<string, StdPassThroughs>();
+
+    const getPassthroughs = (nativeId?: ScryptedNativeId) => {
         if (!nativeId)
             nativeId = undefined;
-        let buffers = outputs.get(nativeId);
-        if (!buffers) {
-            buffers = [];
-            outputs.set(nativeId, buffers);
+        let pts = outputs.get(nativeId)
+        if (!pts) {
+            const stdout = new PassThrough();
+            const stderr = new PassThrough();
+
+            pts = {
+                stdout,
+                stderr,
+                buffers: [],
+            }
+            outputs.set(nativeId, pts);
+
+            const appendOutput = (data: Buffer) => {
+                const { buffers } = pts;
+                buffers.push(data);
+                // when we're over 4000 lines or whatever these buffer are,
+                // truncate down to 2000.
+                if (buffers.length > 4000)
+                    pts.buffers = buffers.slice(buffers.length - 2000);
+            };
+
+            stdout.on('data', appendOutput);
+            stderr.on('data', appendOutput);
         }
-        buffers.push(data);
-        // when we're over 4000 lines or whatever these buffer are,
-        // truncate down to 2000.
-        if (buffers.length > 4000)
-            outputs.set(nativeId, buffers.slice(buffers.length - 2000))
-    };
+
+        return pts;
+    }
+
+    let pluginConsole: Console;
+    {
+        const { stdout, stderr } = getPassthroughs();
+        remoteStdout.pipe(stdout);
+        remoteStderr.pipe(stderr);
+        pluginConsole = new Console(stdout, stderr);
+    }
 
     const sockets = new Set<net.Socket>();
-
-    const events = new EventEmitter();
-    events.on('stdout', appendOutput);
-    events.on('stderr', appendOutput);
-
-    stdout.on('data', data => events.emit('stdout', data));
-    stderr.on('data', data => events.emit('stderr', data));
 
     const readServer = new Server(async (socket) => {
         sockets.add(socket);
@@ -47,24 +74,22 @@ export async function createConsoleServer(stdout: Readable, stderr: Readable) {
         if (filter === 'undefined')
             filter = undefined;
 
-        const buffers = outputs.get(filter);
+        const pts = outputs.get(filter);
+        const buffers = pts?.buffers;
         if (buffers) {
             const concat = Buffer.concat(buffers);
-            outputs.set(filter, [concat]);
+            pts.buffers = [concat];
             socket.write(concat);
         }
 
-        const cb = (data: Buffer, nativeId: ScryptedNativeId) => {
-            if (nativeId !== filter)
-                return;
-            socket.write(data);
-        };
-        events.on('stdout', cb)
-        events.on('stderr', cb)
+        const cb = (data: Buffer) => socket.write(data);
+        const { stdout, stderr } = getPassthroughs(filter);
+        stdout.on('data', cb);
+        stderr.on('data', cb);
 
         const cleanup = () => {
-            events.removeListener('stdout', cb);
-            events.removeListener('stderr', cb);
+            stdout.removeListener('data', cb);
+            stderr.removeListener('data', cb);
             socket.destroy();
             socket.removeAllListeners();
             sockets.delete(socket);
@@ -88,9 +113,8 @@ export async function createConsoleServer(stdout: Readable, stderr: Readable) {
         if (filter === 'undefined')
             filter = undefined;
 
-        const cb = (data: Buffer) => events.emit('stdout', data, filter);
-
-        socket.on('data', cb);
+        const { stdout } = getPassthroughs(filter);
+        socket.pipe(stdout, { end: false });
 
         const cleanup = () => {
             socket.destroy();
@@ -106,6 +130,7 @@ export async function createConsoleServer(stdout: Readable, stderr: Readable) {
     const writePort = await listenZero(writeServer);
 
     return {
+        pluginConsole,
         readPort,
         writePort,
         readServer,

@@ -4,7 +4,7 @@ import path from 'path';
 import { ScryptedNativeId, DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/sdk/types'
 import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { SystemManagerImpl } from './system';
-import { RpcPeer, RPCResultError, PROPERTY_PROXY_ONEWAY_METHODS, PROPERTY_JSON_DISABLE_SERIALIZATION  } from '../rpc';
+import { RpcPeer, RPCResultError, PROPERTY_PROXY_ONEWAY_METHODS, PROPERTY_JSON_DISABLE_SERIALIZATION } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { EventEmitter } from 'events';
 import { createWebSocketClass } from './plugin-remote-websocket';
@@ -407,7 +407,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
             async loadZip(packageJson: any, zipData: Buffer, zipOptions?: PluginRemoteLoadZipOptions) {
                 const pluginConsole = getPluginConsole?.();
-                pluginConsole?.log('starting plugin', pluginId, packageJson.version);
                 const zip = new AdmZip(zipData);
                 await options?.onLoadZip?.(zip, packageJson);
                 const main = zip.getEntry('main.nodejs.js');

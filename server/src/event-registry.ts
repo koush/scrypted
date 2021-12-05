@@ -54,8 +54,13 @@ export class EventRegistry {
             property,
         };
 
-        for (const event of this.systemListeners) {
-            event(id, eventDetails, value);
+        // system listeners only get state changes.
+        // there are many potentially noisy stateless events, like
+        // object detection and settings changes.
+        if (property) {
+            for (const event of this.systemListeners) {
+                event(id, eventDetails, value);
+            }
         }
 
         const events = this.listeners[`${id}#${eventInterface}`];

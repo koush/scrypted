@@ -297,6 +297,11 @@ export class PluginHost {
         this.worker.stderr.on('data', data => console.error(data.toString()));
         this.consoleServer = createConsoleServer(this.worker.stdout, this.worker.stderr);
 
+        this.consoleServer.then(cs => {
+            const { pluginConsole } = cs;
+            pluginConsole.log('starting plugin', this.pluginId, this.packageJson.version);
+        });
+
         this.worker.on('disconnect', () => {
             connected = false;
             logger.log('e', `${this.pluginName} disconnected`);
@@ -384,6 +389,11 @@ export function startPluginRemote() {
     }
 
     const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
+        // the the plugin console is simply the default console
+        // and gets read from stderr/stdout.
+        if (!nativeId)
+            return console;
+
         return getConsole(async (stdout, stderr) => {
             const plugins = await api.getComponent('plugins');
             const connect = async () => {
@@ -474,7 +484,7 @@ export function startPluginRemote() {
             pluginId = _pluginId;
             peer.selfName = pluginId;
         },
-        onPluginReady: async(scrypted, params, plugin) => {
+        onPluginReady: async (scrypted, params, plugin) => {
             replPort = createREPLServer(scrypted, params, plugin);
         },
         getPluginConsole,
