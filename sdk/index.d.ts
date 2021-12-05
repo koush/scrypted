@@ -1,6 +1,6 @@
 export * from './types';
 import { DeviceBase } from './types';
-import type { ScryptedNativeId } from './types';
+import type { ScryptedNativeId, EventListenerRegister } from './types';
 import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types';
 export declare class ScryptedDeviceBase extends DeviceBase {
     nativeId?: string;
@@ -26,6 +26,7 @@ export declare class MixinDeviceBase<T> extends DeviceBase implements DeviceStat
     private _log;
     private _console;
     private _deviceState;
+    private _listeners;
     constructor(mixinDevice: T, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId);
     get storage(): Storage;
     get console(): Console;
@@ -34,6 +35,7 @@ export declare class MixinDeviceBase<T> extends DeviceBase implements DeviceStat
      */
     onDeviceEvent(eventInterface: string, eventData: any): Promise<void>;
     _lazyLoadDeviceState(): void;
+    manageListener(listener: EventListenerRegister): void;
     release(): void;
 }
 declare let sdk: ScryptedStatic;

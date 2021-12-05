@@ -60,6 +60,7 @@ class MixinDeviceBase extends types_1.DeviceBase {
         this.mixinDevice = mixinDevice;
         this.mixinDeviceInterfaces = mixinDeviceInterfaces;
         this.mixinProviderNativeId = mixinProviderNativeId;
+        this._listeners = new Set();
         this._deviceState = mixinDeviceState;
     }
     get storage() {
@@ -85,7 +86,13 @@ class MixinDeviceBase extends types_1.DeviceBase {
     }
     _lazyLoadDeviceState() {
     }
+    manageListener(listener) {
+        this._listeners.add(listener);
+    }
     release() {
+        for (const l of this._listeners) {
+            l.removeListener();
+        }
     }
 }
 exports.MixinDeviceBase = MixinDeviceBase;

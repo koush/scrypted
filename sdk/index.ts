@@ -1,6 +1,6 @@
 export * from './types'
 import { ScryptedInterfaceProperty, DeviceBase } from './types';
-import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager } from './types';
+import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager, EventListenerRegister } from './types';
 import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types';
 
 export class ScryptedDeviceBase extends DeviceBase {
@@ -60,6 +60,7 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   private _log: Logger;
   private _console: Console;
   private _deviceState: DeviceState;
+  private _listeners = new Set<EventListenerRegister>();
 
   constructor(public mixinDevice: T, public mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public mixinProviderNativeId: ScryptedNativeId) {
     super();
@@ -95,7 +96,14 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   _lazyLoadDeviceState() {
   }
 
+  manageListener(listener: EventListenerRegister) {
+    this._listeners.add(listener);
+  }
+
   release() {
+    for (const l of this._listeners) {
+      l.removeListener();
+    }
   }
 }
 
