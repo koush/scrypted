@@ -18,7 +18,8 @@ const defaultDetectionTimeout = 10;
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
   released = false;
-  registerMotion: EventListenerRegister;
+  motionListener: EventListenerRegister;
+  detectionListener: EventListenerRegister;
   detections = new Map<string, DetectionInput>();
   realDevice: ScryptedDevice & Camera & VideoCamera & ObjectDetector & MotionSensor;
   minConfidence = parseFloat(this.storage.getItem('minConfidence')) || defaultMinConfidence;
@@ -30,7 +31,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   currentPeople: DenoisedDetectionEntry<FaceRecognitionResult>[] = [];
   objectDetection: ObjectDetection & ScryptedDevice;
   detectionId = randomBytes(8).toString('hex');
-  detectionListener: EventListenerRegister;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, public objectDetectionPlugin: ObjectDetectionPlugin) {
     super(mixinDevice, mixinDeviceState, {
@@ -84,18 +84,18 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       return;
     }
 
-    this.objectDetection.listen({
+    this.detectionListener = this.objectDetection.listen({
       event: ScryptedInterface.ObjectDetection,
       watch: false,
     }, (eventSource, eventDetails, eventData: ObjectsDetected) => {
       if (eventData?.detectionId !== this.detectionId)
         return;
       this.objectsDetected(eventData)
-    })
+    });
   }
 
   async register() {
-    this.registerMotion = this.realDevice.listen(ScryptedInterface.MotionSensor, async () => {
+    this.motionListener = this.realDevice.listen(ScryptedInterface.MotionSensor, async () => {
       if (!this.realDevice.motionDetected)
         return;
       this.resetDetectionTimeout();
@@ -316,9 +316,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 
   release() {
+    super.release();
     this.released = true;
     this.clearDetectionTimeout();
-    this.registerMotion?.removeListener();
+    this.motionListener?.removeListener();
+    this.detectionListener?.removeListener();
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
     });

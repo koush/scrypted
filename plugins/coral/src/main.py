@@ -181,6 +181,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         score_threshold = -float('inf')
         duration = None
         detection_id = None
+        detection_session = None
 
         if session:
             detection_id = session.get('detectionId', -float('inf'))
