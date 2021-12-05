@@ -46,8 +46,5 @@
    "devDependencies": {
       "@types/lodash": "^4.14.175",
       "@types/node": "^14.17.11"
-   },
-   "optionalDependencies": {
-      "canvas": "^2.8.0"
    }
 }
