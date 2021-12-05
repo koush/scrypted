@@ -1,8 +1,12 @@
 
 {
-    "scrypted.debugHost": "127.0.0.1",
-    "scrypted.serverRoot": "/Volumes/Dev/scrypted",
-    "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/server/volume/plugin.zip",
+    // "scrypted.debugHost": "127.0.0.1",
+    // "scrypted.serverRoot": "/Volumes/Dev/scrypted/server",
+    "scrypted.debugHost": "127.0.0.1:11443",
+    "scrypted.serverRoot": "/Volumes/Dev/scrypted/server",
+    // "scrypted.debugHost": "192.168.2.119",
+    // "scrypted.serverRoot": "/home/pi/.scrypted",
+    "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
     "python.analysis.extraPaths": [
         "./node_modules/@scrypted/sdk/scrypted_python"
     ]

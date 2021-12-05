@@ -1,7 +1,7 @@
 from __future__ import annotations
 from asyncio.events import AbstractEventLoop, TimerHandle
 from asyncio.futures import Future
-from typing import Mapping
+from typing import Any, Mapping
 from safe_set_result import safe_set_result
 import scrypted_sdk
 import numpy as np
@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 from gi.repository import Gst
 import multiprocessing
 from third_party.sort import Sort
+import threading
 
 from scrypted_sdk.types import FFMpegInput, Lock, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
@@ -47,6 +48,7 @@ class DetectionSession:
     loop: AbstractEventLoop
     score_threshold: float
     running: bool
+    thread: Any
 
     def __init__(self) -> None:
         self.timerHandle = None
@@ -111,12 +113,12 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         tracker_detections = []
 
         for obj in objs:
-            element = []  # np.array([])
+            element = []
             element.append(obj.bbox.xmin)
             element.append(obj.bbox.ymin)
             element.append(obj.bbox.xmax)
             element.append(obj.bbox.ymax)
-            element.append(obj.score)  # print('element= ',element)
+            element.append(obj.score)
             tracker_detections.append(element)
 
         tracker_detections = np.array(tracker_detections)
@@ -237,13 +239,14 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         detection_session.setTimeout(duration / 1000)
 
         if not new_session:
+            print("existing session")
             return
 
         print('detection starting', detection_id)
         b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.MediaStreamUrl.value)
         s = b.decode('utf8')
         j: FFMpegInput = json.loads(s)
-        container = j['container']
+        container = j.get('container', None)
         videofmt = 'raw'
         videosrc = j['url']
         if container == 'mpegts' and videosrc.startswith('tcp://'):
@@ -286,6 +289,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                                           videofmt=videofmt)
         task = pipeline.run()
         asyncio.ensure_future(task)
+        # detection_session.thread = threading.Thread(target=lambda: pipeline.run())
+        # detection_session.thread.start()
 
         detection_result: ObjectsDetected = {}
         detection_result['detectionId'] = detection_id

@@ -17,12 +17,13 @@ import sys
 import threading
 
 import gi
-
-from safe_set_result import safe_set_result
 gi.require_version('Gst', '1.0')
 gi.require_version('GstBase', '1.0')
-from gi.repository import GLib, Gst
 
+from safe_set_result import safe_set_result
+from gi.repository import GLib, GObject, Gst
+
+GObject.threads_init()
 Gst.init(None)
 
 class GstPipeline:
@@ -78,10 +79,10 @@ class GstPipeline:
             safe_set_result(self.finished)
         elif t == Gst.MessageType.WARNING:
             err, debug = message.parse_warning()
-            sys.stderr.write('Warning: %s: %s\n' % (err, debug))
+            print('Warning: %s: %s\n' % (err, debug))
         elif t == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
-            sys.stderr.write('Error: %s: %s\n' % (err, debug))
+            print('Error: %s: %s\n' % (err, debug))
             safe_set_result(self.finished)
         return True
 
@@ -174,8 +175,8 @@ def run_pipeline(finished,
     scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
     scale = tuple(int(x * scale) for x in src_size)
     scale_caps = 'video/x-raw,width={width},height={height}'.format(width=scale[0], height=scale[1])
-    PIPELINE += """ ! decodebin ! queue ! videoconvert ! videoscale
-    ! {scale_caps} ! videobox name=box autocrop=true ! {sink_caps} ! {sink_element}
+    PIPELINE += """ ! decodebin ! queue leaky=downstream max-size-buffers=10 ! videoconvert ! videoscale
+    ! {scale_caps} ! videobox name=box autocrop=true ! queue leaky=downstream max-size-buffers=1 ! {sink_caps} ! {sink_element}
     """
 
     SINK_ELEMENT = 'appsink name=appsink emit-signals=true max-buffers=1 drop=true sync=false'
@@ -188,7 +189,7 @@ def run_pipeline(finished,
         src_caps=src_caps, sink_caps=sink_caps,
         sink_element=SINK_ELEMENT, scale_caps=scale_caps)
 
-    # print('Gstreamer pipeline:\n', pipeline)
+    print('Gstreamer pipeline:\n', pipeline)
 
     pipeline = GstPipeline(finished, pipeline, user_function, src_size)
     return pipeline
