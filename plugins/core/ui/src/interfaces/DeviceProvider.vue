@@ -6,11 +6,7 @@
       max-width="600px"
       persistent
     >
-      <Settings
-        v-model="createDeviceSettings"
-        :noTitle="true"
-        class="pa-2"
-      >
+      <Settings v-model="createDeviceSettings" :noTitle="true" class="pa-2">
         <template v-slot:append>
           <v-card-actions>
             <v-spacer></v-spacer>
@@ -32,12 +28,12 @@
         @click="openDeviceCreationDialog"
         >Add Device</v-btn
       >
-      <v-btn
+      <!-- <v-btn
         v-if="device.interfaces.includes('DeviceDiscovery')"
         text
         color="primary"
         >Discover Devices</v-btn
-      >
+      > -->
     </v-card-actions>
     <v-card-text>These things were created by {{ device.name }}.</v-card-text>
     <DeviceGroup :deviceGroup="managedDevices"></DeviceGroup>
