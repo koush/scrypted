@@ -426,7 +426,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
       },
       {
         title: 'Face Recognition Interval',
-        description: 'The interval used to recognize faces when a person is detected',
+        description: 'The interval in milliseconds used to recognize faces when a person is detected.',
         key: 'recognitionInterval',
         type: 'number',
         value: this.recognitionInterval.toString(),

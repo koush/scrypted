@@ -90,7 +90,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     }, (eventSource, eventDetails, eventData: ObjectsDetected) => {
       if (eventData?.detectionId !== this.detectionId)
         return;
-      this.objectsDetected(eventData)
+      this.objectsDetected(eventData);
+      this.reportObjectDetections(eventData, undefined);
     });
   }
 
@@ -155,26 +156,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       if (detectionResult.running)
         this.extendedObjectDetect();
     }
-
-    this.reportObjectDetections(detectionResult, undefined);
-  }
-
-  reportPeopleDetections(faces?: ObjectDetectionResult[], detectionInput?: DetectionInput) {
-    const detectionId = Math.random().toString();
-    const detection: ObjectsDetected = {
-      timestamp: Date.now(),
-      detectionId: detectionInput ? detectionId : undefined,
-      inputDimensions: detectionInput
-        ? [detectionInput?.input.shape[1], detectionInput?.input.shape[0]]
-        : undefined,
-      people: this.currentPeople.map(d => d.detection),
-      faces,
-    }
-
-    if (detectionInput)
-      this.setDetection(detectionId, detectionInput);
-
-    this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
 
   async peopleDetected(detectionResult: ObjectsDetected) {
@@ -191,16 +172,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
       timeout: this.detectionTimeout * 1000,
       added: d => found.push(d),
       removed: d => {
-        this.console.log('no longer detected', d.name)
-        this.reportPeopleDetections(undefined)
+        this.console.log('expired detection:', `${d.detection.label} (${d.detection.score}, ${d.detection.id})`);
+        if (detectionResult.running)
+          this.extendedFaceDetect();
       }
     });
     if (found.length) {
-      this.console.log('detected', found.map(d => d.detection.label).join(', '));
+      this.console.log('new detection:', found.map(d => `${d.detection.label} (${d.detection.score}, ${d.detection.id})`).join(', '));
+      this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
       this.extendedFaceDetect();
     }
-
-    this.reportPeopleDetections(detectionResult.faces);
   }
 
   async extendedFaceDetect() {

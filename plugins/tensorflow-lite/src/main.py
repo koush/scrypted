@@ -145,7 +145,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection: ObjectDetectionResult = {}
                 detection['id'] = str(trackID)
                 detection['boundingBox'] = (
-                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax, obj.bbox.ymax)
+                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
                 detection['className'] = self.labels.get(obj.id, obj.id)
                 detection['score'] = obj.score
                 detections.append(detection)
@@ -153,7 +153,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             for obj in objs:
                 detection: ObjectDetectionResult = {}
                 detection['boundingBox'] = (
-                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax, obj.bbox.ymax)
+                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
                 detection['className'] = self.labels.get(obj.id, obj.id)
                 detection['score'] = obj.score
                 detections.append(detection)

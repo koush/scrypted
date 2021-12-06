@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/tensorflow",
    "version": "0.0.13",
-   "description": "Object Detection for VideoCameras.",
+   "description": "Face Recognition for VideoCameras.",
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {
@@ -29,7 +29,7 @@
       "person"
    ],
    "scrypted": {
-      "name": "TensorFlow Plugin",
+      "name": "TensorFlow Face Recognition Plugin",
       "singleInstance": true,
       "type": "API",
       "interfaces": [
