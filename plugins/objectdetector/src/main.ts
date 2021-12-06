@@ -107,16 +107,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     });
   }
 
-  reportObjectDetections(detections: ObjectDetectionResult[], detectionInput?: DetectionInput) {
-    const detection: ObjectsDetected = {
-      timestamp: Date.now(),
-      detectionId: detectionInput ? this.detectionId : undefined,
-      inputDimensions: detectionInput
-        ? [detectionInput?.input.shape[1], detectionInput?.input.shape[0]]
-        : undefined,
-      detections,
-    }
-
+  reportObjectDetections(detection: ObjectsDetected, detectionInput?: DetectionInput) {
     if (detectionInput)
       this.setDetection(this.detectionId, detectionInput);
 
@@ -165,7 +156,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         this.extendedObjectDetect();
     }
 
-    this.reportObjectDetections(detectionResult.detections, undefined);
+    this.reportObjectDetections(detectionResult, undefined);
   }
 
   reportPeopleDetections(faces?: ObjectDetectionResult[], detectionInput?: DetectionInput) {

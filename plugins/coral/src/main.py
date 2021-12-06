@@ -145,7 +145,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection: ObjectDetectionResult = {}
                 detection['id'] = str(trackID)
                 detection['boundingBox'] = (
-                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.ymax, obj.bbox.ymax)
+                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax, obj.bbox.ymax)
                 detection['className'] = self.labels.get(obj.id, obj.id)
                 detection['score'] = obj.score
                 detections.append(detection)
@@ -153,7 +153,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             for obj in objs:
                 detection: ObjectDetectionResult = {}
                 detection['boundingBox'] = (
-                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.ymax, obj.bbox.ymax)
+                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax, obj.bbox.ymax)
                 detection['className'] = self.labels.get(obj.id, obj.id)
                 detection['score'] = obj.score
                 detections.append(detection)
@@ -174,19 +174,20 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         detection_result: ObjectsDetected = {}
         detection_result['running'] = False
+        detection_result['timestamp'] = int(time.time() * 1000)
 
         self.detection_event(detection_session, detection_result)
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
-        score_threshold = -float('inf')
+        score_threshold = None
         duration = None
         detection_id = None
         detection_session = None
 
         if session:
-            detection_id = session.get('detectionId', -float('inf'))
+            detection_id = session.get('detectionId', None)
             duration = session.get('duration', None)
-            score_threshold = session.get('minScore', score_threshold)
+            score_threshold = session.get('minScore', None)
 
         is_image = mediaObject and mediaObject.mimeType.startswith('image/')
 
@@ -207,7 +208,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
                 detection_session = DetectionSession()
                 detection_session.id = detection_id
-                detection_session.score_threshold = score_threshold
+                detection_session.score_threshold = score_threshold or -float('inf')
                 loop = asyncio.get_event_loop()
                 detection_session.loop = loop
                 self.detection_sessions[detection_id] = detection_session
@@ -234,7 +235,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             with self.mutex:
                 self.interpreter.invoke()
                 objs = detect.get_objects(
-                    self.interpreter, score_threshold=score_threshold, image_scale=scale)
+                    self.interpreter, score_threshold=score_threshold or -float('inf'), image_scale=scale)
 
             return self.create_detection_result(objs, image.size, tracker = tracker)
 
@@ -243,9 +244,11 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             detection_session.running = True
 
         detection_session.setTimeout(duration / 1000)
+        if score_threshold != None:
+            detection_session.score_threshold = score_threshold
 
         if not new_session:
-            print("existing session")
+            print("existing session", detection_session.id)
             return
 
         print('detection starting', detection_id)
@@ -265,13 +268,13 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         inference_size = input_size(self.interpreter)
         width, height = inference_size
         w, h = (size['width'], size['height'])
-        scale = min(width / w, height / h)
+        scale = (width / w, height / h)
 
         def user_callback(input_tensor, src_size, inference_box):
             with self.mutex:
                 run_inference(self.interpreter, input_tensor)
                 objs = detect.get_objects(
-                    self.interpreter, score_threshold=score_threshold, image_scale=(scale, scale))
+                    self.interpreter, score_threshold=detection_session.score_threshold, image_scale=scale)
 
             # (result, mapinfo) = input_tensor.map(Gst.MapFlags.READ)
 
@@ -301,6 +304,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         detection_result: ObjectsDetected = {}
         detection_result['detectionId'] = detection_id
         detection_result['running'] = True
+        detection_result['timestamp'] = int(time.time() * 1000)
         return detection_result
 
 
