@@ -6,4 +6,5 @@ fs
 src
 .vscode
 dist/*.js
+dist/*.txt
 HAP-NodeJS

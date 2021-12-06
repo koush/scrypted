@@ -1,5 +1,10 @@
 .DS_Store
 out/
 node_modules/
-dist/*.map
+*.map
+fs
+src
+.vscode
+dist/*.js
+dist/*.txt
 face-api.js

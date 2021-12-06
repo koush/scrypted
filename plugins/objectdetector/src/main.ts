@@ -2,6 +2,7 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { randomBytes } from 'crypto';
+import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
 import { DenoisedDetectionEntry, denoiseDetections } from './denoise';
 
 export interface DetectionInput {
@@ -309,6 +310,11 @@ class ObjectDetectionPlugin extends ScryptedDeviceBase implements MixinProvider 
       if (!device.mixins?.includes(this.id))
         continue;
       device.probe();
+
+      alertRecommendedPlugins({
+        '@scrypted/tensorflow': 'TensorFlow Face Recognition Plugin',
+        '@scrypted/tensorflow-lite': 'TensorFlow Lite Object Detection Plugin',
+      });
     }
   }
 

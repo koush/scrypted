@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/tensorflow",
-   "version": "0.0.13",
-   "description": "Face Recognition for VideoCameras.",
+   "version": "0.0.16",
+   "description": "Face Recognition Service.",
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {
@@ -20,8 +20,6 @@
       "plugin",
       "tensorflow",
       "motion",
-      "object",
-      "detect",
       "detection",
       "face",
       "recognition",

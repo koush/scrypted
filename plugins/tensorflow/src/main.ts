@@ -13,6 +13,7 @@ import { sleep } from './sleep';
 import { makeBoundingBoxFromFace } from './util';
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '../../../common/src/ffmpeg-rebroadcast';
 import { createRawVideoParser, PIXEL_FORMAT_RGB24, StreamChunk } from '@scrypted/common/src/stream-parser';
+import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
 import { once } from 'events';
 import { decodeJpeg, encodeJpeg } from './jpeg';
 import { EventEmitter } from 'stream';
@@ -166,6 +167,10 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
     }
 
     this.reloadFaceMatcher();
+
+    alertRecommendedPlugins({
+      '@scrypted/objectdetector': 'Object Detection Plugin',
+    });
   }
 
   async addUnknowns(unknowns: { descriptor: Float32Array, nativeId: string, detection: FaceDetection }[], input: Tensor3D, buffer: Buffer) {
@@ -363,7 +368,6 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
           if (!detectionSession.running)
             return;
           this.onDeviceEvent(ScryptedInterface.ObjectDetection, detections);
-          this.console.log(detections);
 
           await sleep(1000);
         }

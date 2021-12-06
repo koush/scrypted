@@ -1,6 +1,20 @@
 {
-   "name": "@scrypted/tensowflow-lite",
-   "description": "Object Detection for VideoCameras.",
+   "name": "@scrypted/tensorflow-lite",
+   "description": "Object Detection Service.",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "tensorflow",
+      "coral",
+      "tpu",
+      "edge",
+      "motion",
+      "object",
+      "detect",
+      "detection",
+      "people",
+      "person"
+   ],
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -15,7 +29,7 @@
    "scrypted": {
       "name": "TensorFlow Lite + Coral TPU Object Detection Plugin",
       "runtime": "python",
-      "type": "Light",
+      "type": "API",
       "interfaces": [
          "ObjectDetection"
       ]
@@ -23,5 +37,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.15"
+   "version": "0.0.21"
 }
