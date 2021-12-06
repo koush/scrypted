@@ -1,5 +1,5 @@
 {
-   "name": "@scrypted/coral",
+   "name": "@scrypted/tensowflow-lite",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -12,7 +12,7 @@
       "scrypted-webpack": "scrypted-webpack"
    },
    "scrypted": {
-      "name": "Coral TPU Plugin",
+      "name": "TensorFlow Lite + Coral TPU Plugin",
       "runtime": "python",
       "type": "Light",
       "interfaces": [
