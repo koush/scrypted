@@ -516,7 +516,7 @@ addSupportedType({
             }
 
             const motionDetected = needAudioMotionService ?
-                () => motionDevice.audioDetected || motionDevice.motionDetected :
+                () => !!motionDevice.audioDetected || !!motionDevice.motionDetected :
                 () => !!motionDevice.motionDetected;
 
             const { motionService } = controller;
@@ -525,14 +525,6 @@ addSupportedType({
                 motionService,
                 Characteristic.MotionDetected,
                 () => motionDetected(), true)
-
-            if (needAudioMotionService) {
-                bindCharacteristic(motionDevice,
-                    ScryptedInterface.AudioSensor,
-                    motionService,
-                    Characteristic.MotionDetected,
-                    () => motionDetected(), true)
-            }
 
             const { recordingManagement } = controller;
 
