@@ -161,7 +161,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             this.mixinTable.unshift({
                 mixinProviderId: mixinId,
                 entry: (async () => {
-                    const { allInterfaces } = await previousEntry;
+                    let { allInterfaces } = await previousEntry;
                     try {
                         const mixinProvider = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
                         const interfaces = await mixinProvider?.canMixin(type, allInterfaces) as any as ScryptedInterface[];
@@ -180,6 +180,8 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                             };
                         }
 
+                        allInterfaces = allInterfaces.slice();
+                        allInterfaces.push(...interfaces);
                         const combinedInterfaces = [...new Set(allInterfaces)];
 
                         const wrappedHandler = new PluginDeviceProxyHandler(this.scrypted, this.id);
