@@ -29,7 +29,7 @@
       "person"
    ],
    "scrypted": {
-      "name": "Object and Face Recognition Plugin",
+      "name": "TensorFlow Plugin",
       "singleInstance": true,
       "type": "API",
       "interfaces": [
@@ -50,7 +50,6 @@
       "@types/node": "^14.17.11"
    },
    "optionalDependencies": {
-      "@tensorflow-models/coco-ssd": "^2.2.2",
       "@tensorflow/tfjs": "^3.11.0",
       "@tensorflow/tfjs-core": "^3.9.0",
       "@tensorflow/tfjs-node-gpu": "^3.11.0",

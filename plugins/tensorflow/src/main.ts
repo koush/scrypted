@@ -1,10 +1,7 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedDevice, ObjectDetectionResult, FaceRecognition, ObjectDetectionTypes, ScryptedMimeTypes, FFMpegInput, ObjectsDetected, ObjectDetectionModel, ObjectDetectionSession } from '@scrypted/sdk';
+import { ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, FaceRecognitionResult, ScryptedMimeTypes, FFMpegInput, ObjectsDetected, ObjectDetectionModel, ObjectDetectionSession } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import * as tf from '@tensorflow/tfjs-node-gpu';
-import { ENV, tensor3d } from '@tensorflow/tfjs-node-gpu';
-import * as coco from '@tensorflow-models/coco-ssd';
+import { ENV, tensor3d, Tensor3D } from '@tensorflow/tfjs-node-gpu';
 import path from 'path';
 import fetch from 'node-fetch';
 import * as faceapi from '@koush/face-api.js';
@@ -12,18 +9,13 @@ import { FaceDetection, FaceMatcher, LabeledFaceDescriptors } from '@koush/face-
 import canvas, { createCanvas } from 'canvas';
 import { Canvas, Image, ImageData } from 'canvas';
 import { randomBytes } from 'crypto';
-import throttle from 'lodash/throttle'
 import { sleep } from './sleep';
-import { CLASSES } from './classes';
-import { makeBoundingBox, makeBoundingBoxFromFace } from './util';
+import { makeBoundingBoxFromFace } from './util';
 import { FFMpegRebroadcastSession, startRebroadcastSession } from '../../../common/src/ffmpeg-rebroadcast';
 import { createRawVideoParser, PIXEL_FORMAT_RGB24, StreamChunk } from '@scrypted/common/src/stream-parser';
 import { once } from 'events';
-import { DenoisedDetectionEntry, denoiseDetections, DetectionInput } from './denoise';
 import { decodeJpeg, encodeJpeg } from './jpeg';
-import fs from 'fs';
-import { listenZeroCluster } from '@scrypted/common/src/listen-cluster';
-import { Server } from 'http';
+import { EventEmitter } from 'stream';
 
 const DISPOSE_TIMEOUT = 10000;
 
@@ -40,10 +32,7 @@ function observeLoadError(promise: Promise<any>) {
   promise.catch(e => console.error('load error', e));
 }
 
-const ssdPromise = (async () => {
-  // setWasmPaths('wasm/')
-
-  // await tf.setBackend('wasm');
+const faceapiPromise = (async () => {
   const fdnPromise = faceapi.nets.ssdMobilenetv1.loadFromDisk('./');
   observeLoadError(fdnPromise);
   const flnPromise = faceapi.nets.faceLandmark68Net.loadFromDisk('./');
@@ -51,35 +40,7 @@ const ssdPromise = (async () => {
   const frnPromise = faceapi.nets.faceRecognitionNet.loadFromDisk('./');
   observeLoadError(frnPromise);
 
-  const server = new Server();
-  server.on('request', async (req, res) => {
-    try {
-      const check = path.join(process.env.SCRYPTED_PLUGIN_VOLUME, req.url);
-      const realfs = require('realfs');
-      let buffer: Buffer;
-      if (realfs.existsSync(check)) {
-        buffer = realfs.readFileSync(check);
-      }
-      else {
-        const url = 'https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2' + req.url;
-        const response = await fetch(url);
-        buffer = await response.buffer();
-        realfs.writeFileSync(check, buffer);
-      }
-      res.write(buffer);
-      res.end();
-    }
-    catch (e) {
-      res.statusCode = 404;
-      res.write('');
-      res.end();
-    }
-  });
-  const port = await listenZeroCluster(server);
-
-  return coco.load({
-    modelUrl: `http://127.0.0.1:${port}/model.json`,
-  });
+  await Promise.all([fdnPromise, flnPromise, frnPromise]);
 })();
 
 const { deviceManager, mediaManager, systemManager } = sdk;
@@ -174,497 +135,20 @@ class RecognizedPerson extends ScryptedDeviceBase implements Camera, Settings {
   }
 }
 
-class TensorFlowMixin extends SettingsMixinDeviceBase<ObjectDetector> implements ObjectDetector, Settings {
-  released = false;
-  registerMotion: EventListenerRegister;
-  registerObject: EventListenerRegister;
-  detections = new Map<string, DetectionInput>();
-  realDevice: ScryptedDevice & Camera & VideoCamera & ObjectDetector;
-  minConfidence = parseInt(this.storage.getItem('minConfidence')) || defaultMinConfidence;
-  objectInterval = parseInt(this.storage.getItem('objectInterval')) || defaultObjectInterval;
-  recognitionInterval = parseInt(this.storage.getItem('recognitionInterval')) || defaultRecognitionInterval;
-  detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
-  currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
-  currentPeople: DenoisedDetectionEntry<FaceRecognition>[] = [];
-  rebroadcaster: Promise<FFMpegRebroadcastSession>;
-  rebroadcasterTimeout: NodeJS.Timeout;
-
-  throttledObjectDetect = throttle(
-    async (detectionInput: DetectionInput) => {
-      const ret = this.objectDetect(detectionInput);
-      ret.catch(e => this.console.error('object detect error', e));
-      return ret;
-    },
-    1000);
-
-  throttledFaceDetect = throttle(
-    async (detectionInput: DetectionInput) => {
-      const ret = this.faceDetect(detectionInput);
-      ret.catch(e => this.console.error('face detect error', e));
-      return ret;
-    },
-    1000);
-
-  throttledGrab = throttle(async () => {
-
-    if (!this.rebroadcaster) {
-      // start the frame grabber if necessary
-      const video = await this.realDevice.getVideoStream();
-      const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(video, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-      if (!this.rebroadcaster) {
-        this.rebroadcaster = startRebroadcastSession(ffmpegInput, {
-          console: this.console,
-          parsers: {
-            'rawvideo': createRawVideoParser({
-              pixelFormat: PIXEL_FORMAT_RGB24,
-            })
-          }
-        })
-
-        this.rebroadcaster.then(session => {
-          session.events.on('killed', () => {
-            this.rebroadcaster = undefined;
-          })
-          session.events.on('error', e => this.console.log('ffmpeg error', e))
-        })
-      }
-    }
-
-    const session = await this.rebroadcaster;
-
-    // reset/start the frame grabber timeout to quit after 10 seconds of idle.
-    // various detection loops will keep this alive.
-    clearTimeout(this.rebroadcasterTimeout);
-    this.rebroadcasterTimeout = setTimeout(() => session.kill(), 10000);
-
-    const args = await once(session.events, 'rawvideo-data');
-    const chunk: StreamChunk = args[0];
-
-    const input = tensor3d(Buffer.concat(chunk.chunks), [
-      session.ffmpegInputs.rawvideo.mediaStreamOptions.video.height,
-      session.ffmpegInputs.rawvideo.mediaStreamOptions.video.width,
-      3,
-    ]);
-
-    setTimeout(() => input.dispose(), DISPOSE_TIMEOUT);
-    return {
-      jpegBuffer: undefined, input,
-    } as DetectionInput
-  }, 500);
-
-  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, public tensorFlow: TensorFlow) {
-    super(mixinDevice, mixinDeviceState, {
-      providerNativeId: tensorFlow.nativeId,
-      mixinDeviceInterfaces,
-      group: "Object Detection Settings",
-      groupKey: "tensorflow",
-    });
-
-    this.realDevice = systemManager.getDeviceById<Camera & VideoCamera & ObjectDetector>(this.id);
-
-    this.register();
-  }
-
-  async register() {
-    // const nativeTypes = await this.getNativeObjectTypes();
-
-    this.registerMotion = this.realDevice.listen(ScryptedInterface.MotionSensor, async () => {
-      // if (nativeTypes.detections?.includes('person'))
-      //   return;
-
-      let detectionInput = await this.throttledGrab();
-
-      // on motion, watch what happens for 10 seconds.
-      // new objects being found will trigger a longer observation.
-      for (let i = 0; i < 10; i++) {
-        await this.throttledObjectDetect(detectionInput);
-        await sleep(1000);
-        detectionInput = undefined;
-      }
-    });
-
-    this.registerObject = this.realDevice.listen(ScryptedInterface.ObjectDetector, async (es, ed, detection: ObjectsDetected) => {
-      // ignore face/people detection. already processed.
-      if (detection.faces || detection.people)
-        return;
-
-      // no person, ignore it
-      const person = detection && detection.detections.find(detection => detection.className === 'person');
-      if (!person)
-        return;
-
-      let detectionInput = this.detections.get(detection.detectionId);
-      if (!detectionInput) {
-        let video = await this.realDevice.getDetectionInput(detection.detectionId);
-        const buffer = video ? await mediaManager.convertMediaObjectToBuffer(video, 'image/jpeg') : undefined;
-        if (buffer) {
-          const input = decodeJpeg(buffer, 3);
-          detectionInput = {
-            input, jpegBuffer: buffer,
-          }
-        }
-      }
-
-      // on object detection, watch what happens for 10 seconds.
-      // new people being found will trigger a longer observation.
-      for (let i = 0; i < 10; i++) {
-        await this.throttledFaceDetect(detectionInput);
-        await sleep(1000);
-        detectionInput?.input?.dispose();
-        detectionInput = undefined;
-      }
-    });
-  }
-
-  reportObjectDetections(detectionInput?: DetectionInput) {
-    const detectionId = Math.random().toString();
-    const detection: ObjectsDetected = {
-      timestamp: Date.now(),
-      detectionId: detectionInput ? detectionId : undefined,
-      inputDimensions: detectionInput
-        ? [detectionInput?.input.shape[1], detectionInput?.input.shape[0]]
-        : undefined,
-      detections: this.currentDetections.map(d => d.detection),
-    }
-
-    if (detectionInput)
-      this.setDetection(detectionId, detectionInput);
-
-    this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
-  }
-
-  async extendedObjectDetect() {
-    for (let i = 0; i < 60; i++) {
-      await this.throttledObjectDetect(undefined);
-      await sleep(1000);
-    }
-  }
-
-  async objectDetect(detectionInput: DetectionInput) {
-    if (!detectionInput) {
-      detectionInput = await this.throttledGrab();
-    }
-
-    const { input } = detectionInput;
-
-    const ssd = await ssdPromise;
-    const detections = await ssd.detect(input);
-    // this.console.log('memory', tf.memory());
-
-    const found: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
-    denoiseDetections<ObjectDetectionResult>(this.currentDetections, detections.map(detection => ({
-      name: detection.class,
-      detection: {
-        className: detection.class,
-        score: detection.score,
-        boundingBox: detection.bbox,
-      },
-    })), {
-      added: d => found.push(d),
-      removed: d => {
-        this.console.log('no longer detected', d.name)
-        this.reportObjectDetections()
-      }
-    });
-    if (found.length) {
-      this.console.log('detected', found.map(d => d.detection.className).join(', '));
-      this.extendedObjectDetect();
-    }
-
-    this.reportObjectDetections(detectionInput);
-  }
-
-  setDetection(detectionId: string, detectionInput: DetectionInput) {
-    this.detections.set(detectionId, detectionInput);
-    setTimeout(() => {
-      this.detections.delete(detectionId);
-      detectionInput?.input?.dispose();
-    }, DISPOSE_TIMEOUT);
-  }
-
-  reportPeopleDetections(faces?: ObjectDetectionResult[], detectionInput?: DetectionInput) {
-    const detectionId = Math.random().toString();
-    const detection: ObjectsDetected = {
-      timestamp: Date.now(),
-      detectionId: detectionInput ? detectionId : undefined,
-      inputDimensions: detectionInput
-        ? [detectionInput?.input.shape[1], detectionInput?.input.shape[0]]
-        : undefined,
-      people: this.currentPeople.map(d => d.detection),
-      faces,
-    }
-
-    if (detectionInput)
-      this.setDetection(detectionId, detectionInput);
-
-    this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
-  }
-
-  async extendedFaceDetect() {
-    for (let i = 0; i < 60; i++) {
-      await this.throttledFaceDetect(undefined);
-      await sleep(1000);
-    }
-  }
-
-  async faceDetect(detectionInput: DetectionInput) {
-    let faces: ObjectDetectionResult[] = [];
-    let people: FaceRecognition[] = [];
-    const report = () => {
-      denoiseDetections(this.currentPeople, [],
-        {
-          removed: d => {
-            this.console.log('no longer detected', d.detection.label)
-            this.reportPeopleDetections(faces, detectionInput);
-          },
-        })
-
-      this.reportPeopleDetections(faces, detectionInput);
-    }
-
-    if (!detectionInput) {
-      detectionInput = await this.throttledGrab();
-    }
-
-    const { input } = detectionInput;
-    const facesDetected = await faceapi.detectAllFaces(input, new faceapi.SsdMobilenetv1Options({
-      minConfidence: this.minConfidence,
-    }))
-      .withFaceLandmarks()
-      .withFaceDescriptors();
-
-    // no faces
-    if (!facesDetected.length) {
-      report();
-      return;
-    }
-
-    faces = facesDetected.map(face => ({
-      className: 'face',
-      score: face.detection.score,
-      boundingBox: makeBoundingBoxFromFace(face),
-    }));
-
-    const unknowns: {
-      q: Float32Array,
-      r: FaceDetection,
-    }[] = [];
-    if (!this.tensorFlow.faceMatcher) {
-      unknowns.push(...facesDetected.map(f => ({
-        q: f.descriptor,
-        r: f.detection,
-      })));
-    }
-    else {
-      const matches = await Promise.all(facesDetected.map(async (q) => ({
-        q,
-        m: this.tensorFlow.faceMatcher.findBestMatch(q.descriptor),
-      })));
-
-      unknowns.push(...matches.filter(match => match.m.label === 'unknown').map(match => ({
-        q: match.q.descriptor,
-        r: match.q.detection
-      })));
-
-      for (const match of matches) {
-        if (match.m.label === 'unknown')
-          continue;
-
-        const nativeId = match.m.label;
-        people.push({
-          id: nativeId,
-          label: deviceManager.getDeviceState(nativeId)?.name,
-          score: 1 - match.m.distance,
-          boundingBox: makeBoundingBoxFromFace(match.q),
-        });
-      }
-    }
-
-    if (unknowns.length) {
-      let fullPromise: Promise<canvas.Image>;
-      const autoAdd = this.tensorFlow.storage.getItem('autoAdd') !== 'false';
-
-      for (const unknown of unknowns) {
-        const nativeId = 'person:' + Buffer.from(randomBytes(8)).toString('hex');
-
-        people.push({
-          id: nativeId,
-          label: `Unknown Person (${nativeId})`,
-          score: unknown.r.score,
-          boundingBox: makeBoundingBox(unknown.r.box),
-        });
-
-        if (!autoAdd)
-          continue;
-
-        if (!fullPromise) {
-          const buffer = detectionInput.jpegBuffer || Buffer.from(await encodeJpeg(input));
-          if (!detectionInput.jpegBuffer)
-            detectionInput.jpegBuffer = buffer;
-          fullPromise = canvas.loadImage(buffer);
-        }
-
-        await this.tensorFlow.discoverPerson(nativeId);
-        const storage = deviceManager.getDeviceStorage(nativeId);
-        const d = unknown.q;
-        storage.setItem('descriptor-0', Buffer.from(d.buffer, d.byteOffset, d.byteLength).toString('base64'));
-
-        (async () => {
-          const full = await fullPromise;
-          const c = createCanvas(unknown.r.box.width, unknown.r.box.height);
-          const draw = c.getContext('2d');
-          draw.drawImage(full,
-            unknown.r.box.x, unknown.r.box.y, unknown.r.box.width, unknown.r.box.height,
-            0, 0, unknown.r.box.width, unknown.r.box.height);
-          const cropped = c.toBuffer('image/jpeg');
-
-          require('realfs').writeFileSync(path.join(process.env.SCRYPTED_PLUGIN_VOLUME, nativeId + '.jpg'), cropped)
-        })();
-      }
-
-      this.tensorFlow.reloadFaceMatcher();
-    }
-
-    const found: DenoisedDetectionEntry<FaceRecognition>[] = [];
-    denoiseDetections(this.currentPeople, people.map(person => ({
-      detection: person,
-      name: person.label,
-    })),
-      {
-        added: d => found.push(d),
-        removed: d => {
-          this.console.log('no longer detected', d.detection.label)
-          report();
-        },
-      });
-
-    const actualNew: DenoisedDetectionEntry<FaceRecognition>[] = [];
-    // after denoising, resolve all newly found people against the current list.
-    for (const person of found) {
-      let index: number;
-      if (person.detection.label.startsWith('Unknown Person')) {
-        // new unknowns may possibly be unrecognizable and thus missing faces this pass
-        // first try to resolve with a missing unknown person
-        index = this.currentPeople.findIndex(check => check.detection.label.startsWith('Unknown Person') && check.timeout);
-        // otherwise resolve with a missing known person
-        if (index === -1)
-          index = this.currentPeople.findIndex(check => !check.detection.label.startsWith('Unknown Person') && check.timeout);
-      }
-      else {
-        // new people may possibly be unrecognizable people and thus missing from the previous pass
-        index = this.currentPeople.findIndex(check => check.detection.label.startsWith('Unknown Person') && check.timeout);
-      }
-      // todo: sort by closest bounding box or something
-      if (index !== -1) {
-        clearTimeout(this.currentPeople[index].timeout);
-        this.currentPeople.splice(index, 1);
-      }
-      else {
-        actualNew.push(person);
-      }
-    }
-
-    if (actualNew.length) {
-      this.console.log('detected', actualNew.map(d => d.detection.label).join(', '));
-      this.extendedFaceDetect()
-    }
-    this.reportPeopleDetections(faces, detectionInput);
-
-    for (const person of this.currentDetections) {
-      person.detection.boundingBox = undefined;
-      person.detection.score = undefined;
-    }
-  }
-
-  async getNativeObjectTypes(): Promise<ObjectDetectionTypes> {
-    if (this.mixinDeviceInterfaces.includes(ScryptedInterface.ObjectDetector))
-      return this.mixinDevice.getObjectTypes();
-    return {};
-  }
-
-  async getObjectTypes(): Promise<ObjectDetectionTypes> {
-    return {
-      detections: Object.values(CLASSES).map(c => c.displayName),
-      faces: true,
-      people: this.tensorFlow.getAllPeople().map(person => ({
-        id: person.nativeId,
-        label: person.name,
-      })),
-    }
-  }
-
-  async getDetectionInput(detectionId: any): Promise<MediaObject> {
-    const detection = this.detections.get(detectionId);
-    if (!detection) {
-      if (this.mixinDeviceInterfaces.includes(ScryptedInterface.ObjectDetector))
-        return this.mixinDevice.getDetectionInput(detectionId);
-      return;
-    }
-    if (!detection.jpegBuffer) {
-      detection.jpegBuffer = Buffer.from(await encodeJpeg(detection.input));
-    }
-    return mediaManager.createMediaObject(detection.jpegBuffer, 'image/jpeg');
-  }
-
-  async getMixinSettings(): Promise<Setting[]> {
-    return [
-      {
-        title: 'Minimum Face Detection Confidence',
-        description: 'Higher values eliminate false positives and low quality recognition candidates.',
-        key: 'minConfidence',
-        type: 'number',
-        value: this.minConfidence.toString(),
-      },
-      {
-        title: 'Detection Duration',
-        description: 'The duration to process video when an event occurs.',
-        key: 'detectionDuration',
-        type: 'number',
-        value: this.detectionDuration.toString(),
-      },
-      {
-        title: 'Object Detection Interval',
-        description: 'The interval used to detect objects when motion is detected',
-        key: 'objectInterval',
-        type: 'number',
-        value: this.objectInterval.toString(),
-      },
-      {
-        title: 'Face Recognition Interval',
-        description: 'The interval used to recognize faces when a person is detected',
-        key: 'recognitionInterval',
-        type: 'number',
-        value: this.recognitionInterval.toString(),
-      },
-    ];
-  }
-
-  async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
-    const vs = value.toString();
-    this.storage.setItem(key, vs);
-    if (key === 'minConfidence') {
-      this.minConfidence = parseInt(vs) || 0.5;
-    }
-    else if (key === 'detectionDuration') {
-      this.detectionDuration = parseInt(vs) || defaultDetectionDuration;
-    }
-    else if (key === 'objectInterval') {
-      this.objectInterval = parseInt(vs) || defaultObjectInterval;
-    }
-    else if (key === 'recognitionInterval') {
-      this.recognitionInterval = parseInt(vs) || defaultRecognitionInterval;
-    }
-  }
-
-  release() {
-    this.released = true;
-    this.registerMotion?.removeListener();
-    this.registerObject?.removeListener();
-  }
+interface DetectionSession {
+  id: string;
+  minScore: number;
+  events: EventEmitter;
+  running?: boolean;
+
+  rebroadcaster?: Promise<FFMpegRebroadcastSession>;
+  rebroadcasterTimeout?: NodeJS.Timeout;
 }
 
-class TensorFlow extends AutoenableMixinProvider implements ObjectDetection, DeviceProvider, Settings {
+class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DeviceProvider, Settings {
   faceMatcher: FaceMatcher;
+  detectionSessions = new Map<string, DetectionSession>();
+  recognitionInterval = parseInt(this.storage.getItem('recognitionInterval')) || defaultRecognitionInterval;
 
   constructor(nativeId?: string) {
     super(nativeId);
@@ -684,8 +168,229 @@ class TensorFlow extends AutoenableMixinProvider implements ObjectDetection, Dev
     this.reloadFaceMatcher();
   }
 
-  detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected> {
-    throw new Error('Method not implemented.');
+  async addUnknowns(unknowns: { descriptor: Float32Array, nativeId: string, detection: FaceDetection }[], input: Tensor3D, buffer: Buffer) {
+    const newDescriptors = this.faceMatcher?.labeledDescriptors?.slice() || [];
+    newDescriptors.push(...unknowns.map(unk => new LabeledFaceDescriptors('person:' + unk.nativeId, [unk.descriptor])));
+    this.faceMatcher = new FaceMatcher(newDescriptors);
+
+    let fullPromise: Promise<canvas.Image>;
+    const autoAdd = this.storage.getItem('autoAdd') !== 'false';
+    if (!autoAdd)
+      return;
+
+    for (const unknown of unknowns) {
+      if (!fullPromise) {
+        fullPromise = (async () => {
+          const b = buffer || Buffer.from(await encodeJpeg(input));
+          return canvas.loadImage(b);
+        })();
+      }
+
+      const rawNativeId = unknown.nativeId;
+      const nativeId = 'person:' + rawNativeId;
+      await this.discoverPerson(nativeId);
+      const storage = deviceManager.getDeviceStorage(nativeId);
+      const d = unknown.descriptor;
+      storage.setItem('descriptor-0', Buffer.from(d.buffer, d.byteOffset, d.byteLength).toString('base64'));
+
+      (async () => {
+        const full = await fullPromise;
+        const c = createCanvas(unknown.detection.box.width, unknown.detection.box.height);
+        const draw = c.getContext('2d');
+        draw.drawImage(full,
+          unknown.detection.box.x, unknown.detection.box.y, unknown.detection.box.width, unknown.detection.box.height,
+          0, 0, unknown.detection.box.width, unknown.detection.box.height);
+        const cropped = c.toBuffer('image/jpeg');
+
+        require('realfs').writeFileSync(path.join(process.env.SCRYPTED_PLUGIN_VOLUME, nativeId + '.jpg'), cropped)
+      })();
+    }
+  }
+
+  async getDetections(detectionId: string, input: Tensor3D, jpegBuffer: Buffer, minScore: number) {
+    await faceapiPromise;
+    const facesDetected = await faceapi.detectAllFaces(input, new faceapi.SsdMobilenetv1Options({
+      minConfidence: minScore || undefined,
+    }))
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+
+    const faces = facesDetected.map(face => ({
+      className: 'face',
+      score: face.detection.score,
+      boundingBox: makeBoundingBoxFromFace(face),
+    }));
+    let people: FaceRecognitionResult[] = undefined;
+
+    if (this.faceMatcher) {
+      people = [];
+
+      const matches = await Promise.all(facesDetected.map(async (faceDetection) => ({
+        faceDetection,
+        faceMatch: this.faceMatcher.findBestMatch(faceDetection.descriptor),
+      })));
+
+      const unknowns = matches.filter(match => match.faceMatch.label === 'unknown');
+
+      for (const match of matches) {
+        if (match.faceMatch.label === 'unknown')
+          continue;
+
+        const nativeId = match.faceMatch.label;
+        people.push({
+          id: nativeId,
+          label: deviceManager.getDeviceState(nativeId)?.name,
+          score: 1 - match.faceMatch.distance,
+          boundingBox: makeBoundingBoxFromFace(match.faceDetection),
+        });
+      }
+
+      if (unknowns.length) {
+        this.addUnknowns(unknowns.map(unk => ({
+          detection: unk.faceDetection.detection,
+          descriptor: unk.faceDetection.descriptor,
+          nativeId: unk.faceMatch.label,
+        })), input, jpegBuffer);
+      }
+    }
+    else if (faces.length) {
+      this.addUnknowns(facesDetected.map(face => ({
+        descriptor: face.descriptor,
+        detection: face.detection,
+        nativeId: randomBytes(8).toString('hex'),
+      })), input, jpegBuffer)
+    }
+
+    const detection: ObjectsDetected = {
+      timestamp: Date.now(),
+      detectionId,
+      inputDimensions: [input.shape[1], input.shape[0]],
+      faces,
+      people,
+    }
+
+    return detection;
+  }
+
+  async detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected> {
+    let detectionSession = this.detectionSessions.get(session?.detectionId);
+    let detectionId = session?.detectionId;
+    const duration = session?.duration;
+    const minScore = session?.minScore;
+
+    const isImage = mediaObject?.mimeType?.startsWith('image/');
+
+    let ending = false;
+
+    if (!isImage && !detectionId)
+      detectionId = randomBytes(8).toString('hex');
+
+    if (!duration && !isImage) {
+      ending = true;
+    }
+    else if (detectionId && !detectionSession) {
+      if (!mediaObject)
+        throw new Error(`session ${detectionId} inactive and no mediaObject provided`);
+
+      detectionSession = {
+        id: detectionId,
+        minScore,
+        events: new EventEmitter(),
+      };
+      this.detectionSessions.set(detectionId, detectionSession);
+      detectionSession.events.once('ended', () => this.endSession(detectionSession));
+    }
+
+    if (ending) {
+      if (detectionSession)
+        this.endSession(detectionSession);
+      return;
+    }
+
+    if (isImage) {
+      const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg');
+      const input = decodeJpeg(buffer, 3);
+      return this.getDetections(detectionId, input, buffer, minScore);
+    }
+
+    const newSession = !detectionSession.running;
+    if (newSession)
+      detectionSession.running = true;
+
+    clearTimeout(detectionSession.rebroadcasterTimeout);
+    detectionSession.rebroadcasterTimeout = setTimeout(() => detectionSession.rebroadcaster?.then(rb => rb.kill()), duration);
+    if (minScore !== undefined)
+      detectionSession.minScore = minScore;
+
+    if (!newSession) {
+      this.console.log('existing session', detectionSession.id);
+      return;
+    }
+
+    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const rebroadcaster = startRebroadcastSession(ffmpegInput, {
+      console: this.console,
+      parsers: {
+        'rawvideo': createRawVideoParser({
+          pixelFormat: PIXEL_FORMAT_RGB24,
+        })
+      }
+    })
+
+    rebroadcaster.then(session => {
+      session.events.on('killed', () => {
+        detectionSession.rebroadcaster = undefined;
+      });
+      session.events.on('error', e => this.console.log('ffmpeg error', e))
+    });
+
+    (async () => {
+      const session = await rebroadcaster;
+      try {
+        while (detectionSession.running) {
+          const args = await once(session.events, 'rawvideo-data');
+          if (!detectionSession.running)
+            return;
+          const chunk: StreamChunk = args[0];
+
+          const input = tensor3d(Buffer.concat(chunk.chunks), [
+            session.ffmpegInputs.rawvideo.mediaStreamOptions.video.height,
+            session.ffmpegInputs.rawvideo.mediaStreamOptions.video.width,
+            3,
+          ]);
+
+          const detections = await this.getDetections(detectionId, input, undefined, detectionSession.minScore);
+          if (!detectionSession.running)
+            return;
+          this.onDeviceEvent(ScryptedInterface.ObjectDetection, detections);
+          this.console.log(detections);
+
+          await sleep(1000);
+        }
+      }
+      finally {
+        session.kill();
+      }
+    })();
+
+    return {
+      timestamp: Date.now(),
+      detectionId: detectionId,
+      running: true,
+    };
+  }
+
+  endSession(detectionSession: DetectionSession) {
+    this.console.log('detection ended', detectionSession.id)
+    detectionSession.rebroadcaster?.then(session => session.kill());
+    detectionSession.running = false;
+
+    const detections: ObjectsDetected = {
+      detectionId: detectionSession.id,
+      timestamp: Date.now(),
+      running: false,
+    };
+    this.onDeviceEvent(ScryptedInterface.ObjectDetection, detections)
   }
 
   async getInferenceModels(): Promise<ObjectDetectionModel[]> {
@@ -693,7 +398,6 @@ class TensorFlow extends AutoenableMixinProvider implements ObjectDetection, Dev
       {
         id: 'coco-ssd',
         name: 'Coco SSD',
-        classes: Object.values(CLASSES).map(c => c.displayName),
         people: this.getAllPeople().map(person => ({
           id: person.nativeId,
           label: person.name,
@@ -719,12 +423,24 @@ class TensorFlow extends AutoenableMixinProvider implements ObjectDetection, Dev
         value: (this.storage.getItem('autoAdd') !== 'false').toString(),
         type: 'boolean',
         key: 'autoAdd',
-      }
+      },
+      {
+        title: 'Face Recognition Interval',
+        description: 'The interval used to recognize faces when a person is detected',
+        key: 'recognitionInterval',
+        type: 'number',
+        value: this.recognitionInterval.toString(),
+      },
     ]
   }
 
   async putSetting(key: string, value: string | number | boolean): Promise<void> {
-    this.storage.setItem(key, value.toString());
+    const vs = value?.toString();
+    this.storage.setItem(key, vs);
+
+    if (key === 'recognitionInterval') {
+      this.recognitionInterval = parseInt(vs) || defaultRecognitionInterval;
+    }
   }
 
   reloadFaceMatcher() {
@@ -741,9 +457,6 @@ class TensorFlow extends AutoenableMixinProvider implements ObjectDetection, Dev
 
     if (labelledDescriptors.length)
       this.faceMatcher = new FaceMatcher(labelledDescriptors);
-  }
-
-  async discoverDevices(duration: number): Promise<void> {
   }
 
   getAllDescriptors(device: ScryptedDeviceBase) {
@@ -771,22 +484,6 @@ class TensorFlow extends AutoenableMixinProvider implements ObjectDetection, Dev
   async getDevice(nativeId: string) {
     if (nativeId.startsWith('person:'))
       return new RecognizedPerson(this, nativeId);
-  }
-
-  async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-    if ((interfaces.includes(ScryptedInterface.VideoCamera) || interfaces.includes(ScryptedInterface.Camera))
-      && interfaces.includes(ScryptedInterface.MotionSensor)) {
-      return [ScryptedInterface.ObjectDetector, ScryptedInterface.Settings];
-    }
-    return null;
-  }
-
-  async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
-    this.setHasEnabledMixin(mixinDeviceState.id);
-    return new TensorFlowMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this);
-  }
-  async releaseMixin(id: string, mixinDevice: any) {
-    mixinDevice.release();
   }
 }
 
