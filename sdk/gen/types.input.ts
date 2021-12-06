@@ -603,19 +603,23 @@ export interface Position {
   latitude?: number;
   longitude?: number;
 }
-export interface ObjectDetectionResult {
+export interface BoundingBoxResult {
+  /**
+   * x, y, width, height
+   */
+  boundingBox?: [number, number, number, number],
+}
+export interface ObjectDetectionResult extends BoundingBoxResult {
   id?: string;
   className: string;
   score: number;
-  boundingBox?: [number, number, number, number],
 }
 export interface FaceRecognitionCandidate {
   id: string;
   label: string;
 }
-export interface FaceRecognitionResult extends FaceRecognitionCandidate {
+export interface FaceRecognitionResult extends BoundingBoxResult, FaceRecognitionCandidate {
   score?: number,
-  boundingBox?: [number, number, number, number];
 }
 export interface ObjectsDetected {
   /**
