@@ -577,6 +577,7 @@ addSupportedType({
                 const resetSensorTimeout = () => {
                     clearTimeout(timeout);
                     timeout = setTimeout(() => {
+                        contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
                         sensor.updateCharacteristic(Characteristic.ContactSensorState, contactState);
                     }, (parseInt(storage.getItem('objectDetectionContactSensorTimeout')) || defaultObjectDetectionContactSensorTimeout) * 1000)
                 }
@@ -589,13 +590,11 @@ addSupportedType({
                     if (!isPerson) {
                         if (!ed.detections)
                             return contactState;
+
                         const objects = ed.detections.map(d => d.className);
                         if (objects.includes(ojs)) {
                             contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
                             resetSensorTimeout();
-                        }
-                        else {
-                            contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
                         }
 
                         return contactState;
@@ -605,8 +604,10 @@ addSupportedType({
                         return contactState;
 
                     const people = ed.people.map(d => 'Person: ' + d.label);
-                    contactState = people.includes(ojs) ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED;
-
+                    if (people.includes(ojs)) {
+                        contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+                        resetSensorTimeout();
+                    }
                     return contactState;
                 }, true);
             }
