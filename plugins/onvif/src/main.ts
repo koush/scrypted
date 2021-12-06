@@ -57,7 +57,7 @@ class OnvifCamera extends RtspSmartCamera {
         if (!id) {
             const vsos = await this.getVideoStreamOptions();
             const vso = this.getDefaultStream(vsos);
-            id = vso.id;
+            id = vso?.id;
         }
 
         snapshot = await client.jpegSnapshot(id);
@@ -68,7 +68,7 @@ class OnvifCamera extends RtspSmartCamera {
             // so we can take advantage of the rebroadcast plugin if available.
             const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
             return realDevice.getVideoStream({
-                id: options.id,
+                id,
             });
 
             // todo: this is bad. just disable camera interface altogether.
