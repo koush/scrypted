@@ -10,8 +10,8 @@ RUN apt-get -y upgrade
 RUN apt-get -y install software-properties-common apt-utils
 RUN apt-get -y update
 
-RUN apt-get -y install \
 # base development stuff
+RUN apt-get -y install \
     build-essential \
     gcc \
     gir1.2-gtk-3.0 \
@@ -24,8 +24,10 @@ RUN apt-get -y install \
     libopenjp2-7 \
     libpango1.0-dev \
     librsvg2-dev \
-    pkg-config \
+    pkg-config
+
 # python native
+RUN apt-get -y install \
     python3.9 \
     python3-dev \
     python3-gi \
@@ -34,10 +36,14 @@ RUN apt-get -y install \
     python3-numpy \
     python3-pil \
     python3-pip \
-    python3-skimage \
+    python3-skimage
+
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
-    gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
+RUN apt-get -y install \
+    gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+
 # Coral Edge TPU
+RUN apt-get -y install \
     libedgetpu1-std
 
 # python pip
@@ -47,9 +53,6 @@ RUN python3 -m pip install aiofiles debugpy
 # RUN apt-get -y install libopencv-dev
 # sanity check
 # RUN pkg-config opencv4 --libs
-
-# sanity check
-RUN python3.9 -v
 
 # TODO: I don't think this even works anymore on latest raspbian. should maybe switch to v4l2.
 # grab raspbian (omx) ffmpeg, since we don't know at build time whether this is
