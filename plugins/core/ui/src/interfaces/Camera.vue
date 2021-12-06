@@ -53,14 +53,31 @@ export default {
       if (!this.lastDetection) return "";
 
       let contents = "";
-      for (const detection of this.lastDetection.detections) {
+
+      for (const detection of this.lastDetection.detections || []) {
         const sw = 2;
         const s = "red";
         const x = detection.boundingBox[0];
         const y = detection.boundingBox[1];
-        const w = detection.boundingBox[2] - x;
-        const h = detection.boundingBox[3] - y;
+        const w = detection.boundingBox[2];
+        const h = detection.boundingBox[3];
         const t = detection.className;
+        const fs = 20;
+        const box =
+        `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
+        <text x="${x}" y="${y-5}" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
+        <text x="${x}" y="${y-5}" font-size="${fs}" fill="white">${t}</text>`;
+        contents += box;
+      }
+
+      for (const detection of this.lastDetection.people || []) {
+        const sw = 2;
+        const s = "red";
+        const x = detection.boundingBox[0];
+        const y = detection.boundingBox[1];
+        const w = detection.boundingBox[2];
+        const h = detection.boundingBox[3];
+        const t = detection.label;
         const fs = 20;
         const box =
         `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
