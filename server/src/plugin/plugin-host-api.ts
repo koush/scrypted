@@ -47,8 +47,9 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         const mixins: string[] = getState(device, ScryptedInterfaceProperty.mixins) || [];
         if (!mixins.includes(mixinProvider._id))
             throw new Error(`${mixinProvider._id} is not a mixin provider for ${id}`);
-        const tableEntry = (await this.scrypted.devices[device._id].handler.mixinTable).find(entry => entry.mixinProviderId === mixinProvider._id);
-        if (!tableEntry.interfaces.includes(eventInterface))
+        const tableEntry = this.scrypted.devices[device._id].handler.mixinTable.find(entry => entry.mixinProviderId === mixinProvider._id);
+        const { interfaces } = await tableEntry.entry;
+        if (!interfaces.has(eventInterface))
             throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
         this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
     }

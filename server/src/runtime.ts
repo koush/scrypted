@@ -424,6 +424,15 @@ export class ScryptedRuntime {
         return proxyPair;
     }
 
+    // should this be async?
+    invalidatePluginDeviceMixins(id: string) {
+        const proxyPair = this.devices[id];
+        if (!proxyPair)
+            return;
+        proxyPair.handler.invalidateMixinTable();
+        return proxyPair;
+    }
+
     async installNpm(pkg: string, version?: string): Promise<PluginHost> {
         const registry = (await axios(`https://registry.npmjs.org/${pkg}`)).data;
         if (!version) {

@@ -29,7 +29,7 @@ export class PluginComponent {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
         this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
         await this.scrypted.datastore.upsert(pluginDevice);
-        const device = this.scrypted.invalidatePluginDevice(id);
+        const device = this.scrypted.invalidatePluginDeviceMixins(id);
         await device?.handler.ensureProxy();
     }
     async getMixins(id: string) {
