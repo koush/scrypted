@@ -63,6 +63,14 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             }
         }
 
+        // settings.push({
+        //     title: 'H265 Streams',
+        //     key: 'h265Support',
+        //     description: 'Camera outputs h265 codec streams.',
+        //     value: (this.storage.getItem('h265Support') === 'true').toString(),
+        //     type: 'boolean',
+        // });
+
         settings.push({
             title: 'HomeKit Transcoding',
             group: 'HomeKit Transcoding',

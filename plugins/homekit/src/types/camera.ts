@@ -1,6 +1,6 @@
 import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectDetection, ObjectsDetected } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
-import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
+import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
 
 import sdk from '@scrypted/sdk';
@@ -395,9 +395,14 @@ addSupportedType({
         // ensureHasWidthResolution(streamingResolutions, 1280, 720);
         // ensureHasWidthResolution(streamingResolutions, 1920, 1080);
 
+        const storage = deviceManager.getMixinStorage(device.id, undefined);
+        const h265Support = storage.getItem('h265Support') === 'true';
+        const codecType = h265Support ? VideoCodecType.H265 : VideoCodecType.H264
+
         const streamingOptions: CameraStreamingOptions = {
             video: {
                 codec: {
+                    type: VideoCodecType.H264,
                     levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
                     profiles: [H264Profile.MAIN],
                 },
@@ -430,7 +435,6 @@ addSupportedType({
 
         const accessory = makeAccessory(device);
 
-        const storage = deviceManager.getMixinStorage(device.id, undefined);
         const detectAudio = storage.getItem('detectAudio') === 'true';
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
         const linkedMotionSensor = storage.getItem('linkedMotionSensor');
@@ -478,6 +482,7 @@ addSupportedType({
 
                 video: {
                     codec: {
+                        type: codecType,
                         levels: [H264Level.LEVEL3_1, H264Level.LEVEL3_2, H264Level.LEVEL4_0],
                         profiles: [H264Profile.BASELINE, H264Profile.MAIN, H264Profile.HIGH],
                     },
