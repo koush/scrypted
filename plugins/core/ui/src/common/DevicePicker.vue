@@ -1,5 +1,6 @@
 <template>
   <v-select
+    dense
     v-model="lazyValue"
     :items="devices"
     item-value="id"

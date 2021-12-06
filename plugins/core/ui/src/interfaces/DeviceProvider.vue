@@ -4,7 +4,6 @@
       v-if="createDeviceSettings"
       :value="true"
       max-width="600px"
-      persistent
     >
       <Settings v-model="createDeviceSettings" :noTitle="true" class="pa-2">
         <template v-slot:append>
