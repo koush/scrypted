@@ -57,7 +57,7 @@ export class EventRegistry {
         // system listeners only get state changes.
         // there are many potentially noisy stateless events, like
         // object detection and settings changes.
-        if (property) {
+        if (property || eventInterface === ScryptedInterface.ScryptedDevice) {
             for (const event of this.systemListeners) {
                 event(id, eventDetails, value);
             }
