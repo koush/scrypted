@@ -469,9 +469,9 @@ export function startPluginRemote() {
 
     let _pluginConsole: Console;
     const getPluginConsole = () => {
-        if (_pluginConsole)
-            return _pluginConsole;
-        _pluginConsole = getDeviceConsole(undefined);
+        if (!_pluginConsole)
+            _pluginConsole = getDeviceConsole(undefined);
+        return _pluginConsole;
     }
 
     attachPluginRemote(peer, {
