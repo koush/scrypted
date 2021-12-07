@@ -1,0 +1,13 @@
+version: '3.5'
+
+services:
+    scrypted:
+        image: koush/scrypted
+        container_name: scrypted
+        restart: unless-stopped
+        network_mode: host
+        environment:
+            - TZ=America/Seattle
+        volumes:
+            - ~/.scrypted/volume:/server/volume
+
