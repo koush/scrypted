@@ -41,7 +41,7 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
         delete ctx.WebSocket;
         delete ctx.pluginHostAPI;
 
-        const replFilter = new Set<string>(['require', 'localStorage'])
+        const replFilter = new Set<string>(['require', 'localStorage', 'exports', '__filename'])
         const replVariables = Object.keys(ctx).filter(key => !replFilter.has(key));
 
         const welcome = `JavaScript REPL variables:\n${replVariables.map(key => '  ' + key).join('\n')}\n\n`;

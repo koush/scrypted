@@ -50,7 +50,7 @@ async function startServer() {
 }
 
 export function getInstallDir() {
-    return path.join(os.homedir(), '.scrypted');
+    return process.env.SCRYPTED_INSTALL_PATH || path.join(os.homedir(), '.scrypted');
 }
 
 export function cwdInstallDir(): { volume: string, installDir: string } {
