@@ -46,6 +46,7 @@ class SmtpMixin extends SettingsMixinDeviceBase<Settings> {
         this.console.log('mail text:', parsed.text);
         const { onText, offText } = this.storage;
 
+        // turn the device on if there is no on text (empty default behavior), or on text matches
         if (!onText || (parsed.text.indexOf(onText) !== -1)) {
             if (this.realDevice.interfaces.includes(ScryptedInterface.OnOff)) {
                 this.console.log('SMTP turning on device.');
@@ -56,8 +57,8 @@ class SmtpMixin extends SettingsMixinDeviceBase<Settings> {
                 this.realDevice.start();
             }
         }
-
-        if ((!offText && onText) || (offText && parsed.text.indexOf(offText) !== -1)) {
+        // otherwise turn the device off if there is no off text (empty default behavior), or the off text matches
+        else if ((!offText && onText) || (offText && parsed.text.indexOf(offText) !== -1)) {
             if (this.realDevice.interfaces.includes(ScryptedInterface.OnOff)) {
                 this.console.log('SMTP turning off device.');
                 this.realDevice.turnOff();
