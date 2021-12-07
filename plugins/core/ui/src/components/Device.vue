@@ -260,38 +260,6 @@
             </v-card-actions>
           </v-card>
         </v-flex>
-        <!--
-        <v-flex xs12 v-if="!ownerDevice && pluginData">
-          <v-card raised>
-            <v-card-title
-              class="green-gradient subtitle-1 text--white font-weight-light"
-            >
-              <font-awesome-icon size="sm" icon="database" />
-              &nbsp;&nbsp;Plugin Management
-            </v-card-title>
-            <v-card-text></v-card-text>
-            <v-container>
-              <v-layout>
-                <v-flex>
-                  <v-btn outlined color="blue" @click="reloadPlugin"
-                    >Reload Plugin</v-btn
-                  >
-                </v-flex>
-              </v-layout></v-container
-            >
-            <v-card-actions>
-              <v-btn text color="primary" @click="showStorage = !showStorage"
-                >Storage</v-btn
-              >
-
-              <v-spacer></v-spacer>
-              <PluginAdvancedUpdate
-                :pluginData="pluginData"
-                @installed="reload"
-              />
-            </v-card-actions>
-          </v-card>
-        </v-flex> -->
 
         <v-flex xs12 v-if="deviceComponent && deviceComponent !== 'Script'">
           <component

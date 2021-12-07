@@ -6,6 +6,8 @@ import https from 'https';
 import { randomBytes } from "crypto";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
+export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
+
 const { log, deviceManager, mediaManager } = sdk;
 
 const httpsAgent = new https.Agent({
