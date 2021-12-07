@@ -71,7 +71,7 @@ class GstPipeline:
         with self.condition:
             self.running = False
             self.condition.notify_all()
-        worker.join()
+        # worker.join()
 
     def on_bus_message(self, bus, message):
         t = message.type

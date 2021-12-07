@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/objectdetector",
-   "version": "0.0.18",
+   "version": "0.0.19",
    "description": "Object Detector for VideoCameras. Installed alongside a detection service.",
    "author": "Scrypted",
    "license": "Apache-2.0",

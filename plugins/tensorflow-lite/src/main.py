@@ -169,6 +169,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def end_session(self, detection_session: DetectionSession):
         print('detection ended', detection_session.id)
         detection_session.cancel()
+        safe_set_result(detection_session.future)
         with self.session_mutex:
             self.detection_sessions.pop(detection_session.id, None)
 
@@ -177,6 +178,13 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         detection_result['timestamp'] = int(time.time() * 1000)
 
         self.detection_event(detection_session, detection_result)
+
+    def create_detection_result_status(self, detection_id: str, running: bool):
+        detection_result: ObjectsDetected = {}
+        detection_result['detectionId'] = detection_id
+        detection_result['running'] = running
+        detection_result['timestamp'] = int(time.time() * 1000)
+        return detection_result
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         score_threshold = None
@@ -219,7 +227,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if ending:
             if detection_session:
                 self.end_session(detection_session)
-            return
+            return self.create_detection_result_status(detection_id, False)
 
         if is_image:
             stream = io.BytesIO(bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')))
@@ -249,7 +257,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         if not new_session:
             print("existing session", detection_session.id)
-            return
+            return self.create_detection_result_status(detection_id, detection_session.running)
 
         print('detection starting', detection_id)
         b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.MediaStreamUrl.value)
@@ -301,11 +309,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         # detection_session.thread = threading.Thread(target=lambda: pipeline.run())
         # detection_session.thread.start()
 
-        detection_result: ObjectsDetected = {}
-        detection_result['detectionId'] = detection_id
-        detection_result['running'] = True
-        detection_result['timestamp'] = int(time.time() * 1000)
-        return detection_result
+        return self.create_detection_result_status(detection_id, True)
 
 
 def create_scrypted_plugin():

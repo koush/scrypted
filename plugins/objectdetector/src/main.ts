@@ -1,9 +1,10 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDeviceBase, ScryptedDevice, ObjectDetectionResult, FaceRecognitionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDeviceBase, ScryptedDevice, ObjectDetectionResult, FaceRecognitionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { randomBytes } from 'crypto';
 import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
 import { DenoisedDetectionEntry, denoiseDetections } from './denoise';
+import { settings } from 'cluster';
 
 export interface DetectionInput {
   jpegBuffer?: Buffer;
@@ -31,7 +32,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
   currentPeople: DenoisedDetectionEntry<FaceRecognitionResult>[] = [];
   objectDetection: ObjectDetection & ScryptedDevice;
-  detectionId = randomBytes(8).toString('hex');
+  detectionId: string;
+  running = false;
 
   constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, public objectDetectionPlugin: ObjectDetectionPlugin) {
     super(mixinDevice, mixinDeviceState, {
@@ -42,6 +44,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     });
 
     this.realDevice = systemManager.getDeviceById<Camera & VideoCamera & ObjectDetector & MotionSensor>(this.id);
+    this.detectionId = 'objectdetection-' + this.realDevice.id;
 
     this.bindObjectDetection();
     this.register();
@@ -57,7 +60,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
 
   resetDetectionTimeout() {
     this.clearDetectionTimeout();
-    this.detectionIntervalTimeout = setInterval(() => this.detectPicture(), this.detectionInterval * 1000);
+    this.detectionIntervalTimeout = setInterval(() => {
+      if (!this.running)
+        this.detectPicture();
+    }, this.detectionInterval * 1000);
   }
 
   async detectPicture() {
@@ -70,6 +76,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 
   bindObjectDetection() {
+    this.running = false;
     this.detectionListener?.removeListener();
     this.detectionListener = undefined;
     this.objectDetection?.detectObjects(undefined, {
@@ -93,6 +100,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         return;
       this.objectsDetected(eventData);
       this.reportObjectDetections(eventData, undefined);
+
+      this.running = eventData.running;
     });
   }
 
@@ -100,12 +109,32 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     this.motionListener = this.realDevice.listen(ScryptedInterface.MotionSensor, async () => {
       if (!this.realDevice.motionDetected)
         return;
-      this.resetDetectionTimeout();
-      this.objectDetection?.detectObjects(await this.realDevice.getVideoStream(), {
-        detectionId: this.detectionId,
-        duration: this.detectionDuration * 1000,
-        minScore: this.minConfidence,
-      });
+
+      // prevent stream retrieval noise until notified that the detection is no logner running.
+      if (this.running)
+        return;
+      this.running = true;
+
+      try {
+        let selectedStream: MediaStreamOptions;
+
+        const streamingChannel = this.storage.getItem('streamingChannel');
+        if (streamingChannel) {
+          const msos = await this.realDevice.getVideoStreamOptions();
+          selectedStream = msos.find(mso => mso.name === streamingChannel);
+        }
+
+        const session = await this.objectDetection?.detectObjects(await this.realDevice.getVideoStream(selectedStream), {
+          detectionId: this.detectionId,
+          duration: this.detectionDuration * 1000,
+          minScore: this.minConfidence,
+        });
+
+        this.running = session.running;
+      }
+      catch (e) {
+        this.running = false;
+      }
     });
   }
 
@@ -129,7 +158,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 
   async objectsDetected(detectionResult: ObjectsDetected) {
-    this.resetDetectionTimeout();
     if (!detectionResult?.detections) {
       // detection session ended.
       return;
@@ -229,7 +257,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
   }
 
   async getMixinSettings(): Promise<Setting[]> {
-    return [
+    const settings: Setting[] = [];
+
+    settings.push(
       {
         title: 'Object Detector',
         key: 'objectDetection',
@@ -237,6 +267,26 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         deviceFilter: `interfaces.includes("${ScryptedInterface.ObjectDetection}")`,
         value: this.storage.getItem('objectDetection'),
       },
+    );
+
+    let msos: MediaStreamOptions[] = [];
+    try {
+      msos = await this.realDevice.getVideoStreamOptions();
+    }
+    catch (e) {
+    }
+
+    if (msos?.length) {
+      settings.push({
+        title: 'Video Stream',
+        key: 'streamingChannel',
+        value: this.storage.getItem('streamingChannel') || msos[0].name,
+        description: 'The media stream to analyze.',
+        choices: msos.map(mso => mso.name),
+      });
+    }
+
+    settings.push(
       {
         title: 'Minimum Detection Confidence',
         description: 'Higher values eliminate false positives and low quality recognition candidates.',
@@ -265,7 +315,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
         type: 'number',
         value: this.detectionTimeout.toString(),
       },
-    ];
+    );
+    return settings;
   }
 
   async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
@@ -279,11 +330,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<ObjectDetector> imple
     }
     else if (key === 'detectionInterval') {
       this.detectionInterval = parseInt(vs) || defaultDetectionInterval;
+      this.resetDetectionTimeout();
     }
     else if (key === 'detectionTimeout') {
       this.detectionTimeout = parseInt(vs) || defaultDetectionTimeout;
     }
     else if (key === 'objectDetection') {
+      this.bindObjectDetection();
+    }
+    else if (key === 'streamingChannel') {
       this.bindObjectDetection();
     }
   }
