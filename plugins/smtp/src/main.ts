@@ -58,7 +58,7 @@ class SmtpMixin extends SettingsMixinDeviceBase<Settings> {
             }
         }
         // otherwise turn the device off if there is no off text (empty default behavior), or the off text matches
-        else if ((!offText && onText) || (offText && parsed.text.indexOf(offText) !== -1)) {
+        else if (!offText || (offText && parsed.text.indexOf(offText) !== -1)) {
             if (this.realDevice.interfaces.includes(ScryptedInterface.OnOff)) {
                 this.console.log('SMTP turning off device.');
                 this.realDevice.turnOff();
