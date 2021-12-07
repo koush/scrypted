@@ -1,4 +1,4 @@
-name: Publish Scrypted
+name: Publish Scrypted Base OS
 
 on:
   workflow_dispatch:
