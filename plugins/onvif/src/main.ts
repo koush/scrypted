@@ -1,6 +1,6 @@
-import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery } from "@scrypted/sdk";
+import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetection, ObjectDetector, ObjectDetectionTypes, ObjectsDetected } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
-import { RtspSmartCamera, RtspProvider, Destroyable, RtspMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 import xml2js from 'xml2js';
 import onvif from 'onvif';
@@ -25,10 +25,24 @@ function convertAudioCodec(codec: string) {
     return codec?.toLowerCase();
 }
 
-class OnvifCamera extends RtspSmartCamera {
+class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
     eventStream: Stream;
     client: OnvifCameraAPI;
-    rtspMediaStreamOptions: Promise<RtspMediaStreamOptions[]>;
+    rtspMediaStreamOptions: Promise<UrlMediaStreamOptions[]>;
+
+    getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject> {
+        throw new Error("Method not implemented.");
+    }
+
+    async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        const client = await this.getClient();
+        const classes = await client.getEventTypes();
+        const faces = classes.includes('face');
+        return {
+            classes,
+            faces,
+        }
+    }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         try {
@@ -76,13 +90,13 @@ class OnvifCamera extends RtspSmartCamera {
         return mediaManager.createMediaObject(snapshot, 'image/jpeg');
     }
 
-    async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+    async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         if (!this.rtspMediaStreamOptions) {
             this.rtspMediaStreamOptions = new Promise(async (resolve) => {
                 try {
                     const client = await this.getClient();
                     const profiles: any[] = await client.getProfiles();
-                    const ret: RtspMediaStreamOptions[] = [];
+                    const ret: UrlMediaStreamOptions[] = [];
                     for (const { $, name, videoEncoderConfiguration, audioEncoderConfiguration } of profiles) {
                         try {
                             ret.push({
@@ -144,9 +158,21 @@ class OnvifCamera extends RtspSmartCamera {
                 ret.emit('error', e);
                 return;
             }
+
+            try {
+                const eventTypes = await client.getEventTypes();
+                if (!eventTypes)
+                    return;
+                if (this.storage.getItem('onvifDetector') !== 'true') {
+                    this.storage.setItem('onvifDetector', 'true');
+                    this.updateDevice();
+                }
+            }
+            catch (e) {
+            }
             this.console.log('listening events');
             const events = client.listenEvents();
-            events.on('event', event => {
+            events.on('event', (event, className) => {
                 if (event === OnvifEvent.MotionBuggy) {
                     this.motionDetected = true;
                     clearTimeout(motionTimeout);
@@ -166,6 +192,19 @@ class OnvifCamera extends RtspSmartCamera {
                     this.binaryState = true;
                 else if (event === OnvifEvent.BinaryStop)
                     this.binaryState = false;
+                else if (event === OnvifEvent.Detection) {
+                    const d: ObjectsDetected = {
+                        timestamp: Date.now(),
+                        faces: className === 'face' ? [] : undefined,
+                        detections: [
+                            {
+                                score: undefined,
+                                className,
+                            }
+                        ]
+                    }
+                    this.onDeviceEvent(ScryptedInterface.ObjectDetector, d);
+                }
             })
         })();
         ret.destroy = () => {
@@ -219,6 +258,17 @@ class OnvifCamera extends RtspSmartCamera {
         ]
     }
 
+    updateDevice() {
+        const interfaces: string[] = [...this.provider.getInterfaces()];
+        if (this.storage.getItem('onvifDetector') === 'true')
+            interfaces.push(ScryptedInterface.ObjectDetector);
+        const doorbell = this.storage.getItem('onvifDoorbell');
+        if (doorbell === 'true')
+            this.provider.updateDevice(this.nativeId, this.name, [...interfaces, ScryptedInterface.BinarySensor], ScryptedDeviceType.Doorbell)
+        else
+            this.provider.updateDevice(this.nativeId, this.name, interfaces);
+    }
+
     async putSetting(key: string, value: string) {
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
@@ -227,10 +277,7 @@ class OnvifCamera extends RtspSmartCamera {
             return super.putSetting(key, value);
 
         this.storage.setItem(key, value);
-        if (value === 'true')
-            this.provider.updateDevice(this.nativeId, this.name, [...this.provider.getInterfaces(), ScryptedInterface.BinarySensor], ScryptedDeviceType.Doorbell)
-        else
-            this.provider.updateDevice(this.nativeId, this.name, this.provider.getInterfaces())
+        this.updateDevice();
     }
 }
 
@@ -242,11 +289,11 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
         onvif.Discovery.on('device', (cam: any, rinfo: any, xml: any) => {
             // Function will be called as soon as the NVT responses
-               
+
             // Parsing of Discovery responses taken from my ONVIF-Audit project, part of the 2018 ONVIF Open Source Challenge
             // Filter out xml name spaces
             xml = xml.replace(/xmlns([^=]*?)=(".*?")/g, '');
-        
+
             let parser = new xml2js.Parser({
                 attrkey: 'attr',
                 charkey: 'payload',                // this ensures the payload is called .payload regardless of whether the XML Tags have Attributes or not
@@ -263,12 +310,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
                     let xaddrs = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['XAddrs'][0].payload;
                     let scopes = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['Scopes'][0].payload;
                     scopes = scopes.split(" ");
-        
+
                     let hardware = "";
                     let name = "";
                     for (let i = 0; i < scopes.length; i++) {
-                        if (scopes[i].includes('onvif://www.onvif.org/name')) {name = decodeURI(scopes[i].substring(27));}
-                        if (scopes[i].includes('onvif://www.onvif.org/hardware')) {hardware = decodeURI(scopes[i].substring(31));}
+                        if (scopes[i].includes('onvif://www.onvif.org/name')) { name = decodeURI(scopes[i].substring(27)); }
+                        if (scopes[i].includes('onvif://www.onvif.org/hardware')) { hardware = decodeURI(scopes[i].substring(31)); }
                     }
                     let msg = 'Discovery Reply from ' + rinfo.address + ' (' + name + ') (' + hardware + ') (' + xaddrs + ') (' + urn + ')';
                     this.console.log(msg);
@@ -318,7 +365,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
 
             this.storage.setItem('autodiscovery', 'true');
         }
-        else if(ad === 'false') {
+        else if (ad === 'false') {
             // auto discovery is disabled, but maybe we can reenable it.
             if (!cameraCount) {
                 this.console.log('autodiscovery reenabled, no cameras found');

@@ -20,6 +20,7 @@ export enum OnvifEvent {
     BinaryStart,
     BinaryStop,
     CellMotion,
+    Detection,
 }
 
 function stripNamespaces(topic: string) {
@@ -55,6 +56,7 @@ export class OnvifCameraAPI {
     profiles: Promise<any>;
     binaryStateEvent: string;
     digestAuth: AxiosDigestAuth;
+    detections = new Map<string, string>();
 
     constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string, public debug?: boolean) {
         this.binaryStateEvent = binaryStateEvent
@@ -76,7 +78,7 @@ export class OnvifCameraAPI {
             }
 
             if (event.message.message.data && event.message.message.data.simpleItem) {
-                const dataValue = event.message.message.data.simpleItem.$.Value
+                const dataValue = event.message.message.data.simpleItem.$.Value;
                 if (eventTopic.includes('MotionAlarm')) {
                     // ret.emit('event', OnvifEvent.MotionBuggy);
                     if (dataValue)
@@ -99,6 +101,18 @@ export class OnvifCameraAPI {
                     // unclear if the IsMotion false is indicative of motion stop?
                     if (event.message.message.data.simpleItem.$.Name === 'IsMotion' && dataValue) {
                         ret.emit('event', OnvifEvent.MotionBuggy);
+                    }
+                }
+                else if (eventTopic.includes('RuleEngine/ObjectDetector')) {
+                    if (dataValue) {
+                        try {
+                            const eventName = event.message.message.data.simpleItem.$.Name;
+                            const className = this.detections.get(eventName);
+                            ret.emit('event', OnvifEvent.Detection, className);
+                        }
+                        catch (e) {
+                            this.console.warn('error parsing detection', e);
+                        }
                     }
                 }
             }
@@ -147,6 +161,32 @@ export class OnvifCameraAPI {
                 }
 
                 resolve(undefined);
+            });
+        })
+    }
+
+    async getEventTypes(): Promise<string[]> {
+        return new Promise((resolve, reject) => {
+            this.cam.getEventProperties((err, data, xml) => {
+                if (err) {
+                    this.console.log('getEventTypes error', err);
+                    return reject(err);
+                }
+
+                this.console.log(xml);
+                for (const [className, entry] of Object.entries(data.topicSet.ruleEngine.objectDetector) as any) {
+                    try {
+                        const eventName = entry.messageDescription.data.simpleItemDescription.$.Name;
+                        this.detections.set(eventName, className);
+                    }
+                    catch (e) {
+                    }
+                }
+
+                if (this.detections.size === 0)
+                    this.detections = undefined;
+
+                resolve([...this.detections.values()]);
             });
         })
     }
