@@ -36,6 +36,7 @@ RUN apt-get -y install \
     python3-numpy \
     python3-pil \
     python3-pip \
+    python3-setuptools \
     python3-skimage
 
 # gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
@@ -47,7 +48,7 @@ RUN apt-get -y install \
     libedgetpu1-std
 
 # python pip
-RUN python3 -m pip install aiofiles debugpy typing_extensions typing setuptools
+RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 
 # opencv
 # RUN apt-get -y install libopencv-dev
