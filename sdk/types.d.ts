@@ -1175,7 +1175,7 @@ export interface Setting {
     group?: string;
     description?: string;
     placeholder?: string;
-    type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer';
+    type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button';
     readonly?: boolean;
     choices?: string[];
     combobox?: boolean;

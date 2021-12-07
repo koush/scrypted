@@ -47,7 +47,7 @@ RUN apt-get -y install \
     libedgetpu1-std
 
 # python pip
-RUN python3 -m pip install aiofiles debugpy
+RUN python3 -m pip install aiofiles debugpy typing_extensions typings
 
 # opencv
 # RUN apt-get -y install libopencv-dev

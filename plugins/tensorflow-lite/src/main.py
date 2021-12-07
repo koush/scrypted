@@ -1,7 +1,7 @@
 from __future__ import annotations
 from asyncio.events import AbstractEventLoop, TimerHandle
 from asyncio.futures import Future
-from typing import Any, Mapping
+from typing import Any, Mapping, List
 from safe_set_result import safe_set_result
 import scrypted_sdk
 import numpy as np
@@ -28,6 +28,7 @@ from third_party.sort import Sort
 import threading
 
 from scrypted_sdk.types import FFMpegInput, Lock, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionSession, OnOff, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -86,13 +87,13 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             self.interpreter = make_interpreter(model)
         else:
             model = scrypted_sdk.zip.open(
-            'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
+                'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
             self.interpreter = tflite.Interpreter(model_content=model)
         self.interpreter.allocate_tensors()
         self.mutex = multiprocessing.Lock()
 
     async def getInferenceModels(self) -> list[ObjectDetectionModel]:
-        ret = list[ObjectDetectionModel]()
+        ret: List[ObjectDetectionModel] = []
         _, height, width, channels = self.interpreter.get_input_details()[
             0]['shape']
 
@@ -106,7 +107,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         return ret
 
     def create_detection_result(self, objs, size, tracker: Sort = None):
-        detections = list[ObjectDetectionResult]()
+        detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = size
@@ -205,7 +206,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection_id = binascii.b2a_hex(os.urandom(15)).decode('utf8')
 
             if detection_id:
-                detection_session = self.detection_sessions.get(detection_id, None)
+                detection_session = self.detection_sessions.get(
+                    detection_id, None)
 
             if not duration and not is_image:
                 ending = True
@@ -216,7 +218,8 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
                 detection_session = DetectionSession()
                 detection_session.id = detection_id
-                detection_session.score_threshold = score_threshold or -float('inf')
+                detection_session.score_threshold = score_threshold or - \
+                    float('inf')
                 loop = asyncio.get_event_loop()
                 detection_session.loop = loop
                 self.detection_sessions[detection_id] = detection_session
@@ -245,7 +248,7 @@ class CoralPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 objs = detect.get_objects(
                     self.interpreter, score_threshold=score_threshold or -float('inf'), image_scale=scale)
 
-            return self.create_detection_result(objs, image.size, tracker = tracker)
+            return self.create_detection_result(objs, image.size, tracker=tracker)
 
         new_session = not detection_session.running
         if new_session:

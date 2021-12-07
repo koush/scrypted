@@ -1,8 +1,7 @@
 from asyncio.futures import Future
-from typing import Callable
+from typing import Callable, Mapping, List
 import traceback
 import inspect
-from collections.abc import Mapping, Sequence
 import weakref
 
 jsonSerializable = set()
@@ -47,7 +46,7 @@ class RpcProxyMethod:
 
 
 class RpcProxy(object):
-    def __init__(self, peer, proxyId: str, proxyConstructorName: str, proxyProps: any, proxyOneWayMethods: list[str]):
+    def __init__(self, peer, proxyId: str, proxyConstructorName: str, proxyProps: any, proxyOneWayMethods: List[str]):
         self.__dict__['__proxy_id'] = proxyId
         self.__dict__['__proxy_constructor'] = proxyConstructorName
         self.__dict__['__proxy_peer'] = peer
@@ -70,6 +69,7 @@ class RpcProxy(object):
 
 
 class RpcPeer:
+    # todo: these are all class statics lol, fix this.
     idCounter = 1
     peerName = 'Unnamed Peer'
     params: Mapping[str, any] = {}
@@ -84,7 +84,7 @@ class RpcPeer:
     def __init__(self, send: Callable[[object, Callable[[Exception], None]], None]) -> None:
         self.send = send
 
-    def __apply__(self, proxyId: str, oneWayMethods: list[str], method: str, args: list):
+    def __apply__(self, proxyId: str, oneWayMethods: List[str], method: str, args: list):
         serializedArgs = []
         for arg in args:
             serializedArgs.append(self.serialize(arg, False))
@@ -176,7 +176,7 @@ class RpcPeer:
         }
         self.send(rpcFinalize)
 
-    def newProxy(self, proxyId: str, proxyConstructorName: str, proxyProps: any, proxyOneWayMethods: list[str]):
+    def newProxy(self, proxyId: str, proxyConstructorName: str, proxyProps: any, proxyOneWayMethods: List[str]):
         proxy = RpcProxy(self, proxyId, proxyConstructorName,
                          proxyProps, proxyOneWayMethods)
         wr = weakref.ref(proxy)

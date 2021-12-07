@@ -220,7 +220,7 @@ class ${td.name}(TypedDict):
 fs.writeFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/types.py'),
     `from __future__ import annotations
 from enum import Enum
-from typing import TypedDict
+from typing_extensions import TypedDict
 from typing import Any
 from typing import Callable
 

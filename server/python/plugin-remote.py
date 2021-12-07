@@ -16,7 +16,8 @@ import asyncio
 from asyncio.events import AbstractEventLoop
 import json
 import aiofiles
-from typing import Tuple, TypedDict
+from typing import Tuple
+from typing_extensions import TypedDict
 import base64
 import time
 import zipfile
@@ -163,6 +164,8 @@ class PluginRemote:
         if not os.path.exists(python_prefix):
             os.makedirs(python_prefix)
 
+        python = 'python3.7'
+
         if 'requirements.txt' in zip.namelist():
             requirements = zip.open('requirements.txt').read()
             str_requirements = requirements.decode('utf8')
@@ -185,7 +188,7 @@ class PluginRemote:
                 f.write(requirements)
                 f.close()
 
-                p = subprocess.Popen(['pip', 'install', '-r', requirementstxt, '--prefix', python_prefix], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                p = subprocess.Popen([python, '-m', 'pip', 'install', '-r', requirementstxt, '--prefix', python_prefix], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 while True:
                     line = p.stdout.readline()
                     if not line:
@@ -205,7 +208,7 @@ class PluginRemote:
                 print(str_requirements)
 
         sys.path.insert(0, zipPath)
-        site_packages = os.path.join(python_prefix, 'lib/python3.9/site-packages')
+        site_packages = os.path.join(python_prefix, 'lib/%s/site-packages' % python)
         sys.path.insert(0, site_packages)
         from scrypted_sdk import sdk_init # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)

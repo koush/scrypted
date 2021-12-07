@@ -317,7 +317,7 @@ export class ScryptedRuntime {
         }
 
         if (!isEngineIOEndpoint && isUpgrade) {
-            this.wss.handleUpgrade(req, req.socket, (req as any).upgradeHead, ws => {
+            this.wss.handleUpgrade(req, req.socket, (req as any).upgradeHead, async (ws) => {
                 try {
                     const handler = this.getDevice<EngineIOHandler>(pluginDevice._id);
                     const id = 'ws-' + this.wsAtomic++;
@@ -327,8 +327,6 @@ export class ScryptedRuntime {
                         return;
                     }
                     pluginHost.ws[id] = ws;
-
-                    handler.onConnection(httpRequest, `ws://${id}`);
 
                     ws.on('message', async (message) => {
                         try {
@@ -346,6 +344,8 @@ export class ScryptedRuntime {
                         }
                         delete pluginHost.ws[id];
                     });
+
+                    await handler.onConnection(httpRequest, `ws://${id}`);
                 }
                 catch (e) {
                     console.error('websocket plugin error', e);

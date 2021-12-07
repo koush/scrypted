@@ -1,6 +1,6 @@
 from __future__ import annotations
 from enum import Enum
-from typing import TypedDict
+from typing_extensions import TypedDict
 from typing import Any
 from typing import Callable
 
@@ -393,7 +393,7 @@ class Setting(TypedDict):
     placeholder: str
     readonly: bool
     title: str
-    type: Any | Any | Any | Any | Any | Any
+    type: Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
     pass
 

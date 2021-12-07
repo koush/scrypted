@@ -117,7 +117,6 @@ export class PluginHost {
                 } = (socket.request as any).scrypted;
 
                 const handler = this.scrypted.getDevice<EngineIOHandler>(pluginDevice._id);
-                handler.onConnection(endpointRequest, `io://${socket.id}`);
 
                 socket.on('message', message => {
                     this.remote.ioEvent(socket.id, 'message', message)
@@ -125,6 +124,8 @@ export class PluginHost {
                 socket.on('close', reason => {
                     this.remote.ioEvent(socket.id, 'close');
                 });
+
+                await handler.onConnection(endpointRequest, `io://${socket.id}`);
             }
             catch (e) {
                 console.error('engine.io plugin error', e);
@@ -235,7 +236,7 @@ export class PluginHost {
                 path.join(__dirname, '../../python', 'plugin-remote.py'),
             )
 
-            this.worker = child_process.spawn('python3', args, {
+            this.worker = child_process.spawn('python3.7', args, {
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                 env: Object.assign({}, process.env, env),
