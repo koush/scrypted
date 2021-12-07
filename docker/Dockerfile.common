@@ -48,6 +48,7 @@ RUN apt-get -y install \
     libedgetpu1-std
 
 # python pip
+RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 
 # opencv
