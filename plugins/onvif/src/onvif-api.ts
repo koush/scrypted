@@ -108,6 +108,7 @@ export class OnvifCameraAPI {
                         try {
                             const eventName = event.message.message.data.simpleItem.$.Name;
                             const className = this.detections.get(eventName);
+                            this.console.log('object detected:', className);
                             ret.emit('event', OnvifEvent.Detection, className);
                         }
                         catch (e) {
