@@ -21,13 +21,13 @@ class SmtpMixin extends SettingsMixinDeviceBase<Settings> {
             {
                 title: 'On/Start Search Text',
                 key: 'onText',
-                description: 'Turn on or start the device when the entered text is found. Leave empty to turn on any mail.',
+                description: 'Turn on or start the device when the entered text is found. Leave empty to turn on from any mail.',
                 value: this.storage.getItem('onText'),
             },
             {
                 title: 'Off/Stop Search Text',
                 key: 'offText',
-                description: 'Turn off or stop the device when the entered text is found. Leave empty to turn off any text (will be ignored if On Text is also empty).',
+                description: 'Turn off or stop the device when the entered text is found.',
                 value: this.storage.getItem('offText'),
             },
         ]
@@ -57,8 +57,8 @@ class SmtpMixin extends SettingsMixinDeviceBase<Settings> {
                 this.realDevice.start();
             }
         }
-        // otherwise turn the device off if there is no off text (empty default behavior), or the off text matches
-        else if (!offText || (offText && parsed.text.indexOf(offText) !== -1)) {
+
+        if (offText && parsed.text.indexOf(offText) !== -1) {
             if (this.realDevice.interfaces.includes(ScryptedInterface.OnOff)) {
                 this.console.log('SMTP turning off device.');
                 this.realDevice.turnOff();
