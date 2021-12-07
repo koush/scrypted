@@ -161,9 +161,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
 
             try {
                 const eventTypes = await client.getEventTypes();
-                if (!eventTypes)
-                    return;
-                if (this.storage.getItem('onvifDetector') !== 'true') {
+                if (eventTypes?.length && this.storage.getItem('onvifDetector') !== 'true') {
                     this.storage.setItem('onvifDetector', 'true');
                     this.updateDevice();
                 }
