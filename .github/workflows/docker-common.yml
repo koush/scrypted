@@ -1,4 +1,4 @@
-name: Publish Docker Common image
+name: Publish Scrypted
 
 on:
   workflow_dispatch:

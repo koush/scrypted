@@ -1,4 +1,4 @@
-name: Publish Docker image
+name: Publish Scrypted Base OS
 
 on:
   workflow_dispatch:
