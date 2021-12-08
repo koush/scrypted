@@ -1,4 +1,5 @@
-FROM koush/scrypted-common
+ARG BASE="16"
+FROM koush/scrypted-common:${BASE}
 
 WORKDIR /
 RUN npx -y scrypted install-server && \
