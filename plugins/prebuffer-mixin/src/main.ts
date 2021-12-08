@@ -232,6 +232,9 @@ class PrebufferSession {
 
     this.parsers = rbo.parsers;
 
+    // create missing pts from dts so mpegts and mp4 muxing does not fail
+    ffmpegInput.inputArguments.unshift('-fflags', '+genpts');
+
     const session = await startRebroadcastSession(ffmpegInput, rbo);
     this.parserSession = session;
 
