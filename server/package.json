@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.94",
+  "version": "0.0.96",
   "description": "",
   "dependencies": {
     "@scrypted/sdk": "^0.0.128",
@@ -56,6 +56,9 @@
     "@types/tmp": "^0.2.0",
     "@types/whatwg-mimetype": "^2.1.0",
     "@types/ws": "^7.4.7"
+  },
+  "bin": {
+    "scrypted-server": "bin/scrypted-server"
   },
   "scripts": {
     "preserve": "npm run build",
