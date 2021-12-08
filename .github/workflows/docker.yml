@@ -39,15 +39,15 @@ jobs:
         env:
           BASE: 16
         with:
-          build-args: BASE=${{ BASE }}
+          build-args: BASE=${{ env.BASE }}
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
             koush/scrypted:latest
-            koush/scrypted:${{ BASE }}
-            ghcr.io/koush/scrypted:${{ BASE }}
+            koush/scrypted:${{ env.BASE }}
+            ghcr.io/koush/scrypted:${{ env.BASE }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -56,13 +56,13 @@ jobs:
         env:
           BASE: 16-bullseye
         with:
-          build-args: BASE=${{ BASE }}
+          build-args: BASE=${{ env.BASE }}
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            koush/scrypted:${{ BASE }}
-            ghcr.io/koush/scrypted:${{ BASE }}
+            koush/scrypted:${{ env.BASE }}
+            ghcr.io/koush/scrypted:${{ env.BASE }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
