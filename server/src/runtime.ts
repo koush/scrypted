@@ -28,6 +28,8 @@ import { Alerts } from './services/alerts';
 import { Info } from './services/info';
 import io from 'engine.io';
 import {spawn as ptySpawn} from 'node-pty';
+import rimraf from 'rimraf';
+import { getPluginVolume } from './plugin/plugin-volume';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -582,6 +584,7 @@ export class ScryptedRuntime {
             const plugin = await this.datastore.tryGet(Plugin, device.pluginId);
             this.killPlugin(plugin);
             await this.datastore.remove(plugin);
+            rimraf.sync(getPluginVolume(plugin._id));
         }
         this.stateManager.removeDevice(device._id);
 
