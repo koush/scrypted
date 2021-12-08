@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.91",
+  "version": "0.0.92",
   "description": "",
   "dependencies": {
     "@scrypted/sdk": "^0.0.128",
