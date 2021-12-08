@@ -6,6 +6,7 @@ import { handleFunctionInvocations } from "../rpc";
 import { getState } from "../state";
 import { getDisplayType } from "../infer-defaults";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
+import { PluginError } from "./plugin-error";
 
 interface MixinTable {
     mixinProviderId: string;
@@ -96,7 +97,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     ensureProxy(lastValidMixinId?: string): Promise<PluginDevice> {
         const pluginDevice = this.scrypted.findPluginDeviceById(this.id);
         if (!pluginDevice)
-            throw new Error(`device ${this.id} does not exist`);
+            throw new PluginError(`device ${this.id} does not exist`);
 
         let previousEntry: Promise<MixinTableEntry>;
         if (!lastValidMixinId) {
@@ -140,10 +141,10 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         }
         else {
             if (!this.mixinTable)
-                throw new Error('mixin table partial invalidation was called with empty mixin table');
+                throw new PluginError('mixin table partial invalidation was called with empty mixin table');
             const prevTable = this.mixinTable.find(table => table.mixinProviderId === lastValidMixinId);
             if (!prevTable)
-                throw new Error('mixin table partial invalidation was called with invalid lastValidMixinId');
+                throw new PluginError('mixin table partial invalidation was called with invalid lastValidMixinId');
             previousEntry = prevTable.entry;
         }
 
@@ -193,7 +194,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                             async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value));
                         const mixinProxy = await mixinProvider.getMixin(wrappedProxy, allInterfaces as ScryptedInterface[], deviceState);
                         if (!mixinProxy)
-                            throw new Error(`mixin provider ${mixinId} did not return mixin for ${this.id}`);
+                            throw new PluginError(`mixin provider ${mixinId} did not return mixin for ${this.id}`);
 
                         return {
                             interfaces: new Set<string>(interfaces),
@@ -284,19 +285,19 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     async applyMixin(method: string, argArray?: any): Promise<any> {
         const iface = methodInterfaces[method];
         if (!iface)
-            throw new Error(`unknown method ${method}`);
+            throw new PluginError(`unknown method ${method}`);
 
         for (const mixin of this.mixinTable) {
             const { interfaces, proxy } = await mixin.entry;
             // this could be null?
             if (interfaces.has(iface)) {
                 if (!proxy)
-                    throw new Error(`device is unavailable ${this.id} (mixin ${mixin.mixinProviderId})`);
+                    throw new PluginError(`device is unavailable ${this.id} (mixin ${mixin.mixinProviderId})`);
                 return proxy[method](...argArray);
             }
         }
 
-        throw new Error(`${method} not implemented`)
+        throw new PluginError(`${method} not implemented`)
     }
 
     async apply(target: any, thisArg: any, argArray?: any): Promise<any> {
@@ -308,7 +309,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             return this.applyMixin('refresh', argArray);
 
         if (!isValidInterfaceMethod(pluginDevice.state.interfaces.value, method))
-            throw new Error(`device ${this.id} does not support method ${method}`);
+            throw new PluginError(`device ${this.id} does not support method ${method}`);
 
         if (method === 'refresh') {
             const refreshInterface = argArray[0];

@@ -24,13 +24,14 @@ import { Info } from './services/info';
 import { getAddresses } from './addresses';
 import { sleep } from './sleep';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
+import { PluginError } from './plugin/plugin-error';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
 }
 
 process.on('unhandledRejection', error => {
-    if (error?.constructor !== RPCResultError) {
+    if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
         throw error;
     }
     console.warn('unhandled rejection of RPC Result', error);
