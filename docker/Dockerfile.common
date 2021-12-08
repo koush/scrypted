@@ -27,6 +27,10 @@ RUN apt-get -y install \
     librsvg2-dev \
     pkg-config
 
+# gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
+RUN apt-get -y install \
+    gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+
 # python native
 RUN apt-get -y install \
     python3 \
@@ -40,10 +44,6 @@ RUN apt-get -y install \
     python3-setuptools \
     python3-skimage \
     python3-wheel
-
-# gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
-RUN apt-get -y install \
-    gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
 
 # Coral Edge TPU
 RUN apt-get -y install \
