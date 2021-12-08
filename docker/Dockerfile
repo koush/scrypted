@@ -4,4 +4,4 @@ FROM koush/scrypted-common:${BASE}
 WORKDIR /
 RUN npx -y scrypted install-server
 WORKDIR /server
-CMD npm exec scrypted-server
+CMD npm exec scrypted-serve

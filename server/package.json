@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.96",
+  "version": "0.0.97",
   "description": "",
   "dependencies": {
     "@scrypted/sdk": "^0.0.128",
@@ -58,7 +58,7 @@
     "@types/ws": "^7.4.7"
   },
   "bin": {
-    "scrypted-server": "bin/scrypted-server"
+    "scrypted-serve": "bin/scrypted-serve"
   },
   "scripts": {
     "preserve": "npm run build",
