@@ -22,9 +22,6 @@ from asyncio.streams import StreamReader, StreamWriter
 import os
 from os import sys
 from sys import stderr, stdout
-more = os.path.join(os.getcwd(), 'node_modules/@scrypted/sdk')
-sys.path.insert(0, more)
-
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int

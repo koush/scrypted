@@ -239,7 +239,9 @@ export class PluginHost {
             this.worker = child_process.spawn('python3', args, {
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
-                env: Object.assign({}, process.env, env),
+                env: Object.assign({
+                    PYTHONPATH: path.join(process.cwd(), 'node_modules/@scrypted/sdk'),
+                }, process.env, env),
             });
 
             const peerin = this.worker.stdio[3] as Writable;
