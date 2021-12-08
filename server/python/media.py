@@ -7,7 +7,7 @@ import asyncio
 import json
 import aiofiles
 import os
-from typing import TypedDict
+from typing_extensions import TypedDict
 import base64
 from os import sys
 import time
