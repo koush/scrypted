@@ -236,7 +236,7 @@ export class PluginHost {
                 path.join(__dirname, '../../python', 'plugin-remote.py'),
             )
 
-            this.worker = child_process.spawn('python3.7', args, {
+            this.worker = child_process.spawn('python3', args, {
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                 env: Object.assign({}, process.env, env),

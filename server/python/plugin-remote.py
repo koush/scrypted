@@ -164,7 +164,8 @@ class PluginRemote:
         if not os.path.exists(python_prefix):
             os.makedirs(python_prefix)
 
-        python = 'python3.7'
+        python = 'python%s' % str(sys.version_info[0])+"."+str(sys.version_info[1])
+        print('python:', python)
 
         if 'requirements.txt' in zip.namelist():
             requirements = zip.open('requirements.txt').read()
