@@ -39,6 +39,7 @@ RUN apt-get -y install \
     python3-gst-1.0 \
     python3-matplotlib \
     python3-numpy \
+    python3-opencv \
     python3-pil \
     python3-pip \
     python3-setuptools \
