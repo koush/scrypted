@@ -1,4 +1,8 @@
 from __future__ import annotations
+
+import matplotlib
+matplotlib.use('Agg')
+
 from asyncio.events import AbstractEventLoop, TimerHandle
 from asyncio.futures import Future
 from typing import Any, Mapping, List
