@@ -43,9 +43,7 @@ addSupportedType({
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
     async getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
-        const console = deviceManager.getMixinConsole
-            ? deviceManager.getMixinConsole(device.id, undefined)
-            : deviceManager.getDeviceConsole(undefined);
+        const console = deviceManager.getMixinConsole(device.id, undefined);
 
         interface Session {
             prepareRequest: PrepareStreamRequest;
@@ -126,7 +124,7 @@ addSupportedType({
                 callback(null, response);
             },
             async handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback) {
-                console.log(device.name, 'streaming request', request);
+                console.log('streaming request', request);
                 if (request.type === StreamRequestTypes.STOP) {
                     killSession(request.sessionID);
                     callback();
@@ -193,7 +191,7 @@ addSupportedType({
                 const audiomtu = 188 * 1;
 
                 try {
-                    console.log(device.name, 'fetching video stream');
+                    console.log('fetching video stream');
                     const media = await device.getVideoStream(selectedStream);
                     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
 
@@ -307,7 +305,12 @@ addSupportedType({
                         }
                     }
 
-                    console.log(device.name, args);
+                    if (!sessions.has(request.sessionID)) {
+                        console.log('session ended before streaming could start. bailing.');
+                        return;
+                    }
+
+                    console.log('ffmpeg args', args);
 
                     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
                     ffmpegLogInitialOutput(console, cp);
@@ -316,7 +319,7 @@ addSupportedType({
 
                     // audio talkback
                     if (twoWayAudio) {
-                        session.demuxer = new RtpDemuxer(device.name, console, session.audioReturn);
+                        session.demuxer = new RtpDemuxer(console, session.audioReturn);
                         const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
 
                         session.rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
@@ -335,7 +338,7 @@ addSupportedType({
                     }
                 }
                 catch (e) {
-                    console.error(device.name, 'streaming error', e);
+                    console.error('streaming error', e);
                 }
             },
         };

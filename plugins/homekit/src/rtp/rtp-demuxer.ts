@@ -20,11 +20,11 @@ import { EventEmitter } from "stream";
  */
 export class RtpDemuxer extends EventEmitter {
     // Create an instance of RtpDemuxer.
-    constructor(public deviceName: string, public console: Console, public socket: Socket) {
+    constructor(public console: Console, public socket: Socket) {
         super();
         // Catch errors when they happen on our demuxer.
         this.socket.on("error", (error) => {
-            this.console.error(this.deviceName, "RtpDemuxer Error:", error);
+            this.console.error("RtpDemuxer Error:", error);
             this.socket.close();
         });
 
