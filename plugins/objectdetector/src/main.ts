@@ -196,7 +196,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.resetMotionTimeout();
 
         const areas = detection.detections.filter(d => d.className === 'motion' && d.score !== 1).map(d => d.score)
-        this.console.log('detection areas', areas);
+        if (areas.length)
+          this.console.log('detection areas', areas);
       }
     }
 
