@@ -18,7 +18,11 @@ interface MixinTableEntry {
     allInterfaces: string[];
     proxy: any;
     error?: Error;
+    passthrough: boolean;
 }
+
+export const RefreshSymbol = Symbol('ScryptedDeviceRefresh');
+export const QueryInterfaceSymbol = Symbol("ScryptedPluginDeviceQueryInterface");
 
 export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
     scrypted: ScryptedRuntime;
@@ -49,7 +53,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         }
     }
 
-    invalidateMixinTable() {
+    rebuildMixinTable() {
         if (!this.mixinTable)
             return this.invalidate();
 
@@ -88,6 +92,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                 break;
             this.mixinTable.shift();
             this.invalidateEntry(entry);
+            console.log('invalidating mixin', entry.mixinProviderId);
         }
 
         this.ensureProxy(lastValidMixinId);
@@ -99,14 +104,13 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         if (!pluginDevice)
             throw new PluginError(`device ${this.id} does not exist`);
 
-        let previousEntry: Promise<MixinTableEntry>;
         if (!lastValidMixinId) {
             if (this.mixinTable)
                 return Promise.resolve(pluginDevice);
 
             this.mixinTable = [];
 
-            previousEntry = (async () => {
+            const entry = (async () => {
                 let proxy;
                 try {
                     if (!pluginDevice.nativeId) {
@@ -128,6 +132,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
 
                 const interfaces: ScryptedInterface[] = getState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces) || [];
                 return {
+                    passthrough: false,
                     proxy,
                     interfaces: new Set<string>(interfaces),
                     allInterfaces: interfaces,
@@ -136,7 +141,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
 
             this.mixinTable.unshift({
                 mixinProviderId: undefined,
-                entry: previousEntry,
+                entry,
             });
         }
         else {
@@ -145,10 +150,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             const prevTable = this.mixinTable.find(table => table.mixinProviderId === lastValidMixinId);
             if (!prevTable)
                 throw new PluginError('mixin table partial invalidation was called with invalid lastValidMixinId');
-            previousEntry = prevTable.entry;
         }
-
-        const type = getDisplayType(pluginDevice);
 
         for (const mixinId of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
             if (lastValidMixinId) {
@@ -158,65 +160,11 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             }
 
             const wrappedMixinTable = this.mixinTable.slice();
+            const entry = this.rebuildEntry(pluginDevice, mixinId, Promise.resolve(wrappedMixinTable));
 
             this.mixinTable.unshift({
                 mixinProviderId: mixinId,
-                entry: (async () => {
-                    let { allInterfaces } = await previousEntry;
-                    try {
-                        const mixinProvider = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
-                        const interfaces = await mixinProvider?.canMixin(type, allInterfaces) as any as ScryptedInterface[];
-                        if (!interfaces) {
-                            // this is not an error
-                            // do not advertise interfaces so it is skipped during
-                            // vtable lookup.
-                            console.log(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
-                            const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
-                            this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
-                            this.scrypted.datastore.upsert(pluginDevice);
-                            return {
-                                allInterfaces,
-                                interfaces: new Set<string>(),
-                                proxy: undefined as any,
-                            };
-                        }
-
-                        allInterfaces = allInterfaces.slice();
-                        allInterfaces.push(...interfaces);
-                        const combinedInterfaces = [...new Set(allInterfaces)];
-
-                        const wrappedHandler = new PluginDeviceProxyHandler(this.scrypted, this.id);
-                        wrappedHandler.mixinTable = wrappedMixinTable;
-                        const wrappedProxy = new Proxy(wrappedHandler, wrappedHandler);
-
-                        const host = this.scrypted.getPluginHostForDeviceId(mixinId);
-                        const deviceState = await host.remote.createDeviceState(this.id,
-                            async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value));
-                        const mixinProxy = await mixinProvider.getMixin(wrappedProxy, allInterfaces as ScryptedInterface[], deviceState);
-                        if (!mixinProxy)
-                            throw new PluginError(`mixin provider ${mixinId} did not return mixin for ${this.id}`);
-
-                        return {
-                            interfaces: new Set<string>(interfaces),
-                            allInterfaces: combinedInterfaces,
-                            proxy: mixinProxy,
-                        };
-                    }
-                    catch (e) {
-                        // on any error, do not advertise interfaces
-                        // on this mixin, so as to prevent total failure?
-                        // this has been the behavior for a while,
-                        // but maybe interfaces implemented by that mixin
-                        // should rethrow the error caught here in applyMixin.
-                        console.warn(e);
-                        return {
-                            allInterfaces,
-                            interfaces: new Set<string>(),
-                            error: e,
-                            proxy: undefined as any,
-                        };
-                    }
-                })(),
+                entry,
             });
         }
 
@@ -224,6 +172,81 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, entry.allInterfaces);
             return pluginDevice;
         });
+    }
+
+    async rebuildEntry(pluginDevice: PluginDevice, mixinId: string, wrappedMixinTablePromise: Promise<MixinTable[]>): Promise<MixinTableEntry> {
+        const wrappedMixinTable = await wrappedMixinTablePromise;
+        const previousEntry = wrappedMixinTable[0].entry;
+
+        const type = getDisplayType(pluginDevice);
+
+        let { allInterfaces } = await previousEntry;
+        try {
+            const mixinProvider = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
+            const interfaces = mixinProvider?.interfaces?.includes(ScryptedInterface.MixinProvider) && await mixinProvider?.canMixin(type, allInterfaces) as any as ScryptedInterface[];
+            if (!interfaces) {
+                // this is not an error
+                // do not advertise interfaces so it is skipped during
+                // vtable lookup.
+                console.log(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
+                const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+                this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
+                this.scrypted.datastore.upsert(pluginDevice);
+                return {
+                    passthrough: true,
+                    allInterfaces,
+                    interfaces: new Set<string>(),
+                    proxy: undefined as any,
+                };
+            }
+
+            const previousInterfaces = allInterfaces;
+            allInterfaces = previousInterfaces.slice();
+            allInterfaces.push(...interfaces);
+            const combinedInterfaces = [...new Set(allInterfaces)];
+
+            const wrappedHandler = new PluginDeviceProxyHandler(this.scrypted, this.id);
+            wrappedHandler.mixinTable = wrappedMixinTable;
+            const wrappedProxy = new Proxy(wrappedHandler, wrappedHandler);
+
+            const implementer = await (mixinProvider as any)[QueryInterfaceSymbol](ScryptedInterface.MixinProvider);
+            const host = this.scrypted.getPluginHostForDeviceId(implementer);
+            // todo: remove this and pass the setter directly.
+            const deviceState = await host.remote.createDeviceState(this.id,
+                async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value));
+            const mixinProxy = await mixinProvider.getMixin(wrappedProxy, allInterfaces as ScryptedInterface[], deviceState);
+            if (!mixinProxy)
+                throw new PluginError(`mixin provider ${mixinId} did not return mixin for ${this.id}`);
+
+            // mixin is a passthrough of no interfaces changed, and the proxy is the same
+            // a mixin can be a passthrough even if it implements an interface (like Settings),
+            // so long as the wrapped proxy also implements that interface.
+            // techically it is a passthrough if the proxies are the same instance, but
+            // better to be explicit here about interface differences.
+            const passthrough = wrappedProxy === mixinProxy && previousInterfaces.length === combinedInterfaces.length;
+
+            return {
+                passthrough,
+                interfaces: new Set<string>(interfaces),
+                allInterfaces: combinedInterfaces,
+                proxy: mixinProxy,
+            };
+        }
+        catch (e) {
+            // on any error, do not advertise interfaces
+            // on this mixin, so as to prevent total failure?
+            // this has been the behavior for a while,
+            // but maybe interfaces implemented by that mixin
+            // should rethrow the error caught here in applyMixin.
+            console.warn(e);
+            return {
+                passthrough: false,
+                allInterfaces,
+                interfaces: new Set<string>(),
+                error: e,
+                proxy: undefined as any,
+            };
+        }
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {
@@ -241,7 +264,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         if (allInterfaceProperties.includes(prop))
             return getState(pluginDevice, prop);
 
-        if (p === RefreshSymbol)
+        if (p === RefreshSymbol || p === QueryInterfaceSymbol)
             return new Proxy(() => p, this);
 
         if (!isValidInterfaceMethod(pluginDevice.state.interfaces.value, prop))
@@ -287,17 +310,26 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         if (!iface)
             throw new PluginError(`unknown method ${method}`);
 
-        for (const mixin of this.mixinTable) {
-            const { interfaces, proxy } = await mixin.entry;
-            // this could be null?
-            if (interfaces.has(iface)) {
-                if (!proxy)
-                    throw new PluginError(`device is unavailable ${this.id} (mixin ${mixin.mixinProviderId})`);
-                return proxy[method](...argArray);
-            }
+        const found = await this.findMixin(iface);
+        if (found) {
+            const { mixin, entry } = found;
+            const { proxy } = entry;
+            if (!proxy)
+                throw new PluginError(`device is unavailable ${this.id} (mixin ${mixin.mixinProviderId})`);
+            return proxy[method](...argArray);
         }
 
         throw new PluginError(`${method} not implemented`)
+    }
+
+    async findMixin(iface: string) {
+        for (const mixin of this.mixinTable) {
+            const entry = await mixin.entry;
+            const { interfaces } = entry;
+            if (interfaces.has(iface)) {
+                return { mixin, entry };
+            }
+        }
     }
 
     async apply(target: any, thisArg: any, argArray?: any): Promise<any> {
@@ -307,6 +339,16 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
 
         if (method === RefreshSymbol)
             return this.applyMixin('refresh', argArray);
+
+        if (method === QueryInterfaceSymbol) {
+            const iface = argArray[0];
+            const found = await this.findMixin(iface);
+            if (found?.entry.interfaces.has(iface)) {
+                return found.mixin.mixinProviderId || this.id;
+            }
+
+            throw new PluginError(`${iface} not implemented`)
+        }
 
         if (!isValidInterfaceMethod(pluginDevice.state.interfaces.value, method))
             throw new PluginError(`device ${this.id} does not support method ${method}`);
@@ -326,5 +368,3 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         return this.applyMixin(method, argArray);
     }
 }
-
-export const RefreshSymbol = Symbol('ScryptedDeviceRefresh');

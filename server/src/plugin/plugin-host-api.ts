@@ -41,16 +41,38 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         this.pluginId = plugin._id;
     }
 
-    async onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: any, eventData?: any) {
+    // do we care about mixin validation here?
+    // maybe to prevent/notify errant dangling events?
+    async onMixinEvent(id: string, nativeIdOrMixinDevice: ScryptedNativeId|any, eventInterface: any, eventData?: any) {
+        // nativeId code path has been deprecated in favor of mixin object 12/10/2021
         const device = this.scrypted.findPluginDeviceById(id);
-        const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeId);
-        const mixins: string[] = getState(device, ScryptedInterfaceProperty.mixins) || [];
-        if (!mixins.includes(mixinProvider._id))
-            throw new Error(`${mixinProvider._id} is not a mixin provider for ${id}`);
-        const tableEntry = this.scrypted.devices[device._id].handler.mixinTable.find(entry => entry.mixinProviderId === mixinProvider._id);
-        const { interfaces } = await tableEntry.entry;
-        if (!interfaces.has(eventInterface))
-            throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
+        if (!nativeIdOrMixinDevice || typeof nativeIdOrMixinDevice === 'string') {
+            // todo: deprecate this code path
+            const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
+            const mixins: string[] = getState(device, ScryptedInterfaceProperty.mixins) || [];
+            if (!mixins.includes(mixinProvider._id))
+                throw new Error(`${mixinProvider._id} is not a mixin provider for ${id}`);
+
+            this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
+            const tableEntry = this.scrypted.devices[device._id].handler.mixinTable.find(entry => entry.mixinProviderId === mixinProvider._id);
+            const { interfaces } = await tableEntry.entry;
+            if (!interfaces.has(eventInterface))
+                throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
+        }
+        else {
+            let found = false;
+            for (const mixin of this.scrypted.devices[device._id].handler.mixinTable) {
+                const { proxy } = await mixin.entry;
+                if (proxy === nativeIdOrMixinDevice) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
+                throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
+            }
+        }
         this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
     }
 

@@ -427,12 +427,33 @@ export class ScryptedRuntime {
     }
 
     // should this be async?
-    invalidatePluginDeviceMixins(id: string) {
+    rebuildPluginDeviceMixinTable(id: string) {
         const proxyPair = this.devices[id];
         if (!proxyPair)
             return;
-        proxyPair.handler.invalidateMixinTable();
+        proxyPair.handler.rebuildMixinTable();
         return proxyPair;
+    }
+
+    invalidateMixins(mixinIds: Set<string>) {
+        // const ret = new Set(mixinIds);
+
+        // for (const device of Object.values(this.devices)) {
+        //     const pluginDevice = this.pluginDevices[device.handler.id];
+        //     if (ret.has(pluginDevice._id))
+        //         continue;
+        //     if (!pluginDevice) {
+        //         console.warn('PluginDevice missing?', device.handler.id);
+        //         continue;
+        //     }
+        //     for (const mixin of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
+        //         if (this.scrypted.findPluginDeviceById(mixin)?.pluginId === this.pluginId) {
+        //             device.handler.invalidate();
+        //         }
+        //     }
+        // }
+
+        // return ret;
     }
 
     async installNpm(pkg: string, version?: string): Promise<PluginHost> {

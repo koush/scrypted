@@ -60,6 +60,9 @@ export class PluginHost {
         }
         this.ws = {};
 
+        // const pluginDevices = new Set<string>(Object.values(this.scrypted.pluginDevices).filter(d => d.pluginId === this.pluginId).map(d => d._id));
+        // this.scrypted.invalidateMixins(pluginDevices);
+
         for (const device of Object.values(this.scrypted.devices)) {
             const pluginDevice = this.scrypted.pluginDevices[device.handler.id];
             if (!pluginDevice) {
