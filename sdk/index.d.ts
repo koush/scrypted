@@ -22,12 +22,13 @@ export declare class MixinDeviceBase<T> extends DeviceBase implements DeviceStat
     mixinDevice: T;
     mixinDeviceInterfaces: ScryptedInterface[];
     mixinProviderNativeId: ScryptedNativeId;
+    private _mixinStorageSuffix?;
     private _storage;
     private _log;
     private _console;
     private _deviceState;
     private _listeners;
-    constructor(mixinDevice: T, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId);
+    constructor(mixinDevice: T, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId, _mixinStorageSuffix?: string);
     get storage(): Storage;
     get console(): Console;
     /**

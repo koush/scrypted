@@ -147,11 +147,6 @@ class AudioStreamOptions(TypedDict):
     codec: str
     pass
 
-class FaceRecognitionCandidate(TypedDict):
-    id: str
-    label: str
-    pass
-
 class FaceRecognitionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     id: str
@@ -318,11 +313,9 @@ class MediaStreamOptions(TypedDict):
 
 class ObjectDetectionModel(TypedDict):
     classes: list[str]
-    faces: bool
-    id: str
-    inputShape: list[float]
+    inputSize: list[float]
     name: str
-    people: list[FaceRecognitionCandidate]
+    settings: list[Setting]
     pass
 
 class ObjectDetectionSession(TypedDict):
@@ -333,8 +326,6 @@ class ObjectDetectionSession(TypedDict):
 
 class ObjectDetectionTypes(TypedDict):
     classes: list[str]
-    faces: bool
-    people: list[FaceRecognitionCandidate]
     pass
 
 class ObjectsDetected(TypedDict):
@@ -589,7 +580,7 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
         pass
-    async def getInferenceModels(self) -> list[ObjectDetectionModel]:
+    async def getDetectionModel(self) -> ObjectDetectionModel:
         pass
     pass
 
@@ -768,7 +759,7 @@ class DeviceManager:
         pass
     def getMixinConsole(self, mixinId: str, nativeId: str = None) -> Console:
         pass
-    def getMixinStorage(self, id: str, nativeId: str = None) -> Storage:
+    def getMixinStorage(self, idOrToken: str, nativeId: str = None) -> Storage:
         pass
     def getNativeIds(self) -> list[str]:
         pass
@@ -780,7 +771,7 @@ class DeviceManager:
         pass
     async def onDevicesChanged(self, devices: DeviceManifest) -> None:
         pass
-    async def onMixinEvent(self, id: str, nativeId: str, eventInterface: str, eventData: Any) -> None:
+    async def onMixinEvent(self, id: str, mixinDevice: Any, eventInterface: str, eventData: Any) -> None:
         pass
     async def requestRestart(self) -> None:
         pass

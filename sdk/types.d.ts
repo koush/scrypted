@@ -744,10 +744,13 @@ export interface ObjectsDetected {
     inputDimensions?: [number, number];
     timestamp: number;
 }
+export declare type ObjectDetectionClass = 'motion' | 'face' | 'person' | string;
 export interface ObjectDetectionTypes {
-    classes?: string[];
-    faces?: boolean;
-    people?: FaceRecognitionCandidate[];
+    /**
+     * Classes of objects that can be recognized. This can include motion
+     * or the names of specific people.
+     */
+    classes?: ObjectDetectionClass[];
 }
 /**
  * ObjectDetector is found on Cameras that have smart detection capabilities.
@@ -766,9 +769,9 @@ export interface ObjectDetectionSession {
     minScore?: number;
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
-    id: string;
     name: string;
-    inputShape?: number[];
+    inputSize?: number[];
+    settings: Setting[];
 }
 /**
  * ObjectDetection can run classification models on arbitrary media sources.
@@ -776,7 +779,7 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
  */
 export interface ObjectDetection {
     detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
-    getInferenceModels(): Promise<ObjectDetectionModel[]>;
+    getDetectionModel(): Promise<ObjectDetectionModel>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.
@@ -913,14 +916,14 @@ export interface DeviceManager {
     getDeviceStorage(): Storage;
     /**
      * Get the storage for a mixin.
-     * @param id The id of the device being mixined.
+     * @param idOrToken The id of the device being mixined.
      * @param nativeId The nativeId of the MixinProvider.
      */
-    getMixinStorage(id: string, nativeId?: ScryptedNativeId): Storage;
+    getMixinStorage(idOrToken: string, nativeId?: ScryptedNativeId): Storage;
     /**
      * Fire an event for a mixin provided by this plugin.
      */
-    onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any): Promise<void>;
+    onMixinEvent(id: string, mixinDevice: any, eventInterface: string, eventData: any): Promise<void>;
     /**
     * Get the per device Storage object.
     */

@@ -55,17 +55,20 @@ class ScryptedDeviceBase extends types_1.DeviceBase {
 }
 exports.ScryptedDeviceBase = ScryptedDeviceBase;
 class MixinDeviceBase extends types_1.DeviceBase {
-    constructor(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId) {
+    constructor(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId, _mixinStorageSuffix) {
         super();
         this.mixinDevice = mixinDevice;
         this.mixinDeviceInterfaces = mixinDeviceInterfaces;
         this.mixinProviderNativeId = mixinProviderNativeId;
+        this._mixinStorageSuffix = _mixinStorageSuffix;
         this._listeners = new Set();
         this._deviceState = mixinDeviceState;
     }
     get storage() {
         if (!this._storage) {
-            this._storage = deviceManager.getMixinStorage(this.id, this.mixinProviderNativeId);
+            const mixinStorageSuffix = this._mixinStorageSuffix;
+            const mixinStorageKey = this.id + (mixinStorageSuffix ? ':' + mixinStorageSuffix : '');
+            this._storage = deviceManager.getMixinStorage(mixinStorageKey, this.mixinProviderNativeId);
         }
         return this._storage;
     }
@@ -82,7 +85,7 @@ class MixinDeviceBase extends types_1.DeviceBase {
      * Fire an event for this device.
      */
     onDeviceEvent(eventInterface, eventData) {
-        return deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, eventInterface, eventData);
+        return deviceManager.onMixinEvent(this.id, this, eventInterface, eventData);
     }
     _lazyLoadDeviceState() {
     }

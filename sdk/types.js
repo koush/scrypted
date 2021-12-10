@@ -496,7 +496,7 @@ exports.ScryptedInterfaceDescriptors = {
         name: 'ObjectDetection',
         methods: [
             'detectObjects',
-            'getInferenceModels'
+            'getDetectionModel'
         ],
         properties: []
     },

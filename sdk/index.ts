@@ -62,15 +62,16 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   private _deviceState: DeviceState;
   private _listeners = new Set<EventListenerRegister>();
 
-  constructor(public mixinDevice: T, public mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public mixinProviderNativeId: ScryptedNativeId) {
+  constructor(public mixinDevice: T, public mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public mixinProviderNativeId: ScryptedNativeId, private _mixinStorageSuffix?: string) {
     super();
     this._deviceState = mixinDeviceState;
   }
 
-
   get storage() {
     if (!this._storage) {
-      this._storage = deviceManager.getMixinStorage(this.id, this.mixinProviderNativeId);
+      const mixinStorageSuffix = this._mixinStorageSuffix;
+      const mixinStorageKey = this.id + (mixinStorageSuffix ? ':' + mixinStorageSuffix : '');
+      this._storage = deviceManager.getMixinStorage(mixinStorageKey, this.mixinProviderNativeId);
     }
     return this._storage;
   }
@@ -90,7 +91,7 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
    * Fire an event for this device.
    */
    onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
-    return deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, eventInterface, eventData);
+    return deviceManager.onMixinEvent(this.id, this, eventInterface, eventData);
   }
 
   _lazyLoadDeviceState() {
