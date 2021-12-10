@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/tensorflow-lite",
-   "description": "Object Detection Service.",
+   "description": "Scrypted Object Detection Service.",
    "keywords": [
       "scrypted",
       "plugin",
@@ -27,7 +27,7 @@
       "scrypted-webpack": "scrypted-webpack"
    },
    "scrypted": {
-      "name": "TensorFlow Lite + Coral TPU Object Detection Plugin",
+      "name": "TensorFlow Lite (and Coral) Object Detection",
       "runtime": "python",
       "type": "API",
       "interfaces": [

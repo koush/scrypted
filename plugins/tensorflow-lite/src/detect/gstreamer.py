@@ -13,14 +13,13 @@
 # limitations under the License.
 
 from asyncio.futures import Future
-import sys
 import threading
 
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstBase', '1.0')
 
-from safe_set_result import safe_set_result
+from detect.safe_set_result import safe_set_result
 from gi.repository import GLib, GObject, Gst
 
 GObject.threads_init()
@@ -123,16 +122,7 @@ class GstPipeline:
                 gstsample = self.gstsample
                 self.gstsample = None
 
-            # Passing Gst.Buffer as input tensor avoids 2 copies of it.
-            gstbuffer = gstsample.get_buffer()
-            svg = self.user_function(gstbuffer, self.src_size, self.get_box())
-            if svg:
-                if self.overlay:
-                    self.overlay.set_property('data', svg)
-                if self.gloverlay:
-                    self.gloverlay.emit('set-svg', svg, gstbuffer.pts)
-                if self.overlaysink:
-                    self.overlaysink.set_property('svg', svg)
+            self.user_function(gstsample, self.src_size, self.get_box())
 
 def get_dev_board_model():
   try:
@@ -148,45 +138,25 @@ def run_pipeline(finished,
                  user_function,
                  src_size,
                  appsink_size,
-                 videosrc='/dev/video1',
-                 videofmt='raw'):
-    if videofmt == 'h264':
-        SRC_CAPS = 'video/x-h264,width={width},height={height},framerate=30/1'
-    elif videofmt == 'jpeg':
-        SRC_CAPS = 'image/jpeg,width={width},height={height},framerate=30/1'
-    else:
-        SRC_CAPS = 'video/x-raw,width={width},height={height},framerate=30/1'
-    if videosrc.startswith('/dev/video'):
-        PIPELINE = 'v4l2src device=%s ! {src_caps}'%videosrc
-    elif videosrc.startswith('http'):
-        PIPELINE = 'souphttpsrc location=%s'%videosrc
-    elif videosrc.startswith('rtsp'):
-        PIPELINE = 'rtspsrc location=%s'%videosrc
-    else:
-        demux =  'avidemux' if videosrc.endswith('avi') else 'qtdemux'
-        PIPELINE = """filesrc location=%s ! %s name=demux  demux.video_0
-                    ! queue ! decodebin  ! videorate
-                    ! videoconvert n-threads=4 ! videoscale n-threads=4
-                    ! {src_caps} ! {leaky_q} """ % (videosrc, demux)
-
-    if videofmt == 'gst':
-        PIPELINE = videosrc
+                 video_input,
+                 pixel_format):
+    PIPELINE = video_input
 
     scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
     scale = tuple(int(x * scale) for x in src_size)
     scale_caps = 'video/x-raw,width={width},height={height}'.format(width=scale[0], height=scale[1])
+    # scale_caps = 'video/x-raw,width={width},height={height}'.format(width=appsink_size[0], height=appsink_size[1])
     PIPELINE += """ ! decodebin ! queue leaky=downstream max-size-buffers=10 ! videoconvert ! videoscale
     ! {scale_caps} ! videobox name=box autocrop=true ! queue leaky=downstream max-size-buffers=1 ! {sink_caps} ! {sink_element}
     """
 
     SINK_ELEMENT = 'appsink name=appsink emit-signals=true max-buffers=1 drop=true sync=false'
-    SINK_CAPS = 'video/x-raw,format=RGB,width={width},height={height}'
+    SINK_CAPS = 'video/x-raw,format={pixel_format},width={width},height={height}'
     LEAKY_Q = 'queue max-size-buffers=100 leaky=upstream'
 
-    src_caps = SRC_CAPS.format(width=src_size[0], height=src_size[1])
-    sink_caps = SINK_CAPS.format(width=appsink_size[0], height=appsink_size[1])
+    sink_caps = SINK_CAPS.format(width=appsink_size[0], height=appsink_size[1], pixel_format=pixel_format)
     pipeline = PIPELINE.format(leaky_q=LEAKY_Q,
-        src_caps=src_caps, sink_caps=sink_caps,
+        sink_caps=sink_caps,
         sink_element=SINK_ELEMENT, scale_caps=scale_caps)
 
     print('Gstreamer pipeline:\n', pipeline)
