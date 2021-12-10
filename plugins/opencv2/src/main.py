@@ -12,7 +12,6 @@ def gst_to_opencv(sample):
     caps = sample.get_caps()
     # can't trust the width value, compute the stride
     height = caps.get_structure(0).get_value('height')
-    stride = int(buf.get_size() / height / 4)
     width = caps.get_structure(0).get_value('width')
     arr = np.ndarray(
         (height,
@@ -95,6 +94,10 @@ class OpenCVPlugin(DetectPlugin):
 
         # todo: go from native yuv to gray. tested this with GRAY8 in the gstreamer
         # pipeline but it failed...
+        # todo update: tried also decoding straight to I420 and got a seemingly
+        # skewed image (packed instead of planar?).
+        # that may be the issue. is the hardware decoder lying
+        # about the output type? is there a way to coerce it to gray or a sane type?
         gray = cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY)
         curFrame = cv2.GaussianBlur(gray, (21,21), 0)
 
@@ -113,7 +116,7 @@ class OpenCVPlugin(DetectPlugin):
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
-        detection_result['inputDimensions'] = (frame.shape[1], frame.shape[0])
+        detection_result['inputDimensions'] = (curFrame.shape[1], curFrame.shape[0])
         
         for c in contours:
             contour_area = cv2.contourArea(c)
