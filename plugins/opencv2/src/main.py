@@ -1,15 +1,11 @@
 from __future__ import annotations
-import threading
 from detect import DetectionSession, DetectPlugin
 from typing import Any, List
 from detect.safe_set_result import safe_set_result
-import scrypted_sdk
 import numpy as np
-import io
-import multiprocessing
 import cv2
 import imutils
-from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected
+from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 
 def gst_to_opencv(sample):
     buf = sample.get_buffer()
@@ -37,29 +33,65 @@ class OpenCVDetectionSession(DetectionSession):
         self.frames_to_skip = 0
 
 defaultThreshold = 25
-defaultArea = 0
+defaultArea = 2000
+defaultInterval = 10
 
 class OpenCVPlugin(DetectPlugin):
-    async def getInferenceModels(self) -> list[ObjectDetectionModel]:
-        ret: List[ObjectDetectionModel] = []
-
-        d = {
-            'id': 'opencv',
+    async def getDetectionModel(self) -> ObjectDetectionModel:
+        d: ObjectDetectionModel = {
             'name': 'OpenCV',
             'classes': ['motion'],
         }
-        ret.append(d)
-        return ret
+        settings = [
+            {
+                'title': "Motion Area",
+                'description': "The area size required to trigger motion. Higher values (larger areas) are less sensitive.",
+                'value': defaultArea,
+                'key': 'area',
+                'placeholder': defaultArea,
+                'type': 'number',
+            },
+            {
+                'title': "Motion Threshold",
+                'description': "The threshold required to consider a pixel changed. Higher values (larger changes) are less sensitive.",
+                'value': defaultThreshold,
+                'key': 'threshold',
+                'placeholder': defaultThreshold,
+                'type': 'number',
+            },
+            {
+                'title': "Frame Analysis Interval",
+                'description': "The number of frames to wait between motion analysis.",
+                'value': defaultInterval,
+                'key': 'interval',
+                'placeholder': defaultInterval,
+                'type': 'number',
+            },
+        ]
+        d['settings'] = settings
+        return d
 
     def get_pixel_format(self):
         return 'BGRA'
 
-    def detect(self, detection_session: OpenCVDetectionSession, frame, min_score: float, src_size, inference_box) -> ObjectsDetected:
+    def parse_settings(self, settings: Any):
+        area = defaultArea
+        threshold = defaultThreshold
+        interval = defaultInterval
+        if settings:
+            area = float(settings.get('area', area))
+            threshold = int(settings.get('threshold', threshold))
+            interval = float(settings.get('interval', interval))
+        return area, threshold, interval
+
+    def detect(self, detection_session: OpenCVDetectionSession, frame, settings: Any, src_size, inference_box) -> ObjectsDetected:
+        area, threshold, interval = self.parse_settings(settings)
+
         if detection_session.frames_to_skip:
             detection_session.frames_to_skip = detection_session.frames_to_skip - 1
             return
         else:
-            detection_session.frames_to_skip = 10
+            detection_session.frames_to_skip = interval
 
         # todo: go from native yuv to gray. tested this with GRAY8 in the gstreamer
         # pipeline but it failed...
@@ -73,7 +105,7 @@ class OpenCVPlugin(DetectPlugin):
         frameDelta = cv2.absdiff(detection_session.previous_frame, curFrame)
         detection_session.previous_frame = curFrame
 
-        _, thresh = cv2.threshold(frameDelta, defaultThreshold, 255, cv2.THRESH_BINARY)
+        _, thresh = cv2.threshold(frameDelta, threshold, 255, cv2.THRESH_BINARY)
         dilated = cv2.dilate(thresh, None, iterations=2)
         fcontours = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = imutils.grab_contours(fcontours)
@@ -85,7 +117,7 @@ class OpenCVPlugin(DetectPlugin):
         
         for c in contours:
             contour_area = cv2.contourArea(c)
-            if contour_area > defaultArea:
+            if contour_area > area:
                 x, y, w, h = cv2.boundingRect(c)
 
                 detection: ObjectDetectionResult = {}
@@ -122,9 +154,9 @@ class OpenCVPlugin(DetectPlugin):
             detection_session.cap = None
         return super().end_session(detection_session)
 
-    def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, min_score: float, src_size, inference_box, scale)-> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, settings: Any, src_size, inference_box, scale)-> ObjectsDetected:
         mat = gst_to_opencv(gst_sample)
-        return self.detect(detection_session, mat, min_score, src_size, inference_box)
+        return self.detect(detection_session, mat, settings, src_size, inference_box)
 
     def create_detection_session(self):
         return OpenCVDetectionSession()

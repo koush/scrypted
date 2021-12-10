@@ -21,7 +21,7 @@ class DetectionSession:
     timerHandle: TimerHandle
     future: Future
     loop: AbstractEventLoop
-    score_threshold: float
+    settings: Any
     running: bool
     thread: Any
 
@@ -89,7 +89,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         detection_result['timestamp'] = int(time.time() * 1000)
         return detection_result
 
-    def run_detection_jpeg(self, detection_session: DetectionSession, image_bytes: bytes, min_score: float) -> ObjectsDetected:
+    def run_detection_jpeg(self, detection_session: DetectionSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
         pass
 
     def get_detection_input_size(self, src_size):
@@ -98,11 +98,11 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def create_detection_session(self):
         return DetectionSession()
 
-    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, min_score: float, src_size, inference_box, scale)-> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, inference_box, scale)-> ObjectsDetected:
         pass
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
-        score_threshold = None
+        settings = None
         duration = None
         detection_id = None
         detection_session = None
@@ -110,7 +110,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if session:
             detection_id = session.get('detectionId', None)
             duration = session.get('duration', None)
-            score_threshold = session.get('minScore', None)
+            settings = session.get('settings', None)
 
         is_image = mediaObject and mediaObject.mimeType.startswith('image/')
 
@@ -132,8 +132,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
                 detection_session = self.create_detection_session()
                 detection_session.id = detection_id
-                detection_session.score_threshold = score_threshold or - \
-                    float('inf')
+                detection_session.settings = settings
                 loop = asyncio.get_event_loop()
                 detection_session.loop = loop
                 self.detection_sessions[detection_id] = detection_session
@@ -147,15 +146,15 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             return self.create_detection_result_status(detection_id, False)
 
         if is_image:
-            return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), score_threshold)
+            return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
 
         new_session = not detection_session.running
         if new_session:
             detection_session.running = True
 
         detection_session.setTimeout(duration / 1000)
-        if score_threshold != None:
-            detection_session.score_threshold = score_threshold
+        if settings != None:
+            detection_session.settings = settings
 
         if not new_session:
             print("existing session", detection_session.id)
@@ -191,7 +190,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         def user_callback(gst_sample, src_size, inference_box):
             try:
                 detection_result = self.run_detection_gstsample(
-                    detection_session, gst_sample, detection_session.score_threshold, src_size, inference_box, scale)
+                    detection_session, gst_sample, detection_session.settings, src_size, inference_box, scale)
                 if detection_result:
                     self.detection_event(detection_session, detection_result)
 

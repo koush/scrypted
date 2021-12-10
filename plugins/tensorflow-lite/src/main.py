@@ -1,34 +1,34 @@
 from __future__ import annotations
+from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
+import asyncio
+from detect.safe_set_result import safe_set_result
+from third_party.sort import Sort
+import multiprocessing
+import io
+import common
+from PIL import Image
+from pycoral.adapters import detect
+from pycoral.adapters.common import input_size
+from pycoral.utils.edgetpu import run_inference
+from pycoral.utils.edgetpu import list_edge_tpus
+from pycoral.utils.edgetpu import make_interpreter
+import tflite_runtime.interpreter as tflite
+import re
+import numpy as np
+import scrypted_sdk
+from typing import Any, List
 
 import matplotlib
 
 from detect import DetectionSession, DetectPlugin
 matplotlib.use('Agg')
 
-from typing import List
-import scrypted_sdk
-import numpy as np
-import re
-import tflite_runtime.interpreter as tflite
-from pycoral.utils.edgetpu import make_interpreter
-from pycoral.utils.edgetpu import list_edge_tpus
-from pycoral.utils.edgetpu import run_inference
-from pycoral.adapters.common import input_size
-from pycoral.adapters import detect
-from PIL import Image
-import common
-import io
-import multiprocessing
-from third_party.sort import Sort
-from detect.safe_set_result import safe_set_result
-import asyncio
-
-from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected
 
 class TrackerDetectionSession(DetectionSession):
     def __init__(self) -> None:
         super().__init__()
         self.tracker = Sort()
+
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -40,6 +40,8 @@ def parse_label_contents(contents: str):
         else:
             ret[row_number] = content.strip()
     return ret
+
+defaultThreshold = .4
 
 class CoralPlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -60,19 +62,25 @@ class CoralPlugin(DetectPlugin):
         self.interpreter.allocate_tensors()
         self.mutex = multiprocessing.Lock()
 
-    async def getInferenceModels(self) -> list[ObjectDetectionModel]:
-        ret: List[ObjectDetectionModel] = []
+    async def getDetectionModel(self) -> ObjectDetectionModel:
         _, height, width, channels = self.interpreter.get_input_details()[
             0]['shape']
 
-        d = {
-            'id': 'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu',
+        d: ObjectDetectionModel = {
             'name': 'Coco SSD',
             'classes': list(self.labels.values()),
-            'inputShape': [int(width), int(height), int(channels)],
+            'inputSize': [int(width), int(height), int(channels)],
         }
-        ret.append(d)
-        return ret
+        setting: Setting = {
+            'title': 'Minimum Detection Confidence',
+            'description': 'Higher values eliminate false positives and low quality recognition candidates.',
+            'key': 'score_threshold',
+            'type': 'number',
+            'value': defaultThreshold,
+            'placeholder': defaultThreshold,
+        }
+        d['settings'] = [setting]
+        return d
 
     def create_detection_result(self, objs, size, tracker: Sort = None):
         detections: List[ObjectDetectionResult] = []
@@ -129,7 +137,13 @@ class CoralPlugin(DetectPlugin):
 
         return detection_result
 
-    def run_detection_jpeg(self, detection_session: TrackerDetectionSession, image_bytes: bytes, min_score: float) -> ObjectsDetected:
+    def parse_settings(self, settings: Any):
+        score_threshold = .4
+        if settings:
+            score_threshold = float(settings.get('score_threshold', score_threshold))
+        return score_threshold
+
+    def run_detection_jpeg(self, detection_session: TrackerDetectionSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
         stream = io.BytesIO(image_bytes)
         image = Image.open(stream)
 
@@ -140,22 +154,25 @@ class CoralPlugin(DetectPlugin):
         if detection_session:
             tracker = detection_session.tracker
 
+        score_threshold = self.parse_settings(settings)
         with self.mutex:
             self.interpreter.invoke()
             objs = detect.get_objects(
-                self.interpreter, score_threshold=min_score or -float('inf'), image_scale=scale)
+                self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
         return self.create_detection_result(objs, image.size, tracker=tracker)
 
     def get_detection_input_size(self, src_size):
         return input_size(self.interpreter)
 
-    def run_detection_gstsample(self, detection_session: TrackerDetectionSession, gstsample, min_score: float, src_size, inference_box, scale)-> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: TrackerDetectionSession, gstsample, settings: Any, src_size, inference_box, scale) -> ObjectsDetected:
+        score_threshold = self.parse_settings(settings)
+
         gst_buffer = gstsample.get_buffer()
         with self.mutex:
             run_inference(self.interpreter, gst_buffer)
             objs = detect.get_objects(
-                self.interpreter, score_threshold=min_score, image_scale=scale)
+                self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
         return self.create_detection_result(objs, src_size, detection_session.tracker)
 
