@@ -60,21 +60,8 @@ export class PluginHost {
         }
         this.ws = {};
 
-        // const pluginDevices = new Set<string>(Object.values(this.scrypted.pluginDevices).filter(d => d.pluginId === this.pluginId).map(d => d._id));
-        // this.scrypted.invalidateMixins(pluginDevices);
-
-        for (const device of Object.values(this.scrypted.devices)) {
-            const pluginDevice = this.scrypted.pluginDevices[device.handler.id];
-            if (!pluginDevice) {
-                console.warn('PluginDevice missing?', device.handler.id);
-                continue;
-            }
-            for (const mixin of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
-                if (this.scrypted.findPluginDeviceById(mixin)?.pluginId === this.pluginId) {
-                    device.handler.invalidate();
-                }
-            }
-        }
+        const deviceIds = new Set<string>(Object.values(this.scrypted.pluginDevices).filter(d => d.pluginId === this.pluginId).map(d => d._id));
+        this.scrypted.invalidateMixins(deviceIds);
 
         this.consoleServer?.then(server => {
             server.readServer.close();

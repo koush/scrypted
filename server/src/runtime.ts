@@ -27,7 +27,7 @@ import { ServiceControl } from './services/service-control';
 import { Alerts } from './services/alerts';
 import { Info } from './services/info';
 import io from 'engine.io';
-import {spawn as ptySpawn} from 'node-pty';
+import { spawn as ptySpawn } from 'node-pty';
 import rimraf from 'rimraf';
 import { getPluginVolume } from './plugin/plugin-volume';
 
@@ -435,25 +435,49 @@ export class ScryptedRuntime {
         return proxyPair;
     }
 
-    invalidateMixins(mixinIds: Set<string>) {
-        // const ret = new Set(mixinIds);
+    invalidateMixins(ids: Set<string>) {
+        const ret = new Set<string>();
+        const remaining = [...ids];
 
-        // for (const device of Object.values(this.devices)) {
-        //     const pluginDevice = this.pluginDevices[device.handler.id];
-        //     if (ret.has(pluginDevice._id))
-        //         continue;
-        //     if (!pluginDevice) {
-        //         console.warn('PluginDevice missing?', device.handler.id);
-        //         continue;
-        //     }
-        //     for (const mixin of getState(pluginDevice, ScryptedInterfaceProperty.mixins) || []) {
-        //         if (this.scrypted.findPluginDeviceById(mixin)?.pluginId === this.pluginId) {
-        //             device.handler.invalidate();
-        //         }
-        //     }
-        // }
+        // first pass:
+        // for every id, find anything it is acting as a mixin, and clear out the entry.
+        while (remaining.length) {
+            const id = remaining.pop();
 
-        // return ret;
+            for (const device of Object.values(this.devices)) {
+                const foundIndex = device.handler?.mixinTable?.findIndex(mt => mt.mixinProviderId === id);
+                if (foundIndex === -1 || foundIndex === undefined)
+                    continue;
+
+                const did = device.handler.id;
+                if (!ret.has(did)) {
+                    // add this to the list of mixin providers that need to be rebuilt
+                    ret.add(did);
+                    remaining.push(did);
+                }
+
+                // if it is the last entry, that means it is the device itself.
+                // can this happen? i don't think it is possible. mixin provider id would be undefined.
+                if (foundIndex === device.handler.mixinTable.length - 1) {
+                    console.warn('attempt to invalidate mixin on actual device?');
+                    continue;
+                }
+
+                const removed = device.handler.mixinTable.splice(0, foundIndex + 1);
+                for (const entry of removed) {
+                    device.handler.invalidateEntry(entry);
+                }
+            }
+        }
+
+        // second pass:
+        // rebuild the mixin tables.
+        for (const id of ret) {
+            const device = this.devices[id];
+            device.handler.rebuildMixinTable();
+        }
+
+        return ret;
     }
 
     async installNpm(pkg: string, version?: string): Promise<PluginHost> {

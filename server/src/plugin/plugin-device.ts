@@ -35,7 +35,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     }
 
     invalidateEntry(mixinEntry: MixinTable) {
-        if (!mixinEntry.mixinProviderId)
+        if (!mixinEntry?.mixinProviderId)
             return;
         (async () => {
             const mixinProvider = this.scrypted.getDevice(mixinEntry.mixinProviderId) as ScryptedDevice & MixinProvider;
@@ -53,6 +53,9 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         }
     }
 
+    /**
+     * Rebuild the mixin table with any currently missing mixins.
+     */
     rebuildMixinTable() {
         if (!this.mixinTable)
             return this.invalidate();
