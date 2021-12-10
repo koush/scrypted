@@ -611,7 +611,7 @@ export interface BoundingBoxResult {
 }
 export interface ObjectDetectionResult extends BoundingBoxResult {
   id?: string;
-  className: string;
+  className: ObjectDetectionClass;
   score: number;
 }
 export interface FaceRecognitionCandidate {

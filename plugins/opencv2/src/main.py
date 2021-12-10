@@ -44,7 +44,7 @@ class OpenCVPlugin(DetectPlugin):
         settings = [
             {
                 'title': "Motion Area",
-                'description': "The area size required to trigger motion. Higher values (larger areas) are less sensitive.",
+                'description': "The area size required to trigger motion. Higher values (larger areas) are less sensitive. Setting this to 0 will output all matches into the console.",
                 'value': defaultArea,
                 'key': 'area',
                 'placeholder': defaultArea,
@@ -120,14 +120,14 @@ class OpenCVPlugin(DetectPlugin):
         
         for c in contours:
             contour_area = cv2.contourArea(c)
-            if contour_area > area:
+            if not area or contour_area > area:
                 x, y, w, h = cv2.boundingRect(c)
 
                 detection: ObjectDetectionResult = {}
                 detection['boundingBox'] = (
                     x, y, w, h)
                 detection['className'] = 'motion'
-                detection['score'] = contour_area
+                detection['score'] = 1 if area else contour_area
                 detections.append(detection)
 
         return detection_result                

@@ -15,6 +15,7 @@ const { mediaManager, systemManager, log } = sdk;
 const defaultDetectionDuration = 60;
 const defaultDetectionInterval = 60;
 const defaultDetectionTimeout = 10;
+const defaultMotionDuration = 10;
 
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera & MotionSensor & ObjectDetector> implements ObjectDetector, Settings {
   released = false;
@@ -24,6 +25,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor;
   detectionTimeout = parseInt(this.storage.getItem('detectionTimeout')) || defaultDetectionTimeout;
   detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
+  motionDuration = parseInt(this.storage.getItem('motionDuration')) || defaultMotionDuration;
+  motionAsObjects = this.storage.getItem('motionAsObjects') === 'true';
+  motionTimeout: NodeJS.Timeout;
   detectionInterval = parseInt(this.storage.getItem('detectionInterval')) || defaultDetectionInterval;
   detectionIntervalTimeout: NodeJS.Timeout;
   currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
@@ -63,6 +67,18 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }, this.detectionInterval * 1000);
   }
 
+  clearMotionTimeout() {
+    clearTimeout(this.motionTimeout);
+    this.motionTimeout = undefined;
+  }
+
+  resetMotionTimeout() {
+    this.clearMotionTimeout();
+    this.motionTimeout = setTimeout(() => {
+      this.motionDetected = false;
+    }, this.motionDuration * 1000);
+  }
+
   async ensureSettings(): Promise<Setting[]> {
     if (this.hasMotionType !== undefined)
       return;
@@ -70,6 +86,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const model = await this.objectDetection.getDetectionModel();
     this.hasMotionType = model.classes.includes('motion');
     this.settings = model.settings;
+    this.motionDetected = false;
   }
 
   async getCurrentSettings() {
@@ -171,7 +188,21 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (detectionInput)
       this.setDetection(this.detectionId, detectionInput);
 
-    this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
+    if (this.hasMotionType) {
+      const found = detection.detections?.find(d => d.className === 'motion');
+      if (found) {
+        if (!this.motionDetected)
+          this.motionDetected = true;
+        this.resetMotionTimeout();
+
+        const areas = detection.detections.filter(d => d.className === 'motion' && d.score !== 1).map(d => d.score)
+        this.console.log('detection areas', areas);
+      }
+    }
+
+    if (!this.hasMotionType || this.motionAsObjects) {
+      this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
+    }
   }
 
   async extendedObjectDetect() {
@@ -328,7 +359,24 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           type: 'number',
           value: this.detectionTimeout.toString(),
         },
-      )
+      );
+    }
+    else {
+      settings.push({
+        title: 'Motion Duration',
+        description: 'The duration in seconds to wait to reset the motion sensor.',
+        key: 'motionDuration',
+        type: 'number',
+        value: this.motionDuration.toString(),
+        },
+        {
+          title: 'Motion Detection Objects',
+          description: 'Report motion detections as objects (useful for debugging).',
+          key: 'motionAsObjects',
+          type: 'boolean',
+          value: this.motionAsObjects,
+        }
+      );
     }
 
     if (this.settings) {
@@ -355,6 +403,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     else if (key === 'detectionTimeout') {
       this.detectionTimeout = parseInt(vs) || defaultDetectionTimeout;
     }
+    else if (key === 'motionDuration') {
+      this.motionDuration = parseInt(vs) || defaultMotionDuration;
+    }
+    else if (key === 'motionAsObjects') {
+      this.motionAsObjects = vs === 'true';
+    }
     else if (key === 'streamingChannel') {
       this.bindObjectDetection();
     }
@@ -371,6 +425,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     super.release();
     this.released = true;
     this.clearDetectionTimeout();
+    this.clearMotionTimeout();
     this.motionListener?.removeListener();
     this.detectionListener?.removeListener();
     this.objectDetection?.detectObjects(undefined, {
