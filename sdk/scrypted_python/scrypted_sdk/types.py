@@ -321,7 +321,7 @@ class ObjectDetectionModel(TypedDict):
 class ObjectDetectionSession(TypedDict):
     detectionId: str
     duration: float
-    minScore: float
+    settings: Any
     pass
 
 class ObjectDetectionTypes(TypedDict):

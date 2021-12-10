@@ -766,7 +766,9 @@ export interface ObjectDetector {
 export interface ObjectDetectionSession {
     detectionId?: string;
     duration?: number;
-    minScore?: number;
+    settings?: {
+        [key: string]: any;
+    };
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
     name: string;
@@ -774,8 +776,8 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
     settings: Setting[];
 }
 /**
- * ObjectDetection can run classification models on arbitrary media sources.
- * E.g. TensorFlow or a Coral TPU.
+ * ObjectDetection can run classifications or analysis on arbitrary media sources.
+ * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
     detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;

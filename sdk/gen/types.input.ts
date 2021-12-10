@@ -664,7 +664,7 @@ export interface ObjectDetector {
 export interface ObjectDetectionSession {
   detectionId?: string;
   duration?: number;
-  minScore?: number;
+  settings?: { [key: string]: any };
 }
 export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
