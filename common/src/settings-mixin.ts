@@ -8,6 +8,7 @@ export interface SettingsMixinDeviceOptions {
     mixinDeviceInterfaces: ScryptedInterface[];
     group: string;
     groupKey: string;
+    mixinStorageSuffix?: string;
 }
 
 export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Settings> implements Settings {
@@ -15,7 +16,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
     settingsGroupKey: string;
 
     constructor(mixinDevice: any, mixinDeviceState: { [key: string]: any }, options: SettingsMixinDeviceOptions) {
-        super(mixinDevice, options.mixinDeviceInterfaces, mixinDeviceState, options.providerNativeId);
+        super(mixinDevice, options.mixinDeviceInterfaces, mixinDeviceState, options.providerNativeId, options.mixinStorageSuffix);
 
         this.settingsGroup = options.group;
         this.settingsGroupKey = options.groupKey;
