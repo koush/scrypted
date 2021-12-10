@@ -465,6 +465,7 @@ export class ScryptedRuntime {
 
                 const removed = device.handler.mixinTable.splice(0, foundIndex + 1);
                 for (const entry of removed) {
+                    console.log('invalidating mixin', device.handler.id, entry.mixinProviderId);
                     device.handler.invalidateEntry(entry);
                 }
             }

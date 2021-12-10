@@ -95,7 +95,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
                 break;
             this.mixinTable.shift();
             this.invalidateEntry(entry);
-            console.log('invalidating mixin', entry.mixinProviderId);
+            console.log('invalidating mixin', this.id, entry.mixinProviderId);
         }
 
         this.ensureProxy(lastValidMixinId);
