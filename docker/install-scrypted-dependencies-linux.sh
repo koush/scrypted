@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+if [ "$USER" != "root" ]
+then
+    echo "Installation must be run as 'root' (use sudo)."
+    exit 1
+fi
+
 set -x
 
 # bad hack to run a dockerfile like a shell script.
