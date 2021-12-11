@@ -31,10 +31,12 @@ export default {
   mixins: [RPCInterface],
   data() {
     return {
-      lastDetection: null,
+      lastDetection: {},
       objectListener: this.device.listen(
         ScryptedInterface.ObjectDetector,
-        (s, d, e) => (this.lastDetection = e)
+        (s, d, e) => {
+          this.lastDetection = e || {};
+        }
       ),
       pc: undefined,
       src: "images/cameraloading.jpg",
@@ -63,10 +65,11 @@ export default {
         const h = detection.boundingBox[3];
         const t = detection.className;
         const fs = 20;
-        const box =
-        `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
-        <text x="${x}" y="${y-5}" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
-        <text x="${x}" y="${y-5}" font-size="${fs}" fill="white">${t}</text>`;
+        const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
+        <text x="${x}" y="${
+          y - 5
+        }" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
+        <text x="${x}" y="${y - 5}" font-size="${fs}" fill="white">${t}</text>`;
         contents += box;
       }
 
@@ -79,10 +82,11 @@ export default {
         const h = detection.boundingBox[3];
         const t = detection.label;
         const fs = 20;
-        const box =
-        `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
-        <text x="${x}" y="${y-5}" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
-        <text x="${x}" y="${y-5}" font-size="${fs}" fill="white">${t}</text>`;
+        const box = `<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${s}" stroke-width="${sw}" fill="none" />
+        <text x="${x}" y="${
+          y - 5
+        }" font-size="${fs}" dx="0.05em" dy="0.05em" fill="black">${t}</text>
+        <text x="${x}" y="${y - 5}" font-size="${fs}" fill="white">${t}</text>`;
         contents += box;
       }
 
