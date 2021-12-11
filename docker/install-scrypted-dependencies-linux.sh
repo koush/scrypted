@@ -29,6 +29,9 @@ ENV() {
 
 source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/Dockerfile.common)
 
+echo "Installing Scrypted..."
+RUN npx -y install-server
+
 if [ -z "$SERVICE_USER" ]
 then
     echo "Scrypted SERVICE_USER environment variable was not specified. Service will not be installed."
