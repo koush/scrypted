@@ -54,7 +54,6 @@ After=network.target
 User=$SERVICE_USER
 Group=$SERVICE_USER
 Type=simple
-KillMode=process
 ExecStart=/usr/bin/npx -y scrypted serve
 Restart=on-failure
 RestartSec=3
