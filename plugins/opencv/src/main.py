@@ -7,6 +7,9 @@ import cv2
 import imutils
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 
+from scrypted_sdk import systemManager, remote
+import asyncio
+
 def gst_to_opencv(sample):
     buf = sample.get_buffer()
     caps = sample.get_caps()
@@ -164,5 +167,22 @@ class OpenCVPlugin(DetectPlugin):
     def create_detection_session(self):
         return OpenCVDetectionSession()
 
+async def require_plugins(plugins: Any):
+    api = remote.api
+    logger = await api.getLogger(None)
+    pluginsComponent = await systemManager.getComponent('plugins')
+    for plugin in plugins:
+        found = await pluginsComponent.getIdForPluginId(plugin)
+        if found:
+            continue
+        name = plugins[plugin]
+        await logger.log('a', 'Installation of the %s plugin is also recommended. origin:/#/component/plugin/install/%s' % (name, plugin))
+        
+
 def create_scrypted_plugin():
+    plugins = {
+      '@scrypted/objectdetector': "Video Analysis Plugin",
+    }
+    asyncio.run_coroutine_threadsafe(require_plugins(plugins), loop=asyncio.get_event_loop())
+
     return OpenCVPlugin()
