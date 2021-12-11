@@ -35,6 +35,12 @@ then
     exit 0
 fi
 
+if [ "$SERVICE_USER" == "root" ]
+then
+    echo "Scrypted SERVICE_USER root is not allowed."
+    exit 1
+fi
+
 cat <<EOT > /etc/systemd/system/scrypted.service
 
 [Unit]
@@ -42,8 +48,8 @@ Description=Scrypted service
 After=network.target
 
 [Service]
-User=pi
-Group=pi
+User=$SERVICE_USER
+Group=$SERVICE_USER
 Type=simple
 KillMode=process
 ExecStart=/usr/bin/npx -y scrypted serve
