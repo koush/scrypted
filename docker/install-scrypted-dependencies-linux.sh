@@ -74,5 +74,6 @@ WantedBy=multi-user.target
 
 EOT
 
+RUN systemctl daemon-reload
 RUN systemctl enable scrypted.service
 RUN systemctl restart scrypted.service
