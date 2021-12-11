@@ -47,6 +47,11 @@ then
     exit 1
 fi
 
+
+# this is not RUN as we do not care about the result
+echo "Setting permissions on /home/$SERVICE_USER/.scrypted"
+chown -R $SERVICE_USER /home/$SERVICE_USER/.scrypted
+
 echo "Installing Scrypted..."
 RUN sudo -u $SERVICE_USER npx -y scrypted install-server
 
