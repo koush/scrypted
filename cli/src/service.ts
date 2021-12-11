@@ -31,13 +31,9 @@ async function runCommandEatError(command: string, ...args: string[]) {
     }
 }
 
-export function getRunServerArguments() {
-    return ['--expose-gc', 'node_modules/@scrypted/server/dist/scrypted-main.js'];
-}
-
 export async function runServer() {
     console.log('Starting scrypted main...');
-    await runCommand(process.argv[0], ...getRunServerArguments());
+    await runCommand('npm', 'exec', 'scrypted-serve');
 }
 
 async function startServer() {
