@@ -12,6 +12,10 @@
       @change="save"
       :class="lazyValue.description ? 'mb-2' : ''"
     ></v-checkbox>
+    <div v-if="lazyValue.type === 'button'" @click="save">
+      <v-btn small block> {{ lazyValue.title }} </v-btn>
+      <span v-if="lazyValue.description" class="caption pl-1">{{ lazyValue.description }}</span>
+    </div>
     <v-combobox
       v-else-if="lazyValue.choices && lazyValue.combobox"
       dense
@@ -129,7 +133,8 @@ export default {
     booleanValue: {
       get() {
         return (
-          this.lazyValue.value && this.lazyValue.value.toString().toLowerCase() === "true"
+          this.lazyValue.value &&
+          this.lazyValue.value.toString().toLowerCase() === "true"
         );
       },
       set(val) {

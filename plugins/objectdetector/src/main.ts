@@ -115,7 +115,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       detectionId: this.detectionId,
       settings: await this.getCurrentSettings(),
     });
-    this.objectsDetected(detections);
+    this.objectsDetected(detections, true);
   }
 
   bindObjectDetection() {
@@ -218,7 +218,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  async objectsDetected(detectionResult: ObjectsDetected) {
+  async objectsDetected(detectionResult: ObjectsDetected, showAll?: boolean) {
     // do not denoise
     if (this.hasMotionType) {
       return;
@@ -247,43 +247,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     });
     if (found.length) {
       this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
+    }
+    if (found.length || showAll) {
       this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
       if (detectionResult.running)
         this.extendedObjectDetect();
     }
-  }
-
-  async peopleDetected(detectionResult: ObjectsDetected) {
-    if (!detectionResult?.people) {
-      return;
-    }
-
-    const found: DenoisedDetectionEntry<FaceRecognitionResult>[] = [];
-    denoiseDetections<FaceRecognitionResult>(this.currentPeople, detectionResult.people.map(detection => ({
-      id: detection.id,
-      name: detection.label,
-      detection,
-    })), {
-      timeout: this.detectionTimeout * 1000,
-      added: d => found.push(d),
-      removed: d => {
-        this.console.log('expired detection:', `${d.detection.label} (${d.detection.score}, ${d.detection.id})`);
-        if (detectionResult.running)
-          this.extendedFaceDetect();
-      }
-    });
-    if (found.length) {
-      this.console.log('new detection:', found.map(d => `${d.detection.label} (${d.detection.score}, ${d.detection.id})`).join(', '));
-      this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
-      this.extendedFaceDetect();
-    }
-  }
-
-  async extendedFaceDetect() {
-    this.objectDetection?.detectObjects(undefined, {
-      detectionId: this.detectionId,
-      duration: 60000,
-    });
   }
 
   setDetection(detectionId: string, detectionInput: DetectionInput) {
@@ -398,11 +367,22 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       );
     }
 
+    if (!this.hasMotionType) {
+      settings.push(
+        {
+          title: 'Analyze',
+          description: 'Analyzes the video stream for 1 minute. Results will be shown in the Console.',
+          key: 'analyzeButton',
+          type: 'button',
+        }
+      );
+    }
+
     return settings;
   }
 
   async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
-    const vs = value.toString();
+    const vs = value?.toString();
     this.storage.setItem(key, vs);
     if (key === 'detectionDuration') {
       this.detectionDuration = parseInt(vs) || defaultDetectionDuration;
@@ -422,6 +402,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     else if (key === 'streamingChannel') {
       this.bindObjectDetection();
+    }
+    else if (key === 'analyzeButton') {
+      this.snapshotDetection();
+      this.startVideoDetection();
+      this.extendedObjectDetect();
     }
     else {
       const settings = await this.getCurrentSettings();
