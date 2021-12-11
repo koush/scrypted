@@ -3,5 +3,4 @@
 # plugin
 numpy>=1.16.2
 PyGObject>=3.30.4
-opencv-python>=3.0.0
 imutils>=0.5.0
