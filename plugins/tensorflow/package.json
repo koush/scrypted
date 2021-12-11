@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/tensorflow",
-   "version": "0.0.17",
+   "version": "0.0.18",
    "description": "Scrypted Face Recognition Service.",
    "author": "Scrypted",
    "license": "Apache-2.0",

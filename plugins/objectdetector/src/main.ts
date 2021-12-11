@@ -481,8 +481,8 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider {
 
     alertRecommendedPlugins({
       '@scrypted/opencv': "OpenCV Motion Detection Plugin",
-      '@scrypted/tensorflow': 'TensorFlow Face Recognition Plugin',
-      '@scrypted/tensorflow-lite': 'TensorFlow Lite Object Detection Plugin',
+      // '@scrypted/tensorflow': 'TensorFlow Face Recognition Plugin',
+      // '@scrypted/tensorflow-lite': 'TensorFlow Lite Object Detection Plugin',
     });
   }
 
