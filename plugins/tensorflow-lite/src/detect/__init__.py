@@ -16,6 +16,7 @@ from . import gstreamer
 
 from scrypted_sdk.types import FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
+
 class DetectionSession:
     id: str
     timerHandle: TimerHandle
@@ -98,7 +99,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def create_detection_session(self):
         return DetectionSession()
 
-    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, inference_box, scale)-> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, inference_box, scale) -> ObjectsDetected:
         pass
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
@@ -170,6 +171,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             parsed_url = urlparse(videosrc)
             videosrc = 'tcpclientsrc port=%s host=%s ! tsdemux' % (
                 parsed_url.port, parsed_url.hostname)
+        elif videosrc.startswith('rtsp'):
+            videosrc = 'rtspsrc location=%s ! rtph264depay ! h264parse' % videosrc
 
         size = j['mediaStreamOptions']['video']
         src_size = (size['width'], size['height'])
