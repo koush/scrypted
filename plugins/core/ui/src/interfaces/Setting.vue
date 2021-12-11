@@ -12,7 +12,7 @@
       @change="save"
       :class="lazyValue.description ? 'mb-2' : ''"
     ></v-checkbox>
-    <div v-if="lazyValue.type === 'button'" @click="save">
+    <div v-else-if="lazyValue.type === 'button'" @click="save">
       <v-btn small block> {{ lazyValue.title }} </v-btn>
       <span v-if="lazyValue.description" class="caption pl-1">{{ lazyValue.description }}</span>
     </div>

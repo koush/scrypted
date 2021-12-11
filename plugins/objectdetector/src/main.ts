@@ -165,7 +165,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         selectedStream = msos.find(mso => mso.name === streamingChannel);
       }
 
-      const session = await this.objectDetection?.detectObjects(await this.cameraDevice.getVideoStream(selectedStream), {
+      const stream = await this.cameraDevice.getVideoStream(selectedStream);
+      const session = await this.objectDetection?.detectObjects(stream, {
         detectionId: this.detectionId,
         duration: this.getDetectionDuration(),
         settings: await this.getCurrentSettings(),
@@ -404,9 +405,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.bindObjectDetection();
     }
     else if (key === 'analyzeButton') {
-      this.snapshotDetection();
-      this.startVideoDetection();
-      this.extendedObjectDetect();
+      await this.snapshotDetection();
+      await this.startVideoDetection();
+      await this.extendedObjectDetect();
     }
     else {
       const settings = await this.getCurrentSettings();
