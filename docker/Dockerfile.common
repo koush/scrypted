@@ -1,5 +1,5 @@
 ARG BASE="16"
-FROM koush/node-opencv:${BASE}
+FROM node:${BASE}
 
 # Coral Edge TPU sources.list
 # https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
