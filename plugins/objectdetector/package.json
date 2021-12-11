@@ -1,7 +1,7 @@
 {
    "name": "@scrypted/objectdetector",
-   "version": "0.0.20",
-   "description": "Object Detector for VideoCameras. Installed alongside a detection service.",
+   "version": "0.0.23",
+   "description": "Scrypted Video Analysis Plugin. Installed alongside a detection service like OpenCV or TensorFlow.",
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {
@@ -30,7 +30,7 @@
       "person"
    ],
    "scrypted": {
-      "name": "Object Detector Plugin",
+      "name": "Video Analysis Plugin",
       "singleInstance": true,
       "type": "API",
       "interfaces": [
