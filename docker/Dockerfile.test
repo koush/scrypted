@@ -1,0 +1,6 @@
+FROM node:16
+
+COPY . .
+WORKDIR  /
+
+RUN ./install-scrypted-dependencies-linux.sh
