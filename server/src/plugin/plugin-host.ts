@@ -410,11 +410,17 @@ export function startPluginRemote() {
         }, undefined, undefined);
     }
 
-    const getMixinConsole = (mixinId: string, nativeId?: ScryptedNativeId) => {
+    const getMixinConsole = (mixinId: string, nativeId: ScryptedNativeId) => {
         return getConsole(async (stdout, stderr) => {
-            if (!mixinId || !systemManager.getDeviceById(mixinId).mixins.includes(idForNativeId(nativeId))) {
+            if (!mixinId) {
                 return;
             }
+            // todo: fix this. a mixin provider can mixin another device to make it a mixin provider itself.
+            // so the mixin id in the mixin table will be incorrect.
+            // there's no easy way to fix this from the remote.
+            // if (!systemManager.getDeviceById(mixinId).mixins.includes(idForNativeId(nativeId))) {
+            //     return;
+            // }
             const plugins = await systemManager.getComponent('plugins');
             const connect = async () => {
                 const ds = deviceManager.getDeviceState(nativeId);

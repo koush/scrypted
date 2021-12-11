@@ -60,17 +60,9 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
                 throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
         }
         else {
-            let found = false;
-            for (const mixin of this.scrypted.devices[device._id].handler.mixinTable) {
-                const { proxy } = await mixin.entry;
-                if (proxy === nativeIdOrMixinDevice) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
+            if (!await this.scrypted.devices[device._id]?.handler?.isMixin(id, nativeIdOrMixinDevice)) {
                 const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
-                throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
+                throw new Error(`${mixinProvider?._id} does not mixin ${eventInterface} for ${id}`);
             }
         }
         this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);
