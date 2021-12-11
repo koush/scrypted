@@ -77,3 +77,15 @@ EOT
 RUN systemctl daemon-reload
 RUN systemctl enable scrypted.service
 RUN systemctl restart scrypted.service
+
+
+set +x
+echo
+echo
+echo
+echo
+echo "Scrypted Service has been installed (and started). You can start and stop Scrypted with:"
+echo "  systemctl start scrypted.service"
+echo "  systemctl stop scrypted.service"
+echo
+echo
