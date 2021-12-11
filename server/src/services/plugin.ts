@@ -29,8 +29,10 @@ export class PluginComponent {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
         this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
         await this.scrypted.datastore.upsert(pluginDevice);
-        const device = this.scrypted.rebuildPluginDeviceMixinTable(id);
-        await device?.handler.ensureProxy();
+        // device may not exist, so force creation.
+        this.scrypted.rebuildPluginDeviceMixinTable(id);
+        this.scrypted.getDevice(id);
+        await this.scrypted.devices[id]?.handler?.ensureProxy();
     }
     async getMixins(id: string) {
         console.warn('legacy use of getMixins, use the mixins property');
