@@ -36,7 +36,7 @@ ENV() {
 source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/Dockerfile.common)
 
 echo "Installing Scrypted..."
-RUN npx -y install-server
+RUN npx -y scrypted install-server
 
 if [ -z "$SERVICE_USER" ]
 then
