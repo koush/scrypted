@@ -19,6 +19,7 @@ import { decodeJpeg, encodeJpeg } from './jpeg';
 import { EventEmitter } from 'stream';
 
 const DISPOSE_TIMEOUT = 10000;
+const defaultThreshold = .4
 
 // do not delete this, it makes sure tf is initialized.
 console.log(tf.getBackend());
@@ -281,7 +282,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
     let detectionSession = this.detectionSessions.get(session?.detectionId);
     let detectionId = session?.detectionId;
     const duration = session?.duration;
-    const minScore = session?.minScore;
+    const settings = session?.settings;
 
     const isImage = mediaObject?.mimeType?.startsWith('image/');
 
@@ -299,7 +300,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
 
       detectionSession = {
         id: detectionId,
-        minScore,
+        minScore : settings?.minScore || defaultThreshold,
         events: new EventEmitter(),
       };
       this.detectionSessions.set(detectionId, detectionSession);
@@ -315,7 +316,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
     if (isImage) {
       const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg');
       const input = decodeJpeg(buffer, 3);
-      return this.getDetections(detectionId, input, buffer, minScore);
+      return this.getDetections(detectionId, input, buffer, settings?.minScore || defaultThreshold);
     }
 
     const newSession = !detectionSession.running;
@@ -324,8 +325,8 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
 
     clearTimeout(detectionSession.rebroadcasterTimeout);
     detectionSession.rebroadcasterTimeout = setTimeout(() => detectionSession.rebroadcaster?.then(rb => rb.kill()), duration);
-    if (minScore !== undefined)
-      detectionSession.minScore = minScore;
+    if (settings?.minScore !== undefined)
+      detectionSession.minScore = settings?.minScore;
 
     if (!newSession) {
       this.console.log('existing session', detectionSession.id);
@@ -397,17 +398,21 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
     this.onDeviceEvent(ScryptedInterface.ObjectDetection, detections)
   }
 
-  async getInferenceModels(): Promise<ObjectDetectionModel[]> {
-    return [
-      {
-        id: 'coco-ssd',
-        name: 'Coco SSD',
-        people: this.getAllPeople().map(person => ({
-          id: person.nativeId,
-          label: person.name,
-        }))
-      }
-    ]
+  async getDetectionModel(): Promise<ObjectDetectionModel> {
+    return {
+      name: 'Coco SSD',
+      classes: this.getAllPeople().map(person => person.name),
+      settings: [
+        {
+          title: 'Minimum Detection Confidence',
+          description: 'Higher values eliminate false positives and low quality recognition candidates.',
+          key: 'score_threshold',
+          type: 'number',
+          value: defaultThreshold,
+          placeholder: defaultThreshold.toString(),
+        }
+      ],
+    };
   }
 
   discoverPerson(nativeId: string) {
