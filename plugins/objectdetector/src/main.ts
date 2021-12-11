@@ -320,6 +320,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   async getMixinSettings(): Promise<Setting[]> {
     const settings: Setting[] = [];
 
+    if (this.hasMotionType && this.mixinDeviceInterfaces.includes(ScryptedInterface.MotionSensor)) {
+      settings.push({
+        title: 'Existing Motion Sensor',
+        description: 'This camera has a built in motion sensor. Using OpenCV Motion Sensing may be unnecessary and will use additional CPU.',
+        readonly: true,
+        value: 'WARNING',
+        key: 'existingMotionSensor',
+      })
+    }
+
     let msos: MediaStreamOptions[] = [];
     try {
       msos = await this.cameraDevice.getVideoStreamOptions();
@@ -369,7 +379,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         key: 'motionDuration',
         type: 'number',
         value: this.motionDuration.toString(),
-        },
+      },
         {
           title: 'Motion Detection Objects',
           description: 'Report motion detections as objects (useful for debugging).',
