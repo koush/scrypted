@@ -6,7 +6,7 @@ export const SCRYPTED_DEBUG_PORT = parseInt(process.env.SCRYPTED_DEBUG_PORT) || 
 
 export function getIpAddress(): string {
     const ni = os.networkInterfaces();
-    for (const i of [0, 1, 2, 3, 4, 5]) {
+    for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
         let ipv4: os.NetworkInterfaceInfo;
         let ipv6: os.NetworkInterfaceInfo;
         for (const en of (ni[`en${i}`] || [])) {

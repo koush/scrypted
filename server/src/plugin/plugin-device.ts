@@ -252,7 +252,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
             // this has been the behavior for a while,
             // but maybe interfaces implemented by that mixin
             // should rethrow the error caught here in applyMixin.
-            console.warn(e);
+            console.warn('mixin error', e);
             return {
                 passthrough: false,
                 allInterfaces,

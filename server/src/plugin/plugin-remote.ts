@@ -73,11 +73,17 @@ class EndpointManagerImpl implements EndpointManager {
         return id;
     }
 
+    async getUrlSafeIp() {
+        // ipv6 addresses have colons and need to be bracketed for url safety
+        const ip: string = await this.api.getComponent('SCRYPTED_IP_ADDRESS')
+        return ip.includes(':') ? `[${ip}]` : ip;
+    }
+
     async getAuthenticatedPath(nativeId?: ScryptedNativeId): Promise<string> {
         return `/endpoint/${this.getEndpoint(nativeId)}/`;
     }
     async getInsecurePublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
-        return `http://${await this.api.getComponent('SCRYPTED_IP_ADDRESS')}:${await this.api.getComponent('SCRYPTED_INSECURE_PORT')}/endpoint/${this.getEndpoint(nativeId)}/public/`;
+        return `http://${await this.getUrlSafeIp()}:${await this.api.getComponent('SCRYPTED_INSECURE_PORT')}/endpoint/${this.getEndpoint(nativeId)}/public/`;
     }
     async getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         const local = await this.getPublicLocalEndpoint(nativeId);
@@ -85,7 +91,7 @@ class EndpointManagerImpl implements EndpointManager {
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     }
     async getPublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
-        return `https://${await this.api.getComponent('SCRYPTED_IP_ADDRESS')}:${await this.api.getComponent('SCRYPTED_SECURE_PORT')}/endpoint/${this.getEndpoint(nativeId)}/public/`;
+        return `https://${await this.getUrlSafeIp()}:${await this.api.getComponent('SCRYPTED_SECURE_PORT')}/endpoint/${this.getEndpoint(nativeId)}/public/`;
     }
     async getPublicPushEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         const mo = this.mediaManager.createMediaObject(Buffer.from(this.getEndpoint(nativeId)), ScryptedMimeTypes.PushEndpoint);
