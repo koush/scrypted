@@ -54,20 +54,6 @@ RUN apt-get -y install \
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 
-# opencv
-# RUN apt-get -y install libopencv-dev
-# sanity check
-# RUN pkg-config opencv4 --libs
-
-# TODO: I don't think this even works anymore on latest raspbian. should maybe switch to v4l2.
-# grab raspbian (omx) ffmpeg, since we don't know at build time whether this is
-# a raspbian system.
-RUN mkdir -p /raspbian && cd /raspbian \
-    && curl -O -L https://github.com/homebridge/ffmpeg-for-homebridge/releases/latest/download/ffmpeg-raspbian-armv6l.tar.gz \
-    && tar xzvfm ffmpeg-raspbian-armv6l.tar.gz \
-    && rm ffmpeg-raspbian-armv6l.tar.gz
-ENV SCRYPTED_RASPBIAN_FFMPEG_PATH="/raspbian/usr/local/bin/ffmpeg"
-
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
