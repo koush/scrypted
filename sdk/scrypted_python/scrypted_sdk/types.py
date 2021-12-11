@@ -748,6 +748,27 @@ class VideoCamera:
         pass
     pass
 
+class Logger:
+    def a(self, msg: str) -> None:
+        pass
+    def clear(self) -> None:
+        pass
+    def clearAlert(self, msg: str) -> None:
+        pass
+    def clearAlerts(self) -> None:
+        pass
+    def d(self, msg: str) -> None:
+        pass
+    def e(self, msg: str) -> None:
+        pass
+    def i(self, msg: str) -> None:
+        pass
+    def v(self, msg: str) -> None:
+        pass
+    def w(self, msg: str) -> None:
+        pass
+    pass
+
 class DeviceManager:
     def getDeviceConsole(self, nativeId: str = None) -> Console:
         pass

@@ -5,7 +5,6 @@ from typing import Callable
 SettingValue = str
 EventListener = Callable[[Any, Any, Any], None]
 
-
 class Console:
     pass
 
