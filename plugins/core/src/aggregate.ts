@@ -72,6 +72,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         ];
 
         const filteredInput: FFMpegInput = {
+            url: undefined,
             inputArguments: [],
         };
 
