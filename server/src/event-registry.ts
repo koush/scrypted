@@ -8,7 +8,8 @@ export class EventListenerRegisterImpl implements EventListenerRegister {
     }
 }
 
-const allowedEventInterfaces = new Set<string>([ScryptedInterface.ScryptedDevice, 'Logger'])
+// todo: storage should only go to host plugin
+const allowedEventInterfaces = new Set<string>([ScryptedInterface.ScryptedDevice, 'Logger', 'Storage'])
 
 export class EventRegistry {
     systemListeners = new Set<(id: string, eventDetails: EventDetails, eventData: object) => void>();
