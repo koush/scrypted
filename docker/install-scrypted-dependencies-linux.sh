@@ -28,3 +28,32 @@ ENV() {
 }
 
 source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/Dockerfile.common)
+
+if [ -z "$SERVICE_USER" ]
+then
+    echo "Scrypted SERVICE_USER environment variable was not specified. Service will not be installed."
+    exit 0
+fi
+
+cat <<EOT > /etc/systemd/system/scrypted.service
+
+[Unit]
+Description=Scrypted service
+After=network.target
+
+[Service]
+User=pi
+Group=pi
+Type=simple
+KillMode=process
+ExecStart=/usr/bin/npx -y scrypted serve
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+
+EOT
+
+RUN systemctl enable scrypted.service
+RUN systemctl restart scrypted.service
