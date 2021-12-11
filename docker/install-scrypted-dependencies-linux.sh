@@ -41,14 +41,14 @@ then
     exit 0
 fi
 
-echo "Installing Scrypted..."
-RUN sudo -u $SERVICE_USER npx -y scrypted install-server
-
 if [ "$SERVICE_USER" == "root" ]
 then
     echo "Scrypted SERVICE_USER root is not allowed."
     exit 1
 fi
+
+echo "Installing Scrypted..."
+RUN sudo -u $SERVICE_USER npx -y scrypted install-server
 
 cat <<EOT > /etc/systemd/system/scrypted.service
 
