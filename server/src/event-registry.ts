@@ -8,6 +8,8 @@ export class EventListenerRegisterImpl implements EventListenerRegister {
     }
 }
 
+const allowedEventInterfaces = new Set<string>([ScryptedInterface.ScryptedDevice, 'Logger'])
+
 export class EventRegistry {
     systemListeners = new Set<(id: string, eventDetails: EventDetails, eventData: object) => void>();
     listeners: { [token: string]: Set<(eventDetails: EventDetails, eventData: object) => void> } = {};
@@ -57,7 +59,7 @@ export class EventRegistry {
         // system listeners only get state changes.
         // there are many potentially noisy stateless events, like
         // object detection and settings changes.
-        if (property || eventInterface === ScryptedInterface.ScryptedDevice) {
+        if (property || allowedEventInterfaces.has(eventInterface)) {
             for (const event of this.systemListeners) {
                 event(id, eventDetails, value);
             }

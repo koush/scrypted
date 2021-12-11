@@ -34,7 +34,9 @@ class SystemManager(scrypted_python.scrypted_sdk.SystemManager):
         super().__init__()
         self.api = api
         self.systemState = systemState
-
+    
+    async def getComponent(self, id: str) -> Any:
+        return await self.api.getComponent(id)
 
 class DeviceState(scrypted_python.scrypted_sdk.DeviceState):
     def __init__(self, id: str, nativeId: str, systemManager: SystemManager, deviceManager: scrypted_python.scrypted_sdk.DeviceManager) -> None:
