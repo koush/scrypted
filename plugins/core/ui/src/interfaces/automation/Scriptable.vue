@@ -1,6 +1,14 @@
 <template>
   <div>
     <v-toolbar dense>
+      <v-tooltip top>
+        <template v-slot:activator="{ on }">
+          <v-btn v-on="on" text @click="expanded = !expanded">
+            <v-icon x-small>fa-angle-double-down</v-icon>
+          </v-btn>
+        </template>
+        <span>Toggle Expand</span>
+      </v-tooltip>
       <v-tooltip top v-if="device">
         <template v-slot:activator="{ on }">
           <v-btn v-on="on" text @click="save">
@@ -22,7 +30,7 @@
         scriptSource.scriptTitle
       }}</v-toolbar-title>
     </v-toolbar>
-    <div style="height: 500px">
+    <div :style="divStyle">
       <div ref="container" style="width: 100%; height: 100%"></div>
     </div>
   </div>
@@ -89,11 +97,18 @@ export default {
   mounted() {
     this.reload();
   },
+  computed: {
+    divStyle() {
+      const height = this.expanded ? 1000 : 500;
+      return `height: ${height}px`;
+    },
+  },
   data() {
     return {
+      expanded: false,
       scriptSource: {
         filename: "script.ts",
-        script: '',
+        script: "",
         scriptTitle: "Script",
         language: "typescript",
         monacoEvalDefaults: () => monacoEvalDefaults,

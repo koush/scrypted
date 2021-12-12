@@ -20,6 +20,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
 
         this.settingsGroup = options.group;
         this.settingsGroupKey = options.groupKey;
+        process.nextTick(() => deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, null));
     }
 
     abstract getMixinSettings(): Promise<Setting[]>;
@@ -47,6 +48,10 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
         }
 
         await this.putMixinSetting(key.substring(prefix.length), value)
-        deviceManager.onMixinEvent?.(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, null);
+        deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, null);
+    }
+
+    release() {
+        deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, null);
     }
 }

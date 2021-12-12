@@ -31,7 +31,7 @@
       </div>
     </v-flex>
 
-    <v-flex v-for="iface in noCardAboveInterfaces" :key="iface">
+    <v-flex v-for="iface in noCardAboveInterfaces" :key="iface" xs12>
       <component :value="deviceState" :device="device" :is="iface"></component>
     </v-flex>
 
