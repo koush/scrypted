@@ -7,6 +7,7 @@ import { getState } from "../state";
 import { getDisplayType } from "../infer-defaults";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
 import { PluginError } from "./plugin-error";
+import { sleep } from "../sleep";
 
 interface MixinTable {
     mixinProviderId: string;
@@ -28,6 +29,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     scrypted: ScryptedRuntime;
     id: string;
     mixinTable: MixinTable[];
+    releasing = new Set<any>();
 
     constructor(scrypted: ScryptedRuntime, id: string) {
         this.scrypted = scrypted;
@@ -40,12 +42,18 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         (async () => {
             const mixinProvider = this.scrypted.getDevice(mixinEntry.mixinProviderId) as ScryptedDevice & MixinProvider;
             const { proxy } = await mixinEntry.entry;
+            // allow mixins in the process of being released to manage final
+            // events, etc, before teardown.
+            this.releasing.add(proxy);
             mixinProvider?.releaseMixin(this.id, proxy);
+            await sleep(1000);
+            this.releasing.delete(proxy);
         })().catch(() => { });
     }
 
     async isMixin(id: string, mixinDevice: any) {
-        let found = false;
+        if (this.releasing.has(mixinDevice))
+            return true;
         for (const mixin of this.scrypted.devices[id].handler.mixinTable) {
             const { proxy } = await mixin.entry;
             if (proxy === mixinDevice) {

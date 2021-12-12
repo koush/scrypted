@@ -76,7 +76,7 @@ class EndpointManagerImpl implements EndpointManager {
     async getUrlSafeIp() {
         // ipv6 addresses have colons and need to be bracketed for url safety
         const ip: string = await this.api.getComponent('SCRYPTED_IP_ADDRESS')
-        return ip.includes(':') ? `[${ip}]` : ip;
+        return ip?.includes(':') ? `[${ip}]` : ip;
     }
 
     async getAuthenticatedPath(nativeId?: ScryptedNativeId): Promise<string> {

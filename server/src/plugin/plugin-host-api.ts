@@ -46,6 +46,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     async onMixinEvent(id: string, nativeIdOrMixinDevice: ScryptedNativeId|any, eventInterface: any, eventData?: any) {
         // nativeId code path has been deprecated in favor of mixin object 12/10/2021
         const device = this.scrypted.findPluginDeviceById(id);
+
         if (!nativeIdOrMixinDevice || typeof nativeIdOrMixinDevice === 'string') {
             // todo: deprecate this code path
             const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
