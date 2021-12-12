@@ -44,14 +44,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         return username;
     }
 
-    getHomeKitHubs(): string[] {
-        try {
-            return JSON.parse(this.storage.getItem('homekitHubs'));
-        }
-        catch (e) {
-        }
-    }
-
     async getSettings(): Promise<Setting[]> {
         const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
         return [
@@ -292,8 +284,42 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         return parseInt(this.storage.getItem('portOverride')) || 0;
     }
 
+    getHomeKitHubs(): string[] {
+        try {
+            return JSON.parse(this.storage.getItem('homekitHubs'));
+        }
+        catch (e) {
+        }
+    }
+
+    getAutoHomeKitHubs(): string[] {
+        try {
+            return JSON.parse(this.storage.getItem('autoHomekitHubs'));
+        }
+        catch (e) {
+            return [];
+        }
+    }
+
     isHomeKitHub(address: string) {
         return !!this.getHomeKitHubs()?.find(check => check.endsWith(address));
+    }
+
+    detectedHomeKitHub(ip: string) {
+        try {
+            const homekitHubs = this.getHomeKitHubs();
+            if (homekitHubs?.includes(ip))
+                return;
+            const autoHomekitHubs = this.getAutoHomeKitHubs();
+            if (autoHomekitHubs.includes(ip))
+                return;
+            autoHomekitHubs.push(ip);
+            homekitHubs.push(ip);
+            this.storage.setItem('autoHomekitHubs', JSON.stringify(autoHomekitHubs));
+            this.storage.setItem('homekitHubs', JSON.stringify(homekitHubs));
+        }
+        catch (e) {
+        }
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]) {

@@ -19,7 +19,7 @@ import { Active, ContactSensor } from 'hap-nodejs/src/lib/definitions';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSnapshotHandler } from './camera/camera-snapshot';
 import { evalRequest } from './camera/camera-transcode';
-import { CharacteristicEventTypes, Service, WithUUID } from 'hap-nodejs/src';
+import { CharacteristicEventTypes, DataStreamConnection, Service, WithUUID } from 'hap-nodejs/src';
 import { RecordingManagement } from 'hap-nodejs/src/lib/camera';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 
@@ -446,7 +446,8 @@ addSupportedType({
 
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
-                handleFragmentsRequests(): AsyncGenerator<Buffer, void, unknown> {
+                handleFragmentsRequests(connection: DataStreamConnection): AsyncGenerator<Buffer, void, unknown> {
+                    homekitSession.detectedHomeKitHub(connection.remoteAddress);
                     const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
                     return handleFragmentsRequests(device, configuration, console)
                 }
