@@ -5,24 +5,11 @@ from detect.safe_set_result import safe_set_result
 import numpy as np
 import cv2
 import imutils
+from gi.repository import GLib, Gst
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 
 from scrypted_sdk import systemManager, remote
 import asyncio
-
-def gst_to_opencv(sample):
-    buf = sample.get_buffer()
-    caps = sample.get_caps()
-    # can't trust the width value, compute the stride
-    height = caps.get_structure(0).get_value('height')
-    width = caps.get_structure(0).get_value('width')
-    arr = np.ndarray(
-        (height,
-         width,
-         4),
-        buffer=buf.extract_dup(0, buf.get_size()),
-        dtype= np.uint8)
-    return arr
 
 class OpenCVDetectionSession(DetectionSession):
     cap: cv2.VideoCapture
@@ -161,8 +148,24 @@ class OpenCVPlugin(DetectPlugin):
         return super().end_session(detection_session)
 
     def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, settings: Any, src_size, inference_box, scale)-> ObjectsDetected:
-        mat = gst_to_opencv(gst_sample)
-        return self.detect(detection_session, mat, settings, src_size, inference_box)
+        buf = gst_sample.get_buffer()
+        caps = gst_sample.get_caps()
+        # can't trust the width value, compute the stride
+        height = caps.get_structure(0).get_value('height')
+        width = caps.get_structure(0).get_value('width')
+        result, info = buf.map(Gst.MapFlags.READ)
+        if not result:
+            return
+        try:
+            mat = np.ndarray(
+                (height,
+                width,
+                4),
+                buffer=info.data,
+                dtype= np.uint8)
+            return self.detect(detection_session, mat, settings, src_size, inference_box)
+        finally:
+            buf.unmap(info)
 
     def create_detection_session(self):
         return OpenCVDetectionSession()
