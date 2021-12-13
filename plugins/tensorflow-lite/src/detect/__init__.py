@@ -201,8 +201,14 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         w, h = src_size
         scale = (width / w, height / h)
 
+        first_frame = True
         def user_callback(gst_sample, src_size, inference_box):
             try:
+                nonlocal first_frame
+                if first_frame:
+                    first_frame = False
+                    print("first frame received", detection_session.id)
+
                 detection_result = self.run_detection_gstsample(
                     detection_session, gst_sample, detection_session.settings, src_size, inference_box, scale)
                 if detection_result:
