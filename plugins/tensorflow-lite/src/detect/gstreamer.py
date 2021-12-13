@@ -73,13 +73,13 @@ class GstPipeline:
         # worker.join()
 
     def on_bus_message(self, bus, message):
-        t = message.type
-        if t == Gst.MessageType.EOS:
+        t = str(message.type)
+        if t == str(Gst.MessageType.EOS):
             safe_set_result(self.finished)
-        elif t == Gst.MessageType.WARNING:
+        elif t == str(Gst.MessageType.WARNING):
             err, debug = message.parse_warning()
             print('Warning: %s: %s\n' % (err, debug))
-        elif t == Gst.MessageType.ERROR:
+        elif t == str(Gst.MessageType.ERROR):
             err, debug = message.parse_error()
             print('Error: %s: %s\n' % (err, debug))
             safe_set_result(self.finished)
