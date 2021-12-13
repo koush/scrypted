@@ -73,6 +73,8 @@ class GstPipeline:
         # worker.join()
 
     def on_bus_message(self, bus, message):
+        # seeing the following error on pi 32 bit
+        # OverflowError: Python int too large to convert to C long
         t = str(message.type)
         if t == str(Gst.MessageType.EOS):
             safe_set_result(self.finished)
