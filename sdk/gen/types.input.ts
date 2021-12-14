@@ -1012,8 +1012,9 @@ export interface SystemManager {
 
   /**
    * Get the current state of a device.
+   * @deprecated
    */
-  getDeviceState(id: string): any;
+  getDeviceState(id: string): { [property: string]: SystemDeviceState };
 
   /**
    * Get the current state of every device.
