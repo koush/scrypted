@@ -4,9 +4,8 @@ import { ScryptedNativeId, Device, EngineIOHandler, HttpRequest, HttpRequestHand
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { Plugin, PluginDevice, ScryptedAlert } from './db-types';
 import { getState, ScryptedStateManager, setState } from './state';
-import { Request, Response, Router } from 'express';
+import { Request, Response } from 'express';
 import { createResponseInterface } from './http-interfaces';
-import bodyParser from 'body-parser';
 import http, { ServerResponse } from 'http';
 import https from 'https';
 import express from 'express';
@@ -31,9 +30,6 @@ import { spawn as ptySpawn } from 'node-pty';
 import rimraf from 'rimraf';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { PluginHttp } from './plugin/plugin-http';
-import httpProxy from 'http-proxy';
-import { ParamsDictionary } from 'express-serve-static-core';
-import { ParsedQs } from 'qs';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -61,7 +57,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     shellio = io(undefined, {
         pingTimeout: 120000,
     });
-    proxy = httpProxy.createProxyServer({});
 
     constructor(datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
         super(app);
@@ -317,35 +312,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
     }
 
-    handleGetUsernme(req: Request, res: Response): string {
-        return res.locals.username;
-    }
-
     async handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
-        this.getDevice<EngineIOHandler>(pluginDevice._id);
-        const handler = this.devices[pluginDevice._id];
-        handler.handler.ensureProxy();
-        const mixin = await handler.handler.findMixin(ScryptedInterface.EngineIOHandler);
-        const mixinHost = !mixin.mixin.mixinProviderId ? pluginHost : this.getPluginHostForDeviceId(mixin.mixin.mixinProviderId);
-        await mixinHost.module;
-        const httpPort = await mixinHost.remote.getServicePort('http', mixin.entry.proxy, endpointRequest.rootPath);
-
-        if (httpPort) {
-            if ((req as any).upgradeHead) {
-                this.proxy.ws(req, req.socket, (req as any).upgradeHead, {
-                    target: 'ws://127.0.0.1:' + httpPort,
-                    ws: true,
-                    secure: false,
-                });
-            }
-            else {
-                this.proxy.web(req, res, {
-                    target: 'http://127.0.0.1:' + httpPort
-                });
-            }
-            return;
-        }
 
         (req as any).scrypted = {
             endpointRequest,

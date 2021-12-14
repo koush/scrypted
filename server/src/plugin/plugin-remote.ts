@@ -289,9 +289,7 @@ export interface PluginRemoteAttachOptions {
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
     onLoadZip?: (zip: AdmZip, packageJson: any) => Promise<void>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
-    onGotRemote?: (remote: PluginRemote) => void;
     onPluginReady?: (scrypted: ScryptedStatic, params: any, plugin: any) => Promise<void>;
-    onWebSocketConnect?: (url: string, protocols: any, callbacks: WebSocketConnectCallbacks) => WebSocketCustomHandler;
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
@@ -431,18 +429,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     volume.writeFileSync(name, entry.getData());
                 }
 
-                const { onWebSocketConnect } = options || {};
                 function websocketConnect(url: string, protocols: any, callbacks: WebSocketConnectCallbacks) {
-                    if (onWebSocketConnect) {
-                        const handler = onWebSocketConnect(url, protocols, callbacks);
-                        if (handler) {
-                            const { id, methods } = handler;
-                            ioSockets[id] = callbacks;
-                            callbacks.connect(undefined, methods);
-                            return;
-                        }
-                    }
-
                     if (url.startsWith('io://') || url.startsWith('ws://')) {
                         const id = url.substring('xx://'.length);
 
@@ -497,7 +484,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             },
         }
 
-        options?.onGotRemote?.(remote);
         return remote;
     }
 

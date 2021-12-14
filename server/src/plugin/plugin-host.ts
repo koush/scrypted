@@ -1,6 +1,6 @@
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { HttpRequestHandler, SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, HttpRequest } from '@scrypted/sdk/types'
+import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io from 'engine.io';
@@ -25,14 +25,6 @@ import { installOptionalDependencies } from './plugin-npm-dependencies';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
 import { createREPLServer } from './plugin-repl';
 import { LazyRemote } from './plugin-lazy-remote';
-import http from 'http';
-import { listenZeroExpress } from './listen-zero';
-import express, { Request, Response } from 'express';
-import { PluginHttp } from './plugin-http';
-import { createResponseInterface } from '../http-interfaces';
-import { WebSocketConnectCallbacks } from './plugin-remote-websocket';
-import { ParamsDictionary } from 'express-serve-static-core';
-import { ParsedQs } from 'qs';
 
 export class PluginHost {
     worker: child_process.ChildProcess;
@@ -338,7 +330,6 @@ export function startPluginRemote() {
     let deviceManager: DeviceManager;
     let api: PluginAPI;
     let pluginId: string;
-    let pluginRemote: PluginRemote;
 
     const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>,
         also?: Console, alsoPrefix?: string) => {
@@ -475,107 +466,6 @@ export function startPluginRemote() {
         return _pluginConsole;
     }
 
-    interface PluginRemoteHttpData {
-
-    }
-
-    let admZip: AdmZip;
-    const ioServer = io(undefined, {
-        pingTimeout: 120000,
-    });
-    let wsAtomic = 0;
-    const deviceOrMixins = new Map<string, HttpRequestHandler & EngineIOHandler>();
-
-    const websockets = new Map<string, WebSocket>();
-    class PluginRemoteHttp extends PluginHttp<PluginRemoteHttpData> {
-        constructor(app: express.Express, public port: Promise<number>) {
-            super(app);
-
-            ioServer.on('connection', async (socket) => {
-                try {
-                    const {
-                        endpointRequest,
-                    } = (socket.request as any).scrypted;
-
-                    socket.on('message', message => {
-                        pluginRemote.ioEvent(socket.id, 'message', message)
-                    });
-                    socket.on('close', reason => {
-                        pluginRemote.ioEvent(socket.id, 'close');
-                    });
-
-                    const deviceOrMixin = deviceOrMixins.get(endpointRequest.rootPath);
-                    await deviceOrMixin.onConnection(endpointRequest, `ioproxy://${socket.id}`);
-                }
-                catch (e) {
-                    console.error('engine.io plugin error', e);
-                    socket.close();
-                }
-            })
-        }
-
-        handleGetUsernme(req: express.Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>, res: express.Response<any, Record<string, any>>): string {
-            return 'koush';
-        }
-
-        async handleEngineIOEndpoint(req: Request, res: http.ServerResponse, endpointRequest: HttpRequest, pluginData: PluginRemoteHttpData): Promise<void> {
-            (req as any).scrypted = {
-                endpointRequest,
-            };
-
-            if ((req as any).upgradeHead)
-                ioServer.handleUpgrade(req, res.socket, (req as any).upgradeHead)
-            else
-                ioServer.handleRequest(req, res);
-        }
-        async handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: PluginRemoteHttpData): Promise<void> {
-            const deviceOrMixin = deviceOrMixins.get(endpointRequest.rootPath);
-            deviceOrMixin.onRequest(req, createResponseInterface(res, admZip));
-        }
-        async getEndpointPluginData(endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<PluginRemoteHttpData> {
-            return {};
-        }
-        async handleWebSocket(endpoint: string, httpRequest: HttpRequest, ws: WebSocket, pluginData: PluginRemoteHttpData): Promise<void> {
-            const id = 'ws-' + wsAtomic++;
-
-            ws.on('message', async (message) => {
-                try {
-                    pluginRemote.ioEvent(id, 'message', message)
-                }
-                catch (e) {
-                    ws.close();
-                }
-            });
-            ws.on('close', async (reason) => {
-                try {
-                    pluginRemote.ioEvent(id, 'close');
-                }
-                catch (e) {
-                }
-                websockets.delete(id);
-            });
-
-            const deviceOrMixin = deviceOrMixins.get(endpoint);
-            await deviceOrMixin.onConnection(httpRequest, `wsproxy://${id}`);
-        }
-    }
-
-    const app = express();
-    app.disable('x-powered-by');
-    const { server, port: httpPort } = listenZeroExpress(app);
-    let remoteHttp = new PluginRemoteHttp(app, httpPort);
-    server.on('upgrade', (req, socket, upgradeHead) => {
-        (req as any).upgradeHead = upgradeHead;
-        (app as any).handle(req, {
-            socket,
-            upgradeHead
-        })
-    })
-    const getHttpPort = (deviceOrMixin: any, rootPath: string) => {
-        deviceOrMixins.set(rootPath, deviceOrMixin);
-        return remoteHttp.port;
-    }
-
     attachPluginRemote(peer, {
         createMediaManager: async (sm) => {
             systemManager = sm;
@@ -586,49 +476,21 @@ export function startPluginRemote() {
             pluginId = _pluginId;
             peer.selfName = pluginId;
         },
-        onGotRemote: async (r) => pluginRemote = r,
         onPluginReady: async (scrypted, params, plugin) => {
             replPort = createREPLServer(scrypted, params, plugin);
         },
         getPluginConsole,
         getDeviceConsole,
         getMixinConsole,
-        onWebSocketConnect: (url, protocol, callbacks) => {
-            if (!url.startsWith('wsproxy://') && !url.startsWith('ioproxy://'))
-                return;
-            const check = url.substring('wsproxy://'.length);
-            const ws = websockets.get(check);
-            if (ws) {
-                return {
-                    id: check,
-                    methods: {
-                        send: (message) => ws.send(message),
-                        close: (reason) => ws.close(0, reason),
-                    }
-                }
-            }
-            const ios = ioServer.clients[check];
-            return {
-                id: check,
-                methods: {
-                    send: (message) => ios.send(message),
-                    close: () => ios.close(),
-                }
-            }
-        },
         async getServicePort(name, ...args: any[]) {
             if (name === 'repl') {
                 if (!replPort)
                     throw new Error('REPL unavailable: Plugin not loaded.')
                 return replPort;
             }
-            if (name === 'http') {
-                return getHttpPort(args[0], args[1]);
-            }
             throw new Error(`unknown service ${name}`);
         },
         async onLoadZip(zip: AdmZip, packageJson: any) {
-            admZip = zip;
             installSourceMapSupport({
                 environment: 'node',
                 retrieveSourceMap(source) {
