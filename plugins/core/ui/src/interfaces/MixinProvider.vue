@@ -42,7 +42,7 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import DeviceGroup from "../common/DeviceTable.vue";
-import { setMixin } from '../common/mixin';
+import { getMixinProviderAvailableDevices, setMixin } from '../common/mixin';
 import { typeToIcon, getDeviceViewPath } from "../components/helpers";
 
 export default {
@@ -87,25 +87,7 @@ export default {
         return this.currentMixins;
       },
       async get() {
-        const devices = this.$store.state.scrypted.devices.map((id) =>
-          this.$scrypted.systemManager.getDeviceById(id)
-        );
-        const checks = await Promise.all(
-          devices.map(async (device) =>
-            device.mixins?.includes(this.device.id) ||
-            (await this.device.canMixin(device.type, device.interfaces))
-              ? device
-              : undefined
-          )
-        );
-        const found = checks.filter((check) => !!check).sort((d1, d2) => d1.id < d2.id ? -1 : 1);
-
-        return found.map((device) => ({
-          id: device.id,
-          name: device.name,
-          type: device.type,
-          enabled: device.mixins?.includes(this.device.id),
-        }));
+        return getMixinProviderAvailableDevices(this.$scrypted.systemManager, this.device);
       },
     },
   },

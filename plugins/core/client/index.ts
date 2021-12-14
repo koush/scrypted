@@ -12,14 +12,14 @@ export interface ScryptedClientStatic extends ScryptedStatic {
 }
 
 export default {
-    connect(baseUrl: string): Promise<ScryptedClientStatic> {
+    connect(baseUrl: string, pluginId: string): Promise<ScryptedClientStatic> {
         const rootLocation = baseUrl || `${window.location.protocol}//${window.location.host}`;
-        const endpointPath = `/endpoint/@scrypted/core`;
+        const endpointPath = `/endpoint/${pluginId}`;
 
         return new Promise((resolve, reject) => {
 
             const options: SocketOptions = {
-                path: `${endpointPath}/engine.io/`,
+                path: `${endpointPath}/engine.io/api/`,
             };
             const socket = eio(rootLocation, options);
 

@@ -23,7 +23,7 @@ function isValidDevice(id) {
 
 Vue.use(Vue => {
     Vue.prototype.$connectScrypted = () => {
-        const clientPromise = client.connect(null);
+        const clientPromise = client.connect(null, '@scrypted/core');
 
         store.commit("setHasLogin", undefined);
         store.commit("setIsLoggedIn", undefined);

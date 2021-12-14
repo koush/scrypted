@@ -111,7 +111,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             }
         }
 
-        (async() => {
+        (async () => {
             const updatePluginsNativeId = 'automation:update-plugins'
             let updatePlugins = this.automations.get(updatePluginsNativeId);
             if (!updatePlugins) {
@@ -153,6 +153,22 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             sendJSON(res, {
                 id,
             });
+        });
+
+        // update the automations and grouped devices on storage change.
+        systemManager.listen((eventSource, eventDetails, eventData) => {
+            if (eventDetails.eventInterface === 'Storage') {
+                let ids = [...this.automations.values()].map(a => a.id);
+                if (ids.includes(eventSource.id)) {
+                    const automation = [...this.automations.values()].find(a => a.id === eventSource.id);
+                    automation.bind();
+                }
+                ids = [...this.aggregate.values()].map(a => a.id);
+                if (ids.includes(eventSource.id)) {
+                    const aggregate = [...this.aggregate.values()].find(a => a.id === eventSource.id);
+                    reportAggregate(aggregate.nativeId, aggregate.computeInterfaces());
+                }
+            }
         });
     }
 
@@ -208,57 +224,17 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         peer.params.userStorage = userStorage;
 
         const api = new PluginAPIProxy(pluginHostAPI, mediaManager);
-        const remote = await setupPluginRemote(peer, api, null);
-        await remote.setSystemState(systemManager.getSystemState());
-
-        // this listener keeps the system state up to date on the other end.
-        // use the api listen instead of system manager because the listeners are detached
-        // on connection close.
-        api.listen((id, eventDetails, eventData) => {
-            const eventSource = systemManager.getDeviceById(id);
-            if (eventDetails.eventInterface === ScryptedInterface.ScryptedDevice) {
-                if (eventDetails.property === ScryptedInterfaceProperty.id) {
-                    remote.updateDeviceState(eventData, undefined);
-                }
-                else if (!eventSource) {
-                    console.warn('unknown event source', eventData);
-                }
-                else {
-                    remote.updateDeviceState(eventSource.id, systemManager.getDeviceState(eventSource.id));
-                }
-                return;
-            }
-
-            if (eventDetails.eventInterface === 'Storage') {
-                let ids = [...this.automations.values()].map(a => a.id);
-                if (ids.includes(eventSource.id)) {
-                    const automation = [...this.automations.values()].find(a => a.id === eventSource.id);
-                    automation.bind();
-                }
-                ids = [...this.aggregate.values()].map(a => a.id);
-                if (ids.includes(eventSource.id)) {
-                    const aggregate = [...this.aggregate.values()].find(a => a.id === eventSource.id);
-                    reportAggregate(aggregate.nativeId, aggregate.computeInterfaces());
-                }
-            }
-
-            if (eventDetails.property) {
-                if (!eventSource) {
-                    console.warn('unknown event source', eventData);
-                }
-                else {
-                    const propertyState = systemManager.getDeviceState(eventSource.id)?.[eventDetails.property];
-                    remote.notify(eventSource.id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, propertyState, eventDetails.changed);
-                }
-            }
-            else {
-                remote.notify(undefined, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed);
-            }
-        })
 
         ws.onclose = () => {
             peer.kill('engine.io connection closed.')
             api.removeListeners();
+        }
+
+        try {
+            await setupPluginRemote(peer, api, null, () => systemManager.getSystemState());
+        }
+        catch (e) {
+            ws.close();
         }
     }
 
