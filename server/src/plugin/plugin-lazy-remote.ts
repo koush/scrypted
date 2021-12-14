@@ -2,6 +2,8 @@ import { ScryptedNativeId, SystemDeviceState } from '@scrypted/sdk/types'
 import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 
 /**
+ * This remote is necessary as the host needs to create a remote synchronously
+ * in the constructor and immediately begin queueing commands.
  * Warning: do not await in any of these methods unless necessary, otherwise
  * execution order of state reporting may fail.
  */

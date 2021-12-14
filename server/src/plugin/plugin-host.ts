@@ -1,11 +1,11 @@
 import { RpcMessage, RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler } from '@scrypted/sdk/types'
+import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRegister, EngineIOHandler, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
-import io from 'engine.io';
+import io, { Socket } from 'engine.io';
 import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
-import { PluginAPI, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { Logger } from '../logger';
 import { MediaManagerHostImpl, MediaManagerImpl } from './media';
 import WebSocket from 'ws';
@@ -41,7 +41,6 @@ export class PluginHost {
     api: PluginHostAPI;
     pluginName: string;
     packageJson: any;
-    listener: EventListenerRegister;
     stats: {
         cpuUsage: NodeJS.CpuUsage,
         memoryUsage: NodeJS.MemoryUsage,
@@ -51,7 +50,6 @@ export class PluginHost {
 
     kill() {
         this.killed = true;
-        this.listener.removeListener();
         this.api.removeListeners();
         this.worker.kill();
         this.io.close();
@@ -77,7 +75,6 @@ export class PluginHost {
         return this.pluginName || 'no plugin name';
     }
 
-
     async upsertDevice(upsert: Device) {
         const pi = await this.scrypted.upsertDevice(this.pluginId, upsert, true);
         await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
@@ -101,6 +98,17 @@ export class PluginHost {
 
         this.io.on('connection', async (socket) => {
             try {
+                try {
+                    if (socket.request.url.indexOf('/api') !== -1) {
+                        await this.createRpcIoPeer(socket);
+                        return;
+                    }
+                }
+                catch (e) {
+                    socket.close();
+                    return;
+                }
+
                 const {
                     endpointRequest,
                     pluginDevice,
@@ -138,8 +146,7 @@ export class PluginHost {
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
 
-
-        const remotePromise = setupPluginRemote(this.peer, this.api, self.pluginId);
+        const remotePromise = setupPluginRemote(this.peer, this.api, self.pluginId, () => this.scrypted.stateManager.getSystemState());
         const init = (async () => {
             const remote = await remotePromise;
 
@@ -190,19 +197,9 @@ export class PluginHost {
         this.module = init.then(({ module }) => module);
         this.remote = new LazyRemote(remotePromise, init.then(({ remote }) => remote));
 
-        this.listener = scrypted.stateManager.listen((id, eventDetails, eventData) => {
-            if (eventDetails.property) {
-                const device = scrypted.findPluginDeviceById(id);
-                this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, device?.state[eventDetails.property], eventDetails.changed);
-            }
-            else {
-                this.remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed);
-            }
-        });
-
         init.catch(e => {
             console.error('plugin failed to load', e);
-            this.listener.removeListener();
+            this.api.removeListeners();
         });
     }
 
@@ -313,6 +310,27 @@ export class PluginHost {
                 this.stats = oob;
             }
         };
+    }
+
+    async createRpcIoPeer(socket: Socket) {
+        let connected = true;
+        const rpcPeer = new RpcPeer(`api/${this.pluginId}`, 'web', (message, reject) => {
+            if (!connected)
+                reject?.(new Error('peer disconnected'));
+            else
+                socket.send(JSON.stringify(message))
+        });
+        socket.on('message', data => rpcPeer.handleMessage(JSON.parse(data as string)));
+        // wrap the host api with a connection specific api that can be torn down on disconnect
+        const api = new PluginAPIProxy(this.api, await this.peer.getParam('mediaManager'));
+        const kill = () => {
+            connected = false;
+            rpcPeer.kill('engine.io connection closed.')
+            api.removeListeners();
+        }
+        socket.on('close', kill);
+        socket.on('error', kill);
+        return setupPluginRemote(rpcPeer, api, null, () => this.scrypted.stateManager.getSystemState());
     }
 }
 

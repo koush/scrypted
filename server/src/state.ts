@@ -72,23 +72,15 @@ export class ScryptedStateManager extends EventRegistry {
     }
 
     updateDescriptor(device: PluginDevice) {
-        for (const plugin of Object.values(this.scrypted.plugins)) {
-            plugin.remote?.updateDeviceState(device._id, device.state);
-        }
+        this.notify(device._id, undefined, ScryptedInterface.ScryptedDevice, undefined, device.state, true);
     }
 
     removeDevice(id: string) {
-        for (const plugin of Object.values(this.scrypted.plugins)) {
-            plugin.remote?.updateDeviceState(id, undefined);
-        }
-
         this.notify(undefined, undefined, ScryptedInterface.ScryptedDevice, ScryptedInterfaceProperty.id, id, true);
     }
 
     notifyInterfaceEvent(device: PluginDevice, eventInterface: ScryptedInterface | string, value: any) {
-        const eventTime = Date.now();
-
-        this.notify(device?._id, eventTime, eventInterface, undefined, value, true);
+        this.notify(device?._id, Date.now(), eventInterface, undefined, value, true);
     }
 
     setState(id: string, property: string, value: any) {

@@ -8,7 +8,6 @@ import { PluginHost } from './plugin-host';
 import debounce from 'lodash/debounce';
 import { PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
 
-
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;
 
@@ -151,8 +150,8 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     async getDeviceById<T>(id: string): Promise<T & ScryptedDevice> {
         return this.scrypted.getDevice(id);
     }
-    async listen(EventListener: (id: string, eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
-        return this.manageListener(this.scrypted.stateManager.listen(EventListener));
+    async listen(listener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
+        return this.manageListener(this.scrypted.stateManager.listen(listener));
     }
     async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
         const device = this.scrypted.findPluginDeviceById(id);

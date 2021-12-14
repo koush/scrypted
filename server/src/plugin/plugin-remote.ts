@@ -261,7 +261,7 @@ class StorageImpl implements Storage {
     }
 }
 
-export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string): Promise<PluginRemote> {
+export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string, getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } }): Promise<PluginRemote> {
     try {
         // the host/remote connection can be from server to plugin (node to node),
         // core plugin to web (node to browser).
@@ -269,7 +269,32 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         // but in plugin-host, mark Buffer as transport safe.
         peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
         const getRemote = await peer.getParam('getRemote');
-        return await getRemote(api, pluginId);
+        const remote = await getRemote(api, pluginId);
+
+        await remote.setSystemState(getSystemState());
+        api.listen((id, eventDetails, eventData) => {
+            // ScryptedDevice events will be handled specially and repropagated by the remote.
+            if (eventDetails.eventInterface === ScryptedInterface.ScryptedDevice) {
+                if (eventDetails.property === ScryptedInterfaceProperty.id) {
+                    // a change on the id property means device was deleted
+                    remote.updateDeviceState(eventData, undefined);
+                }
+                else {
+                    // a change on anything else is a descriptor update
+                    remote.updateDeviceState(id, getSystemState()[id]);
+                }
+                return;
+            }
+
+            if (eventDetails.property) {
+                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, getSystemState()[id]?.[eventDetails.property], eventDetails.changed);
+            }
+            else {
+                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed);
+            }
+        });
+
+        return remote;
     }
     catch (e) {
         throw new RPCResultError(peer, 'error while retrieving PluginRemote', e);
@@ -307,6 +332,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
         const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager);
+        peer.params['mediaManager'] = mediaManager;
         const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
 
         systemManager.api = api;
@@ -380,11 +406,11 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             async updateDeviceState(id: string, state: { [property: string]: SystemDeviceState }) {
                 if (!state) {
                     delete systemManager.state[id];
-                    systemManager.events.notify(id, Date.now(), ScryptedInterface.ScryptedDevice, ScryptedInterfaceProperty.id, id, true);
+                    systemManager.events.notify(undefined, undefined, ScryptedInterface.ScryptedDevice, ScryptedInterfaceProperty.id, id, true);
                 }
                 else {
                     systemManager.state[id] = state;
-                    systemManager.events.notify(id, Date.now(), ScryptedInterface.ScryptedDevice, undefined, undefined, true);
+                    systemManager.events.notify(id, undefined, ScryptedInterface.ScryptedDevice, undefined, state, true);
                 }
             },
 
