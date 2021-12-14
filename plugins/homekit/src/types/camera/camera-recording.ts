@@ -137,6 +137,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             }
             // console.log('mp4 box type', type, length);
         }
+        console.log(`motion recording finished`);
     }
     catch (e) {
         console.log(`motion recording complete ${e}`);
