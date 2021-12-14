@@ -6,8 +6,7 @@ import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } fro
 import { SystemManagerImpl } from './system';
 import { RpcPeer, RPCResultError, PROPERTY_PROXY_ONEWAY_METHODS, PROPERTY_JSON_DISABLE_SERIALIZATION } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
-import { EventEmitter } from 'events';
-import { createWebSocketClass } from './plugin-remote-websocket';
+import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
 
 class DeviceLogger implements Logger {
     nativeId: ScryptedNativeId;
@@ -262,13 +261,6 @@ class StorageImpl implements Storage {
     }
 }
 
-interface WebSocketCallbacks {
-    end: any;
-    error: any;
-    data: any;
-}
-
-
 export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId: string): Promise<PluginRemote> {
     try {
         // the host/remote connection can be from server to plugin (node to node),
@@ -284,15 +276,22 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
     }
 }
 
+export interface WebSocketCustomHandler {
+    id: string,
+    methods: WebSocketMethods;
+}
+
 export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
-    getServicePort?: (name: string) => Promise<number>;
+    getServicePort?: (name: string, ...args: any[]) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
     onLoadZip?: (zip: AdmZip, packageJson: any) => Promise<void>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
+    onGotRemote?: (remote: PluginRemote) => void;
     onPluginReady?: (scrypted: ScryptedStatic, params: any, plugin: any) => Promise<void>;
+    onWebSocketConnect?: (url: string, protocols: any, callbacks: WebSocketConnectCallbacks) => WebSocketCustomHandler;
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
@@ -309,8 +308,8 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const systemManager = new SystemManagerImpl();
         const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
-        const ioSockets: { [id: string]: WebSocketCallbacks } = {};
         const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager);
+        const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
 
         systemManager.api = api;
         deviceManager.api = api;
@@ -432,32 +431,27 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     volume.writeFileSync(name, entry.getData());
                 }
 
-                function websocketConnect(url: string, protocols: any, connect: any, end: any, error: any, data: any) {
-                    if (url.startsWith('io://')) {
-                        const id = url.substring('io://'.length);
-
-                        ioSockets[id] = {
-                            data,
-                            error,
-                            end
-                        };
-
-                        connect(undefined, {
-                            close: () => api.ioClose(id),
-                        }, (message: string) => api.ioSend(id, message));
+                const { onWebSocketConnect } = options || {};
+                function websocketConnect(url: string, protocols: any, callbacks: WebSocketConnectCallbacks) {
+                    if (onWebSocketConnect) {
+                        const handler = onWebSocketConnect(url, protocols, callbacks);
+                        if (handler) {
+                            const { id, methods } = handler;
+                            ioSockets[id] = callbacks;
+                            callbacks.connect(undefined, methods);
+                            return;
+                        }
                     }
-                    else if (url.startsWith('ws://')) {
-                        const id = url.substring('ws://'.length);
 
-                        ioSockets[id] = {
-                            data,
-                            error,
-                            end
-                        };
+                    if (url.startsWith('io://') || url.startsWith('ws://')) {
+                        const id = url.substring('xx://'.length);
 
-                        connect(undefined, {
+                        ioSockets[id] = callbacks;
+
+                        callbacks.connect(undefined, {
                             close: () => api.ioClose(id),
-                        }, (message: string) => api.ioSend(id, message));
+                            send: (message: string) => api.ioSend(id, message),
+                        });
                     }
                     else {
                         throw new Error('unsupported websocket');
@@ -503,6 +497,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             },
         }
 
+        options?.onGotRemote?.(remote);
         return remote;
     }
 

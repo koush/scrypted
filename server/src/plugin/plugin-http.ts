@@ -32,6 +32,7 @@ export abstract class PluginHttp<T> {
     abstract handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: T): Promise<void>;
     abstract getEndpointPluginData(endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<T>;
     abstract handleWebSocket(endpoint: string, httpRequest: HttpRequest, ws: WebSocket, pluginData: T): Promise<void>;
+    abstract handleGetUsernme(req: Request, res: Response): string;
 
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
         handler: (req: Request, res: Response, endpointRequest: HttpRequest, pluginData: T) => void) {
@@ -51,7 +52,7 @@ export abstract class PluginHttp<T> {
             }
         };
 
-        if (!isPublicEndpoint && !res.locals.username) {
+        if (!isPublicEndpoint && !this.handleGetUsernme(req, res)) {
             end(401, 'Not Authorized');
             return;
         }

@@ -15,7 +15,7 @@ import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefaul
 import { URL } from "url";
 import qs from "query-string";
 import { PluginComponent } from './services/plugin';
-import { Server as WebSocketServer } from "ws";
+import WebSocket, { Server as WebSocketServer } from "ws";
 import axios from 'axios';
 import tar from 'tar';
 import { once } from 'events';
@@ -30,6 +30,10 @@ import io from 'engine.io';
 import { spawn as ptySpawn } from 'node-pty';
 import rimraf from 'rimraf';
 import { getPluginVolume } from './plugin/plugin-volume';
+import { PluginHttp } from './plugin/plugin-http';
+import httpProxy from 'http-proxy';
+import { ParamsDictionary } from 'express-serve-static-core';
+import { ParsedQs } from 'qs';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -39,13 +43,17 @@ interface DeviceProxyPair {
 const MIN_SCRYPTED_CORE_VERSION = 'v0.0.146';
 const PLUGIN_DEVICE_STATE_VERSION = 2;
 
-export class ScryptedRuntime {
+interface HttpPluginData {
+    pluginHost: PluginHost;
+    pluginDevice: PluginDevice
+}
+
+export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     datastore: Level;
     plugins: { [id: string]: PluginHost } = {};
     pluginDevices: { [id: string]: PluginDevice } = {};
     devices: { [id: string]: DeviceProxyPair } = {};
     stateManager = new ScryptedStateManager(this);
-    app: Router;
     logger = new Logger(this, '', 'Scrypted');
     devicesLogger = this.logger.getLogger('device', 'Devices');
     wss = new WebSocketServer({ noServer: true });
@@ -53,31 +61,14 @@ export class ScryptedRuntime {
     shellio = io(undefined, {
         pingTimeout: 120000,
     });
+    proxy = httpProxy.createProxyServer({});
 
     constructor(datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
+        super(app);
         this.datastore = datastore;
         this.app = app;
 
         app.disable('x-powered-by');
-
-        app.all(['/endpoint/@:owner/:pkg/public/engine.io/*', '/endpoint/:pkg/public/engine.io/*'], (req, res) => {
-            this.endpointHandler(req, res, true, true, this.handleEngineIOEndpoint.bind(this))
-        });
-
-        app.all(['/endpoint/@:owner/:pkg/engine.io/*', '/endpoint/@:owner/:pkg/engine.io/*'], (req, res) => {
-            this.endpointHandler(req, res, false, true, this.handleEngineIOEndpoint.bind(this))
-        });
-
-        // stringify all http endpoints
-        app.all(['/endpoint/@:owner/:pkg/public', '/endpoint/@:owner/:pkg/public/*', '/endpoint/:pkg', '/endpoint/:pkg/*'], bodyParser.text() as any);
-
-        app.all(['/endpoint/@:owner/:pkg/public', '/endpoint/@:owner/:pkg/public/*', '/endpoint/:pkg/public', '/endpoint/:pkg/public/*'], (req, res) => {
-            this.endpointHandler(req, res, true, false, this.handleRequestEndpoint.bind(this))
-        });
-
-        app.all(['/endpoint/@:owner/:pkg', '/endpoint/@:owner/:pkg/*', '/endpoint/:pkg', '/endpoint/:pkg/*'], (req, res) => {
-            this.endpointHandler(req, res, false, false, this.handleRequestEndpoint.bind(this))
-        });
 
         app.get('/web/oauth/callback', (req, res) => {
             this.oauthCallback(req, res);
@@ -190,7 +181,7 @@ export class ScryptedRuntime {
         }
     }
 
-    async getPluginForEndpoint(endpoint: string) {
+    async getPluginForEndpoint(endpoint: string): Promise<HttpPluginData> {
         let pluginHost = this.plugins[endpoint] ?? this.getPluginHostForDeviceId(endpoint);
         if (endpoint === '@scrypted/core') {
             // enforce a minimum version on @scrypted/core
@@ -254,110 +245,55 @@ export class ScryptedRuntime {
             this.shellio.handleRequest(req, res);
     }
 
-    async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
-        handler: (req: Request, res: Response, endpointRequest: HttpRequest, pluginHost: PluginHost, pluginDevice: PluginDevice) => void) {
-
-        const isUpgrade = req.headers.connection?.toLowerCase() === 'upgrade';
-
-        const end = (code: number, message: string) => {
-            if (isUpgrade) {
-                const socket = res.socket;
-                socket.write(`HTTP/1.1 ${code} ${message}\r\n` +
-                    '\r\n');
-                socket.destroy();
-            }
-            else {
-                res.status(code);
-                res.send(message);
-            }
-        };
-
-        if (!isPublicEndpoint && !res.locals.username) {
-            end(401, 'Not Authorized');
-            return;
-        }
-
-        const { owner, pkg } = req.params;
-        let endpoint = pkg;
-        if (owner)
-            endpoint = `@${owner}/${endpoint}`;
-
-        const { pluginHost, pluginDevice } = await this.getPluginForEndpoint(endpoint);
+    async getEndpointPluginData(endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<HttpPluginData> {
+        const ret = await this.getPluginForEndpoint(endpoint);
+        const { pluginDevice } = ret;
 
         // check if upgrade requests can be handled. must be websocket.
         if (isUpgrade) {
-            if (req.headers.upgrade?.toLowerCase() !== 'websocket' || !pluginDevice?.state.interfaces.value.includes(ScryptedInterface.EngineIOHandler)) {
-                end(404, 'Not Found');
+            if (!pluginDevice?.state.interfaces.value.includes(ScryptedInterface.EngineIOHandler)) {
                 return;
             }
         }
         else {
             if (!isEngineIOEndpoint && !pluginDevice?.state.interfaces.value.includes(ScryptedInterface.HttpRequestHandler)) {
-                end(404, 'Not Found');
                 return;
             }
         }
 
-        let rootPath = `/endpoint/${endpoint}`;
-        if (isPublicEndpoint)
-            rootPath += '/public'
+        return ret;
+    }
 
-        const body = req.body && typeof req.body !== 'string' ? JSON.stringify(req.body) : req.body;
+    async handleWebSocket(endpoint: string, httpRequest: HttpRequest, ws: WebSocket, pluginData: HttpPluginData): Promise<void> {
+        const { pluginDevice } = pluginData;
 
-        const httpRequest: HttpRequest = {
-            body,
-            headers: req.headers,
-            method: req.method,
-            rootPath,
-            url: req.url,
-            isPublicEndpoint,
-            username: res.locals.username,
-        };
-
-        if (isEngineIOEndpoint && !isUpgrade && isPublicEndpoint) {
-            res.header("Access-Control-Allow-Origin", '*');
+        const handler = this.getDevice<EngineIOHandler>(pluginDevice._id);
+        const id = 'ws-' + this.wsAtomic++;
+        const pluginHost = this.plugins[endpoint] ?? this.getPluginHostForDeviceId(endpoint);
+        if (!pluginHost) {
+            ws.close();
+            return;
         }
+        pluginHost.ws[id] = ws;
 
-        if (!isEngineIOEndpoint && isUpgrade) {
-            this.wss.handleUpgrade(req, req.socket, (req as any).upgradeHead, async (ws) => {
-                try {
-                    const handler = this.getDevice<EngineIOHandler>(pluginDevice._id);
-                    const id = 'ws-' + this.wsAtomic++;
-                    const pluginHost = this.plugins[endpoint] ?? this.getPluginHostForDeviceId(endpoint);
-                    if (!pluginHost) {
-                        ws.close();
-                        return;
-                    }
-                    pluginHost.ws[id] = ws;
+        ws.on('message', async (message) => {
+            try {
+                pluginHost.remote.ioEvent(id, 'message', message)
+            }
+            catch (e) {
+                ws.close();
+            }
+        });
+        ws.on('close', async (reason) => {
+            try {
+                pluginHost.remote.ioEvent(id, 'close');
+            }
+            catch (e) {
+            }
+            delete pluginHost.ws[id];
+        });
 
-                    ws.on('message', async (message) => {
-                        try {
-                            pluginHost.remote.ioEvent(id, 'message', message)
-                        }
-                        catch (e) {
-                            ws.close();
-                        }
-                    });
-                    ws.on('close', async (reason) => {
-                        try {
-                            pluginHost.remote.ioEvent(id, 'close');
-                        }
-                        catch (e) {
-                        }
-                        delete pluginHost.ws[id];
-                    });
-
-                    await handler.onConnection(httpRequest, `ws://${id}`);
-                }
-                catch (e) {
-                    console.error('websocket plugin error', e);
-                    ws.close();
-                }
-            });
-        }
-        else {
-            handler(req, res, httpRequest, pluginHost, pluginDevice);
-        }
+        await handler.onConnection(httpRequest, `ws://${id}`);
     }
 
     async getComponent(componentId: string): Promise<any> {
@@ -381,7 +317,36 @@ export class ScryptedRuntime {
         }
     }
 
-    async handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginHost: PluginHost, pluginDevice: PluginDevice) {
+    handleGetUsernme(req: Request, res: Response): string {
+        return res.locals.username;
+    }
+
+    async handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
+        const { pluginHost, pluginDevice } = pluginData;
+        this.getDevice<EngineIOHandler>(pluginDevice._id);
+        const handler = this.devices[pluginDevice._id];
+        handler.handler.ensureProxy();
+        const mixin = await handler.handler.findMixin(ScryptedInterface.EngineIOHandler);
+        const mixinHost = !mixin.mixin.mixinProviderId ? pluginHost : this.getPluginHostForDeviceId(mixin.mixin.mixinProviderId);
+        await mixinHost.module;
+        const httpPort = await mixinHost.remote.getServicePort('http', mixin.entry.proxy, endpointRequest.rootPath);
+
+        if (httpPort) {
+            if ((req as any).upgradeHead) {
+                this.proxy.ws(req, req.socket, (req as any).upgradeHead, {
+                    target: 'ws://127.0.0.1:' + httpPort,
+                    ws: true,
+                    secure: false,
+                });
+            }
+            else {
+                this.proxy.web(req, res, {
+                    target: 'http://127.0.0.1:' + httpPort
+                });
+            }
+            return;
+        }
+
         (req as any).scrypted = {
             endpointRequest,
             pluginDevice,
@@ -392,21 +357,15 @@ export class ScryptedRuntime {
             pluginHost.io.handleRequest(req, res);
     }
 
-    async handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginHost: PluginHost, pluginDevice: PluginDevice) {
-        try {
-            const handler = this.getDevice<HttpRequestHandler>(pluginDevice._id);
-            if (handler.interfaces.includes(ScryptedInterface.EngineIOHandler) && req.headers.connection === 'upgrade' && req.headers.upgrade?.toLowerCase() === 'websocket') {
-                this.wss.handleUpgrade(req, req.socket, null, ws => {
-                    console.log(ws);
-                });
-            }
-            handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost));
+    async handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
+        const { pluginHost, pluginDevice } = pluginData;
+        const handler = this.getDevice<HttpRequestHandler>(pluginDevice._id);
+        if (handler.interfaces.includes(ScryptedInterface.EngineIOHandler) && req.headers.connection === 'upgrade' && req.headers.upgrade?.toLowerCase() === 'websocket') {
+            this.wss.handleUpgrade(req, req.socket, null, ws => {
+                console.log(ws);
+            });
         }
-        catch (e) {
-            res.status(500);
-            res.send(e.toString());
-            console.error(e);
-        }
+        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.zip));
     }
 
     killPlugin(plugin: Plugin) {

@@ -1,9 +1,9 @@
 import { HttpResponse, HttpResponseOptions } from "@scrypted/sdk/types";
 import { Response } from "express";
-import { PluginHost } from './plugin/plugin-host';
 import mime from "mime";
+import AdmZip from "adm-zip";
 
-export function createResponseInterface(res: Response, plugin: PluginHost): HttpResponse {
+export function createResponseInterface(res: Response, zip: AdmZip): HttpResponse {
     class HttpResponseImpl implements HttpResponse {
         send(body: string): void;
         send(body: string, options: HttpResponseOptions): void;
@@ -35,7 +35,7 @@ export function createResponseInterface(res: Response, plugin: PluginHost): Http
             if (!res.getHeader('Content-Type'))
                 res.contentType(mime.lookup(path));
 
-            const data = plugin.zip.getEntry(`fs/${path}`)?.getData();
+            const data = zip.getEntry(`fs/${path}`)?.getData();
             if (!data) {
                 res.status(404);
                 res.end();

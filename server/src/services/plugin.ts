@@ -120,7 +120,7 @@ export class PluginComponent {
         console.log('done updating plugins');
     }
 
-    async getRemoteServicePort(pluginId: string, name: string): Promise<number> {
+    async getRemoteServicePort(pluginId: string, name: string, ...args: any[]): Promise<number> {
         if (name === 'console') {
             const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
             return consoleServer.readPort;
@@ -129,6 +129,6 @@ export class PluginComponent {
             const consoleServer = await this.scrypted.plugins[pluginId].consoleServer;
             return consoleServer.writePort;
         }
-        return this.scrypted.plugins[pluginId].remote.getServicePort(name);
+        return this.scrypted.plugins[pluginId].remote.getServicePort(name, ...args);
     }
 }

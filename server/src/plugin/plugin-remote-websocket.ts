@@ -2,7 +2,7 @@ interface WebSocketEvent {
     type: string;
     reason?: string;
     message?: string;
-    data?: string|ArrayBufferLike;
+    data?: string | ArrayBufferLike;
     source?: any;
 }
 
@@ -12,7 +12,7 @@ interface WebSocketEventListener {
 
 // @ts-ignore
 class WebSocketEventTarget {
-    events: { [type: string]: WebSocketEventListener[]} = {};
+    events: { [type: string]: WebSocketEventListener[] } = {};
 
     dispatchEvent(event: WebSocketEvent) {
         const list = this.events[event.type];
@@ -53,32 +53,20 @@ function defineEventAttribute(p: any, type: string) {
     });
 }
 
-interface WebSocketEndCallback {
-    (): void;
+export interface WebSocketConnectCallbacks {
+    connect(e: Error, ws: WebSocketMethods): void;
+    end(): void;
+    error(e: Error): void;
+    data(data: string | ArrayBufferLike): void;
 }
 
-interface WebSocketErrorCallback {
-    (e: Error): void;
+export interface WebSocketConnect {
+    (url: string, protocols: string[], callbacks: WebSocketConnectCallbacks): void;
 }
 
-interface WebSocketDataCallback {
-    (data: string | ArrayBufferLike): void;
-}
-
-interface WebSocketSend {
-    (message: string|ArrayBufferLike): void;
-}
-
-interface WebSocketConnectCallback {
-    (e: Error, ws: any, send: WebSocketSend): void;
-}
-
-interface WebSocketConnect {
-    (url: string, protocols: string[],
-        connect: WebSocketConnectCallback,
-        end: WebSocketEndCallback,
-        error: WebSocketErrorCallback,
-        data: WebSocketDataCallback): void;
+export interface WebSocketMethods {
+    send(message: string | ArrayBufferLike): void;
+    close(message: string): void;
 }
 
 export function createWebSocketClass(__websocketConnect: WebSocketConnect) {
@@ -88,8 +76,7 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect) {
         _url: string;
         _protocols: string[];
         readyState: number;
-        send: (message: string|ArrayBufferLike) => void;
-        _ws: any;
+        _ws: WebSocketMethods;
 
         constructor(url: string, protocols?: string[]) {
             super();
@@ -97,44 +84,52 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect) {
             this._protocols = protocols;
             this.readyState = 0;
 
-            __websocketConnect(url, protocols, (e, ws, send) => {
-                // connect
-                if (e != null) {
+            __websocketConnect(url, protocols, {
+                connect: (e, ws) => {
+                    // connect
+                    if (e != null) {
+                        this.dispatchEvent({
+                            type: 'error',
+                            message: e.toString(),
+                        });
+                        return;
+                    }
+
+                    this._ws = ws;
+                    this.readyState = 1;
+                    this.dispatchEvent({
+                        type: 'open',
+                    });
+                },
+                end: () => {
+                    // end
+                    this.readyState = 3;
+                    this.dispatchEvent({
+                        type: 'close',
+                        reason: 'closed',
+                    });
+                },
+                error: (e: Error) => {
+                    // error
+                    this.readyState = 3;
                     this.dispatchEvent({
                         type: 'error',
                         message: e.toString(),
                     });
-                    return;
+                },
+                data: (data: string | ArrayBufferLike) => {
+                    // data
+                    this.dispatchEvent({
+                        type: 'message',
+                        data: data,
+                        source: this,
+                    });
                 }
+            })
+        }
 
-                this._ws = ws;
-                this.send = send;
-                this.readyState = 1;
-                this.dispatchEvent({
-                    type: 'open',
-                });
-            }, () => {
-                // end
-                this.readyState = 3;
-                this.dispatchEvent({
-                    type: 'close',
-                    reason: 'closed',
-                });
-            }, (e: Error) => {
-                // error
-                this.readyState = 3;
-                this.dispatchEvent({
-                    type: 'error',
-                    message: e.toString(),
-                });
-            }, (data: string | ArrayBufferLike) => {
-                // data
-                this.dispatchEvent({
-                    type: 'message',
-                    data: data,
-                    source: this,
-                });
-            });
+        send(message: string | ArrayBufferLike) {
+            this._ws.send(message);
         }
 
         get url() {
@@ -145,8 +140,8 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect) {
             return "";
         }
 
-        close() {
-            this._ws.close();
+        close(reason: string) {
+            this._ws.close(reason);
         }
     }
 

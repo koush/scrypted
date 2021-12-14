@@ -146,7 +146,7 @@ export interface PluginRemote {
 
     createDeviceState(id: string, setState: (property: string, value: any) => Promise<any>): Promise<any>;
 
-    getServicePort(name: string): Promise<number>;
+    getServicePort(name: string, ...args: any[]): Promise<number>;
 }
 
 export interface MediaObjectRemote extends MediaObject {
