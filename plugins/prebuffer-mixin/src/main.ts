@@ -52,7 +52,7 @@ class PrebufferSession {
   prevIdr = 0;
   incompatibleDetected = false;
   legacyDetected = false;
-  audioDisabled = false;
+  allowImmediateRestart = false;
 
   mixinDevice: VideoCamera;
   console: Console;
@@ -84,8 +84,8 @@ class PrebufferSession {
     // pcm audio only used when explicitly set.
     const pcmAudio = audioConfig.indexOf(PCM_AUDIO) !== -1;
     const legacyAudio = audioConfig.indexOf(LEGACY_AUDIO) !== -1;
-    // reencode audio will be used if explicitly set.
-    const reencodeAudio = audioConfig.indexOf(OTHER_AUDIO) !== -1;
+    // reencode audio will be used if explicitly set, OR an incompatible codec was detected, PCM audio was not explicitly set
+    const reencodeAudio = audioConfig.indexOf(OTHER_AUDIO) !== -1 || (!pcmAudio && this.incompatibleDetected);
     return {
       audioConfig,
       pcmAudio,
@@ -177,17 +177,10 @@ class PrebufferSession {
     const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
 
     const { audioConfig, pcmAudio, reencodeAudio, legacyAudio } = this.getAudioConfig();
-    const isUsingDefaultAudioConfig = !audioConfig || audioConfig === DEFAULT_AUDIO;
-    const forceNoAudio = this.incompatibleDetected && isUsingDefaultAudioConfig;
 
-    this.audioDisabled = false;
     let acodec: string[];
-    if (probe.noAudio || forceNoAudio) {
+    if (probe.noAudio || pcmAudio) {
       // no audio? explicitly disable it.
-      acodec = ['-an'];
-      this.audioDisabled = true;
-    }
-    else if (pcmAudio) {
       acodec = ['-an'];
     }
     else if (reencodeAudio) {
@@ -233,7 +226,7 @@ class PrebufferSession {
 
     // if pcm prebuffer is requested, create the the parser. don't do it if
     // the camera wants to mute the audio though.
-    if (!probe.noAudio && !forceNoAudio && pcmAudio) {
+    if (!probe.noAudio && pcmAudio) {
       rbo.parsers.s16le = createPCMParser();
     }
 
@@ -269,9 +262,10 @@ class PrebufferSession {
     else if (!compatibleAudio.includes(session.inputAudioCodec)) {
       this.console.error('Detected audio codec is not mp4/mpegts compatible.', session.inputAudioCodec);
       // show an alert if no audio config was explicitly specified. Force the user to choose/experiment.
-      if (isUsingDefaultAudioConfig && !probe.noAudio) {
-        log.a(`${this.mixin.name} is using the ${session.inputAudioCodec} audio codec and has had its audio disabled. Select Disable Audio on your Camera or select Reencode Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
+      if (!audioConfig && !probe.noAudio) {
+        log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable Reencode Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
         this.incompatibleDetected = true;
+        this.allowImmediateRestart = true;
         // this will probably crash ffmpeg due to mp4/mpegts not being a valid container for pcm,
         // and then it will automatically restart with pcm handling.
       }
@@ -281,6 +275,7 @@ class PrebufferSession {
       if (!legacyAudio) {
         log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable MP2/MP3 Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
         this.legacyDetected = true;
+        this.allowImmediateRestart = true;
         // this will probably crash ffmpeg due to mp2/mp3 not supporting the aac bit stream filters,
         // and then it will automatically restart with legacy handling.
       }
@@ -402,10 +397,7 @@ class PrebufferSession {
 
     const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
 
-    if (this.audioDisabled) {
-      delete mediaStreamOptions.audio;
-    }
-    else if (reencodeAudio) {
+    if (reencodeAudio) {
       mediaStreamOptions.audio = {
         codec: 'aac',
       }
