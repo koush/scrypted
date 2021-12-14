@@ -143,7 +143,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             type: 'device',
             deviceFilter: 'interfaces.includes("MotionSensor")',
             value: this.storage.getItem('linkedMotionSensor') || null,
-            placeholder: this.providedInterfaces.includes(ScryptedInterface.MotionSensor)
+            placeholder: this.interfaces.includes(ScryptedInterface.MotionSensor)
                 ? 'Built-In Motion Sensor' : 'None',
             description: "Link motion sensor used to trigger HomeKit Secure Video recordings.",
         })
@@ -161,34 +161,33 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         if (this.interfaces.includes(ScryptedInterface.ObjectDetector)) {
             try {
                 const types = await realDevice.getObjectTypes();
-                const choices = types.people?.map(p => `Person: ${p.label}`) || [];
-                if (types.classes)
-                    choices.push(...types.classes);
+                if (types.classes?.length) {
+                    const value: string[] = [];
+                    try {
+                        value.push(...JSON.parse(this.storage.getItem('objectDetectionContactSensors')));
+                    }
+                    catch (e) {
+                    }
 
-                const value: string[] = [];
-                try {
-                    value.push(...JSON.parse(this.storage.getItem('objectDetectionContactSensors')));
+                    settings.push({
+                        title: 'Object Detection Contact Sensors',
+                        type: 'string',
+                        choices: types.classes,
+                        multiple: true,
+                        key: 'objectDetectionContactSensors',
+                        description: 'Create HomeKit contact sensors that detect specific people or objects.',
+                        value,
+                    });
+
+                    settings.push({
+                        title: 'Object Detection Contact Sensor Timeout',
+                        type: 'number',
+                        key: 'objectDetectionContactSensorTimeout',
+                        description: 'Duration in seconds to keep the contact sensor open.',
+                        value: this.storage.getItem('objectDetectionContactSensorTimeout') || defaultObjectDetectionContactSensorTimeout,
+                    });
                 }
-                catch (e) {
-                }
 
-                settings.push({
-                    title: 'Object Detection Contact Sensors',
-                    type: 'string',
-                    choices,
-                    multiple: true,
-                    key: 'objectDetectionContactSensors',
-                    description: 'Create HomeKit contact sensors that detect specific people or objects.',
-                    value,
-                });
-
-                settings.push({
-                    title: 'Object Detection Contact Sensor Timeout',
-                    type: 'number',
-                    key: 'objectDetectionContactSensorTimeout',
-                    description: 'Duration in seconds to keep the contact sensor open.',
-                    value: this.storage.getItem('objectDetectionContactSensorTimeout') || defaultObjectDetectionContactSensorTimeout,
-                });
             }
             catch (e) {
             }
