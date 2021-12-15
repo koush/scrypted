@@ -47,8 +47,8 @@ https://developer.scrypted.app
 1. Install Scrypted.
 2. Open https://localhost:10443/ (substitute localhost appropriately for a remote server).
 3. Install the Unifi, HikVision, ONVIF, or Amcrest camera plugin.
-   * HKSV requires a plugin with hardware motion detect support.
-   * If there's no plugin for your camera but it supports motion alerts using mail, use the generic RTSP, SMTP plugin, and Dummy Switch plugin. This will create a mail activated motion sensor.
+   * HKSV requires cameras with motion alerts, and these plugins provide motion alerts.
+   * If there's no plugin for your camera, but it supports motion alerts using mail, use the generic RTSP, SMTP plugin, and Dummy Switch plugin. This will create a mail activated motion sensor.
    * If there's no plugin or mail support for your camera, you can install the generic RTSP and the OpenCV motion detector plugin. This will use the processing power on your server to detect camera motion.
 4. Install the HomeKit Plugin.
 5. Install the Rebroadcast plugin.

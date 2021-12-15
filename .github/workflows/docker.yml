@@ -49,5 +49,6 @@ jobs:
             koush/scrypted:${{ matrix.node }}
             ${{ matrix.node == '16-bullseye' && 'koush/scrypted:latest' || '' }}
             ghcr.io/koush/scrypted:${{ matrix.node }}
+            ${{ matrix.node == '16-bullseye' && 'ghcr.io/koush/scrypted:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
