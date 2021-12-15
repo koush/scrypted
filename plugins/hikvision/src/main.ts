@@ -1,7 +1,7 @@
 import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { HikVisionCameraAPI } from "./hikvision-camera-api";
-import { Destroyable, RtspMediaStreamOptions, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
+import { Destroyable, UrlMediaStreamOptions, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
 import { HikVisionCameraEvent } from "./hikvision-camera-api";
 const { mediaManager } = sdk;
 
@@ -112,7 +112,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return this.storage.getItem('rtspUrlParams') || '?transportmode=unicast';
     }
 
-    async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+    async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         if (!this.channelIds) {
             const client = this.createClient();
             this.channelIds = new Promise(async (resolve, reject) => {
