@@ -28,17 +28,46 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
 
     async getSettings(): Promise<Setting[]> {
         const settingsPromise = this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings) ? this.mixinDevice.getSettings() : undefined;
+        const mixinSettingsPromise = this.getMixinSettings();
+        const allSettings: Setting[] = [];
 
-        const mixinSettings = await this.getMixinSettings();
-        for (const setting of mixinSettings) {
-            setting.group = setting.group || this.settingsGroup;
-            setting.key = this.settingsGroupKey + ':' + setting.key;
+        try {
+            const settings = (await settingsPromise) || [];
+            allSettings.push(...settings);
+        }
+        catch (e) {
+            const name = this.name;
+            allSettings.push({
+                key: Math.random().toString(),
+                title: name,
+                value: 'Settings Error',
+                group: 'Errors',
+                description: `${name} Extension settings failed to load.`,
+                readonly: true,
+            });
         }
 
-        const settings = (await settingsPromise) || [];
-        settings.push(...mixinSettings);
+        try {
+            const mixinSettings = (await mixinSettingsPromise) || [];
+            for (const setting of mixinSettings) {
+                setting.group = setting.group || this.settingsGroup;
+                setting.key = this.settingsGroupKey + ':' + setting.key;
+            }
+            allSettings.push(...mixinSettings);
+        }
+        catch (e) {
+            const name = deviceManager.getDeviceState(this.mixinProviderNativeId).name;
+            allSettings.push({
+                key: Math.random().toString(),
+                title: name,
+                value: 'Settings Error',
+                group: 'Errors',
+                description: `${name} Extension settings failed to load.`,
+                readonly: true,
+            });
+        }
 
-        return settings;
+        return allSettings;
     }
 
     async putSetting(key: string, value: string | number | boolean) {
