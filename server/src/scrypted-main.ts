@@ -116,6 +116,10 @@ else {
         const db = level(dbPath);
         await db.open();
 
+        if (process.env.SCRYPTED_RESET_ALL_USERS === 'true') {
+            await db.removeAll(ScryptedUser);
+        }
+
         let certSetting = await db.tryGet(Settings, 'certificate') as Settings;
 
         if (certSetting?.value?.version !== CURRENT_SELF_SIGNED_CERTIFICATE_VERSION) {
