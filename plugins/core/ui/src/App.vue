@@ -322,7 +322,6 @@ export default {
     getAlertIcon,
     removeAlert,
     doAlert(alert) {
-      this.removeAlert(alert);
       this.$router.push(alert.path);
     },
     friendlyTime(timestamp) {
