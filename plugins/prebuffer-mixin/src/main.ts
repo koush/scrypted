@@ -476,6 +476,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       const stream = await this.mixinDevice.getVideoStream(options);
       const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(stream, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
       id = ffmpegInput?.mediaStreamOptions?.id;
+      // this MAY be null.
       this.sessions.set(options?.id, this.sessions.get(id));
     }
     let session = this.sessions.get(id);
@@ -528,20 +529,27 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   async getMixinSettings(): Promise<Setting[]> {
     const settings: Setting[] = [];
 
-    const msos = await this.mixinDevice.getVideoStreamOptions();
-    const enabledStreams = this.getEnabledMediaStreamOptions(msos);
-    if (enabledStreams && msos?.length > 1) {
-      settings.push(
-        {
-          title: 'Prebuffered Streams',
-          description: 'The streams to prebuffer. Enable only as necessary to reduce traffic.',
-          key: 'enabledStreams',
-          value: enabledStreams.map(mso => mso.name || ''),
-          choices: msos.map(mso => mso.name),
-          multiple: true,
-        },
-      )
+    try {
+      const msos = await this.mixinDevice.getVideoStreamOptions();
+      const enabledStreams = this.getEnabledMediaStreamOptions(msos);
+      if (enabledStreams && msos?.length > 1) {
+        settings.push(
+          {
+            title: 'Prebuffered Streams',
+            description: 'The streams to prebuffer. Enable only as necessary to reduce traffic.',
+            key: 'enabledStreams',
+            value: enabledStreams.map(mso => mso.name || ''),
+            choices: msos.map(mso => mso.name),
+            multiple: true,
+          },
+        )
+      }
     }
+    catch (e) {
+      this.console.error('error in getVideoStreamOptions', e);
+      throw e;
+    }
+
 
     settings.push(
       {
@@ -562,7 +570,15 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
 
     for (const session of new Set([...this.sessions.values()])) {
-      settings.push(...await session.getMixinSettings());
+      if (!session)
+        continue;
+      try {
+        settings.push(...await session.getMixinSettings());
+      }
+      catch (e) {
+        this.console.error('error in prebuffer session getMixinSettings', e);
+        throw e;
+      }
     }
 
     return settings;
