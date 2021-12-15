@@ -20,7 +20,9 @@ function computeBitrate(bitrate: number) {
 }
 
 function convertAudioCodec(codec: string) {
-    if (codec === 'MP4A-LATM')
+    if (codec?.toLowerCase()?.includes('mp4a'))
+        return 'aac';
+    if (codec?.toLowerCase()?.includes('aac'))
         return 'aac';
     return codec?.toLowerCase();
 }
@@ -37,10 +39,8 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
         const client = await this.getClient();
         const classes = await client.getEventTypes();
-        const faces = classes.includes('face');
         return {
             classes,
-            faces,
         }
     }
 
