@@ -255,7 +255,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
         this.addUnknowns(unknowns.map(unk => ({
           detection: unk.faceDetection.detection,
           descriptor: unk.faceDetection.descriptor,
-          nativeId: unk.faceMatch.label,
+          nativeId: randomBytes(8).toString('hex'),
         })), input, jpegBuffer);
       }
     }
