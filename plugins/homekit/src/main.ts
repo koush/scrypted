@@ -277,7 +277,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 return MDNSAdvertiser.CIAO;
         }
 
-        return os.platform() === 'win32' ? MDNSAdvertiser.CIAO : MDNSAdvertiser.BONJOUR;
+        // return os.platform() === 'win32' ? MDNSAdvertiser.CIAO : MDNSAdvertiser.BONJOUR;
+        return MDNSAdvertiser.CIAO;
     }
 
     getHAPPort() {
