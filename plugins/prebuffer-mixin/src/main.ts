@@ -594,7 +594,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       this.storage.setItem(key, value.toString());
     }
     for (const session of sessions.values()) {
-      session.parserSessionPromise?.then(session => session.kill());
+      session?.parserSessionPromise?.then(session => session.kill());
     }
     this.ensurePrebufferSessions();
   }
@@ -636,7 +636,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.console.log('prebuffer releasing if started');
     this.released = true;
     for (const session of this.sessions.values()) {
-      session.parserSessionPromise?.then(session => {
+      session?.parserSessionPromise?.then(session => {
         this.console.log('prebuffer released');
         session.kill();
       });
