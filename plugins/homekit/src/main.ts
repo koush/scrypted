@@ -81,7 +81,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 title: 'Bridge Port',
                 value: this.getHAPPort().toString(),
                 key: 'portOverride',
-                description: 'Optional: The TCP port used by the Scrypted bridge. Default: 0, a random port on startup.',
+                description: 'Optional: The TCP port used by the Scrypted bridge. If none is specified, a random port will be chosen.',
                 type: 'number',
             },
             {
@@ -282,7 +282,12 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     }
 
     getHAPPort() {
-        return parseInt(this.storage.getItem('portOverride')) || 0;
+        let port = parseInt(this.storage.getItem('portOverride')) || 0;
+        if (!port) {
+            port = Math.round(10000 + Math.random() * 30000);
+            this.storage.setItem('portOverride', port.toString());
+        }
+        return port;
     }
 
     getHomeKitHubs(): string[] {
