@@ -27,11 +27,12 @@ Supported accessories:
 
 ## Debug in VSCode
 
-Follow the steps for running locally above to set up your environment, but stop short of `npm run`.
+Follow the steps above for running locally to set up your environment.
 
 ```sh
 # switch to the server directory
 cd scrypted/server
+npm install
 # open this directory in VSCode
 code .
 ```
