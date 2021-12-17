@@ -1,5 +1,7 @@
 import vm from 'vm';
 
+const finalizerIdSymbol = Symbol('rpcFinalizerId');
+
 function getDefaultTransportSafeArgumentTypes() {
     const jsonSerializable = new Set<string>();
     jsonSerializable.add(Number.name);
@@ -40,6 +42,7 @@ interface RpcOob extends RpcMessage {
 
 interface RpcRemoteProxyValue {
     __remote_proxy_id: string;
+    __remote_proxy_finalizer_id: string;
     __remote_constructor_name: string;
     __remote_proxy_props: any;
     __remote_proxy_oneway_methods: string[];
@@ -52,6 +55,7 @@ interface RpcLocalProxyValue {
 
 interface RpcFinalize extends RpcMessage {
     __local_proxy_id: string;
+    __local_proxy_finalizer_id: string;
 }
 
 interface Deferred {
@@ -78,20 +82,17 @@ export const PROPERTY_PROXY_PROPERTIES = '__proxy_props';
 export const PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children';
 
 class RpcProxy implements ProxyHandler<any> {
+
     constructor(public peer: RpcPeer,
-        public id: string,
+        public entry: LocalProxiedEntry,
         public constructorName: string,
         public proxyProps: any,
         public proxyOneWayMethods: string[]) {
-        this.peer = peer;
-        this.id = id;
-        this.constructorName = constructorName;
-        this.proxyProps = proxyProps;
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {
         if (p === '__proxy_id')
-            return this.id;
+            return this.entry.id;
         if (p === '__proxy_constructor')
             return this.constructorName;
         if (p === '__proxy_peer')
@@ -114,6 +115,12 @@ class RpcProxy implements ProxyHandler<any> {
         return new Proxy(() => p, this);
     }
 
+    set(target: any, p: string | symbol, value: any, receiver: any): boolean {
+        if (p === finalizerIdSymbol)
+            this.entry.finalizerId = value;
+        return true;
+    }
+
     apply(target: any, thisArg: any, argArray?: any): any {
         const method = target();
         const args: any[] = [];
@@ -124,7 +131,7 @@ class RpcProxy implements ProxyHandler<any> {
         const rpcApply: RpcApply = {
             type: "apply",
             id: undefined,
-            proxyId: this.id,
+            proxyId: this.entry.id,
             args,
             method,
         };
@@ -187,16 +194,21 @@ export interface RpcSerializer {
     deserialize(serialized: any): any;
 }
 
+interface LocalProxiedEntry {
+    id: string;
+    finalizerId: string;
+}
+
 export class RpcPeer {
     idCounter = 1;
     onOob: (oob: any) => void;
     params: { [name: string]: any } = {};
     pendingResults: { [id: string]: Deferred } = {};
     proxyCounter = 1;
-    localProxied = new Map<any, string>();
+    localProxied = new Map<any, LocalProxiedEntry>();
     localProxyMap: { [id: string]: any } = {};
     remoteWeakProxies: { [id: string]: WeakRef<any> } = {};
-    finalizers = new FinalizationRegistry(id => this.finalize(id as string));
+    finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
     constructorSerializerMap = new Map<string, string>();
     transportSafeArgumentTypes = getDefaultTransportSafeArgumentTypes();
@@ -238,10 +250,11 @@ export class RpcPeer {
         this.constructorSerializerMap.set(ctr, name);
     }
 
-    finalize(id: string) {
-        delete this.remoteWeakProxies[id];
+    finalize(entry: LocalProxiedEntry) {
+        delete this.remoteWeakProxies[entry.id];
         const rpcFinalize: RpcFinalize = {
-            __local_proxy_id: id,
+            __local_proxy_id: entry.id,
+            __local_proxy_finalizer_id: entry.finalizerId,
             type: 'finalize',
         }
         this.send(rpcFinalize);
@@ -294,9 +307,12 @@ export class RpcPeer {
             return ret;
         }
 
-        const { __remote_proxy_id, __local_proxy_id, __remote_constructor_name, __serialized_value, __remote_proxy_props, __remote_proxy_oneway_methods } = value;
+        const { __remote_proxy_id, __remote_proxy_finalizer_id, __local_proxy_id, __remote_constructor_name, __serialized_value, __remote_proxy_props, __remote_proxy_oneway_methods } = value;
         if (__remote_proxy_id) {
-            const proxy = this.remoteWeakProxies[__remote_proxy_id]?.deref() || this.newProxy(__remote_proxy_id, __remote_constructor_name, __remote_proxy_props, __remote_proxy_oneway_methods);
+            let proxy = this.remoteWeakProxies[__remote_proxy_id]?.deref();
+            if (!proxy)
+                proxy = this.newProxy(__remote_proxy_id, __remote_constructor_name, __remote_proxy_props, __remote_proxy_oneway_methods);
+            proxy[finalizerIdSymbol] = __remote_proxy_finalizer_id;
             return proxy;
         }
 
@@ -329,10 +345,13 @@ export class RpcPeer {
 
         let __remote_constructor_name = value.__proxy_constructor || value.constructor?.name?.toString();
 
-        let proxyId = this.localProxied.get(value);
-        if (proxyId) {
+        let proxiedEntry = this.localProxied.get(value);
+        if (proxiedEntry) {
+            const __remote_proxy_finalizer_id = (this.proxyCounter++).toString();
+            proxiedEntry.finalizerId = __remote_proxy_finalizer_id;
             const ret: RpcRemoteProxyValue = {
-                __remote_proxy_id: proxyId,
+                __remote_proxy_id: proxiedEntry.id,
+                __remote_proxy_finalizer_id,
                 __remote_constructor_name,
                 __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
                 __remote_proxy_oneway_methods: value?.[PROPERTY_PROXY_ONEWAY_METHODS],
@@ -355,6 +374,7 @@ export class RpcPeer {
             const serialized = serializer.serialize(value);
             const ret: RpcRemoteProxyValue = {
                 __remote_proxy_id: undefined,
+                __remote_proxy_finalizer_id: undefined,
                 __remote_constructor_name,
                 __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
                 __remote_proxy_oneway_methods: value?.[PROPERTY_PROXY_ONEWAY_METHODS],
@@ -363,12 +383,17 @@ export class RpcPeer {
             return ret;
         }
 
-        proxyId = (this.proxyCounter++).toString();
-        this.localProxied.set(value, proxyId);
-        this.localProxyMap[proxyId] = value;
+        const __remote_proxy_id = (this.proxyCounter++).toString();
+        proxiedEntry = {
+            id: __remote_proxy_id,
+            finalizerId: __remote_proxy_id,
+        };
+        this.localProxied.set(value, proxiedEntry);
+        this.localProxyMap[__remote_proxy_id] = value;
 
         const ret: RpcRemoteProxyValue = {
-            __remote_proxy_id: proxyId,
+            __remote_proxy_id,
+            __remote_proxy_finalizer_id: __remote_proxy_id,
             __remote_constructor_name,
             __remote_proxy_props: value?.[PROPERTY_PROXY_PROPERTIES],
             __remote_proxy_oneway_methods: value?.[PROPERTY_PROXY_ONEWAY_METHODS],
@@ -378,12 +403,16 @@ export class RpcPeer {
     }
 
     newProxy(proxyId: string, proxyConstructorName: string, proxyProps: any, proxyOneWayMethods: string[]) {
-        const rpc = new RpcProxy(this, proxyId, proxyConstructorName, proxyProps, proxyOneWayMethods);
+        const localProxiedEntry: LocalProxiedEntry = {
+            id: proxyId,
+            finalizerId: undefined,
+        }
+        const rpc = new RpcProxy(this, localProxiedEntry, proxyConstructorName, proxyProps, proxyOneWayMethods);
         const target = proxyConstructorName === 'Function' || proxyConstructorName === 'AsyncFunction' ? function () { } : rpc;
         const proxy = new Proxy(target, rpc);
         const weakref = new WeakRef(proxy);
         this.remoteWeakProxies[proxyId] = weakref;
-        this.finalizers.register(rpc, proxyId);
+        this.finalizers.register(rpc, localProxiedEntry);
         global.gc?.();
         return proxy;
     }
@@ -460,8 +489,16 @@ export class RpcPeer {
                 case 'finalize': {
                     const rpcFinalize = message as RpcFinalize;
                     const local = this.localProxyMap[rpcFinalize.__local_proxy_id];
-                    delete this.localProxyMap[rpcFinalize.__local_proxy_id];
-                    this.localProxied.delete(local);
+                    if (local) {
+                        const localProxiedEntry = this.localProxied.get(local);
+                        // if a finalizer id is specified, it must match.
+                        if (rpcFinalize.__local_proxy_finalizer_id && rpcFinalize.__local_proxy_finalizer_id !== localProxiedEntry?.finalizerId) {
+                            console.error(this.selfName, this.peerName, 'finalizer mismatch')
+                            break;
+                        }
+                        delete this.localProxyMap[rpcFinalize.__local_proxy_id];
+                        this.localProxied.delete(local);
+                    }
                     break;
                 }
                 case 'oob': {
