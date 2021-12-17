@@ -4,7 +4,6 @@ import child_process from 'child_process';
 import path from 'path';
 import { once } from 'events';
 import process from 'process';
-import rimraf from "rimraf";
 import mkdirp from "mkdirp";
 
 export async function installOptionalDependencies(console: Console, packageJson: any) {

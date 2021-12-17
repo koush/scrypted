@@ -22,7 +22,6 @@ from asyncio.streams import StreamReader, StreamWriter
 import os
 from os import sys
 import platform
-import shutil
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
