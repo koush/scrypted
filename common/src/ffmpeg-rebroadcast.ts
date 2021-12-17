@@ -90,6 +90,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
     let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;
     let isActive = true;
     const events = new EventEmitter();
+    events.on('error', e => console.error('rebroadcast error', e));
     const { console } = options;
 
     let inputAudioCodec: string;
@@ -133,10 +134,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
     const servers = [];
 
-    ffmpegIncomingConnectionTimeout = setTimeout(() => {
-        kill();
-        reject(new Error('timed out waiting for incoming initiate ffmpeg tcp connection'));
-    }, 30000);
+    ffmpegIncomingConnectionTimeout = setTimeout(kill, 30000);
 
     for (const container of Object.keys(options.parsers)) {
         const parser = options.parsers[container];
@@ -223,6 +221,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
     await socketPromise;
     clearTimeout(ffmpegIncomingConnectionTimeout);
+    console.log('ok!');
 
     return {
         inputAudioCodec,
