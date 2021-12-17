@@ -3,14 +3,19 @@ import fs from 'fs';
 import child_process from 'child_process';
 import path from 'path';
 import { once } from 'events';
+import process from 'process';
+import rimraf from "rimraf";
+import mkdirp from "mkdirp";
 
 export async function installOptionalDependencies(console: Console, packageJson: any) {
     const pluginVolume = ensurePluginVolume(packageJson.name);
-    const optPj = path.join(pluginVolume, 'package.json');
+    const nodePrefix = path.join(pluginVolume, `${process.platform}-${process.arch}`);
+    const packageJsonPath = path.join(nodePrefix, 'package.json');
+    const currentInstalledPackageJsonPath = path.join(nodePrefix, 'package.installed.json');
 
     let currentPackageJson: any;
     try {
-        currentPackageJson = JSON.parse(fs.readFileSync(optPj).toString());
+        currentPackageJson = JSON.parse(fs.readFileSync(currentInstalledPackageJsonPath).toString());
     }
     catch (e) {
     }
@@ -34,21 +39,18 @@ export async function installOptionalDependencies(console: Console, packageJson:
     delete reduced.optionalDependencies;
     delete reduced.devDependencies;
 
-    try {
-        fs.writeFileSync(optPj, JSON.stringify(reduced));
+    mkdirp.sync(nodePrefix);
+    fs.writeFileSync(packageJsonPath, JSON.stringify(reduced));
 
-        const cp = child_process.spawn('npm', ['--prefix', pluginVolume, 'install'], {
-            cwd: pluginVolume,
-            stdio: 'inherit',
-        });
-    
-        await once(cp, 'exit');
-        if (cp.exitCode !== 0)
-            throw new Error('npm installation failed with exit code ' + cp.exitCode);
-    }
-    catch (e) {
-        fs.rmSync(optPj);
-        throw e;
-    }
+    const cp = child_process.spawn('npm', ['--prefix', nodePrefix, 'install'], {
+        cwd: nodePrefix,
+        stdio: 'inherit',
+    });
+
+    await once(cp, 'exit');
+    if (cp.exitCode !== 0)
+        throw new Error('npm installation failed with exit code ' + cp.exitCode);
+
+    fs.writeFileSync(currentInstalledPackageJsonPath, JSON.stringify(reduced));
     console.log('native dependencies installed.');
 }

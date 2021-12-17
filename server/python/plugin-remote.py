@@ -21,7 +21,8 @@ from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
 import os
 from os import sys
-from sys import stderr, stdout
+import platform
+import shutil
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -164,8 +165,8 @@ class PluginRemote:
 
         zip = zipfile.ZipFile(zipPath)
 
-        python_prefix = os.path.join(os.environ.get(
-            'SCRYPTED_PLUGIN_VOLUME'), 'python')
+        plugin_volume = os.environ.get('SCRYPTED_PLUGIN_VOLUME')
+        python_prefix = os.path.join(plugin_volume, 'python-%s-%s' % (platform.system(), platform.machine()))
         if not os.path.exists(python_prefix):
             os.makedirs(python_prefix)
 
@@ -179,7 +180,7 @@ class PluginRemote:
 
             requirementstxt = os.path.join(python_prefix, 'requirements.txt')
             installed_requirementstxt = os.path.join(
-                python_prefix, 'installed-requirements.txt')
+                python_prefix, 'requirements.installed.txt')
 
             need_pip = True
             try:
