@@ -47,22 +47,23 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         const device = this.scrypted.findPluginDeviceById(id);
 
         if (!nativeIdOrMixinDevice || typeof nativeIdOrMixinDevice === 'string') {
+            const nativeId: string = nativeIdOrMixinDevice;
             // todo: deprecate this code path
-            const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
+            const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeId);
             const mixins: string[] = getState(device, ScryptedInterfaceProperty.mixins) || [];
             if (!mixins.includes(mixinProvider._id))
                 throw new Error(`${mixinProvider._id} is not a mixin provider for ${id}`);
 
-            this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
+            this.scrypted.findPluginDevice(this.pluginId, nativeId);
             const tableEntry = this.scrypted.devices[device._id].handler.mixinTable.find(entry => entry.mixinProviderId === mixinProvider._id);
             const { interfaces } = await tableEntry.entry;
             if (!interfaces.has(eventInterface))
                 throw new Error(`${mixinProvider._id} does not mixin ${eventInterface} for ${id}`);
         }
         else {
-            if (!await this.scrypted.devices[device._id]?.handler?.isMixin(id, nativeIdOrMixinDevice)) {
-                const mixinProvider = this.scrypted.findPluginDevice(this.pluginId, nativeIdOrMixinDevice);
-                throw new Error(`${mixinProvider?._id} does not mixin ${eventInterface} for ${id}`);
+            const mixin: object = nativeIdOrMixinDevice;
+            if (!await this.scrypted.devices[device._id]?.handler?.isMixin(id, mixin)) {
+                throw new Error(`${mixin} does not mixin ${eventInterface} for ${id}`);
             }
         }
         this.scrypted.stateManager.notifyInterfaceEvent(device, eventInterface, eventData);

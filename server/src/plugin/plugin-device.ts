@@ -54,6 +54,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     async isMixin(id: string, mixinDevice: any) {
         if (this.releasing.has(mixinDevice))
             return true;
+        await this.scrypted.devices[id].handler.ensureProxy();
         for (const mixin of this.scrypted.devices[id].handler.mixinTable) {
             const { proxy } = await mixin.entry;
             if (proxy === mixinDevice) {
