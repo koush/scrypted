@@ -147,18 +147,13 @@ class AudioStreamOptions(TypedDict):
     codec: str
     pass
 
-class FaceRecognitionResult(TypedDict):
-    boundingBox: tuple[float, float, float, float]
-    id: str
-    label: str
-    score: float
-    pass
-
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
     id: str
     score: float
+    zoneHistory: Any
+    zones: list[str]
     pass
 
 class PictureDimensions(TypedDict):
@@ -332,9 +327,7 @@ class ObjectsDetected(TypedDict):
     detectionId: Any
     detections: list[ObjectDetectionResult]
     eventId: Any
-    faces: list[ObjectDetectionResult]
     inputDimensions: tuple[float, float]
-    people: list[FaceRecognitionResult]
     running: bool
     timestamp: float
     pass
@@ -384,7 +377,7 @@ class Setting(TypedDict):
     placeholder: str
     readonly: bool
     title: str
-    type: Any | Any | Any | Any | Any | Any | Any
+    type: Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
     pass
 

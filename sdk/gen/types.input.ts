@@ -470,7 +470,7 @@ export interface DeviceDiscovery {
   /**
    * Perform device discovery for the specified duration in seconds.
    */
-   discoverDevices(duration: number): Promise<void>;
+  discoverDevices(duration: number): Promise<void>;
 }
 /**
  * Battery retrieves the battery level of battery powered devices.
@@ -603,23 +603,22 @@ export interface Position {
   latitude?: number;
   longitude?: number;
 }
+export interface ZoneHistory {
+  firstEntry: number;
+  lastEntry: number;
+}
 export interface BoundingBoxResult {
   /**
    * x, y, width, height
    */
-  boundingBox?: [number, number, number, number],
+  boundingBox?: [number, number, number, number];
+  zoneHistory?: { [zone: string]: ZoneHistory };
+  zones?: string[];
 }
 export interface ObjectDetectionResult extends BoundingBoxResult {
   id?: string;
   className: ObjectDetectionClass;
   score: number;
-}
-export interface FaceRecognitionCandidate {
-  id: string;
-  label: string;
-}
-export interface FaceRecognitionResult extends BoundingBoxResult, FaceRecognitionCandidate {
-  score?: number,
 }
 export interface ObjectsDetected {
   /**
@@ -628,8 +627,6 @@ export interface ObjectsDetected {
    */
   running?: boolean;
   detections?: ObjectDetectionResult[];
-  faces?: ObjectDetectionResult[];
-  people?: FaceRecognitionResult[];
   /**
    * The id for the detection session.
    */
@@ -1137,7 +1134,7 @@ export interface Setting {
   group?: string;
   description?: string;
   placeholder?: string;
-  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button';
+  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath';
   readonly?: boolean;
   choices?: string[];
   combobox?: boolean;

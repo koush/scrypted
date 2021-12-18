@@ -217,7 +217,7 @@
       </v-card>
     </v-dialog>
 
-    <v-content elevation="-2">
+    <v-main elevation="-2">
       <v-container
         grid-list-xs
         grid-list-xl
@@ -230,7 +230,7 @@
           <router-view v-if="$store.state.isConnected"></router-view>
         </v-fade-transition>
       </v-container>
-    </v-content>
+    </v-main>
   </v-app>
 </template>
 

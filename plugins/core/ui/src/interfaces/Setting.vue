@@ -14,7 +14,9 @@
     ></v-checkbox>
     <div v-else-if="lazyValue.type === 'button'" @click="save">
       <v-btn small block> {{ lazyValue.title }} </v-btn>
-      <span v-if="lazyValue.description" class="caption pl-1">{{ lazyValue.description }}</span>
+      <span v-if="lazyValue.description" class="caption pl-1">{{
+        lazyValue.description
+      }}</span>
     </div>
     <v-combobox
       v-else-if="lazyValue.choices && lazyValue.combobox"
@@ -85,6 +87,18 @@
         </v-btn>
       </template>
     </DevicePicker>
+    <div v-else-if="lazyValue.type === 'clippath'" class="mb-2">
+      <v-btn small block @click="editZone">{{ lazyValue.title }} </v-btn>
+      <Camera
+        :value="device"
+        :device="device"
+        :clipPathValue="sanitizedClipPathValue"
+        :showDialog="editingZone"
+        :hidePreview="true"
+        @dialog="editingZoneChanged"
+        @clipPath="lazyValue.value = $event"
+      ></Camera>
+    </div>
     <v-text-field
       v-else
       dense
@@ -116,12 +130,19 @@ import RPCInterface from "./RPCInterface.vue";
 import DevicePicker from "../common/DevicePicker.vue";
 import Grower from "../common/Grower.vue";
 import cloneDeep from "lodash/cloneDeep";
+import Camera from "./Camera.vue";
 
 export default {
   mixins: [RPCInterface],
   components: {
+    Camera,
     DevicePicker,
     Grower,
+  },
+  data() {
+    return {
+      editingZone: false,
+    };
   },
   watch: {
     dirty() {
@@ -130,6 +151,13 @@ export default {
     },
   },
   computed: {
+    sanitizedClipPathValue() {
+      try {
+        return JSON.parse(JSON.stringify(this.lazyValue.value)) || [];
+      } catch (e) {
+        return [];
+      }
+    },
     booleanValue: {
       get() {
         return (
@@ -183,9 +211,16 @@ export default {
   },
   methods: {
     onChange() {},
+    editingZoneChanged(value) {
+      this.editingZone = value;
+      if (!value) {
+        this.rpc().putSetting(this.lazyValue.key, this.createInputValue().value);
+        this.onInput();
+      }
+    },
     createLazyValue() {
       var type = this.value.type || "";
-      if (type.indexOf("[]") == -1) {
+      if (type.indexOf("[]") == -1 && type !== 'clippath') {
         return cloneDeep(this.value);
       }
 
@@ -195,7 +230,7 @@ export default {
     },
     createInputValue() {
       var type = this.lazyValue.type || "";
-      if (type.indexOf("[]") == -1) {
+      if (type.indexOf("[]") == -1 && type !== 'clippath') {
         return this.lazyValue;
       }
 
@@ -206,6 +241,9 @@ export default {
     save() {
       this.rpc().putSetting(this.lazyValue.key, this.createInputValue().value);
       this.onInput();
+    },
+    editZone() {
+      this.editingZone = true;
     },
   },
 };

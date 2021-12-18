@@ -1,9 +1,11 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, FaceRecognitionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
 import { DenoisedDetectionEntry, denoiseDetections } from './denoise';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider"
+
+const polygonOverlap = require('polygon-overlap');
 
 export interface DetectionInput {
   jpegBuffer?: Buffer;
@@ -17,6 +19,9 @@ const defaultDetectionInterval = 60;
 const defaultDetectionTimeout = 10;
 const defaultMotionDuration = 10;
 
+type ClipPath = [number, number][];
+type Zones = { [zone: string]: ClipPath };
+
 class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera & MotionSensor & ObjectDetector> implements ObjectDetector, Settings {
   released = false;
   motionListener: EventListenerRegister;
@@ -29,9 +34,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   motionAsObjects = this.storage.getItem('motionAsObjects') === 'true';
   motionTimeout: NodeJS.Timeout;
   detectionInterval = parseInt(this.storage.getItem('detectionInterval')) || defaultDetectionInterval;
+  zones = this.getZones();
   detectionIntervalTimeout: NodeJS.Timeout;
   currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
-  currentPeople: DenoisedDetectionEntry<FaceRecognitionResult>[] = [];
   detectionId: string;
   running = false;
   hasMotionType: boolean;
@@ -203,6 +208,28 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     if (!this.hasMotionType || this.motionAsObjects) {
+      if (detection.detections && Object.keys(this.zones).length) {
+        for (const o of detection.detections) {
+          if (!o.boundingBox)
+            continue;
+          o.zones = []
+          let [x, y, width, height] = o.boundingBox;
+          let x2 = x + width;
+          let y2 = y + height;
+          // the zones are point paths in percentage format
+          x = x * 100 / detection.inputDimensions[0];
+          y = y * 100 / detection.inputDimensions[1];
+          x2 = x2 * 100 / detection.inputDimensions[0];
+          y2 = y2 * 100 / detection.inputDimensions[1];
+          const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
+          for (const [zone, zoneValue] of Object.entries(this.zones)) {
+            if (polygonOverlap(box, zoneValue)) {
+              this.console.log(o.className, 'inside', zone);
+              o.zones.push(zone);
+            }
+          }
+        }
+      }
       this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
     }
   }
@@ -363,6 +390,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (this.settings) {
       settings.push(...this.settings.map(setting =>
         Object.assign({}, setting, {
+          placeholder: setting.placeholder?.toString(),
           value: this.storage.getItem(setting.key) || setting.value,
         } as Setting))
       );
@@ -379,11 +407,55 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       );
     }
 
+    settings.push({
+      key: 'zones',
+      title: 'Zones',
+      type: 'string',
+      multiple: true,
+      value: Object.keys(this.zones),
+      choices: Object.keys(this.zones),
+      combobox: true,
+    });
+
+    for (const [name, value] of Object.entries(this.zones)) {
+      settings.push({
+        key: `zone-${name}`,
+        title: `Edit Zone: ${name}`,
+        type: 'clippath',
+        value: JSON.stringify(value),
+      });
+    }
+
     return settings;
   }
 
-  async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
+  getZones(): Zones {
+    try {
+      return JSON.parse(this.storage.getItem('zones'));
+    }
+    catch (e) {
+      return {};
+    }
+  }
+
+  async putMixinSetting(key: string, value: string | number | boolean | string[] | number[]): Promise<void> {
     const vs = value?.toString();
+
+    if (key === 'zones') {
+      const newZones: Zones = {};
+      for (const name of value as string[]) {
+        newZones[name] = this.zones[name] || [];
+      }
+      this.zones = newZones;
+      this.storage.setItem('zones', JSON.stringify(newZones));
+      return;
+    }
+    if (key.startsWith('zone-')) {
+      this.zones[key.substring(5)] = JSON.parse(vs);
+      this.storage.setItem('zones', JSON.stringify(this.zones));
+      return;
+    }
+
     this.storage.setItem(key, vs);
     if (key === 'detectionDuration') {
       this.detectionDuration = parseInt(vs) || defaultDetectionDuration;

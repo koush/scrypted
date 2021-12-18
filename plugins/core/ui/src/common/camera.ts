@@ -26,7 +26,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
         const processCandidates = (result: Buffer) => {
           const message: RTCAVMessage = JSON.parse(result.toString());
           for (const candidate of message.candidates) {
-            console.log('remote candidate', candidate);
+            // console.log('remote candidate', candidate);
             pc.addIceCandidate(candidate);
           }
         };
@@ -34,7 +34,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
         pc.onicecandidate = async (evt) => {
           if (!evt.candidate)
             return;
-          console.log('local candidate', evt.candidate);
+          // console.log('local candidate', evt.candidate);
           const candidateObject: RTCAVMessage = {
             id: json.id,
             candidates: [evt.candidate],
