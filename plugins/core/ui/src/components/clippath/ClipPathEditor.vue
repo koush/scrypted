@@ -1,8 +1,13 @@
 <template>
   <div id="playground_container" class="playground-container flex">
-    <v-btn @click="toggle">
-      {{ 'Toggle Mode: ' + (!customizing ? "Add Points" : "Drag Points") }}
-    </v-btn>
+    <v-btn-toggle mandatory v-model="pointMode">
+      <v-btn @click="customizing = false" width="100px">
+        {{ "Drag Points" }}
+      </v-btn>
+      <v-btn @click="customizing = true" width="100px">
+        {{ "Add Points" }}
+      </v-btn>
+    </v-btn-toggle>
     <section
       @click="addHandle"
       class="playground"
@@ -25,7 +30,7 @@
             },
           ]"
         ></div>
-        
+
         <ClipPathEditorHandles
           ref="handles"
           @updateHandle="updateHandle"
@@ -41,7 +46,7 @@
 <script>
 import { clipCSS } from "./utilities";
 import ClipPathEditorHandles from "./ClipPathEditorHandles.vue";
-import CustomValue from "../../common/CustomValue.vue"
+import CustomValue from "../../common/CustomValue.vue";
 
 export default {
   mixins: [CustomValue],
@@ -52,24 +57,21 @@ export default {
 
   data() {
     return {
+      pointMode: this.value.length < 3 ? 1 : 0,
       customizing: this.value.length < 3,
     };
   },
 
   mounted() {
-    console.log('mounted clippatheditor')
+    console.log("mounted clippatheditor");
   },
 
   watch: {
-    lazyValue() {
-    }
+    lazyValue() {},
   },
 
   methods: {
     clipCSS,
-    toggle() {
-      this.customizing = !this.customizing;
-    },
     addHandle(e) {
       if (!this.customizing) return;
 

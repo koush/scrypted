@@ -8,19 +8,19 @@
     <div style="position: relative; overflow: hidden;">
       <video
         ref="video"
-        style="background-color: black; width: 100%; height: 100%"
+        style="background-color: black; width: 100%; height: 100%; z-index: 0;"
         playsinline
         autoplay
       ></video>
       <svg
         :viewBox="`0 0 ${svgWidth} ${svgHeight}`"
         ref="svg"
-        style="top: 0; left: 0; position: absolute; width: 100%; height: 100%"
+        style="top: 0; left: 0; position: absolute; width: 100%; height: 100%; z-index: 1;"
         v-html="svgContents"
       ></svg>
       <ClipPathEditor
         v-if="clipPath"
-        style="background: transparent; top: 0; left: 0; position: absolute; width: 100%; height: 100%"
+        style="background: transparent; top: 0; left: 0; position: absolute; width: 100%; height: 100%; z-index: 2;"
         v-model="clipPath"
       ></ClipPathEditor>
     </div>
