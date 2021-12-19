@@ -1,4 +1,4 @@
-import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectDetection, ObjectsDetected } from '@scrypted/sdk'
+import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectsDetected } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
@@ -15,13 +15,14 @@ import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate,
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
-import { Active, ContactSensor } from 'hap-nodejs/src/lib/definitions';
+import { ContactSensor } from 'hap-nodejs/src/lib/definitions';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSnapshotHandler } from './camera/camera-snapshot';
 import { evalRequest } from './camera/camera-transcode';
 import { CharacteristicEventTypes, DataStreamConnection, Service, WithUUID } from 'hap-nodejs/src';
 import { RecordingManagement } from 'hap-nodejs/src/lib/camera';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
+import os from 'os';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -36,6 +37,8 @@ async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket,
 }
 
 const numberPrebufferSegments = 1;
+const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
+const v4v6Regex = /^::ffff:[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/;
 
 addSupportedType({
     type: ScryptedDeviceType.Camera,
@@ -119,6 +122,37 @@ addSupportedType({
                 if (addressOverride) {
                     console.log('using address override', addressOverride);
                     response.addressOverride = addressOverride;
+                }
+                else {
+                    // HAP-NodeJS has weird default address determination behavior. Ideally it should use
+                    // the same IP address as the incoming socket, because that is by definition reachable.
+                    // But it seems to rechoose a matching address based on the interface. This guessing
+                    // can be error prone if that interface offers multiple addresses, some of which
+                    // may not be reachable.
+                    // Return the incoming address, assuming the sanity checks pass. Otherwise, fall through
+                    // to the HAP-NodeJS implementation.
+                    let check: string;
+                    if (request.addressVersion === 'ipv4') {
+                        const localAddress = request.connection.localAddress;
+                        if (v4Regex.exec(localAddress)) {
+                            check = localAddress;
+                        }
+                        else if (v4v6Regex.exec(localAddress)) {
+                            // if this is a v4 over v6 address, parse it out.
+                            check = localAddress.substring('::ffff:'.length);
+                        }
+                    }
+                    else if (request.addressVersion === 'ipv6' && !v4Regex.exec(request.connection.localAddress)) {
+                        check = request.connection.localAddress;
+                    }
+
+                    // sanity check this address.
+                    if (check) {
+                        const infos = os.networkInterfaces()[request.connection.networkInterface];
+                        if (infos && infos.find(info => info.address === check)) {
+                            response.addressOverride = check;
+                        }
+                    }
                 }
 
                 callback(null, response);
@@ -573,7 +607,6 @@ addSupportedType({
             for (const ojs of new Set(objectDetectionContactSensors)) {
                 const sensor = new ContactSensor(`${device.name}: ` + ojs, ojs);
                 accessory.addService(sensor);
-                const isPerson = ojs.startsWith('Person: ');
 
                 let contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
                 let timeout: NodeJS.Timeout;
@@ -591,27 +624,15 @@ addSupportedType({
                         return contactState;
 
                     const ed: ObjectsDetected = data;
-                    if (!isPerson) {
-                        if (!ed.detections)
-                            return contactState;
-
-                        const objects = ed.detections.map(d => d.className);
-                        if (objects.includes(ojs)) {
-                            contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
-                            resetSensorTimeout();
-                        }
-
-                        return contactState;
-                    }
-
-                    if (!ed.people)
+                    if (!ed.detections)
                         return contactState;
 
-                    const people = ed.people.map(d => 'Person: ' + d.label);
-                    if (people.includes(ojs)) {
+                    const objects = ed.detections.map(d => d.className);
+                    if (objects.includes(ojs)) {
                         contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
                         resetSensorTimeout();
                     }
+
                     return contactState;
                 }, true);
             }
