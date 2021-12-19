@@ -802,7 +802,7 @@ class SystemManager:
         pass
     def getSystemState(self) -> Any:
         pass
-    def listen(self, EventListener: EventListener) -> EventListenerRegister:
+    def listen(self, callback: EventListener) -> EventListenerRegister:
         pass
     def listenDevice(self, id: str, event: str | EventListenerOptions, callback: EventListener) -> EventListenerRegister:
         pass
