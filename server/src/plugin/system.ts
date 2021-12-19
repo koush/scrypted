@@ -1,6 +1,6 @@
 import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger } from "@scrypted/sdk/types";
 import { PluginAPI } from "./plugin-api";
-import { handleFunctionInvocations } from '../rpc';
+import { handleFunctionInvocations, PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
 import { EventRegistry } from "../event-registry";
 import { allInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
 
@@ -56,7 +56,7 @@ class DeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
         return (this.device as any)[method](...argArray);
     }
 
-    listen(event: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: object) => void): EventListenerRegister {
+    listen(event: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         return this.systemManager.listenDevice(this.id, event, callback);
     }
 
@@ -92,6 +92,15 @@ class EventListenerRegisterImpl implements EventListenerRegister {
     }
 }
 
+function makeOneWayCallback<T>(input: T): T {
+    const f: any = input;
+    const oneways: string[] = f[PROPERTY_PROXY_ONEWAY_METHODS] || [];
+    if (!oneways.includes(null))
+        oneways.push(null);
+    f[PROPERTY_PROXY_ONEWAY_METHODS] = oneways;
+    return input;
+}
+
 export class SystemManagerImpl implements SystemManager {
     api: PluginAPI;
     state: {[id: string]: {[property: string]: SystemDeviceState}};
@@ -122,10 +131,10 @@ export class SystemManagerImpl implements SystemManager {
                 return this.getDeviceById(id);
         }
     }
-    listen(EventListener: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: object) => void): EventListenerRegister {
-        return this.events.listen((id, eventDetails, eventData) => EventListener(this.getDeviceById(id), eventDetails, eventData));
+    listen(callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
+        return this.events.listen(makeOneWayCallback((id, eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData)));
     }
-    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: object) => void): EventListenerRegister {
+    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         let { event, watch } = (options || {}) as EventListenerOptions;
         if (!event && typeof options === 'string')
             event = options as string;
@@ -136,7 +145,7 @@ export class SystemManagerImpl implements SystemManager {
         if (watch)
             return this.events.listenDevice(id, event, (eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData));
 
-        return new EventListenerRegisterImpl(this.api.listenDevice(id, options, (eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData)))
+        return new EventListenerRegisterImpl(this.api.listenDevice(id, options, makeOneWayCallback((eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData))));
     }
 
     async removeDevice(id: string) {

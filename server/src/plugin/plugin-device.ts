@@ -299,7 +299,7 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
         return new Proxy(() => prop, this);
     }
 
-    listen(event: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: object) => void): EventListenerRegister {
+    listen(event: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         return this.scrypted.stateManager.listenDevice(this.id, event, (eventDetails, eventData) => callback(this.scrypted.getDevice(this.id), eventDetails, eventData));
     }
     async setName(name: string): Promise<void> {

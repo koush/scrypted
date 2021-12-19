@@ -122,7 +122,10 @@ class RpcProxy implements ProxyHandler<any> {
     }
 
     apply(target: any, thisArg: any, argArray?: any): any {
-        const method = target();
+        // rpc objects can be functions. if the function is a oneway method,
+        // it will have a null in the oneway method list. this is because
+        // undefined is not JSON serializable.
+        const method = target() || null;
         const args: any[] = [];
         for (const arg of (argArray || [])) {
             args.push(this.peer.serialize(arg));

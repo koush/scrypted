@@ -151,10 +151,10 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     async getDeviceById<T>(id: string): Promise<T & ScryptedDevice> {
         return this.scrypted.getDevice(id);
     }
-    async listen(listener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
-        return this.manageListener(this.scrypted.stateManager.listen(listener));
+    async listen(callback: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
+        return this.manageListener(this.scrypted.stateManager.listen(callback));
     }
-    async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
+    async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
         const device = this.scrypted.findPluginDeviceById(id);
         if (device) {
             const self = this.scrypted.findPluginDevice(this.pluginId);

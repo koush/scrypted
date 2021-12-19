@@ -99,7 +99,7 @@ export class ScryptedStateManager extends EventRegistry {
         return systemState;
     }
 
-    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): EventListenerRegister {
+    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         let { denoise, event, watch } = (options || {}) as EventListenerOptions;
         if (!event && typeof options === 'string')
             event = options as string;
@@ -124,7 +124,7 @@ export class ScryptedStateManager extends EventRegistry {
         }
 
         let lastData: any = undefined;
-        let cb = (eventDetails: EventDetails, eventData: object) => {
+        let cb = (eventDetails: EventDetails, eventData: any) => {
             if (denoise && lastData === eventData)
                 return;
             callback(eventDetails, eventData);

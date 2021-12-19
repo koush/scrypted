@@ -20,7 +20,7 @@ export interface PluginAPI {
     setDeviceProperty(id: string, property: ScryptedInterfaceProperty, value: any): Promise<void>;
     removeDevice(id: string): Promise<void>;
     listen(EventListener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister>;
-    listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister>;
+    listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister>;
 
     ioClose(id: string): Promise<void>;
     ioSend(id: string, message: string): Promise<void>;
@@ -101,10 +101,10 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
     removeDevice(id: string): Promise<void> {
         return this.api.removeDevice(id);
     }
-    async listen(EventListener: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
-        return this.manageListener(await this.api.listen(EventListener));
+    async listen(callback: (id: string, eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
+        return this.manageListener(await this.api.listen(callback));
     }
-    async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): Promise<EventListenerRegister> {
+    async listenDevice(id: string, event: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): Promise<EventListenerRegister> {
         return this.manageListener(await this.api.listenDevice(id, event, callback));
     }
     ioClose(id: string): Promise<void> {

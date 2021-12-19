@@ -12,12 +12,12 @@ export class EventListenerRegisterImpl implements EventListenerRegister {
 const allowedEventInterfaces = new Set<string>([ScryptedInterface.ScryptedDevice, 'Logger', 'Storage'])
 
 export class EventRegistry {
-    systemListeners = new Set<(id: string, eventDetails: EventDetails, eventData: object) => void>();
-    listeners: { [token: string]: Set<(eventDetails: EventDetails, eventData: object) => void> } = {};
+    systemListeners = new Set<(id: string, eventDetails: EventDetails, eventData: any) => void>();
+    listeners: { [token: string]: Set<(eventDetails: EventDetails, eventData: any) => void> } = {};
 
-    listen(EventListener: (id: string, eventDetails: EventDetails, eventData: object) => void): EventListenerRegister {
+    listen(callback: (id: string, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         const events = this.systemListeners;
-        let cb = EventListener;
+        let cb = callback;
         events.add(cb);
         return new EventListenerRegisterImpl(() => {
             events.delete(cb);
@@ -25,7 +25,7 @@ export class EventRegistry {
         });
     }
 
-    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: object) => void): EventListenerRegister {
+    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         let { event } = (options || {}) as EventListenerOptions;
         if (!event && typeof options === 'string')
             event = options as string;
