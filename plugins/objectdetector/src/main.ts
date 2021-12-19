@@ -518,7 +518,7 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-    if (type !== ScryptedDeviceType.Person && (interfaces.includes(ScryptedInterface.VideoCamera) || interfaces.includes(ScryptedInterface.Camera))) {
+    if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && (interfaces.includes(ScryptedInterface.VideoCamera) || interfaces.includes(ScryptedInterface.Camera))) {
       return [ScryptedInterface.ObjectDetector, ScryptedInterface.MotionSensor, ScryptedInterface.Settings];
     }
     return null;
