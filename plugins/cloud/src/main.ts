@@ -155,7 +155,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             //     description: 'Authorization token used by Scrypted Cloud.',
             //     readonly: true,
             // },
-        ]
+        ];
     }
 
     async putSetting(key: string, value: string | number | boolean) {
@@ -178,7 +178,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             registration_id: this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
         })
-        return `https://${this.getHostname()}/_punch/login?${args}`
+        return `https://home.scrypted.app/_punch/login?${args}`;
+        // this is disabled because we can't assume that custom domains will implement this oauth endpoint.
+        // return `https://${this.getHostname()}/_punch/login?${args}`
     }
 
     async onOauthCallback(callbackUrl: string) {
