@@ -8,8 +8,6 @@ import throttle from 'lodash/throttle';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
 
-console.log(ScryptedInterfaceProperty)
-
 const refreshFrequency = 60;
 
 function fromNestMode(mode: string): ThermostatMode {
@@ -63,6 +61,7 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         const u = result.data.results.streamUrls.rtspUrl;
 
         return mediaManager.createFFmpegMediaObject({
+            url: undefined,
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -269,7 +268,10 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     updateClient() {
         this.clientId = this.storage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com';
         this.clientSecret = this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg';
-        this.projectId = this.storage.getItem('projectId') || '778da527-9690-4368-9c96-6872bb29e7a0';
+        this.projectId = this.storage.getItem('projectId');// || '778da527-9690-4368-9c96-6872bb29e7a0';
+        if (!this.projectId) {
+            this.log.a('Enter a valid project ID. Setup instructions for Nest: https://www.home-assistant.io/integrations/nest/');
+        }
 
         this.authorizationUri = `https://nestservices.google.com/partnerconnections/${this.projectId}/auth`
         this.client = new ClientOAuth2({
@@ -362,18 +364,18 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 key: 'projectId',
                 title: 'Project ID',
                 description: 'Google Device Access Project ID',
-                value: this.storage.getItem('projectId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com',
+                value: this.storage.getItem('projectId'), // || '778da527-9690-4368-9c96-6872bb29e7a0',
             },
             {
                 key: 'clientId',
-                title: 'Client ID',
-                description: 'Google Device Access Client ID',
-                value: this.storage.getItem('clientId') || '778da527-9690-4368-9c96-6872bb29e7a0',
+                title: 'Google OAuth Client ID',
+                description: 'Optional: The Google OAuth Client ID to use. The default value will use Scrypted Cloud OAuth login.',
+                value: this.storage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com',
             },
             {
                 key: 'clientSecret',
-                title: 'Client Secret',
-                description: 'Google Device Access Client Secret',
+                title: 'Google OAuth Client Secret',
+                description: 'Optional: The Google OAuth Client Secret to use. The default value will use Scrypted Cloud login.',
                 value: this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg',
             },
             {
@@ -383,7 +385,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 readonly: true,
                 value: endpoint,
                 placeholder: 'http://somehost.dyndns.org',
-            }
+            },
         ];
     }
 
