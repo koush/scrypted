@@ -73,7 +73,7 @@ class OpenCVPlugin(DetectPlugin):
             interval = float(settings.get('interval', interval))
         return area, threshold, interval
 
-    def detect(self, detection_session: OpenCVDetectionSession, frame, settings: Any, src_size, inference_box) -> ObjectsDetected:
+    def detect(self, detection_session: OpenCVDetectionSession, frame, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         area, threshold, interval = self.parse_settings(settings)
 
         if detection_session.frames_to_skip:
@@ -106,16 +106,22 @@ class OpenCVPlugin(DetectPlugin):
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
-        detection_result['inputDimensions'] = (curFrame.shape[1], curFrame.shape[0])
+        detection_result['inputDimensions'] = src_size
         
         for c in contours:
             contour_area = cv2.contourArea(c)
             if not area or contour_area > area:
                 x, y, w, h = cv2.boundingRect(c)
+                # if w * h != contour_area:
+                #     print("mismatch w/h", contour_area - w * h)
+
+                x2, y2 = convert_to_src_size((x + w, y + h))
+                x, y = convert_to_src_size((x, y))
+                w = x2 - x + 1
+                h = y2 - y + 1
 
                 detection: ObjectDetectionResult = {}
-                detection['boundingBox'] = (
-                    x, y, w, h)
+                detection['boundingBox'] = (x, y, w, h)
                 detection['className'] = 'motion'
                 detection['score'] = 1 if area else contour_area
                 detections.append(detection)
@@ -147,7 +153,7 @@ class OpenCVPlugin(DetectPlugin):
             detection_session.cap = None
         return super().end_session(detection_session)
 
-    def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, settings: Any, src_size, inference_box, scale)-> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size)-> ObjectsDetected:
         buf = gst_sample.get_buffer()
         caps = gst_sample.get_caps()
         # can't trust the width value, compute the stride
@@ -163,7 +169,7 @@ class OpenCVPlugin(DetectPlugin):
                 4),
                 buffer=info.data,
                 dtype= np.uint8)
-            return self.detect(detection_session, mat, settings, src_size, inference_box)
+            return self.detect(detection_session, mat, settings, src_size, convert_to_src_size)
         finally:
             buf.unmap(info)
 

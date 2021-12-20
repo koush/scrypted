@@ -109,7 +109,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def create_detection_session(self):
         return DetectionSession()
 
-    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, inference_box, scale) -> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         pass
 
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
@@ -197,12 +197,9 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
     def run_pipeline(self, detection_session: DetectionSession, duration, src_size, video_input):
         inference_size = self.get_detection_input_size(src_size)
-        width, height = inference_size
-        w, h = src_size
-        scale = (width / w, height / h)
 
         first_frame = True
-        def user_callback(gst_sample, src_size, inference_box):
+        def user_callback(gst_sample, src_size, convert_to_src_size):
             try:
                 nonlocal first_frame
                 if first_frame:
@@ -210,7 +207,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     print("first frame received", detection_session.id)
 
                 detection_result = self.run_detection_gstsample(
-                    detection_session, gst_sample, detection_session.settings, src_size, inference_box, scale)
+                    detection_session, gst_sample, detection_session.settings, src_size, convert_to_src_size)
                 if detection_result:
                     self.detection_event(detection_session, detection_result)
 
@@ -220,7 +217,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 pass
 
         pipeline = gstreamer.run_pipeline(detection_session.future, user_callback,
-                                          src_size,
                                           appsink_size=inference_size,
                                           video_input=video_input,
                                           pixel_format=self.get_pixel_format())

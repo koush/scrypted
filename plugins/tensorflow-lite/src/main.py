@@ -41,7 +41,9 @@ def parse_label_contents(contents: str):
             ret[row_number] = content.strip()
     return ret
 
+
 defaultThreshold = .4
+
 
 class CoralPlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -82,7 +84,7 @@ class CoralPlugin(DetectPlugin):
         d['settings'] = [setting]
         return d
 
-    def create_detection_result(self, objs, size, tracker: Sort = None):
+    def create_detection_result(self, objs, size, tracker: Sort = None, convert_to_src_size=None):
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
@@ -135,12 +137,20 @@ class CoralPlugin(DetectPlugin):
                 detection['score'] = obj.score
                 detections.append(detection)
 
+        if convert_to_src_size:
+            for detection in detection_result['detections']:
+                bb = detection['boundingBox']
+                x, y = convert_to_src_size((bb[0], bb[1]))
+                x2, y2 = convert_to_src_size((bb[0] + bb[2], bb[1] + bb[3]))
+                detection['boundingBox'] = (x, y, x2 - x + 1, y2 - y + 1)
+
         return detection_result
 
     def parse_settings(self, settings: Any):
         score_threshold = .4
         if settings:
-            score_threshold = float(settings.get('score_threshold', score_threshold))
+            score_threshold = float(settings.get(
+                'score_threshold', score_threshold))
         return score_threshold
 
     def run_detection_jpeg(self, detection_session: TrackerDetectionSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
@@ -165,16 +175,16 @@ class CoralPlugin(DetectPlugin):
     def get_detection_input_size(self, src_size):
         return input_size(self.interpreter)
 
-    def run_detection_gstsample(self, detection_session: TrackerDetectionSession, gstsample, settings: Any, src_size, inference_box, scale) -> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: TrackerDetectionSession, gstsample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         score_threshold = self.parse_settings(settings)
 
         gst_buffer = gstsample.get_buffer()
         with self.mutex:
             run_inference(self.interpreter, gst_buffer)
             objs = detect.get_objects(
-                self.interpreter, score_threshold=score_threshold, image_scale=scale)
+                self.interpreter, score_threshold=score_threshold)
 
-        return self.create_detection_result(objs, src_size, detection_session.tracker)
+        return self.create_detection_result(objs, src_size, detection_session.tracker, convert_to_src_size)
 
     def create_detection_session(self):
         return TrackerDetectionSession()

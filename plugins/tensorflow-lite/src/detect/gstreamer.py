@@ -21,19 +21,22 @@ gi.require_version('GstBase', '1.0')
 
 from detect.safe_set_result import safe_set_result
 from gi.repository import GLib, GObject, Gst
+import math
 
 GObject.threads_init()
 Gst.init(None)
 
 class GstPipeline:
-    def __init__(self, finished: Future, pipeline, user_function, src_size):
+    def __init__(self, finished: Future, pipeline, user_function):
         self.finished = finished
         self.user_function = user_function
         self.running = False
         self.gstsample = None
         self.sink_size = None
-        self.src_size = src_size
-        self.box = None
+        self.src_size = None
+        self.dst_size = None
+        self.pad_size = None
+        self.scale_size = None
         self.condition = threading.Condition()
 
         self.pipeline = Gst.parse_launch(pipeline)
@@ -97,22 +100,53 @@ class GstPipeline:
             self.condition.notify_all()
         return Gst.FlowReturn.OK
 
-    def get_box(self):
-        if not self.box:
-            glbox = self.pipeline.get_by_name('glbox')
-            if glbox:
-                glbox = glbox.get_by_name('filter')
-            box = self.pipeline.get_by_name('box')
-            assert glbox or box
-            assert self.sink_size
-            if glbox:
-                self.box = (glbox.get_property('x'), glbox.get_property('y'),
-                        glbox.get_property('width'), glbox.get_property('height'))
-            else:
-                self.box = (-box.get_property('left'), -box.get_property('top'),
-                    self.sink_size[0] + box.get_property('left') + box.get_property('right'),
-                    self.sink_size[1] + box.get_property('top') + box.get_property('bottom'))
-        return self.box
+    def get_src_size(self):
+        if not self.src_size:
+            videoconvert = self.pipeline.get_by_name('videoconvert')
+            structure = videoconvert.srcpads[0].get_current_caps().get_structure(0)
+            _, w = structure.get_int('width')
+            _, h = structure.get_int('height')
+            self.src_size = (w, h)
+
+            videoscale = self.pipeline.get_by_name('videoscale')
+            structure = videoscale.srcpads[0].get_current_caps().get_structure(0)
+            _, w = structure.get_int('width')
+            _, h = structure.get_int('height')
+            self.dst_size = (w, h)
+
+            # the dimension with the higher scale value got cropped.
+            # use the other dimension to figure out the crop amount.
+            scales = (self.dst_size[0] / self.src_size[0], self.dst_size[1] / self.src_size[1])
+            scale = min(scales[0], scales[1])
+            self.scale_size = scale
+
+            dx = self.src_size[0] * scale
+            dy = self.src_size[1] * scale
+
+            px = math.ceil((self.dst_size[0] - dx) / 2)
+            py = math.ceil((self.dst_size[1] - dy) / 2)
+
+            self.pad_size = (px, py)
+            
+        return self.src_size
+
+    def convert_to_src_size(self, point):
+        px, py = self.pad_size
+        x, y = point
+
+        x = (x - px) / self.scale_size
+        if x < 0:
+            x = 0
+        if x >= self.src_size[0]:
+            x = self.src_size[0] - 1
+
+        y = (y - py) / self.scale_size
+        if y < 0:
+            y = 0
+        if y >= self.src_size[1]:
+            y = self.src_size[1] - 1
+
+        return (int(math.ceil(x)), int(math.ceil(y)))
 
     def inference_loop(self):
         while True:
@@ -124,7 +158,7 @@ class GstPipeline:
                 gstsample = self.gstsample
                 self.gstsample = None
 
-            self.user_function(gstsample, self.src_size, self.get_box())
+            self.user_function(gstsample, self.get_src_size(), lambda p: self.convert_to_src_size(p))
 
 def get_dev_board_model():
   try:
@@ -138,30 +172,25 @@ def get_dev_board_model():
 
 def run_pipeline(finished,
                  user_function,
-                 src_size,
                  appsink_size,
                  video_input,
                  pixel_format):
     PIPELINE = video_input
 
-    scale = min(appsink_size[0] / src_size[0], appsink_size[1] / src_size[1])
-    scale = tuple(int(x * scale) for x in src_size)
-    scale_caps = 'video/x-raw,width={width},height={height}'.format(width=scale[0], height=scale[1])
-    # scale_caps = 'video/x-raw,width={width},height={height}'.format(width=appsink_size[0], height=appsink_size[1])
-    PIPELINE += """ ! decodebin ! queue leaky=downstream max-size-buffers=10 ! videoconvert ! videoscale
-    ! {scale_caps} ! videobox name=box autocrop=true ! queue leaky=downstream max-size-buffers=1 ! {sink_caps} ! {sink_element}
+    PIPELINE += """ ! decodebin ! queue leaky=downstream max-size-buffers=10 ! videoconvert name=videoconvert ! videoscale name=videoscale
+    ! queue leaky=downstream max-size-buffers=1 ! {sink_caps} ! {sink_element}
     """
 
     SINK_ELEMENT = 'appsink name=appsink emit-signals=true max-buffers=1 drop=true sync=false'
-    SINK_CAPS = 'video/x-raw,format={pixel_format},width={width},height={height}'
+    SINK_CAPS = 'video/x-raw,format={pixel_format},width={width},height={height},pixel-aspect-ratio=1/1'
     LEAKY_Q = 'queue max-size-buffers=100 leaky=upstream'
 
     sink_caps = SINK_CAPS.format(width=appsink_size[0], height=appsink_size[1], pixel_format=pixel_format)
     pipeline = PIPELINE.format(leaky_q=LEAKY_Q,
         sink_caps=sink_caps,
-        sink_element=SINK_ELEMENT, scale_caps=scale_caps)
+        sink_element=SINK_ELEMENT)
 
     print('Gstreamer pipeline:\n', pipeline)
 
-    pipeline = GstPipeline(finished, pipeline, user_function, src_size)
+    pipeline = GstPipeline(finished, pipeline, user_function)
     return pipeline
