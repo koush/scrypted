@@ -63,8 +63,6 @@ export default {
     handleAdded(payload) {},
 
     resetHandles() {
-      let handles = document.querySelectorAll(".handle");
-
       this.clearDraggies();
 
       this.$refs.handleRefs.forEach((handle) => {
