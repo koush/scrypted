@@ -221,7 +221,6 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
     await socketPromise;
     clearTimeout(ffmpegIncomingConnectionTimeout);
-    console.log('ok!');
 
     return {
         inputAudioCodec,

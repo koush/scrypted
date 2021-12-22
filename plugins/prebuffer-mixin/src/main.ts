@@ -403,7 +403,7 @@ class PrebufferSession {
     const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
 
     if (this.audioDisabled) {
-      delete mediaStreamOptions.audio;
+      mediaStreamOptions.audio = null;
     }
     else if (reencodeAudio) {
       mediaStreamOptions.audio = {
