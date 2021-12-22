@@ -56,7 +56,7 @@ export class OnvifCameraAPI {
     profiles: Promise<any>;
     binaryStateEvent: string;
     digestAuth: AxiosDigestAuth;
-    detections = new Map<string, string>();
+    detections: Map<string, string>;
 
     constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string, public debug?: boolean) {
         this.binaryStateEvent = binaryStateEvent
@@ -167,6 +167,9 @@ export class OnvifCameraAPI {
     }
 
     async getEventTypes(): Promise<string[]> {
+        if (this.detections)
+            return [...this.detections.values()];
+
         return new Promise((resolve, reject) => {
             this.cam.getEventProperties((err, data, xml) => {
                 if (err) {
@@ -175,17 +178,20 @@ export class OnvifCameraAPI {
                 }
 
                 this.console.log(xml);
-                for (const [className, entry] of Object.entries(data.topicSet.ruleEngine.objectDetector) as any) {
-                    try {
-                        const eventName = entry.messageDescription.data.simpleItemDescription.$.Name;
-                        this.detections.set(eventName, className);
-                    }
-                    catch (e) {
+                this.detections = new Map();
+                try {
+
+                    for (const [className, entry] of Object.entries(data.topicSet.ruleEngine.objectDetector) as any) {
+                        try {
+                            const eventName = entry.messageDescription.data.simpleItemDescription.$.Name;
+                            this.detections.set(eventName, className);
+                        }
+                        catch (e) {
+                        }
                     }
                 }
-
-                if (this.detections.size === 0)
-                    this.detections = undefined;
+                catch (e) {
+                }
 
                 resolve([...this.detections.values()]);
             });
