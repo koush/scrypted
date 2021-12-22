@@ -193,7 +193,6 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
                 else if (event === OnvifEvent.Detection) {
                     const d: ObjectsDetected = {
                         timestamp: Date.now(),
-                        faces: className === 'face' ? [] : undefined,
                         detections: [
                             {
                                 score: undefined,
