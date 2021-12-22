@@ -288,19 +288,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     refreshThrottled = throttle(async () => {
         const response = await this.authGet('/devices');
         const userId = response.headers['user-id'];
-        if (userId && this.storage.getItem('userId') !== userId) {
-            try {
-                const endpoint = await endpointManager.getPublicCloudEndpoint();
-                this.console.log('pubsub endpoint:', endpoint);
-                await axios.post(`https://scrypted-gda-server.uw.r.appspot.com/register/${userId}`, {
-                    endpoint,
-                });
-                this.storage.setItem('userId', userId);
-            }
-            catch (e) {
-                this.console.error('register error', e);
-            }
-        }
+        this.console.log('user-id', userId);
         return response.data;
     }, refreshFrequency * 1000);
 
