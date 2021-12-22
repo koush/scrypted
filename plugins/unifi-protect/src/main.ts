@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
 import { ProtectApi } from "unifi-protect";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "unifi-protect";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "unifi-protect";
@@ -10,6 +10,8 @@ import { fitHeightToWidth } from "../../../common/src/resolution-utils";
 
 const { log, deviceManager, mediaManager } = sdk;
 
+const defaultSensorTimeout = 30;
+
 class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings, ObjectDetector {
     protect: UnifiProtect;
     motionTimeout: NodeJS.Timeout;
@@ -18,7 +20,6 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     lastMotion: number;
     lastRing: number;
     lastSeen: number;
-    detections = new Map<string, Promise<Buffer>>();
 
     constructor(protect: UnifiProtect, nativeId: string, protectCamera: Readonly<ProtectCameraConfigInterface>) {
         super(nativeId);
@@ -34,17 +35,24 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     }
 
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        const classes = ['motion'];
+        if (this.interfaces.includes(ScryptedInterface.BinarySensor))
+            classes.push('ring');
+        if (this.interfaces.includes(ScryptedInterface.ObjectDetector))
+            classes.push(...this.findCamera().featureFlags.smartDetectTypes);
         return {
-            classes: this.findCamera().featureFlags.smartDetectTypes,
-        }
+            classes,
+        };
     }
 
     async getDetectionInput(detectionId: any): Promise<MediaObject> {
-        const data = this.detections.get(detectionId);
-        if (!data)
-            return;
-        this.console.log('sending detection input');
-        return mediaManager.createMediaObject(await data, 'image/jpeg');
+        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/events/${detectionId}/thumbnail`;
+        const response = await this.protect.api.loginFetch(url);
+        if (!response) {
+            throw new Error('Unifi Protect login refresh failed.');
+        }
+        const data = await response.arrayBuffer();
+        return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
 
     getDefaultOrderedVideoStreamOptions(vsos: MediaStreamOptions[]) {
@@ -80,7 +88,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
             {
                 title: 'Sensor Timeout',
                 key: 'sensorTimeout',
-                value: this.storage.getItem('sensorTimeout') || 30,
+                value: this.storage.getItem('sensorTimeout') || defaultSensorTimeout,
                 description: 'Time to wait in seconds before clearing the motion, doorbell button, or object detection state.',
             }
         ];
@@ -270,8 +278,6 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     listener = (event: Buffer) => {
         const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
 
-        this.debugLog('event', updatePacket);
-
         if (!updatePacket) {
             this.console.error("%s: Unable to process message from the realtime update events API.", this.api.getNvrName());
             return;
@@ -279,56 +285,48 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
         switch (updatePacket.action.modelKey) {
             case "camera": {
-
-                // We listen for the following camera update actions:
-                //   doorbell LCD updates
-                //   doorbell rings
-                //   motion detection
-
-                // We're only interested in update actions.
-                if (updatePacket.action.action !== "update") {
-                    return;
-                }
-
-                // Grab the right payload type, camera update payloads.
-                const payload = updatePacket.payload as ProtectNvrUpdatePayloadCameraUpdate;
-
-                // Now filter out payloads we aren't interested in. We only want motion detection and doorbell rings for now.
-                if (!payload.isMotionDetected && !payload.lastRing && !payload.lcdMessage) {
-                    this.debugLog('not a motion event');
-                    return;
-                }
-
-                // Lookup the accessory associated with this camera.
                 const rtsp = this.cameras.get(updatePacket.action.id);
 
                 // We don't know about this camera - we're done.
                 if (!rtsp) {
-                    this.debugLog('unknown camera');
+                    // this.console.log('unknown camera', updatePacket.action.id);
                     return;
                 }
 
-                if (payload.isMotionDetected) {
+                if (updatePacket.action.action !== "update") {
+                    rtsp.console.log('non update', updatePacket.action.action);
+                    return;
+                }
+
+                // rtsp.console.log('event camera', rtsp?.name, updatePacket.payload);
+
+                const payload = updatePacket.payload as ProtectNvrUpdatePayloadCameraUpdate;
+
+                // unifi protect will start events with isMotionDetected=true, and then send
+                // subsequent updates to that motion event with lastMotion timestamp.
+                // finally, it seems to set isMotionDetected=false, when the motion event ends.
+
+
+                if (payload.isMotionDetected !== undefined) {
+                    // explicitly set the motion state
+                    rtsp.motionDetected = payload.isMotionDetected;
+                    rtsp.lastMotion = payload.lastMotion;
+                    rtsp.resetMotionTimeout();
+                }
+                else if (rtsp.lastMotion && payload.lastMotion && payload.lastMotion > rtsp.lastMotion) {
+                    // motion is ongoing update
                     rtsp.motionDetected = true;
                     rtsp.lastMotion = payload.lastMotion;
                     rtsp.resetMotionTimeout();
                 }
                 else if (rtsp.motionDetected && payload.lastSeen > payload.lastMotion + rtsp.getSensorTimeout()) {
+                    // something weird happened, lets set unset any motion state
                     rtsp.motionDetected = false;
                 }
 
-                // It's a ring event - process it accordingly.
-                if (payload.lastRing && rtsp.interfaces.includes(ScryptedInterface.BinarySensor) && rtsp.lastRing < payload.lastRing) {
-                    rtsp.lastRing = payload.lastRing;
-                    rtsp.binaryState = true;
-                    rtsp.resetRingTimeout();
-                }
-                else if (rtsp.binaryState && payload.lastSeen > payload.lastRing + rtsp.getSensorTimeout()) {
+                if (payload.lastRing && rtsp.binaryState && payload.lastSeen > payload.lastRing + rtsp.getSensorTimeout()) {
+                    // something weird happened, lets set unset any binary sensor state
                     rtsp.binaryState = false;
-                }
-
-                // It's a doorbell LCD message event - process it accordingly.
-                if (payload.lcdMessage) {
                 }
 
                 rtsp.lastSeen = payload.lastSeen;
@@ -343,48 +341,66 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 // Grab the right payload type, for event add payloads.
                 const payload = updatePacket.payload as ProtectNvrUpdatePayloadEventAdd;
 
-                // We're only interested in smart motion detection events.
-                if (payload.type !== "smartDetectZone") {
-                    return;
-                }
-
                 // Lookup the accessory associated with this camera.
                 const rtsp = this.cameras.get(payload.camera);
 
                 // We don't know about this camera - we're done.
                 if (!rtsp) {
+                    // this.console.log('unknown camera', payload.camera);
                     return;
                 }
 
-                // It's a motion event - process it accordingly, but only if we're not configured for smart motion events - we handle those elsewhere.
-                if (rtsp.lastMotion < payload.start) {
-                    rtsp.motionDetected = true;
-                    rtsp.lastMotion = payload.start;
-                    rtsp.resetMotionTimeout();
-                }
-                else if (rtsp.motionDetected && rtsp.lastSeen > payload.start + rtsp.getSensorTimeout()) {
-                    rtsp.motionDetected = false;
-                }
+                rtsp.console.log('Camera Event', payload);
 
-                rtsp.resetDetectionTimeout();
+                let detections: ObjectDetectionResult[] = [];
 
-                const detectionId = Math.random().toString();
-                const camera = rtsp.findCamera();
-                const snapshotChannel = camera.channels[0];
+                if (payload.type === 'smartDetectZone') {
+                    rtsp.resetDetectionTimeout();
+
+                    detections = payload.smartDetectTypes.map(type => ({
+                        className: type,
+                        score: payload.score,
+                    }))
+
+                    const detectionId = payload.id;
+                    const camera = rtsp.findCamera();
+                    const snapshotChannel = camera.channels[0];
+    
+                    const detection: ObjectsDetected = {
+                        detectionId,
+                        timestamp: Date.now(),
+                        detections: payload.smartDetectTypes.map(type => ({
+                            className: type,
+                            score: payload.score,
+                        })),
+                        inputDimensions: [snapshotChannel.width, snapshotChannel.height],
+                    };
+                }
+                else {
+                    detections = [{
+                        className: payload.type,
+                        score: payload.score,
+                    }];
+
+                    if (payload.type === 'ring') {
+                        rtsp.binaryState = true;
+                        rtsp.lastRing = payload.start;
+                        rtsp.resetRingTimeout();
+                    }
+                    else if (payload.type === 'motion') {
+                        rtsp.motionDetected = true;
+                        rtsp.lastMotion = payload.start;
+                        rtsp.resetMotionTimeout();
+                    }
+                }
+                
+                const detectionId = payload.id;
 
                 const detection: ObjectsDetected = {
                     detectionId,
                     timestamp: Date.now(),
-                    detections: payload.smartDetectTypes.map(type => ({
-                        className: type,
-                        score: payload.score,
-                    })),
-                    inputDimensions: [snapshotChannel.width, snapshotChannel.height],
+                    detections,
                 };
-
-                const snapshot = rtsp.getSnapshot();
-                rtsp.detections.set(detectionId, snapshot);
-                setTimeout(() => rtsp.detections.delete(detectionId), 30000);
                 rtsp.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
 
                 rtsp.lastSeen = payload.start;
@@ -502,9 +518,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 if (camera.featureFlags.hasSpeaker) {
                     d.interfaces.push(ScryptedInterface.Intercom);
                 }
-                if (camera.featureFlags.smartDetectTypes?.length) {
-                    d.interfaces.push(ScryptedInterface.ObjectDetector);
-                }
+                d.interfaces.push(ScryptedInterface.ObjectDetector);
                 devices.push(d);
             }
 
@@ -546,6 +560,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     getSetting(key: string): string {
         return this.storage.getItem(key);
     }
+
     async getSettings(): Promise<Setting[]> {
         const ret: Setting[] = [
             {
