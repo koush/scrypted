@@ -361,7 +361,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 })
                 this.runningEvents.set(detectionId, { resolve, promise });
                 this.runningEvents.set(actionId, { resolve, promise });
-                setTimeout(() => resolve(undefined), 30000);
+                setTimeout(() => resolve(undefined), 60000);
 
                 // Lookup the accessory associated with this camera.
                 const rtsp = this.cameras.get(payload.camera);
