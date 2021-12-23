@@ -21,6 +21,8 @@ export enum OnvifEvent {
     BinaryStop,
     CellMotion,
     Detection,
+    DigitalInputStart,
+    DigitalInputStop,
 }
 
 function stripNamespaces(topic: string) {
@@ -91,7 +93,14 @@ export class OnvifCameraAPI {
                         ret.emit('event', OnvifEvent.AudioStart)
                     else
                         ret.emit('event', OnvifEvent.AudioStop)
-                } else if (eventTopic.includes(this.binaryStateEvent)) {
+                }
+                // else if (eventTopic.includes('DigitalInput')) {
+                //     if (dataValue)
+                //         ret.emit('event', OnvifEvent.BinaryStart)
+                //     else
+                //         ret.emit('event', OnvifEvent.BinaryStop)
+                // }
+                else if (eventTopic.includes(this.binaryStateEvent)) {
                     if (dataValue)
                         ret.emit('event', OnvifEvent.BinaryStart)
                     else
