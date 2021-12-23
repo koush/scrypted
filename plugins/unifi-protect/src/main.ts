@@ -46,6 +46,9 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     }
 
     async getDetectionInput(detectionId: any): Promise<MediaObject> {
+        const input = this.protect.runningEvents.get(detectionId);
+        if (input)
+            await input.promise;
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/events/${detectionId}/thumbnail`;
         const response = await this.protect.api.loginFetch(url);
         if (!response) {
@@ -267,6 +270,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     cameras: Map<string, UnifiCamera> = new Map();
     api: ProtectApi;
     startup: Promise<void>;
+    runningEvents = new Map<string, {promise: Promise<unknown>, resolve: (value: unknown) => void}>();
 
     constructor(nativeId?: string, createOnly?: boolean) {
         super(nativeId);
@@ -335,11 +339,29 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
             case "event": {
                 // We're only interested in add events.
                 if (updatePacket.action.action !== "add") {
+                    this.console.log(updatePacket.action.action);
+                    if ((updatePacket?.payload as any)?.end && updatePacket.action.id) {
+                        const running = this.runningEvents.get(updatePacket.action.id);
+                        running?.resolve?.(undefined);
+                    }
                     return;
                 }
 
                 // Grab the right payload type, for event add payloads.
                 const payload = updatePacket.payload as ProtectNvrUpdatePayloadEventAdd;
+
+                const detectionId = payload.id;
+                const actionId = updatePacket.action.id;
+
+                let resolve: (value: unknown) => void;
+                const promise = new Promise(r => resolve = r);
+                promise.finally(() => {
+                    this.runningEvents.delete(detectionId);
+                    this.runningEvents.delete(actionId);
+                })
+                this.runningEvents.set(detectionId, { resolve, promise });
+                this.runningEvents.set(actionId, { resolve, promise });
+                setTimeout(() => resolve(undefined), 30000);
 
                 // Lookup the accessory associated with this camera.
                 const rtsp = this.cameras.get(payload.camera);
@@ -360,21 +382,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     detections = payload.smartDetectTypes.map(type => ({
                         className: type,
                         score: payload.score,
-                    }))
-
-                    const detectionId = payload.id;
-                    const camera = rtsp.findCamera();
-                    const snapshotChannel = camera.channels[0];
-    
-                    const detection: ObjectsDetected = {
-                        detectionId,
-                        timestamp: Date.now(),
-                        detections: payload.smartDetectTypes.map(type => ({
-                            className: type,
-                            score: payload.score,
-                        })),
-                        inputDimensions: [snapshotChannel.width, snapshotChannel.height],
-                    };
+                    }));
                 }
                 else {
                     detections = [{
@@ -393,8 +401,6 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                         rtsp.resetMotionTimeout();
                     }
                 }
-                
-                const detectionId = payload.id;
 
                 const detection: ObjectsDetected = {
                     detectionId,
