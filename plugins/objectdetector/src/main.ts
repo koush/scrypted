@@ -19,6 +19,10 @@ const defaultDetectionInterval = 60;
 const defaultDetectionTimeout = 10;
 const defaultMotionDuration = 10;
 
+const DETECT_PERIODIC_SNAPSHOTS = "Periodic Snapshots";
+const DETECT_MOTION_SNAPSHOTS = "Motion Snapshots";
+const DETECT_VIDEO_MOTION = "Video Motion";
+
 type ClipPath = [number, number][];
 type Zones = { [zone: string]: ClipPath };
 
@@ -26,8 +30,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   released = false;
   motionListener: EventListenerRegister;
   detectionListener: EventListenerRegister;
+  detectorListener: EventListenerRegister;
   detections = new Map<string, DetectionInput>();
   cameraDevice: ScryptedDevice & Camera & VideoCamera & MotionSensor;
+  detectSnapshotsOnly = this.storage.getItem('detectionMode');
+  detectionModes = this.getDetectionModes();
   detectionTimeout = parseInt(this.storage.getItem('detectionTimeout')) || defaultDetectionTimeout;
   detectionDuration = parseInt(this.storage.getItem('detectionDuration')) || defaultDetectionDuration;
   motionDuration = parseInt(this.storage.getItem('motionDuration')) || defaultMotionDuration;
@@ -59,6 +66,19 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.resetDetectionTimeout();
   }
 
+  getDetectionModes(): string[] {
+    try {
+      return JSON.parse(this.storage.getItem('detectionModes'));
+    }
+    catch (e) {
+      return [
+        DETECT_PERIODIC_SNAPSHOTS,
+        DETECT_VIDEO_MOTION,
+        DETECT_MOTION_SNAPSHOTS,
+      ];
+    }
+  }
+
   clearDetectionTimeout() {
     clearTimeout(this.detectionIntervalTimeout);
     this.detectionIntervalTimeout = undefined;
@@ -67,8 +87,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   resetDetectionTimeout() {
     this.clearDetectionTimeout();
     this.detectionIntervalTimeout = setInterval(() => {
-      if (!this.running)
-        this.snapshotDetection();
+      if (!this.running) {
+        if (this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS))
+          this.snapshotDetection();
+      }
     }, this.detectionInterval * 1000);
   }
 
@@ -127,6 +149,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.running = false;
     this.detectionListener?.removeListener();
     this.detectionListener = undefined;
+    this.detectorListener?.removeListener();
+    this.detectorListener = undefined;
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
     });
@@ -143,7 +167,24 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.running = eventData.running;
     });
 
-    this.snapshotDetection();
+    if (this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS))
+      this.snapshotDetection();
+
+    if (this.detectionModes.includes(DETECT_MOTION_SNAPSHOTS)) {
+      this.detectorListener = this.cameraDevice.listen(ScryptedInterface.ObjectDetector, async (eventSource, eventDetails, eventData: ObjectsDetected) => {
+        if (!eventData?.detections?.find(d => d.className === 'motion'))
+          return;
+        if (!eventData?.eventId)
+          return;
+        const od = eventSource as any as ObjectDetector;
+        const mo = await od.getDetectionInput(eventData.detectionId, eventData.eventId);
+        const detections = await this.objectDetection.detectObjects(mo, {
+          detectionId: this.detectionId,
+          settings: await this.getCurrentSettings(),
+        });
+        this.objectsDetected(detections, true);
+      });
+    }
   }
 
   async register() {
@@ -151,7 +192,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!this.cameraDevice.motionDetected)
         return;
 
-      await this.startVideoDetection();
+      if (this.detectionModes.includes(DETECT_VIDEO_MOTION))
+        await this.startVideoDetection();
     });
   }
 
@@ -298,7 +340,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   async getObjectTypes(): Promise<ObjectDetectionTypes> {
-    return this.objectDetection.getDetectionModel();
+    const ret = await this.getNativeObjectTypes();
+    if (!ret.classes)
+      ret.classes = [];
+    ret.classes.push(...(await this.objectDetection.getDetectionModel()).classes);
+    return ret;
   }
 
   async getDetectionInput(detectionId: any): Promise<MediaObject> {
@@ -345,21 +391,45 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
 
     if (!this.hasMotionType) {
+      settings.push({
+        title: 'Detection Modes',
+        description: 'Configure when to analyze the video stream. Video Motion can be CPU intensive.',
+        key: 'detectionModes',
+        type: 'string',
+        multiple: true,
+        choices: [
+          DETECT_PERIODIC_SNAPSHOTS,
+          DETECT_VIDEO_MOTION,
+          DETECT_MOTION_SNAPSHOTS,
+        ],
+        value: this.detectionModes,
+      });
+
+      if (this.detectionModes.includes(DETECT_VIDEO_MOTION)) {
+        settings.push(
+          {
+            title: 'Detection Duration',
+            description: 'The duration in seconds to analyze video when motion occurs.',
+            key: 'detectionDuration',
+            type: 'number',
+            value: this.detectionDuration.toString(),
+          }
+        );
+      }
+
+      if (this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS)) {
+        settings.push(
+          {
+            title: 'Idle Detection Interval',
+            description: 'The interval in seconds to analyze snapshots when there is no motion.',
+            key: 'detectionInterval',
+            type: 'number',
+            value: this.detectionInterval.toString(),
+          }
+        );
+      }
+
       settings.push(
-        {
-          title: 'Detection Duration',
-          description: 'The duration in seconds to analyze video when motion occurs.',
-          key: 'detectionDuration',
-          type: 'number',
-          value: this.detectionDuration.toString(),
-        },
-        {
-          title: 'Idle Detection Interval',
-          description: 'The interval in seconds to analyze snapshots when there is no motion.',
-          key: 'detectionInterval',
-          type: 'number',
-          value: this.detectionInterval.toString(),
-        },
         {
           title: 'Detection Timeout',
           description: 'Timeout in seconds before removing an object that is no longer detected.',
@@ -481,6 +551,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       await this.startVideoDetection();
       await this.extendedObjectDetect();
     }
+    else if (key === 'detectionModes') {
+      this.storage.setItem(key, JSON.stringify(value));
+      this.detectionModes = this.getDetectionModes();
+      this.bindObjectDetection();
+    }
     else {
       const settings = await this.getCurrentSettings();
       if (settings && settings[key]) {
@@ -497,6 +572,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.clearMotionTimeout();
     this.motionListener?.removeListener();
     this.detectionListener?.removeListener();
+    this.detectorListener?.removeListener();
     this.objectDetection?.detectObjects(undefined, {
       detectionId: this.detectionId,
     });
