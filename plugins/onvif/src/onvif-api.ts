@@ -100,7 +100,7 @@ export class OnvifCameraAPI {
                 //     else
                 //         ret.emit('event', OnvifEvent.BinaryStop)
                 // }
-                else if (eventTopic.includes(this.binaryStateEvent)) {
+                else if (this.binaryStateEvent && eventTopic.includes(this.binaryStateEvent)) {
                     if (dataValue)
                         ret.emit('event', OnvifEvent.BinaryStart)
                     else
