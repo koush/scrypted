@@ -380,16 +380,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     catch (e) {
     }
 
-    if (msos?.length) {
-      settings.push({
-        title: 'Video Stream',
-        key: 'streamingChannel',
-        value: this.storage.getItem('streamingChannel') || msos[0].name,
-        description: 'The media stream to analyze.',
-        choices: msos.map(mso => mso.name),
-      });
-    }
-
     if (!this.hasMotionType) {
       settings.push({
         title: 'Detection Modes',
@@ -406,6 +396,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
 
       if (this.detectionModes.includes(DETECT_VIDEO_MOTION)) {
+        if (msos?.length) {
+          settings.push({
+            title: 'Video Stream',
+            key: 'streamingChannel',
+            value: this.storage.getItem('streamingChannel') || msos[0].name,
+            description: 'The media stream to analyze.',
+            choices: msos.map(mso => mso.name),
+          });
+        }
+
         settings.push(
           {
             title: 'Detection Duration',
