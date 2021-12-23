@@ -21,6 +21,7 @@ export enum OnvifEvent {
     BinaryStop,
     CellMotion,
     Detection,
+    BinaryRingEvent,
     DigitalInputStart,
     DigitalInputStop,
 }
@@ -94,6 +95,12 @@ export class OnvifCameraAPI {
                     else
                         ret.emit('event', OnvifEvent.AudioStop)
                 }
+                // Mobotix T26
+                else if (eventTopic.includes('VideoSource/Alarm')) {
+                    if (dataValue == "Ring" || dataValue == "CameraBellButton") {
+                        ret.emit('event', OnvifEvent.BinaryRingEvent);
+                    }
+                }                    
                 // else if (eventTopic.includes('DigitalInput')) {
                 //     if (dataValue)
                 //         ret.emit('event', OnvifEvent.BinaryStart)

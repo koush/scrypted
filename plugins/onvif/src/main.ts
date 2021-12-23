@@ -142,6 +142,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
 
     listenEvents(): EventEmitter & Destroyable {
         let motionTimeout: NodeJS.Timeout;
+        let binaryTimeout: NodeJS.Timeout;
         const ret: any = new EventEmitter();
 
         (async () => {
@@ -175,6 +176,12 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
                     this.motionDetected = true;
                     clearTimeout(motionTimeout);
                     motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
+                    return;
+                }
+                if (event === OnvifEvent.BinaryRingEvent) {
+                    this.binaryState = true;
+                    clearTimeout(binaryTimeout);
+                    binaryTimeout = setTimeout(() => this.binaryState = false, 30000);
                     return;
                 }
 
