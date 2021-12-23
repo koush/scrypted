@@ -35,6 +35,7 @@
       "@types/node": "^16.9.6"
    },
    "dependencies": {
+      "@koush/axios-digest-auth": "^0.8.5",
       "url-parse": "^1.4.7"
    }
 }
