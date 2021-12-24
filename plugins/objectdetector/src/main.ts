@@ -440,6 +440,16 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       );
     }
     else {
+      if (msos?.length) {
+        settings.push({
+          title: 'Video Stream',
+          key: 'streamingChannel',
+          value: this.storage.getItem('streamingChannel') || msos[0].name,
+          description: 'The media stream to analyze.',
+          choices: msos.map(mso => mso.name),
+        });
+      }
+
       settings.push({
         title: 'Motion Duration',
         description: 'The duration in seconds to wait to reset the motion sensor.',
