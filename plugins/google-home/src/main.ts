@@ -13,11 +13,15 @@ import { GoogleAuth } from "google-auth-library"
 import { commandHandlers } from './handlers';
 import { canAccess } from './commands/camerastream';
 
-import mdns from 'mdns';
 import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
 import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
-import { addBuiltins } from "../../../common/src/wrtc-converters";
+import { addBuiltins } from "../../../common/src/wrtc-convertors";
+
+import ciao, { Protocol } from '@homebridge/ciao';
+import os from 'os';
+
+const responder = ciao.getResponder();
 
 const { systemManager, mediaManager, endpointManager, deviceManager } = sdk;
 addBuiltins(console, mediaManager);
@@ -124,8 +128,17 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         endpointManager.getInsecurePublicLocalEndpoint().then(endpoint => {
             const url = new URL(endpoint);
             this.console.log(endpoint);
-            const ad = mdns.createAdvertisement(mdns.tcp('scrypted-gh'), parseInt(url.port));
-            ad.start();
+
+            const service = responder.createService({
+                name: 'Scrypted',
+                type: 'scrypted-gh',
+                protocol: Protocol.TCP,
+                port: parseInt(url.port),
+                txt: { // optional
+                  key: "value",
+                }
+            });
+            service.advertise();
         });
     }
 
