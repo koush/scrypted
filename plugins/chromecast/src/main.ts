@@ -3,7 +3,7 @@ import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject,
 import { EventEmitter } from 'events';
 import mdns from 'multicast-dns';
 import mime from 'mime';
-import { addBuiltins } from "../../../common/src/wrtc-converters";
+import { addBuiltins } from "../../../common/src/wrtc-convertors";
 
 const { mediaManager, endpointManager, deviceManager } = sdk;
 addBuiltins(console, mediaManager);

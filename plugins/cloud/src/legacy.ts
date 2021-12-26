@@ -4,7 +4,17 @@ import { EventEmitter } from 'events';
 import process from 'process';
 import axios from 'axios';
 const { register, listen } = require('push-receiver');
-const { RTCIceCandidate, RTCPeerConnection, RTCSessionDescription } = require('wrtc');
+
+let wrtc: any;
+try {
+    wrtc = require('wrtc');
+}
+catch (e) {
+    console.warn('loading wrtc failed. trying @koush/wrtc fallback.');
+    wrtc = require('@koush/wrtc');
+}
+
+const { RTCIceCandidate, RTCPeerConnection, RTCSessionDescription } = wrtc;
 
 const debug = Debug('rtc');
 
