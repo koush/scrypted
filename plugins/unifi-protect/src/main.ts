@@ -47,8 +47,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
 
     async getDetectionInput(detectionId: any): Promise<MediaObject> {
         const input = this.protect.runningEvents.get(detectionId);
-        if (input)
+        if (input) {
+            this.console.log('fetching event snapshot', detectionId);
             await input.promise;
+        }
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/events/${detectionId}/thumbnail`;
         const response = await this.protect.api.loginFetch(url);
         if (!response) {
@@ -339,10 +341,13 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
             case "event": {
                 // We're only interested in add events.
                 if (updatePacket.action.action !== "add") {
-                    this.console.log(updatePacket.action.action);
                     if ((updatePacket?.payload as any)?.end && updatePacket.action.id) {
-                        const running = this.runningEvents.get(updatePacket.action.id);
-                        running?.resolve?.(undefined);
+                        // unifi reports the event ended but it seems to take a moment before the snapshot
+                        // is actually ready.
+                        setTimeout(() => {
+                            const running = this.runningEvents.get(updatePacket.action.id);
+                            running?.resolve?.(undefined)
+                        }, 2000);
                     }
                     return;
                 }
