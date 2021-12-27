@@ -1,4 +1,4 @@
-# @scrypted/coral
+# @scrypted/tensorflow-lite
 
 ## npm commands
  * npm run scrypted-webpack
