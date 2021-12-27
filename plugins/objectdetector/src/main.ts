@@ -143,6 +143,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       settings: await this.getCurrentSettings(),
     });
     this.objectsDetected(detections, true);
+    this.reportObjectDetections(detections, undefined);
   }
 
   bindObjectDetection() {
@@ -183,6 +184,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           settings: await this.getCurrentSettings(),
         });
         this.objectsDetected(detections, true);
+        this.reportObjectDetections(detections, eventData.detectionId);
       });
     }
   }
@@ -317,11 +319,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     });
     if (found.length) {
       this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
+      if (detectionResult.running)
+        this.extendedObjectDetect();
     }
     if (found.length || showAll) {
       this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
-      if (detectionResult.running)
-        this.extendedObjectDetect();
     }
   }
 
