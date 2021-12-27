@@ -1,8 +1,13 @@
 import path from 'path';
 import mkdirp from 'mkdirp';
 
+export function getScryptedVolume() {
+    const volumeDir = process.env.SCRYPTED_VOLUME || path.join(process.cwd(), 'volume');
+    return volumeDir;
+}
+
 export function getPluginVolume(pluginId: string) {
-    const volume = path.join(process.cwd(), 'volume');
+    const volume = getScryptedVolume();
     const pluginVolume = path.join(volume, 'plugins', pluginId);
     return pluginVolume;
 }

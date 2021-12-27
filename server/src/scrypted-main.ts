@@ -25,6 +25,7 @@ import { getAddresses } from './addresses';
 import { sleep } from './sleep';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { PluginError } from './plugin/plugin-error';
+import { getScryptedVolume } from './plugin/plugin-volume';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -105,7 +106,7 @@ else {
     app.use(bodyParser.raw({ type: 'application/zip', limit: 100000000 }) as any)
 
     async function start() {
-        const volumeDir = process.env.SCRYPTED_VOLUME || path.join(process.cwd(), 'volume');
+        const volumeDir = getScryptedVolume();
         mkdirp.sync(volumeDir);
         const dbPath = path.join(volumeDir, 'scrypted.db');
         const oldDbPath = path.join(process.cwd(), 'scrypted.db');
