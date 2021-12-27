@@ -1,6 +1,6 @@
 # Scrypted Home Automation
 
-Scrypted is primarily a home automation platform focusing on making camera experiences seamless.
+Scrypted is a home automation platform primarily focusing on making camera experiences seamless.
  * Streams load instantly, everywhere: [Demo](https://www.reddit.com/r/homebridge/comments/r34k6b/if_youre_using_homebridge_for_cameras_ditch_it/)
  * HomeKit Secure Video Support
  * Google Home support: "Ok Google, Stream Backyard"
