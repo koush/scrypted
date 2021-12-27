@@ -90,6 +90,8 @@ export function createPCMParser(): StreamParser {
 }
 
 export function createMpegTsParser(options?: StreamParserOptions): StreamParser {
+    let pat: Buffer;
+    let pmt: Buffer;
     return {
         container: 'mpegts',
         outputArguments: [
@@ -100,6 +102,20 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
         parse: createLengthParser(188, concat => {
             if (concat[0] != 0x47) {
                 throw new Error('Invalid sync byte in mpeg-ts packet. Terminating stream.')
+            }
+
+            if (pat && pmt)
+                return;
+
+            const pid = ((concat[1] & 0x1F) << 8) | concat[2];
+            if (pid === 0) {
+                const tableId = concat[5];
+                if (tableId === 0) {
+                    pat = concat.slice(0, 188);
+                }
+                else if (tableId === 2) {
+                    pmt = concat.slice(0, 188);
+                }
             }
         }),
         findSyncFrame(streamChunks): StreamChunk[] {
@@ -118,12 +134,15 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
                             if ((pkt[3] & 0x20) && (pkt[4] > 0)) {
                                 // have AF
                                 if (pkt[5] & 0x40) {
+                                    // we found the sync frame, but also need to send the pat and pmt
+                                    // which might be at the start of this chunk before the keyframe.
+                                    // yolo!
                                     return streamChunks.slice(prebufferIndex);
                                     // const chunks = streamChunk.chunks.slice(chunkIndex + 1);
                                     // const take = chunk.subarray(offset);
                                     // chunks.unshift(take);
 
-                                    // const remainingChunks = findSyncFrame(streamChunks.slice(prebufferIndex + 1));
+                                    // const remainingChunks = streamChunks.slice(prebufferIndex + 1);
                                     // const ret = Object.assign({}, streamChunk);
                                     // ret.chunks = chunks;
                                     // return [

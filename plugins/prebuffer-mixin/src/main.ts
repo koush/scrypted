@@ -152,6 +152,13 @@ class PrebufferSession {
         readonly: true,
         value: ((this.detectedIdrInterval || 0) / 1000).toString() || 'none',
       },
+      {
+        group,
+        key: 'rebroadcastUrl',
+        title: 'Rebroadcast Url',
+        readonly: true,
+        value: this.parserSession?.ffmpegInputs?.mpegts.url,
+      }
     );
     return settings;
   }
@@ -228,7 +235,6 @@ class PrebufferSession {
           acodec,
         }),
       },
-      parseOnly: true,
     };
 
     // if pcm prebuffer is requested, create the the parser. don't do it if
@@ -370,19 +376,19 @@ class PrebufferSession {
           this.events.on(eventName, safeWriteData);
           session.events.once('killed', cleanup);
 
-          for (const prebuffer of prebufferContainer) {
-            if (prebuffer.time < now - requestedPrebuffer)
-              continue;
+          // for (const prebuffer of prebufferContainer) {
+          //   if (prebuffer.time < now - requestedPrebuffer)
+          //     continue;
 
-            safeWriteData(prebuffer.chunk);
-          }
+          //   safeWriteData(prebuffer.chunk);
+          // }
 
           // for some reason this doesn't work as well as simply guessing and dumping.
-          // const parser = this.parsers[container];
-          // const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
-          // for (const prebuffer of availablePrebuffers) {
-          //   safeWriteData(prebuffer);
-          // }
+          const parser = this.parsers[container];
+          const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
+          for (const prebuffer of availablePrebuffers) {
+            safeWriteData(prebuffer);
+          }
           return cleanup;
         }
       })
@@ -428,6 +434,7 @@ class PrebufferSession {
       url,
       container,
       inputArguments: [
+        '-analyzeduration', '0', '-probesize', '100000',
         '-f', container,
         '-i', url,
       ],
@@ -436,6 +443,7 @@ class PrebufferSession {
 
     if (pcmAudio) {
       ffmpegInput.inputArguments.push(
+        '-analyzeduration', '0', '-probesize', '100000',
         '-f', 's16le',
         '-i', `tcp://127.0.0.1:${await createContainerServer('s16le')}`,
       )
