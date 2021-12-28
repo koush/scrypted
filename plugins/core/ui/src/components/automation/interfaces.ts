@@ -23,6 +23,7 @@ export const actionableInterfaces = [
 ];
 
 export const actionableEvents = [
+    ScryptedInterface.Online,
     ScryptedInterface.OnOff,
     ScryptedInterface.Brightness,
     ScryptedInterface.ColorSettingHsv,
