@@ -502,6 +502,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const msos = await this.mixinDevice.getVideoStreamOptions();
     const enabled = this.getEnabledMediaStreamOptions(msos);
     const ids = enabled ? enabled.map(mso => mso.id) : [undefined];
+
+    let active = 0;
+    const total = ids.length;
     for (const id of ids) {
       let session = this.sessions.get(id);
       if (!session) {
@@ -518,11 +521,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
             session.ensurePrebufferSession();
             try {
               const ps = await session.parserSessionPromise;
+              active++;
+              this.online = active == total;
               await once(ps.events, 'killed');
               this.console.error('prebuffer session ended');
             }
             catch (e) {
               this.console.error('prebuffer session ended with error', e);
+            }
+            finally {
+              active--;
+              this.online = active == total;
             }
             this.console.log('restarting prebuffer session in 5 seconds');
             await new Promise(resolve => setTimeout(resolve, 5000));
@@ -683,7 +692,7 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
-    return [ScryptedInterface.VideoCamera, ScryptedInterface.Settings];
+    return [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online];
   }
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
@@ -691,6 +700,7 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
     return new PrebufferMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
   }
   async releaseMixin(id: string, mixinDevice: any) {
+    mixinDevice.online = true;
     mixinDevice.release();
   }
 }
