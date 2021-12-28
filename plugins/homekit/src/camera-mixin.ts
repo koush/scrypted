@@ -4,11 +4,6 @@ import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmp
 
 const { log, systemManager, deviceManager } = sdk;
 
-const extraEncoderArgs = [
-    '-b:v',
-    '${request.video.max_bit_rate * 2}k',
-];
-
 export const defaultObjectDetectionContactSensorTimeout = 60;
 
 export class CameraMixin extends SettingsMixinDeviceBase<any> implements Settings {
@@ -205,8 +200,17 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         if (key === 'h264EncoderArguments') {
             const encoderArgs = getH264EncoderArgs();
             const args = encoderArgs[value.toString()];
-            if (args)
+            if (args) {
+                // if default args were specified (ie, videotoolbox, quicksync, etc),
+                // expand that into args that include bitrate and rescale.
+                const extraEncoderArgs = [
+                    '-b:v',
+                    '${request.video.max_bit_rate * 2}k',
+                    '-vf',
+                    'scale=${request.video.width}:${request.video.height}',
+                ];
                 args.push(...extraEncoderArgs);
+            }
             const substitute = args?.join(' ');
             value = substitute ? `\`${substitute}\`` : value;
         }

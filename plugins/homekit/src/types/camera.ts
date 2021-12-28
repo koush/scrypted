@@ -253,7 +253,7 @@ addSupportedType({
                     args.push(...ffmpegInput.inputArguments);
 
                     // dummy audio
-                    if (!noAudio) {
+                    if (noAudio) {
                         // create a dummy audio track if none actually exists.
                         // this track will only be used if no audio track is available.
                         // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
