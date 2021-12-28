@@ -434,7 +434,7 @@ class PrebufferSession {
       url,
       container,
       inputArguments: [
-        '-analyzeduration', '0', '-probesize', '100000',
+        '-analyzeduration', '0', '-probesize', '500000',
         '-f', container,
         '-i', url,
       ],
@@ -443,7 +443,7 @@ class PrebufferSession {
 
     if (pcmAudio) {
       ffmpegInput.inputArguments.push(
-        '-analyzeduration', '0', '-probesize', '100000',
+        '-analyzeduration', '0', '-probesize', '500000',
         '-f', 's16le',
         '-i', `tcp://127.0.0.1:${await createContainerServer('s16le')}`,
       )
