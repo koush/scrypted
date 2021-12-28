@@ -1,6 +1,6 @@
 import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger } from "@scrypted/sdk/types";
 import { PluginAPI } from "./plugin-api";
-import { handleFunctionInvocations, PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
+import { handleFunctionInvocations, PrimitiveProxyHandler, PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
 import { EventRegistry } from "../event-registry";
 import { allInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
 
@@ -11,13 +11,13 @@ function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
 }
 
 
-class DeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
+class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
     device: ScryptedDevice;
-    id: string;
-    systemManager: SystemManagerImpl;
-    constructor(id: string, systemManager: SystemManagerImpl) {
-        this.id = id;
-        this.systemManager = systemManager;
+    constructor(public id: string, public systemManager: SystemManagerImpl) {
+    }
+
+    toPrimitive() {
+        return `ScryptedDevice-${this.id}`
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {

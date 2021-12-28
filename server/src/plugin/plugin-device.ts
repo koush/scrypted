@@ -2,7 +2,7 @@ import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegist
 import { ScryptedRuntime } from "../runtime";
 import { PluginDevice } from "../db-types";
 import { MixinProvider } from "@scrypted/sdk/types";
-import { handleFunctionInvocations } from "../rpc";
+import { handleFunctionInvocations, PrimitiveProxyHandler } from "../rpc";
 import { getState } from "../state";
 import { getDisplayType } from "../infer-defaults";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
@@ -25,7 +25,7 @@ interface MixinTableEntry {
 export const RefreshSymbol = Symbol('ScryptedDeviceRefresh');
 export const QueryInterfaceSymbol = Symbol("ScryptedPluginDeviceQueryInterface");
 
-export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevice {
+export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
     scrypted: ScryptedRuntime;
     id: string;
     mixinTable: MixinTable[];
@@ -34,6 +34,10 @@ export class PluginDeviceProxyHandler implements ProxyHandler<any>, ScryptedDevi
     constructor(scrypted: ScryptedRuntime, id: string) {
         this.scrypted = scrypted;
         this.id = id;
+    }
+
+    toPrimitive() {
+        return `PluginDevice-${this.id}`;
     }
 
     invalidateEntry(mixinEntry: MixinTable) {

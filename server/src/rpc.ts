@@ -63,7 +63,7 @@ interface Deferred {
     reject: any;
 }
 
-export function handleFunctionInvocations(thiz: ProxyHandler<any>, target: any, p: PropertyKey, receiver: any): any {
+export function handleFunctionInvocations(thiz: PrimitiveProxyHandler<any>, target: any, p: PropertyKey, receiver: any): any {
     if (p === 'apply') {
         return (thisArg: any, args: any[]) => {
             return thiz.apply(target, thiz, args);
@@ -74,6 +74,11 @@ export function handleFunctionInvocations(thiz: ProxyHandler<any>, target: any, 
             return thiz.apply(target, thiz, args);
         }
     }
+    else if (p === 'toString' || p === Symbol.toPrimitive) {
+        return (thisArg: any, ...args: any[]) => {
+            return thiz.toPrimitive();
+        }
+    }
 }
 
 export const PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
@@ -81,13 +86,21 @@ export const PROPERTY_JSON_DISABLE_SERIALIZATION = '__json_disable_serialization
 export const PROPERTY_PROXY_PROPERTIES = '__proxy_props';
 export const PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children';
 
-class RpcProxy implements ProxyHandler<any> {
+export interface PrimitiveProxyHandler<T extends object> extends ProxyHandler<T> {
+    toPrimitive(): any;
+}
 
+class RpcProxy implements PrimitiveProxyHandler<any> {
     constructor(public peer: RpcPeer,
         public entry: LocalProxiedEntry,
         public constructorName: string,
         public proxyProps: any,
         public proxyOneWayMethods: string[]) {
+    }
+
+    toPrimitive() {
+        const peer = this.peer;
+        return `RpcProxy-${peer.selfName}:${peer.peerName}: ${this.constructorName}`;
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {

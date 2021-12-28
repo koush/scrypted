@@ -433,12 +433,21 @@ export function startPluginRemote() {
             //     return;
             // }
             const plugins = await systemManager.getComponent('plugins');
+            const reconnect = () => {
+                stdout.removeAllListeners();
+                stderr.removeAllListeners();
+                stdout.pause();
+                stderr.pause();
+                setTimeout(tryConnect, 10000);
+            };
+
             const connect = async () => {
                 const ds = deviceManager.getDeviceState(nativeId);
                 if (!ds) {
                     // deleted?
                     return;
                 }
+
                 const { pluginId, nativeId: mixinNativeId } = await plugins.getDeviceInfo(mixinId);
                 const port = await plugins.getRemoteServicePort(pluginId, 'console-writer');
                 const socket = net.connect(port);
@@ -451,15 +460,18 @@ export function startPluginRemote() {
                 };
                 stdout.on('data', writer);
                 stderr.on('data', writer);
-                socket.on('error', () => {
-                    stdout.removeAllListeners();
-                    stderr.removeAllListeners();
-                    stdout.pause();
-                    stderr.pause();
-                    setTimeout(connect, 10000);
-                });
+                socket.on('close', reconnect);
             };
-            connect();
+
+            const tryConnect = async() => {
+                try {
+                    await connect();
+                }
+                catch (e) {
+                    reconnect();
+                }
+            }
+            tryConnect();
         }, getDeviceConsole(nativeId), `[${systemManager.getDeviceById(mixinId)?.name}]`);
     }
 
