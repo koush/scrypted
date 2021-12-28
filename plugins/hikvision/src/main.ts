@@ -148,7 +148,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         const cameraNumber = this.getCameraNumber() || '1';
         for (let index = 0; index < channelIds.length; index++) {
             const channel = (index + 1).toString().padStart(2, '0');
-            const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/Streaming/Channels/${cameraNumber}${channel}/${params}`, index);
+            const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${cameraNumber}${channel}/${params}`, index);
             ret.push(mso);
         }
 
