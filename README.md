@@ -55,7 +55,7 @@ https://developer.scrypted.app
 3. Install the Unifi, HikVision, ONVIF, or Amcrest camera plugin.
    * HKSV requires cameras with motion alerts, and these plugins provide motion alerts.
    * If there's no plugin for your camera, but it supports motion alerts using mail, use the generic RTSP, SMTP plugin, and Dummy Switch plugin. This will create a mail activated motion sensor.
-   * If there's no plugin or mail support for your camera, you can install the generic RTSP, Video Analysis, and OpenCV motion detector plugin. This will use the processing power on your server to detect camera motion.
+   * If there's no plugin or mail support for your camera, you can install the generic RTSP Plugin, Video Analysis Plugin, and OpenCV motion detection Plugin. This will use the processing power on your server to detect camera motion.
 4. Install the HomeKit Plugin.
 5. Install the Rebroadcast plugin.
     * This is optional but highly recommended. It keeps a short video loop of the stream in memory leading up to the motion.  
