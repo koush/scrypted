@@ -21,7 +21,7 @@ import { PluginDebug } from './plugin-debug';
 import readline from 'readline';
 import { Readable, Writable } from 'stream';
 import { ensurePluginVolume } from './plugin-volume';
-import { installOptionalDependencies } from './plugin-npm-dependencies';
+import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
 import { createREPLServer } from './plugin-repl';
 import { LazyRemote } from './plugin-lazy-remote';
@@ -92,7 +92,7 @@ export class PluginHost {
         const cwd = ensurePluginVolume(this.pluginId);
 
         this.startPluginHost(logger, {
-            NODE_PATH: path.join(cwd, 'node_modules'),
+            NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),
             SCRYPTED_PLUGIN_VOLUME: cwd,
         }, plugin.packageJson.scrypted.runtime);
 

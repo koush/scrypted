@@ -6,9 +6,14 @@ import { once } from 'events';
 import process from 'process';
 import mkdirp from "mkdirp";
 
-export async function installOptionalDependencies(console: Console, packageJson: any) {
-    const pluginVolume = ensurePluginVolume(packageJson.name);
+export function getPluginNodePath(name: string) {
+    const pluginVolume = ensurePluginVolume(name);
     const nodePrefix = path.join(pluginVolume, `${process.platform}-${process.arch}`);
+    return nodePrefix;
+}
+
+export async function installOptionalDependencies(console: Console, packageJson: any) {
+    const nodePrefix = getPluginNodePath(packageJson.name);
     const packageJsonPath = path.join(nodePrefix, 'package.json');
     const currentInstalledPackageJsonPath = path.join(nodePrefix, 'package.installed.json');
 
