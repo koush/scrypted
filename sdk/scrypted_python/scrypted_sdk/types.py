@@ -86,7 +86,6 @@ class ScryptedInterface(Enum):
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
     MediaPlayer = "MediaPlayer"
-    MediaSource = "MediaSource"
     MixinProvider = "MixinProvider"
     MotionSensor = "MotionSensor"
     Notifier = "Notifier"
@@ -102,6 +101,7 @@ class ScryptedInterface(Enum):
     PowerSensor = "PowerSensor"
     Program = "Program"
     PushHandler = "PushHandler"
+    Readme = "Readme"
     Refresh = "Refresh"
     Scene = "Scene"
     Scriptable = "Scriptable"
@@ -540,11 +540,6 @@ class MediaPlayer:
         pass
     pass
 
-class MediaSource:
-    def getMedia(self) -> MediaObject:
-        pass
-    pass
-
 class MixinProvider:
     async def canMixin(self, type: ScryptedDeviceType, interfaces: list[str]) -> list[str]:
         pass
@@ -632,6 +627,11 @@ class Program:
 
 class PushHandler:
     async def onPush(self, request: HttpRequest) -> None:
+        pass
+    pass
+
+class Readme:
+    async def getReadmeMarkdown(self) -> str:
         pass
     pass
 

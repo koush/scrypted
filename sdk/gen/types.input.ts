@@ -726,14 +726,8 @@ export interface Logger {
   w(msg: string): void;
 
 }
-export interface MediaSource {
-  /**
-   * Get a MediaObject that will be automatically converted for playback on other devices.
-   */
-  getMedia(): MediaObject;
-
-}
-export interface MessagingEndpoint {
+export interface Readme {
+  getReadmeMarkdown(): Promise<string>;
 }
 /**
  * The OauthClient can be implemented to perform the browser based Oauth process from within a plugin.
@@ -1186,7 +1180,7 @@ export enum ScryptedInterface {
   UltravioletSensor = "UltravioletSensor",
   LuminanceSensor = "LuminanceSensor",
   PositionSensor = "PositionSensor",
-  MediaSource = "MediaSource",
+  Readme = "Readme",
   OauthClient = "OauthClient",
   MixinProvider = "MixinProvider",
   HttpRequestHandler = "HttpRequestHandler",

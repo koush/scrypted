@@ -29,6 +29,10 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
     const resolved = path.resolve(cwd, 'src');
 
     const zip = new AdmZip();
+    const readme = path.join(cwd, 'README.md');
+    if (fs.existsSync(readme)) {
+        zip.addLocalFile(readme);
+    }
 
     zip.addLocalFolder(resolved);
 
@@ -65,6 +69,11 @@ else if (false) {
     })
         .then(() => {
             const zip = new AdmZip();
+
+            const readme = path.join(cwd, 'README.md');
+            if (fs.existsSync(readme)) {
+                zip.addLocalFile(readme);
+            }
 
             zip.addLocalFile(outfile);
             zip.addLocalFile(outfile + '.map');
@@ -126,6 +135,11 @@ else {
         webpackCmd += '.cmd';
     }
     var zip = new AdmZip();
+
+    const readme = path.join(cwd, 'README.md');
+    if (fs.existsSync(readme)) {
+        zip.addLocalFile(readme);
+    }
 
     const NODE_PATH = path.resolve(__dirname, '..', 'node_modules');
 

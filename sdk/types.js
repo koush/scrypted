@@ -423,10 +423,10 @@ exports.ScryptedInterfaceDescriptors = {
             'position'
         ]
     },
-    MediaSource: {
-        name: 'MediaSource',
+    Readme: {
+        name: 'Readme',
         methods: [
-            'getMedia'
+            'getReadmeMarkdown'
         ],
         properties: []
     },
@@ -637,7 +637,7 @@ var ScryptedInterface;
     ScryptedInterface["UltravioletSensor"] = "UltravioletSensor";
     ScryptedInterface["LuminanceSensor"] = "LuminanceSensor";
     ScryptedInterface["PositionSensor"] = "PositionSensor";
-    ScryptedInterface["MediaSource"] = "MediaSource";
+    ScryptedInterface["Readme"] = "Readme";
     ScryptedInterface["OauthClient"] = "OauthClient";
     ScryptedInterface["MixinProvider"] = "MixinProvider";
     ScryptedInterface["HttpRequestHandler"] = "HttpRequestHandler";
