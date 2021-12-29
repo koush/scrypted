@@ -10,7 +10,7 @@ Follow steps at the link below to create your personal Google Device Access deve
 * Google Cloud Project aka GCP (might be within the free tier)
 https://developers.google.com/nest/device-access/get-started
 
-## Google Cloud Setup
+### Google Cloud Setup
 1. Create a API & Services -> Credentials -> WebApplication with the following redirect URIs:
 ```
 https://home.scrypted.app/web/oauth/callback
@@ -18,7 +18,7 @@ https://www.google.com
 ```
 2. Open the API Dashboard -> Enable Cloud Pub/Sub 
 
-## Google Device Access Setup
+### Google Device Access Setup
 1. Create the project.
 2. Add the GCP client id.
 3. Note the pub/sub topic.
