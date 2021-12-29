@@ -4,14 +4,14 @@ The Google Device Access Plugin allows you to import and control your Nest and G
 
 ## Setup
 
-## Scrypted Cloud
+### Scrypted Cloud
 
 Scrypted Cloud must be installed so Google can push device status changes to the plugin.
 
 1. Install the Scrypted Cloud plugin (@scrypted/cloud).
 2. Log in to Scrypted Cloud.
 
-# Google Account Creation
+### Google Account Creation
 
 Follow steps at the link below to create your personal Google Device Access developer account Google Cloud developer account:
 
