@@ -430,6 +430,7 @@ import TemperatureSetting from "../interfaces/TemperatureSetting.vue";
 import PositionSensor from "../interfaces/sensors/PositionSensor.vue";
 import DeviceProvider from "../interfaces/DeviceProvider.vue";
 import MixinProvider from "../interfaces/MixinProvider.vue";
+import Readme from "../interfaces/Readme.vue";
 import Scriptable from "../interfaces/automation/Scriptable.vue";
 import Storage from "../common/Storage.vue";
 import { checkUpdate } from "./plugin/plugin";
@@ -462,7 +463,7 @@ const cardUnderInterfaces = [
   ScryptedInterface.MixinProvider,
 ];
 
-const noCardInterfaces = [ScryptedInterface.Settings];
+const noCardInterfaces = [ScryptedInterface.Settings, ScryptedInterface.Readme];
 const noCardAboveInterfaces = [ScryptedInterface.Scriptable];
 
 const cardInterfaces = [
@@ -555,6 +556,7 @@ export default {
     LogCard,
     ConsoleCard,
     REPLCard,
+    Readme,
 
     Storage,
 
