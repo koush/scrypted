@@ -4,7 +4,7 @@ The Google Device Access Plugin allows you to import and control your Nest and G
 
 ## Setup
 
-Fllow steps at the link below to create your personal Google Device Access developer account Google Cloud developer account:
+Follow steps at the link below to create your personal Google Device Access developer account Google Cloud developer account:
 
 * Google Device Access Project aka GDA ($5)
 * Google Cloud Project aka GCP (might be within the free tier)

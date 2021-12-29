@@ -1,15 +1,16 @@
-# @scrypted/google-home
+# Google Home Plugin for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
+The Google Home Plugin lets you control your Scrypted devices from Google Assistant.
 
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
+## Setup
 
-## Visual Studio Code configuration
+1. Install the Scrypted Cloud plugin (@scrypted/cloud).
+2. Log in to Scrypted Cloud.
+3. Install this plugin.
+4. Open the Google Home app on your mobile device.
+5. Add Device.
+6. Click "Works with Google".
+7. Search for "Scrypted".
+8. Add Scrypted, and log in to Scrypted with the same account from the step 2.
 
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
+Your devices should now sync with Google Home.

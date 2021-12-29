@@ -1,5 +1,9 @@
 {
-   "name": "@scrypted/google-home",
+   "name": "@scrypted/gstreamer-camera",
+   "version": "0.0.3",
+   "description": "GStreamer Camera Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -14,33 +18,23 @@
    "keywords": [
       "scrypted",
       "plugin",
-      "google",
-      "home"
+      "gstreamer",
+      "camera"
    ],
    "scrypted": {
-      "name": "Google Home",
+      "name": "GStreamer Camera Plugin",
       "type": "DeviceProvider",
       "interfaces": [
-         "HttpRequestHandler",
-         "EngineIOHandler",
-         "MixinProvider"
+         "DeviceProvider",
+         "DeviceCreator"
       ]
    },
-   "dependencies": {
-      "@googleapis/homegraph": "^2.0.0",
-      "@homebridge/ciao": "^1.1.3",
-      "@koush/wrtc": "^0.5.2",
-      "actions-on-google": "^3.0.0",
-      "axios": "^0.21.1",
-      "google-auth-library": "^7.9.2",
-      "lodash": "^4.17.21",
-      "url-parse": "^1.5.1"
-   },
    "devDependencies": {
+      "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@types/debug": "^4.1.5",
-      "@types/lodash": "^4.14.168",
-      "@types/url-parse": "^1.4.3"
+      "@types/node": "^16.9.6"
    },
-   "version": "0.0.31"
+   "dependencies": {
+      "url-parse": "^1.4.7"
+   }
 }
