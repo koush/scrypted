@@ -28,6 +28,6 @@ https://www.google.com
 2. Login.
 3. Note the pubsub url.
 
-### Google Cloud Console PubSub Setup
+### Google Cloud PubSub Setup
 
 Create a pubsub *push* subscription and configure it using the previously noted GDA topic and Scrypted pubsub url.
