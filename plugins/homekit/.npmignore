@@ -8,3 +8,4 @@ src
 dist/*.js
 dist/*.txt
 HAP-NodeJS
+.gitmodules
