@@ -476,7 +476,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     exports,
                     window,
                     require: (name: string) => {
-                        if (name === 'fs' && !packageJson.scrypted.realfs) {
+                        if (name === 'fakefs' || (name === 'fs' && !packageJson.scrypted.realfs)) {
                             return volume;
                         }
                         if (name === 'realfs') {

@@ -33,8 +33,11 @@ export async function createREPLServer(scrypted: ScryptedStatic, params: any, pl
             device = await device.getDevice(c);
         }
 
+        const realDevice = systemManager.getDeviceById(device.id);
+
         const ctx = Object.assign(params, {
-            device
+            device,
+            realDevice,
         });
         delete ctx.console;
         delete ctx.window;

@@ -377,6 +377,19 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             throw new PluginError(`${iface} not implemented`)
         }
 
+        if (method === 'getReadmeMarkdown') {
+            const pluginDevice = this.scrypted.findPluginDeviceById(this.id);
+            if (pluginDevice && !pluginDevice.nativeId) {
+                const plugin = this.scrypted.plugins[pluginDevice.pluginId];
+                if (!plugin.packageJson.scrypted.interfaces.includes(ScryptedInterface.Readme)) {
+                    const entry = plugin.zip.getEntry('README.md');
+                    if (entry) {
+                        return entry.getData().toString();
+                    }
+                }
+            }
+        }
+
         if (!isValidInterfaceMethod(pluginDevice.state.interfaces.value, method))
             throw new PluginError(`device ${this.id} does not support method ${method}`);
 

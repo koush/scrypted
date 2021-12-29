@@ -30,6 +30,7 @@ import { spawn as ptySpawn } from 'node-pty';
 import rimraf from 'rimraf';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { PluginHttp } from './plugin/plugin-http';
+import AdmZip from 'adm-zip';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -459,7 +460,20 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     async installPlugin(plugin: Plugin, pluginDebug?: PluginDebug): Promise<PluginHost> {
-        await this.upsertDevice(plugin._id, plugin.packageJson.scrypted);
+        const device: Device = Object.assign({}, plugin.packageJson.scrypted);
+        try {
+            if (!device.interfaces.includes(ScryptedInterface.Readme)) {
+                const zipData = Buffer.from(plugin.zip, 'base64');
+                const adm = new AdmZip(zipData);
+                if (adm.getEntry('README.md')) {
+                    device.interfaces = device.interfaces.slice();
+                    device.interfaces.push(ScryptedInterface.Readme);
+                }
+            }
+        }
+        catch (e) {
+        }
+        await this.upsertDevice(plugin._id, device);
         return this.runPlugin(plugin, pluginDebug);
     }
 
