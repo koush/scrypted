@@ -16,7 +16,7 @@ https://developers.google.com/nest/device-access/get-started
 https://home.scrypted.app/web/oauth/callback
 https://www.google.com
 ```
-2. Open the API Dashboard -> Enable Cloud Pub/Sub 
+2. Open the API Dashboard -> Enable Cloud Pub/Sub. You will come back to this again later.
 
 ### Google Device Access Setup
 1. Create the project.
