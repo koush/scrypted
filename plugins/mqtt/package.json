@@ -17,9 +17,10 @@
       "mqtt"
    ],
    "scrypted": {
-      "name": "MQTT Plugin",
+      "name": "MQTT",
       "type": "DeviceProvider",
       "interfaces": [
+         "MixinProvider",
          "DeviceProvider",
          "Settings"
       ]
@@ -37,5 +38,5 @@
       "@scrypted/sdk": "file:../../sdk",
       "@types/nunjucks": "^3.2.0"
    },
-   "version": "0.0.31"
+   "version": "0.0.32"
 }

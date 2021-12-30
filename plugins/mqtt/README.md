@@ -1,15 +1,9 @@
-# @scrypted/mqtt
+# MQTT Plugin for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
+The MQTT Plugin can be used as both an MQTT Broker and or as an MQTT Client.
 
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
+The MQTT Client for Scrypted can be both a MQTT publisher and a subscriber:
+ * Devices published from Scrypted will report their state and events to the MQTT Broker.
+ * MQTT topics subscribed by Scrypted can be used to import devices into Scrypted.
 
-## Visual Studio Code configuration
-
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
+This plugin includes the Aedes MQTT Broker.
