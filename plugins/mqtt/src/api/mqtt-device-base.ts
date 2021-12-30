@@ -61,11 +61,8 @@ export class MqttDeviceBase extends ScryptedDeviceBase implements Settings {
         });
         client.setMaxListeners(Infinity);
 
-        client.on('connect', err => {
-            if (err) {
-                this.console.error('error subscribing to mqtt', err);
-                return;
-            }
+        client.on('connect', packet => {
+            this.console.log('connected to mqtt', packet);
         })
         
         return this.client;

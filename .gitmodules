@@ -19,3 +19,6 @@
 [submodule "external/sort"]
 	path = external/sort
 	url = git@github.com:koush/sort.git
+[submodule "external/scrypted-ffmpeg"]
+	path = external/scrypted-ffmpeg
+	url = git@github.com:koush/scrypted-ffmpeg

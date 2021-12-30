@@ -295,6 +295,8 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
     release() {
         this.client?.end();
         this.client = undefined;
+        this.listener?.removeListener();
+        this.listener = undefined;
     }
 }
 
