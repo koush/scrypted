@@ -69,6 +69,8 @@ export default {
       let contents = "";
 
       for (const detection of this.lastDetection.detections || []) {
+        if (!detection.boundingBox)
+          continue;
         const sw = 2;
         const s = "red";
         const x = detection.boundingBox[0];
