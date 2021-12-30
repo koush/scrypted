@@ -1,4 +1,4 @@
-import { ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, FaceRecognitionResult, ScryptedMimeTypes, FFMpegInput, ObjectsDetected, ObjectDetectionModel, ObjectDetectionSession } from '@scrypted/sdk';
+import { ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedMimeTypes, FFMpegInput, ObjectsDetected, ObjectDetectionModel, ObjectDetectionSession, ObjectDetectionResult } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import * as tf from '@tensorflow/tfjs-node-gpu';
 import { ENV, tensor3d, Tensor3D } from '@tensorflow/tfjs-node-gpu';
@@ -226,7 +226,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
       score: face.detection.score,
       boundingBox: makeBoundingBoxFromFace(face),
     }));
-    let people: FaceRecognitionResult[] = undefined;
+    let people: ObjectDetectionResult[] = undefined;
 
     if (this.faceMatcher) {
       people = [];
@@ -245,7 +245,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
         const nativeId = match.faceMatch.label;
         people.push({
           id: nativeId,
-          label: deviceManager.getDeviceState(nativeId)?.name,
+          className: deviceManager.getDeviceState(nativeId)?.name,
           score: 1 - match.faceMatch.distance,
           boundingBox: makeBoundingBoxFromFace(match.faceDetection),
         });
@@ -271,8 +271,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
       timestamp: Date.now(),
       detectionId,
       inputDimensions: [input.shape[1], input.shape[0]],
-      faces,
-      people,
+      detections: people,
     }
 
     return detection;
