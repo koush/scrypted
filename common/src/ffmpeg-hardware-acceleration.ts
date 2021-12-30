@@ -89,6 +89,9 @@ export function getH264DecoderArgs(): CodecArgs {
 
 export function getH264EncoderArgs() {
     const encoders: { [type: string]: string } = {};
+
+    encoders['Copy Video, Transcode Audio'] = 'copy';
+
     if (isRaspberryPi()) {
         encoders['Raspberry Pi OMX'] = 'h264_omx';
         encoders[V4L2] = 'h264_v4l2m2m';
