@@ -3,6 +3,10 @@ echo "npm installing in popular plugins..."
 echo ######################################
 
 cd $(dirname $0)
+
+git submodule init
+git submodule update
+
 for base in sdk common
 do
     echo $base
@@ -11,7 +15,12 @@ do
     popd
 done
 
-for plugin in ffmpeg-camera rtsp amcrest onvif hikvision unifi-protect
+pushd external/HAP-NodeJS
+npm install
+npm run build
+popd
+
+for plugin in ffmpeg-camera rtsp amcrest onvif hikvision unifi-protect homekit
 do
     echo $plugin
     pushd plugins/$plugin
