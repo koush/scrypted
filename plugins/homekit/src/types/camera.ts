@@ -564,7 +564,7 @@ addSupportedType({
             const persistBooleanCharacteristic = (service: Service, characteristic: WithUUID<{ new(): Characteristic }>) => {
                 const property = `characteristic-v2-${characteristic.UUID}`
                 service.getCharacteristic(characteristic)
-                    .on(CharacteristicEventTypes.GET, callback => callback(null, storage.getItem(property) === 'true'))
+                    .on(CharacteristicEventTypes.GET, callback => callback(null, storage.getItem(property) === 'true' ? 1 : 0))
                     .on(CharacteristicEventTypes.SET, (value, callback) => {
                         callback();
                         storage.setItem(property, (!!value).toString());
