@@ -51,6 +51,18 @@ code .
 
 You can now launch Scrypted in VSCode.
 
+## Debug Scrypted Plugins in VSCode
+
+```sh
+# this is an example for homekit
+# follow the steps above to set up the checkout
+cd plugins/homekit
+# open this directory in VS Code
+code .
+```
+
+You can now launch the HomeKit Plugin in VSCode.
+
 ## HomeKit Secure Video Setup
 
 1. Install Scrypted.
