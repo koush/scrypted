@@ -32,13 +32,13 @@ Supported accessories:
 
 ## Debug in VSCode
 
-Follow the steps above for running locally to set up your environment.
-
 ```sh
+# check out the code
+git clone https://github.com/koush/scrypted
 # switch to the server directory
 cd scrypted/server
 npm install
-# open this directory in VSCode
+# open this directory in VS Code
 code .
 ```
 
