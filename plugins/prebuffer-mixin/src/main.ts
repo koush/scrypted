@@ -414,6 +414,8 @@ class PrebufferSession {
     else if (reencodeAudio) {
       mediaStreamOptions.audio = {
         codec: 'aac',
+        encoder: 'libfdk_aac',
+        profile: 'aac_eld',
       }
     }
     else {
