@@ -145,6 +145,8 @@ class ThermostatMode(Enum):
 class AudioStreamOptions(TypedDict):
     bitrate: float
     codec: str
+    encoder: str
+    profile: str
     pass
 
 class ObjectDetectionResult(TypedDict):

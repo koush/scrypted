@@ -463,6 +463,8 @@ export interface VideoStreamOptions {
 }
 export interface AudioStreamOptions {
     codec?: string;
+    encoder?: string;
+    profile?: string;
     bitrate?: number;
 }
 /**

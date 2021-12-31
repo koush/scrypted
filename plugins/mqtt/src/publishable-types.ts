@@ -11,5 +11,6 @@ export function canMixin(type: ScryptedDeviceType, interfaces: string[]): boolea
     set.delete(ScryptedInterface.EngineIOHandler);
     set.delete(ScryptedInterface.HttpRequestHandler);
     set.delete(ScryptedInterface.Settings);
+    set.delete(ScryptedInterface.Readme);
     return !!set.size;
 }
