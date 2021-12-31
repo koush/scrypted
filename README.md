@@ -59,7 +59,7 @@ code plugins/homekit
 # npm run scrypted-webpack && npm run scrypted-deploy 127.0.0.1
 ```
 
-You can now launch the HomeKit Plugin in VSCode.
+You can now launch the HomeKit Plugin in VSCode. Please be aware that you do *not* need to restart the Scrypted Server if you make changes to a plugin. Edit the plugin, and launch, and the changes will apply on the running server.
 
 ## Plugin Development
 
