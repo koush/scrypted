@@ -7,7 +7,7 @@ cd $(dirname $0)
 git submodule init
 git submodule update
 
-for base in sdk common
+for base in sdk common server
 do
     echo $base
     pushd $base
