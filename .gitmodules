@@ -1,24 +1,24 @@
 [submodule "plugins/homekit/HAP-NodeJS"]
 	path = external/HAP-NodeJS
-	url = git@github.com:koush/HAP-NodeJS
+	url = ../HAP-NodeJS
 [submodule "plugins/unifi-protect/src/unifi-protect"]
 	path = external/unifi-protect
-	url = git@github.com:koush/unifi-protect.git
+	url = ../unifi-protect.git
 [submodule "plugins/myq/src/myq"]
 	path = plugins/myq/src/myq
-	url = git@github.com:koush/myq.git
+	url = ../myq.git
 [submodule "plugins/neato/node-botvac"]
 	path = plugins/neato/node-botvac
-	url = git@github.com:koush/node-botvac
+	url = ../node-botvac
 [submodule "plugins/tensorflow/face-api.js"]
 	path = external/face-api.js
-	url = git@github.com:koush/face-api.js
+	url = ../face-api.js
 [submodule "external/axios-digest-auth"]
 	path = external/axios-digest-auth
-	url = git@github.com:koush/axios-digest-auth
+	url = ../axios-digest-auth
 [submodule "external/sort"]
 	path = external/sort
-	url = git@github.com:koush/sort.git
+	url = ../sort.git
 [submodule "external/scrypted-ffmpeg"]
 	path = external/scrypted-ffmpeg
-	url = git@github.com:koush/scrypted-ffmpeg
+	url = ../scrypted-ffmpeg
