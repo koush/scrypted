@@ -53,6 +53,10 @@ You can now launch Scrypted in VSCode.
 # follow the steps above to set up the checkout.
 # open the homekit project in VS Code
 code plugins/homekit
+
+# you can also build/run without VS Code with the following command.
+# replace the IP of your server as necessary.
+# npm run scrypted-webpack && npm run scrypted-deploy 127.0.0.1
 ```
 
 You can now launch the HomeKit Plugin in VSCode.
