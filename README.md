@@ -32,9 +32,6 @@ Supported accessories:
 
 ## Plugin Development Documentation
 
-https://developer.scrypted.app
-
-
 ## Debug the Scrypted Server in VSCode
 
 ```sh
@@ -62,6 +59,11 @@ code .
 ```
 
 You can now launch the HomeKit Plugin in VSCode.
+
+## Plugin Development
+
+Want to write your own plugin? Full documentation is available here: https://developer.scrypted.app
+
 
 ## HomeKit Secure Video Setup
 
