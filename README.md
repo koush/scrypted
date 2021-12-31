@@ -30,23 +30,26 @@ Supported accessories:
 
 [Local Installation Instructions](https://github.com/koush/scrypted/wiki/Local-Installation)
 
-## Debug in VSCode
+## Plugin Development Documentation
+
+https://developer.scrypted.app
+
+
+## Debug the Scrypted Server in VSCode
 
 ```sh
 # check out the code
 git clone https://github.com/koush/scrypted
+cd scrypted
+# get the dependencies for the server and various plugins
+./npm-install.sh
 # switch to the server directory
-cd scrypted/server
-npm install
+cd server
 # open this directory in VS Code
 code .
 ```
 
 You can now launch Scrypted in VSCode.
-
-## Plugin Development Documentation
-
-https://developer.scrypted.app
 
 ## HomeKit Secure Video Setup
 
