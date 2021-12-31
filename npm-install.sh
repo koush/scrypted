@@ -1,5 +1,5 @@
 echo ######################################
-echo "npm installing in popular plugins..."
+echo "npm ciing in popular plugins..."
 echo ######################################
 
 cd $(dirname $0)
@@ -11,12 +11,12 @@ for base in sdk common server
 do
     echo $base
     pushd $base
-    npm install
+    npm ci
     popd
 done
 
 pushd external/HAP-NodeJS
-npm install
+npm ci
 npm run build
 popd
 
@@ -24,6 +24,6 @@ for plugin in ffmpeg-camera rtsp amcrest onvif hikvision unifi-protect homekit
 do
     echo $plugin
     pushd plugins/$plugin
-    npm install
+    npm ci
     popd
 done
