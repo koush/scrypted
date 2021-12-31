@@ -40,10 +40,8 @@ git clone https://github.com/koush/scrypted
 cd scrypted
 # get the dependencies for the server and various plugins
 ./npm-install.sh
-# switch to the server directory
-cd server
-# open this directory in VS Code
-code .
+# open server project in VS Code
+code server
 ```
 
 You can now launch Scrypted in VSCode.
@@ -51,11 +49,10 @@ You can now launch Scrypted in VSCode.
 ## Debug Scrypted Plugins in VSCode
 
 ```sh
-# this is an example for homekit
-# follow the steps above to set up the checkout
-cd plugins/homekit
-# open this directory in VS Code
-code .
+# this is an example for homekit.
+# follow the steps above to set up the checkout.
+# open the homekit project in VS Code
+code plugins/homekit
 ```
 
 You can now launch the HomeKit Plugin in VSCode.
