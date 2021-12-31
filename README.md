@@ -30,7 +30,7 @@ Supported accessories:
 
 [Local Installation Instructions](https://github.com/koush/scrypted/wiki/Local-Installation)
 
-## Plugin Development Documentation
+## Development
 
 ## Debug the Scrypted Server in VSCode
 
