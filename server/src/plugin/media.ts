@@ -7,7 +7,7 @@ import { once } from 'events';
 import fs from 'fs';
 import tmp from 'tmp';
 import os from 'os';
-import pathToFfmpeg from 'ffmpeg-for-homebridge';
+import { getInstalledFfmpeg } from '@scrypted/ffmpeg'
 import { ffmpegLogInitialOutput } from "../media-helpers";
 
 function addBuiltins(console: Console, mediaManager: MediaManager) {
@@ -133,7 +133,7 @@ export abstract class MediaManagerBase implements MediaManager {
             return f;
 
         const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-        return pathToFfmpeg || defaultPath;
+        return getInstalledFfmpeg() || defaultPath;
     }
 
     getConverters(): BufferConverter[] {

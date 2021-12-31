@@ -3,6 +3,7 @@
   "version": "0.0.116",
   "description": "",
   "dependencies": {
+    "@scrypted/ffmpeg": "^1.0.2",
     "@scrypted/sdk": "^0.0.133",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
@@ -31,7 +32,6 @@
   },
   "optionalDependencies": {
     "@koush/wrtc": "^0.5.2",
-    "ffmpeg-for-homebridge": "^0.0.9",
     "mdns": "^2.7.2"
   },
   "devDependencies": {
