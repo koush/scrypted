@@ -55,7 +55,7 @@ You can now launch Scrypted in VSCode.
 code plugins/homekit
 ```
 
-You can now launch the HomeKit Plugin in VSCode. Please be aware that you do *not* need to restart the Scrypted Server if you make changes to a plugin. Edit the plugin, click Start Debugging, and the updated plugin will deploy on the running server.
+You can now launch (using the Start Debugging play button) the HomeKit Plugin in VSCode. Please be aware that you do *not* need to restart the Scrypted Server if you make changes to a plugin. Edit the plugin, launch, and the updated plugin will deploy on the running server.
 
 If you do not want to set up VS Code, you can also run build and install the plugin directly from the command line:
 
