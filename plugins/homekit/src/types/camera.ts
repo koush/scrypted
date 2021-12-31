@@ -576,7 +576,7 @@ addSupportedType({
             persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.EventSnapshotsActive);
             persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.HomeKitCameraActive);
             persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.PeriodicSnapshotsActive);
-
+            persistBooleanCharacteristic(controller.cameraOperatingModeService, Characteristic.CameraOperatingModeIndicator);
 
             recordingManagement.getService().getCharacteristic(Characteristic.SelectedCameraRecordingConfiguration)
                 .on(CharacteristicEventTypes.GET, callback => {
