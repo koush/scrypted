@@ -92,6 +92,11 @@ export function createPCMParser(): StreamParser {
 export function createMpegTsParser(options?: StreamParserOptions): StreamParser {
     let pat: Buffer;
     let pmt: Buffer;
+    let audioCodecInfo: Buffer;
+    let videoCodecInfo: Buffer;
+    let seventeen: Buffer;
+    let startStream: Buffer[] = [];
+
     return {
         container: 'mpegts',
         outputArguments: [
@@ -104,21 +109,54 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
                 throw new Error('Invalid sync byte in mpeg-ts packet. Terminating stream.')
             }
 
-            if (pat && pmt)
-                return;
+            // if (pat && pmt && audioCodecInfo && seventeen && videoCodecInfo)
+            //     return;
 
-            const pid = ((concat[1] & 0x1F) << 8) | concat[2];
-            if (pid === 0) {
-                const tableId = concat[5];
-                if (tableId === 0) {
-                    pat = concat.slice(0, 188);
-                }
-                else if (tableId === 2) {
-                    pmt = concat.slice(0, 188);
-                }
-            }
+            // let offset = 0;
+            // while (offset + 188 < concat.length) {
+            //     const pkt = concat.subarray(offset, offset + 188);
+            //     const pid = ((concat[1] & 0x1F) << 8) | concat[2];
+            //     if (!pat && pid === 0) {
+            //         pat = pkt;
+            //         startStream.push(pkt);
+            //     }
+            //     else if (!videoCodecInfo && pid === 256) {
+            //         videoCodecInfo = pkt;
+            //         startStream.push(pkt);
+            //     }
+            //     else if (!audioCodecInfo && pid === 257) {
+            //         audioCodecInfo = pkt;
+            //         startStream.push(pkt);
+            //     }
+            //     else if (!pmt && pid === 0x1000) {
+            //         pmt = pkt;
+            //         startStream.push(pkt);
+            //     }
+            //     else if (!seventeen && pid === 17) {
+            //         seventeen = pkt;
+            //         startStream.push(pkt);
+            //     }
+
+            //     switch (pid) {
+            //         case 0:
+            //         case 17:
+            //         case 0x1000:
+            //         case 256:
+            //         case 257:
+            //             break;
+            //         default:
+            //             console.log('what pid', pid);
+            //     }
+
+
+            //     offset += 188;
+            // }
         }),
         findSyncFrame(streamChunks): StreamChunk[] {
+            // pmt pid: 0x1000
+            // pat pid: 0x0000
+            // 17 aka 0x11: unknown
+
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
 
@@ -134,21 +172,34 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
                             if ((pkt[3] & 0x20) && (pkt[4] > 0)) {
                                 // have AF
                                 if (pkt[5] & 0x40) {
-                                    // we found the sync frame, but also need to send the pat and pmt
-                                    // which might be at the start of this chunk before the keyframe.
-                                    // yolo!
-                                    return streamChunks.slice(prebufferIndex);
-                                    // const chunks = streamChunk.chunks.slice(chunkIndex + 1);
-                                    // const take = chunk.subarray(offset);
-                                    // chunks.unshift(take);
+                                    console.log('found sync', pid);
+                                    if (true) {
+                                        // we found the sync frame, but also need to send the pat and pmt
+                                        // which might be at the start of this chunk before the keyframe.
+                                        // yolo!
+                                        const ret: StreamChunk = {
+                                            chunks: [],
+                                            startStream: startStream.length ? Buffer.concat(startStream) : undefined,
+                                        };
+                                        const remainingChunks = streamChunks.slice(prebufferIndex);
+                                        return [
+                                            ret,
+                                            ...remainingChunks,
+                                        ]
+                                    }
 
-                                    // const remainingChunks = streamChunks.slice(prebufferIndex + 1);
-                                    // const ret = Object.assign({}, streamChunk);
-                                    // ret.chunks = chunks;
-                                    // return [
-                                    //     ret,
-                                    //     ...remainingChunks
-                                    // ];
+                                    const chunks = streamChunk.chunks.slice(chunkIndex + 1);
+                                    const take = chunk.subarray(offset);
+                                    chunks.unshift(take);
+
+                                    const remainingChunks = streamChunks.slice(prebufferIndex + 1);
+                                    const ret = Object.assign({}, streamChunk);
+                                    ret.chunks = chunks;
+                                    ret.startStream = startStream.length ? Buffer.concat(startStream) : undefined;
+                                    return [
+                                        ret,
+                                        ...remainingChunks
+                                    ];
                                 }
                             }
                         }

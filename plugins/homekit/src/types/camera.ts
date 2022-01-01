@@ -58,6 +58,7 @@ addSupportedType({
             audioReturn: dgram.Socket;
             demuxer?: RtpDemuxer;
             rtpSink?: HomeKitRtpSink;
+            mtu: number;
         }
         const sessions = new Map<string, Session>();
 
@@ -98,6 +99,7 @@ addSupportedType({
                     cp: null,
                     videoReturn,
                     audioReturn,
+                    mtu: socketType === 'udp4' ? 1378 : 1228,
                 }
 
                 sessions.set(request.sessionID, session);
@@ -221,8 +223,8 @@ addSupportedType({
                 }, 60000));
 
 
-                const videomtu = 188 * 3;
-                const audiomtu = 188 * 1;
+                const videomtu = 188 * 3;//request.video.mtu || session.mtu;
+                const audiomtu = 188;//request.video.mtu || session.mtu;
 
                 try {
                     console.log('fetching video stream');
