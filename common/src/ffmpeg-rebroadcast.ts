@@ -17,9 +17,9 @@ export interface MP4Atom {
     data: Buffer;
 }
 
-export interface FFMpegRebroadcastSession {
+export interface FFMpegRebroadcastSession<T extends string> {
     cp: ChildProcess;
-    ffmpegInputs: { [container: string]: FFMpegInput };
+    ffmpegInputs: { [container in T]?: FFMpegInput };
     servers: Server[];
     inputAudioCodec?: string;
     inputVideoCodec?: string;
@@ -30,8 +30,8 @@ export interface FFMpegRebroadcastSession {
     events: EventEmitter;
 }
 
-export interface FFMpegRebroadcastOptions {
-    parsers: { [container: string]: StreamParser };
+export interface FFMpegRebroadcastOptions<T extends string> {
+    parsers: { [container in T]?: StreamParser };
     timeout?: number;
     console: Console;
     parseOnly?: boolean;
@@ -84,7 +84,7 @@ export async function parseAudioCodec(cp: ChildProcess) {
     return parseToken(cp, 'Audio');
 }
 
-export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options: FFMpegRebroadcastOptions): Promise<FFMpegRebroadcastSession> {
+export async function startRebroadcastSession<T extends string>(ffmpegInput: FFMpegInput, options: FFMpegRebroadcastOptions<T>): Promise<FFMpegRebroadcastSession<T>> {
     let clients = 0;
     let dataTimeout: NodeJS.Timeout;
     let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;
@@ -128,7 +128,7 @@ export async function startRebroadcastSession(ffmpegInput: FFMpegInput, options:
 
     resetActivityTimer();
 
-    const ffmpegInputs: { [container: string]: FFMpegInput } = {};
+    const ffmpegInputs: { [container in T]: FFMpegInput } = {} as any;
 
     const args = ffmpegInput.inputArguments.slice();
 

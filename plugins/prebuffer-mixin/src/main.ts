@@ -36,10 +36,12 @@ interface Prebuffers {
   s16le: PrebufferStreamChunk[];
 }
 
+type PrebufferParsers = "mpegts" | "mp4" | "s16le";
+
 class PrebufferSession {
 
-  parserSessionPromise: Promise<FFMpegRebroadcastSession>;
-  parserSession: FFMpegRebroadcastSession;
+  parserSessionPromise: Promise<FFMpegRebroadcastSession<PrebufferParsers>>;
+  parserSession: FFMpegRebroadcastSession<PrebufferParsers>;
   prebuffers: Prebuffers = {
     mp4: [],
     mpegts: [],
@@ -223,7 +225,7 @@ class PrebufferSession {
       'copy',
     ];
 
-    const rbo: FFMpegRebroadcastOptions = {
+    const rbo: FFMpegRebroadcastOptions<PrebufferParsers> = {
       console: this.console,
       parsers: {
         mp4: createFragmentedMp4Parser({
