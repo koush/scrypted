@@ -252,10 +252,13 @@ addSupportedType({
                     // ffmpeg input for decoder
                     args.push(...ffmpegInput.inputArguments);
 
-                    // create a dummy audio track.
-                    // this track will only be used if no audio track is available, as the plugin always advertises audio as available.
-                    // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-                    args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1');
+                    if (noAudio) {
+                        // create a dummy audio track if none actually exists.
+                        // this track will only be used if no audio track is available.
+                        // this prevents homekit erroring out if the audio track is actually missing.
+                        // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+                        args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+                    }
 
                     // video encoding
                     args.push(
@@ -298,40 +301,42 @@ addSupportedType({
                         `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
                     )
 
-                    // audio encoding
-                    const audioCodec = (request as StartStreamRequest).audio.codec;
-                    args.push(
-                        "-vn", '-sn', '-dn',
-                    );
-
-                    // homekit live streaming seems extremely picky about aac output.
-                    // so currently always transcode audio.
-                    if (false && !transcodeStreaming) {
+                    if (!noAudio) {
+                        // audio encoding
+                        const audioCodec = (request as StartStreamRequest).audio.codec;
                         args.push(
-                            "-acodec", "copy",
+                            "-vn", '-sn', '-dn',
                         );
-                    }
-                    else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
-                        args.push(
-                            '-acodec', ...(audioCodec === AudioStreamingCodecType.OPUS ?
-                                ['libopus', '-application', 'lowdelay'] :
-                                ['libfdk_aac', '-profile:a', 'aac_eld']),
-                            '-flags', '+global_header',
-                            '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
-                            '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
-                            '-ac', `${(request as StartStreamRequest).audio.channel}`,
-                            "-payload_type",
-                            (request as StartStreamRequest).audio.pt.toString(),
-                            "-ssrc", session.audiossrc.toString(),
-                            "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
-                            "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
-                            "-srtp_out_params", audioKey.toString('base64'),
-                            "-f", "rtp",
-                            `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
-                        )
-                    }
-                    else {
-                        console.warn(device.name, 'unknown audio codec', request);
+
+                        // homekit live streaming seems extremely picky about aac output.
+                        // so currently always transcode audio.
+                        if (false && !transcodeStreaming) {
+                            args.push(
+                                "-acodec", "copy",
+                            );
+                        }
+                        else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
+                            args.push(
+                                '-acodec', ...(audioCodec === AudioStreamingCodecType.OPUS ?
+                                    ['libopus', '-application', 'lowdelay'] :
+                                    ['libfdk_aac', '-profile:a', 'aac_eld']),
+                                '-flags', '+global_header',
+                                '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
+                                '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
+                                '-ac', `${(request as StartStreamRequest).audio.channel}`,
+                                "-payload_type",
+                                (request as StartStreamRequest).audio.pt.toString(),
+                                "-ssrc", session.audiossrc.toString(),
+                                "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
+                                "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
+                                "-srtp_out_params", audioKey.toString('base64'),
+                                "-f", "rtp",
+                                `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
+                            )
+                        }
+                        else {
+                            console.warn(device.name, 'unknown audio codec, audio will not be streamed.', request);
+                        }
                     }
 
                     if (!sessions.has(request.sessionID)) {
