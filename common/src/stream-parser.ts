@@ -90,8 +90,6 @@ export function createPCMParser(): StreamParser {
 }
 
 export function createMpegTsParser(options?: StreamParserOptions): StreamParser {
-    let pat: Buffer;
-    let pmt: Buffer;
     return {
         container: 'mpegts',
         outputArguments: [
@@ -102,20 +100,6 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
         parse: createLengthParser(188, concat => {
             if (concat[0] != 0x47) {
                 throw new Error('Invalid sync byte in mpeg-ts packet. Terminating stream.')
-            }
-
-            if (pat && pmt)
-                return;
-
-            const pid = ((concat[1] & 0x1F) << 8) | concat[2];
-            if (pid === 0) {
-                const tableId = concat[5];
-                if (tableId === 0) {
-                    pat = concat.slice(0, 188);
-                }
-                else if (tableId === 2) {
-                    pmt = concat.slice(0, 188);
-                }
             }
         }),
         findSyncFrame(streamChunks): StreamChunk[] {
