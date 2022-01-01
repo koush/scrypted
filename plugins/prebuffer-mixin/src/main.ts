@@ -437,12 +437,25 @@ class PrebufferSession {
       })
     }
 
+    const now = Date.now();
+    let available = 0;
+    const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+    for (const prebuffer of prebufferContainer) {
+      if (prebuffer.time < now - requestedPrebuffer)
+        continue;
+      for (const chunk of prebuffer.chunk.chunks) {
+        available += chunk.length;
+      }
+    }
+
+    const length = Math.max(500000, available).toString();
+
     const url = `tcp://127.0.0.1:${await createContainerServer(container)}`;
     const ffmpegInput: FFMpegInput = {
       url,
       container,
       inputArguments: [
-        // '-analyzeduration', '0', '-probesize', '500000',
+        '-analyzeduration', '0', '-probesize', length,
         '-f', container,
         '-i', url,
       ],
@@ -451,7 +464,7 @@ class PrebufferSession {
 
     if (pcmAudio) {
       ffmpegInput.inputArguments.push(
-        // '-analyzeduration', '0', '-probesize', '500000',
+        '-analyzeduration', '0', '-probesize', length,
         '-f', 's16le',
         '-i', `tcp://127.0.0.1:${await createContainerServer('s16le')}`,
       )
