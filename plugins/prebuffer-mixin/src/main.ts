@@ -376,19 +376,23 @@ class PrebufferSession {
           this.events.on(eventName, safeWriteData);
           session.events.once('killed', cleanup);
 
-          // for (const prebuffer of prebufferContainer) {
-          //   if (prebuffer.time < now - requestedPrebuffer)
-          //     continue;
+          if (true) {
+            for (const prebuffer of prebufferContainer) {
+              if (prebuffer.time < now - requestedPrebuffer)
+                continue;
 
-          //   safeWriteData(prebuffer.chunk);
-          // }
-
-          // for some reason this doesn't work as well as simply guessing and dumping.
-          const parser = this.parsers[container];
-          const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
-          for (const prebuffer of availablePrebuffers) {
-            safeWriteData(prebuffer);
+              safeWriteData(prebuffer.chunk);
+            }
           }
+          else {
+            // for some reason this doesn't work as well as simply guessing and dumping.
+            const parser = this.parsers[container];
+            const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
+            for (const prebuffer of availablePrebuffers) {
+              safeWriteData(prebuffer);
+            }
+          }
+
           return cleanup;
         }
       })
