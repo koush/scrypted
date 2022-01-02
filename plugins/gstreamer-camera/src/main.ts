@@ -1,5 +1,5 @@
 import sdk, { FFMpegInput, MediaObject, MediaStreamOptions, Setting, SettingValue } from "@scrypted/sdk";
-import child_process from "child_process";
+import child_process, { ChildProcess } from "child_process";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common";
 // import {} from "../../../common/src/stream-parser"
 // import {} from "../../../common/src/ffmpeg-rebroadcast"
@@ -9,6 +9,8 @@ import {listenZeroCluster} from "../../../common/src/listen-cluster"
 const { log, deviceManager, mediaManager } = sdk;
 
 class GStreamerCamera extends CameraBase<MediaStreamOptions> {
+    currentProcess: ChildProcess;
+
     createGStreamerMediaStreamOptions(gstreamerInput: string, index: number): MediaStreamOptions {
         return {
             id: `channel${index}`,
@@ -54,6 +56,13 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
                 value: this.getGStreamerInputs(),
                 multiple: true,
             },
+            {
+                key: 'singleInstance',
+                title: 'Single Instance',
+                description: 'This camera is only capable of serving a single stream, such as a physically attached camera source.',
+                type: 'boolean',
+                value: this.storage.getItem('singleInstance') === 'true'
+            }
         ];
     }
 
@@ -102,7 +111,15 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
             const args = gstreamerInput.split(' ');
             args.push('!', 'mpegtsmux', '!',  'tcpclientsink', `port=${gstreamerPort}`, 'sync=false');
             this.console.log(args);
+            const singleInstance = this.storage.getItem('singleInstance') === 'true';
+            if (this.currentProcess && singleInstance) {
+                this.currentProcess.kill();
+                this.currentProcess = undefined;
+            }
             const cp = child_process.spawn('gst-launch-1.0', args);
+            if (singleInstance) {
+                this.currentProcess = cp;
+            }
             cp.stdout.on('data', data => this.console.log(data.toString()));
             cp.stderr.on('data', data => this.console.log(data.toString()));
 
