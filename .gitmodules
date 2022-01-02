@@ -22,3 +22,6 @@
 [submodule "external/scrypted-ffmpeg"]
 	path = external/scrypted-ffmpeg
 	url = ../../koush/scrypted-ffmpeg
+[submodule "external/scrypted-private"]
+	path = external/private
+	url = ../../koush/scrypted-private
