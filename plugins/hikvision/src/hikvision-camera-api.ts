@@ -2,6 +2,10 @@ import { Readable } from 'stream';
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { EventEmitter } from "stream";
 
+function getChannel(channel: string) {
+    return channel || '101';
+}
+
 export enum HikVisionCameraEvent {
     MotionDetected = "<eventType>VMD</eventType>",
     VideoLoss = "<eventType>videoloss</eventType>",
@@ -28,7 +32,7 @@ export class HikVisionCameraAPI {
     deviceModel : Promise<string>;
     listenerPromise : Promise<EventEmitter>;
 
-    constructor(public ip: string, username: string, password: string, public channel: string, public console: Console) {
+    constructor(public ip: string, username: string, password: string, public console: Console) {
         this.digestAuth = new AxiosDigestAuth({
             username,
             password,
@@ -61,7 +65,7 @@ export class HikVisionCameraAPI {
         return model.match(/DS-7608NI-E2/) != undefined;
     }
 
-    async checkStreamSetup(): Promise<HikVisionCameraStreamSetup> {
+    async checkStreamSetup(channel: string): Promise<HikVisionCameraStreamSetup> {
         const isOld = await this.checkIsOldModel();
         if (isOld) {
             this.console.error('NVR is old version.  Defaulting camera capabilities to H.264/AAC');
@@ -74,7 +78,7 @@ export class HikVisionCameraAPI {
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'text',
-            url: `http://${this.ip}/ISAPI/Streaming/channels/${this.getChannel()}/capabilities`,
+            url: `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`,
         });
 
         // this is bad:
@@ -88,12 +92,8 @@ export class HikVisionCameraAPI {
         }
     }
 
-    getChannel() {
-        return this.channel || '101';
-    }
-
-    async jpegSnapshot(): Promise<Buffer> {
-        const url = `http://${this.ip}/ISAPI/Streaming/channels/${this.getChannel()}/picture?snapShotImageType=JPEG`
+    async jpegSnapshot(channel: string): Promise<Buffer> {
+        const url = `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
 
         const response = await this.digestAuth.request({
             method: "GET",
@@ -124,10 +124,6 @@ export class HikVisionCameraAPI {
                     for (const event of Object.values(HikVisionCameraEvent)) {
                         if (data.indexOf(event) !== -1) {
                             const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
-                            if (this.channel
-                                && data.indexOf(`<channelID>${this.channel.substr(0, 1)}</channelID>`) === -1) {
-                                continue;
-                            }
                             stream.emit('event', event, cameraNumber);
                         }
                     }

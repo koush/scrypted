@@ -35,11 +35,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                         }
         
                         // this.console.error('### Detected motion, camera: ', cameraNumber);
-                        const prevMotion = this.motionDetected;
-                        if (!prevMotion) { 
-                            this.motionDetected = true;
-                            this.console.log(`motionDetected, camera ${this.getCameraNumber()}`);
-                        }
+                        this.motionDetected = true;
                         clearTimeout(motionTimeout);
                         motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
                     }
@@ -53,12 +49,12 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
     }
 
     createClient() {
-        const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.getRtspChannel(), this.console);
+        const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
 
         (async () => {
             if (this.hasCheckedCodec)
                 return;
-            const streamSetup = await client.checkStreamSetup();
+            const streamSetup = await client.checkStreamSetup(this.getRtspChannel());
             this.hasCheckedCodec = true;
             if (streamSetup.videoCodecType !== 'H.264') {
                 this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
@@ -79,7 +75,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     async takeSmartCameraPicture(): Promise<MediaObject> {
         const api = this.createClient();
-        return mediaManager.createMediaObject(await api.jpegSnapshot(), 'image/jpeg');
+        return mediaManager.createMediaObject(await api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
     }
 
     async getUrlSettings() {
@@ -199,7 +195,7 @@ class HikVisionProvider extends RtspProvider {
         const check = this.clients.get(key);
         if (check)
             return check;
-        const client = new HikVisionCameraAPI(address, username, password, undefined, this.console);
+        const client = new HikVisionCameraAPI(address, username, password, this.console);
         this.clients.set(key, client);
         return client;
     }
