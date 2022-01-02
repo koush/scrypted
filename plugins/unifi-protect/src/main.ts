@@ -1,7 +1,7 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
-import { ProtectApi } from "unifi-protect";
-import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "unifi-protect";
-import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "unifi-protect";
+import { ProtectApi } from "@koush/unifi-protect";
+import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "@koush/unifi-protect";
+import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "@koush/unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
