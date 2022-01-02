@@ -3,7 +3,7 @@ from __future__ import annotations
 from asyncio.events import AbstractEventLoop, TimerHandle
 from asyncio.futures import Future
 from typing import Any, Mapping, List
-from .safe_set_result import safe_set_result
+from pipeline import safe_set_result
 import scrypted_sdk
 import json
 import asyncio
@@ -12,7 +12,7 @@ import os
 import binascii
 from urllib.parse import urlparse
 import multiprocessing
-from . import gstreamer
+from pipeline import run_pipeline
 
 from scrypted_sdk.types import FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
@@ -216,7 +216,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             finally:
                 pass
 
-        pipeline = gstreamer.run_pipeline(detection_session.future, user_callback,
+        pipeline = run_pipeline(detection_session.future, user_callback,
                                           appsink_size=inference_size,
                                           video_input=video_input,
                                           pixel_format=self.get_pixel_format())

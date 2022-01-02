@@ -1,7 +1,6 @@
 from __future__ import annotations
 from detect import DetectionSession, DetectPlugin
 from typing import Any, List
-from detect.safe_set_result import safe_set_result
 import numpy as np
 import cv2
 import imutils

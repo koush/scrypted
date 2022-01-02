@@ -19,7 +19,7 @@ import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstBase', '1.0')
 
-from detect.safe_set_result import safe_set_result
+from .safe_set_result import safe_set_result
 from gi.repository import GLib, GObject, Gst
 import math
 
