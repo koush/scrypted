@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
 import AxiosDigestAuth from '@koush/axios-digest-auth';
+import { EventEmitter } from "stream";
 
 export enum HikVisionCameraEvent {
     MotionDetected = "<eventType>VMD</eventType>",
@@ -24,6 +25,8 @@ export interface HikVisionCameraStreamSetup {
 
 export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
+    deviceModel : Promise<string>;
+    listenerPromise : Promise<EventEmitter>;
 
     constructor(public ip: string, username: string, password: string, public channel: string, public console: Console) {
         this.digestAuth = new AxiosDigestAuth({
@@ -32,7 +35,42 @@ export class HikVisionCameraAPI {
         });
     }
 
+    async checkDeviceModel() : Promise<string> {
+        if (!this.deviceModel) {
+            this.deviceModel = new Promise(async (resolve, reject) => {
+                try {
+                    const response = await this.digestAuth.request({
+                        method: "GET",
+                        responseType: 'text',
+                        url: `http://${this.ip}/ISAPI/System/deviceInfo`,
+                    });
+                    const deviceModel = response.data.match(/>(.*?)<\/model>/)?.[1];
+                    resolve(deviceModel);    
+                } catch (e) {
+                    this.console.error('error checking NVR model', e);
+                    resolve("unknown");
+                }
+            });
+        }
+        return await this.deviceModel;
+    }
+
+    async checkIsOldModel() : Promise<boolean> {
+        // The old Hikvision DS-7608NI-E2 doesn't support channel capability checks, and the requests cause errors
+        const model = await this.checkDeviceModel();
+        return model.match(/DS-7608NI-E2/) != undefined;
+    }
+
     async checkStreamSetup(): Promise<HikVisionCameraStreamSetup> {
+        const isOld = await this.checkIsOldModel();
+        if (isOld) {
+            this.console.error('NVR is old version.  Defaulting camera capabilities to H.264/AAC');
+            return {
+                videoCodecType: "H.264",
+                audioCodecType: "AAC",
+            }
+        }
+
         const response = await this.digestAuth.request({
             method: "GET",
             responseType: 'text',
@@ -67,30 +105,38 @@ export class HikVisionCameraAPI {
     }
 
     async listenEvents() {
-        const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
-        this.console.log('listener url', url);
-        const response = await this.digestAuth.request({
-            method: "GET",
-            url,
-            responseType: 'stream',
-        });
-        const stream = response.data as Readable;
+        // support multiple cameras listening to a single single stream 
+        if (!this.listenerPromise) {
+            this.listenerPromise = new Promise(async (resolve, reject) => {
+                const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
+                this.console.log('listener url', url);
 
-        stream.on('data', (buffer: Buffer) => {
-            const data = buffer.toString();
-            // this.console.log(data);
-            for (const event of Object.values(HikVisionCameraEvent)) {
-                if (data.indexOf(event) !== -1) {
-                    const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
-                    if (this.channel
-                        && data.indexOf(`<channelID>${this.channel.substr(0, 1)}</channelID>`) === -1) {
-                        continue;
+                const response = await this.digestAuth.request({
+                    method: "GET",
+                    url,
+                    responseType: 'stream',
+                });
+                const stream = response.data as Readable;
+        
+                stream.on('data', (buffer: Buffer) => {
+                    const data = buffer.toString();
+                    // this.console.log(data);
+                    for (const event of Object.values(HikVisionCameraEvent)) {
+                        if (data.indexOf(event) !== -1) {
+                            const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
+                            if (this.channel
+                                && data.indexOf(`<channelID>${this.channel.substr(0, 1)}</channelID>`) === -1) {
+                                continue;
+                            }
+                            stream.emit('event', event, cameraNumber);
+                        }
                     }
-                    stream.emit('event', event, cameraNumber);
-                }
-            }
-        });
+                });
+                resolve(stream);
+            });
+        }
 
-        return stream;
+        const eventSource = await this.listenerPromise;
+        return eventSource;
     }
 }

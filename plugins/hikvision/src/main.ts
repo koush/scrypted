@@ -26,13 +26,20 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                 events.on('close', () => ret.emit('error', new Error('close')));
                 events.on('error', e => ret.emit('error', e));
                 events.on('event', (event: HikVisionCameraEvent, cameraNumber: string) => {
-                    // if (this.getRtspChannel() && cameraNumber !== this.getCameraNumber()) {
-                    //     return;
-                    // }
                     if (event === HikVisionCameraEvent.MotionDetected
                         || event === HikVisionCameraEvent.LineDetection
                         || event === HikVisionCameraEvent.FieldDetection) {
-                        this.motionDetected = true;
+                        if (this.getRtspChannel() && cameraNumber !== this.getCameraNumber()) {
+                            // this.console.error(`### Skipping motion event ${cameraNumber} != ${this.getCameraNumber()}`);
+                            return;
+                        }
+        
+                        // this.console.error('### Detected motion, camera: ', cameraNumber);
+                        const prevMotion = this.motionDetected;
+                        if (!prevMotion) { 
+                            this.motionDetected = true;
+                            this.console.log(`motionDetected, camera ${this.getCameraNumber()}`);
+                        }
                         clearTimeout(motionTimeout);
                         motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
                     }
@@ -57,7 +64,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                 this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
             }
             if (!this.isAudioDisabled() && streamSetup.audioCodecType && streamSetup.audioCodecType !== 'AAC') {
-                this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it it for AAC is recommended for optimal performance.`);
+                this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it for AAC is recommended for optimal performance.`);
             }
         })();
 
@@ -116,8 +123,12 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         if (!this.channelIds) {
             const client = this.createClient();
             this.channelIds = new Promise(async (resolve, reject) => {
-                try {
-
+                const isOld = await client.checkIsOldModel();
+                if (isOld) {
+                    this.console.error('Old NVR. Defaulting to two camera configuration');
+                    const camNumber = this.getCameraNumber() || '1';
+                    resolve([camNumber + '01', camNumber + '02']);
+                } else try {
                     const response = await client.digestAuth.request({
                         url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
                         responseType: 'text',
