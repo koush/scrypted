@@ -7,14 +7,29 @@ RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" |
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 
 RUN apt-get -y update
-RUN apt-get -y install software-properties-common apt-utils
-
-# Coral Edge TPU
-RUN apt-get -y install \
-    libedgetpu1-std
-
-RUN apt-get -y update
 RUN apt-get -y upgrade
+RUN apt-get -y install software-properties-common apt-utils
+RUN apt-get -y update
+
+# base development stuff
+RUN apt-get -y install \
+    build-essential \
+    gcc \
+    gir1.2-gtk-3.0 \
+    libavahi-compat-libdnssd-dev \
+    libcairo2-dev \
+    libgirepository1.0-dev \
+    libglib2.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    libopenjp2-7 \
+    libpango1.0-dev \
+    librsvg2-dev \
+    pkg-config
+
+# gstreamer native https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c#install-gstreamer-on-ubuntu-or-debian
+RUN apt-get -y install \
+    gstreamer1.0-tools libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
 
 # python native
 RUN apt-get -y install \
@@ -31,15 +46,9 @@ RUN apt-get -y install \
     python3-skimage \
     python3-wheel
 
-# gstreamer1.0-tools: handy CLI tools
-# gstreamer1.0-plugins-bad: tsdemux
-# gstreamer1.0-*: codecs, parsers, etc.
+# Coral Edge TPU
 RUN apt-get -y install \
-     gstreamer1.0-tools \
-     gstreamer1.0-plugins-base \
-     gstreamer1.0-plugins-good \
-     gstreamer1.0-plugins-bad \
-     gstreamer1.0-libav
+    libedgetpu1-std
 
 # python pip
 RUN python3 -m pip install --upgrade pip
