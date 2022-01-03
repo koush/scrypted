@@ -3,7 +3,7 @@
   "version": "0.0.116",
   "description": "",
   "dependencies": {
-    "@scrypted/ffmpeg": "^1.0.2",
+    "@scrypted/ffmpeg": "^1.0.4",
     "@scrypted/sdk": "^0.0.133",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
