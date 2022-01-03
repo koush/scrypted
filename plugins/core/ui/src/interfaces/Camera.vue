@@ -5,22 +5,43 @@
         ><v-img contain :src="src" lazy-src="images/cameraloading.jpg"></v-img
       ></a>
     </template>
-    <div style="position: relative; overflow: hidden;">
+    <div style="position: relative; overflow: hidden">
       <video
         ref="video"
-        style="background-color: black; width: 100%; height: 100%; z-index: 0;"
+        style="
+          background-color: black;
+          width: 100%;
+          height: 100%;
+          z-index: 0;
+          -webkit-transform-style: preserve-3d;
+        "
         playsinline
         autoplay
       ></video>
       <svg
         :viewBox="`0 0 ${svgWidth} ${svgHeight}`"
         ref="svg"
-        style="top: 0; left: 0; position: absolute; width: 100%; height: 100%; z-index: 1;"
+        style="
+          top: 0;
+          left: 0;
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          z-index: 1;
+        "
         v-html="svgContents"
       ></svg>
       <ClipPathEditor
         v-if="clipPath"
-        style="background: transparent; top: 0; left: 0; position: absolute; width: 100%; height: 100%; z-index: 2;"
+        style="
+          background: transparent;
+          top: 0;
+          left: 0;
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          z-index: 2;
+        "
         v-model="clipPath"
       ></ClipPathEditor>
     </div>
@@ -39,7 +60,7 @@ export default {
     ClipPathEditor,
   },
   mixins: [RPCInterface],
-  props: ['clipPathValue', 'hidePreview', 'showDialog'],
+  props: ["clipPathValue", "hidePreview", "showDialog"],
   data() {
     return {
       lastDetection: {},
@@ -69,8 +90,7 @@ export default {
       let contents = "";
 
       for (const detection of this.lastDetection.detections || []) {
-        if (!detection.boundingBox)
-          continue;
+        if (!detection.boundingBox) continue;
         const sw = 2;
         const s = "red";
         const x = detection.boundingBox[0];
@@ -117,11 +137,11 @@ export default {
       this.dialog = this.showDialog;
     },
     clipPath() {
-      this.$emit('clipPath', cloneDeep(this.clipPath));
+      this.$emit("clipPath", cloneDeep(this.clipPath));
     },
     async dialog(val) {
       this.cleanupConnection();
-      this.$emit('dialog', val);
+      this.$emit("dialog", val);
       if (!val) {
         return;
       }
