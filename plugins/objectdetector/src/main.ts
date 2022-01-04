@@ -49,7 +49,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   hasMotionType: boolean;
   settings: Setting[];
 
-  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, detectionId: string) {
+  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, public internal: boolean) {
     super(mixinDevice, mixinDeviceState, {
       providerNativeId,
       mixinDeviceInterfaces,
@@ -59,7 +59,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     });
 
     this.cameraDevice = systemManager.getDeviceById<Camera & VideoCamera & MotionSensor>(this.id);
-    this.detectionId = detectionId || modelName + '-' + this.cameraDevice.id;
+    this.detectionId = internal ? modelName : modelName + '-' + this.cameraDevice.id;
 
     this.bindObjectDetection();
     this.register();
@@ -87,8 +87,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   resetDetectionTimeout() {
     this.clearDetectionTimeout();
     this.detectionIntervalTimeout = setInterval(() => {
-      if (!this.running) {
-        if (this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS))
+      if ((!this.running && this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS)) || this.hasMotionType) {
           this.snapshotDetection();
       }
     }, this.detectionInterval * 1000);
@@ -201,7 +200,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
   async startVideoDetection() {
     try {
-      // prevent stream retrieval noise until notified that the detection is no logner running.
+      // prevent stream retrieval noise until notified that the detection is no longer running.
       if (this.running) {
         const session = await this.objectDetection?.detectObjects(undefined, {
           detectionId: this.detectionId,
@@ -214,14 +213,19 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.running = true;
 
       let selectedStream: MediaStreamOptions;
+      let stream: MediaObject;
 
-      const streamingChannel = this.storage.getItem('streamingChannel');
-      if (streamingChannel) {
-        const msos = await this.cameraDevice.getVideoStreamOptions();
-        selectedStream = msos.find(mso => mso.name === streamingChannel);
+      // intenral streams must implicitly be available.
+      if (!this.internal) {
+        const streamingChannel = this.storage.getItem('streamingChannel');
+        if (streamingChannel) {
+          const msos = await this.cameraDevice.getVideoStreamOptions();
+          selectedStream = msos.find(mso => mso.name === streamingChannel);
+        }
+  
+        stream = await this.cameraDevice.getVideoStream(selectedStream);
       }
 
-      const stream = await this.cameraDevice.getVideoStream(selectedStream);
       const session = await this.objectDetection?.detectObjects(stream, {
         detectionId: this.detectionId,
         duration: this.getDetectionDuration(),
@@ -405,7 +409,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
 
       if (this.detectionModes.includes(DETECT_VIDEO_MOTION)) {
-        if (msos?.length) {
+        if (msos?.length && !this.internal) {
           settings.push({
             title: 'Video Stream',
             key: 'streamingChannel',
@@ -449,7 +453,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       );
     }
     else {
-      if (msos?.length) {
+      if (msos?.length && !this.internal) {
         settings.push({
           title: 'Video Stream',
           key: 'streamingChannel',
@@ -623,13 +627,13 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
     let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
     const group = objectDetection.name;
     const model = await objectDetection.getDetectionModel();
-    let detectionId: string;
+    let internal = false;
     if (mixinDeviceInterfaces.includes(`${ScryptedInterface.ObjectDetection}:${model.name}` as any)) {
       const id = mixinDeviceState['id'];
       objectDetection = systemManager.getDeviceById<ObjectDetection>(id);
-      detectionId = model.name;
+      internal = true;
     }
-    return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, model.name, group, detectionId);
+    return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, model.name, group, internal);
   }
 
   async releaseMixin(id: string, mixinDevice: any) {

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 from pipeline.safe_set_result import safe_set_result
-from third_party.sort import Sort
+from .third_party.sort import Sort
 import multiprocessing
 import io
 from .common import *
@@ -44,7 +44,7 @@ def parse_label_contents(contents: str):
 defaultThreshold = .4
 
 
-class CoralPlugin(DetectPlugin):
+class TensorFlowLitePlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
         labels_contents = scrypted_sdk.zip.open(
@@ -143,6 +143,7 @@ class CoralPlugin(DetectPlugin):
                 x2, y2 = convert_to_src_size((bb[0] + bb[2], bb[1] + bb[3]))
                 detection['boundingBox'] = (x, y, x2 - x + 1, y2 - y + 1)
 
+        print(detection_result)
         return detection_result
 
     def parse_settings(self, settings: Any):
@@ -187,7 +188,3 @@ class CoralPlugin(DetectPlugin):
 
     def create_detection_session(self):
         return TrackerDetectionSession()
-
-
-def create_scrypted_plugin():
-    return CoralPlugin()

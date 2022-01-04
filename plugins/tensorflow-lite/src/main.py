@@ -1,4 +1,4 @@
-from tflite import CoralPlugin
+from tflite import TensorFlowLitePlugin
 
 def create_scrypted_plugin():
-    return CoralPlugin()
+    return TensorFlowLitePlugin()

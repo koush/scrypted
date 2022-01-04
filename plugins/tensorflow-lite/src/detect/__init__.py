@@ -47,17 +47,22 @@ class DetectionSession:
         self.choke = multiprocessing.Lock()
         self.mutex = multiprocessing.Lock()
 
-    def clearTimeout(self):
+    def clearTimeoutLocked(self):
         if self.timerHandle:
             self.timerHandle.cancel()
             self.timerHandle = None
+
+    def clearTimeout(self):
+        with self.mutex:
+            self.clearTimeoutLocked()
 
     def timedOut(self):
         self.plugin.end_session(self)
 
     def setTimeout(self, duration: float):
-        self.clearTimeout()
-        self.loop.call_later(duration, lambda: self.timedOut())
+        with self.mutex:
+            self.clearTimeoutLocked()
+            self.timerHandle = self.loop.call_later(duration, lambda: self.timedOut())
 
 class DetectionSink(TypedDict):
     pipeline: str
@@ -92,7 +97,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         detection_result: ObjectsDetected = {}
         detection_result['running'] = False
-        detection_result['timestamp'] = int(time.time() * 1000)
 
         self.detection_event(detection_session, detection_result)
 
@@ -257,6 +261,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection_result = self.run_detection_gstsample(
                     detection_session, gst_sample, detection_session.settings, src_size, convert_to_src_size)
                 if detection_result:
+                    detection_result['running'] = True
                     self.detection_event(detection_session, detection_result)
                     self.detection_event_notified(detection_session.settings)
 
@@ -295,7 +300,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         with self.session_mutex:
             detection_session = self.detection_sessions.pop(detection_id)
         if not detection_session:
-            raise Exception("pipelien already detached?")
+            raise Exception("pipeline already detached?")
         with detection_session.mutex:
             detection_session.running = False
         detection_session.clearTimeout()
