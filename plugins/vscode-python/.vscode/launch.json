@@ -9,7 +9,7 @@
             "type": "python",
             "request": "attach",
             "connect": {
-                "host": "localhost",
+                "host": "${config:scrypted.debugHost}",
                 "port": 10081
             },
             "justMyCode": false,
