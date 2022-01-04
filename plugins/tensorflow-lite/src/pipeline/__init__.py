@@ -26,54 +26,21 @@ import math
 GObject.threads_init()
 Gst.init(None)
 
-class GstPipeline:
-    def __init__(self, finished: Future, pipeline, user_function):
+class GstPipelineBase:
+    def __init__(self, finished: Future) -> None:
         self.finished = finished
-        self.user_function = user_function
-        self.running = False
-        self.gstsample = None
-        self.sink_size = None
-        self.src_size = None
-        self.dst_size = None
-        self.pad_size = None
-        self.scale_size = None
-        self.condition = threading.Condition()
+        self.gst = None
 
-        self.pipeline = Gst.parse_launch(pipeline)
-        self.overlay = self.pipeline.get_by_name('overlay')
-        self.gloverlay = self.pipeline.get_by_name('gloverlay')
-        self.overlaysink = self.pipeline.get_by_name('overlaysink')
+    def attach_launch(self, gst):
+        self.gst = gst
 
-        appsink = self.pipeline.get_by_name('appsink')
-        appsink.connect('new-preroll', self.on_new_sample, True)
-        appsink.connect('new-sample', self.on_new_sample, False)
+    def parse_launch(self, pipeline: str):
+        self.attach_launch(Gst.parse_launch(pipeline))
 
         # Set up a pipeline bus watch to catch errors.
-        bus = self.pipeline.get_bus()
+        bus = self.gst.get_bus()
         bus.add_signal_watch()
         bus.connect('message', self.on_bus_message)
-
-    async def run(self):
-        # Start inference worker.
-        self.running = True
-        worker = threading.Thread(target=self.inference_loop)
-        worker.start()
-
-        # Run pipeline.
-        self.pipeline.set_state(Gst.State.PLAYING)
-        try:
-            await self.finished
-        except:
-            pass
-
-        # Clean up.
-        self.pipeline.set_state(Gst.State.NULL)
-        while GLib.MainContext.default().iteration(False):
-            pass
-        with self.condition:
-            self.running = False
-            self.condition.notify_all()
-        # worker.join()
 
     def on_bus_message(self, bus, message):
         # seeing the following error on pi 32 bit
@@ -90,6 +57,58 @@ class GstPipeline:
             safe_set_result(self.finished)
         return True
 
+    async def run_attached(self):
+        try:
+            await self.finished
+        except:
+            pass
+
+    async def run(self):
+        # Run pipeline.
+        self.gst.set_state(Gst.State.PLAYING)
+
+        await self.run_attached()
+
+        # Clean up.
+        self.gst.set_state(Gst.State.NULL)
+        while GLib.MainContext.default().iteration(False):
+            pass
+
+class GstPipeline(GstPipelineBase):
+    def __init__(self, finished: Future, appsink_name: str, user_function):
+        super().__init__(finished)
+        self.appsink_name = appsink_name
+        self.user_function = user_function
+        self.running = False
+        self.gstsample = None
+        self.sink_size = None
+        self.src_size = None
+        self.dst_size = None
+        self.pad_size = None
+        self.scale_size = None
+        self.condition = threading.Condition()
+
+    def attach_launch(self, gst):
+        super().attach_launch(gst)
+
+        appsink = self.gst.get_by_name(self.appsink_name)
+        appsink.connect('new-preroll', self.on_new_sample, True)
+        appsink.connect('new-sample', self.on_new_sample, False)
+
+    async def run_attached(self):
+        # Start inference worker.
+        self.running = True
+        worker = threading.Thread(target=self.inference_loop)
+        worker.start()
+
+        await super().run_attached()
+
+        with self.condition:
+            self.running = False
+            self.condition.notify_all()
+        # we should join, but this blocks the asyncio thread.
+        # worker.join()
+
     def on_new_sample(self, sink, preroll):
         sample = sink.emit('pull-preroll' if preroll else 'pull-sample')
         if not self.sink_size:
@@ -102,13 +121,13 @@ class GstPipeline:
 
     def get_src_size(self):
         if not self.src_size:
-            videoconvert = self.pipeline.get_by_name('videoconvert')
+            videoconvert = self.gst.get_by_name('videoconvert')
             structure = videoconvert.srcpads[0].get_current_caps().get_structure(0)
             _, w = structure.get_int('width')
             _, h = structure.get_int('height')
             self.src_size = (w, h)
 
-            videoscale = self.pipeline.get_by_name('videoscale')
+            videoscale = self.gst.get_by_name('videoscale')
             structure = videoscale.srcpads[0].get_current_caps().get_structure(0)
             _, w = structure.get_int('width')
             _, h = structure.get_int('height')
@@ -170,27 +189,40 @@ def get_dev_board_model():
   except: pass
   return None
 
-def run_pipeline(finished,
-                 user_function,
+def create_pipeline_sink(
+                 appsink_name,
                  appsink_size,
-                 video_input,
                  pixel_format):
-    PIPELINE = video_input
-
-    PIPELINE += """ ! decodebin ! queue leaky=downstream max-size-buffers=10 ! videoconvert name=videoconvert ! videoscale name=videoscale
-    ! queue leaky=downstream max-size-buffers=1 ! {sink_caps} ! {sink_element}
-    """
-
-    SINK_ELEMENT = 'appsink name=appsink emit-signals=true max-buffers=1 drop=true sync=false'
+    SINK_ELEMENT = 'appsink name={appsink_name} emit-signals=true max-buffers=1 drop=true sync=false'.format(appsink_name=appsink_name)
     SINK_CAPS = 'video/x-raw,format={pixel_format},width={width},height={height},pixel-aspect-ratio=1/1'
-    LEAKY_Q = 'queue max-size-buffers=100 leaky=upstream'
 
     sink_caps = SINK_CAPS.format(width=appsink_size[0], height=appsink_size[1], pixel_format=pixel_format)
-    pipeline = PIPELINE.format(leaky_q=LEAKY_Q,
+    pipeline = " {sink_caps} ! {sink_element}".format(
         sink_caps=sink_caps,
         sink_element=SINK_ELEMENT)
 
-    print('Gstreamer pipeline:\n', pipeline)
-
-    pipeline = GstPipeline(finished, pipeline, user_function)
     return pipeline
+
+def create_pipeline(
+                 appsink_name,
+                 appsink_size,
+                 video_input,
+                 pixel_format):
+    sink = create_pipeline_sink(appsink_name, appsink_size, pixel_format)
+    PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! videoscale name=videoscale
+        ! {sink}
+    """
+    pipeline = PIPELINE.format(video_input = video_input, sink = sink)
+    print('Gstreamer pipeline:\n', pipeline)
+    return pipeline
+
+def run_pipeline(finished,
+                 user_function,
+                 appsink_name,
+                 appsink_size,
+                 video_input,
+                 pixel_format):
+    gst = GstPipeline(finished, appsink_name, user_function)
+    pipeline = create_pipeline(appsink_name, appsink_size, video_input, pixel_format)
+    gst.parse_launch(pipeline)
+    return gst

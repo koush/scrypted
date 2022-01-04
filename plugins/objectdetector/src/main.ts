@@ -49,17 +49,17 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   hasMotionType: boolean;
   settings: Setting[];
 
-  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, public objectDetectionPlugin: ObjectDetectorMixin, public objectDetection: ObjectDetection & ScryptedDevice) {
+  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, detectionId: string) {
     super(mixinDevice, mixinDeviceState, {
-      providerNativeId: objectDetectionPlugin.mixinProviderNativeId,
+      providerNativeId,
       mixinDeviceInterfaces,
-      group: objectDetection.name,
+      group,
       groupKey: "objectdetectionplugin:" + objectDetection.id,
       mixinStorageSuffix: objectDetection.id,
     });
 
     this.cameraDevice = systemManager.getDeviceById<Camera & VideoCamera & MotionSensor>(this.id);
-    this.detectionId = 'objectdetection-' + this.cameraDevice.id;
+    this.detectionId = detectionId || modelName + '-' + this.cameraDevice.id;
 
     this.bindObjectDetection();
     this.register();
@@ -200,12 +200,19 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   async startVideoDetection() {
-    // prevent stream retrieval noise until notified that the detection is no logner running.
-    if (this.running)
-      return;
-    this.running = true;
-
     try {
+      // prevent stream retrieval noise until notified that the detection is no logner running.
+      if (this.running) {
+        const session = await this.objectDetection?.detectObjects(undefined, {
+          detectionId: this.detectionId,
+          duration: this.getDetectionDuration(),
+          settings: await this.getCurrentSettings(),
+        });
+        this.running = session.running;
+        return;
+      }
+      this.running = true;
+
       let selectedStream: MediaStreamOptions;
 
       const streamingChannel = this.storage.getItem('streamingChannel');
@@ -613,7 +620,16 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   }
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
-    return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this, systemManager.getDeviceById<ObjectDetection>(this.id));
+    let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
+    const group = objectDetection.name;
+    const model = await objectDetection.getDetectionModel();
+    let detectionId: string;
+    if (mixinDeviceInterfaces.includes(`${ScryptedInterface.ObjectDetection}:${model.name}` as any)) {
+      const id = mixinDeviceState['id'];
+      objectDetection = systemManager.getDeviceById<ObjectDetection>(id);
+      detectionId = model.name;
+    }
+    return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, model.name, group, detectionId);
   }
 
   async releaseMixin(id: string, mixinDevice: any) {
@@ -635,6 +651,10 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider {
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.ObjectDetection))
       return;
+    for (const iface of interfaces) {
+      if (iface.startsWith(`${ScryptedInterface.ObjectDetection}:`))
+        return;
+    }
     return [ScryptedInterface.MixinProvider];
   }
 
