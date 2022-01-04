@@ -18,7 +18,11 @@ RUN() {
 }
 
 echo "Installing Scrypted dependencies..."
+# needed by scrypted-ffmpeg
+RUN brew install sdl2
+# gstreamer plugins
 RUN brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
+# gst python bindings
 RUN brew install gst-python
 RUN pip3 install --upgrade pip
 RUN pip3 install aiofiles debugpy typing_extensions typing opencv-python
