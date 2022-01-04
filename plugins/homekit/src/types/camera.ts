@@ -252,7 +252,7 @@ addSupportedType({
                     // ffmpeg input for decoder
                     args.push(...ffmpegInput.inputArguments);
 
-                    if (noAudio) {
+                    if (!noAudio) {
                         // create a dummy audio track if none actually exists.
                         // this track will only be used if no audio track is available.
                         // this prevents homekit erroring out if the audio track is actually missing.
