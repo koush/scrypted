@@ -22,6 +22,23 @@ defaultArea = 2000
 defaultInterval = 250
 
 class OpenCVPlugin(DetectPlugin):
+    def __init__(self, nativeId: str | None = None):
+        super().__init__(nativeId=nativeId)
+        self.color2Gray = None
+        self.pixelFormat = "I420"
+        self.pixelFormatChannelCount = 1
+
+        if True:
+            self.retainAspectRatio = False
+            self.color2Gray = None
+            self.pixelFormat = "I420"
+            self.pixelFormatChannelCount = 1
+        else:
+            self.retainAspectRatio = True
+            self.color2Gray = cv2.COLOR_BGRA2GRAY
+            self.pixelFormat = "BGRA"
+            self.pixelFormatChannelCount = 4
+
     async def getDetectionModel(self) -> ObjectDetectionModel:
         d: ObjectDetectionModel = {
             'name': '@scrypted/opencv',
@@ -57,7 +74,7 @@ class OpenCVPlugin(DetectPlugin):
         return d
 
     def get_pixel_format(self):
-        return 'BGRA'
+        return self.pixelFormat
 
     def parse_settings(self, settings: Any):
         area = defaultArea
@@ -72,13 +89,11 @@ class OpenCVPlugin(DetectPlugin):
     def detect(self, detection_session: OpenCVDetectionSession, frame, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         area, threshold, interval = self.parse_settings(settings)
 
-        # todo: go from native yuv to gray. tested this with GRAY8 in the gstreamer
-        # pipeline but it failed...
-        # todo update: tried also decoding straight to I420 and got a seemingly
-        # skewed image (packed instead of planar?).
-        # that may be the issue. is the hardware decoder lying
-        # about the output type? is there a way to coerce it to gray or a sane type?
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY)
+        # see get_detection_input_size on undocumented size requirements for GRAY8
+        if self.color2Gray != None:
+            gray = cv2.cvtColor(frame, self.color2Gray)
+        else:
+            gray = frame
         curFrame = cv2.GaussianBlur(gray, (21,21), 0)
 
         if detection_session.previous_frame is None:
@@ -99,17 +114,18 @@ class OpenCVPlugin(DetectPlugin):
         detection_result['inputDimensions'] = src_size
         
         for c in contours:
-            contour_area = cv2.contourArea(c)
+            x, y, w, h = cv2.boundingRect(c)
+            # if w * h != contour_area:
+            #     print("mismatch w/h", contour_area - w * h)
+
+            x2, y2 = convert_to_src_size((x + w, y + h))
+            x, y = convert_to_src_size((x, y))
+            w = x2 - x + 1
+            h = y2 - y + 1
+
+            contour_area = w * h
+
             if not area or contour_area > area:
-                x, y, w, h = cv2.boundingRect(c)
-                # if w * h != contour_area:
-                #     print("mismatch w/h", contour_area - w * h)
-
-                x2, y2 = convert_to_src_size((x + w, y + h))
-                x, y = convert_to_src_size((x, y))
-                w = x2 - x + 1
-                h = y2 - y + 1
-
                 detection: ObjectDetectionResult = {}
                 detection['boundingBox'] = (x, y, w, h)
                 detection['className'] = 'motion'
@@ -122,6 +138,17 @@ class OpenCVPlugin(DetectPlugin):
         raise Exception('can not run motion detection on jpeg')
 
     def get_detection_input_size(self, src_size):
+        # The initial implementation of this plugin used BGRA
+        # because it seemed impossible to pull the Y frame out of I420 without corruption.
+        # This is because while 318x174 is aspect ratio correct,
+        # it seems to cause strange issues with stride and the image is skewed.
+        # By using 300x300, this seems to avoid some undocumented minimum size
+        # reqiurement in gst-videoscale or opencv. Unclear which.
+
+        # This is the same input size as tensorflow-lite. Allows for better pipelining.
+        if not self.retainAspectRatio:
+            return (300, 300)
+
         width, height = src_size
         if (width > height):
             if (width > 318):
@@ -156,7 +183,7 @@ class OpenCVPlugin(DetectPlugin):
             mat = np.ndarray(
                 (height,
                 width,
-                4),
+                self.pixelFormatChannelCount),
                 buffer=info.data,
                 dtype= np.uint8)
             return self.detect(detection_session, mat, settings, src_size, convert_to_src_size)
