@@ -137,13 +137,19 @@ class TensorFlowLitePlugin(DetectPlugin):
                 detections.append(detection)
 
         if convert_to_src_size:
-            for detection in detection_result['detections']:
+            detections = detection_result['detections']
+            detection_result['detections'] = []
+            for detection in detections:
                 bb = detection['boundingBox']
-                x, y = convert_to_src_size((bb[0], bb[1]))
-                x2, y2 = convert_to_src_size((bb[0] + bb[2], bb[1] + bb[3]))
+                x, y, valid = convert_to_src_size((bb[0], bb[1]), True)
+                x2, y2, valid2 = convert_to_src_size((bb[0] + bb[2], bb[1] + bb[3]), True)
+                if not valid or not valid2:
+                    # print("filtering out", detection['className'])
+                    continue
                 detection['boundingBox'] = (x, y, x2 - x + 1, y2 - y + 1)
+                detection_result['detections'].append(detection)
 
-        print(detection_result)
+        # print(detection_result)
         return detection_result
 
     def parse_settings(self, settings: Any):

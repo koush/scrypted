@@ -149,23 +149,34 @@ class GstPipeline(GstPipelineBase):
             
         return self.src_size
 
-    def convert_to_src_size(self, point):
+    def convert_to_src_size(self, point, normalize = False):
+        valid = True
         px, py = self.pad_size
         x, y = point
+
+        if normalize:
+            x = max(0, x)
+            x = min(x, self.src_size[0] - 1)
+            y = max(0, y)
+            y = min(y, self.src_size[1] - 1)
 
         x = (x - px) / self.scale_size
         if x < 0:
             x = 0
+            valid = False
         if x >= self.src_size[0]:
             x = self.src_size[0] - 1
+            valid = False
 
         y = (y - py) / self.scale_size
         if y < 0:
             y = 0
+            valid = False
         if y >= self.src_size[1]:
             y = self.src_size[1] - 1
+            valid = False
 
-        return (int(math.ceil(x)), int(math.ceil(y)))
+        return (int(math.ceil(x)), int(math.ceil(y)), valid)
 
     def inference_loop(self):
         while True:
@@ -177,7 +188,7 @@ class GstPipeline(GstPipelineBase):
                 gstsample = self.gstsample
                 self.gstsample = None
 
-            self.user_function(gstsample, self.get_src_size(), lambda p: self.convert_to_src_size(p))
+            self.user_function(gstsample, self.get_src_size(), lambda p, normalize=False: self.convert_to_src_size(p, normalize))
 
 def get_dev_board_model():
   try:

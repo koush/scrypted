@@ -91,6 +91,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     detection_session.running = False
                     detection_session.choke.acquire()
         else:
+            # leave detection_session.running as True to avoid race conditions.
+            # the removal from detection_sessions will restart it.
             safe_set_result(detection_session.future)
             with self.session_mutex:
                 self.detection_sessions.pop(detection_session.id, None)
@@ -146,8 +148,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 ending = True
             elif detection_id and not detection_session:
                 if not mediaObject:
-                    raise Exception(
-                        'session %s inactive and no mediaObject provided' % detection_id)
+                    return (False, None, self.create_detection_result_status(detection_id, False))
 
                 new_session = True
                 detection_session = self.create_detection_session()
@@ -169,9 +170,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if is_image:
             return (False, detection_session, None)
 
-        if new_session:
-            detection_session.running = True
-
         detection_session.setTimeout(duration / 1000)
         if settings != None:
             detection_session.settings = settings
@@ -187,7 +185,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                             detection_session.choke.release()
                         except:
                             pass
-            return (False, None, self.create_detection_result_status(detection_id, detection_session.running))
+            return (False, detection_session, self.create_detection_result_status(detection_id, detection_session.running))
 
         return (True, detection_session, None)
 
@@ -207,9 +205,15 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
 
         if not create:
-            return objects_detected
+            # a detection session may have been created, but not started
+            # if the initial request was for an image.
+            # however, attached sessions should be unchoked, as the pipeline
+            # is not managed here.
+            if not detection_session or detection_session.attached or detection_session.running or not mediaObject:
+                return objects_detected
 
         detection_id = detection_session.id
+        detection_session.running = True
 
         print('detection starting', detection_id)
         b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.MediaStreamUrl.value)

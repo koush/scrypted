@@ -208,7 +208,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           settings: await this.getCurrentSettings(),
         });
         this.running = session.running;
-        return;
+        if (this.running)
+          return;
       }
       this.running = true;
 
