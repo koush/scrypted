@@ -1,15 +1,10 @@
-# @scrypted/coral
+# Motion Detection Plugin for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
+The OpenCV Motion Detection Plugin adds motion detection to any camera. This can also be used with cameras with built in motion detection.
 
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
+## Setup
 
-## Visual Studio Code configuration
-
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
+1. Enable the integration on a camera.
+2. Choose the lowest resolution substream available. The plugin does not need to analyze a full resolution video for motion, and processing anything over 300x300 will use excessive CPU time.
+3. Configure the motion area and threshold to change the sensitivity.
+4. You test your setup in the camera's OpenCV Motion Detection settings, by enabling `Motion Detection Events` to view where motion is trigger.
