@@ -201,15 +201,14 @@ export function addBuiltins(console: Console, mediaManager: MediaManager) {
                 args.push(`tcp://127.0.0.1:${audioPort}`);
             }
 
+            args.push('-an');
             // chromecast seems to crap out on higher than 15fps??? is there
             // some webrtc video negotiation that is failing here?
             args.push('-r', '15');
             args.push('-vcodec', 'rawvideo');
-            args.push('-an');
             args.push('-pix_fmt', 'yuv420p');
             args.push('-f', 'rawvideo');
             args.push(`tcp://127.0.0.1:${videoPort}`);
-
 
             console.log(ffInput);
             console.log(args);
