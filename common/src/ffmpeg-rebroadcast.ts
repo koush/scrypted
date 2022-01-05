@@ -111,6 +111,8 @@ export async function startRebroadcastSession<T extends string>(ffmpegInput: FFM
         }
         isActive = false;
         cp?.kill();
+        // might need this too?
+        cp?.kill('SIGKILL');
         for (const server of servers) {
             server?.close();
         }
