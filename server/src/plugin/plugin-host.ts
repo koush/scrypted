@@ -260,7 +260,7 @@ export class PluginHost {
                 execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
             }
 
-            this.worker = child_process.fork(require.main.filename, ['child'], {
+            this.worker = child_process.fork(require.main.filename, ['child', this.pluginId], {
                 stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
                 env: Object.assign({}, process.env, env),
                 serialization: 'advanced',
