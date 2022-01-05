@@ -118,8 +118,8 @@ class OpenCVPlugin(DetectPlugin):
             # if w * h != contour_area:
             #     print("mismatch w/h", contour_area - w * h)
 
-            x2, y2 = convert_to_src_size((x + w, y + h))
-            x, y = convert_to_src_size((x, y))
+            x2, y2, _ = convert_to_src_size((x + w, y + h))
+            x, y, _ = convert_to_src_size((x, y))
             w = x2 - x + 1
             h = y2 - y + 1
 
