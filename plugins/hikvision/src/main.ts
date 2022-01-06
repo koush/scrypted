@@ -78,12 +78,16 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
     }
 
     createClient() {
-        const client = new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
+        return new HikVisionCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
+    }
 
+    getClient() {
+        if (!this.client)
+            this.client = this.createClient();
         (async () => {
             if (this.hasCheckedCodec)
                 return;
-            const streamSetup = await client.checkStreamSetup(this.getRtspChannel());
+            const streamSetup = await this.client.checkStreamSetup(this.getRtspChannel());
             this.hasCheckedCodec = true;
             if (streamSetup.videoCodecType !== 'H.264') {
                 this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
@@ -93,17 +97,11 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
             }
         })();
 
-        return client;
+        return this.client;
     }
 
-    // getClient() {
-    //     if (!this.client)
-    //         this.client = this.createClient();
-    //     return this.client;
-    // }
-
     async takeSmartCameraPicture(): Promise<MediaObject> {
-        const api = this.createClient();
+        const api = this.getClient();
         return mediaManager.createMediaObject(await api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
     }
 
@@ -146,7 +144,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         if (!this.channelIds) {
-            const client = this.createClient();
+            const client = this.getClient();
             this.channelIds = new Promise(async (resolve, reject) => {
                 const isOld = await client.checkIsOldModel();
                 if (isOld) {
