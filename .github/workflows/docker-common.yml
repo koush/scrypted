@@ -48,6 +48,8 @@ jobs:
           push: true
           tags: |
             koush/scrypted-common:${{ matrix.node }}
+            ${{ matrix.node == '16-bullseye' && 'koush/scrypted-common:latest' || '' }}
             ghcr.io/koush/scrypted-common:${{ matrix.node }}
+            ${{ matrix.node == '16-bullseye' && 'ghcr.io/scrypted-common:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

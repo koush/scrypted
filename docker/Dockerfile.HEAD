@@ -1,4 +1,5 @@
-FROM koush/scrypted-common
+ARG BASE="16-bullseye"
+FROM koush/scrypted-common:${BASE}
 
 WORKDIR /
 RUN git clone --depth=1 https://github.com/koush/scrypted
