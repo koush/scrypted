@@ -1,6 +1,0 @@
-FROM node:16
-
-COPY . .
-WORKDIR  /
-
-RUN curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/install-scrypted-dependencies-linux.sh | bash -e

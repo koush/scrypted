@@ -1,0 +1,10 @@
+FROM koush/scrypted-common
+
+WORKDIR /
+RUN git clone https://github.com/koush/scrypted
+
+WORKDIR /scrypted/server
+RUN npm install
+RUN npm run build
+
+CMD npm run serve-no-build
