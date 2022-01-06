@@ -36,7 +36,15 @@ export class SynologyApiClient {
             idList: cameraIds.join(',')
         };
 
-        return await this.sendRequest<SynologyCameraLiveViewPath[]>(params);
+        const errorCodeDescs = {
+            '400': 'Execution failed',
+            // Usually when 401 happens, there's a "Fail to get local host Ip str!" error in surveillance.log.
+            // One instance it was due to an old network bridge configured in Docker that had to be removed.
+            '401': 'Parameter invalid (possibly due to misconfigured Synology network interface -- run ifconfig on your server)',
+            '402': 'Camera disabled'
+        };
+
+        return await this.sendRequest<SynologyCameraLiveViewPath[]>(params, null, false, errorCodeDescs);
     }
 
     public async getCameraSnapshot(cameraId: number | string) {
@@ -67,7 +75,8 @@ export class SynologyApiClient {
         return response.cameras;
     }
 
-    public async login(account: string, password: string): Promise<void> {
+    public async login(account: string, password: string, otpCode?: number, enableDeviceToken: boolean = false, deviceName?: string,
+        deviceId?: string): Promise<string | undefined> {
         const params = {
             api: 'SYNO.API.Auth',
             version: 6,
@@ -76,6 +85,22 @@ export class SynologyApiClient {
             account: account,
             passwd: password
         };
+
+        if (otpCode) {
+            params['otp_code'] = otpCode;
+        }
+
+        if (enableDeviceToken) {
+            params['enable_device_token'] = enableDeviceToken ? 'yes' : 'no';
+        }
+
+        if (deviceName) {
+            params['device_name'] = deviceName;
+        }
+
+        if (deviceId) {
+            params['device_id'] = deviceId;
+        }
 
         const errorCodeDescs = {
             '400': 'Invalid password',
@@ -92,7 +117,9 @@ export class SynologyApiClient {
             '411': 'Account Locked (when account max try exceed)'
         };
 
-        await this.sendRequest(params, null, true, errorCodeDescs);
+        const response = await this.sendRequest<SynologyApiAuthResponse>(params, null, true, errorCodeDescs);
+
+        return response.did;
     }
 
     private async queryApiInfo(): Promise<Record<string, SynologyApiInfo>> {
@@ -151,6 +178,11 @@ interface SynologyApiResponse<T> {
     data?: T;
     error?: SynologyApiError;
     success: boolean;
+}
+
+interface SynologyApiAuthResponse {
+    sid?: string;
+    did?: string;
 }
 
 interface SynologyApiListCamerasResponse {
