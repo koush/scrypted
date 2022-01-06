@@ -211,6 +211,8 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
         const url = this.getSetting('url');
         const username = this.getSetting('username');
         const password = this.getSetting('password');
+        const otpCode = this.getSetting('otpCode');
+        const mfaDeviceId = this.getSetting('mfaDeviceId');
 
         this.log.clearAlerts();
 
@@ -234,8 +236,31 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
         }
 
         try {
-            await this.api.login(username, password);
+            const newMfaDeviceId = await this.api.login(username, password, otpCode ? parseInt(otpCode) : undefined, !!otpCode, 'Scrypted', mfaDeviceId);
 
+            // If a OTP was present, store the device ID to allow us to skip the OTP requirement next login.
+            if (otpCode) {
+                this.storage.setItem('mfaDeviceId', newMfaDeviceId);
+            }
+        }
+        catch (e) {
+            this.log.a(`login error: ${e}`);
+            this.console.error('login error', e);
+
+            // Clear device ID upon login failure, since it's likely useless now
+            this.storage.removeItem('mfaDeviceId');
+
+            return;
+        }
+        finally {
+            // Clear the OTP setting if provided since it's a temporary code
+            if (otpCode) {
+                this.storage.removeItem('otpCode');
+                this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+            }
+        }
+
+        try {
             this.cameras = await this.api.listCameras();
 
             if (!this.cameras) {
@@ -289,8 +314,8 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
             }
         }
         catch (e) {
-            this.log.a(`login error: ${e}`);
-            this.console.error('login error', e);
+            this.log.a(`device discovery error: ${e}`);
+            this.console.error('device discovery error', e);
         }
     }
 
@@ -322,6 +347,13 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
                 title: 'Password',
                 type: 'password',
                 value: this.getSetting('password'),
+            },
+            {
+                key: 'otpCode',
+                title: 'Verification Code (OTP)',
+                description: 'Required only if you have two-factor authentication enabled',
+                type: 'integer',
+                value: this.getSetting('otpCode'),
             },
             {
                 key: 'url',
