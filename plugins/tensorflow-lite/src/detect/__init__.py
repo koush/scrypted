@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from asyncio.events import AbstractEventLoop, TimerHandle
 from asyncio.futures import Future
-from typing import Any, Mapping, List, Tuple, TypedDict
+from typing import Any, Callable, Mapping, List, Tuple, TypedDict
 
-from numpy import number
+from numpy import number, void
 from pipeline import GstPipeline, GstPipelineBase, create_pipeline_sink, safe_set_result
 import scrypted_sdk
 import json
@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 import multiprocessing
 from pipeline import run_pipeline
 import threading
+
+from gi.repository import Gst
 
 from scrypted_sdk.types import FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
@@ -29,6 +31,43 @@ def optional_chain(root, *keys):
         if result is None:
             break
     return result
+
+
+class PipelineValve:
+    allowPacketCounter: int
+    def __init__(self) -> None:
+        self.allowPacketCounter = 1
+        self.mutex = multiprocessing.Lock()
+
+    def allowCount(self, count: int):
+        with self.mutex:
+            self.allowPacketCounter = count
+
+
+def setupPipelineValve(name: str, gst: Any) -> PipelineValve:
+    ret = PipelineValve()
+    valve = gst.get_by_name(name + "Valve")
+    src = valve.get_static_pad("src")
+
+    def sink_probe(pad, info):
+        if info.type & Gst.PadProbeType.BUFFER or info.type & Gst.PadProbeType.BUFFER_LIST:
+            with ret.mutex:
+                if ret.allowPacketCounter == None:
+                    return Gst.PadProbeReturn.PASS
+                if ret.allowPacketCounter == 0:
+                    return Gst.PadProbeReturn.DROP
+
+                if ret.allowPacketCounter < 0:
+                    ret.allowPacketCounter = ret.allowPacketCounter + 1
+                    if ret.allowPacketCounter == 0:
+                        ret.allowPacketCounter = None
+                    return Gst.PadProbeReturn.DROP
+
+                ret.allowPacketCounter = ret.allowPacketCounter - 1
+        return Gst.PadProbeReturn.PASS
+
+    src.add_probe(Gst.PadProbeType.BLOCK_DOWNSTREAM or Gst.PadProbeType.GST_PAD_PROBE_TYPE_BUFFER or Gst.PadProbeType.GST_PAD_PROBE_TYPE_BUFFER_LIST, sink_probe)
+    return ret
 
 class DetectionSession:
     id: str
@@ -44,8 +83,8 @@ class DetectionSession:
         self.future = Future()
         self.running = False
         self.attached = False
-        self.choke = multiprocessing.Lock()
         self.mutex = multiprocessing.Lock()
+        self.valve = PipelineValve()
 
     def clearTimeoutLocked(self):
         if self.timerHandle:
@@ -89,7 +128,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 if detection_session.running:
                     print("choked session", detection_session.id)
                     detection_session.running = False
-                    detection_session.choke.acquire()
+                    detection_session.valve.allowCount(0)
         else:
             # leave detection_session.running as True to avoid race conditions.
             # the removal from detection_sessions will restart it.
@@ -181,10 +220,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     if not detection_session.running:
                         print("unchoked session", detection_session.id)
                         detection_session.running = True
-                        try:
-                            detection_session.choke.release()
-                        except:
-                            pass
+                        detection_session.valve.allowCount(None)
             return (False, detection_session, self.create_detection_result_status(detection_id, detection_session.running))
 
         return (True, detection_session, None)
@@ -274,16 +310,16 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             finally:
                 pass
 
-            if detection_session.attached:
-                with detection_session.choke:
-                    pass
-
         return user_callback
 
-    def attach_pipeline(self, gstPipeline: GstPipelineBase, session: ObjectDetectionSession = None):
+    def attach_pipeline(self, gstPipeline: GstPipelineBase, session: ObjectDetectionSession, valveName: str = None):
         class DummyMediaObject:
             mimeType = 'video/*'
         create, detection_session, objects_detected = self.ensure_session(DummyMediaObject(), session)
+
+        if detection_session and valveName:
+            valve = setupPipelineValve(valveName, gstPipeline.gst)
+            detection_session.valve = valve
 
         if not create:
             return create, detection_session, objects_detected, None
@@ -308,11 +344,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         with detection_session.mutex:
             detection_session.running = False
         detection_session.clearTimeout()
-        try:
-            detection_session.choke.release()
-        except:
-            pass
-
+ 
     def run_pipeline(self, detection_session: DetectionSession, duration, src_size, video_input):
         inference_size = self.get_detection_input_size(src_size)
 
