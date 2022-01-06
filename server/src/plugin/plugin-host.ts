@@ -396,7 +396,13 @@ export function startPluginRemote() {
         return ret;
     }
 
-    const pluginsPromise = api.getComponent('plugins');
+    let pluginsPromise: Promise<any>;
+    function getPlugins() {
+        if (!pluginsPromise)
+            pluginsPromise = api.getComponent('plugins');
+        return pluginsPromise;
+    }
+
     const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
         // the the plugin console is simply the default console
         // and gets read from stderr/stdout.
@@ -404,8 +410,8 @@ export function startPluginRemote() {
             return console;
 
         return getConsole(async (stdout, stderr) => {
-            const plugins = await pluginsPromise;
             const connect = async () => {
+                const plugins = await getPlugins();
                 const port = await plugins.getRemoteServicePort(peer.selfName, 'console-writer');
                 const socket = net.connect(port);
                 socket.write(nativeId + '\n');
@@ -445,7 +451,6 @@ export function startPluginRemote() {
                 setTimeout(tryConnect, 10000);
             };
 
-            const plugins = await pluginsPromise;
             const connect = async () => {
                 const ds = deviceManager.getDeviceState(nativeId);
                 if (!ds) {
@@ -453,6 +458,7 @@ export function startPluginRemote() {
                     return;
                 }
 
+                const plugins = await getPlugins();
                 const { pluginId, nativeId: mixinNativeId } = await plugins.getDeviceInfo(mixinId);
                 const port = await plugins.getRemoteServicePort(pluginId, 'console-writer');
                 const socket = net.connect(port);
