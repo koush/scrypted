@@ -3,6 +3,7 @@
   "version": "0.0.117",
   "description": "",
   "dependencies": {
+    "@mapbox/node-pre-gyp": "^1.0.5",
     "@scrypted/ffmpeg": "^1.0.4",
     "@scrypted/sdk": "^0.0.133",
     "adm-zip": "^0.5.3",
@@ -35,7 +36,6 @@
     "mdns": "^2.7.2"
   },
   "devDependencies": {
-    "@mapbox/node-pre-gyp": "^1.0.5",
     "@types/adm-zip": "^0.4.33",
     "@types/cookie-parser": "^1.4.2",
     "@types/debug": "^4.1.5",
