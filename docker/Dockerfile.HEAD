@@ -1,7 +1,7 @@
 FROM koush/scrypted-common
 
 WORKDIR /
-RUN git clone https://github.com/koush/scrypted
+RUN git clone -–depth 1 https://github.com/koush/scrypted
 
 WORKDIR /scrypted/server
 RUN npm install
