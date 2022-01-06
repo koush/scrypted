@@ -84,7 +84,8 @@ class EventListenerRegisterImpl implements EventListenerRegister {
     async removeListener(): Promise<void> {
         try {
             const register = await this.promise;
-            register.removeListener();
+            this.promise = undefined;
+            register?.removeListener();
         }
         catch (e) {
             console.error('removeListener', e);

@@ -2,9 +2,15 @@ import { HttpResponse, HttpResponseOptions } from "@scrypted/sdk/types";
 import { Response } from "express";
 import mime from "mime";
 import AdmZip from "adm-zip";
+import { PROPERTY_PROXY_ONEWAY_METHODS } from "./rpc";
 
 export function createResponseInterface(res: Response, zip: AdmZip): HttpResponse {
     class HttpResponseImpl implements HttpResponse {
+        [PROPERTY_PROXY_ONEWAY_METHODS] = [
+            'send',
+            'sendFile',
+        ];
+
         send(body: string): void;
         send(body: string, options: HttpResponseOptions): void;
         send(body: Buffer): void;
