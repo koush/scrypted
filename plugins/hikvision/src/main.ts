@@ -23,17 +23,46 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                     events.removeAllListeners();
                 };
 
+                let ignoreCameraNumber: boolean;
+
                 events.on('close', () => ret.emit('error', new Error('close')));
                 events.on('error', e => ret.emit('error', e));
-                events.on('event', (event: HikVisionCameraEvent, cameraNumber: string) => {
+                events.on('event', async (event: HikVisionCameraEvent, cameraNumber: string) => {
                     if (event === HikVisionCameraEvent.MotionDetected
                         || event === HikVisionCameraEvent.LineDetection
                         || event === HikVisionCameraEvent.FieldDetection) {
-                        if (this.getRtspChannel() && cameraNumber !== this.getCameraNumber()) {
-                            // this.console.error(`### Skipping motion event ${cameraNumber} != ${this.getCameraNumber()}`);
-                            return;
+
+                        // check if the camera+channel field is in use, and filter events.
+                        if (this.getRtspChannel()) {
+                            // it is possible to set it up to use a camera number
+                            // on an nvr IP (which gives RTSP urls through the NVR), but then use a http port
+                            // that gives a filtered event stream from only that camera.
+                            // this this case, the camera numbers will not
+                            // match as they will be always be "1".
+                            // to detect that a camera specific endpoint is being used
+                            // can look at the channel ids, and see if that camera number is found.
+                            // this is different from the use case where the NVR or camera
+                            // is using a port other than 80 (the default).
+                            // could add a setting to have the user explicitly denote nvr usage
+                            // but that is error prone.
+                            const userCameraNumber = this.getCameraNumber();
+                            if (ignoreCameraNumber === undefined && this.channelIds) {
+                                const channelIds = await this.channelIds;
+                                ignoreCameraNumber = true;
+                                for (const id of channelIds) {
+                                    if (id.startsWith(userCameraNumber)) {
+                                        ignoreCameraNumber = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (!ignoreCameraNumber && cameraNumber !== userCameraNumber) {
+                                // this.console.error(`### Skipping motion event ${cameraNumber} != ${this.getCameraNumber()}`);
+                                return;
+                            }
                         }
-        
+
                         // this.console.error('### Detected motion, camera: ', cameraNumber);
                         this.motionDetected = true;
                         clearTimeout(motionTimeout);

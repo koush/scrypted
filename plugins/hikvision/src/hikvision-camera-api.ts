@@ -29,8 +29,8 @@ export interface HikVisionCameraStreamSetup {
 
 export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
-    deviceModel : Promise<string>;
-    listenerPromise : Promise<EventEmitter>;
+    deviceModel: Promise<string>;
+    listenerPromise: Promise<EventEmitter>;
 
     constructor(public ip: string, username: string, password: string, public console: Console) {
         this.digestAuth = new AxiosDigestAuth({
@@ -39,7 +39,7 @@ export class HikVisionCameraAPI {
         });
     }
 
-    async checkDeviceModel() : Promise<string> {
+    async checkDeviceModel(): Promise<string> {
         if (!this.deviceModel) {
             this.deviceModel = new Promise(async (resolve, reject) => {
                 try {
@@ -49,7 +49,7 @@ export class HikVisionCameraAPI {
                         url: `http://${this.ip}/ISAPI/System/deviceInfo`,
                     });
                     const deviceModel = response.data.match(/>(.*?)<\/model>/)?.[1];
-                    resolve(deviceModel);    
+                    resolve(deviceModel);
                 } catch (e) {
                     this.console.error('error checking NVR model', e);
                     resolve("unknown");
@@ -59,7 +59,7 @@ export class HikVisionCameraAPI {
         return await this.deviceModel;
     }
 
-    async checkIsOldModel() : Promise<boolean> {
+    async checkIsOldModel(): Promise<boolean> {
         // The old Hikvision DS-7608NI-E2 doesn't support channel capability checks, and the requests cause errors
         const model = await this.checkDeviceModel();
         return model.match(/DS-7608NI-E2/) != undefined;
@@ -117,7 +117,7 @@ export class HikVisionCameraAPI {
                     responseType: 'stream',
                 });
                 const stream = response.data as Readable;
-        
+
                 stream.on('data', (buffer: Buffer) => {
                     const data = buffer.toString();
                     // this.console.log(data);
