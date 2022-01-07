@@ -22,6 +22,7 @@ from asyncio.streams import StreamReader, StreamWriter
 import os
 from os import sys
 import platform
+import shutil
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -156,11 +157,18 @@ class PluginRemote:
             nativeId, *values, sep=sep, end=end, flush=flush), self.loop)
 
     async def loadZip(self, packageJson, zipData, options=None):
-        zipPath = options['filename']
+        zipPath: str
 
-        f = open(zipPath, 'wb')
-        f.write(zipData)
-        f.close()
+        if isinstance(zipData, str):
+            zipPath = (options and options.get('filename', None)) or zipData
+            if zipPath != zipData:
+                shutil.copyfile(zipData, zipPath)
+        else:
+            zipPath = options['filename']
+            f = open(zipPath, 'wb')
+            f.write(zipData)
+            f.close()
+
         zipData = None
 
         zip = zipfile.ZipFile(zipPath)

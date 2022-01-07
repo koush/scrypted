@@ -201,16 +201,18 @@ export class PluginHost {
                     filename: isPython
                         ? pluginDebug
                             ? `${volume}/plugin.zip`
-                            : `${pluginVolume}/plugin.zip`
+                            : zipFile
                         : pluginDebug
                             ? '/plugin/main.nodejs.js'
                             : `/${this.pluginId}/main.nodejs.js`,
                     unzippedPath: this.unzippedPath,
                 };
-                const zipData = isPython ? zipBuffer : zipFile;
-                const module = await remote.loadZip(this.packageJson, zipData, loadZipOptions);
+                // original implementation sent the zipBuffer, sending the zipFile name now.
+                // can switch back for non-local plugins.
+                const modulePromise = remote.loadZip(this.packageJson, zipFile, loadZipOptions);
                 // allow garbage collection of the zip buffer
                 zipBuffer = undefined;
+                const module = await modulePromise;
                 logger.log('i', `loaded ${this.pluginName}`);
                 logger.clearAlert(fail)
                 return { module, remote };

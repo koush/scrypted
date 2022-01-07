@@ -509,7 +509,6 @@ export class RpcPeer {
                         const localProxiedEntry = this.localProxied.get(local);
                         // if a finalizer id is specified, it must match.
                         if (rpcFinalize.__local_proxy_finalizer_id && rpcFinalize.__local_proxy_finalizer_id !== localProxiedEntry?.finalizerId) {
-                            console.error(this.selfName, this.peerName, 'finalizer mismatch')
                             break;
                         }
                         delete this.localProxyMap[rpcFinalize.__local_proxy_id];
