@@ -137,13 +137,15 @@ class RecognizedPerson extends ScryptedDeviceBase implements Camera, Settings {
   }
 }
 
+type RebroadcastParsers = "rawvideo";
+
 interface DetectionSession {
   id: string;
   minScore: number;
   events: EventEmitter;
   running?: boolean;
 
-  rebroadcaster?: Promise<FFMpegRebroadcastSession>;
+  rebroadcaster?: Promise<FFMpegRebroadcastSession<RebroadcastParsers>>;
   rebroadcasterTimeout?: NodeJS.Timeout;
 }
 
@@ -333,10 +335,10 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
     }
 
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-    const rebroadcaster = startRebroadcastSession(ffmpegInput, {
+    const rebroadcaster = startRebroadcastSession<RebroadcastParsers>(ffmpegInput, {
       console: this.console,
       parsers: {
-        'rawvideo': createRawVideoParser({
+        rawvideo: createRawVideoParser({
           pixelFormat: PIXEL_FORMAT_RGB24,
         })
       }

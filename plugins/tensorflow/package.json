@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/tensorflow",
-   "version": "0.0.20",
+   "version": "0.0.21",
    "description": "Scrypted Face Recognition Service.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -34,7 +34,8 @@
          "DeviceProvider",
          "ObjectDetection",
          "Settings"
-      ]
+      ],
+      "sharedWorker": false
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
