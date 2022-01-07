@@ -334,7 +334,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 console.log(ws);
             });
         }
-        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.zip));
+        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedDir));
     }
 
     killPlugin(plugin: Plugin) {
@@ -465,7 +465,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             if (!device.interfaces.includes(ScryptedInterface.Readme)) {
                 const zipData = Buffer.from(plugin.zip, 'base64');
                 const adm = new AdmZip(zipData);
-                if (adm.getEntry('README.md')) {
+                const entry = adm.getEntry('README.md');
+                if (entry) {
                     device.interfaces = device.interfaces.slice();
                     device.interfaces.push(ScryptedInterface.Readme);
                 }

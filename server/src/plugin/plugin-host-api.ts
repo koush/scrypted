@@ -35,9 +35,9 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         this.scrypted.runPlugin(plugin);
     }, 15000);
 
-    constructor(public scrypted: ScryptedRuntime, plugin: Plugin, public pluginHost: PluginHost, public mediaManager: MediaManager) {
+    constructor(public scrypted: ScryptedRuntime, pluginId: string, public pluginHost: PluginHost, public mediaManager: MediaManager) {
         super();
-        this.pluginId = plugin._id;
+        this.pluginId = pluginId;
     }
 
     // do we care about mixin validation here?

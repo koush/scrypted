@@ -17,7 +17,7 @@ import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
         })();
     }
 
-    async loadZip(packageJson: any, zipData: Buffer, options?: PluginRemoteLoadZipOptions): Promise<any> {
+    async loadZip(packageJson: any, zipData: Buffer|string, options?: PluginRemoteLoadZipOptions): Promise<any> {
         if (!this.remote)
             await this.remoteReadyPromise;
         return this.remote.loadZip(packageJson, zipData, options);

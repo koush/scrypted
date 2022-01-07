@@ -434,9 +434,10 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 done(ret);
             },
 
-            async loadZip(packageJson: any, zipData: Buffer, zipOptions?: PluginRemoteLoadZipOptions) {
+            async loadZip(packageJson: any, zipData: Buffer|string, zipOptions?: PluginRemoteLoadZipOptions) {
                 const pluginConsole = getPluginConsole?.();
-                const zip = new AdmZip(zipData);
+                let zip = new AdmZip(zipData);
+                zipData = undefined;
                 await options?.onLoadZip?.(zip, packageJson);
                 const main = zip.getEntry('main.nodejs.js');
                 const script = main.getData().toString();
@@ -450,10 +451,11 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                         continue;
                     if (!entry.entryName.startsWith('fs/'))
                         continue;
-                    const name = entry.entryName.substr('fs/'.length);
+                    const name = entry.entryName.substring('fs/'.length);
                     volume.mkdirpSync(path.dirname(name));
                     volume.writeFileSync(name, entry.getData());
                 }
+                zip = undefined;
 
                 function websocketConnect(url: string, protocols: any, callbacks: WebSocketConnectCallbacks) {
                     if (url.startsWith('io://') || url.startsWith('ws://')) {

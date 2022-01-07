@@ -161,6 +161,7 @@ class PluginRemote:
         f = open(zipPath, 'wb')
         f.write(zipData)
         f.close()
+        zipData = None
 
         zip = zipfile.ZipFile(zipPath)
 

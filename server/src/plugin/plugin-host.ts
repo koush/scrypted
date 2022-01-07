@@ -20,11 +20,15 @@ import child_process from 'child_process';
 import { PluginDebug } from './plugin-debug';
 import readline from 'readline';
 import { Readable, Writable } from 'stream';
-import { ensurePluginVolume } from './plugin-volume';
+import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { getPluginNodePath, installOptionalDependencies } from './plugin-npm-dependencies';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
 import { createREPLServer } from './plugin-repl';
 import { LazyRemote } from './plugin-lazy-remote';
+import crypto from 'crypto';
+import fs from 'fs';
+import mkdirp from 'mkdirp';
+import rimraf from 'rimraf';
 
 export class PluginHost {
     worker: child_process.ChildProcess;
@@ -33,7 +37,6 @@ export class PluginHost {
     module: Promise<any>;
     scrypted: ScryptedRuntime;
     remote: PluginRemote;
-    zip: AdmZip;
     io = io(undefined, {
         pingTimeout: 120000,
     });
@@ -47,6 +50,7 @@ export class PluginHost {
     };
     killed = false;
     consoleServer: Promise<ConsoleServer>;
+    unzippedDir: string;
 
     kill() {
         this.killed = true;
@@ -86,15 +90,19 @@ export class PluginHost {
         this.pluginId = plugin._id;
         this.pluginName = plugin.packageJson?.name;
         this.packageJson = plugin.packageJson;
-        const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(plugin._id));
+        let zipBuffer = Buffer.from(plugin.zip, 'base64');
+        // allow garbage collection of the base 64 contents
+        plugin = undefined;
 
-        const volume = path.join(process.cwd(), 'volume');
-        const cwd = ensurePluginVolume(this.pluginId);
+        const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(this.pluginId));
+
+        const volume = getScryptedVolume();
+        const pluginVolume = ensurePluginVolume(this.pluginId);
 
         this.startPluginHost(logger, {
             NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),
-            SCRYPTED_PLUGIN_VOLUME: cwd,
-        }, plugin.packageJson.scrypted.runtime);
+            SCRYPTED_PLUGIN_VOLUME: pluginVolume,
+        }, this.packageJson.scrypted.runtime);
 
         this.io.on('connection', async (socket) => {
             try {
@@ -138,10 +146,26 @@ export class PluginHost {
             ? new MediaManagerHostImpl(scrypted.stateManager.getSystemState(), id => scrypted.getDevice(id), console)
             : undefined;
 
-        this.api = new PluginHostAPI(scrypted, plugin, this, mediaManager);
+        this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager);
 
-        const zipBuffer = Buffer.from(plugin.zip, 'base64');
-        this.zip = new AdmZip(zipBuffer);
+        const zipDir = path.join(pluginVolume, 'zip');
+        const extractVersion = "1-";
+        const hash = extractVersion + crypto.createHash('md5').update(zipBuffer).digest().toString('hex');
+        const zipFilename = `${hash}.zip`;
+        const zipFile = path.join(zipDir, zipFilename);
+        this.unzippedDir = path.join(zipDir, 'unzipped')
+        {
+            const zipDirTmp = zipDir + '.tmp';
+            if (!fs.existsSync(zipFile)) {
+                rimraf.sync(zipDirTmp);
+                rimraf.sync(zipDir);
+                mkdirp.sync(zipDirTmp);
+                fs.writeFileSync(path.join(zipDirTmp, zipFilename), zipBuffer);
+                const admZip = new AdmZip(zipBuffer);
+                admZip.extractAllTo(path.join(zipDirTmp, 'unzipped'));
+                fs.renameSync(zipDirTmp, zipDir);
+            }
+        }
 
         logger.log('i', `loading ${this.pluginName}`);
         logger.log('i', 'pid ' + this.worker?.pid);
@@ -170,18 +194,22 @@ export class PluginHost {
 
             const fail = 'Plugin failed to load. Console for more information.';
             try {
+                const isPython = runtime === 'python';
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
                     // if debugging, use a normalized path for sourcemap resolution, otherwise
                     // prefix with module path.
-                    filename: runtime === 'python'
+                    filename: isPython
                         ? pluginDebug
                             ? `${volume}/plugin.zip`
-                            : `${cwd}/plugin.zip`
+                            : `${pluginVolume}/plugin.zip`
                         : pluginDebug
                             ? '/plugin/main.nodejs.js'
                             : `/${this.pluginId}/main.nodejs.js`,
                 };
-                const module = await remote.loadZip(plugin.packageJson, zipBuffer, loadZipOptions);
+                const zipData = isPython ? zipBuffer : zipFile;
+                const module = await remote.loadZip(this.packageJson, zipData, loadZipOptions);
+                // allow garbage collection of the zip buffer
+                zipBuffer = undefined;
                 logger.log('i', `loaded ${this.pluginName}`);
                 logger.clearAlert(fail)
                 return { module, remote };
@@ -474,7 +502,7 @@ export function startPluginRemote() {
                 socket.on('close', reconnect);
             };
 
-            const tryConnect = async() => {
+            const tryConnect = async () => {
                 try {
                     await connect();
                 }

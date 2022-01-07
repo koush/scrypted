@@ -8,6 +8,8 @@ import { getDisplayType } from "../infer-defaults";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
 import { PluginError } from "./plugin-error";
 import { sleep } from "../sleep";
+import path from 'path';
+import fs from 'fs';
 
 interface MixinTable {
     mixinProviderId: string;
@@ -382,9 +384,14 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             if (pluginDevice && !pluginDevice.nativeId) {
                 const plugin = this.scrypted.plugins[pluginDevice.pluginId];
                 if (!plugin.packageJson.scrypted.interfaces.includes(ScryptedInterface.Readme)) {
-                    const entry = plugin.zip.getEntry('README.md');
-                    if (entry) {
-                        return entry.getData().toString();
+                    const readmePath = path.join(plugin.unzippedDir, 'README.md');
+                    if (fs.existsSync(readmePath)) {
+                        try {
+                            return fs.readFileSync(readmePath).toString();
+                        }
+                        catch (e) {
+                            return "# Error loading Readme:\n\n" + e;
+                        }
                     }
                 }
             }
