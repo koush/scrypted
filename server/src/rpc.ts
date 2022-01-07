@@ -135,6 +135,9 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
     }
 
     apply(target: any, thisArg: any, argArray?: any): any {
+        if (Object.isFrozen(this.peer.pendingResults))
+            return Promise.reject(new RPCResultError(this.peer, 'RpcPeer has been killed'));
+
         // rpc objects can be functions. if the function is a oneway method,
         // it will have a null in the oneway method list. this is because
         // undefined is not JSON serializable.
