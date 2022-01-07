@@ -286,7 +286,7 @@ async def readLoop(loop, peer, reader):
             asyncio.run_coroutine_threadsafe(peer.handleMessage(message), loop)
         except Exception as e:
             print('read loop error', e)
-            pass
+            sys.exit()
 
 
 async def async_main(loop: AbstractEventLoop):
