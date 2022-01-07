@@ -40,5 +40,5 @@
       "@types/qrcode": "^1.4.1",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.147"
+   "version": "0.0.148"
 }

@@ -1,12 +1,14 @@
 
 import { FFMpegInput, MotionSensor, ScryptedDevice, ScryptedMimeTypes, VideoCamera, AudioSensor, MediaStreamOptions } from '@scrypted/sdk'
 import { H264Level, H264Profile } from '../../hap';
+import net from 'net';
 
 import sdk from '@scrypted/sdk';
 
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from 'hap-nodejs/src/lib/camera/RecordingManagement';
-import { startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { FFMpegFragmentedMP4Session, startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { evalRequest } from './camera-transcode';
+import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -37,88 +39,104 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         log.a(`${device.name} is not prebuffered. Please install and enable the Rebroadcast plugin.`);
     }
 
-    const inputArguments: string[] = [];
-    const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
-    const request: any = {
-        video: {
-            width: configuration.videoCodec.resolution[0],
-            height: configuration.videoCodec.resolution[1],
-            fps: configuration.videoCodec.resolution[2],
-            max_bit_rate: configuration.videoCodec.bitrate,
-        }
-    }
-
-    if (transcodeRecording) {
-        // decoder arguments
-        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
-        if (videoDecoderArguments) {
-            inputArguments.push(...evalRequest(videoDecoderArguments, request));
-        }
-    }
-
-    inputArguments.push(...ffmpegInput.inputArguments)
-
     const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
-
-    if (noAudio) {
-        console.log(device.name, 'adding dummy audio track');
-        // create a dummy audio track if none actually exists.
-        // this track will only be used if no audio track is available.
-        // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
-    }
-
-    let audioArgs: string[];
     const audioCodec = ffmpegInput.mediaStreamOptions?.audio?.codec;
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
-    if (noAudio || transcodeRecording || isDefinitelyNotAAC) {
-        if (!(noAudio || transcodeRecording))
-            console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
-        audioArgs = [
-            '-bsf:a', 'aac_adtstoasc',
-            '-acodec', 'libfdk_aac',
-            ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
-                ['-profile:a', 'aac_low'] :
-                ['-profile:a', 'aac_eld']),
-            '-ar', `${AudioRecordingSamplerateValues[configuration.audioCodec.samplerate]}k`,
-            '-b:a', `${configuration.audioCodec.bitrate}k`,
-            '-ac', `${configuration.audioCodec.audioChannels}`
-        ];
+    const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
+    const incompatibleStream = noAudio || transcodeRecording || isDefinitelyNotAAC;
+
+    let session: FFMpegFragmentedMP4Session;
+
+    if (ffmpegInput.container === 'mp4' && ffmpegInput.url.startsWith('tcp://') && !incompatibleStream) {
+        console.log('prebuffer is tcp/mp4/h264/aac compatible. using direct tcp.');
+        const socketUrl = new URL(ffmpegInput.url);
+        const socket = net.connect(parseInt(socketUrl.port), socketUrl.hostname);
+        session = {
+            socket,
+            cp: undefined,
+            generator: parseFragmentedMP4(socket),
+        }
     }
     else {
-        audioArgs = [
-            '-bsf:a', 'aac_adtstoasc',
-            '-acodec', 'copy'
-        ];
-    }
+        const inputArguments: string[] = [];
+        const request: any = {
+            video: {
+                width: configuration.videoCodec.resolution[0],
+                height: configuration.videoCodec.resolution[1],
+                fps: configuration.videoCodec.resolution[2],
+                max_bit_rate: configuration.videoCodec.bitrate,
+            }
+        }
 
-    const profile = configuration.videoCodec.profile === H264Profile.HIGH ? 'high'
-        : configuration.videoCodec.profile === H264Profile.MAIN ? 'main' : 'baseline';
+        if (transcodeRecording) {
+            // decoder arguments
+            const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
+            if (videoDecoderArguments) {
+                inputArguments.push(...evalRequest(videoDecoderArguments, request));
+            }
+        }
 
-    const level = configuration.videoCodec.level === H264Level.LEVEL4_0 ? '4.0'
-        : configuration.videoCodec.level === H264Level.LEVEL3_2 ? '3.2' : '3.1';
+        inputArguments.push(...ffmpegInput.inputArguments)
 
-    let videoArgs: string[];
-    if (transcodeRecording) {
-        const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
-        videoArgs = h264EncoderArguments
-            ? evalRequest(h264EncoderArguments, request) : [
-                '-profile:v', profile,
-                '-level:v', level,
-                '-b:v', `${configuration.videoCodec.bitrate}k`,
-                '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
-                '-r', configuration.videoCodec.resolution[2].toString(),
-                '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
+
+        if (noAudio) {
+            console.log(device.name, 'adding dummy audio track');
+            // create a dummy audio track if none actually exists.
+            // this track will only be used if no audio track is available.
+            // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+            inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+        }
+
+        let audioArgs: string[];
+        if (noAudio || transcodeRecording || isDefinitelyNotAAC) {
+            if (!(noAudio || transcodeRecording))
+                console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
+            audioArgs = [
+                '-bsf:a', 'aac_adtstoasc',
+                '-acodec', 'libfdk_aac',
+                ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
+                    ['-profile:a', 'aac_low'] :
+                    ['-profile:a', 'aac_eld']),
+                '-ar', `${AudioRecordingSamplerateValues[configuration.audioCodec.samplerate]}k`,
+                '-b:a', `${configuration.audioCodec.bitrate}k`,
+                '-ac', `${configuration.audioCodec.audioChannels}`
             ];
-    }
-    else {
-        videoArgs = [
-            '-vcodec', 'copy',
-        ];
-    }
+        }
+        else {
+            audioArgs = [
+                '-bsf:a', 'aac_adtstoasc',
+                '-acodec', 'copy'
+            ];
+        }
 
-    console.log(`motion recording starting`);
-    const session = await startFFMPegFragmetedMP4Session(inputArguments, audioArgs, videoArgs, console);
+        const profile = configuration.videoCodec.profile === H264Profile.HIGH ? 'high'
+            : configuration.videoCodec.profile === H264Profile.MAIN ? 'main' : 'baseline';
+
+        const level = configuration.videoCodec.level === H264Level.LEVEL4_0 ? '4.0'
+            : configuration.videoCodec.level === H264Level.LEVEL3_2 ? '3.2' : '3.1';
+
+        let videoArgs: string[];
+        if (transcodeRecording) {
+            const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
+            videoArgs = h264EncoderArguments
+                ? evalRequest(h264EncoderArguments, request) : [
+                    '-profile:v', profile,
+                    '-level:v', level,
+                    '-b:v', `${configuration.videoCodec.bitrate}k`,
+                    '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
+                    '-r', configuration.videoCodec.resolution[2].toString(),
+                    '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
+                ];
+        }
+        else {
+            videoArgs = [
+                '-vcodec', 'copy',
+            ];
+        }
+
+        console.log(`motion recording starting`);
+        session = await startFFMPegFragmetedMP4Session(inputArguments, audioArgs, videoArgs, console);
+    }
 
     console.log(`motion recording started`);
     const { socket, cp, generator } = session;
@@ -144,6 +162,6 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     }
     finally {
         socket.destroy();
-        cp.kill();
+        cp?.kill();
     }
 }
