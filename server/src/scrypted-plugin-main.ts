@@ -1,3 +1,3 @@
-import { startPluginRemote } from './plugin/plugin-host';
+import { startPluginRemote } from "./plugin/plugin-remote-worker";
 
 startPluginRemote();
