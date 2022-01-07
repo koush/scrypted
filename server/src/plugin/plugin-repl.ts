@@ -1,4 +1,3 @@
-import { EventEmitter } from 'ws';
 import { listenZero } from './listen-zero';
 import { Server } from 'net';
 import { once } from 'events';

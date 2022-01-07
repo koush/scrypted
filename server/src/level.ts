@@ -5,8 +5,6 @@
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
 // TypeScript Version: 2.3
 
-import { asyncFilter } from "./asynciterable-utils";
-
 export interface AbstractOptions {
     // wtf is this?
     readonly [k: string]: any;
