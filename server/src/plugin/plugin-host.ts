@@ -50,7 +50,7 @@ export class PluginHost {
     };
     killed = false;
     consoleServer: Promise<ConsoleServer>;
-    unzippedDir: string;
+    unzippedPath: string;
 
     kill() {
         this.killed = true;
@@ -153,7 +153,7 @@ export class PluginHost {
         const hash = extractVersion + crypto.createHash('md5').update(zipBuffer).digest().toString('hex');
         const zipFilename = `${hash}.zip`;
         const zipFile = path.join(zipDir, zipFilename);
-        this.unzippedDir = path.join(zipDir, 'unzipped')
+        this.unzippedPath = path.join(zipDir, 'unzipped')
         {
             const zipDirTmp = zipDir + '.tmp';
             if (!fs.existsSync(zipFile)) {
@@ -162,7 +162,7 @@ export class PluginHost {
                 mkdirp.sync(zipDirTmp);
                 fs.writeFileSync(path.join(zipDirTmp, zipFilename), zipBuffer);
                 const admZip = new AdmZip(zipBuffer);
-                admZip.extractAllTo(path.join(zipDirTmp, 'unzipped'));
+                admZip.extractAllTo(path.join(zipDirTmp, 'unzipped'), true);
                 fs.renameSync(zipDirTmp, zipDir);
             }
         }
@@ -205,6 +205,7 @@ export class PluginHost {
                         : pluginDebug
                             ? '/plugin/main.nodejs.js'
                             : `/${this.pluginId}/main.nodejs.js`,
+                    unzippedPath: this.unzippedPath,
                 };
                 const zipData = isPython ? zipBuffer : zipFile;
                 const module = await remote.loadZip(this.packageJson, zipData, loadZipOptions);
@@ -560,12 +561,13 @@ export function startPluginRemote() {
             throw new Error(`unknown service ${name}`);
         },
         async onLoadZip(zip: AdmZip, packageJson: any) {
+            const entry = zip.getEntry('main.nodejs.js.map')
+            const map = entry?.getData().toString();
+
             installSourceMapSupport({
                 environment: 'node',
                 retrieveSourceMap(source) {
                     if (source === '/plugin/main.nodejs.js' || source === `/${pluginId}/main.nodejs.js`) {
-                        const entry = zip.getEntry('main.nodejs.js.map')
-                        const map = entry?.getData().toString();
                         if (!map)
                             return null;
                         return {

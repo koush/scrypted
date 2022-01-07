@@ -7,6 +7,8 @@ import { SystemManagerImpl } from './system';
 import { RpcPeer, RPCResultError, PROPERTY_PROXY_ONEWAY_METHODS, PROPERTY_JSON_DISABLE_SERIALIZATION } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
+import fs from 'fs';
+const {link} = require('linkfs');
 
 class DeviceLogger implements Logger {
     nativeId: ScryptedNativeId;
@@ -434,7 +436,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 done(ret);
             },
 
-            async loadZip(packageJson: any, zipData: Buffer|string, zipOptions?: PluginRemoteLoadZipOptions) {
+            async loadZip(packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
                 const pluginConsole = getPluginConsole?.();
                 let zip = new AdmZip(zipData);
                 zipData = undefined;
@@ -445,15 +447,21 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 const exports: any = window;
                 window.exports = exports;
 
-                const volume = new Volume();
-                for (const entry of zip.getEntries()) {
-                    if (entry.isDirectory)
-                        continue;
-                    if (!entry.entryName.startsWith('fs/'))
-                        continue;
-                    const name = entry.entryName.substring('fs/'.length);
-                    volume.mkdirpSync(path.dirname(name));
-                    volume.writeFileSync(name, entry.getData());
+                let volume: any;
+                if (zipOptions?.unzippedPath && fs.existsSync(path.join(zipOptions.unzippedPath, 'fs'))) {
+                    volume = link(fs, ['', path.join(zipOptions.unzippedPath, 'fs')]);
+                }
+                else {
+                    for (const entry of zip.getEntries()) {
+                        if (entry.isDirectory)
+                            continue;
+                        if (!entry.entryName.startsWith('fs/'))
+                            continue;
+                        const name = entry.entryName.substring('fs/'.length);
+                        volume.mkdirpSync(path.dirname(name));
+                        const data = entry.getData();
+                        volume.writeFileSync(name, data);
+                    }
                 }
                 zip = undefined;
 

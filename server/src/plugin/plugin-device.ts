@@ -384,7 +384,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             if (pluginDevice && !pluginDevice.nativeId) {
                 const plugin = this.scrypted.plugins[pluginDevice.pluginId];
                 if (!plugin.packageJson.scrypted.interfaces.includes(ScryptedInterface.Readme)) {
-                    const readmePath = path.join(plugin.unzippedDir, 'README.md');
+                    const readmePath = path.join(plugin.unzippedPath, 'README.md');
                     if (fs.existsSync(readmePath)) {
                         try {
                             return fs.readFileSync(readmePath).toString();

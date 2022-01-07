@@ -334,7 +334,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 console.log(ws);
             });
         }
-        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedDir));
+        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedPath));
     }
 
     killPlugin(plugin: Plugin) {

@@ -132,7 +132,15 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
 }
 
 export interface PluginRemoteLoadZipOptions {
+    /**
+     * The filename to load the script as. Use for debugger source mapping.
+     */
     filename?: string;
+    /**
+     * The path that the zip is currently unzipped at on the server. May not
+     * exist on the "remote", if it is not the same machine.
+     */
+    unzippedPath?: string;
 }
 
 export interface PluginRemote {
