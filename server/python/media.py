@@ -1,18 +1,7 @@
 from __future__ import annotations
 import scrypted_python.scrypted_sdk
-from scrypted_python.scrypted_sdk.types import MediaObject, ScryptedInterfaceProperty
-from collections.abc import Mapping
-from genericpath import exists
-import asyncio
-import json
-import aiofiles
+from scrypted_python.scrypted_sdk.types import MediaObject
 import os
-from typing_extensions import TypedDict
-import base64
-from os import sys
-import time
-import zipfile
-import subprocess
 from typing import Any
 
 class MediaObjectRemote:

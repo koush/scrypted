@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from asyncio.events import AbstractEventLoop, TimerHandle
 from asyncio.futures import Future
-from typing import Any, Callable, Mapping, List, Tuple, TypedDict
+from typing import Any, Mapping, Tuple, TypedDict
 
-from numpy import number, void
+from numpy import number
 from pipeline import GstPipeline, GstPipelineBase, create_pipeline_sink, safe_set_result
 import scrypted_sdk
 import json
@@ -15,7 +15,6 @@ import binascii
 from urllib.parse import urlparse
 import multiprocessing
 from pipeline import run_pipeline
-import threading
 
 from gi.repository import Gst
 

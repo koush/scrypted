@@ -17,10 +17,7 @@ import numpy as np
 import scrypted_sdk
 from typing import Any, List
 
-import matplotlib
-
 from detect import DetectionSession, DetectPlugin
-matplotlib.use('Agg')
 
 
 class TrackerDetectionSession(DetectionSession):

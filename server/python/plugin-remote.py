@@ -13,9 +13,8 @@ import json
 from asyncio.events import AbstractEventLoop
 import asyncio
 import rpc
-from genericpath import exists
 from collections.abc import Mapping
-from scrypted_python.scrypted_sdk.types import DeviceManifest, MediaManager, MediaObject, ScryptedInterfaceProperty
+from scrypted_python.scrypted_sdk.types import DeviceManifest, MediaManager, ScryptedInterfaceProperty
 import scrypted_python.scrypted_sdk
 from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
