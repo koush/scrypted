@@ -27,6 +27,7 @@
                 "${workspaceFolder}/**/*.js"
             ],
             "env": {
+                "SCRYPTED_SHARED_WORKER": "true",
                 "DEBUG": "/scrypted/*",
             }
         },

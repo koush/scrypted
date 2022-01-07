@@ -26,6 +26,7 @@ import mkdirp from 'mkdirp';
 import rimraf from 'rimraf';
 
 export class PluginHost {
+    static sharedWorker: child_process.ChildProcess;
     worker: child_process.ChildProcess;
     peer: RpcPeer;
     pluginId: string;
@@ -286,27 +287,73 @@ export class PluginHost {
                 execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
             }
 
-            this.worker = child_process.fork(require.main.filename, ['child', this.pluginId], {
-                stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-                env: Object.assign({}, process.env, env),
-                serialization: 'advanced',
-                execArgv,
-            });
-
-            this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
-                if (connected) {
-                    this.worker.send(message, undefined, e => {
-                        if (e && reject)
-                            reject(e);
+            const useSharedWorker = process.env.SCRYPTED_SHARED_WORKER &&
+                this.packageJson.scrypted.sharedWorker !== false &&
+                this.packageJson.scrypted.realfs !== true &&
+                Object.keys(this.packageJson.optionalDependencies || {}).length === 0;
+            if (useSharedWorker) {
+                if (!PluginHost.sharedWorker) {
+                    PluginHost.sharedWorker = child_process.fork(require.main.filename, ['child', '@scrypted/shared'], {
+                        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+                        env: Object.assign({}, process.env, env),
+                        serialization: 'advanced',
+                        execArgv,
                     });
+                    PluginHost.sharedWorker.setMaxListeners(100);
+                    PluginHost.sharedWorker.on('close', () => PluginHost.sharedWorker = undefined);
+                    PluginHost.sharedWorker.on('error', () => PluginHost.sharedWorker = undefined);
+                    PluginHost.sharedWorker.on('exit', () => PluginHost.sharedWorker = undefined);
+                    PluginHost.sharedWorker.on('disconnect', () => PluginHost.sharedWorker = undefined);
                 }
-                else if (reject) {
-                    reject(new Error('peer disconnected'));
-                }
-            });
-            this.peer.transportSafeArgumentTypes.add(Buffer.name);
+                PluginHost.sharedWorker.send({
+                    type: 'start',
+                    pluginId: this.pluginId,
+                });
+                this.worker = PluginHost.sharedWorker;
+                this.worker.on('message', (message: any) => {
+                    if (message.pluginId === this.pluginId)
+                        this.peer.handleMessage(message.message)
+                });
+    
+                this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
+                    if (connected) {
+                        this.worker.send({
+                            type: 'message',
+                            pluginId: this.pluginId,
+                            message: message,
+                        }, undefined, e => {
+                            if (e && reject)
+                                reject(e);
+                        });
+                    }
+                    else if (reject) {
+                        reject(new Error('peer disconnected'));
+                    }
+                });
+            }
+            else {
+                this.worker = child_process.fork(require.main.filename, ['child', this.pluginId], {
+                    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+                    env: Object.assign({}, process.env, env),
+                    serialization: 'advanced',
+                    execArgv,
+                });
+                this.worker.on('message', message => this.peer.handleMessage(message as any));
+    
+                this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
+                    if (connected) {
+                        this.worker.send(message, undefined, e => {
+                            if (e && reject)
+                                reject(e);
+                        });
+                    }
+                    else if (reject) {
+                        reject(new Error('peer disconnected'));
+                    }
+                });
+            }
 
-            this.worker.on('message', message => this.peer.handleMessage(message as any));
+            this.peer.transportSafeArgumentTypes.add(Buffer.name);
         }
 
         this.worker.stdout.on('data', data => console.log(data.toString()));
@@ -318,6 +365,10 @@ export class PluginHost {
             pluginConsole.log('starting plugin', this.pluginId, this.packageJson.version);
         });
 
+        this.worker.on('close', () => {
+            connected = false;
+            logger.log('e', `${this.pluginName} close`);
+        });
         this.worker.on('disconnect', () => {
             connected = false;
             logger.log('e', `${this.pluginName} disconnected`);

@@ -1,3 +1,6 @@
-import { startPluginRemote } from "./plugin/plugin-remote-worker";
+import { startPluginRemote, startSharedPluginRemote } from "./plugin/plugin-remote-worker";
 
-startPluginRemote();
+if (process.argv[3] !== '@scrypted/shared')
+    startPluginRemote(process.argv[3]);
+else
+    startSharedPluginRemote();

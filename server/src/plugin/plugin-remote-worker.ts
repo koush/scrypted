@@ -10,15 +10,46 @@ import net from 'net'
 import { installOptionalDependencies } from './plugin-npm-dependencies';
 import { createREPLServer } from './plugin-repl';
 
-export function startPluginRemote() {
-    const peer = new RpcPeer('unknown', 'host', (message, reject) => process.send(message, undefined, {
-        swallowErrors: !reject,
-    }, e => {
-        if (e)
-            reject?.(e);
-    }));
+export function startSharedPluginRemote() {
+    process.setMaxListeners(100);
+    process.on('message', (message: any) => {
+        if (message.type === 'start')
+            startPluginRemote(message.pluginId)
+    });
+}
+
+export function startPluginRemote(pluginId: string) {
+    let peerSend: (message: RpcMessage, reject?: (e: Error) => void) => void;
+    let peerListener: NodeJS.MessageListener;
+
+    if (process.argv[3] === '@scrypted/shared') {
+        peerSend = (message, reject) => process.send({
+            pluginId,
+            message,
+        }, undefined, {
+            swallowErrors: !reject,
+        }, e => {
+            if (e)
+                reject?.(e);
+        });
+        peerListener = (message: any) => {
+            if (message.type === 'message' && message.pluginId === pluginId)
+                peer.handleMessage(message.message);
+        }
+    }
+    else {
+        peerSend = (message, reject) => process.send(message, undefined, {
+            swallowErrors: !reject,
+        }, e => {
+            if (e)
+                reject?.(e);
+        });
+        peerListener = message => peer.handleMessage(message as RpcMessage);
+    }
+
+    const peer = new RpcPeer('unknown', 'host', peerSend);
     peer.transportSafeArgumentTypes.add(Buffer.name);
-    process.on('message', message => peer.handleMessage(message as RpcMessage));
+    process.on('message', peerListener);
     process.on('disconnect', () => {
         console.error('peer host disconnected, exiting.');
         process.exit(1);
@@ -27,7 +58,6 @@ export function startPluginRemote() {
     let systemManager: SystemManager;
     let deviceManager: DeviceManager;
     let api: PluginAPI;
-    let pluginId: string;
 
     const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>,
         also?: Console, alsoPrefix?: string) => {
@@ -190,7 +220,6 @@ export function startPluginRemote() {
         },
         onGetRemote: async (_api, _pluginId) => {
             api = _api;
-            pluginId = _pluginId;
             peer.selfName = pluginId;
         },
         onPluginReady: async (scrypted, params, plugin) => {
