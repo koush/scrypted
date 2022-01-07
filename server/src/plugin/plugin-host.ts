@@ -4,7 +4,7 @@ import { SystemManager, DeviceManager, ScryptedNativeId, Device, EventListenerRe
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io, { Socket } from 'engine.io';
-import { attachPluginRemote, setupPluginRemote } from './plugin-remote';
+import { attachPluginRemote, PluginReader, setupPluginRemote } from './plugin-remote';
 import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { Logger } from '../logger';
 import { MediaManagerHostImpl, MediaManagerImpl } from './media';
@@ -560,9 +560,9 @@ export function startPluginRemote() {
             }
             throw new Error(`unknown service ${name}`);
         },
-        async onLoadZip(zip: AdmZip, packageJson: any) {
-            const entry = zip.getEntry('main.nodejs.js.map')
-            const map = entry?.getData().toString();
+        async onLoadZip(pluginReader: PluginReader, packageJson: any) {
+            const entry = pluginReader('main.nodejs.js.map')
+            const map = entry?.toString();
 
             installSourceMapSupport({
                 environment: 'node',

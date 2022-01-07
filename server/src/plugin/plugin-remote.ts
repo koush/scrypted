@@ -308,13 +308,15 @@ export interface WebSocketCustomHandler {
     methods: WebSocketMethods;
 }
 
+export type PluginReader = (name: string) => Buffer;
+
 export interface PluginRemoteAttachOptions {
     createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
-    onLoadZip?: (zip: AdmZip, packageJson: any) => Promise<void>;
+    onLoadZip?: (pluginReader: PluginReader, packageJson: any) => Promise<void>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
     onPluginReady?: (scrypted: ScryptedStatic, params: any, plugin: any) => Promise<void>;
 }
@@ -438,21 +440,22 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
             async loadZip(packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
                 const pluginConsole = getPluginConsole?.();
-                let zip = new AdmZip(zipData);
-                zipData = undefined;
-                await options?.onLoadZip?.(zip, packageJson);
-                const main = zip.getEntry('main.nodejs.js');
-                const script = main.getData().toString();
-                const window: any = {};
-                const exports: any = window;
-                window.exports = exports;
 
                 let volume: any;
-                if (zipOptions?.unzippedPath && fs.existsSync(path.join(zipOptions.unzippedPath, 'fs'))) {
+                let pluginReader: PluginReader;
+                if (zipOptions?.unzippedPath && fs.existsSync(zipOptions?.unzippedPath)) {
                     volume = link(fs, ['', path.join(zipOptions.unzippedPath, 'fs')]);
+                    pluginReader = name => {
+                        const filename = path.join(zipOptions.unzippedPath, name);
+                        if (!fs.existsSync(filename))
+                            return;
+                        return fs.readFileSync(filename);
+                    };
                 }
                 else {
-                    for (const entry of zip.getEntries()) {
+                    const admZip = new AdmZip(zipData);
+                    volume = new Volume();
+                    for (const entry of admZip.getEntries()) {
                         if (entry.isDirectory)
                             continue;
                         if (!entry.entryName.startsWith('fs/'))
@@ -462,8 +465,24 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                         const data = entry.getData();
                         volume.writeFileSync(name, data);
                     }
+
+                    pluginReader = name => {
+                        const entry = admZip.getEntry(name);
+                        if (!entry)
+                            return;
+                        return entry.getData();
+                    }
                 }
-                zip = undefined;
+                zipData = undefined;
+
+                await options?.onLoadZip?.(pluginReader, packageJson);
+                const main = pluginReader('main.nodejs.js');
+                pluginReader = undefined;
+                const script = main.toString();
+                const window: any = {};
+                const exports: any = window;
+                window.exports = exports;
+
 
                 function websocketConnect(url: string, protocols: any, callbacks: WebSocketConnectCallbacks) {
                     if (url.startsWith('io://') || url.startsWith('ws://')) {

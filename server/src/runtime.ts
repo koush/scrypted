@@ -313,7 +313,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
     }
 
-    async handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
+    handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
 
         (req as any).scrypted = {
@@ -326,7 +326,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             pluginHost.io.handleRequest(req, res);
     }
 
-    async handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
+    handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
         const handler = this.getDevice<HttpRequestHandler>(pluginDevice._id);
         if (handler.interfaces.includes(ScryptedInterface.EngineIOHandler) && req.headers.connection === 'upgrade' && req.headers.upgrade?.toLowerCase() === 'websocket') {
