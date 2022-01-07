@@ -1,10 +1,13 @@
-import ts, { ScriptTarget } from "typescript";
+import type { TranspileOptions } from "typescript";
 import sdk, { ScryptedDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
 import vm from "vm";
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
-function tsCompile(source: string, options: ts.TranspileOptions = null): string {
+function tsCompile(source: string, options: TranspileOptions = null): string {
+    const ts = require("typescript");
+    const { ScriptTarget } = ts;
+
     // Default options -- you could also perform a merge, or use the project tsconfig.json
     if (null === options) {
         options = {

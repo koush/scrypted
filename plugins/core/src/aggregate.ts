@@ -39,8 +39,10 @@ aggregators.set(ScryptedInterface.Lock,
     values => values.reduce((prev, cur) => cur === LockState.Unlocked ? cur : prev, LockState.Locked));
 
 
+type AggregateCameraParsers = "mpegts";
+
 function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamera {
-    let sessionPromise: Promise<FFMpegRebroadcastSession>
+    let sessionPromise: Promise<FFMpegRebroadcastSession<AggregateCameraParsers>>
 
     async function getVideoStreamWrapped(options: MediaStreamOptions) {
         if (sessionPromise) {

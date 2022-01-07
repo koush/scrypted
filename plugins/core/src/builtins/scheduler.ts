@@ -53,6 +53,7 @@ export class Scheduler {
             async setName() { },
             async setType() { },
             async setRoom() { },
+            async probe() { return true },
             listen(event: EventListenerOptions, callback, source?: ScryptedDeviceBase) {
                 function reschedule(): Date {
                     const now = Date.now();
