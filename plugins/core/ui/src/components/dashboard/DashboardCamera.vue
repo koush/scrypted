@@ -25,9 +25,7 @@
 <script>
 import { ScryptedInterface } from "@scrypted/sdk/types";
 import DashboardBase from "./DashboardBase";
-import { streamCamera } from "../../common/camera";
-
-var currentStream;
+import { createBlobUrl, streamCamera } from "../../common/camera";
 
 const scryptedServerVariables = {};
 scryptedServerVariables.registrationId = "web:/web/message";
@@ -75,12 +73,7 @@ export default {
       } else {
         picture = await this.device.getVideoStream();
       }
-      const result = await this.$scrypted.mediaManager.convertMediaObjectToLocalUrl(
-        picture,
-        "image/jpeg"
-      );
-      const url = new URL(result);
-      this.src = url.pathname;
+      this.src = await createBlobUrl(this.$scrypted.mediaManager, picture);
     },
   },
   mounted() {

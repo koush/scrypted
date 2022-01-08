@@ -50,7 +50,7 @@
 
 <script>
 import RPCInterface from "./RPCInterface.vue";
-import { streamCamera } from "../common/camera";
+import { createBlobUrl, streamCamera } from "../common/camera";
 import { ScryptedInterface } from "@scrypted/sdk/types";
 import ClipPathEditor from "../components/clippath/ClipPathEditor.vue";
 import cloneDeep from "lodash/cloneDeep";
@@ -123,13 +123,7 @@ export default {
     },
     async refresh() {
       const picture = await this.device.takePicture();
-      this.$scrypted.mediaManager
-        .convertMediaObjectToLocalUrl(picture, "image/*")
-        .then((result) => {
-          this.picture = true;
-          const url = new URL(result);
-          this.src = url.pathname;
-        });
+      this.src = await createBlobUrl(this.$scrypted.mediaManager, picture);
     },
   },
   watch: {
