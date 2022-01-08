@@ -2,7 +2,7 @@
   <v-dialog v-model="dialog" width="1024" :disabled="disabled">
     <template v-slot:activator="{ on }">
       <a v-on="on" v-if="!hidePreview"
-        ><v-img contain :src="src" lazy-src="images/cameraloading.jpg"></v-img
+        ><v-img :src="src"></v-img
       ></a>
     </template>
     <div style="position: relative; overflow: hidden">
