@@ -1,5 +1,5 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
-import { ProtectApi } from "@koush/unifi-protect";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult, Notifier, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk";
+import { ProtectApi, ProtectCameraLcdMessagePayload } from "@koush/unifi-protect";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "@koush/unifi-protect";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "@koush/unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
@@ -234,8 +234,25 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
     }
 }
 
-class UnifiDoorbell extends UnifiCamera implements Intercom {
+class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
     cp?: ChildProcess;
+
+    async sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void> {
+        const payload: ProtectCameraLcdMessagePayload = {
+            text: body.substring(0, 30),
+            type: 'CUSTOM_MESSAGE',
+        };
+        this.protect.api.updateCamera(this.findCamera(), {
+            lcdMessage: payload,
+        })
+        
+        if (typeof media === 'string' && media.startsWith(SCRYPTED_MEDIA_SCHEME)) {
+            media = await mediaManager.createMediaObjectFromUrl(media);
+        }
+        if (media && typeof media !== 'string') {
+            this.startIntercom(media);
+        }
+    }
 
     async startIntercom(media: MediaObject) {
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
@@ -529,7 +546,10 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     d.interfaces.push(ScryptedInterface.BinarySensor);
                 }
                 if (camera.featureFlags.hasSpeaker) {
-                    d.interfaces.push(ScryptedInterface.Intercom);
+                    d.interfaces.push(
+                        ScryptedInterface.Intercom,
+                        ScryptedInterface.Notifier,
+                    );
                 }
                 d.interfaces.push(ScryptedInterface.ObjectDetector);
                 devices.push(d);
