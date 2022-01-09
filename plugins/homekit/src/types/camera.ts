@@ -72,7 +72,7 @@ addSupportedType({
             console.log('streaming session killed');
 
             sessions.delete(sessionID);
-            session.cp?.kill();
+            session.cp?.kill('SIGKILL');
             session.videoReturn?.close();
             session.audioReturn?.close();
             session.rtpSink?.destroy();

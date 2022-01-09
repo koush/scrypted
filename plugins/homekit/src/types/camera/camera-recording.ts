@@ -162,6 +162,6 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     }
     finally {
         socket.destroy();
-        cp?.kill();
+        cp?.kill('SIGKILL');
     }
 }
