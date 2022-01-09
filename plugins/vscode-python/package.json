@@ -20,8 +20,6 @@
       ]
    },
    "dependencies": {
-      "@types/node": "^16.6.1",
-      "axios": "^0.19.0"
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
