@@ -34,38 +34,46 @@ def optional_chain(root, *keys):
 
 class PipelineValve:
     allowPacketCounter: int
-    def __init__(self) -> None:
+    def __init__(self, gst, name) -> None:
         self.allowPacketCounter = 1
         self.mutex = multiprocessing.Lock()
+        valve = gst.get_by_name(name + "Valve")
+        self.pad = valve.get_static_pad("src")
+        self.name = name
 
-    def allowCount(self, count: int):
+        needRemove = False
+        def probe(pad, info):
+            nonlocal needRemove
+            if needRemove:
+                self.close()
+                return Gst.PadProbeReturn.DROP
+            # REMOVE - remove this probe, passing the data.
+            needRemove = True
+            return Gst.PadProbeReturn.PASS
+
+        # need one buffer to go through to go into flowing state
+        self.probe = self.pad.add_probe(Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
+
+    def open(self):
         with self.mutex:
-            self.allowPacketCounter = count
+            print("open", self.name)
+            if self.probe != None:
+                self.pad.remove_probe(self.probe)
+                self.probe = None
+    def close(self):
+        with self.mutex:
+            if self.probe != None:
+                self.pad.remove_probe(self.probe)
+                self.probe = None
+            def probe(pad, info):
+                print("block", self.name)
+                return Gst.PadProbeReturn.OK
+
+            self.probe = self.pad.add_probe(Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
 
 
 def setupPipelineValve(name: str, gst: Any) -> PipelineValve:
-    ret = PipelineValve()
-    valve = gst.get_by_name(name + "Valve")
-    src = valve.get_static_pad("src")
-
-    def sink_probe(pad, info):
-        if info.type & Gst.PadProbeType.BUFFER or info.type & Gst.PadProbeType.BUFFER_LIST:
-            with ret.mutex:
-                if ret.allowPacketCounter == None:
-                    return Gst.PadProbeReturn.PASS
-                if ret.allowPacketCounter == 0:
-                    return Gst.PadProbeReturn.DROP
-
-                if ret.allowPacketCounter < 0:
-                    ret.allowPacketCounter = ret.allowPacketCounter + 1
-                    if ret.allowPacketCounter == 0:
-                        ret.allowPacketCounter = None
-                    return Gst.PadProbeReturn.DROP
-
-                ret.allowPacketCounter = ret.allowPacketCounter - 1
-        return Gst.PadProbeReturn.PASS
-
-    src.add_probe(Gst.PadProbeType.BLOCK_DOWNSTREAM or Gst.PadProbeType.GST_PAD_PROBE_TYPE_BUFFER or Gst.PadProbeType.GST_PAD_PROBE_TYPE_BUFFER_LIST, sink_probe)
+    ret = PipelineValve(gst, name)
     return ret
 
 class DetectionSession:
@@ -83,7 +91,7 @@ class DetectionSession:
         self.running = False
         self.attached = False
         self.mutex = multiprocessing.Lock()
-        self.valve = PipelineValve()
+        self.valve: PipelineValve = None
 
     def clearTimeoutLocked(self):
         if self.timerHandle:
@@ -127,7 +135,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 if detection_session.running:
                     print("choked session", detection_session.id)
                     detection_session.running = False
-                    detection_session.valve.allowCount(0)
+                    if detection_session.valve:
+                        detection_session.valve.close()
         else:
             # leave detection_session.running as True to avoid race conditions.
             # the removal from detection_sessions will restart it.
@@ -219,7 +228,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     if not detection_session.running:
                         print("unchoked session", detection_session.id)
                         detection_session.running = True
-                        detection_session.valve.allowCount(None)
+                        if detection_session.valve:
+                            detection_session.valve.open()
             return (False, detection_session, self.create_detection_result_status(detection_id, detection_session.running))
 
         return (True, detection_session, None)
