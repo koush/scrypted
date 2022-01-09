@@ -322,7 +322,10 @@ addSupportedType({
                         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
                             args.push(
                                 '-acodec', ...(audioCodec === AudioStreamingCodecType.OPUS ?
-                                    ['libopus', '-application', 'lowdelay'] :
+                                    [
+                                        'libopus', '-application', 'lowdelay',
+                                        '-frame_duration', (request as StartStreamRequest).audio.packet_time.toString(),
+                                    ] :
                                     ['libfdk_aac', '-profile:a', 'aac_eld']),
                                 '-flags', '+global_header',
                                 '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
@@ -335,8 +338,10 @@ addSupportedType({
                                 "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
                                 "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                                 "-srtp_out_params", audioKey.toString('base64'),
+                                // not sure this works.
+                                // '-fflags', '+flush_packets', '-flush_packets', '1',
                                 "-f", "rtp",
-                                `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
+                                `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}`
                             )
                         }
                         else {
