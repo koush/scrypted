@@ -221,8 +221,12 @@ addSupportedType({
                 }, 60000));
 
 
-                const videomtu = 188 * 3;
-                const audiomtu = 188 * 1;
+                const videomtu = request.video.mtu;
+                // seems fine? no idea what to use here. this is the mtu for sending audio to homekit.
+                // from my observation of talkback packets, the max packet size is ~370, so
+                // I'm just guessing that HomeKit wants something similar for the audio it receives.
+                // going higher causes choppiness. going lower may cause other issues.
+                let audiomtu = 400;
 
                 try {
                     console.log('fetching video stream');
@@ -323,6 +327,7 @@ addSupportedType({
                                 '-flags', '+global_header',
                                 '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
                                 '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
+                                "-bufsize", `${(request as StartStreamRequest).audio.max_bit_rate * 4}`,
                                 '-ac', `${(request as StartStreamRequest).audio.channel}`,
                                 "-payload_type",
                                 (request as StartStreamRequest).audio.pt.toString(),
