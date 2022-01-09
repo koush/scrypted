@@ -94,7 +94,7 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
             })
             const to = setTimeout(() => {
                 console.log('ffmpeg stream to image convesion timed out.');
-                cp.kill();
+                cp.kill('SIGKILL');
             }, 10000);
             await once(cp, 'exit');
             clearTimeout(to);

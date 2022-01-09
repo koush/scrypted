@@ -51,7 +51,7 @@ export class PluginHost {
     kill() {
         this.killed = true;
         this.api.removeListeners();
-        this.worker.kill();
+        this.worker.kill('SIGKILL');
         this.io.close();
         for (const s of Object.values(this.ws)) {
             s.close();
