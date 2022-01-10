@@ -12,6 +12,16 @@ function getDefaultTransportSafeArgumentTypes() {
     return jsonSerializable;
 }
 
+export function startPeriodicGarbageCollection() {
+    if (global.gc) {
+        console.warn('rpc peer garbagae collection not available: global.gc is not exposed.');
+        return;
+    }
+    return setInterval(() => {
+        global?.gc();
+    }, 10000);
+}
+
 export interface RpcMessage {
     type: string;
 }
@@ -432,7 +442,6 @@ export class RpcPeer {
         const weakref = new WeakRef(proxy);
         this.remoteWeakProxies[proxyId] = weakref;
         this.finalizers.register(rpc, localProxiedEntry);
-        global.gc?.();
         return proxy;
     }
 

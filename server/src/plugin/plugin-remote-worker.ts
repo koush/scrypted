@@ -201,7 +201,6 @@ export function startPluginRemote(pluginId: string) {
             cpu: cpuUsage,
             memoryUsage: process.memoryUsage(),
         });
-        global?.gc();
     }, 10000);
 
     let replPort: Promise<number>;
