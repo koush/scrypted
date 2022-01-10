@@ -10,6 +10,8 @@ You can use the admin page provided by your camera manufacturer to set the optim
 * 1920x1080
 * 2 Mbit variable bitrate (though up to 6Mbit may work)
 * 4 second keyframe interval
+  * `Keyframe Interval` is the number of seconds between keyframes. `Frame Interval` is the number frames between keyframes.
+  * Cameras are typically configured in `Frame Interval` rather than `Keyframe Interval`. The formula for `Frame Interval` value is: `Frame Interval = 4 * FPS`. So if `FPS` is `30` as specified, `Frame Interval` should be set to `120`.
 
 ## Troubleshooting
 

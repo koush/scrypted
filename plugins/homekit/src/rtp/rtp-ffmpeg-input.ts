@@ -134,11 +134,19 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
     });
     const sdpServerPort = await listenZeroCluster(server);
 
-    const ffmpegInput = {
+    const ffmpegInput: FFMpegInput = {
+        url: undefined,
+        mediaStreamOptions: {
+            video: null,
+            audio: {
+                codec: 'aac',
+                encoder: 'libfdk_aac',
+            }
+        },
         inputArguments: [
             "-protocol_whitelist", "pipe,udp,rtp,file,crypto,tcp",
-            "-f", "sdp",
             "-acodec", "libfdk_aac", '-ac', '1',
+            "-f", "sdp",
             "-i", "tcp://127.0.0.1:" + sdpServerPort,
         ]
     };
