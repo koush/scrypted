@@ -269,7 +269,9 @@ class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
             "-b:a", "64k",
             "-f", "adts",
             "udp://" + camera.host + ":" + camera.talkbackSettings.bindPort,
-        )
+        );
+
+        this.console.log('starting 2 way audio', args);
 
         const ffmpeg = await mediaManager.getFFmpegPath();
         this.cp = child_process.spawn(ffmpeg, args);

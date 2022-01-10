@@ -225,7 +225,7 @@ class AmcrestProvider extends RtspProvider {
         ];
     }
 
-    getDevice(nativeId: string): object {
+    createCamera(nativeId: string) {
         return new AmcrestCamera(nativeId, this);
     }
 }
