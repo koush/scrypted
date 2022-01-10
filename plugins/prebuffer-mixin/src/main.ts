@@ -68,6 +68,12 @@ class PrebufferSession {
     this.mixinDevice = mixin.mixinDevice;
   }
 
+  clearPrebuffers() {
+    this.prebuffers.mp4 = [];
+    this.prebuffers.mpegts = [];
+    this.prebuffers.s16le = [];
+  }
+
   ensurePrebufferSession() {
     if (this.parserSessionPromise || this.mixin.released)
       return;
@@ -674,9 +680,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     this.console.log('prebuffer releasing if started');
     this.released = true;
     for (const session of this.sessions.values()) {
-      session?.parserSessionPromise?.then(session => {
+      if (!session)
+        continue;
+      session.clearPrebuffers();
+      session.parserSessionPromise?.then(parserSession => {
         this.console.log('prebuffer released');
-        session.kill();
+        parserSession.kill();
+        session.clearPrebuffers();
       });
     }
   }
