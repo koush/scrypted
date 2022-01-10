@@ -1,5 +1,7 @@
-import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import sdk, { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk';
 import { addSupportedType, queryResponse, syncResponse } from '../common';
+
+const { systemManager } = sdk;
 
 addSupportedType({
     type: ScryptedDeviceType.Doorbell,
@@ -23,9 +25,25 @@ addSupportedType({
         const ret = queryResponse(device);
         return ret;
     },
-    async notifications(device: ScryptedDevice & BinarySensor) {
+    async notifications(device: ScryptedDevice & BinarySensor, notificationsState: any) {
         if (!device.binaryState)
             return {};
+
+        // store and compare the timestamp of this binary state 
+        const detectionTimestamp = systemManager.getSystemState()?.[device.id]?.[ScryptedInterfaceProperty.binaryState]?.stateTime;
+
+        // can this happen?
+        if (!detectionTimestamp) {
+            console.warn(ScryptedInterfaceProperty.binaryState, 'timestamp is missing?')
+            return {};
+        }
+
+        // existing event.
+        if (notificationsState[ScryptedInterfaceProperty.binaryState] === detectionTimestamp)
+            return {};
+
+        // new event
+        notificationsState[ScryptedInterfaceProperty.binaryState] = detectionTimestamp;
 
         const ret = {
             ObjectDetection: {
@@ -33,7 +51,7 @@ addSupportedType({
                     "unfamiliar": 1
                 },
                 priority: 0,
-                detectionTimestamp: Date.now(),
+                detectionTimestamp,
             }
         }
         return ret;

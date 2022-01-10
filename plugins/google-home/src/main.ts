@@ -63,6 +63,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
     googleAuthClient: JSONClient;
 
     homegraph = homegraph('v1');
+    notificationsState: any = {};
 
     constructor() {
         super();
@@ -430,7 +431,13 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 continue;
             try {
                 const status = await supportedType.query(device);
-                const notifications = await supportedType.notifications?.(device);
+                let notificationsState = this.notificationsState[device.id];
+                if (!notificationsState) {
+                    notificationsState = {};
+                    this.notificationsState[device.id] = notificationsState;
+                }
+
+                const notifications = await supportedType.notifications?.(device, notificationsState);
                 const hasNotifications = notifications && !!Object.keys(notifications).length;
                 // don't report state on devices with no state
                 if (!Object.keys(status).length && !hasNotifications)
