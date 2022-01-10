@@ -2,7 +2,7 @@ import { createServer, Socket } from 'net';
 import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput } from '@scrypted/sdk/types';
-import { listenZeroCluster } from './listen-cluster';
+import { listenZero } from './listen-cluster';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput } from './media-helpers';
 import { MP4Atom, parseFragmentedMP4 } from './stream-parser';
@@ -26,7 +26,7 @@ export async function startFFMPegFragmetedMP4Session(inputArguments: string[], a
                 generator: parseFragmentedMP4(socket),
             });
         });
-        const serverPort = await listenZeroCluster(server);
+        const serverPort = await listenZero(server);
 
         const args = inputArguments.slice();
         args.push(

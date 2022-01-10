@@ -12,7 +12,7 @@ function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
 
 
 class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
-    device: ScryptedDevice;
+    device: Promise<ScryptedDevice>;
     constructor(public id: string, public systemManager: SystemManagerImpl) {
     }
 
@@ -41,19 +41,20 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         return new Proxy(() => p, this);
     }
 
-    async ensureDevice() {
+     ensureDevice() {
         if (!this.device)
-            this.device = await this.systemManager.api.getDeviceById(this.id);
+            this.device = this.systemManager.api.getDeviceById(this.id);
+        return this.device;
     }
 
     async apply(target: any, thisArg: any, argArray?: any) {
         const method = target();
-        await this.ensureDevice();
+        const device = await this.ensureDevice();
         if (false && method === 'refresh') {
             const name = this.systemManager.state[this.id]?.[ScryptedInterfaceProperty.name].value;
             this.systemManager.log.i(`requested refresh ${name}`);
         }
-        return (this.device as any)[method](...argArray);
+        return (device as any)[method](...argArray);
     }
 
     listen(event: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {

@@ -1,5 +1,5 @@
 import sdk from "@scrypted/sdk";
-import { listenZeroCluster } from "@scrypted/common/src/listen-cluster";
+import { listenZero } from "@scrypted/common/src/listen-cluster";
 import { FFMpegInput } from "@scrypted/sdk";
 import { Socket, SocketType } from "dgram";
 import { createServer, Server } from "net";
@@ -132,7 +132,7 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
         socket.write(Buffer.from(sdpReturnAudio));
         socket.end();
     });
-    const sdpServerPort = await listenZeroCluster(server);
+    const sdpServerPort = await listenZero(server);
 
     const ffmpegInput: FFMpegInput = {
         url: undefined,

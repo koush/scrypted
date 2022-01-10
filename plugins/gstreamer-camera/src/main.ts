@@ -4,7 +4,7 @@ import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common"
 // import {} from "../../../common/src/stream-parser"
 // import {} from "../../../common/src/ffmpeg-rebroadcast"
 import net from 'net';
-import {listenZeroCluster} from "../../../common/src/listen-cluster"
+import { listenZero } from "../../../common/src/listen-cluster"
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -107,9 +107,9 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
                 this.console.log('timed out waiting for gstreamer');
                 gstreamerServer.close();
             }, 30000);
-            const gstreamerPort = await listenZeroCluster(gstreamerServer);
+            const gstreamerPort = await listenZero(gstreamerServer);
             const args = gstreamerInput.split(' ');
-            args.push('!', 'mpegtsmux', '!',  'tcpclientsink', `port=${gstreamerPort}`, 'sync=false');
+            args.push('!', 'mpegtsmux', '!', 'tcpclientsink', `port=${gstreamerPort}`, 'sync=false');
             this.console.log(args);
             const singleInstance = this.storage.getItem('singleInstance') === 'true';
             if (this.currentProcess && singleInstance) {
@@ -129,7 +129,7 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
             this.console.log('timed out waiting for client');
             server.close();
         }, 30000);
-        const port = await listenZeroCluster(server);
+        const port = await listenZero(server);
 
         const ret: FFMpegInput = {
             url: undefined,

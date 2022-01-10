@@ -2,7 +2,7 @@ import { createServer, Server } from 'net';
 import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput } from '@scrypted/sdk/types';
-import { listenZeroCluster } from './listen-cluster';
+import { listenZero } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput } from './media-helpers';
@@ -202,7 +202,7 @@ export async function startRebroadcastSession<T extends string>(ffmpegInput: FFM
         });
         servers.push(server);
 
-        const serverPort = await listenZeroCluster(server);
+        const serverPort = await listenZero(server);
 
         args.push(
             ...parser.outputArguments,
@@ -282,7 +282,7 @@ export async function createRebroadcaster(options?: RebroadcasterOptions): Promi
         socket.on('close', cleanup);
         socket.on('error', cleanup);
     });
-    const port = await listenZeroCluster(server);
+    const port = await listenZero(server);
     return {
         server,
         port,

@@ -1,7 +1,7 @@
 import { RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes } from "@scrypted/sdk/types";
 import child_process from 'child_process';
 import net from 'net';
-import { listenZeroCluster } from "./listen-cluster";
+import { listenZero } from "./listen-cluster";
 import { ffmpegLogInitialOutput } from "./media-helpers";
 
 let wrtc: any;
@@ -153,7 +153,7 @@ export function addBuiltins(console: Console, mediaManager: MediaManager) {
                         }
                     });
                 });
-                audioPort = await listenZeroCluster(audioServer);
+                audioPort = await listenZero(audioServer);
             }
 
             const videoServer = net.createServer(async (socket) => {
@@ -179,7 +179,7 @@ export function addBuiltins(console: Console, mediaManager: MediaManager) {
                     }
                 });
             });
-            const videoPort = await listenZeroCluster(videoServer);
+            const videoPort = await listenZero(videoServer);
 
             const args = [
                 '-hide_banner',
