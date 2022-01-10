@@ -100,7 +100,7 @@ export default {
     doSearch: debounce(function () {
       axios
         .get(
-          `${getComponentWebPath("script")}/search?text=keywords:scrypted+${
+          `https://registry.npmjs.org/-/v1/search?text=keywords:scrypted+${
             this.search
           }`
         )

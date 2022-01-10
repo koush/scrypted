@@ -10,7 +10,12 @@ export interface PluginUpdateCheck {
 }
 
 export async function checkUpdate(npmPackage: string, npmPackageVersion: string): Promise<PluginUpdateCheck> {
-    const response = await axios.get(`${componentPath}/npm/${npmPackage}`);
+    // const response = await axios.get(`${componentPath}/npm/${npmPackage}`);
+    // registry.npmjs.org does not support CORS on the package endpoints.
+    // open issue:
+    // https://github.com/npm/feedback/discussions/117
+    // npmjs.cf is an unofficial CDN that provides it
+    const response = await axios.get(`https://registry.npmjs.cf/${npmPackage}`);
     const { data } = response;
     const versions = Object.values(data.versions).sort((a: any, b: any) => semver.compare(a.version, b.version)).reverse();
     let updateAvailable: any;
