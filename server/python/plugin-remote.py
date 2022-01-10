@@ -22,6 +22,7 @@ import os
 from os import sys
 import platform
 import shutil
+import gc
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -313,6 +314,12 @@ async def async_main(loop: AbstractEventLoop):
 
 def main():
     loop = asyncio.get_event_loop()
+
+    def gc_runner():
+        gc.collect()
+        loop.call_later(10, gc_runner)
+    gc_runner()
+
     loop.run_until_complete(async_main(loop))
     loop.close()
 
