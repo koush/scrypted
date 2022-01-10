@@ -1,12 +1,12 @@
 import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions } from "@scrypted/sdk";
 import { Stream } from "stream";
 import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
-import { RtspSmartCamera, RtspProvider, Destroyable, RtspMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { EventEmitter } from "stream";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import net from 'net';
-import { listenZeroCluster } from "../../../common/src/listen-cluster";
+import { listenZero } from "../../../common/src/listen-cluster";
 
 const { mediaManager } = sdk;
 
@@ -119,7 +119,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         return this.storage.getItem('rtspChannel');
     }
     
-    async getConstructedVideoStreamOptions(): Promise<RtspMediaStreamOptions[]> {
+    async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         let mas = this.maxExtraStreams;
         if (!this.maxExtraStreams) {
             const client = this.getClient();
@@ -189,7 +189,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
             }
             this.cp.kill();
         });
-        const port = await listenZeroCluster(server)
+        const port = await listenZero(server)
 
         args.push(
             "-vn",
