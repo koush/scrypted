@@ -307,10 +307,10 @@ class PrebufferSession {
     // s16le will be a no-op if there's no pcm, no harm.
     for (const container of ['mpegts', 'mp4', 's16le']) {
       const eventName = container + '-data';
-      let prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
       let shifts = 0;
 
       session.events.on(eventName, (chunk: StreamChunk) => {
+        const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
         const now = Date.now();
 
         if (chunk.type === 'mdat') {
@@ -330,7 +330,7 @@ class PrebufferSession {
         }
 
         if (shifts > 1000) {
-          prebufferContainer = this.prebuffers[container] = prebufferContainer.slice();
+          this.prebuffers[container] = prebufferContainer.slice();
           shifts = 0;
         }
 

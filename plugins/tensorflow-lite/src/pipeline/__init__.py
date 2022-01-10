@@ -20,7 +20,7 @@ gi.require_version('Gst', '1.0')
 gi.require_version('GstBase', '1.0')
 
 from .safe_set_result import safe_set_result
-from gi.repository import GLib, GObject, Gst
+from gi.repository import GObject, Gst
 import math
 
 GObject.threads_init()
@@ -71,8 +71,6 @@ class GstPipelineBase:
 
         # Clean up.
         self.gst.set_state(Gst.State.NULL)
-        while GLib.MainContext.default().iteration(False):
-            pass
 
 class GstPipeline(GstPipelineBase):
     def __init__(self, finished: Future, appsink_name: str, user_function):

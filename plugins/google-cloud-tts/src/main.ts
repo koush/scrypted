@@ -1,57 +1,28 @@
 // https://developer.scrypted.app/#getting-started
 import axios from 'axios';
 import sdk, { BufferConverter, ScryptedDeviceBase, Settings, Setting } from "@scrypted/sdk";
-import { Buffer } from 'buffer';
+import { title } from 'process';
 const { log } = sdk;
 
-const api_key = localStorage.getItem('api_key');
-
-function alertAndThrow(msg) {
-  log.a(msg);
-  throw new Error(msg);
-}
-
-if (!api_key) {
-  alertAndThrow('The "api_key" Script Setting values is missing.');
-}
-log.clearAlerts();
-
-
-var voice_name = localStorage.getItem("voice_name");
-if (!voice_name) {
-  voice_name = "en-GB-Standard-A";
-  log.i(`Using default voice_name setting: ${voice_name}. See settings for more information.`);
-}
-
-var voice_gender = localStorage.getItem("voice_gender");
-if (!voice_gender) {
-  voice_gender = "FEMALE";
-  log.i(`Using default voice_gender setting: ${voice_gender}. See settings for more information.`);
-}
-
-var voice_language_code = localStorage.getItem("voice_language_code");
-if (!voice_language_code) {
-  voice_language_code = "en-GB";
-  log.i(`Using default voice_language_code setting: ${voice_language_code}. See settings for more information.`);
-}
-
-var voices: any = {};
-axios.get(`https://texttospeech.googleapis.com/v1/voices?key=${api_key}`)
-  .then(response => {
-    log.i(JSON.stringify(response.data, null, 2));
-    voices = response.data;
-  });
-
-
-class Device extends ScryptedDeviceBase implements BufferConverter, Settings {
+class GoogleCloudTts extends ScryptedDeviceBase implements BufferConverter, Settings {
   constructor() {
     super();
     this.fromMimeType = 'text/plain';
     this.toMimeType = 'audio/mpeg';
+
+    if (!this.getApiKey())
+      this.log.a('API key missing.');
   }
-  async convert(from, fromMimeType) {
-    log.i(from.toString());
-    from = Buffer.from(from);
+  getApiKey() {
+    const apiKey = this.storage.getItem('api_key');
+    return apiKey;
+  }
+  async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer> {
+    const voice_name = this.storage.getItem("voice_name") || "en-GB-Standard-A";
+    const voice_gender = this.storage.getItem("voice_gender") || "FEMALE";
+    const voice_language_code = this.storage.getItem("voice_language_code") || "en-GB";
+
+    const from = Buffer.from(data);
     var json = {
       "input": {
         "text": from.toString()
@@ -65,40 +36,62 @@ class Device extends ScryptedDeviceBase implements BufferConverter, Settings {
         "audioEncoding": "MP3"
       }
     };
-    log.i(JSON.stringify(json));
 
-    var result = await axios.post(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${api_key}`, json);
-    log.i(JSON.stringify(result.data, null, 2));
+    var result = await axios.post(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${this.getApiKey()}`, json);
+    console.log(JSON.stringify(result.data, null, 2));
     const buffer = Buffer.from(result.data.audioContent, 'base64');
     return buffer;
   }
 
+  voices: any;
   async getSettings(): Promise<Setting[]> {
-    return [{
+    const ret: Setting[] = [
+      {
+        title: 'API Key',
+        description: 'API Key used by Google Cloud TTS.',
+        key: 'api_key',
+        value: this.storage.getItem('api_key'),
+      }
+    ];
+
+    if (!this.getApiKey())
+      return ret;
+
+    try {
+      if (!this.voices) {
+        const response = await axios.get(`https://texttospeech.googleapis.com/v1/voices?key=${this.getApiKey()}`)
+        this.voices = response.data;
+      }
+
+    }
+    catch (e) {
+      this.log.a('Error retrieving settings from Google Cloud Text to Speech. Is your API Key correct?');
+      return ret;
+    }
+    ret.push({
       title: "Voice",
-      choices: voices.voices.map(voice => voice.name),
+      choices: this.voices.voices.map(voice => voice.name),
       key: "voice",
-      value: voice_name,
-    }];
+      value: this.storage.getItem("voice_name"),
+    });
+    return ret;
   }
-  putSetting(key: string, value: string | number | boolean): void {
+  async putSetting(key: string, value: string | number | boolean) {
     if (key !== 'voice') {
+      this.storage.setItem(key, value.toString());
       return;
     }
 
-    var found = voices.voices.find(voice => voice.name === value);
+    const found = this.voices.voices.find((voice: any) => voice.name === value);
     if (!found) {
-      log.a('Voice not found.');
+      console.error('Voice not found.');
       return;
     }
 
-    voice_name = found.name;
-    voice_language_code = found.languageCodes[0];
-    voice_gender = found.ssmlGender;
-    localStorage.setItem('voice_name', voice_name);
-    localStorage.setItem('voice_language_code', voice_language_code);
-    localStorage.setItem('voice_gender', voice_gender);
+    localStorage.setItem('voice_name', found.name);
+    localStorage.setItem('voice_language_code', found.languageCodes[0]);
+    localStorage.setItem('voice_gender', found.ssmlGender);
   }
 }
 
-export default new Device();
+export default new GoogleCloudTts();

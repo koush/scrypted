@@ -5,7 +5,7 @@ from typing import Any, List
 import numpy as np
 import cv2
 import imutils
-from gi.repository import GLib, Gst
+from gi.repository import Gst
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected
 
 class OpenCVDetectionSession(DetectionSession):
