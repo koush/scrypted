@@ -4,7 +4,7 @@
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.5",
-    "@scrypted/ffmpeg": "^1.0.6",
+    "@scrypted/ffmpeg": "^1.0.9",
     "@scrypted/sdk": "^0.0.134",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
