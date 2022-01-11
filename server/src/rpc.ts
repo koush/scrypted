@@ -13,8 +13,8 @@ function getDefaultTransportSafeArgumentTypes() {
 }
 
 export function startPeriodicGarbageCollection() {
-    if (global.gc) {
-        console.warn('rpc peer garbagae collection not available: global.gc is not exposed.');
+    if (!global.gc) {
+        console.warn('rpc peer garbage collection not available: global.gc is not exposed.');
         return;
     }
     return setInterval(() => {
