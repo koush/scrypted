@@ -46,7 +46,7 @@
     "@types/lodash": "^4.14.168",
     "@types/mkdirp": "^1.0.2",
     "@types/node-dijkstra": "^2.5.1",
-    "@types/node-forge": "^0.10.10",
+    "@types/node-forge": "^1.0.0",
     "@types/pem": "^1.9.5",
     "@types/rimraf": "^3.0.2",
     "@types/semver": "^7.3.8",
