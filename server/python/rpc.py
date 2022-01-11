@@ -317,11 +317,12 @@ class RpcPeer:
                     self.send(result)
 
             elif messageType == 'result':
-                future = self.pendingResults.get(message['id'], None)
+                id = message['id']
+                future = self.pendingResults.get(id, None)
                 if not future:
                     raise RpcResultException(
-                        None, 'unknown result %s' % message['id'])
-                del message['id']
+                        None, 'unknown result %s' % id)
+                del self.pendingResults[id]
                 if hasattr(message, 'message') or hasattr(message, 'stack'):
                     e = RpcResultException(
                         None, message.get('message', None))
