@@ -53,6 +53,7 @@ export abstract class PluginHttp<T> {
 
         if (!isPublicEndpoint && !res.locals.username) {
             end(401, 'Not Authorized');
+            console.log('rejected request', isPublicEndpoint, res.locals.username, req.originalUrl)
             return;
         }
 
