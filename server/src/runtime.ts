@@ -478,7 +478,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return this.runPlugin(plugin, pluginDebug);
     }
 
-    async runPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
+    runPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
         this.killPlugin(plugin);
 
         const pluginDevices = this.findPluginDevices(plugin._id);
@@ -505,7 +505,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     return;
                 }
 
-                this.runPlugin(plugin).catch(e => console.error('error restarting plugin', plugin._id, e));
+                try {
+                    this.runPlugin(plugin);
+                }
+                catch (e) {
+                    console.error('error restarting plugin', plugin._id, e);
+                }
             }, 60000);
         })
         this.plugins[plugin._id] = pluginHost;
@@ -690,7 +695,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
 
         for await (const plugin of this.datastore.getAll(Plugin)) {
-            this.runPlugin(plugin).catch(e => console.error('error starting plugin', plugin._id, e));
+            try {
+                this.runPlugin(plugin);
+            }
+            catch (e) {
+                console.error('error starting plugin', plugin._id, e);
+            }
         }
     }
 }

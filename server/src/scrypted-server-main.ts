@@ -151,8 +151,12 @@ async function start() {
         cert: keys.certificate
     }, httpsServerOptions);
     const secure = https.createServer(mergedHttpsServerOptions, app);
-    listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
     const insecure = http.createServer(app);
+
+    const scrypted = new ScryptedRuntime(db, insecure, secure, app);
+    await scrypted.start();
+
+    listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
     listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
 
     // legacy secure port 9443 is now in use by portainer.
@@ -250,8 +254,6 @@ async function start() {
     console.log('export SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/options.json');
     console.log('https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions')
     console.log('#######################################################');
-    const scrypted = new ScryptedRuntime(db, insecure, secure, app);
-    await scrypted.start();
 
     app.get(['/web/component/script/npm/:pkg', '/web/component/script/npm/@:owner/:pkg'], async (req, res) => {
         const { owner, pkg } = req.params;
