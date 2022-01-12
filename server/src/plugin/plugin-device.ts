@@ -33,6 +33,10 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
     mixinTable: MixinTable[];
     releasing = new Set<any>();
 
+    static sortInterfaces(interfaces: string[]): string[] {
+        return [...new Set(interfaces || [])].sort();
+    }
+
     constructor(scrypted: ScryptedRuntime, id: string) {
         this.scrypted = scrypted;
         this.id = id;
@@ -198,7 +202,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         }
 
         return this.mixinTable[0].entry.then(entry => {
-            this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, entry.allInterfaces);
+            this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, PluginDeviceProxyHandler.sortInterfaces(entry.allInterfaces));
             return pluginDevice;
         });
     }
