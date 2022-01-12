@@ -313,6 +313,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     ],
     properties: []
   },
+  VideoCameraConfiguration: {
+    name: 'VideoCameraConfiguration',
+    methods: [
+      'setVideoStreamOptions'
+    ],
+    properties: []
+  },
   Intercom: {
     name: 'Intercom',
     methods: [
@@ -956,7 +963,14 @@ export interface VideoStreamOptions {
   minBitrate?: number;
   maxBitrate?: number;
   fps?: number;
+  /**
+   * Key Frame interval in milliseconds.
+   */
   idrIntervalMillis?: number;
+  /**
+   * Key Frame interval in frames.
+   */
+  keyframeInterval?: number;
 }
 export interface AudioStreamOptions {
   codec?: string;
@@ -995,6 +1009,10 @@ export interface VideoCamera {
    */
   getVideoStreamOptions(): Promise<MediaStreamOptions[]>;
 
+}
+
+export interface VideoCameraConfiguration {
+  setVideoStreamOptions(options: MediaStreamOptions): Promise<void>;
 }
 
 /**
@@ -1778,6 +1796,7 @@ export enum ScryptedInterface {
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",
   VideoCamera = "VideoCamera",
+  VideoCameraConfiguration = "VideoCameraConfiguration",
   Intercom = "Intercom",
   Lock = "Lock",
   PasswordStore = "PasswordStore",

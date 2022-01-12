@@ -459,7 +459,14 @@ export interface VideoStreamOptions {
     minBitrate?: number;
     maxBitrate?: number;
     fps?: number;
+    /**
+     * Key Frame interval in milliseconds.
+     */
     idrIntervalMillis?: number;
+    /**
+     * Key Frame interval in frames.
+     */
+    keyframeInterval?: number;
 }
 export interface AudioStreamOptions {
     codec?: string;
@@ -495,6 +502,9 @@ export interface VideoCamera {
      * Get the available video streaming options.
      */
     getVideoStreamOptions(): Promise<MediaStreamOptions[]>;
+}
+export interface VideoCameraConfiguration {
+    setVideoStreamOptions(options: MediaStreamOptions): Promise<void>;
 }
 /**
  * Intercom devices can play back
@@ -1203,6 +1213,7 @@ export declare enum ScryptedInterface {
     HumiditySensor = "HumiditySensor",
     Camera = "Camera",
     VideoCamera = "VideoCamera",
+    VideoCameraConfiguration = "VideoCameraConfiguration",
     Intercom = "Intercom",
     Lock = "Lock",
     PasswordStore = "PasswordStore",

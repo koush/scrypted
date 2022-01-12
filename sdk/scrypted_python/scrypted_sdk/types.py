@@ -113,6 +113,7 @@ class ScryptedInterface(Enum):
     Thermometer = "Thermometer"
     UltravioletSensor = "UltravioletSensor"
     VideoCamera = "VideoCamera"
+    VideoCameraConfiguration = "VideoCameraConfiguration"
 
 class ScryptedMimeTypes(Enum):
     AcceptUrlParameter = "accept-url"
@@ -169,6 +170,7 @@ class VideoStreamOptions(TypedDict):
     fps: float
     height: float
     idrIntervalMillis: float
+    keyframeInterval: float
     maxBitrate: float
     minBitrate: float
     width: float
@@ -740,6 +742,11 @@ class VideoCamera:
     async def getVideoStream(self, options: MediaStreamOptions = None) -> MediaObject:
         pass
     async def getVideoStreamOptions(self) -> list[MediaStreamOptions]:
+        pass
+    pass
+
+class VideoCameraConfiguration:
+    async def setVideoStreamOptions(self, options: MediaStreamOptions) -> None:
         pass
     pass
 
