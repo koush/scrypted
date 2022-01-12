@@ -12,7 +12,7 @@ import { ffmpegLogInitialOutput } from "../media-helpers";
 
 function addBuiltins(console: Console, mediaManager: MediaManager) {
     mediaManager.builtinConverters.push({
-        fromMimeType: ScryptedMimeTypes.Url + ';' + ScryptedMimeTypes.AcceptUrlParameter,
+        fromMimeType: `${ScryptedMimeTypes.Url};${ScryptedMimeTypes.AcceptUrlParameter}=true`,
         toMimeType: ScryptedMimeTypes.FFmpegInput,
         async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer | string> {
             const url = data.toString();
