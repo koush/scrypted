@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
 import threading
 
@@ -27,7 +28,8 @@ GObject.threads_init()
 Gst.init(None)
 
 class GstPipelineBase:
-    def __init__(self, finished: Future) -> None:
+    def __init__(self, loop: AbstractEventLoop, finished: Future) -> None:
+        self.loop = loop
         self.finished = finished
         self.gst = None
 
@@ -47,14 +49,14 @@ class GstPipelineBase:
         # OverflowError: Python int too large to convert to C long
         t = str(message.type)
         if t == str(Gst.MessageType.EOS):
-            safe_set_result(self.finished)
+            safe_set_result(self.loop, self.finished)
         elif t == str(Gst.MessageType.WARNING):
             err, debug = message.parse_warning()
             print('Warning: %s: %s\n' % (err, debug))
         elif t == str(Gst.MessageType.ERROR):
             err, debug = message.parse_error()
             print('Error: %s: %s\n' % (err, debug))
-            safe_set_result(self.finished)
+            safe_set_result(self.loop, self.finished)
         return True
 
     async def run_attached(self):
@@ -73,8 +75,8 @@ class GstPipelineBase:
         self.gst.set_state(Gst.State.NULL)
 
 class GstPipeline(GstPipelineBase):
-    def __init__(self, finished: Future, appsink_name: str, user_function):
-        super().__init__(finished)
+    def __init__(self, loop: AbstractEventLoop, finished: Future, appsink_name: str, user_function):
+        super().__init__(loop, finished)
         self.appsink_name = appsink_name
         self.user_function = user_function
         self.running = False
@@ -225,13 +227,13 @@ def create_pipeline(
     print('Gstreamer pipeline:\n', pipeline)
     return pipeline
 
-def run_pipeline(finished,
+def run_pipeline(loop, finished,
                  user_function,
                  appsink_name,
                  appsink_size,
                  video_input,
                  pixel_format):
-    gst = GstPipeline(finished, appsink_name, user_function)
+    gst = GstPipeline(loop, finished, appsink_name, user_function)
     pipeline = create_pipeline(appsink_name, appsink_size, video_input, pixel_format)
     gst.parse_launch(pipeline)
     return gst

@@ -140,7 +140,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         else:
             # leave detection_session.running as True to avoid race conditions.
             # the removal from detection_sessions will restart it.
-            safe_set_result(detection_session.future)
+            safe_set_result(detection_session.loop, detection_session.future)
             with self.session_mutex:
                 self.detection_sessions.pop(detection_session.id, None)
 
@@ -315,7 +315,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     self.detection_event_notified(detection_session.settings)
 
                 if not detection_session or duration == None:
-                    safe_set_result(detection_session.future)
+                    safe_set_result(detection_session.loop, detection_session.future)
             finally:
                 pass
 
@@ -339,7 +339,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if session:
             duration = session.get('duration', None)
 
-        pipeline = GstPipeline(gstPipeline.finished, type(self).__name__, self.create_user_callback(detection_session, duration))
+        pipeline = GstPipeline(gstPipeline.loop, gstPipeline.finished, type(self).__name__, self.create_user_callback(detection_session, duration))
         pipeline.attach_launch(gstPipeline.gst)
 
         return create, detection_session, objects_detected, pipeline
@@ -357,7 +357,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def run_pipeline(self, detection_session: DetectionSession, duration, src_size, video_input):
         inference_size = self.get_detection_input_size(src_size)
 
-        pipeline = run_pipeline(detection_session.future, self.create_user_callback(detection_session, duration),
+        pipeline = run_pipeline(detection_session.loop, detection_session.future, self.create_user_callback(detection_session, duration),
                                           appsink_name=type(self).__name__,
                                           appsink_size=inference_size,
                                           video_input=video_input,

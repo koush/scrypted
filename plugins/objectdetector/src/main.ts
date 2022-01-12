@@ -88,7 +88,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.clearDetectionTimeout();
     this.detectionIntervalTimeout = setInterval(() => {
       if ((!this.running && this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS)) || this.hasMotionType) {
-          this.snapshotDetection();
+        this.snapshotDetection();
       }
     }, this.detectionInterval * 1000);
   }
@@ -223,7 +223,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           const msos = await this.cameraDevice.getVideoStreamOptions();
           selectedStream = msos.find(mso => mso.name === streamingChannel);
         }
-  
+
         stream = await this.cameraDevice.getVideoStream(selectedStream);
       }
 
@@ -604,7 +604,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 }
 
 class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements MixinProvider {
-  constructor(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId) {
+  constructor(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId, public modelName: string, public internal?: boolean) {
     super(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId);
 
     // trigger mixin creation. todo: fix this to not be stupid hack.
@@ -618,6 +618,16 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
+    // filter out 
+    for (const iface of interfaces) {
+      if (iface.startsWith(`${ScryptedInterface.ObjectDetection}:`)) {
+        const deviceMatch = this.mixinDeviceInterfaces.find(miface => miface.startsWith(iface));
+        if (deviceMatch)
+          continue;
+        return null;
+      }
+    }
+
     if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && (interfaces.includes(ScryptedInterface.VideoCamera) || interfaces.includes(ScryptedInterface.Camera))) {
       return [ScryptedInterface.ObjectDetector, ScryptedInterface.MotionSensor, ScryptedInterface.Settings];
     }
@@ -627,17 +637,11 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
     let objectDetection = systemManager.getDeviceById<ObjectDetection>(this.id);
     const group = objectDetection.name;
-    const model = await objectDetection.getDetectionModel();
-    let internal = false;
-    if (mixinDeviceInterfaces.includes(`${ScryptedInterface.ObjectDetection}:${model.name}` as any)) {
-      const id = mixinDeviceState['id'];
-      objectDetection = systemManager.getDeviceById<ObjectDetection>(id);
-      internal = true;
-    }
-    return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, model.name, group, internal);
+    return new ObjectDetectionMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.mixinProviderNativeId, objectDetection, this.modelName, group, this.internal);
   }
 
   async releaseMixin(id: string, mixinDevice: any) {
+    this.console.log('releasing ObjectDetection mixin', id);
     mixinDevice.release();
   }
 }
@@ -656,15 +660,21 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider {
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.ObjectDetection))
       return;
-    for (const iface of interfaces) {
-      if (iface.startsWith(`${ScryptedInterface.ObjectDetection}:`))
-        return;
-    }
     return [ScryptedInterface.MixinProvider];
   }
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-    return new ObjectDetectorMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
+    for (const iface of mixinDeviceInterfaces) {
+      if (iface.startsWith(`${ScryptedInterface.ObjectDetection}:`)) {
+        const model = await mixinDevice.getDetectionModel();
+
+        return new ObjectDetectorMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId, model.name, true);
+      }
+    }
+
+    const objectDetection = systemManager.getDeviceById<ObjectDetection>(mixinDeviceState.id);
+    const model = await objectDetection.getDetectionModel();
+    return new ObjectDetectorMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId, model.name);
   }
 
   async releaseMixin(id: string, mixinDevice: any): Promise<void> {

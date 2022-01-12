@@ -1,6 +1,5 @@
 from __future__ import annotations
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
-from pipeline.safe_set_result import safe_set_result
 from .third_party.sort import Sort
 import multiprocessing
 import io
