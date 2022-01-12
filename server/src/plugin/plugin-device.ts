@@ -364,7 +364,8 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
     async apply(target: any, thisArg: any, argArray?: any): Promise<any> {
         const method = target();
 
-        const pluginDevice = await this.ensureProxy();
+        this.ensureProxy();
+        const pluginDevice = this.scrypted.findPluginDeviceById(this.id);
 
         if (method === RefreshSymbol)
             return this.applyMixin('refresh', argArray);
