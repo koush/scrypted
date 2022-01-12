@@ -249,7 +249,10 @@ class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
         if (typeof media === 'string' && media.startsWith(SCRYPTED_MEDIA_SCHEME)) {
             media = await mediaManager.createMediaObjectFromUrl(media);
         }
-        if (media && typeof media !== 'string') {
+        if (media) {
+            if (typeof media === 'string') {
+                media = await mediaManager.createMediaObjectFromUrl(media);
+            }
             this.startIntercom(media);
         }
     }

@@ -616,7 +616,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         const providedRoom = device.room;
         const isUsingDefaultRoom = getDisplayRoom(pluginDevice) === getProvidedRoomOrDefault(pluginDevice);
 
-        const providedInterfaces = [...new Set(device.interfaces || [])].sort();
+        const providedInterfaces = PluginDeviceProxyHandler.sortInterfaces(device.interfaces);
         // assure final mixin resolved interface list has at least all the
         // interfaces from the provided. the actual list will resolve lazily.
         let mixinInterfaces: string[] = [];
@@ -624,7 +624,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         if (mixins.length)
             mixinInterfaces.push(...getState(pluginDevice, ScryptedInterfaceProperty.interfaces) || []);
         mixinInterfaces.push(...providedInterfaces.slice());
-        mixinInterfaces = [...new Set(mixinInterfaces)].sort();
+        mixinInterfaces = PluginDeviceProxyHandler.sortInterfaces(mixinInterfaces);
 
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);
         const interfacesChanged = this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
