@@ -75,7 +75,14 @@ export class PluginComponent {
         }
     }
     async getPluginInfo(pluginId: string) {
-        const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
+        let packageJson;
+        if (this.scrypted.plugins[pluginId]) {
+            packageJson = this.scrypted.plugins[pluginId].packageJson;
+        }
+        else {
+            const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
+            packageJson = plugin.packageJson;
+        }
         const host = this.scrypted.plugins[pluginId];
         let rpcObjects = 0;
         if (host.peer) {
@@ -85,7 +92,7 @@ export class PluginComponent {
             pid: host?.worker?.pid,
             stats: host?.stats,
             rpcObjects,
-            packageJson: plugin.packageJson,
+            packageJson,
             id: this.scrypted.findPluginDevice(pluginId)._id,
         }
     }
