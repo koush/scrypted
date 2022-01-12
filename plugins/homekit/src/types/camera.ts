@@ -341,7 +341,7 @@ addSupportedType({
                                 // not sure this works.
                                 // '-fflags', '+flush_packets', '-flush_packets', '1',
                                 "-f", "rtp",
-                                `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}`
+                                `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
                             )
                         }
                         else {
