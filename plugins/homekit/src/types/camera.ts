@@ -1,4 +1,4 @@
-import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectsDetected } from '@scrypted/sdk'
+import { Camera, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera, AudioSensor, Intercom, MediaStreamOptions, ObjectsDetected, VideoCameraConfiguration } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
 import { AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingDelegate, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, SRTPCryptoSuites, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../hap';
 import { makeAccessory } from './common';
@@ -45,7 +45,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    async getAccessory(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
+    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
         const console = deviceManager.getMixinConsole(device.id, undefined);
 
         interface Session {
@@ -187,28 +187,18 @@ addSupportedType({
                 }
 
                 if (request.type === StreamRequestTypes.RECONFIGURE) {
-                    // not impleemented, this doesn't work.
+                    if (!device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration))
+                        return;
+
+                    const reconfigured = Object.assign({
+                        video: {
+                        },
+                    }, selectedStream || {});
+                    reconfigured.video.bitrate = request.video.max_bit_rate;
+
+                    device.setVideoStreamOptions(reconfigured);
+                    console.log('reconfigure selected stream', selectedStream);
                     return;
-
-                    // // stop for restart
-                    // session.cp?.kill();
-                    // session.cp = undefined;
-
-                    // // override the old values for new.
-                    // if (request.video) {
-                    //     Object.assign(session.startRequest.video, request.video);
-                    // }
-                    // request = session.startRequest;
-
-                    // const vso = await device.getVideoStreamOptions();
-                    // // try to match by bitrate.
-                    // for (const check of vso || []) {
-                    //     selectedStream = check;
-                    //     if (check?.video?.bitrate < request.video.max_bit_rate * 1000) {
-                    //         break;
-                    //     }
-                    // }
-                    // console.log('reconfigure selected stream', selectedStream);
                 }
                 else {
                     session.startRequest = request as StartStreamRequest;
