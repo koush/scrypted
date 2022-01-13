@@ -1,6 +1,6 @@
 import { ScryptedDevice, ScryptedMimeTypes, RTCAVMessage, MediaManager, VideoCamera, MediaStreamOptions, MediaObject } from '@scrypted/sdk/types';
 
-export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera, getVideo: () => any, createPeerConnection: (configuration: any) => RTCPeerConnection) {
+export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera, getVideo: () => HTMLVideoElement, createPeerConnection: (configuration: any) => RTCPeerConnection) {
   let selectedStream: MediaStreamOptions;
   try {
     const streams = await device.getVideoStreamOptions();
