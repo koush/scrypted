@@ -231,14 +231,12 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
 
     async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
         const bitrate = options?.video?.bitrate;
-        const maxBitrate = options?.video?.maxBitrate;
-        if (!bitrate || !maxBitrate)
+        if (!bitrate)
             return;
 
         const camera = this.findCamera();
         const channel = camera.channels.find(channel => channel.id === options.id);
         channel.bitrate = bitrate;
-        channel.maxBitrate = maxBitrate;
         const cameraResult = await this.protect.api.updateChannels(camera);
         if (!cameraResult) {
             throw new Error("setVideoStreamOptions failed")

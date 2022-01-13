@@ -1,4 +1,4 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions, VideoCameraConfiguration, MediaStreamOptions } from "@scrypted/sdk";
 import { Stream } from "stream";
 import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -10,11 +10,23 @@ import { listenZero } from "../../../common/src/listen-cluster";
 
 const { mediaManager } = sdk;
 
-class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
+class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
     maxExtraStreams: number;
+
+    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+        let bitrate = options?.video?.bitrate;
+        if (!bitrate)
+            return;
+        bitrate = Math.round(bitrate / 1000);
+        // what is Encode[0]? Is that the camera number?
+        const response = await this.getClient().digestAuth.request({
+            url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&Encode[0].MainFormat[${this.getChannelFromMediaStreamOptionsId(options.id)}].Video.BitRate=${bitrate}`
+        });
+        this.console.log('reconfigure result', response.data);
+    }
 
     getClient() {
         if (!this.client)
@@ -118,7 +130,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
     getRtspChannel() {
         return this.storage.getItem('rtspChannel');
     }
-    
+
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         let mas = this.maxExtraStreams;
         if (!this.maxExtraStreams) {
@@ -145,11 +157,10 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
         this.client = undefined;
         this.maxExtraStreams = undefined;
 
-        if (key !== 'amcrestDoorbell')
-            return super.putSetting(key, value);
+        const amcrestDoorbell = key === 'amcrestDoorbell' && value === 'true';
+        super.putSetting(key, value);
 
-        this.storage.setItem(key, value);
-        if (value === 'true')
+        if (amcrestDoorbell)
             provider.updateDevice(this.nativeId, this.name, [...provider.getInterfaces(), ScryptedInterface.BinarySensor, ScryptedInterface.Intercom], ScryptedDeviceType.Doorbell);
         else
             provider.updateDevice(this.nativeId, this.name, provider.getInterfaces());
@@ -219,6 +230,7 @@ class AmcrestCamera extends RtspSmartCamera implements Camera, Intercom {
 class AmcrestProvider extends RtspProvider {
     getAdditionalInterfaces() {
         return [
+            ScryptedInterface.VideoCameraConfiguration,
             ScryptedInterface.Camera,
             ScryptedInterface.AudioSensor,
             ScryptedInterface.MotionSensor,

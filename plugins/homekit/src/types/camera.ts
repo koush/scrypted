@@ -203,7 +203,6 @@ addSupportedType({
                     }, selectedStream || {});
                     const bitrate = request.video.max_bit_rate * 1000;
                     reconfigured.video.bitrate = bitrate;
-                    reconfigured.video.maxBitrate = bitrate;
 
                     device.setVideoStreamOptions(reconfigured);
                     console.log('reconfigure selected stream', selectedStream);

@@ -26,6 +26,10 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         };
     }
 
+    getChannelFromMediaStreamOptionsId(id: string) {
+        return id.substring('channel'.length);
+    }
+
     getRawVideoStreamOptions(): UrlMediaStreamOptions[] {
         let urls: string[] = [];
         try {
