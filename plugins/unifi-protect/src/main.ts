@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult, Notifier, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult, Notifier, SCRYPTED_MEDIA_SCHEME, VideoCameraConfiguration } from "@scrypted/sdk";
 import { ProtectApi, ProtectCameraLcdMessagePayload } from "@koush/unifi-protect";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "@koush/unifi-protect";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "@koush/unifi-protect";
@@ -12,7 +12,7 @@ const { log, deviceManager, mediaManager } = sdk;
 
 const defaultSensorTimeout = 30;
 
-class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, Settings, ObjectDetector {
+class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector {
     protect: UnifiProtect;
     motionTimeout: NodeJS.Timeout;
     detectionTimeout: NodeJS.Timeout;
@@ -229,6 +229,22 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Mot
         return this.getDefaultOrderedVideoStreamOptions(video);
     }
 
+    async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+        const bitrate = options?.video?.bitrate;
+        const maxBitrate = options?.video?.maxBitrate;
+        if (!bitrate || !maxBitrate)
+            return;
+
+        const camera = this.findCamera();
+        const channel = camera.channels.find(channel => channel.id === options.id);
+        channel.bitrate = bitrate;
+        channel.maxBitrate = maxBitrate;
+        const cameraResult = await this.protect.api.updateChannels(camera);
+        if (!cameraResult) {
+            throw new Error("setVideoStreamOptions failed")
+        }
+    }
+
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
     }
@@ -245,7 +261,7 @@ class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
         this.protect.api.updateCamera(this.findCamera(), {
             lcdMessage: payload,
         })
-        
+
         if (typeof media === 'string' && media.startsWith(SCRYPTED_MEDIA_SCHEME)) {
             media = await mediaManager.createMediaObjectFromUrl(media);
         }
@@ -294,7 +310,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
     cameras: Map<string, UnifiCamera> = new Map();
     api: ProtectApi;
     startup: Promise<void>;
-    runningEvents = new Map<string, {promise: Promise<unknown>, resolve: (value: unknown) => void}>();
+    runningEvents = new Map<string, { promise: Promise<unknown>, resolve: (value: unknown) => void }>();
 
     constructor(nativeId?: string, createOnly?: boolean) {
         super(nativeId);
@@ -541,6 +557,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                         ScryptedInterface.Settings,
                         ScryptedInterface.Camera,
                         ScryptedInterface.VideoCamera,
+                        ScryptedInterface.VideoCameraConfiguration,
                         ScryptedInterface.MotionSensor,
                     ],
                     type: camera.featureFlags.hasChime

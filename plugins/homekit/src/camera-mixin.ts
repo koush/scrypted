@@ -74,6 +74,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             readonly: true,
             description: 'Transcoding audio and video for HomeKit is not recommended. Configure your camera using the camera web portal or app to output the correct HomeKit compatible codecs (h264/aac/2000kbps).',
         })
+
         settings.push({
             title: 'Transcode Streaming',
             group: 'HomeKit Transcoding',
@@ -88,7 +89,15 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             type: 'boolean',
             key: 'transcodeStreamingHub',
             value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
-            description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+            description: 'Remote Viewing through a HomeKit Hub only: Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+        });
+        settings.push({
+            title: 'Dynamic Bitrate (Hub)',
+            group: 'HomeKit Transcoding',
+            type: 'boolean',
+            key: 'dynamicBitrate',
+            value: (this.storage.getItem('dynamicBitrate') === 'true').toString(),
+            description: 'Remote Viewing through a HomeKit Hub only: Adjust the bitrate of the native camera stream on demand to accomodate available bandwidth. This setting should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
         });
         let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true'
             || this.storage.getItem('transcodeStreamingHub') === 'true';

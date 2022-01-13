@@ -186,23 +186,37 @@ addSupportedType({
                     selectedStream = msos.find(mso => mso.name === streamingChannel);
                 }
 
-                if (request.type === StreamRequestTypes.RECONFIGURE) {
+                const tryReconfigureBitrate = () => {
+                    if (!isHomeKitHub)
+                        return;
+
                     if (!device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration))
+                        return;
+
+                    const dynamicBitrate = storage.getItem('dynamicBitrate') === 'true';
+                    if (!dynamicBitrate)
                         return;
 
                     const reconfigured = Object.assign({
                         video: {
                         },
                     }, selectedStream || {});
-                    reconfigured.video.bitrate = request.video.max_bit_rate;
+                    const bitrate = request.video.max_bit_rate * 1000;
+                    reconfigured.video.bitrate = bitrate;
+                    reconfigured.video.maxBitrate = bitrate;
 
                     device.setVideoStreamOptions(reconfigured);
                     console.log('reconfigure selected stream', selectedStream);
+                }
+
+                if (request.type === StreamRequestTypes.RECONFIGURE) {
+                    tryReconfigureBitrate();
                     return;
                 }
                 else {
                     session.startRequest = request as StartStreamRequest;
                 }
+                tryReconfigureBitrate();
 
                 // watch for data to verify other side is alive.
                 session.videoReturn.on('data', () => debounce(() => {

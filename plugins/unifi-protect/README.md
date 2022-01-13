@@ -1,15 +1,8 @@
-# Unifi Protect Plugin
+# Unifi Protect Plugin for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
+The Unifi Protect Plugin connects your Unifi Cameras to Scrypted. The Protect appliance such as a Cloud Key or Dream Machine is required.
 
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
+## Unifi Beta 1.21.0-beta.3
 
-## Visual Studio Code configuration
+This beta has a bug in it that causes HomeKit Secure Video recordings to fail. Please roll back to a prior or stable release, and flag [this issue](https://community.ui.com/releases/UniFi-Protect-Application-1-21-0-beta-3/32c7bb7a-697d-4841-8b9f-eef49b8682e9#comment/ad1c2710-2451-4612-847f-6413eb8ec0db).
 
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
