@@ -7,6 +7,10 @@ import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
 import { recommendRebroadcast } from "../../rtsp/src/recommend";
 import { fitHeightToWidth } from "../../../common/src/resolution-utils";
+import { listenZero } from "../../../common/src/listen-cluster";
+import net from 'net';
+import WS from 'ws';
+import { once } from "events";
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -20,6 +24,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
     lastMotion: number;
     lastRing: number;
     lastSeen: number;
+    talkbackUrl: string;
 
     constructor(protect: UnifiProtect, nativeId: string, protectCamera: Readonly<ProtectCameraConfigInterface>) {
         super(nativeId);
@@ -275,17 +280,56 @@ class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
         const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
 
-        const args = ffmpegInput.inputArguments.slice();
-
         const camera = this.findCamera();
+        if (!this.talkbackUrl) {
+            const params = new URLSearchParams({ camera: camera.id });
+            const response = await this.protect.api.loginFetch(this.protect.api.wsUrl() + "/talkback?" + params.toString());
+            const tb = await response.json() as Record<string, string>;
+
+            // Adjust the URL for our address.
+            const tbUrl = new URL(tb.url);
+            tbUrl.hostname = this.protect.getSetting('ip');
+            this.talkbackUrl = tbUrl.toString();
+        }
+
+        const websocket = new WS(this.talkbackUrl, { rejectUnauthorized: false });
+
+        const server = new net.Server(async (socket) => {
+            server.close();
+
+            this.console.log('sending audio data to', this.talkbackUrl);
+
+            try {
+                while (true) {
+                    await once(socket, 'readable');
+                    while (true) {
+                        const data = socket.read();
+                        if (!data)
+                            break;
+                        websocket.send(data, e => {
+                            if (e)
+                                socket.destroy();
+                        });
+                    }
+                }
+            }
+            finally {
+                this.cp.kill();
+            }
+        });
+        const port = await listenZero(server)
+
+        const args = ffmpegInput.inputArguments.slice();
 
         args.push(
             "-acodec", camera.talkbackSettings.typeFmt,
+            "-profile:a", "aac_low",
             "-flags", "+global_header",
             "-ar", camera.talkbackSettings.samplingRate.toString(),
+            "-ac", camera.talkbackSettings.channels.toString(),
             "-b:a", "64k",
             "-f", "adts",
-            "udp://" + camera.host + ":" + camera.talkbackSettings.bindPort,
+            `tcp://127.0.0.1:${port}`,
         );
 
         this.console.log('starting 2 way audio', args);

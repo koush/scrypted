@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/unifi-protect",
-   "version": "0.0.66",
+   "version": "0.0.67",
    "description": "Unifi Protect Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -34,8 +34,8 @@
       "@types/ws": "^7.4.7"
    },
    "dependencies": {
-      "@koush/unifi-protect": "^0.0.6",
+      "@koush/unifi-protect": "^0.0.7",
       "@scrypted/sdk": "file:../../sdk",
-      "ws": "^8.2.0"
+      "ws": "^8.4.0"
    }
 }
