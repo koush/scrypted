@@ -24,7 +24,6 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
     lastMotion: number;
     lastRing: number;
     lastSeen: number;
-    talkbackUrl: string;
 
     constructor(protect: UnifiProtect, nativeId: string, protectCamera: Readonly<ProtectCameraConfigInterface>) {
         super(nativeId);
@@ -281,23 +280,21 @@ class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
         const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
 
         const camera = this.findCamera();
-        if (!this.talkbackUrl) {
-            const params = new URLSearchParams({ camera: camera.id });
-            const response = await this.protect.api.loginFetch(this.protect.api.wsUrl() + "/talkback?" + params.toString());
-            const tb = await response.json() as Record<string, string>;
+        const params = new URLSearchParams({ camera: camera.id });
+        const response = await this.protect.api.loginFetch(this.protect.api.wsUrl() + "/talkback?" + params.toString());
+        const tb = await response.json() as Record<string, string>;
 
-            // Adjust the URL for our address.
-            const tbUrl = new URL(tb.url);
-            tbUrl.hostname = this.protect.getSetting('ip');
-            this.talkbackUrl = tbUrl.toString();
-        }
+        // Adjust the URL for our address.
+        const tbUrl = new URL(tb.url);
+        tbUrl.hostname = this.protect.getSetting('ip');
+        const talkbackUrl = tbUrl.toString();
 
-        const websocket = new WS(this.talkbackUrl, { rejectUnauthorized: false });
+        const websocket = new WS(talkbackUrl, { rejectUnauthorized: false });
 
         const server = new net.Server(async (socket) => {
             server.close();
 
-            this.console.log('sending audio data to', this.talkbackUrl);
+            this.console.log('sending audio data to', talkbackUrl);
 
             try {
                 while (true) {
