@@ -34,7 +34,7 @@
       "@types/ws": "^7.4.7"
    },
    "dependencies": {
-      "@koush/unifi-protect": "^0.0.7",
+      "@koush/unifi-protect": "^0.0.8",
       "@scrypted/sdk": "file:../../sdk",
       "ws": "^8.4.0"
    }

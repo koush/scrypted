@@ -16,7 +16,28 @@ const { log, deviceManager, mediaManager } = sdk;
 
 const defaultSensorTimeout = 30;
 
-class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector {
+class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor {
+    constructor(public camera: UnifiCamera, nativeId: string) {
+        super(nativeId);
+    }
+    async takePicture(options?: PictureOptions): Promise<MediaObject> {
+        const buffer = await this.camera.getSnapshot(options, 'package-snapshot?');
+        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+    }
+    async getPictureOptions(): Promise<PictureOptions[]> {
+        return;
+    }
+    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        const o = (await this.getVideoStreamOptions())[0];
+        return this.camera.getVideoStream(o);
+    }
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+        const options = await this.camera.getVideoStreamOptions();
+        return [options[options.length - 1]];
+    }
+}
+
+class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider {
     protect: UnifiProtect;
     motionTimeout: NodeJS.Timeout;
     detectionTimeout: NodeJS.Timeout;
@@ -24,6 +45,8 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
     lastMotion: number;
     lastRing: number;
     lastSeen: number;
+    intercomProcess?: ChildProcess;
+    packageCamera?: UnifiPackageCamera;
 
     constructor(protect: UnifiProtect, nativeId: string, protectCamera: Readonly<ProtectCameraConfigInterface>) {
         super(nativeId);
@@ -38,6 +61,78 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
         }
     }
 
+    async getDevice(nativeId: string) {
+        if (!this.packageCamera)
+            this.packageCamera = new UnifiPackageCamera(this, nativeId);
+        return this.packageCamera;
+    }
+
+    async startIntercom(media: MediaObject) {
+        const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
+        const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
+
+        const camera = this.findCamera();
+        const params = new URLSearchParams({ camera: camera.id });
+        const response = await this.protect.api.loginFetch(this.protect.api.wsUrl() + "/talkback?" + params.toString());
+        const tb = await response.json() as Record<string, string>;
+
+        // Adjust the URL for our address.
+        const tbUrl = new URL(tb.url);
+        tbUrl.hostname = this.protect.getSetting('ip');
+        const talkbackUrl = tbUrl.toString();
+
+        const websocket = new WS(talkbackUrl, { rejectUnauthorized: false });
+
+        const server = new net.Server(async (socket) => {
+            server.close();
+
+            this.console.log('sending audio data to', talkbackUrl);
+
+            try {
+                while (true) {
+                    await once(socket, 'readable');
+                    while (true) {
+                        const data = socket.read();
+                        if (!data)
+                            break;
+                        websocket.send(data, e => {
+                            if (e)
+                                socket.destroy();
+                        });
+                    }
+                }
+            }
+            finally {
+                this.intercomProcess.kill();
+            }
+        });
+        const port = await listenZero(server)
+
+        const args = ffmpegInput.inputArguments.slice();
+
+        args.push(
+            "-acodec", camera.talkbackSettings.typeFmt,
+            "-profile:a", "aac_low",
+            "-flags", "+global_header",
+            "-ar", camera.talkbackSettings.samplingRate.toString(),
+            "-ac", camera.talkbackSettings.channels.toString(),
+            "-b:a", "64k",
+            "-f", "adts",
+            `tcp://127.0.0.1:${port}`,
+        );
+
+        this.console.log('starting 2 way audio', args);
+
+        const ffmpeg = await mediaManager.getFFmpegPath();
+        this.intercomProcess = child_process.spawn(ffmpeg, args);
+        this.intercomProcess.on('killed', () => this.intercomProcess = undefined);
+        ffmpegLogInitialOutput(this.console, this.intercomProcess);
+    }
+
+    async stopIntercom() {
+        this.intercomProcess?.kill();
+        this.intercomProcess = undefined;
+    }
     async getObjectTypes(): Promise<ObjectDetectionTypes> {
         const classes = ['motion'];
         if (this.interfaces.includes(ScryptedInterface.BinarySensor))
@@ -122,7 +217,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
     resetMotionTimeout() {
         clearTimeout(this.motionTimeout);
         this.motionTimeout = setTimeout(() => {
-            this.motionDetected = false;
+            this.setMotionDetected(false);
         }, this.getSensorTimeout());
     }
 
@@ -144,7 +239,8 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
         }, this.getSensorTimeout());
     }
 
-    async getSnapshot(options?: PictureOptions): Promise<Buffer> {
+    async getSnapshot(options?: PictureOptions, suffix?: string): Promise<Buffer> {
+        suffix = suffix || 'snapshot';
         let size = '';
         try {
             if (options?.picture?.width && options?.picture?.height) {
@@ -159,7 +255,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
         catch (e) {
 
         }
-        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/snapshot?ts=${Date.now()}${size}`
+        const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/${suffix}?ts=${Date.now()}${size}`
 
         const response = await this.protect.api.loginFetch(url);
         if (!response) {
@@ -250,10 +346,12 @@ class UnifiCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Vid
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
     }
-}
 
-class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
-    cp?: ChildProcess;
+    setMotionDetected(motionDetected: boolean) {
+        this.motionDetected = motionDetected;
+        if (this.packageCamera)
+            this.motionDetected = motionDetected;
+    }
 
     async sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void> {
         const payload: ProtectCameraLcdMessagePayload = {
@@ -273,73 +371,6 @@ class UnifiDoorbell extends UnifiCamera implements Intercom, Notifier {
             }
             this.startIntercom(media);
         }
-    }
-
-    async startIntercom(media: MediaObject) {
-        const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
-        const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
-
-        const camera = this.findCamera();
-        const params = new URLSearchParams({ camera: camera.id });
-        const response = await this.protect.api.loginFetch(this.protect.api.wsUrl() + "/talkback?" + params.toString());
-        const tb = await response.json() as Record<string, string>;
-
-        // Adjust the URL for our address.
-        const tbUrl = new URL(tb.url);
-        tbUrl.hostname = this.protect.getSetting('ip');
-        const talkbackUrl = tbUrl.toString();
-
-        const websocket = new WS(talkbackUrl, { rejectUnauthorized: false });
-
-        const server = new net.Server(async (socket) => {
-            server.close();
-
-            this.console.log('sending audio data to', talkbackUrl);
-
-            try {
-                while (true) {
-                    await once(socket, 'readable');
-                    while (true) {
-                        const data = socket.read();
-                        if (!data)
-                            break;
-                        websocket.send(data, e => {
-                            if (e)
-                                socket.destroy();
-                        });
-                    }
-                }
-            }
-            finally {
-                this.cp.kill();
-            }
-        });
-        const port = await listenZero(server)
-
-        const args = ffmpegInput.inputArguments.slice();
-
-        args.push(
-            "-acodec", camera.talkbackSettings.typeFmt,
-            "-profile:a", "aac_low",
-            "-flags", "+global_header",
-            "-ar", camera.talkbackSettings.samplingRate.toString(),
-            "-ac", camera.talkbackSettings.channels.toString(),
-            "-b:a", "64k",
-            "-f", "adts",
-            `tcp://127.0.0.1:${port}`,
-        );
-
-        this.console.log('starting 2 way audio', args);
-
-        const ffmpeg = await mediaManager.getFFmpegPath();
-        this.cp = child_process.spawn(ffmpeg, args);
-        this.cp.on('killed', () => this.cp = undefined);
-        ffmpegLogInitialOutput(this.console, this.cp);
-    }
-
-    async stopIntercom() {
-        this.cp?.kill();
-        this.cp = undefined;
     }
 }
 
@@ -392,19 +423,19 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
                 if (payload.isMotionDetected !== undefined) {
                     // explicitly set the motion state
-                    rtsp.motionDetected = payload.isMotionDetected;
+                    rtsp.setMotionDetected(payload.isMotionDetected);
                     rtsp.lastMotion = payload.lastMotion;
                     rtsp.resetMotionTimeout();
                 }
                 else if (rtsp.lastMotion && payload.lastMotion && payload.lastMotion > rtsp.lastMotion) {
                     // motion is ongoing update
-                    rtsp.motionDetected = true;
+                    rtsp.setMotionDetected(true);
                     rtsp.lastMotion = payload.lastMotion;
                     rtsp.resetMotionTimeout();
                 }
                 else if (rtsp.motionDetected && payload.lastSeen > payload.lastMotion + rtsp.getSensorTimeout()) {
                     // something weird happened, lets set unset any motion state
-                    rtsp.motionDetected = false;
+                    rtsp.setMotionDetected(false);
                 }
 
                 if (payload.lastRing && rtsp.binaryState && payload.lastSeen > payload.lastRing + rtsp.getSensorTimeout()) {
@@ -478,7 +509,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                         rtsp.resetRingTimeout();
                     }
                     else if (payload.type === 'motion') {
-                        rtsp.motionDetected = true;
+                        rtsp.setMotionDetected(true);
                         rtsp.lastMotion = payload.start;
                         rtsp.resetMotionTimeout();
                     }
@@ -607,28 +638,55 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     d.interfaces.push(ScryptedInterface.BinarySensor);
                 }
                 if (camera.featureFlags.hasSpeaker) {
-                    d.interfaces.push(
-                        ScryptedInterface.Intercom,
-                        ScryptedInterface.Notifier,
-                    );
+                    d.interfaces.push(ScryptedInterface.Notifier);
+                }
+                if (camera.featureFlags.hasLcdScreen) {
+                    d.interfaces.push(ScryptedInterface.Intercom);
+                }
+                if (camera.featureFlags.hasPackageCamera) {
+                    d.interfaces.push(ScryptedInterface.DeviceProvider);
                 }
                 d.interfaces.push(ScryptedInterface.ObjectDetector);
                 devices.push(d);
             }
 
-            for (const d of devices) {
-                await deviceManager.onDeviceDiscovered(d);
-            }
-
-            // todo: this was done, october 31st. remove sometime later.
-            // todo: uncomment after implementing per providerNativeId onDevicesChanged.
-            // await deviceManager.onDevicesChanged({
-            //     providerNativeId: this.nativeId,
-            //     devices
-            // });
+            await deviceManager.onDevicesChanged({
+                providerNativeId: this.nativeId,
+                devices
+            });
 
             for (const device of devices) {
                 this.getDevice(device.nativeId);
+            }
+
+            // handle package cameras
+            for (const camera of this.api.Cameras) {
+                if (!camera.featureFlags.hasPackageCamera)
+                    continue;
+                const nativeId = camera.id + '-packageCamera';
+                const d: Device = {
+                    providerNativeId: camera.id,
+                    name: camera.name + ' Package Camera',
+                    nativeId,
+                    info: {
+                        manufacturer: 'Ubiquiti',
+                        model: camera.type,
+                        firmware: camera.firmwareVersion,
+                        version: camera.hardwareRevision,
+                        serialNumber: camera.id,
+                    },
+                    interfaces: [
+                        ScryptedInterface.Camera,
+                        ScryptedInterface.VideoCamera,
+                        ScryptedInterface.MotionSensor,
+                    ],
+                    type: ScryptedDeviceType.Camera,
+                };
+
+                await deviceManager.onDevicesChanged({
+                    providerNativeId: camera.id,
+                    devices: [d],
+                });
             }
         }
         catch (e) {
@@ -637,16 +695,14 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
         }
     }
 
-    async getDevice(nativeId: string): Promise<any> {
+    async getDevice(nativeId: string): Promise<UnifiCamera> {
         await this.startup;
         if (this.cameras.has(nativeId))
             return this.cameras.get(nativeId);
         const camera = this.api.Cameras.find(camera => camera.id === nativeId);
         if (!camera)
             throw new Error('camera not found?');
-        const ret = camera.featureFlags.hasSpeaker ?
-            new UnifiDoorbell(this, nativeId, camera)
-            : new UnifiCamera(this, nativeId, camera);
+        const ret = new UnifiCamera(this, nativeId, camera);
         this.cameras.set(nativeId, ret);
         return ret;
     }
