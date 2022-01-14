@@ -215,7 +215,6 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                 const extraEncoderArgs = [
                     '-b:v', '${request.video.max_bit_rate * 2}k',
                     '-vf', 'scale=${request.video.width}:${request.video.height}',
-                    'scale=${request.video.width}:${request.video.height}',
                     '-r', '${request.video.fps}',
                 ];
                 args.push(...extraEncoderArgs);

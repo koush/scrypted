@@ -61,9 +61,14 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
         }
     }
 
-    async getDevice(nativeId: string) {
-        if (!this.packageCamera)
+    ensurePackageCamera() {
+        if (!this.packageCamera) {
+            const nativeId = this.nativeId + '-packageCamera';
             this.packageCamera = new UnifiPackageCamera(this, nativeId);
+        }
+    }
+    async getDevice(nativeId: string) {
+        this.ensurePackageCamera();
         return this.packageCamera;
     }
 
@@ -349,8 +354,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
 
     setMotionDetected(motionDetected: boolean) {
         this.motionDetected = motionDetected;
-        if (this.packageCamera)
-            this.motionDetected = motionDetected;
+        if (this.findCamera().featureFlags.hasPackageCamera) {
+            this.ensurePackageCamera();
+            this.packageCamera.motionDetected = motionDetected;
+        }
     }
 
     async sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void> {
