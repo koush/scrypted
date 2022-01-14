@@ -213,10 +213,10 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                 // if default args were specified (ie, videotoolbox, quicksync, etc),
                 // expand that into args that include bitrate and rescale.
                 const extraEncoderArgs = [
-                    '-b:v',
-                    '${request.video.max_bit_rate * 2}k',
-                    '-vf',
+                    '-b:v', '${request.video.max_bit_rate * 2}k',
+                    '-vf', 'scale=${request.video.width}:${request.video.height}',
                     'scale=${request.video.width}:${request.video.height}',
+                    '-r', '${request.video.fps}',
                 ];
                 args.push(...extraEncoderArgs);
             }
