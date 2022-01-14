@@ -135,7 +135,7 @@ class OpenCVPlugin(DetectPlugin):
         return detection_result                
 
     def run_detection_jpeg(self, detection_session: DetectionSession, image_bytes: bytes, min_score: float) -> ObjectsDetected:
-        raise Exception('can not run motion detection on jpeg')
+        raise Exception('can not run motion detection on image')
 
     def get_detection_input_size(self, src_size):
         # The initial implementation of this plugin used BGRA

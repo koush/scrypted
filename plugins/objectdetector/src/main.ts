@@ -672,8 +672,7 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider {
       }
     }
 
-    const objectDetection = systemManager.getDeviceById<ObjectDetection>(mixinDeviceState.id);
-    const model = await objectDetection.getDetectionModel();
+    const model = await mixinDevice.getDetectionModel();
     return new ObjectDetectorMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId, model.name);
   }
 

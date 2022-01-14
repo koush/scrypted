@@ -236,7 +236,7 @@ class PluginRemote:
         sdk_init(zip, self, self.systemManager,
                  self.deviceManager, self.mediaManager)
         from main import create_scrypted_plugin  # type: ignore
-        return create_scrypted_plugin()
+        return await rpc.maybe_await(create_scrypted_plugin())
 
     async def setSystemState(self, state):
         self.systemState = state
