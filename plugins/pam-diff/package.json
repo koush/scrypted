@@ -1,5 +1,15 @@
 {
    "name": "@scrypted/pam-diff",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "motion",
+      "detect",
+      "detection",
+      "pamdiff",
+      "pam",
+      "diff"
+   ],
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -28,5 +38,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.4"
+   "version": "0.0.5"
 }
