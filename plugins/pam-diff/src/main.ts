@@ -115,7 +115,6 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
 
         // eslint-disable-next-line no-unused-vars
         pamDiff.on('diff', async (data) => {
-            this.console.log('diff', pamDiff, data);
             const event: ObjectsDetected = {
                 timestamp: Date.now(),
                 running: false,
