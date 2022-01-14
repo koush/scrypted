@@ -1,0 +1,32 @@
+{
+   "name": "@scrypted/pam-diff",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "scrypted": {
+      "name": "PAM Diff Motion Detection",
+      "type": "API",
+      "interfaces": [
+         "ObjectDetection"
+      ]
+   },
+   "dependencies": {
+      "@types/node": "^16.6.1",
+      "pipe2pam": "^0.6.2"
+   },
+   "optionalDependencies": {
+      "pam-diff": "^1.1.0"
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.0.2"
+}
