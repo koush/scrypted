@@ -137,7 +137,7 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         pds.cp = child_process.spawn(ffmpeg, args, {
             stdio:[ 'inherit', 'pipe', 'pipe', 'pipe']
         });
-        pds.cp.stdio[3].pipe(p2p).pipe(pamDiff);
+        pds.cp.stdio[3].pipe(p2p as any).pipe(pamDiff as any);
         pds.cp.on('exit', () => this.console.log('ffmpeg exited'))
         pds.cp.on('error', e => this.console.error('ffmpeg error', e))
         ffmpegLogInitialOutput(this.console, pds.cp);
