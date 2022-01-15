@@ -9,13 +9,16 @@ from gi.repository import Gst
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected
 
 class OpenCVDetectionSession(DetectionSession):
-    cap: cv2.VideoCapture
-    previous_frame: Any
-
     def __init__(self) -> None:
         super().__init__()
-        self.previous_frame = None
-        self.cap = None
+        self.cap: cv2.VideoCapture = None
+        self.previous_frame: Any = None
+        self.curFrame = None
+        self.frameDelta = None
+        self.dilated = None
+        self.thresh = None
+        self.gray = None
+        self.gstsample = None
 
 defaultThreshold = 25
 defaultArea = 2000
@@ -91,21 +94,25 @@ class OpenCVPlugin(DetectPlugin):
 
         # see get_detection_input_size on undocumented size requirements for GRAY8
         if self.color2Gray != None:
-            gray = cv2.cvtColor(frame, self.color2Gray)
+            detection_session.gray = cv2.cvtColor(frame, self.color2Gray, dst=detection_session.gray)
+            gray = detection_session.gray
         else:
             gray = frame
-        curFrame = cv2.GaussianBlur(gray, (21,21), 0)
+        detection_session.curFrame = cv2.GaussianBlur(gray, (21,21), 0, dst=detection_session.curFrame)
 
         if detection_session.previous_frame is None:
-            detection_session.previous_frame = curFrame
+            detection_session.previous_frame = detection_session.curFrame
+            detection_session.curFrame = None
             return
 
-        frameDelta = cv2.absdiff(detection_session.previous_frame, curFrame)
-        detection_session.previous_frame = curFrame
+        detection_session.frameDelta = cv2.absdiff(detection_session.previous_frame, detection_session.curFrame, dst=detection_session.frameDelta)
+        tmp = detection_session.curFrame
+        detection_session.curFrame = detection_session.previous_frame
+        detection_session.previous_frame = tmp
 
-        _, thresh = cv2.threshold(frameDelta, threshold, 255, cv2.THRESH_BINARY)
-        dilated = cv2.dilate(thresh, None, iterations=2)
-        fcontours = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        _, detection_session.thresh = cv2.threshold(detection_session.frameDelta, threshold, 255, cv2.THRESH_BINARY, dst=detection_session.thresh)
+        detection_session.dilated = cv2.dilate(detection_session.thresh, None, iterations=2, dst=detection_session.dilated)
+        fcontours = cv2.findContours(detection_session.dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = imutils.grab_contours(fcontours)
 
         detections: List[ObjectDetectionResult] = []
