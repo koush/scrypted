@@ -193,7 +193,11 @@ class OpenCVPlugin(DetectPlugin):
                 self.pixelFormatChannelCount),
                 buffer=info.data,
                 dtype= np.uint8)
-            return self.detect(detection_session, mat, settings, src_size, convert_to_src_size)
+            detections = self.detect(detection_session, mat, settings, src_size, convert_to_src_size)
+            # no point in triggering empty events.
+            if detections and not len(detections['detections']):
+                return None
+            return detections
         finally:
             buf.unmap(info)
 
