@@ -129,7 +129,10 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         async getVideoStreamOptions() {
             if (devices.length === 1)
                 return devices[0].getVideoStreamOptions();
-            return undefined;
+            return [{
+                video: {},
+                audio: null,
+            }]
         },
 
         async getVideoStream(options) {
