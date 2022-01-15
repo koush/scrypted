@@ -106,6 +106,13 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 description: "Enable if this device is an Amcrest Doorbell.",
                 key: "amcrestDoorbell",
                 value: (!!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor)).toString(),
+            },
+	    {
+	        title: 'Dahua Doorbell',
+	        type: 'boolean',
+	        description: "Enable if this device is an Dahua Doorbell.",
+	        key: "dahuaDoorbell",
+	        value: this.storage.getItem('dahuaDoorbell'),
             }
         ];
     }
