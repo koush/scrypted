@@ -651,10 +651,10 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     d.interfaces.push(ScryptedInterface.BinarySensor);
                 }
                 if (camera.featureFlags.hasSpeaker) {
-                    d.interfaces.push(ScryptedInterface.Notifier);
+                    d.interfaces.push(ScryptedInterface.Intercom);
                 }
                 if (camera.featureFlags.hasLcdScreen) {
-                    d.interfaces.push(ScryptedInterface.Intercom);
+                    d.interfaces.push(ScryptedInterface.Notifier);
                 }
                 if (camera.featureFlags.hasPackageCamera) {
                     d.interfaces.push(ScryptedInterface.DeviceProvider);
