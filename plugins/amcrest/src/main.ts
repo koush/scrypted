@@ -1,5 +1,5 @@
 import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions, VideoCameraConfiguration, MediaStreamOptions } from "@scrypted/sdk";
-import { Stream } from "stream";
+import { Stream, PassThrough } from "stream";
 import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { EventEmitter } from "stream";
@@ -42,6 +42,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             try {
                 const client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
                 const events = await client.listenEvents();
+		const dahuaDoorbell = this.storage.getItem('dahuaDoorbell');
+		    
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();
@@ -76,17 +78,22 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     }
                     else if (event === AmcrestEvent.TalkInvite
                         || event === AmcrestEvent.PhoneCallDetectStart
-                        || event === AmcrestEvent.AlarmIPCStart) {
+                        || event === AmcrestEvent.AlarmIPCStart || event === AmcrestEvent.DahuaTalkInvite) {
                         this.binaryState = true;
                     }
                     else if (event === AmcrestEvent.TalkHangup
                         || event === AmcrestEvent.PhoneCallDetectStop
-                        || event === AmcrestEvent.AlarmIPCStop) {
+                        || event === AmcrestEvent.AlarmIPCStop || event === AmcrestEvent.DahuaTalkHangup) {
                         this.binaryState = false;
                     }
-                    else if (event === AmcrestEvent.TalkPulse) {
+                    else if (event === AmcrestEvent.TalkPulse && dahuaDoorbell == false) {
                         clearTimeout(pulseTimeout);
                         pulseTimeout = setTimeout(() => this.binaryState = false, 30000);
+                        this.binaryState = true;
+                    }
+		    else if (event === AmcrestEvent.DahuaTalkPulse && dahuaDoorbell == true) {
+                        clearTimeout(pulseTimeout);
+                        pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
                         this.binaryState = true;
                     }
                 })
@@ -165,9 +172,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.maxExtraStreams = undefined;
 
         const amcrestDoorbell = key === 'amcrestDoorbell' && value === 'true';
+	const dahuaDoorbell = key === 'dahuaDoorbell' && value === 'true';
         super.putSetting(key, value);
 
-        if (amcrestDoorbell)
+        if (amcrestDoorbell || dahuaDoorbell)
             provider.updateDevice(this.nativeId, this.name, [...provider.getInterfaces(), ScryptedInterface.BinarySensor, ScryptedInterface.Intercom], ScryptedDeviceType.Doorbell);
         else
             provider.updateDevice(this.nativeId, this.name, provider.getInterfaces());
@@ -183,28 +191,58 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         const args = ffmpegInput.inputArguments.slice();
         args.unshift('-hide_banner');
+	    
+	const dahuaDoorbell = this.storage.getItem('dahuaDoorbell');
 
         const server = new net.Server(async (socket) => {
             server.close();
 
             const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=${channel}`;
             this.console.log('posting audio data to', url);
+		
+            if (dahuaDoorbell == true) {
+		    const passthrough = new PassThrough();
+		    this.getClient().digestAuth.request({
+			method: 'POST',
+			url,
+			headers: {
+			    'Content-Type': 'Audio/AAC',
+			    'Content-Length': '9999999'
+			},
+			httpsAgent: amcrestHttpsAgent,
+			data: passthrough,
+		    });
 
-            try {
-                await this.getClient().digestAuth.request({
-                    method: 'POST',
-                    url,
-                    headers: {
-                        'Content-Type': 'Audio/AAC',
-                        'Content-Length': '9999999'
-                    },
-                    httpsAgent: amcrestHttpsAgent,
-                    data: socket
-                });
-            }
-            catch (e) {
-                this.console.error('audio finished with error', e);
-            }
+		    try {
+			while (true) {
+			    const data = await readLength(socket, 1024);
+			    passthrough.push(data);
+			}
+		    }
+		    catch (e) {
+			this.console.error('audio finished with error', e);
+		    }
+		    finally {
+			passthrough.end();
+		    } 
+	    } else {
+		   try {
+			await this.getClient().digestAuth.request({
+			    method: 'POST',
+			    url,
+			    headers: {
+				'Content-Type': 'Audio/AAC',
+				'Content-Length': '9999999'
+			    },
+			    httpsAgent: amcrestHttpsAgent,
+			    data: socket
+			});
+		    }
+		    catch (e) {
+			this.console.error('audio finished with error', e);
+		 } 
+	    }
+
             this.cp.kill();
         });
         const port = await listenZero(server)
