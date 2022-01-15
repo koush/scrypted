@@ -196,6 +196,7 @@ class OpenCVPlugin(DetectPlugin):
             detections = self.detect(detection_session, mat, settings, src_size, convert_to_src_size)
             # no point in triggering empty events.
             if detections and not len(detections['detections']):
+                self.detection_sleep(settings)
                 return None
             return detections
         finally:
@@ -204,8 +205,11 @@ class OpenCVPlugin(DetectPlugin):
     def create_detection_session(self):
         return OpenCVDetectionSession()
 
-    def detection_event_notified(self, settings: Any):
+    def detection_sleep(self, settings: Any):
         area, threshold, interval = self.parse_settings(settings)
         # it is safe to block here because gstreamer creates a queue thread
         sleep(interval / 1000)
+
+    def detection_event_notified(self, settings: Any):
+        self.detection_sleep(settings)
         return super().detection_event_notified(settings)
