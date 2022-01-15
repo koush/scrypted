@@ -116,12 +116,18 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
         const args = ffmpegInput.inputArguments.slice();
 
         args.push(
-            "-acodec", camera.talkbackSettings.typeFmt,
-            "-profile:a", "aac_low",
+            "-acodec", "libfdk_aac",
+            "-profile:a", "aac_he",
+            "-eld_sbr", "1",
+            "-threads", "0",
+            "-avioflags", "direct",
+            "-max_delay", "3000000",
+            "-flush_packets", "1",
+            "-af", "highpass=f=200, lowpass=f=2500, afftdn=tn=1:tr=1",
             "-flags", "+global_header",
             "-ar", camera.talkbackSettings.samplingRate.toString(),
             "-ac", camera.talkbackSettings.channels.toString(),
-            "-b:a", "64k",
+            "-b:a", "16k",
             "-f", "adts",
             `tcp://127.0.0.1:${port}`,
         );
