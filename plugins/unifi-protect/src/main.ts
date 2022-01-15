@@ -117,12 +117,12 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
 
         args.push(
             "-acodec", "libfdk_aac",
-            "-profile:a", "aac_he",
-            "-eld_sbr", "1",
+            "-profile:a", "aac_low",
             "-threads", "0",
             "-avioflags", "direct",
             "-max_delay", "3000000",
             "-flush_packets", "1",
+            "-af", "highpass=f=200, lowpass=f=2500, afftdn=tn=1:tr=1",
             "-flags", "+global_header",
             "-ar", camera.talkbackSettings.samplingRate.toString(),
             "-ac", camera.talkbackSettings.channels.toString(),
