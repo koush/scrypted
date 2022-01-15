@@ -1,15 +1,3 @@
-# Prebuffer mixin for VideoCamera devices.
+# Rebroadcast and Prebuffer for Scrypted
 
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
-
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
-
-## Visual Studio Code configuration
-
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
+This plugin maintains connections to all connected cameras, and buffers a small amount of recent video for instant replays. This instant replay is used by HomeKit Secure Video, as well as speeding up initial live stream load times.
