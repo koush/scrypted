@@ -14,6 +14,9 @@ export enum AmcrestEvent {
     AlarmIPCStop = "Code=AlarmIPC;action=Stop",
     PhoneCallDetectStart = "Code=PhoneCallDetect;action=Start",
     PhoneCallDetectStop = "Code=PhoneCallDetect;action=Stop",
+    DahuaTalkInvite = "Code=CallNoAnswered;action=Start",
+    DahuaTalkHangup = "Code=PassiveHungup;action=Start",
+    DahuaTalkPulse = "Code=_CallNoAnswer_;action=Pulse",
 }
 
 export const amcrestHttpsAgent = new https.Agent({
