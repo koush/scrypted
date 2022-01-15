@@ -87,12 +87,12 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                         || event === AmcrestEvent.AlarmIPCStop || event === AmcrestEvent.DahuaTalkHangup) {
                         this.binaryState = false;
                     }
-                    else if (event === AmcrestEvent.TalkPulse && dahuaDoorbell == false) {
+                    else if (event === AmcrestEvent.TalkPulse && dahuaDoorbell !== 'true') {
                         clearTimeout(pulseTimeout);
                         pulseTimeout = setTimeout(() => this.binaryState = false, 30000);
                         this.binaryState = true;
                     }
-		    else if (event === AmcrestEvent.DahuaTalkPulse && dahuaDoorbell == true) {
+		    else if (event === AmcrestEvent.DahuaTalkPulse && dahuaDoorbell === 'true') {
                         clearTimeout(pulseTimeout);
                         pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
                         this.binaryState = true;
@@ -201,7 +201,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=${channel}`;
             this.console.log('posting audio data to', url);
 		
-            if (dahuaDoorbell == true) {
+            if (dahuaDoorbell === 'true') {
 		    const passthrough = new PassThrough();
 		    this.getClient().digestAuth.request({
 			method: 'POST',
