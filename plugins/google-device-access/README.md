@@ -20,7 +20,7 @@ Follow steps at the link below to create your personal Google Device Access deve
 https://developers.google.com/nest/device-access/get-started
 
 ### Google Cloud Setup
-1. Create a API & Services -> Credentials -> WebApplication with the following redirect URIs:
+1. Create a API & Services -> Credentials -> Create Credentials -> OAuth 2.0 -> WebApplication with the following redirect URIs:
 ```
 https://home.scrypted.app/web/oauth/callback
 https://www.google.com
