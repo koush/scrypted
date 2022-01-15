@@ -62,11 +62,16 @@ export async function convert(converters: BufferConverter[], mediaObject: MediaO
         const targetId = converterIds.get(converter);
         const node: any = nodes[targetId] = {};
         for (const candidate of converters) {
-            const candidateMime = new MimeType(candidate.fromMimeType);
-            if (!mimeMatches(convertedMime, candidateMime))
-                continue;
-            const candidateId = converterIds.get(candidate);
-            node[candidateId] = 1;
+            try {
+                const candidateMime = new MimeType(candidate.fromMimeType);
+                if (!mimeMatches(convertedMime, candidateMime))
+                    continue;
+                const candidateId = converterIds.get(candidate);
+                node[candidateId] = 1;
+            }
+            catch (e) {
+                console.warn('skipping converter due to error', e)
+            }
         }
 
         if (mimeMatches(mediaMime, inputMime)) {
