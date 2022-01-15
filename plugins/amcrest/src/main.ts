@@ -7,6 +7,7 @@ import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import net from 'net';
 import { listenZero } from "../../../common/src/listen-cluster";
+import { readLength } from "../../../common/src/read-length";
 
 const { mediaManager } = sdk;
 
