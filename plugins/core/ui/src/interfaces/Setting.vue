@@ -100,6 +100,7 @@
       ></Camera>
     </div>
     <v-text-field
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
       v-else
       dense
       :readonly="lazyValue.readonly"
