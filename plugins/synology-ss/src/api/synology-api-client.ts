@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import https from 'https';
 
 const errorCodeDescriptions = {
     '100': 'Unknown error',
@@ -22,6 +23,9 @@ export class SynologyApiClient {
         this.client = axios.create({
             baseURL: `${url}/webapi/`,
             timeout: 10000,
+            httpsAgent: new https.Agent({
+                rejectUnauthorized: false,
+            }),
         });
 
         // Fetch info about API method paths and versions in the background
