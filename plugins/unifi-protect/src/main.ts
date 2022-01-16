@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult, Notifier, SCRYPTED_MEDIA_SCHEME, VideoCameraConfiguration } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult, Notifier, SCRYPTED_MEDIA_SCHEME, VideoCameraConfiguration, OnOff } from "@scrypted/sdk";
 import { ProtectApi, ProtectCameraLcdMessagePayload } from "@koush/unifi-protect";
 import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "@koush/unifi-protect";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "@koush/unifi-protect";
@@ -37,7 +37,7 @@ class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, VideoCame
     }
 }
 
-class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider {
+class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Camera, VideoCamera, VideoCameraConfiguration, MotionSensor, Settings, ObjectDetector, DeviceProvider, OnOff {
     protect: UnifiProtect;
     motionTimeout: NodeJS.Timeout;
     detectionTimeout: NodeJS.Timeout;
@@ -59,6 +59,23 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
         if (this.interfaces.includes(ScryptedInterface.BinarySensor)) {
             this.binaryState = false;
         }
+    }
+
+    async setStatusLight(on: boolean) {
+        const camera = this.findCamera() as any;
+        await this.protect.api.updateCamera(camera, {
+            ledSettings: {
+                isEnabled: on,
+            }
+        });
+    }
+
+    async turnOn(): Promise<void> {
+        this.setStatusLight(true);
+    }
+
+    async turnOff(): Promise<void> {
+        this.setStatusLight(false);
     }
 
     ensurePackageCamera() {
@@ -87,6 +104,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
         const talkbackUrl = tbUrl.toString();
 
         const websocket = new WS(talkbackUrl, { rejectUnauthorized: false });
+        await once(websocket, 'open');
 
         const server = new net.Server(async (socket) => {
             server.close();
@@ -94,7 +112,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
             this.console.log('sending audio data to', talkbackUrl);
 
             try {
-                while (true) {
+                while (websocket.readyState === WS.OPEN) {
                     await once(socket, 'readable');
                     while (true) {
                         const data = socket.read();
@@ -108,6 +126,7 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
                 }
             }
             finally {
+                this.console.log('talkback ended')
                 this.intercomProcess.kill();
             }
         });
@@ -134,7 +153,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
 
         const ffmpeg = await mediaManager.getFFmpegPath();
         this.intercomProcess = child_process.spawn(ffmpeg, args);
-        this.intercomProcess.on('killed', () => this.intercomProcess = undefined);
+        this.intercomProcess.on('exit', () => {
+            websocket.close();
+            this.intercomProcess = undefined;
+        });
         ffmpegLogInitialOutput(this.console, this.intercomProcess);
     }
 
@@ -656,6 +678,9 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                 }
                 if (camera.featureFlags.hasPackageCamera) {
                     d.interfaces.push(ScryptedInterface.DeviceProvider);
+                }
+                if (camera.featureFlags.hasLedStatus) {
+                    d.interfaces.push(ScryptedInterface.OnOff);
                 }
                 d.interfaces.push(ScryptedInterface.ObjectDetector);
                 devices.push(d);
