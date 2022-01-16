@@ -218,11 +218,18 @@ def create_pipeline(
                  appsink_name,
                  appsink_size,
                  video_input,
-                 pixel_format):
-    sink = create_pipeline_sink(appsink_name, appsink_size, pixel_format)
-    PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! videoscale name=videoscale
-        ! {sink}
-    """
+                 pixel_format,
+                 parse_only = False):
+    if parse_only:
+        sink = 'appsink name={appsink_name} emit-signals=true sync=false'.format(appsink_name=appsink_name)
+        PIPELINE = """ {video_input}
+            ! {sink}
+        """
+    else:
+        sink = create_pipeline_sink(appsink_name, appsink_size, pixel_format)
+        PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! videoscale name=videoscale
+            ! {sink}
+        """
     pipeline = PIPELINE.format(video_input = video_input, sink = sink)
     print('Gstreamer pipeline:\n', pipeline)
     return pipeline
@@ -232,8 +239,9 @@ def run_pipeline(loop, finished,
                  appsink_name,
                  appsink_size,
                  video_input,
-                 pixel_format):
+                 pixel_format,
+                 parse_only = False):
     gst = GstPipeline(loop, finished, appsink_name, user_function)
-    pipeline = create_pipeline(appsink_name, appsink_size, video_input, pixel_format)
+    pipeline = create_pipeline(appsink_name, appsink_size, video_input, pixel_format, parse_only = parse_only)
     gst.parse_launch(pipeline)
     return gst
