@@ -1,4 +1,4 @@
-import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetection, ObjectDetector, ObjectDetectionTypes, ObjectsDetected } from "@scrypted/sdk";
+import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetection, ObjectDetector, ObjectDetectionTypes, ObjectsDetected, Settings } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
@@ -285,7 +285,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
     }
 }
 
-class OnvifProvider extends RtspProvider implements DeviceDiscovery {
+class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
     constructor(nativeId?: string) {
         super(nativeId);
 
@@ -344,6 +344,27 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
         })
     }
 
+    async putSetting(key: string, value: string | number): Promise<void> {
+        if (key === 'autodiscovery') {
+            this.storage.setItem(key, value.toString());
+            this.onDeviceEvent(ScryptedInterface.Settings, undefined);
+            return;
+        }
+        super.putSetting(key, value);
+    }
+
+    async getSettings(): Promise<Setting[]> {
+        return [
+            {
+                title: 'Autodiscovery',
+                description: 'Autodiscover ONVIF devices on the network',
+                key: 'autodiscovery',
+                type: 'boolean',
+                value: this.storage.getItem('autodiscovery') !== 'false',
+            }
+        ]
+    }
+
     getAdditionalInterfaces() {
         return [
             ScryptedInterface.Camera,
@@ -357,29 +378,9 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery {
     }
 
     async discoverDevices(duration: number) {
-        const ad = this.storage.getItem('autodiscovery');
-        const cameraCount = deviceManager.getNativeIds().filter(nid => !!nid).length
-        if (ad == null) {
-            // no auto discovery state yet, but disable it if legacy cameras are found.
-            if (cameraCount) {
-                this.storage.setItem('autodiscovery', 'false');
-                this.console.log('autodiscovery bypassed. legacy cameras already exist.');
-                return;
-            }
-
-            this.storage.setItem('autodiscovery', 'true');
-        }
-        else if (ad === 'false') {
-            // auto discovery is disabled, but maybe we can reenable it.
-            if (!cameraCount) {
-                this.console.log('autodiscovery reenabled, no cameras found');
-                this.storage.setItem('autodiscovery', 'true');
-            }
-            else {
-                this.console.log('autodiscovery bypassed. running in legacy mode. set it to "true" in storage to override this (and possibly duplicate cameras). Or delete all your cameras and reload the plugin.');
-                return;
-            }
-        }
+        const autodiscovery = this.storage.getItem('autodiscovery') !== "false";
+        if (!autodiscovery)
+            return;
 
         onvif.Discovery.probe();
     }
