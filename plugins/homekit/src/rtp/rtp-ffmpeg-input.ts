@@ -148,6 +148,7 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
             "-acodec", "libfdk_aac", '-ac', '1',
             "-f", "sdp",
             "-i", "tcp://127.0.0.1:" + sdpServerPort,
+            "-af", "highpass=f=200, lowpass=f=3200",
         ]
     };
 
