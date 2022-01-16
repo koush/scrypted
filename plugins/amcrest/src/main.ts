@@ -259,7 +259,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         const ffmpeg = await mediaManager.getFFmpegPath();
         this.cp = child_process.spawn(ffmpeg, args);
-        this.cp.on('killed', () => this.cp = undefined);
+        this.cp.on('exit', () => this.cp = undefined);
         ffmpegLogInitialOutput(this.console, this.cp);
     }
 
