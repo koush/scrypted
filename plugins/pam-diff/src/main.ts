@@ -11,7 +11,7 @@ import P2P from 'pipe2pam';
 const { mediaManager } = sdk;
 
 const defaultDifference = 9;
-const defaultPercentage = 75;
+const defaultPercentage = 15;
 
 interface PamDiffSession {
     id: string;
