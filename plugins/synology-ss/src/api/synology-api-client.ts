@@ -12,6 +12,11 @@ const errorCodeDescriptions = {
     '107': 'Multiple login detected'
 }
 
+
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false,
+});
+
 export class SynologyApiClient {
     private apiInfo: Promise<Record<string, SynologyApiInfo>>;
     private readonly client: AxiosInstance;
@@ -23,9 +28,7 @@ export class SynologyApiClient {
         this.client = axios.create({
             baseURL: `${url}/webapi/`,
             timeout: 10000,
-            httpsAgent: new https.Agent({
-                rejectUnauthorized: false,
-            }),
+            httpsAgent,
         });
 
         // Fetch info about API method paths and versions in the background
@@ -147,7 +150,7 @@ export class SynologyApiClient {
 
         if (!response.data?.success) {
             if (response.data?.error?.code) {
-                const errorCodeLookup = { ...errorCodeDescriptions, ...extraErrorCodes}
+                const errorCodeLookup = { ...errorCodeDescriptions, ...extraErrorCodes }
                 throw new Error(`${errorCodeLookup[response.data.error.code]} (error code ${response.data.error.code})`)
             } else {
                 throw new Error(`Synology API call failed with status code ${response.status}`);
