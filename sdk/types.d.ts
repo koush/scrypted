@@ -492,6 +492,11 @@ export interface MediaStreamOptions {
     container?: string;
     video?: VideoStreamOptions;
     audio?: AudioStreamOptions;
+    /**
+     * The time in seconds that this stream is valid before it must be refreshed again
+     * via a call to getVideoStream.
+     */
+    validDuration?: number;
 }
 /**
  * VideoCamera devices can capture video streams.

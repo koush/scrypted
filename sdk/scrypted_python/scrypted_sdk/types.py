@@ -307,6 +307,7 @@ class MediaStreamOptions(TypedDict):
     id: str
     name: str
     prebuffer: float
+    validDuration: float
     video: VideoStreamOptions
     pass
 
