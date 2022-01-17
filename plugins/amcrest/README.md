@@ -64,19 +64,3 @@ If you have a non-admin user account setup on your cameras and/or Amcrest NVR, t
 The following is known to work (and are likely over permissive), but your specific camera model and firmware may be different:
 * Camera user Group Authority: `Live`, `Playback`, `Storage`, `Event`
 * NVR user Group Authority: `Camera`, `Storage`, `Event Management`
-
-# Development
-
-## npm commands
- * npm run scrypted-webpack
- * npm run scrypted-deploy <ipaddress>
- * npm run scrypted-debug <ipaddress>
-
-## scrypted distribution via npm
- 1. Ensure package.json is set up properly for publishing on npm.
- 2. npm publish
-
-## Visual Studio Code configuration
-
-* If using a remote server, edit [.vscode/settings.json](blob/master/.vscode/settings.json) to specify the IP Address of the Scrypted server.
-* Launch Scrypted Debugger from the launch menu.
