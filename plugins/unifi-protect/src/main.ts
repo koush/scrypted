@@ -1,7 +1,5 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, ObjectDetectionResult, Notifier, SCRYPTED_MEDIA_SCHEME, VideoCameraConfiguration, OnOff } from "@scrypted/sdk";
-import { ProtectApi, ProtectCameraLcdMessagePayload } from "@koush/unifi-protect";
-import { ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "@koush/unifi-protect";
-import { ProtectCameraChannelConfig, ProtectCameraConfigInterface } from "@koush/unifi-protect";
+import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectApi, ProtectCameraLcdMessagePayload, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "@koush/unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
@@ -59,6 +57,8 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
         if (this.interfaces.includes(ScryptedInterface.BinarySensor)) {
             this.binaryState = false;
         }
+
+        this.updateState();
     }
 
     async setStatusLight(on: boolean) {
@@ -405,6 +405,11 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
             this.startIntercom(media);
         }
     }
+
+    updateState() {
+        const camera = this.findCamera();
+        this.on = !!camera.ledSettings?.isEnabled;
+    }
 }
 
 class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvider {
@@ -424,6 +429,7 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
 
     listener = (event: Buffer) => {
         const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
+        this.api.handleUpdatePacket(updatePacket);
 
         if (!updatePacket) {
             this.console.error("%s: Unable to process message from the realtime update events API.", this.api.getNvrName());
@@ -444,6 +450,8 @@ class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvide
                     rtsp.console.log('non update', updatePacket.action.action);
                     return;
                 }
+
+                rtsp.updateState();
 
                 // rtsp.console.log('event camera', rtsp?.name, updatePacket.payload);
 
