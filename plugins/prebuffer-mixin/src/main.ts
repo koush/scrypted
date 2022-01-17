@@ -259,6 +259,32 @@ class PrebufferSession {
     const session = await startRebroadcastSession(ffmpegInput, rbo);
     this.parserSession = session;
 
+    // cloud streams need a periodic token refresh.
+    if (ffmpegInput.mediaStreamOptions?.refreshAt) {
+      let mso = ffmpegInput.mediaStreamOptions;
+      let refreshTimeout: NodeJS.Timeout;
+
+      const refreshStream = async () => {
+        if (!session.isActive)
+          return;
+        const mo = await this.mixinDevice.getVideoStream(mso);
+        const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
+        const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
+        mso = ffmpegInput.mediaStreamOptions
+
+        scheduleRefresh();
+      };
+
+      const scheduleRefresh = () => {
+        const when = ffmpegInput.mediaStreamOptions.refreshAt - Date.now() - 30000;
+        this.console.log('refreshing media stream in', when);
+        refreshTimeout = setTimeout(refreshStream, when);
+      }
+
+      scheduleRefresh();
+      session.events.on('killed', () => clearTimeout(refreshTimeout));
+    }
+
     let watchdog: NodeJS.Timeout;
     const restartWatchdog = () => {
       clearTimeout(watchdog);
@@ -476,7 +502,6 @@ class PrebufferSession {
       )
     }
 
-    // this.console.log('prebuffer ffmpeg input', ffmpegInput);
     const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
     return mo;
   }

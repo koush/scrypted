@@ -305,9 +305,10 @@ class MediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
     id: str
+    metadata: Any
     name: str
     prebuffer: float
-    validDuration: float
+    refreshAt: float
     video: VideoStreamOptions
     pass
 

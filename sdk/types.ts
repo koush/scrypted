@@ -999,10 +999,14 @@ export interface MediaStreamOptions {
   audio?: AudioStreamOptions;
 
   /**
-   * The time in seconds that this stream is valid before it must be refreshed again
+   * The time in milliseconds that this stream must be refreshed again
    * via a call to getVideoStream.
    */
-  validDuration?: number;
+  refreshAt?: number;
+  /**
+   * Stream specific metadata.
+   */
+  metadata?: any;
 }
 
 /**

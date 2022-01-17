@@ -37,6 +37,27 @@ export interface FFMpegRebroadcastOptions<T extends string> {
     parseOnly?: boolean;
 }
 
+export function safePrintFFmpegArguments(console: Console, args: string[]) {
+    const ret = [];
+    for (const arg of args) {
+        try {
+            const url = new URL(arg);
+            if (url.password) {
+                url.password = 'REDACTED';
+                ret.push(url.toString());
+            }
+            else {
+                ret.push(arg);
+            }
+        }
+        catch (e) {
+            ret.push(arg);
+        }
+    }
+
+    console.log(ret.join(' '));
+}
+
 export async function parseResolution(cp: ChildProcess) {
     return new Promise<string[]>(resolve => {
         const parser = data => {
@@ -211,7 +232,7 @@ export async function startRebroadcastSession<T extends string>(ffmpegInput: FFM
     }
 
     args.unshift('-hide_banner');
-    console.log(args.join(' '));
+    safePrintFFmpegArguments(console, args);
     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
     ffmpegLogInitialOutput(console, cp);
 

@@ -197,7 +197,7 @@ addSupportedType({
                     if (!dynamicBitrate)
                         return;
 
-                    const reconfigured = Object.assign({
+                    const reconfigured: MediaStreamOptions = Object.assign({
                         video: {
                         },
                     }, selectedStream || {});
