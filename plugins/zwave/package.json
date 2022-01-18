@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/zwave",
-   "version": "0.0.31",
+   "version": "0.0.32",
    "description": "Z-Wave USB Controller for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
