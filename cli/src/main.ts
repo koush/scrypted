@@ -81,6 +81,23 @@ async function main() {
         await doLogin(ip);
         console.log('login successful.')
     }
+    else if (process.argv[2] === 'create-cert-json' && process.argv.length === 5) {
+        const key = fs.readFileSync(process.argv[3]).toString();
+        const cert = fs.readFileSync(process.argv[4]).toString();
+        const json = JSON.stringify({
+            key,
+            cert,
+        }, null, 2);
+
+        fs.writeFileSync('cert.json', json);
+        console.log('Saved cert.json.');
+        console.log();
+        console.log('Start the Scrypted server with the following environment variable:');
+        console.log('   SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/cert.json')
+        console.log();
+        console.log('Docker users will need to mount the cert in a volume and use the following docker run arguments:');
+        console.log('   -e SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/cert.json')
+    }
     else if (process.argv[2] === 'install') {
         const ip = toIpAndPort(process.argv[4] || '127.0.0.1');
         const pkg = process.argv[3];
@@ -121,6 +138,7 @@ async function main() {
         console.log('   npx scrypted login [127.0.0.1[:10443]]');
         console.log('   npx scrypted serve');
         console.log('   npx scrypted serve@latest');
+        console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
         process.exit(1);
     }
 }
