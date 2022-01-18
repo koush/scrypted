@@ -28,7 +28,7 @@
       "@homebridge/camera-utils": "^2.0.4",
       "@types/node": "^16.6.1",
       "axios": "^0.24.0",
-      "ring-client-api": "^9.23.0"
+      "ring-client-api": "../../external/ring-client-api"
    },
    "optionalDependencies": {
       "got": "11.8.2"
@@ -36,5 +36,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.7"
+   "version": "0.0.8"
 }

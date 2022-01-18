@@ -31,6 +31,7 @@ export async function listenZeroSingleClient() {
     })
 
     return {
+        url: `tcp://127.0.0.1:${port}`,
         port,
         clientPromise,
     }

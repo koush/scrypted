@@ -27,4 +27,4 @@
 	url = ../../koush/scrypted-private
 [submodule "external/ring-client-api"]
 	path = external/ring-client-api
-	url = https://github.com/dgreif/ring.git
+	url = ../../koush/ring

@@ -1,17 +1,15 @@
 import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import ring, { RingApi, RingCamera } from 'ring-client-api';
+import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
 import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
-import { RingRestClient } from 'ring-client-api/lib/api/rest-client';
 import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
-import { RtpDescription } from 'ring-client-api/lib/api/rtp-utils';
 import child_process from 'child_process';
 
 const { log, deviceManager, mediaManager } = sdk;
 
 class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
-    session: ring.SipSession;
+    session: SipSession;
     rtpDescription: RtpDescription;
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
@@ -34,47 +32,28 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         // to the caller.
 
         // this is from sip
-        const { port, clientPromise } = await listenZeroSingleClient();
+        const { clientPromise, url } = await listenZeroSingleClient();
         const camera = this.findCamera();
 
         const sip = await camera.createSipSession({
             skipFfmpegCheck: true,
         })
-        this.rtpDescription = await sip.start({
-            output: [
-                '-bsf:a', 'aac_adtstoasc',
-                '-flags', '+global_header',
-                '-f', 'mpegts',
-                `tcp://127.0.0.1:${port}`,
-            ],
-        })
-
-        const client = await clientPromise;
-
-        this.session?.stop();
-        this.session = undefined;
-        this.session = sip;
-
-        // this is from the consumer
-        const passthrough = await listenZeroSingleClient();
-        passthrough.clientPromise.then(pt => {
-            client.on('close', () => sip.stop());
-            client.pipe(pt);
+        this.rtpDescription = await sip.start();
+        const videoPort = await sip.reservePort(1);
+        const audioPort = await sip.reservePort(1);
+        
+        const ff = sip.prepareTranscoder(true, [], this.rtpDescription, audioPort, videoPort, url);
+        clientPromise.then(client => {
+            client.write(ff.inputSdpLines.filter((x) => Boolean(x)).join('\n'));
+            client.end();
         });
 
-        this.console.log(`sip output port: ${port}, consumer input port ${passthrough.port}`);
-
-        sip.onCallEnded.subscribe(async () => {
-            const pt = await passthrough.clientPromise;
-            pt.destroy();
-        });
+        const index = ff.ffmpegInputArguments.indexOf('-protocol_whitelist');
+        ff.ffmpegInputArguments.splice(index, 2);
 
         const ffmpegInput: FFMpegInput = {
             url: undefined,
-            inputArguments: [
-                '-f', 'mpegts',
-                '-i', `tcp://127.0.0.1:${passthrough.port}`,
-            ]
+            inputArguments: ff.ffmpegInputArguments.filter(line => !!line).map(line => line.toString()),
         };
 
         return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
