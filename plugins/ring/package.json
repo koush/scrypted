@@ -1,0 +1,39 @@
+{
+   "name": "@scrypted/ring",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "ring"
+   ],
+   "scrypted": {
+      "name": "Ring Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "Settings"
+      ]
+   },
+   "dependencies": {
+      "@types/node": "^16.6.1",
+      "axios": "^0.24.0",
+      "ring-client-api": "^9.23.0"
+   },
+   "optionalDependencies": {
+      "got": "11.8.2"
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   },
+   "version": "0.0.2"
+}
