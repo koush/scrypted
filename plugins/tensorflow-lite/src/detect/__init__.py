@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from asyncio.events import AbstractEventLoop, TimerHandle
 from asyncio.futures import Future
-from typing import Any, Mapping, Tuple, TypedDict
+from typing import Any, Mapping, Tuple
+from typing_extensions import TypedDict
 
 from numpy import number
 from pipeline import GstPipeline, GstPipelineBase, create_pipeline_sink, safe_set_result
