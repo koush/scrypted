@@ -52,16 +52,24 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         this.device = device;
     }
 
-    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
-            command: "sdm.devices.commands.CameraLiveStream.GenerateRtspStream",
-            params: {}
-        });
-
+    createFFmpegMediaObject(result: any) {
         const u = result.data.results.streamUrls.rtspUrl;
-
+        this.console.log('rtsp url', u);
+        const { expiresAt, streamToken, streamExtensionToken } = result.data.results;
+        this.console.log(result.data);
+        const expirationDate = new Date(expiresAt);
+        const refreshAt = expirationDate.getTime();
+    
         return mediaManager.createFFmpegMediaObject({
-            url: undefined,
+            url: u,
+            mediaStreamOptions: {
+                refreshAt,
+                metadata: {
+                    expiresAt,
+                    streamToken,
+                    streamExtensionToken,
+                },
+            },
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -73,8 +81,29 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
                 "20000000",
                 "-i",
                 u.toString(),
-            ]
-        })
+            ],
+        });
+    }
+
+    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        if (options?.metadata?.streamExtensionToken) {
+            const { streamExtensionToken } = options?.metadata;
+            const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
+                command: "sdm.devices.commands.CameraLiveStream.ExtendRtspStream",
+                params: {
+                    streamExtensionToken,
+                }
+            });
+
+            return this.createFFmpegMediaObject(result);
+        }
+
+        const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
+            command: "sdm.devices.commands.CameraLiveStream.GenerateRtspStream",
+            params: {}
+        });
+
+        return this.createFFmpegMediaObject(result);
     }
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         return;
@@ -265,6 +294,8 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     authorizationUri: string;
     client: ClientOAuth2;
 
+    startup: Promise<void>;
+
     updateClient() {
         this.clientId = this.storage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com';
         this.clientSecret = this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg';
@@ -295,7 +326,18 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     constructor() {
         super();
         this.updateClient();
-        this.discoverDevices(0).catch(() => { });
+
+        this.startup = (async() => {
+            while (true) {
+                try {
+                    await this.discoverDevices(0);
+                    return;
+                }
+                catch (e) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+            }
+        })();
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
@@ -518,7 +560,8 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         deviceManager.onDevicesChanged(deviceManifest);
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
+        await this.startup;
         const device = this.devices.get(nativeId);
         if (!device)
             return;
