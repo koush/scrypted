@@ -50,21 +50,63 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
 
     startDriver() {
         let networkKey: Buffer | undefined;
-        let b64Key = this.storage.getItem('networkKey');
-        if (b64Key) {
-            networkKey = Buffer.from(b64Key, 'base64');
+        let s2AccessControlKey: Buffer | undefined;
+        let s2AuthenticatedKey: Buffer | undefined;
+        let s2UnauthenticatedKey: Buffer | undefined;
+        let b64NetworkKey = this.storage.getItem('networkKey');
+        let b64s2AccessControlKey = this.storage.getItem('s2AccessControlKey');
+        let b64s2AuthenticatedKey = this.storage.getItem('s2AuthenticatedKey');
+        let b64s2UnauthenticatedKey = this.storage.getItem('s2UnauthenticatedKey');
+        
+        if (b64NetworkKey) {
+            networkKey = Buffer.from(b64NetworkKey, 'base64');
         }
         else {
             networkKey = randomBytes(16);
-            b64Key = networkKey.toString('base64');
-            this.storage.setItem('networKey', b64Key);
+            b64NetworkKey = networkKey.toString('base64');
+            this.storage.setItem('networKey', b64NetworkKey);
             this.log.a('No Network Key was present, so a random one was generated. You can change the Network Key in Settings.')
+        }
+
+        if (b64s2AccessControlKey) {
+            s2AccessControlKey = Buffer.from(b64s2AccessControlKey, 'base64');
+        }
+        else {
+            s2AccessControlKey = randomBytes(16);
+            b64s2AccessControlKey = s2AccessControlKey.toString('base64');
+            this.storage.setItem('s2AccessControlKey', b64s2AccessControlKey);
+            this.log.a('No S2 Access Control Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');
+        }
+
+        if (b64s2AuthenticatedKey) {
+            s2AuthenticatedKey = Buffer.from(b64s2AuthenticatedKey, 'base64');
+        }
+        else {
+            s2AuthenticatedKey = randomBytes(16);
+            b64s2AuthenticatedKey = s2AuthenticatedKey.toString('base64');
+            this.storage.setItem('s2AuthenticatedKey', b64s2AuthenticatedKey);
+            this.log.a('No S2 Authenticated Key was present, so a random one was generated. You can change the S2 Authenticated Key in Settings.')
+        }
+
+        if (b64s2UnauthenticatedKey) {
+            s2UnauthenticatedKey = Buffer.from(b64s2UnauthenticatedKey, 'base64');
+        }
+        else {
+            s2UnauthenticatedKey = randomBytes(16);
+            b64s2UnauthenticatedKey = s2UnauthenticatedKey.toString('base64');
+            this.storage.setItem('s2UnauthenticatedKey', b64s2UnauthenticatedKey);
+            this.log.a('No S2 Unauthenticated Key was present, so a random one was generated. You can change the S2 Unauthenticated Key in Settings.')
         }
         
         const cacheDir = path.join(process.env['SCRYPTED_PLUGIN_VOLUME'], 'cache');
         this.console.log(process.cwd());
         const driver = new Driver(this.storage.getItem('serialPort'), {
-            networkKey,
+            securityKeys: {
+                S2_Unauthenticated: s2UnauthenticatedKey,
+                S2_Authenticated: s2AuthenticatedKey,
+                S2_AccessControl: s2AccessControlKey,
+                S0_Legacy: networkKey
+            },
             storage: {
                 cacheDir,
             }
@@ -131,16 +173,34 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     async getSettings(): Promise<Setting[]> {
         return [
             {
+                title: 'Serial Port',
+                key: 'serialPort',
+                value: this.storage.getItem('serialPort'),
+                description: 'Serial Port path or COM Port name',
+            },
+            {
                 title: 'Network Key',
                 key: 'networkKey',
                 value: this.storage.getItem('networkKey'),
                 description: 'The 16 byte Base64 encoded Network Security Key',
             },
             {
-                title: 'Serial Port',
-                key: 'serialPort',
-                value: this.storage.getItem('serialPort'),
-                description: 'Serial Port path or COM Port name',
+                title: 'S2 Access Control Key',
+                key: 's2AccessControlKey',
+                value: this.storage.getItem('s2AccessControlKey'),
+                description: 'The 16 byte Base64 encoded S2 Access Control Key',
+            },
+            {
+                title: 'S2 Authenticated Key',
+                key: 's2AuthenticatedKey',
+                value: this.storage.getItem('s2AuthenticatedKey'),
+                description: 'The 16 byte Base64 encoded S2 Authenticated Key',
+            },
+            {
+                title: 'S2 Unauthenticated Key',
+                key: 's2UnauthenticatedKey',
+                value: this.storage.getItem('s2UnauthenticatedKey'),
+                description: 'The 16 byte Base64 encoded S2 Unauthenticated Key',
             }
         ]
     }
