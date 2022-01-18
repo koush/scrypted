@@ -14,6 +14,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements VideoCamera, Motion
         super(nativeId);
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        // the ring-api-client can negotiate the sip connection and output the stream
+        // to a ffmpeg output target.
+        // provide a tcp socket to write, and then proxy that back as an ffmpeg input
+        // to the caller.
+
         // this is from sip
         const { port, clientPromise } = await listenZeroSingleClient();
         const camera = this.findCamera();
@@ -26,7 +31,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements VideoCamera, Motion
         });
 
         const client = await clientPromise;
-        // client.on('data', data => this.console.log(data));
 
         this.sessions.set(id, sip);
         sip.onCallEnded.subscribe(() => this.sessions.delete(id));
