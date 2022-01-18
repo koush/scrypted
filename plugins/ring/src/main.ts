@@ -1,15 +1,18 @@
-import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import ring, { RingApi, RingCamera } from 'ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
 import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
 import { RingRestClient } from 'ring-client-api/lib/api/rest-client';
-import { randomBytes } from 'crypto';
+import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
+import { RtpDescription } from 'ring-client-api/lib/api/rtp-utils';
+import child_process from 'child_process';
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class RingCameraDevice extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, BinarySensor {
-    sessions = new Map<string, ring.SipSession>();
+class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
+    session: ring.SipSession;
+    rtpDescription: RtpDescription;
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
     }
@@ -33,24 +36,33 @@ class RingCameraDevice extends ScryptedDeviceBase implements Camera, VideoCamera
         // this is from sip
         const { port, clientPromise } = await listenZeroSingleClient();
         const camera = this.findCamera();
-        const id = randomBytes(8).toString('hex');
-        const sip = await camera.streamVideo({
+
+        const sip = await camera.createSipSession({
+            skipFfmpegCheck: true,
+        })
+        this.rtpDescription = await sip.start({
             output: [
                 '-f', 'mpegts',
                 `tcp://127.0.0.1:${port}`,
             ],
-        });
+        })
 
         const client = await clientPromise;
 
-        this.sessions.set(id, sip);
-        sip.onCallEnded.subscribe(() => this.sessions.delete(id));
+        this.session?.stop();
+        this.session = undefined;
+        this.session = sip;
 
         // this is from the consumer
         const passthrough = await listenZeroSingleClient();
         passthrough.clientPromise.then(pt => client.pipe(pt));
 
         this.console.log(`sip output port: ${port}, consumer input port ${passthrough.port}`);
+
+        sip.onCallEnded.subscribe(async () => {
+            const pt = await passthrough.clientPromise;
+            pt.destroy();
+        });
 
         const ffmpegInput: FFMpegInput = {
             url: undefined,
@@ -66,6 +78,44 @@ class RingCameraDevice extends ScryptedDeviceBase implements Camera, VideoCamera
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         return;
     }
+
+
+    async startIntercom(media: MediaObject): Promise<void> {
+        if (!this.session)
+            throw new Error("not in call");
+
+        const ringRtpOptions = this.rtpDescription;
+        const ringAudioLocation = {
+            port: ringRtpOptions.audio.port,
+            address: ringRtpOptions.address,
+        };
+        const audioOutForwarder = new RtpSplitter(({ message }) => {
+            // Splitter is needed so that transcoded audio can be sent out through the same port as audio in
+            this.session.audioSplitter.send(message, ringAudioLocation).catch(e => this.console.error('audio splitter error', e))
+            return null
+        });
+
+        const ffmpegInput: FFMpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
+        const args = ffmpegInput.inputArguments.slice();
+        args.push(
+            '-vn', '-dn', '-sn',
+            '-acodec', 'pcm_mulaw',
+            '-flags', '+global_header',
+            '-ac', '1',
+            '-ar', '8k',
+            '-f', 'rtp',
+            '-srtp_out_suite', 'AES_CM_128_HMAC_SHA1_80',
+            '-srtp_out_params', encodeSrtpOptions(this.session.rtpOptions.audio),
+            `srtp://127.0.0.1:${await audioOutForwarder.portPromise}?pkt_size=188`,
+        );
+
+        const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+        this.session.onCallEnded.subscribe(() => cp.kill('SIGKILL'));
+    }
+    stopIntercom(): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+
     triggerBinaryState() {
         this.binaryState = true;
         setTimeout(() => this.binaryState = false, 10000);
@@ -78,6 +128,8 @@ class RingCameraDevice extends ScryptedDeviceBase implements Camera, VideoCamera
     findCamera() {
         return this.plugin.cameras.find(camera => camera.id.toString() === this.nativeId);
     }
+
+
 }
 
 class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
@@ -89,17 +141,20 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
     settingsStorage = new StorageSettings(this, {
         email: {
             title: 'Email',
-            onPut: async () => this.clearTryLogin(),
+            onPut: async () => this.clearTryDiscoverDevices(),
         },
         password: {
             title: 'Password',
             type: 'password',
-            onPut: async () => this.clearTryLogin(),
+            onPut: async () => this.clearTryDiscoverDevices(),
         },
         loginCode: {
             title: 'Two Factor Code',
             description: 'Optional: If 2 factor is enabled on your Ring account, enter the code sent by Ring to your email or phone number.',
-            onPut: async (oldValue, newValue) => this.tryLogin(newValue),
+            onPut: async (oldValue, newValue) => {
+                await this.tryLogin(newValue);
+                await this.discoverDevices(0);
+            },
             noStore: true,
         },
         refreshToken: {
@@ -112,10 +167,10 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         this.discoverDevices(0);
     }
 
-    clearTryLogin() {
+    clearTryDiscoverDevices() {
         this.settingsStorage.values.refreshToken = undefined;
         this.client = undefined;
-        this.tryLogin();
+        this.discoverDevices(0);
     }
 
     async tryLogin(code?: string) {
@@ -182,14 +237,17 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         const devices: Device[] = [];
         for (const camera of cameras) {
             const nativeId = camera.id.toString();
-            const isDoorbell = camera.model.toLowerCase().includes('doorbell');
             const interfaces = [
                 ScryptedInterface.Camera,
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.MotionSensor,
             ];
-            if (isDoorbell)
-                interfaces.push(ScryptedInterface.BinarySensor);
+            if (camera.isDoorbot) {
+                interfaces.push(
+                    ScryptedInterface.BinarySensor,
+                    ScryptedInterface.Intercom
+                );
+            }
             const device: Device = {
                 info: {
                     model: camera.model,
@@ -197,7 +255,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 },
                 nativeId,
                 name: camera.name,
-                type: isDoorbell ? ScryptedDeviceType.Doorbell : ScryptedDeviceType.Camera,
+                type: camera.isDoorbot ? ScryptedDeviceType.Doorbell : ScryptedDeviceType.Camera,
                 interfaces,
             };
             devices.push(device);
@@ -211,7 +269,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 camera?.triggerMotion();
             });
         }
-        this.console.log(cameras);
 
         await deviceManager.onDevicesChanged({
             devices,
