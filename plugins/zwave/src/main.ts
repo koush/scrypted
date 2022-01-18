@@ -49,52 +49,32 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     }
 
     startDriver() {
-        let networkKey: Buffer | undefined;
-        let s2AccessControlKey: Buffer | undefined;
-        let s2AuthenticatedKey: Buffer | undefined;
-        let s2UnauthenticatedKey: Buffer | undefined;
-        let b64NetworkKey = this.storage.getItem('networkKey');
-        let b64s2AccessControlKey = this.storage.getItem('s2AccessControlKey');
-        let b64s2AuthenticatedKey = this.storage.getItem('s2AuthenticatedKey');
-        let b64s2UnauthenticatedKey = this.storage.getItem('s2UnauthenticatedKey');
+        let networkKey = this.storage.getItem('networkKey');
+        let s2AccessControlKey = this.storage.getItem('s2AccessControlKey');
+        let s2AuthenticatedKey = this.storage.getItem('s2AuthenticatedKey');
+        let s2UnauthenticatedKey = this.storage.getItem('s2UnauthenticatedKey');
         
-        if (b64NetworkKey) {
-            networkKey = Buffer.from(b64NetworkKey, 'base64');
-        }
-        else {
-            networkKey = randomBytes(16);
-            b64NetworkKey = networkKey.toString('base64');
-            this.storage.setItem('networKey', b64NetworkKey);
+        if (!networkKey) {
+            networkKey = randomBytes(16).toString('hex').toUpperCase();
+            this.storage.setItem('networkKey', networkKey);
             this.log.a('No Network Key was present, so a random one was generated. You can change the Network Key in Settings.')
         }
 
-        if (b64s2AccessControlKey) {
-            s2AccessControlKey = Buffer.from(b64s2AccessControlKey, 'base64');
-        }
-        else {
-            s2AccessControlKey = randomBytes(16);
-            b64s2AccessControlKey = s2AccessControlKey.toString('base64');
-            this.storage.setItem('s2AccessControlKey', b64s2AccessControlKey);
+        if (!s2AccessControlKey) {
+            s2AccessControlKey = randomBytes(16).toString('hex').toUpperCase();
+            this.storage.setItem('s2AccessControlKey', s2AccessControlKey);
             this.log.a('No S2 Access Control Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');
         }
 
-        if (b64s2AuthenticatedKey) {
-            s2AuthenticatedKey = Buffer.from(b64s2AuthenticatedKey, 'base64');
-        }
-        else {
-            s2AuthenticatedKey = randomBytes(16);
-            b64s2AuthenticatedKey = s2AuthenticatedKey.toString('base64');
-            this.storage.setItem('s2AuthenticatedKey', b64s2AuthenticatedKey);
-            this.log.a('No S2 Authenticated Key was present, so a random one was generated. You can change the S2 Authenticated Key in Settings.')
+        if (!s2AuthenticatedKey) {
+            s2AuthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
+            this.storage.setItem('s2AuthenticatedKey', s2AuthenticatedKey);
+            this.log.a('No S2 Authenticated Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');            
         }
 
-        if (b64s2UnauthenticatedKey) {
-            s2UnauthenticatedKey = Buffer.from(b64s2UnauthenticatedKey, 'base64');
-        }
-        else {
-            s2UnauthenticatedKey = randomBytes(16);
-            b64s2UnauthenticatedKey = s2UnauthenticatedKey.toString('base64');
-            this.storage.setItem('s2UnauthenticatedKey', b64s2UnauthenticatedKey);
+        if (!s2UnauthenticatedKey) {
+            s2UnauthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
+            this.storage.setItem('s2UnauthenticatedKey', s2UnauthenticatedKey);
             this.log.a('No S2 Unauthenticated Key was present, so a random one was generated. You can change the S2 Unauthenticated Key in Settings.')
         }
         
@@ -102,10 +82,10 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         this.console.log(process.cwd());
         const driver = new Driver(this.storage.getItem('serialPort'), {
             securityKeys: {
-                S2_Unauthenticated: s2UnauthenticatedKey,
-                S2_Authenticated: s2AuthenticatedKey,
-                S2_AccessControl: s2AccessControlKey,
-                S0_Legacy: networkKey
+                S2_Unauthenticated: Buffer.from(s2UnauthenticatedKey, 'hex'),
+                S2_Authenticated: Buffer.from(s2AuthenticatedKey, 'hex'),
+                S2_AccessControl: Buffer.from(s2AccessControlKey, 'hex'),
+                S0_Legacy: Buffer.from(networkKey, 'hex')
             },
             storage: {
                 cacheDir,
