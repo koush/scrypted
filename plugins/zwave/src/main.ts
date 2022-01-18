@@ -8,6 +8,7 @@ import { Driver, Endpoint, ZWaveController, ZWaveNode, CommandClass } from "zwav
 import { ValueID, CommandClasses } from "@zwave-js/core"
 import { randomBytes } from "crypto";
 import path from "path";
+import { isHex } from "./hex";
 
 const { log, deviceManager } = sdk;
 
@@ -53,7 +54,14 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         let s2AccessControlKey = this.storage.getItem('s2AccessControlKey');
         let s2AuthenticatedKey = this.storage.getItem('s2AuthenticatedKey');
         let s2UnauthenticatedKey = this.storage.getItem('s2UnauthenticatedKey');
-        
+
+        // 1/17/2022: the network key was stored as base64, but for consistency with HA
+        // and others, it was switched to hex. this is the data migration.
+        if (!isHex(networkKey)) {
+            networkKey = Buffer.from(networkKey, 'base64').toString('hex');
+            this.storage.setItem('networkKey', networkKey);
+        }
+
         if (!networkKey) {
             networkKey = randomBytes(16).toString('hex').toUpperCase();
             this.storage.setItem('networkKey', networkKey);
