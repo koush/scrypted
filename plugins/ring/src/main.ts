@@ -1,4 +1,4 @@
-import { BinarySensor, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, MediaObject, MediaStreamOptions, MotionSensor, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import ring, { RingApi, RingCamera } from 'ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
@@ -8,11 +8,22 @@ import { randomBytes } from 'crypto';
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class RingCameraDevice extends ScryptedDeviceBase implements VideoCamera, MotionSensor, BinarySensor {
+class RingCameraDevice extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, BinarySensor {
     sessions = new Map<string, ring.SipSession>();
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
     }
+
+    async takePicture(options?: PictureOptions): Promise<MediaObject> {
+        const camera = this.findCamera();
+        const snapshot = await camera.getSnapshot();
+        return mediaManager.createMediaObject(snapshot, 'image/jpeg');
+    }
+
+    async getPictureOptions(): Promise<PictureOptions[]> {
+        return;
+    }
+
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         // the ring-api-client can negotiate the sip connection and output the stream
         // to a ffmpeg output target.
@@ -173,6 +184,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             const nativeId = camera.id.toString();
             const isDoorbell = camera.model.toLowerCase().includes('doorbell');
             const interfaces = [
+                ScryptedInterface.Camera,
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.MotionSensor,
             ];
