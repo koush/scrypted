@@ -170,25 +170,25 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 title: 'Network Key',
                 key: 'networkKey',
                 value: this.storage.getItem('networkKey'),
-                description: 'The 16 byte Base64 encoded Network Security Key',
+                description: 'The 16 byte hex encoded Network Security Key',
             },
             {
                 title: 'S2 Access Control Key',
                 key: 's2AccessControlKey',
                 value: this.storage.getItem('s2AccessControlKey'),
-                description: 'The 16 byte Base64 encoded S2 Access Control Key',
+                description: 'The 16 byte hex encoded S2 Access Control Key',
             },
             {
                 title: 'S2 Authenticated Key',
                 key: 's2AuthenticatedKey',
                 value: this.storage.getItem('s2AuthenticatedKey'),
-                description: 'The 16 byte Base64 encoded S2 Authenticated Key',
+                description: 'The 16 byte hex encoded S2 Authenticated Key',
             },
             {
                 title: 'S2 Unauthenticated Key',
                 key: 's2UnauthenticatedKey',
                 value: this.storage.getItem('s2UnauthenticatedKey'),
-                description: 'The 16 byte Base64 encoded S2 Unauthenticated Key',
+                description: 'The 16 byte hex encoded S2 Unauthenticated Key',
             }
         ]
     }
