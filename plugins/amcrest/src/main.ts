@@ -11,11 +11,22 @@ import { readLength } from "../../../common/src/read-length";
 
 const { mediaManager } = sdk;
 
+const AMCREST_DOORBELL_TYPE = 'Amcrest Doorbell';
+const DAHUA_DOORBELL_TYPE = 'Dahua Doorbell';
+
 class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
     maxExtraStreams: number;
+
+    constructor(nativeId: string, provider: RtspProvider) {
+        super(nativeId, provider);
+        if (this.storage.getItem('amcrestDoorbell') === 'true') {
+            this.storage.setItem('doorbellType', AMCREST_DOORBELL_TYPE);
+            this.storage.removeItem('amcrestDoorbell');
+        }
+    }
 
     async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
         let bitrate = options?.video?.bitrate;
@@ -43,8 +54,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             try {
                 const client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
                 const events = await client.listenEvents();
-		const dahuaDoorbell = this.storage.getItem('dahuaDoorbell');
-		    
+                const doorbellType = this.storage.getItem('doorbellType');
+
                 ret.destroy = () => {
                     events.removeAllListeners();
                     events.destroy();
@@ -87,12 +98,12 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                         || event === AmcrestEvent.AlarmIPCStop || event === AmcrestEvent.DahuaTalkHangup) {
                         this.binaryState = false;
                     }
-                    else if (event === AmcrestEvent.TalkPulse && dahuaDoorbell !== 'true') {
+                    else if (event === AmcrestEvent.TalkPulse && doorbellType === AMCREST_DOORBELL_TYPE) {
                         clearTimeout(pulseTimeout);
-                        pulseTimeout = setTimeout(() => this.binaryState = false, 30000);
+                        pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
                         this.binaryState = true;
                     }
-		    else if (event === AmcrestEvent.DahuaTalkPulse && dahuaDoorbell === 'true') {
+                    else if (event === AmcrestEvent.DahuaTalkPulse && doorbellType === DAHUA_DOORBELL_TYPE) {
                         clearTimeout(pulseTimeout);
                         pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
                         this.binaryState = true;
@@ -109,19 +120,16 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     async getOtherSettings(): Promise<Setting[]> {
         return [
             {
-                title: 'Amcrest Doorbell',
-                type: 'boolean',
-                description: "Enable if this device is an Amcrest Doorbell.",
-                key: "amcrestDoorbell",
-                value: (!!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor)).toString(),
+                title: 'Doorbell Type',
+                choices: [
+                    'Not a Doorbell',
+                    AMCREST_DOORBELL_TYPE,
+                    DAHUA_DOORBELL_TYPE,
+                ],
+                description: 'If this device is a doorbell, select the appropriate doorbell type.',
+                value: this.storage.getItem('doorbellType'),
+                key: 'doorbellType',
             },
-	    {
-	        title: 'Dahua Doorbell',
-	        type: 'boolean',
-	        description: "Enable if this device is an Dahua Doorbell.",
-	        key: "dahuaDoorbell",
-	        value: this.storage.getItem('dahuaDoorbell'),
-            }
         ];
     }
 
@@ -172,11 +180,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.client = undefined;
         this.maxExtraStreams = undefined;
 
-        const amcrestDoorbell = key === 'amcrestDoorbell' && value === 'true';
-	const dahuaDoorbell = key === 'dahuaDoorbell' && value === 'true';
+        const doorbellType = this.storage.getItem('doorbellType');
+        const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
         super.putSetting(key, value);
 
-        if (amcrestDoorbell || dahuaDoorbell)
+        if (isDoorbell)
             provider.updateDevice(this.nativeId, this.name, [...provider.getInterfaces(), ScryptedInterface.BinarySensor, ScryptedInterface.Intercom], ScryptedDeviceType.Doorbell);
         else
             provider.updateDevice(this.nativeId, this.name, provider.getInterfaces());
@@ -192,57 +200,39 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         const args = ffmpegInput.inputArguments.slice();
         args.unshift('-hide_banner');
-	    
-	const dahuaDoorbell = this.storage.getItem('dahuaDoorbell');
 
         const server = new net.Server(async (socket) => {
             server.close();
 
             const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=${channel}`;
             this.console.log('posting audio data to', url);
-		
-            if (dahuaDoorbell === 'true') {
-		    const passthrough = new PassThrough();
-		    this.getClient().digestAuth.request({
-			method: 'POST',
-			url,
-			headers: {
-			    'Content-Type': 'Audio/AAC',
-			    'Content-Length': '9999999'
-			},
-			httpsAgent: amcrestHttpsAgent,
-			data: passthrough,
-		    });
 
-		    try {
-			while (true) {
-			    const data = await readLength(socket, 1024);
-			    passthrough.push(data);
-			}
-		    }
-		    catch (e) {
-			this.console.error('audio finished with error', e);
-		    }
-		    finally {
-			passthrough.end();
-		    } 
-	    } else {
-		   try {
-			await this.getClient().digestAuth.request({
-			    method: 'POST',
-			    url,
-			    headers: {
-				'Content-Type': 'Audio/AAC',
-				'Content-Length': '9999999'
-			    },
-			    httpsAgent: amcrestHttpsAgent,
-			    data: socket
-			});
-		    }
-		    catch (e) {
-			this.console.error('audio finished with error', e);
-		 } 
-	    }
+            // seems the dahua doorbells preferred 1024 chunks. should investigate adts
+            // parsing and sending multipart chunks instead.
+            const passthrough = new PassThrough();
+            this.getClient().digestAuth.request({
+                method: 'POST',
+                url,
+                headers: {
+                    'Content-Type': 'Audio/AAC',
+                    'Content-Length': '9999999'
+                },
+                httpsAgent: amcrestHttpsAgent,
+                data: passthrough,
+            });
+
+            try {
+                while (true) {
+                    const data = await readLength(socket, 1024);
+                    passthrough.push(data);
+                }
+            }
+            catch (e) {
+                this.console.error('audio finished with error', e);
+            }
+            finally {
+                passthrough.end();
+            }
 
             this.cp.kill();
         });

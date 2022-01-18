@@ -11,16 +11,7 @@ Configure optimal code settings (as required by HomeKit) using Amcrest configura
 You may use the device's webpage access or one of the following applications: `Amcrest Smart Home` (mobile), `IP Config Software`, or `Amcrest Surveillance Pro`  (https://support.amcrest.com/hc/en-us/categories/201939038-All-Downloads).  
 **NOTE:** Amcrest Smart Home app may not expose all codec or stream settings. Use one of the other applications instead.
 
-* h264 video with aac audio (Do **NOT** use H.264+, "Super" H.264, H.264B or any other fancy variant. **TURN IT OFF**.)
-* 1920x1080 (max resolution)
-* 2 Mbit variable bitrate (though up to 6Mbit may work)
-* 30 frames per second (FPS or Frame Rate) is recommended
-* 4 second `Keyframe Interval` (number of seconds between keyframes)
-  * Amcrest cameras are typically configured in `Frame Interval` (the number frames between keyframes)
-  * To achieve 4 second `Keyframe Interval`, use calculation:  `Frame Interval / FPS = 4` or `4 * FPS = Frame Interval`
-  * Both `Frame Rate (FPS)` and `Frame Interval` are editable fields in Amcrest configuration (sometimes it does not look editable, but it is.)
-  * Example 1: If your Frame Rate (FPS) is 30, then Frame Interval = 120 (`Frame Interval / 30 = 4` ; `Frame Interval = 4 * 30` ; `Frame Interval = 120`)
-  * Example 2: If your Frame Rate (FPS) is 15, then Frame Interval = 60 (`Frame Interval / 15 = 4` ; `Frame Interval = 4 * 15` ; `Frame Interval = 60`)
+The optimal/reliable codec settings can be found in the documentation for the [Homekit Plugin](https://github.com/koush/scrypted/tree/main/plugins/homekit).
 
 ## Amcrest Doorbells (e.g. AD110 and AD410)
 At this time, 2-way audio works for AD110 and not AD410.

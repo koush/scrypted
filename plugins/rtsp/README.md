@@ -22,7 +22,7 @@
  
  3. Then add the RTSP Stream Link.
  
-  ie: RTSP://IP-ADDRESS:PORT/[CHANNEL]/[MODE]
+  ie: rtsp://<ip-address>:<port>/<channel>/<mode>
  
   *Please note that RTSP Streams differ between each camera make and model.*
 
