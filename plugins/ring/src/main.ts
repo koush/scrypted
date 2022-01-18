@@ -60,9 +60,17 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
     }
 
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-        return;
+        return [{
+            id: 'default',
+            video: {
+                codec: 'h264',
+            },
+            audio: {
+                // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
+                codec: 'pcm',
+            }
+        }]
     }
-
 
     async startIntercom(media: MediaObject): Promise<void> {
         if (!this.session)
