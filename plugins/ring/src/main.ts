@@ -42,6 +42,8 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         })
         this.rtpDescription = await sip.start({
             output: [
+                '-bsf:a', 'aac_adtstoasc',
+                '-flags', '+global_header',
                 '-f', 'mpegts',
                 `tcp://127.0.0.1:${port}`,
             ],
@@ -55,7 +57,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
 
         // this is from the consumer
         const passthrough = await listenZeroSingleClient();
-        passthrough.clientPromise.then(pt => client.pipe(pt));
+        passthrough.clientPromise.then(pt => {
+            client.on('close', () => sip.stop());
+            client.pipe(pt);
+        });
 
         this.console.log(`sip output port: ${port}, consumer input port ${passthrough.port}`);
 
