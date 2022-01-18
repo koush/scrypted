@@ -10,6 +10,7 @@ import LuminanceSensorToSensorMultilevel from './LuminanceSensorToSensorMultilev
 import UltravioletSensorMultilevel from './UltravioletSensorToSensorMultilevel';
 import SettingsToConfiguration from './SettingsToConfiguration';
 import EntryToBarrierOperator from './EntryToBarrierOperator';
+import EntrySensorToBarriorOperator from './EntrySensorToBarrierOperator';
 import ColorSettingRgbToColor from './ColorSettingRgbToColor';
 import { NotificationType } from './Notification';
 import { EntrySensorToAccessControl } from './EntrySensorToAccessControl';
@@ -86,6 +87,9 @@ addCommandClassIndex(CommandClasses['Notification'], 'Access Control', EntrySens
 addCommandClassIndex(CommandClasses['Notification'], 'Water Alarm', FloodSensorToWaterAlarm, 'FloodSensor');
 addCommandClassIndex(CommandClasses['Notification'], 'Home Security', IntrusionSensorToHomeSecurity, 'IntrusionSensor');
 addCommandClassIndex(CommandClasses['Notification'], 'Power Management', PowerSensorToPowerManagement, 'PowerSensor');
+
+addCommandClassIndex(CommandClasses['Barrier Operator'], 'currentState', EntryToBarrierOperator, 'Entry');
+addCommandClassIndex(CommandClasses['Barrier Operator'], 'position', EntrySensorToBarriorOperator, 'EntrySensor');
 
 addCommandClass(CommandClasses['Configuration'], SettingsToConfiguration, 'Settings');
 addCommandClass(CommandClasses['User Code'], PasswordStoreToUserCode, 'PasswordStore');
