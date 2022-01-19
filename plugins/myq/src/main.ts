@@ -114,7 +114,7 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
       // there's no battery level, so set it to full or empty.
       // consumers of the battery level can decide when to alert on low battery.
       if (device.state.dps_low_battery_mode !== undefined)
-        d.batteryLevel = device.state.dps_low_battery_mode ? 100 : 0;
+        d.batteryLevel = device.state.dps_low_battery_mode ? 0 : 100;
     }
   }
 }
