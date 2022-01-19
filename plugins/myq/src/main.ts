@@ -1,6 +1,6 @@
 // webpack polyfill 'usage' does not seem to work on modules.
 // include directly.
-import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface } from '@scrypted/sdk';
+import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface, Battery } from '@scrypted/sdk';
 const { log } = sdk;
 import { myQApi, myQDevice } from '@hjdhjd/myq';
 import throttle from 'lodash/throttle';
@@ -11,7 +11,7 @@ function isValidGarageDoor(device_type: string) {
   return device_type === 'wifigaragedooropener' || device_type === 'virtualgaragedooropener' || device_type === 'garagedooropener';
 }
 
-class GarageController extends ScryptedDeviceBase implements DeviceProvider, Settings {
+class GarageController extends ScryptedDeviceBase implements DeviceProvider, Settings, Battery {
   devices = new Map<string, GarageDoor>();
   account: myQApi;
   loginTokenTime: number;
@@ -82,11 +82,16 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
         console.log('ignoring device', device);
         continue;
       }
+      
+      const interfaces = [ScryptedInterface.Entry, ScryptedInterface.EntrySensor, ScryptedInterface.Refresh];
+
+      if (device.state.dps_low_battery_mode !== undefined)
+        interfaces.push(ScryptedInterface.Battery);
 
       devices.push({
         name: device.name,
         nativeId: device.serial_number,
-        interfaces: [ScryptedInterface.Entry, ScryptedInterface.EntrySensor, ScryptedInterface.Refresh],
+        interfaces,
         type: ScryptedDeviceType.Garage,
       });
     }
@@ -105,6 +110,11 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
 
       const d = await this.getDevice(device.serial_number) as GarageDoor;
       d.entryOpen = device.state.door_state !== 'closed';
+
+      // there's no battery level, so set it to full or empty.
+      // consumers of the battery level can decide when to alert on low battery.
+      if (device.state.dps_low_battery_mode !== undefined)
+        d.batteryLevel = device.state.dps_low_battery_mode ? 100 : 0;
     }
   }
 }
