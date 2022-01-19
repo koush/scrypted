@@ -49,8 +49,8 @@ const V4L2 = 'Video4Linux (Docker compatible)';
 export function getH264DecoderArgs(): CodecArgs {
     if (isRaspberryPi()) {
         const ret: CodecArgs = {};
-        ret['Raspberry Pi MMAL'] = ['-c:v', 'h264_mmal'];
-        ret[V4L2] = ['-c:v', 'h264_v4l2m2m'];
+        // ret['Raspberry Pi MMAL'] = ['-c:v', 'h264_mmal'];
+        // ret[V4L2] = ['-c:v', 'h264_v4l2m2m'];
         return ret;
     }
     else if (os.platform() === 'darwin') {
@@ -93,8 +93,8 @@ export function getH264EncoderArgs() {
     encoders['Copy Video, Transcode Audio'] = 'copy';
 
     if (isRaspberryPi()) {
-        encoders['Raspberry Pi OMX'] = 'h264_omx';
-        encoders[V4L2] = 'h264_v4l2m2m';
+        // encoders['Raspberry Pi OMX'] = 'h264_omx';
+        // encoders[V4L2] = 'h264_v4l2m2m';
     }
     else if (os.platform() === 'darwin') {
         encoders['VideoToolbox'] = 'h264_videotoolbox';
@@ -119,6 +119,12 @@ export function getH264EncoderArgs() {
         encoderArgs[name] = [
             '-c:v',
             encoder,
+        ]
+    }
+
+    if (isRaspberryPi()) {
+        encoderArgs['Raspberry Pi'] = [
+            '-pix_fmt', 'yuv420p', '-c:v', 'h264_v4l2m2m',
         ]
     }
     return encoderArgs;
