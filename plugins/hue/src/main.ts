@@ -101,7 +101,18 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
 
     constructor() {
         super();
-        this.discoverDevices(0);
+
+        (async() => {
+            while (true) {
+                try {
+                    await this.discoverDevices(0);
+                    return;
+                }
+                catch (e) {
+                }
+                await new Promise(resolve => setTimeout(resolve, 30000));
+            }
+        })();
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -120,6 +131,7 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
             },
         ]
     }
+
     async putSetting(key: string, value: string | number | boolean) {
         localStorage.setItem(key, value?.toString());
         this.discoverDevices(0);
@@ -249,6 +261,7 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
         }
 
         deviceManager.onDevicesChanged(payload);
+        this.console.log('device discovery complete');
     }
     getDevice(nativeId: string): object {
         return this.devices[nativeId];
