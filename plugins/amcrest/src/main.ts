@@ -26,6 +26,42 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             this.storage.setItem('doorbellType', AMCREST_DOORBELL_TYPE);
             this.storage.removeItem('amcrestDoorbell');
         }
+        
+        this.updateDeviceInfo();
+    }
+    
+    async updateDeviceInfo(): Promise<void> {
+        const vendorResponse = await this.getClient().digestAuth.request({
+            url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getVendor`
+        });
+
+        const vendorName = String(vendorResponse.data).replace("vendor=", "");
+        
+        const serialNumberResponse = await this.getClient().digestAuth.request({
+            url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getSerialNo`
+        });
+
+        const serialNumber = String(serialNumberResponse.data).replace("sn=", "");
+        
+        const deviceTypeResponse = await this.getClient().digestAuth.request({
+            url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getDeviceType`
+        });
+
+        const deviceType = String(deviceTypeResponse.data).replace("type=", "");
+        
+        const softwareVersionResponse = await this.getClient().digestAuth.request({
+            url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getSoftwareVersion`
+        });
+
+        const softwareVersion = String(softwareVersionResponse.data).replace("version=", "");
+        
+        this.info = {
+            manufacturer: vendorName,
+            model: deviceType,
+            firmware: softwareVersion,
+            version: softwareVersion,
+            serialNumber: serialNumber,
+        };
     }
 
     async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
