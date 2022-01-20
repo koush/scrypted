@@ -140,7 +140,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
     const thermostatMode = this.thermostatMode || ThermostatMode.Off;
 
     if (!thermostatMode) {
-      log.e('thermostat mode not set');
+      this.console.error('thermostat mode not set');
       return;
     }
 
@@ -153,17 +153,17 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
     // determine if it is manual user input.
     const setState = (state: string) => {
       if (state == thermostatState) {
-        // log.i('Thermostat state unchanged. ' + state)
+        // this.console.log('Thermostat state unchanged. ' + state)
         return;
       }
 
-      log.i('Thermostat state changed. ' + state);
+      this.console.log('Thermostat state changed. ' + state);
       this.storage.setItem('thermostatState', state);
     }
 
     const manageSetpoint = (temperatureDifference: number, er: OnOff & ScryptedDevice, other: OnOff & ScryptedDevice, ing: string, ed: string) => {
       if (!er) {
-        log.e('Thermostat mode set to ' + thermostatMode + ', but ' + thermostatMode + 'er variable is not defined.');
+        this.console.error('Thermostat mode set to ' + thermostatMode + ', but ' + thermostatMode + 'er variable is not defined.');
         return;
       }
 
@@ -213,7 +213,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
       let thermostatSetpoint = this.thermostatSetpoint || this.sensor.temperature;
       if (!thermostatSetpoint) {
-        log.e('No thermostat setpoint is defined.');
+        this.console.error('No thermostat setpoint is defined.');
         return;
       }
 
@@ -225,7 +225,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
       let thermostatSetpoint = this.thermostatSetpoint || this.sensor.temperature;
       if (!thermostatSetpoint) {
-        log.e('No thermostat setpoint is defined.');
+        this.console.error('No thermostat setpoint is defined.');
         return;
       }
 
@@ -240,7 +240,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
       const thermostatSetpointHigh = this.thermostatSetpointHigh || this.sensor.temperature;
 
       if (!thermostatSetpointLow || !thermostatSetpointHigh) {
-        log.e('No thermostat setpoint low/high is defined.');
+        this.console.error('No thermostat setpoint low/high is defined.');
         return;
       }
 
@@ -271,26 +271,26 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
       return;
     }
 
-    log.e('Unknown mode ' + thermostatMode);
+    this.console.error('Unknown mode ' + thermostatMode);
   }
   // implementation of TemperatureSetting
   async setThermostatSetpoint(thermostatSetpoint: number) {
-    log.i('thermostatSetpoint changed ' + thermostatSetpoint);
+    this.console.log('thermostatSetpoint changed ' + thermostatSetpoint);
     this.thermostatSetpoint = thermostatSetpoint;
     this.updateState();
   }
   async setThermostatSetpointLow(thermostatSetpointLow: number) {
-    log.i('thermostatSetpointLow changed ' + thermostatSetpointLow);
+    this.console.log('thermostatSetpointLow changed ' + thermostatSetpointLow);
     this.thermostatSetpointLow = thermostatSetpointLow;
     this.updateState();
   }
   async setThermostatSetpointHigh(thermostatSetpointHigh: number) {
-    log.i('thermostatSetpointHigh changed ' + thermostatSetpointHigh);
+    this.console.log('thermostatSetpointHigh changed ' + thermostatSetpointHigh);
     this.thermostatSetpointHigh = thermostatSetpointHigh;
     this.updateState();
   }
   async setThermostatMode(mode: ThermostatMode) {
-    log.i('thermostat mode set to ' + mode);
+    this.console.log('thermostat mode set to ' + mode);
     if (mode === ThermostatMode.On || mode == ThermostatMode.Auto) {
       mode = this.storage.getItem("lastThermostatMode") as ThermostatMode;
     }
