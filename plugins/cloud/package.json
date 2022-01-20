@@ -34,6 +34,7 @@
    "dependencies": {
       "@koush/wrtc": "^0.5.2",
       "axios": "^0.21.1",
+      "bpmux": "^8.1.3",
       "debug": "^4.3.1",
       "http-proxy": "^1.18.1",
       "push-receiver": "^2.1.1",
@@ -44,5 +45,5 @@
       "@types/debug": "^4.1.5",
       "@types/http-proxy": "^1.17.5"
    },
-   "version": "0.0.22"
+   "version": "0.0.23"
 }

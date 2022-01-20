@@ -11,10 +11,12 @@ import Url from 'url';
 import sdk from "@scrypted/sdk";
 import { once } from 'events';
 import path from 'path';
+import bpmux from 'bpmux';
 
 const { deviceManager, endpointManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
+const SCRYPTED_SERVER = 'home.scrypted.app';
 
 export async function createDefaultRtcManager(): Promise<GcmRtcManager> {
     const manager = await GcmRtcManager.start({
@@ -23,11 +25,6 @@ export async function createDefaultRtcManager(): Promise<GcmRtcManager> {
     },
         {
             iceServers: [
-                {
-                    urls: ["turn:turn0.clockworkmod.com", "turn:n0.clockworkmod.com", "turn:n1.clockworkmod.com"],
-                    username: "foo",
-                    credential: "bar",
-                },
             ],
         });
 
@@ -132,7 +129,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     getHostname() {
-        const hostname = this.storage.getItem('hostname') || 'home.scrypted.app';
+        const hostname = this.storage.getItem('hostname') || SCRYPTED_SERVER;
         return hostname;
     }
 
@@ -178,7 +175,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             registration_id: this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
         })
-        return `https://home.scrypted.app/_punch/login?${args}`;
+        return `https://home.koushikdutta.com/_punch/login?${args}`;
         // this is disabled because we can't assume that custom domains will implement this oauth endpoint.
         // return `https://${this.getHostname()}/_punch/login?${args}`
     }
@@ -244,20 +241,39 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.manager = await createDefaultRtcManager();
         this.manager.on('unhandled', message => {
-            if (message.type !== 'cloudmessage')
-                return;
-            try {
-                const payload = JSON.parse(message.request) as HttpRequest;
-                if (!payload.rootPath?.startsWith('/push/'))
-                    return;
-                const endpoint = payload.rootPath.replace('/push/', '');
-                payload.rootPath = '/';
-                endpointManager.deliverPush(endpoint, payload)
+            if (message.type === 'cloudmessage') {
+                try {
+                    const payload = JSON.parse(message.request) as HttpRequest;
+                    if (!payload.rootPath?.startsWith('/push/'))
+                        return;
+                    const endpoint = payload.rootPath.replace('/push/', '');
+                    payload.rootPath = '/';
+                    endpointManager.deliverPush(endpoint, payload)
+                }
+                catch (e) {
+                    this.console.error('cloudmessage error', e);
+                }
             }
-            catch (e) {
-                this.console.error('cloudmessage error', e);
+            else if (message.type === 'callback') {
+                const client = net.connect(4000, 'home.scrypted.app');
+                client.write(this.manager.registrationId + '\n');
+                const mux: any = new bpmux.BPMux(client as any);
+                mux.on('handshake', async (socket: Duplex) => {
+                    let local: any;
+
+                    await new Promise(resolve => process.nextTick(resolve));
+    
+                    local = net.connect({
+                        port,
+                        host: '127.0.0.1',
+                    });
+                    await new Promise(resolve => process.nextTick(resolve));
+    
+                    socket.pipe(local).pipe(socket);
+                })
             }
         });
+        // legacy
         this.manager.listen("http://localhost", (conn: GcmRtcConnection) => {
             conn.on('socket', async (command: string, socket: Duplex) => {
                 let local: any;

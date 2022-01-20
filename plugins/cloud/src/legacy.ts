@@ -469,11 +469,8 @@ export class GcmRtcManager extends EventEmitter {
       conn.manager.incoming(senderId, src, srcPort, dst, dstPort, message);
       return;
     }
-    else if (GcmRtcManager.onUnknownMessage) {
-      GcmRtcManager.onUnknownMessage(data);
-    }
     else {
-      debug('unknown message ' + type);
+      throw new Error("unhandled message");
     }
   }
 
@@ -881,10 +878,6 @@ export class GcmRtcManager extends EventEmitter {
     }
     return sdp;
   };
-
-  static onUnknownMessage(data: any) {
-
-  }
 }
 
 
