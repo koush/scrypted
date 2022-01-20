@@ -1,6 +1,5 @@
-import sdk, { EventListenerRegister, HumidityCommand, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings, SettingValue, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk';
+import { EventListenerRegister, HumiditySensor, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings, SettingValue, TemperatureSetting, Thermometer, ThermostatMode } from '@scrypted/sdk';
 import { StorageSettings } from "../../../common/src/settings"
-const { deviceManager, log, systemManager } = sdk;
 
 class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting, Thermometer, HumiditySensor, Settings {
   sensor: Thermometer & HumiditySensor & ScryptedDevice;
