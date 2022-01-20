@@ -278,8 +278,8 @@ addSupportedType({
                             ? evalRequest(h264EncoderArguments, request) :
                             [
                                 "-vcodec", "libx264",
-                                '-pix_fmt', 'yuvj420p',
-                                "-profile:v", "high",
+                                '-preset', 'ultrafast', '-tune', 'zerolatency',
+                                '-pix_fmt', 'yuv420p',
                                 '-color_range', 'mpeg',
                                 "-bf", "0",
                                 "-b:v", request.video.max_bit_rate.toString() + "k",
