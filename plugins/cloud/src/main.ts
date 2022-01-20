@@ -175,7 +175,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             registration_id: this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
         })
-        return `https://home.koushikdutta.com/_punch/login?${args}`;
+        return `https://${SCRYPTED_SERVER}/_punch/login?${args}`;
         // this is disabled because we can't assume that custom domains will implement this oauth endpoint.
         // return `https://${this.getHostname()}/_punch/login?${args}`
     }
