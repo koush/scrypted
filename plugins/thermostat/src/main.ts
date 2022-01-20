@@ -295,10 +295,10 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
   }
   async setThermostatMode(mode) {
     log.i('thermostat mode set to ' + mode);
-    if (mode == 'On') {
+    if (mode === ThermostatMode.On || mode == ThermostatMode.Auto) {
       mode = this.storage.getItem("lastThermostatMode");
     }
-    else if (mode != 'Off') {
+    else if (mode != ThermostatMode.Off) {
       this.storage.setItem("lastThermostatMode", mode);
     }
     this.thermostatMode = mode;
