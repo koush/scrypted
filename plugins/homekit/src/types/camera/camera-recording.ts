@@ -116,12 +116,12 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             videoArgs = h264EncoderArguments
                 ? evalRequest(h264EncoderArguments, request) : [
                     "-vcodec", "libx264",
-                    '-preset', 'ultrafast', '-tune', 'zerolatency',
-                    '-pix_fmt', 'yuv420p',
-                    '-color_range', 'mpeg',
+                    // '-preset', 'ultrafast', '-tune', 'zerolatency',
+                    '-pix_fmt', 'yuvj420p',
+                    // '-color_range', 'mpeg',
                     "-bf", "0",
-                    "-profile:v", profileToFfmpeg(request.video.profile),
-                    '-level:v', levelToFfmpeg(request.video.level),
+                    // "-profile:v", profileToFfmpeg(request.video.profile),
+                    // '-level:v', levelToFfmpeg(request.video.level),
                     '-b:v', `${configuration.videoCodec.bitrate}k`,
                     "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
                     "-maxrate", request.video.max_bit_rate.toString() + "k",

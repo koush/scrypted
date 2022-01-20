@@ -279,9 +279,9 @@ addSupportedType({
                             ? evalRequest(h264EncoderArguments, request) :
                             [
                                 "-vcodec", "libx264",
-                                '-preset', 'ultrafast', '-tune', 'zerolatency',
-                                '-pix_fmt', 'yuv420p',
-                                '-color_range', 'mpeg',
+                                // '-preset', 'ultrafast', '-tune', 'zerolatency',
+                                '-pix_fmt', 'yuvj420p',
+                                // '-color_range', 'mpeg',
                                 "-bf", "0",
                                 // "-profile:v", profileToFfmpeg(request.video.profile),
                                 // '-level:v', levelToFfmpeg(request.video.level),
