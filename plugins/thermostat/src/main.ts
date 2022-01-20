@@ -2,10 +2,6 @@ import sdk, { EventListenerRegister, HumidityCommand, HumidityMode, HumiditySens
 import { StorageSettings } from "../../../common/src/settings"
 const { deviceManager, log, systemManager } = sdk;
 
-// const sensor = systemManager.getDeviceById<Thermometer & HumiditySensor>(this.storage.getItem('sensor'));
-// const heater = systemManager.getDeviceById<OnOff>(this.storage.getItem('heater'));
-// const cooler = systemManager.getDeviceById<OnOff>(this.storage.getItem('cooler'));
-
 class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting, Thermometer, HumiditySensor, Settings {
   sensor: Thermometer & HumiditySensor & ScryptedDevice;
   heater: OnOff & ScryptedDevice;
@@ -139,9 +135,9 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
   // whenever the temperature changes, or a new command is sent, this updates the current state accordingly.
   updateState() {
-    var threshold = 2;
+    const threshold = 2;
 
-    var thermostatMode = this.thermostatMode || ThermostatMode.Off;
+    const thermostatMode = this.thermostatMode || ThermostatMode.Off;
 
     if (!thermostatMode) {
       log.e('thermostat mode not set');
@@ -150,12 +146,12 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
     // this holds the last known state of the thermostat.
     // ie, what it decided to do, the last time it updated its state.
-    var thermostatState = this.storage.getItem('thermostatState');
+    const thermostatState = this.storage.getItem('thermostatState');
 
     // set the state before turning any devices on or off.
     // on/off events will need to be resolved by looking at the state to
     // determine if it is manual user input.
-    const setState = (state) => {
+    const setState = (state: string) => {
       if (state == thermostatState) {
         // log.i('Thermostat state unchanged. ' + state)
         return;
@@ -165,7 +161,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
       this.storage.setItem('thermostatState', state);
     }
 
-    const manageSetpoint = (temperatureDifference, er, other, ing, ed) => {
+    const manageSetpoint = (temperatureDifference: number, er: OnOff & ScryptedDevice, other: OnOff & ScryptedDevice, ing: string, ed: string) => {
       if (!er) {
         log.e('Thermostat mode set to ' + thermostatMode + ', but ' + thermostatMode + 'er variable is not defined.');
         return;
@@ -221,7 +217,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
         return;
       }
 
-      var temperatureDifference = this.sensor.temperature - thermostatSetpoint;
+      const temperatureDifference = this.sensor.temperature - thermostatSetpoint;
       manageSetpoint(temperatureDifference, this.cooler, this.heater, 'Cooling', 'Cooled');
       return;
 
@@ -233,15 +229,15 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
         return;
       }
 
-      var temperatureDifference = thermostatSetpoint - this.sensor.temperature;
+      const temperatureDifference = thermostatSetpoint - this.sensor.temperature;
       manageSetpoint(temperatureDifference, this.heater, this.cooler, 'Heating', 'Heated');
       return;
 
     } else if (thermostatMode == 'HeatCool') {
 
-      var temperature = this.sensor.temperature;
-      var thermostatSetpointLow = this.thermostatSetpointLow || this.sensor.temperature;
-      var thermostatSetpointHigh = this.thermostatSetpointHigh || this.sensor.temperature;
+      const temperature = this.sensor.temperature;
+      const thermostatSetpointLow = this.thermostatSetpointLow || this.sensor.temperature;
+      const thermostatSetpointHigh = this.thermostatSetpointHigh || this.sensor.temperature;
 
       if (!thermostatSetpointLow || !thermostatSetpointHigh) {
         log.e('No thermostat setpoint low/high is defined.');
@@ -260,11 +256,11 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
       // if already heating or cooling or way out of tolerance, continue doing it until state changes.
       if (temperature < thermostatSetpointLow || thermostatState == 'Heating') {
-        var temperatureDifference = thermostatSetpointHigh - temperature;
+        const temperatureDifference = thermostatSetpointHigh - temperature;
         manageSetpoint(temperatureDifference, this.heater, null, 'Heating', 'Heated');
         return;
       } else if (temperature > thermostatSetpointHigh || thermostatState == 'Cooling') {
-        var temperatureDifference = temperature - thermostatSetpointLow;
+        const temperatureDifference = temperature - thermostatSetpointLow;
         manageSetpoint(temperatureDifference, this.cooler, null, 'Cooling', 'Cooled');
         return;
       }
@@ -278,25 +274,25 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
     log.e('Unknown mode ' + thermostatMode);
   }
   // implementation of TemperatureSetting
-  async setThermostatSetpoint(thermostatSetpoint) {
+  async setThermostatSetpoint(thermostatSetpoint: number) {
     log.i('thermostatSetpoint changed ' + thermostatSetpoint);
     this.thermostatSetpoint = thermostatSetpoint;
     this.updateState();
   }
-  async setThermostatSetpointLow(thermostatSetpointLow) {
+  async setThermostatSetpointLow(thermostatSetpointLow: number) {
     log.i('thermostatSetpointLow changed ' + thermostatSetpointLow);
     this.thermostatSetpointLow = thermostatSetpointLow;
     this.updateState();
   }
-  async setThermostatSetpointHigh(thermostatSetpointHigh) {
+  async setThermostatSetpointHigh(thermostatSetpointHigh: number) {
     log.i('thermostatSetpointHigh changed ' + thermostatSetpointHigh);
     this.thermostatSetpointHigh = thermostatSetpointHigh;
     this.updateState();
   }
-  async setThermostatMode(mode) {
+  async setThermostatMode(mode: ThermostatMode) {
     log.i('thermostat mode set to ' + mode);
     if (mode === ThermostatMode.On || mode == ThermostatMode.Auto) {
-      mode = this.storage.getItem("lastThermostatMode");
+      mode = this.storage.getItem("lastThermostatMode") as ThermostatMode;
     }
     else if (mode != ThermostatMode.Off) {
       this.storage.setItem("lastThermostatMode", mode);
@@ -309,13 +305,13 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
   // make this resolve with the current state. This relies on the state being set
   // before any devices are turned on or off (as mentioned above) to avoid race
   // conditions.
-  manageEvent(on, ing) {
-    var state = this.storage.getItem('thermostatState');
+  manageEvent(on: boolean, ing: string) {
+    const state = this.storage.getItem('thermostatState');
     if (on) {
       // on implies it must be heating/cooling
       if (state != ing) {
         // should this be Heat/Cool?
-        this.setThermostatMode('On');
+        this.setThermostatMode(ThermostatMode.On);
         return;
       }
       return;
@@ -323,7 +319,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
     // off implies that it must NOT be heating/cooling
     if (state == ing) {
-      this.setThermostatMode('Off');
+      this.setThermostatMode(ThermostatMode.Off);
       return;
     }
   }
