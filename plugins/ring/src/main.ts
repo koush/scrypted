@@ -155,14 +155,15 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         locationIds: {
             title: 'Location ID',
             description: 'Optional: If supplied will on show this locationID.',
+            hide: true,
             
         },
         cameraDingsPollingSeconds: {
-            title: 'Camera Event Polling',
+            title: 'Poll Interval',
             type: 'number',
-            description: 'Optional: Camera motion and ding events does not update live and must be fetched periodically.  By default this is done every 2 seconds',
+            description: 'Optional: Change the default polling interval for motion and doorbell events.',
         }
-    }, this.storage);
+    });
 
     constructor() {
         super();
