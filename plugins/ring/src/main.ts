@@ -145,7 +145,9 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             description: 'Optional: If 2 factor is enabled on your Ring account, enter the code sent by Ring to your email or phone number.',
             onPut: async (oldValue, newValue) => {
                 await this.tryLogin(newValue);
+                this.console.log('login completed successfully with 2 factor code');
                 await this.discoverDevices(0);
+                this.console.log('discovery completed successfully');
             },
             noStore: true,
         },
@@ -156,7 +158,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             title: 'Location ID',
             description: 'Optional: If supplied will on show this locationID.',
             hide: true,
-            
         },
         cameraDingsPollingSeconds: {
             title: 'Poll Interval',
@@ -170,10 +171,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         this.discoverDevices(0);
     }
 
-    clearTryDiscoverDevices() {
+    async clearTryDiscoverDevices() {
         this.settingsStorage.values.refreshToken = undefined;
         this.client = undefined;
-        this.discoverDevices(0);
+        await this.discoverDevices(0);
+        this.console.log('discovery completed successfully');
     }
 
     async tryLogin(code?: string) {
@@ -184,7 +186,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             this.api = new RingApi({
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
-                locationIds: [`${this.settingsStorage.values.locationIds}`],
+                locationIds: this.settingsStorage.values.locationIds ? [this.settingsStorage.values.locationIds] : undefined,
                 cameraDingsPollingSeconds: this.settingsStorage.values.cameraDingsPollingSeconds
             });
             return;
@@ -237,6 +239,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
     }
     async discoverDevices(duration: number) {
         await this.tryLogin();
+        this.console.log('login success, trying discovery');
         const cameras = await this.api.getCameras();
         this.cameras = cameras;
         const devices: Device[] = [];
