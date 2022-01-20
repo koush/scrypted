@@ -1,6 +1,9 @@
-import { ScryptedDeviceBase, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 
-function parseValue(value: string, type: string, defaultValue: any) {
+
+const { systemManager } = sdk;
+
+function parseValue(value: string, type: SettingValue, defaultValue: any) {
     if (type === 'boolean') {
         if (value === 'true')
             return true;
@@ -22,6 +25,10 @@ function parseValue(value: string, type: string, defaultValue: any) {
             return [];
         }
     }
+    if (type === 'device') {
+        return systemManager.getDeviceById(value);
+    }
+
     return value || defaultValue;
 }
 
@@ -35,7 +42,7 @@ export interface StorageSetting extends Setting {
 export class StorageSettings<T extends string> implements Settings {
     public values: { [key in T]: any } = {} as any;
 
-    constructor(public device: ScryptedDeviceBase, public settings: { [key in T]: StorageSetting }, public storage: Storage) {
+    constructor(public device: ScryptedDeviceBase | MixinDeviceBase<any>, public settings: { [key in T]: StorageSetting }) {
         for (const key of Object.keys(settings)) {
             Object.defineProperty(this.values, key, {
                 get: () => this.getItem(key as T),
@@ -51,7 +58,7 @@ export class StorageSettings<T extends string> implements Settings {
             if (s.hide)
                 continue;
             s.key = key;
-            s.value = this.storage.getItem(key);
+            s.value = this.device.storage.getItem(key);
             ret.push(s);
             delete s.onPut;
         }
@@ -65,9 +72,9 @@ export class StorageSettings<T extends string> implements Settings {
             oldValue = this.getItem(key as T);
         if (!setting?.noStore) {
             if (typeof value === 'object')
-                this.storage.setItem(key, JSON.stringify(value));
+                this.device.storage.setItem(key, JSON.stringify(value));
             else
-                this.storage.setItem(key, value?.toString());
+                this.device.storage.setItem(key, value?.toString());
         }
         setting?.onPut?.(oldValue, value);
         this.device.onDeviceEvent(ScryptedInterface.Settings, undefined);
@@ -76,8 +83,8 @@ export class StorageSettings<T extends string> implements Settings {
     getItem(key: T): any {
         const setting = this.settings[key];
         if (!setting)
-            return this.storage.getItem(key);
+            return this.device.storage.getItem(key);
         const type = setting.multiple ? 'array' : setting.type;
-        return parseValue(this.storage.getItem(key), type, setting.defaultValue);
+        return parseValue(this.device.storage.getItem(key), type, setting.defaultValue);
     }
 }

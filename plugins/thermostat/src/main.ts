@@ -1,62 +1,140 @@
-import sdk, { HumidityCommand, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDeviceBase, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk';
+import sdk, { EventListenerRegister, HumidityCommand, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings, SettingValue, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk';
+import { StorageSettings } from "../../../common/src/settings"
 const { deviceManager, log, systemManager } = sdk;
 
-const sensor = systemManager.getDeviceById<Thermometer & HumiditySensor>(localStorage.getItem('sensor'));
-const heater = systemManager.getDeviceById<OnOff>(localStorage.getItem('heater'));
-const cooler = systemManager.getDeviceById<OnOff>(localStorage.getItem('cooler'));
+// const sensor = systemManager.getDeviceById<Thermometer & HumiditySensor>(this.storage.getItem('sensor'));
+// const heater = systemManager.getDeviceById<OnOff>(this.storage.getItem('heater'));
+// const cooler = systemManager.getDeviceById<OnOff>(this.storage.getItem('cooler'));
 
-class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting, Thermometer, HumiditySensor, HumiditySetting {
+class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting, Thermometer, HumiditySensor, Settings {
+  sensor: Thermometer & HumiditySensor & ScryptedDevice;
+  heater: OnOff & ScryptedDevice;
+  cooler: OnOff & ScryptedDevice;
+  listeners: EventListenerRegister[] = [];
+
+  storageSettings = new StorageSettings(this, {
+    sensor: {
+      title: 'Thermometer',
+      description: 'The thermometer used by this virtual thermostat to regulate the temperature.',
+      type: 'device',
+      deviceFilter: `interfaces.includes("${ScryptedInterface.Thermometer}")`,
+      onPut: () => this.updateSettings(),
+    },
+    heater: {
+      title: 'Heating Switch',
+      description: 'Optional: The switch that controls your heating unit.',
+      type: `device`,
+      deviceFilter: `interfaces.includes("${ScryptedInterface.OnOff}")`,
+      onPut: () => this.updateSettings(),
+    },
+    cooler: {
+      title: 'Cooling Switch',
+      description: 'Optional: The switch that controls your cooling unit.',
+      type: `device`,
+      deviceFilter: `interfaces.includes("${ScryptedInterface.OnOff}")`,
+      onPut: () => this.updateSettings(),
+    },
+    temperatureUnit: {
+      title: 'Temperature Unit',
+      choices: ['C', 'F'],
+      defaultValue: 'C',
+      onPut: () => this.updateSettings(),
+    }
+  })
+
   constructor() {
     super();
 
-    this.temperature = sensor.temperature;
-    // copy the current state from the sensor.
-    var unit;
-    if (unit = localStorage.getItem('temperatureUnit')) {
-      this.temperatureUnit = unit === 'F' ? TemperatureUnit.F : TemperatureUnit.C;
-    }
-    else {
-      log.a('Please specify temperatureUnit C or F in Script Settings.');
-      this.temperatureUnit = sensor.temperatureUnit;
-    }
-    this.humidity = sensor.humidity;
-    this.humiditySetting = {
-      mode: HumidityMode.Off,
-      setpoint: 50,
-      activeMode: HumidityMode.Off,
-      availableModes: [HumidityMode.Auto, HumidityMode.Humidify, HumidityMode.Dehumidify],
-    };
+    this.updateSettings();
 
-    var modes: ThermostatMode[] = [];
+    this.temperature = this.sensor?.temperature;
+    this.temperatureUnit = this.storageSettings.values.temperatureUnit;
+    this.humidity = this.sensor?.humidity;
+
+    const modes: ThermostatMode[] = [];
     modes.push(ThermostatMode.Off);
-    if (cooler) {
+    if (this.cooler) {
       modes.push(ThermostatMode.Cool);
     }
-    if (heater) {
+    if (this.heater) {
       modes.push(ThermostatMode.Heat);
     }
-    if (heater && cooler) {
+    if (this.heater && this.cooler) {
       modes.push(ThermostatMode.HeatCool);
     }
     modes.push(ThermostatMode.On);
     this.thermostatAvailableModes = modes;
 
-    try {
-      if (!this.thermostatMode) {
-        this.thermostatMode = ThermostatMode.Off;
-      }
-    }
-    catch (e) {
+    if (!this.thermostatMode) {
+      this.thermostatMode = ThermostatMode.Off;
     }
   }
 
-  async setHumidity(humidity: HumidityCommand): Promise<void> {
-    this.humiditySetting = {
-      mode: humidity.mode,
-      setpoint: 50,
-      activeMode: HumidityMode.Off,
-      availableModes: [HumidityMode.Auto, HumidityMode.Humidify, HumidityMode.Dehumidify],
+  manageListener(listener: EventListenerRegister) {
+    this.listeners.push(listener);
+  }
+
+  clearListeners() {
+    for (const listener of this.listeners) {
+      listener.removeListener();
     }
+    this.listeners = [];
+  }
+
+  updateSettings() {
+    this.clearListeners();
+    this.sensor = this.storageSettings.values.sensor;
+    this.heater = this.storageSettings.values.heater;
+    this.cooler = this.storageSettings.values.cooler;
+
+    this.log.clearAlerts();
+    if (!this.sensor) {
+      this.log.a('Setup Incomplete: Select a thermometer.');
+      return;
+    }
+
+    if (!this.heater && !this.cooler) {
+      this.log.a('Setup Incomplete: Assign the switch that controls the heater or air conditioner devices.');
+      return;
+    }
+
+    if (!this.sensor) {
+      this.log.a('Setup Incomplete: Assign a thermometer and humidity sensor to the "sensor" variable.');
+      return;
+    }
+
+    // register to listen for temperature change events
+    this.sensor.listen(ScryptedInterface.Thermometer, (s, d, data) => {
+      if (d.property === ScryptedInterfaceProperty.temperature) {
+        this.temperature = this.sensor.temperature;
+        this.updateState();
+      }
+    });
+
+    // listen to humidity events too, and pass those along
+    this.sensor.listen(ScryptedInterface.Thermometer, (s, d, data) => {
+      if (d.property === ScryptedInterfaceProperty.humidity) {
+        this.humidity = this.sensor.humidity;
+      }
+    });
+
+    // Watch for on/off events, some of them may be physical
+    // button presses, and those will need to be resolved by
+    // checking the state versus the event.
+    this.heater?.listen(ScryptedInterface.OnOff, (s, d, data) => {
+      this.manageEvent(this.heater.on, 'Heating');
+    })
+
+    this.cooler?.listen(ScryptedInterface.OnOff, (s, d, data) => {
+      this.manageEvent(this.cooler.on, 'Cooling');
+    })
+  }
+
+  getSettings(): Promise<Setting[]> {
+    return this.storageSettings.getSettings();
+  }
+  putSetting(key: string, value: SettingValue): Promise<void> {
+    return this.storageSettings.putSetting(key, value);
   }
 
   // whenever the temperature changes, or a new command is sent, this updates the current state accordingly.
@@ -72,22 +150,22 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
     // this holds the last known state of the thermostat.
     // ie, what it decided to do, the last time it updated its state.
-    var thermostatState = localStorage.getItem('thermostatState');
+    var thermostatState = this.storage.getItem('thermostatState');
 
     // set the state before turning any devices on or off.
     // on/off events will need to be resolved by looking at the state to
     // determine if it is manual user input.
-    function setState(state) {
+    const setState = (state) => {
       if (state == thermostatState) {
         // log.i('Thermostat state unchanged. ' + state)
         return;
       }
 
       log.i('Thermostat state changed. ' + state);
-      localStorage.setItem('thermostatState', state);
+      this.storage.setItem('thermostatState', state);
     }
 
-    function manageSetpoint(temperatureDifference, er, other, ing, ed) {
+    const manageSetpoint = (temperatureDifference, er, other, ing, ed) => {
       if (!er) {
         log.e('Thermostat mode set to ' + thermostatMode + ', but ' + thermostatMode + 'er variable is not defined.');
         return;
@@ -121,12 +199,12 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
       }
     }
 
-    function allOff() {
-      if (heater && heater.on) {
-        heater.turnOff();
+    const allOff = () => {
+      if (this.heater && this.heater.on) {
+        this.heater.turnOff();
       }
-      if (cooler && cooler.on) {
-        cooler.turnOff();
+      if (this.cooler && this.cooler.on) {
+        this.cooler.turnOff();
       }
     }
 
@@ -137,33 +215,33 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
     } else if (thermostatMode == 'Cool') {
 
-      let thermostatSetpoint = this.thermostatSetpoint || sensor.temperature;
+      let thermostatSetpoint = this.thermostatSetpoint || this.sensor.temperature;
       if (!thermostatSetpoint) {
         log.e('No thermostat setpoint is defined.');
         return;
       }
 
-      var temperatureDifference = sensor.temperature - thermostatSetpoint;
-      manageSetpoint(temperatureDifference, cooler, heater, 'Cooling', 'Cooled');
+      var temperatureDifference = this.sensor.temperature - thermostatSetpoint;
+      manageSetpoint(temperatureDifference, this.cooler, this.heater, 'Cooling', 'Cooled');
       return;
 
     } else if (thermostatMode == 'Heat') {
 
-      let thermostatSetpoint = this.thermostatSetpoint || sensor.temperature;
+      let thermostatSetpoint = this.thermostatSetpoint || this.sensor.temperature;
       if (!thermostatSetpoint) {
         log.e('No thermostat setpoint is defined.');
         return;
       }
 
-      var temperatureDifference = thermostatSetpoint - sensor.temperature;
-      manageSetpoint(temperatureDifference, heater, cooler, 'Heating', 'Heated');
+      var temperatureDifference = thermostatSetpoint - this.sensor.temperature;
+      manageSetpoint(temperatureDifference, this.heater, this.cooler, 'Heating', 'Heated');
       return;
 
     } else if (thermostatMode == 'HeatCool') {
 
-      var temperature = sensor.temperature;
-      var thermostatSetpointLow = this.thermostatSetpointLow || sensor.temperature;
-      var thermostatSetpointHigh = this.thermostatSetpointHigh || sensor.temperature;
+      var temperature = this.sensor.temperature;
+      var thermostatSetpointLow = this.thermostatSetpointLow || this.sensor.temperature;
+      var thermostatSetpointHigh = this.thermostatSetpointHigh || this.sensor.temperature;
 
       if (!thermostatSetpointLow || !thermostatSetpointHigh) {
         log.e('No thermostat setpoint low/high is defined.');
@@ -183,11 +261,11 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
       // if already heating or cooling or way out of tolerance, continue doing it until state changes.
       if (temperature < thermostatSetpointLow || thermostatState == 'Heating') {
         var temperatureDifference = thermostatSetpointHigh - temperature;
-        manageSetpoint(temperatureDifference, heater, null, 'Heating', 'Heated');
+        manageSetpoint(temperatureDifference, this.heater, null, 'Heating', 'Heated');
         return;
       } else if (temperature > thermostatSetpointHigh || thermostatState == 'Cooling') {
         var temperatureDifference = temperature - thermostatSetpointLow;
-        manageSetpoint(temperatureDifference, cooler, null, 'Cooling', 'Cooled');
+        manageSetpoint(temperatureDifference, this.cooler, null, 'Cooling', 'Cooled');
         return;
       }
 
@@ -218,10 +296,10 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
   async setThermostatMode(mode) {
     log.i('thermostat mode set to ' + mode);
     if (mode == 'On') {
-      mode = localStorage.getItem("lastThermostatMode");
+      mode = this.storage.getItem("lastThermostatMode");
     }
     else if (mode != 'Off') {
-      localStorage.setItem("lastThermostatMode", mode);
+      this.storage.setItem("lastThermostatMode", mode);
     }
     this.thermostatMode = mode;
     this.updateState();
@@ -232,7 +310,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
   // before any devices are turned on or off (as mentioned above) to avoid race
   // conditions.
   manageEvent(on, ing) {
-    var state = localStorage.getItem('thermostatState');
+    var state = this.storage.getItem('thermostatState');
     if (on) {
       // on implies it must be heating/cooling
       if (state != ing) {
@@ -251,60 +329,4 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
   }
 }
 
-
-
-
-
-
-
-
-var thermostatDevice = new ThermostatDevice();
-
-function alertAndThrow(msg) {
-  log.a(msg);
-  throw new Error(msg);
-}
-
-try {
-  if (!sensor)
-    throw new Error();
-}
-catch {
-  alertAndThrow('Setup Incomplete: Assign a thermometer and humidity sensor to the "sensor" variable.');
-}
-log.clearAlerts();
-
-if (!heater && !cooler) {
-  alertAndThrow('Setup Incomplete: Assign an OnOff device to the "heater" and/or "cooler" OnOff variables.');
-}
-log.clearAlerts();
-
-// register to listen for temperature change events
-sensor.listen('Thermometer', function(source, event, data) {
-  thermostatDevice[event.property] = data;
-  if (event.property == 'temperature') {
-    log.i('temperature event: ' + data);
-    thermostatDevice.updateState();
-  }
-});
-
-// listen to humidity events too, and pass those along
-sensor.listen('HumiditySensor', function(source, event, data) {
-  thermostatDevice[event.property] = data;
-});
-
-// Watch for on/off events, some of them may be physical
-// button presses, and those will need to be resolved by
-// checking the state versus the event.
-if (heater) {
-  heater.listen('OnOff', function(source, event, on) {
-    thermostatDevice.manageEvent(on, 'Heating');
-  });
-}
-if (cooler) {
-  cooler.listen('OnOff', function(source, event, on) {
-    thermostatDevice.manageEvent(on, 'Cooling');
-  });
-}
-
-export default thermostatDevice;
+export default new ThermostatDevice();
