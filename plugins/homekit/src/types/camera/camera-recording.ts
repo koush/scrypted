@@ -9,6 +9,7 @@ import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordin
 import { FFMpegFragmentedMP4Session, startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { evalRequest } from './camera-transcode';
 import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
+import { levelToFfmpeg, profileToFfmpeg } from './camera-utils';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -109,19 +110,13 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             ];
         }
 
-        const profile = configuration.videoCodec.profile === H264Profile.HIGH ? 'high'
-            : configuration.videoCodec.profile === H264Profile.MAIN ? 'main' : 'baseline';
-
-        const level = configuration.videoCodec.level === H264Level.LEVEL4_0 ? '4.0'
-            : configuration.videoCodec.level === H264Level.LEVEL3_2 ? '3.2' : '3.1';
-
         let videoArgs: string[];
         if (transcodeRecording) {
             const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
             videoArgs = h264EncoderArguments
                 ? evalRequest(h264EncoderArguments, request) : [
-                    '-profile:v', profile,
-                    '-level:v', level,
+                    "-profile:v", profileToFfmpeg(request.video.profile),
+                    '-level:v', levelToFfmpeg(request.video.level),
                     '-b:v', `${configuration.videoCodec.bitrate}k`,
                     '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
                     '-r', configuration.videoCodec.resolution[2].toString(),

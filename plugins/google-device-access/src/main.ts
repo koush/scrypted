@@ -59,7 +59,7 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         this.console.log(result.data);
         const expirationDate = new Date(expiresAt);
         const refreshAt = expirationDate.getTime();
-    
+
         return mediaManager.createFFmpegMediaObject({
             url: u,
             mediaStreamOptions: {
@@ -347,7 +347,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         const traits = payload.resourceUpdate?.traits;
         const events = payload.resourceUpdate?.events;
 
-        const nativeId = payload.resourceUpdate.name.split('/').pop();
+        const nativeId = payload.resourceUpdate?.name.split('/').pop();
         const device = this.devices.get(nativeId);
         if (device) {
             if (traits) {

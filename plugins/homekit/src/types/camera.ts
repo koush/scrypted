@@ -23,6 +23,7 @@ import { CharacteristicEventTypes, DataStreamConnection, Service, WithUUID } fro
 import { RecordingManagement } from 'hap-nodejs/src/lib/camera';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 import os from 'os';
+import { levelToFfmpeg, profileToFfmpeg } from './camera/camera-utils';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -225,7 +226,7 @@ addSupportedType({
 
 
                 const videomtu = request.video.mtu;
-                // seems fine? no idea what to use here. this is the mtu for sending audio to homekit.
+                // 400 seems fine? no idea what to use here. this is the mtu for sending audio to homekit.
                 // from my observation of talkback packets, the max packet size is ~370, so
                 // I'm just guessing that HomeKit wants something similar for the audio it receives.
                 // going higher causes choppiness. going lower may cause other issues.
@@ -282,6 +283,8 @@ addSupportedType({
                                 '-pix_fmt', 'yuv420p',
                                 '-color_range', 'mpeg',
                                 "-bf", "0",
+                                "-profile:v", profileToFfmpeg(request.video.profile),
+                                '-level:v', levelToFfmpeg(request.video.level),
                                 "-b:v", request.video.max_bit_rate.toString() + "k",
                                 "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
                                 "-maxrate", request.video.max_bit_rate.toString() + "k",
