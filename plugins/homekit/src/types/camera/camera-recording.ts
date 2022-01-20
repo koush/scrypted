@@ -115,12 +115,18 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
             videoArgs = h264EncoderArguments
                 ? evalRequest(h264EncoderArguments, request) : [
+                    "-vcodec", "libx264",
+                    '-preset', 'ultrafast', '-tune', 'zerolatency',
+                    '-pix_fmt', 'yuv420p',
+                    '-color_range', 'mpeg',
+                    "-bf", "0",
                     "-profile:v", profileToFfmpeg(request.video.profile),
                     '-level:v', levelToFfmpeg(request.video.level),
                     '-b:v', `${configuration.videoCodec.bitrate}k`,
+                    "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
+                    "-maxrate", request.video.max_bit_rate.toString() + "k",
+                    "-filter:v", `fps=${request.video.fps},scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
                     '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
-                    '-r', configuration.videoCodec.resolution[2].toString(),
-                    '-vf', `scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
                 ];
         }
         else {
