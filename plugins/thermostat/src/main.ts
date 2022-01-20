@@ -1,4 +1,4 @@
-import { EventListenerRegister, HumiditySensor, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings, SettingValue, TemperatureSetting, Thermometer, ThermostatMode } from '@scrypted/sdk';
+import { EventListenerRegister, HumiditySensor, OnOff, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings, SettingValue, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk';
 import { StorageSettings } from "../../../common/src/settings"
 
 class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting, Thermometer, HumiditySensor, Settings {
@@ -63,6 +63,10 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
     if (!this.thermostatMode) {
       this.thermostatMode = ThermostatMode.Off;
     }
+  }
+
+  async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {
+    this.storageSettings.values.temperatureUnit = temperatureUnit;
   }
 
   manageListener(listener: EventListenerRegister) {
