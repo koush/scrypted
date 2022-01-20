@@ -1,14 +1,42 @@
 from __future__ import annotations
+from matplotlib.pyplot import bar
+
+from numpy import deprecate
 from .types import *
 from typing import Optional
 from zipfile import ZipFile
-import sys
+from threading import local
 
 deviceManager: DeviceManager = None
 systemManager: SystemManager = None
 mediaManager: MediaManager = None
 zip: ZipFile = None
 remote: Any = None
+
+class SdkInstance:
+    ts = local()
+
+    @property
+    def deviceManager(self) -> DeviceManager:
+        return self.ts.local.deviceManager or deviceManager
+
+    @property
+    def systemManager(self) -> SystemManager:
+        return self.ts.local.deviceManager or deviceManager
+
+    @property
+    def mediaManager(self) -> MediaManager:
+        return self.ts.local.deviceManager or deviceManager
+
+    @property
+    def zip(self) -> ZipFile:
+        return self.ts.local.deviceManager or deviceManager
+
+    @property
+    def remote(self) -> Any:
+        return self.ts.local.deviceManager or deviceManager
+
+sdk = SdkInstance()
 
 def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManager):
     global zip
@@ -21,6 +49,12 @@ def sdk_init(z: ZipFile, r, sm: DeviceManager, dm: SystemManager, mm: MediaManag
     mediaManager = mm
     zip = z
     remote = r
+
+    sdk.ts.systemManager = sm
+    sdk.ts.deviceManager = dm
+    sdk.ts.mediaManager = mm
+    sdk.ts.zip = zip
+    sdk.ts.remote = r
 
 class ScryptedDeviceBase(DeviceState):
     nativeId: str | None

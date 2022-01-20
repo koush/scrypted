@@ -734,6 +734,8 @@ class TemperatureSetting:
 class Thermometer:
     temperature: float
     temperatureUnit: TemperatureUnit
+    async def setTemperatureUnit(self, temperatureUnit: TemperatureUnit) -> None:
+        pass
     pass
 
 class UltravioletSensor:

@@ -284,7 +284,9 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
   },
   Thermometer: {
     name: 'Thermometer',
-    methods: [],
+    methods: [
+      'setTemperatureUnit'
+    ],
     properties: [
       'temperature',
       'temperatureUnit'
@@ -914,9 +916,10 @@ export interface Thermometer {
    */
   temperature?: number;
   /**
-   * Get the user facing unit of measurement for this thermometer. Note that while this may be Fahrenheit, getTemperatureAmbient will return the temperature in Celsius.
+   * Get the user facing unit of measurement for this thermometer, if any. Note that while this may be Fahrenheit, getTemperatureAmbient will return the temperature in Celsius.
    */
   temperatureUnit?: TemperatureUnit;
+  setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void>;
 }
 export enum TemperatureUnit {
   C = "C",

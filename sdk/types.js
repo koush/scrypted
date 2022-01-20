@@ -183,7 +183,9 @@ exports.ScryptedInterfaceDescriptors = {
     },
     Thermometer: {
         name: 'Thermometer',
-        methods: [],
+        methods: [
+            'setTemperatureUnit'
+        ],
         properties: [
             'temperature',
             'temperatureUnit'
