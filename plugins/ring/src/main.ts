@@ -151,6 +151,16 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         },
         refreshToken: {
             hide: true,
+        },
+        locationIds: {
+            title: 'Location ID',
+            description: 'Optional: If supplied will on show this locationID.',
+            
+        },
+        cameraDingsPollingSeconds: {
+            title: 'Camera Event Polling',
+            type: 'number',
+            description: 'Optional: Camera motion and ding events does not update live and must be fetched periodically.  By default this is done every 2 seconds',
         }
     }, this.storage);
 
@@ -173,6 +183,8 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             this.api = new RingApi({
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
+                locationIds: [`${this.settingsStorage.values.locationIds}`],
+                cameraDingsPollingSeconds: this.settingsStorage.values.cameraDingsPollingSeconds
             });
             return;
         }
@@ -233,17 +245,19 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 ScryptedInterface.Camera,
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.MotionSensor,
+                ScryptedInterface.Intercom
             ];
             if (camera.isDoorbot) {
                 interfaces.push(
                     ScryptedInterface.BinarySensor,
-                    ScryptedInterface.Intercom
                 );
             }
             const device: Device = {
                 info: {
-                    model: camera.model,
+                    model: `${camera.model} (${camera.data.kind})`,
                     manufacturer: 'Ring',
+                    firmware: camera.data.firmware_version,
+                    serialNumber: camera.data.device_id
                 },
                 nativeId,
                 name: camera.name,
