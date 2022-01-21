@@ -236,6 +236,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.running = session.running;
     }
     catch (e) {
+      this.console.log('failure retrieving stream', e);
       this.running = false;
     }
   }

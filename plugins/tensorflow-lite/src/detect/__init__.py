@@ -93,6 +93,7 @@ class DetectionSession:
         self.attached = False
         self.mutex = multiprocessing.Lock()
         self.valve: PipelineValve = None
+        self.last_sample = time.time()
 
     def clearTimeoutLocked(self):
         if self.timerHandle:
@@ -210,6 +211,10 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection_session.future.add_done_callback(
                     lambda _: self.end_session(detection_session))
 
+        if detection_session and time.time() - detection_session.last_sample > 30:
+            print('detection session has not received a sample in 30 seconds, terminating', detection_session.id)
+            ending = True
+
         if ending:
             if detection_session:
                 self.end_session(detection_session)
@@ -303,6 +308,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         first_frame = True
         def user_callback(gst_sample, src_size, convert_to_src_size):
             try:
+                detection_session.last_sample = time.time()
+
                 nonlocal first_frame
                 if first_frame:
                     first_frame = False
