@@ -67,6 +67,7 @@ class ThermostatDevice extends ScryptedDeviceBase implements TemperatureSetting,
 
   async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {
     this.storageSettings.values.temperatureUnit = temperatureUnit;
+    this.temperatureUnit = temperatureUnit;
   }
 
   manageListener(listener: EventListenerRegister) {
