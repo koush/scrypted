@@ -41,7 +41,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         this.rtpDescription = await sip.start();
         const videoPort = await sip.reservePort(1);
         const audioPort = await sip.reservePort(1);
-        
+
         const ff = sip.prepareTranscoder(true, [], this.rtpDescription, audioPort, videoPort, url);
         clientPromise.then(client => {
             client.write(ff.inputSdpLines.filter((x) => Boolean(x)).join('\n'));
@@ -163,7 +163,8 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             title: 'Poll Interval',
             type: 'number',
             description: 'Optional: Change the default polling interval for motion and doorbell events.',
-        }
+            defaultValue: 5,
+        },
     });
 
     constructor() {
@@ -179,16 +180,25 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
     }
 
     async tryLogin(code?: string) {
+        const locationIds = this.settingsStorage.values.locationIds ? [this.settingsStorage.values.locationIds] : undefined;
+        const cameraDingsPollingSeconds = this.settingsStorage.values.cameraDingsPollingSeconds;
+        const cameraStatusPollingSeconds = 20;
+
+        const createRingApi = async () => {
+            this.api = new RingApi({
+                refreshToken: this.settingsStorage.values.refreshToken,
+                ffmpegPath: await mediaManager.getFFmpegPath(),
+                locationIds,
+                cameraDingsPollingSeconds,
+                cameraStatusPollingSeconds,
+            });
+        }
+
         if (this.settingsStorage.values.refreshToken) {
             this.client = new RingRestClient({
                 refreshToken: this.settingsStorage.values.refreshToken,
             });
-            this.api = new RingApi({
-                refreshToken: this.settingsStorage.values.refreshToken,
-                ffmpegPath: await mediaManager.getFFmpegPath(),
-                locationIds: this.settingsStorage.values.locationIds ? [this.settingsStorage.values.locationIds] : undefined,
-                cameraDingsPollingSeconds: this.settingsStorage.values.cameraDingsPollingSeconds
-            });
+            await createRingApi();
             return;
         }
 
@@ -225,10 +235,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 return;
             }
         }
-        this.api = new RingApi({
-            refreshToken: this.settingsStorage.values.refreshToken,
-            ffmpegPath: await mediaManager.getFFmpegPath(),
-        });
+        await createRingApi();
     }
 
     getSettings(): Promise<Setting[]> {
@@ -275,6 +282,10 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 camera?.triggerBinaryState();
             });
             camera.onMotionDetected?.subscribe(() => {
+                const camera = this.devices.get(nativeId);
+                camera?.triggerMotion();
+            });
+            camera.onMotionStarted?.subscribe(() => {
                 const camera = this.devices.get(nativeId);
                 camera?.triggerMotion();
             });
