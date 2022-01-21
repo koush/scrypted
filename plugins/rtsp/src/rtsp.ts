@@ -1,10 +1,8 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings } from "@scrypted/sdk";
+import sdk, { Setting, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, PictureOptions, SettingValue } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
-import { recommendRebroadcast } from "./recommend";
-import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
-import { randomBytes } from "crypto";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
+import url from 'url';
 
 export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
@@ -56,17 +54,24 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         if (!vso)
             throw new Error('video streams not set up or no longer exists.');
 
-        const url = new URL(vso.url);
-        this.console.log('rtsp stream url', url.toString());
+        // ignore this deprecation warning. the WHATWG URL class will trim the password
+        // off if it is empty, resulting in urls like rtsp://admin@foo.com/.
+        // this causes ffmpeg to fail on sending a blank password.
+        // we need to send it as follows: rtsp://admin:@foo.com/.
+        // Note the trailing colon.
+        // issue: https://github.com/koush/scrypted/issues/134
+        const parsedUrl = url.parse(vso.url);
+        this.console.log('rtsp stream url', parsedUrl.toString());
         const username = this.storage.getItem("username");
         const password = this.storage.getItem("password");
-        if (username)
-            url.username = username;
-        if (password)
-            url.password = password;
+        if (username) {
+            // if a username is set, ensure a trailing colon is sent for blank password.
+            const auth = `${encodeURIComponent(username)}:${encodeURIComponent(password || '')}`;
+            parsedUrl.auth = auth;
+        }
 
         const ret: FFMpegInput = {
-            url: url.toString(),
+            url: parsedUrl.toString(),
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -77,7 +82,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
                 "-max_delay",
                 "20000000",
                 "-i",
-                url.toString(),
+                parsedUrl.toString(),
             ],
             mediaStreamOptions: vso,
         };
