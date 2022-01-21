@@ -23,7 +23,6 @@ import { CharacteristicEventTypes, DataStreamConnection, Service, WithUUID } fro
 import { RecordingManagement } from 'hap-nodejs/src/lib/camera';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 import os from 'os';
-import { levelToFfmpeg, profileToFfmpeg } from './camera/camera-utils';
 
 const { log, mediaManager, deviceManager, systemManager } = sdk;
 
@@ -77,6 +76,8 @@ addSupportedType({
             session.videoReturn?.close();
             session.audioReturn?.close();
             session.rtpSink?.destroy();
+            if (twoWayAudio)
+                device.stopIntercom();
         }
 
 
@@ -186,6 +187,7 @@ addSupportedType({
                     const msos = await device.getVideoStreamOptions();
                     selectedStream = msos.find(mso => mso.name === streamingChannel);
                 }
+                console.log('isHomeKitHub', isHomeKitHub, 'selected stream', selectedStream?.name || 'Default/undefined');
 
                 const tryReconfigureBitrate = () => {
                     if (!isHomeKitHub)
