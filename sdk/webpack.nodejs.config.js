@@ -19,7 +19,7 @@ const isProduction = process.env.NODE_ENV == 'production';
 function ensureAlias(name) {
     const sanitizedName = name.replace(/@/g, '').replace(/\//g, '').replace(/-/g, '');
     const sanitizedPath = path.join(__dirname, 'polyfill', sanitizedName + '.js');
-    const contents = `const ${sanitizedName} = __non_webpack_require__('${sanitizedName}'); module.exports = ${sanitizedName};`
+    const contents = `const ${sanitizedName} = __non_webpack_require__('${name}'); module.exports = ${sanitizedName};`
     try {
         if (fs.readFileSync(sanitizedPath).toString() !== contents)
             throw new Error();
@@ -36,6 +36,9 @@ const polyfills = [
     "memfs",
     "realfs",
     "fakefs",
+    // remove this at some point
+    // 1/21/2022
+    'wrtc',
     '@koush/wrtc',
     "mdns",
     "typescript",
