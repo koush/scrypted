@@ -530,7 +530,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     findPluginDevices(pluginId: string): PluginDevice[] {
-        return Object.values(this.pluginDevices).filter(e => e.pluginId === pluginId)
+        return Object.values(this.pluginDevices).filter(e => e.state && e.pluginId === pluginId)
     }
 
     getPluginHostForDeviceId(id: string): PluginHost {
@@ -685,6 +685,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         for await (const pluginDevice of this.datastore.getAll(PluginDevice)) {
             this.migrate(pluginDevice);
+
+            // this may happen due to race condition around deletion/update. investigate.
+            if (!pluginDevice.state) {
+                this.datastore.remove(pluginDevice);
+                continue;
+            }
 
             this.pluginDevices[pluginDevice._id] = pluginDevice;
             let mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
