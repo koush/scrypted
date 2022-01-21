@@ -1,8 +1,10 @@
 const path = require('path');
 const webpack = require('webpack');
 const TerserPlugin = require("terser-webpack-plugin");
+// const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+const fs = require('fs');
 
-var out;
+let out;
 const cwd = process.cwd();
 
 if (process.env.NODE_ENV == 'production') {
@@ -13,6 +15,35 @@ else {
 }
 
 const isProduction = process.env.NODE_ENV == 'production';
+
+function ensureAlias(name) {
+    const sanitizedName = name.replace(/@/g, '').replace(/\//g, '').replace(/-/g, '');
+    const sanitizedPath = path.join(__dirname, 'polyfill', sanitizedName + '.js');
+    const contents = `const ${sanitizedName} = __non_webpack_require__('${sanitizedName}'); module.exports = ${sanitizedName};`
+    try {
+        if (fs.readFileSync(sanitizedPath).toString() !== contents)
+            throw new Error();
+    }
+    catch (e) {
+        fs.writeFileSync(sanitizedPath, contents);
+    }
+    return sanitizedPath;
+}
+
+const alias = {};
+const polyfills = [
+    'adm-zip',
+    "memfs",
+    "realfs",
+    "fakefs",
+    '@koush/wrtc',
+    "mdns",
+    "typescript",
+];
+
+for (const p of polyfills) {
+    alias[p] = ensureAlias(p);
+}
 
 module.exports = {
     mode: process.env.NODE_ENV || 'development',
@@ -25,7 +56,7 @@ module.exports = {
         library: {
             name: 'exports',
             type: 'assign-properties',
-          },
+        },
     },
     module: {
         rules: [
@@ -74,16 +105,7 @@ module.exports = {
 
     },
     resolve: {
-
-        alias: {
-            "realfs": path.resolve(__dirname, 'polyfill/realfs'),
-            "fakefs": path.resolve(__dirname, 'polyfill/fakefs'),
-            wrtc: path.resolve(__dirname, 'polyfill/wrtc'),
-            '@koush/wrtc': path.resolve(__dirname, 'polyfill/koush-wrtc'),
-            mdns: path.resolve(__dirname, 'polyfill/mdns'),
-            typescript: path.resolve(__dirname, 'polyfill/typescript'),
-        },
-
+        alias,
         extensions: ['.tsx', '.ts', '.js']
     },
 
@@ -95,6 +117,9 @@ module.exports = {
         new webpack.DefinePlugin({
             'process.env.SSDP_COV': false,
         }),
+        // new BundleAnalyzerPlugin({
+        //     generateStatsFile: true
+        // }),
     ],
 
     optimization: {

@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.0.140",
+  "version": "0.0.141",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -41,12 +41,13 @@
     "webpack": "^5.59.0"
   },
   "devDependencies": {
-    "typedoc": "^0.22.8",
-    "stringify-object": "^3.3.0",
     "@types/node": "^16.11.1",
-    "typescript-json-schema": "^0.50.1",
     "@types/stringify-object": "^4.0.0",
-    "ts-node": "^10.4.0"
+    "stringify-object": "^3.3.0",
+    "ts-node": "^10.4.0",
+    "typedoc": "^0.22.8",
+    "typescript-json-schema": "^0.50.1",
+    "webpack-bundle-analyzer": "^4.5.0"
   },
   "types": "index.d.ts"
 }

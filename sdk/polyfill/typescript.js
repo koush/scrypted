@@ -1,2 +1,1 @@
-const e = __non_webpack_require__('typescript');
-module.exports = e;
+const typescript = __non_webpack_require__('typescript'); module.exports = typescript;
