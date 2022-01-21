@@ -70,8 +70,10 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
             parsedUrl.auth = auth;
         }
 
+        const stringUrl = url.format(parsedUrl);
+
         const ret: FFMpegInput = {
-            url: parsedUrl.toString(),
+            url: stringUrl,
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -82,7 +84,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
                 "-max_delay",
                 "20000000",
                 "-i",
-                parsedUrl.toString(),
+                stringUrl,
             ],
             mediaStreamOptions: vso,
         };
