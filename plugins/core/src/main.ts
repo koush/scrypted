@@ -5,7 +5,6 @@ import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, Engi
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
-import Url from 'url-parse';
 import { UserStorage } from './userStorage';
 import { RpcPeer } from '../../../server/src/rpc';
 import { setupPluginRemote } from '../../../server/src/plugin/plugin-remote';
@@ -240,9 +239,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
 
     handlePublicFinal(request: HttpRequest, response: HttpResponse) {
         // need to strip off the query.
-        const incomingUrl = new Url(request.url);
+        const incomingPathname = request.url.split('?')[0];
         if (request.url !== '/index.html') {
-            response.sendFile("dist" + incomingUrl.pathname);
+            response.sendFile("dist" + incomingPathname);
             return;
         }
 
@@ -250,11 +249,12 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         // have cookies. need to attach auth info to them.
         endpointManager.getPublicCloudEndpoint()
             .then(endpoint => {
-                const u = new Url(endpoint);
+                const u = new URL(endpoint);
+
                 const rewritten = indexHtml
-                    .replace('href=/endpoint/@scrypted/core/public/manifest.json', `href="/endpoint/@scrypted/core/public/manifest.json${u.query}"`)
-                    .replace('href=/endpoint/@scrypted/core/public/img/icons/apple-touch-icon-152x152.png', `href="/endpoint/@scrypted/core/public/img/icons/apple-touch-icon-152x152.png${u.query}"`)
-                    .replace('href=/endpoint/@scrypted/core/public/img/icons/safari-pinned-tab.svg', `href="/endpoint/@scrypted/core/public/img/icons/safari-pinned-tab.svg${u.query}"`)
+                    .replace('href="/endpoint/@scrypted/core/public/manifest.json"', `href="/endpoint/@scrypted/core/public/manifest.json${u.search}"`)
+                    .replace('href="/endpoint/@scrypted/core/public/img/icons/apple-touch-icon-152x152.png"', `href="/endpoint/@scrypted/core/public/img/icons/apple-touch-icon-152x152.png${u.search}"`)
+                    .replace('href="/endpoint/@scrypted/core/public/img/icons/safari-pinned-tab.svg"', `href="/endpoint/@scrypted/core/public/img/icons/safari-pinned-tab.svg${u.search}"`)
                     ;
                 response.send(rewritten, {
                     headers: {
@@ -263,7 +263,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 });
             })
             .catch(() => {
-                response.sendFile("dist" + incomingUrl.pathname);
+                response.sendFile("dist" + incomingPathname);
             });
     }
 
