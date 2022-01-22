@@ -26,6 +26,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
     }
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        if (this.session) {
+            this.session.stop();
+            this.session = undefined;
+        }
+
         // the ring-api-client can negotiate the sip connection and output the stream
         // to a ffmpeg output target.
         // provide a tcp socket to write, and then proxy that back as an ffmpeg input
@@ -37,7 +42,13 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
 
         const sip = await camera.createSipSession({
             skipFfmpegCheck: true,
-        })
+        });
+        this.session = sip;
+        sip.onCallEnded.subscribe(() => {
+            sip.stop();
+            if (this.session === sip)
+                this.session = undefined;
+        });
         this.rtpDescription = await sip.start();
         const videoPort = await sip.reservePort(1);
         const audioPort = await sip.reservePort(1);
@@ -76,6 +87,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         if (!this.session)
             throw new Error("not in call");
 
+
+        await this.session.activateCameraSpeaker();
+
         const ringRtpOptions = this.rtpDescription;
         const ringAudioLocation = {
             port: ringRtpOptions.audio.port,
@@ -104,8 +118,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
         this.session.onCallEnded.subscribe(() => cp.kill('SIGKILL'));
     }
-    stopIntercom(): Promise<void> {
-        throw new Error('Method not implemented.');
+
+    async stopIntercom(): Promise<void> {
+        this.session?.stop();
+        this.session = undefined;
     }
 
     triggerBinaryState() {
