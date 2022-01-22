@@ -66,7 +66,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         const password = this.storage.getItem("password");
         if (username) {
             // if a username is set, ensure a trailing colon is sent for blank password.
-            const auth = `${encodeURIComponent(username)}:${encodeURIComponent(password || '')}`;
+            const auth = `${username}:${password || ''}`;
             parsedUrl.auth = auth;
         }
 

@@ -209,9 +209,9 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.client = undefined;
         this.maxExtraStreams = undefined;
 
+        super.putSetting(key, value);
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
-        super.putSetting(key, value);
 
         if (isDoorbell)
             provider.updateDevice(this.nativeId, this.name, [...provider.getInterfaces(), ScryptedInterface.BinarySensor, ScryptedInterface.Intercom], ScryptedDeviceType.Doorbell);
