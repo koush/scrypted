@@ -26,34 +26,36 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             this.storage.setItem('doorbellType', AMCREST_DOORBELL_TYPE);
             this.storage.removeItem('amcrestDoorbell');
         }
-        
+
         this.updateDeviceInfo();
     }
-    
+
     async updateDeviceInfo(): Promise<void> {
-        var deviceInfo = {};
-        
+        if (this.info)
+            return;
+        const deviceInfo = {};
+
         const deviceParameters = [
-            {"action":"getVendor","replace":"vendor=","parameter":"manufacturer"},
-            {"action":"getSerialNo","replace":"sn=","parameter":"serialNumber"},
-            {"action":"getDeviceType","replace":"type=","parameter":"model"},
-            {"action":"getSoftwareVersion","replace":"version=","parameter":"firmware"}
+            { action: "getVendor", replace: "vendor=", parameter: "manufacturer" },
+            { action: "getSerialNo", replace: "sn=", parameter: "serialNumber" },
+            { action: "getDeviceType", replace: "type=", parameter: "model" },
+            { action: "getSoftwareVersion", replace: "version=", parameter: "firmware" }
         ];
-        
+
         for (const element of deviceParameters) {
             try {
                 const response = await this.getClient().digestAuth.request({
-                    url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=${element['action']}`
+                    url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=${element.action}`
                 });
 
-                const result = String(response.data).replace(element['replace'], "");
-                deviceInfo[element['parameter']] = result;
+                const result = String(response.data).replace(element.replace, "").trim();
+                deviceInfo[element.parameter] = result;
             }
             catch (e) {
-                this.console.error('Error getting device parameter', element['action'], e);
+                this.console.error('Error getting device parameter', element.action, e);
             }
         }
-        
+
         this.info = deviceInfo;
     }
 
