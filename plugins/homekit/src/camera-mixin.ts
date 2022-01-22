@@ -1,4 +1,4 @@
-import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue, MediaStreamOptions } from "@scrypted/sdk";
+import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue, MediaStreamOptions, ScryptedInterfaceProperty } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmpeg-hardware-acceleration";
 
@@ -197,6 +197,16 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             }
             catch (e) {
             }
+        }
+
+        if (this.interfaces.includes(ScryptedInterface.OnOff)) {
+            settings.push({
+                title: 'Camera Status Indicator',
+                description: 'Allow HomeKit to control the camera status indicator light.',
+                key: 'statusIndicator',
+                value: this.storage.getItem('statusIndicator') === 'true',
+                type: 'boolean',
+            });
         }
 
         return settings;

@@ -602,14 +602,24 @@ addSupportedType({
             }
             else {
                 const indicator = controller.cameraOperatingModeService.getCharacteristic(Characteristic.CameraOperatingModeIndicator);
-                bindCharacteristic(device, ScryptedInterface.OnOff, controller.cameraOperatingModeService, Characteristic.CameraOperatingModeIndicator, () => device.on ? 1 : 0);
+                const linkStatusIndicator = storage.getItem('statusIndicator') === 'true';
+                const property = `characteristic-v2-${Characteristic.CameraOperatingModeIndicator.UUID}`
+                bindCharacteristic(device, ScryptedInterface.OnOff, controller.cameraOperatingModeService, Characteristic.CameraOperatingModeIndicator, () => {
+                    if (!linkStatusIndicator)
+                        return storage.getItem(property) === 'true' ? 1 : 0;
+                    
+                    return device.on ? 1 : 0;
+                });
                 indicator.on(CharacteristicEventTypes.SET, (value, callback) => {
                     callback();
+                    if (!linkStatusIndicator)
+                        return storage.setItem(property, (!!value).toString());
+
                     if (value)
                         device.turnOn();
                     else
                         device.turnOff();
-                })
+                });
             }
 
             recordingManagement.getService().getCharacteristic(Characteristic.SelectedCameraRecordingConfiguration)
