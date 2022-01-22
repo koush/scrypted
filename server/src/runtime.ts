@@ -337,10 +337,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedPath));
     }
 
-    killPlugin(plugin: Plugin) {
-        const existing = this.plugins[plugin._id];
+    killPlugin(pluginId: string) {
+        const existing = this.plugins[pluginId];
         if (existing) {
-            delete this.plugins[plugin._id];
+            delete this.plugins[pluginId];
             existing.kill();
         }
     }
@@ -478,15 +478,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return this.runPlugin(plugin, pluginDebug);
     }
 
-    runPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
-        this.killPlugin(plugin);
-
-        const pluginDevices = this.findPluginDevices(plugin._id);
-        for (const pluginDevice of pluginDevices) {
-            this.invalidatePluginDevice(pluginDevice._id);
-        }
-
-        const pluginHost = new PluginHost(this, plugin, pluginDebug);
+    setupPluginHostAutoRestart(pluginHost: PluginHost) {
         pluginHost.worker.once('exit', () => {
             if (pluginHost.killed)
                 return;
@@ -512,8 +504,21 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                     console.error('error restarting plugin', plugin._id, e);
                 }
             }, 60000);
-        })
-        this.plugins[plugin._id] = pluginHost;
+        });
+    }
+
+    runPlugin(plugin: Plugin, pluginDebug?: PluginDebug) {
+        const pluginId = plugin._id;
+        this.killPlugin(pluginId);
+
+        const pluginDevices = this.findPluginDevices(pluginId);
+        for (const pluginDevice of pluginDevices) {
+            this.invalidatePluginDevice(pluginDevice._id);
+        }
+
+        const pluginHost = new PluginHost(this, plugin, pluginDebug);
+        this.setupPluginHostAutoRestart(pluginHost);
+        this.plugins[pluginId] = pluginHost;
 
         return pluginHost;
     }
@@ -575,7 +580,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         await this.datastore.remove(device);
         if (providerId == null || providerId === device._id) {
             const plugin = await this.datastore.tryGet(Plugin, device.pluginId);
-            this.killPlugin(plugin);
+            this.killPlugin(plugin._id);
             await this.datastore.remove(plugin);
             rimraf.sync(getPluginVolume(plugin._id));
         }
