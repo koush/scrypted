@@ -281,9 +281,9 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 }
             }
             catch (e) {
-                this.console.error('audio finished');
             }
             finally {
+                this.console.error('audio finished');
                 passthrough.end();
             }
 
