@@ -367,7 +367,10 @@ class UnifiCamera extends ScryptedDeviceBase implements Notifier, Intercom, Came
 
         const camera = this.findCamera();
         const channel = camera.channels.find(channel => channel.id === options.id);
-        channel.bitrate = bitrate;
+
+        const sanitizedBitrate = Math.min(channel.maxBitrate, Math.max(channel.minBitrate, bitrate));
+        this.console.log('bitrate change requested', bitrate, 'clamped to', sanitizedBitrate);
+        channel.bitrate = sanitizedBitrate;
         const cameraResult = await this.protect.api.updateChannels(camera);
         if (!cameraResult) {
             throw new Error("setVideoStreamOptions failed")
