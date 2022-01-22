@@ -149,7 +149,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async getOtherSettings(): Promise<Setting[]> {
-        return [
+        const ret: Setting[] = [
             {
                 title: 'Doorbell Type',
                 choices: [
@@ -162,6 +162,21 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 key: 'doorbellType',
             },
         ];
+
+        const doorbellType = this.storage.getItem('doorbellType');
+        const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
+        if (!isDoorbell) {
+            ret.push(
+                {
+                    title: 'Two Way Audio',
+                    value: this.storage.getItem('twoWayAudio') === 'true',
+                    key: 'twoWayAudio',
+                    type: 'boolean',
+                },
+            )
+        }
+
+        return ret;
     }
 
     async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
@@ -214,11 +229,18 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         super.putSetting(key, value);
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
+        const twoWayAudio = this.storage.getItem('twoWayAudio') === 'true';
 
-        if (isDoorbell)
-            provider.updateDevice(this.nativeId, this.name, [...provider.getInterfaces(), ScryptedInterface.BinarySensor, ScryptedInterface.Intercom], ScryptedDeviceType.Doorbell);
-        else
-            provider.updateDevice(this.nativeId, this.name, provider.getInterfaces());
+        const interfaces = provider.getInterfaces();
+        let type: ScryptedDeviceType = undefined;
+        if (isDoorbell) {
+            type = ScryptedDeviceType.Doorbell;
+            interfaces.push(ScryptedInterface.BinarySensor)
+        }
+        if (isDoorbell || twoWayAudio) {
+            interfaces.push(ScryptedInterface.Intercom);
+        }
+        provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
