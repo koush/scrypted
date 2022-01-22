@@ -14,7 +14,7 @@ import time
 import os
 import binascii
 from urllib.parse import urlparse
-import multiprocessing
+import threading
 from pipeline import run_pipeline
 
 from gi.repository import Gst
@@ -37,7 +37,7 @@ class PipelineValve:
     allowPacketCounter: int
     def __init__(self, gst, name) -> None:
         self.allowPacketCounter = 1
-        self.mutex = multiprocessing.Lock()
+        self.mutex = threading.Lock()
         valve = gst.get_by_name(name + "Valve")
         self.pad = valve.get_static_pad("src")
         self.name = name
@@ -91,7 +91,7 @@ class DetectionSession:
         self.future = Future()
         self.running = False
         self.attached = False
-        self.mutex = multiprocessing.Lock()
+        self.mutex = threading.Lock()
         self.valve: PipelineValve = None
         self.last_sample = time.time()
 
@@ -120,7 +120,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
         self.detection_sessions: Mapping[str, DetectionSession] = {}
-        self.session_mutex = multiprocessing.Lock()
+        self.session_mutex = threading.Lock()
 
     def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, event_buffer: bytes = None):
         detection_result['detectionId'] = detection_session.id
@@ -211,7 +211,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection_session.future.add_done_callback(
                     lambda _: self.end_session(detection_session))
 
-        if detection_session and time.time() - detection_session.last_sample > 30:
+        if detection_session and time.time() - detection_session.last_sample > 30 and not mediaObject:
             print('detection session has not received a sample in 30 seconds, terminating', detection_session.id)
             ending = True
 

@@ -5,16 +5,19 @@ import { listenZero } from "./listen-cluster";
 import { ffmpegLogInitialOutput } from "./media-helpers";
 
 let wrtc: any;
-try {
-    wrtc = require('wrtc');
-}
-catch (e) {
-    console.warn('loading wrtc failed. trying @koush/wrtc fallback.');
-    wrtc = require('@koush/wrtc');
-}
+function initalizeWebRtc() {
+    if (wrtc)
+        return;
+    try {
+        wrtc = require('wrtc');
+    }
+    catch (e) {
+        console.warn('loading wrtc failed. trying @koush/wrtc fallback.');
+        wrtc = require('@koush/wrtc');
+    }
 
-Object.assign(global, wrtc);
-const { RTCVideoSource, RTCAudioSource } = wrtc.nonstandard;
+    Object.assign(global, wrtc);
+}
 
 interface RTCSession {
     pc: RTCPeerConnection;
@@ -90,6 +93,7 @@ export function addBuiltins(console: Console, mediaManager: MediaManager) {
                 ],
             };
 
+            initalizeWebRtc();
             const pc = new RTCPeerConnection(configuration);
             const id = Math.random().toString();
             const session: RTCSession = {
@@ -105,6 +109,8 @@ export function addBuiltins(console: Console, mediaManager: MediaManager) {
                     session.resolve?.(null);
                 }
             }
+
+            const { RTCVideoSource, RTCAudioSource } = wrtc.nonstandard;
 
             const videoSource = new RTCVideoSource();
             pc.addTrack(videoSource.createTrack());

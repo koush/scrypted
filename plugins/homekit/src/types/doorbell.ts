@@ -1,8 +1,7 @@
 
 import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { ContactSensor, StatelessProgrammableSwitch } from 'hap-nodejs/src/lib/definitions';
+import { Characteristic, CharacteristicEventTypes, CharacteristicGetCallback, Service, ContactSensor, StatelessProgrammableSwitch } from '../hap';
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession, supportedTypes } from '../common'
-import { Characteristic, CharacteristicEventTypes, CharacteristicGetCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 
 addSupportedType({

@@ -61,7 +61,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         // Note the trailing colon.
         // issue: https://github.com/koush/scrypted/issues/134
         const parsedUrl = url.parse(vso.url);
-        this.console.log('rtsp stream url', parsedUrl.toString());
+        this.console.log('rtsp stream url', vso.url);
         const username = this.storage.getItem("username");
         const password = this.storage.getItem("password");
         if (username) {

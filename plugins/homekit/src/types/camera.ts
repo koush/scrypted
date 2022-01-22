@@ -11,16 +11,13 @@ import { once } from 'events';
 import debounce from 'lodash/debounce';
 
 import { CameraRecordingDelegate } from '../hap';
-import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions } from 'hap-nodejs/src/lib/camera/RecordingManagement';
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
-import { ContactSensor, OccupancySensor } from 'hap-nodejs/src/lib/definitions';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSnapshotHandler } from './camera/camera-snapshot';
 import { evalRequest } from './camera/camera-transcode';
-import { CharacteristicEventTypes, DataStreamConnection, Service, WithUUID } from 'hap-nodejs/src';
-import { RecordingManagement } from 'hap-nodejs/src/lib/camera';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID } from '../hap';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 import os from 'os';
 
@@ -204,7 +201,7 @@ addSupportedType({
                         video: {
                         },
                     }, selectedStream || {});
-                    const bitrate = request.video.max_bit_rate * 1000;
+                    const bitrate = 10000000;//request.video.max_bit_rate * 1000;
                     reconfigured.video.bitrate = bitrate;
 
                     device.setVideoStreamOptions(reconfigured);

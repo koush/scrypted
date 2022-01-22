@@ -1,15 +1,13 @@
 
 import { FFMpegInput, MotionSensor, ScryptedDevice, ScryptedMimeTypes, VideoCamera, AudioSensor, MediaStreamOptions } from '@scrypted/sdk'
-import { H264Level, H264Profile } from '../../hap';
 import net from 'net';
 
 import sdk from '@scrypted/sdk';
 
-import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from 'hap-nodejs/src/lib/camera/RecordingManagement';
+import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { FFMpegFragmentedMP4Session, startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { evalRequest } from './camera-transcode';
 import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
-import { levelToFfmpeg, profileToFfmpeg } from './camera-utils';
 
 const { log, mediaManager, deviceManager } = sdk;
 

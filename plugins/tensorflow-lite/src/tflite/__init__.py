@@ -1,7 +1,6 @@
 from __future__ import annotations
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
-from .third_party.sort import Sort
-import multiprocessing
+import threading
 import io
 from .common import *
 from PIL import Image
@@ -12,17 +11,15 @@ from pycoral.utils.edgetpu import list_edge_tpus
 from pycoral.utils.edgetpu import make_interpreter
 import tflite_runtime.interpreter as tflite
 import re
-import numpy as np
 import scrypted_sdk
 from typing import Any, List
 
 from detect import DetectionSession, DetectPlugin
 
 
-class TrackerDetectionSession(DetectionSession):
+class TensorFlowLiteSession(DetectionSession):
     def __init__(self) -> None:
         super().__init__()
-        self.tracker = Sort()
 
 
 def parse_label_contents(contents: str):
@@ -57,7 +54,7 @@ class TensorFlowLitePlugin(DetectPlugin):
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
             self.interpreter = tflite.Interpreter(model_content=model)
         self.interpreter.allocate_tensors()
-        self.mutex = multiprocessing.Lock()
+        self.mutex = threading.Lock()
 
     async def getDetectionModel(self) -> ObjectDetectionModel:
         _, height, width, channels = self.interpreter.get_input_details()[
@@ -79,58 +76,19 @@ class TensorFlowLitePlugin(DetectPlugin):
         d['settings'] = [setting]
         return d
 
-    def create_detection_result(self, objs, size, tracker: Sort = None, convert_to_src_size=None):
+    def create_detection_result(self, objs, size, convert_to_src_size=None):
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = size
 
-        tracker_detections = []
-
         for obj in objs:
-            element = []
-            element.append(obj.bbox.xmin)
-            element.append(obj.bbox.ymin)
-            element.append(obj.bbox.xmax)
-            element.append(obj.bbox.ymax)
-            element.append(obj.score)
-            tracker_detections.append(element)
-
-        tracker_detections = np.array(tracker_detections)
-        trdata = []
-        trackerFlag = False
-        if tracker and tracker_detections.any():
-            trdata = tracker.update(tracker_detections)
-            trackerFlag = True
-
-        if trackerFlag and (np.array(trdata)).size:
-            for td in trdata:
-                x0, y0, x1, y1, trackID = td[0].item(), td[1].item(
-                ), td[2].item(), td[3].item(), td[4].item()
-                overlap = 0
-                for ob in objs:
-                    dx0, dy0, dx1, dy1 = ob.bbox.xmin, ob.bbox.ymin, ob.bbox.xmax, ob.bbox.ymax
-                    area = (min(dx1, x1)-max(dx0, x0)) * \
-                        (min(dy1, y1)-max(dy0, y0))
-                    if (area > overlap):
-                        overlap = area
-                        obj = ob
-
-                detection: ObjectDetectionResult = {}
-                detection['id'] = str(trackID)
-                detection['boundingBox'] = (
-                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
-                detection['className'] = self.labels.get(obj.id, obj.id)
-                detection['score'] = obj.score
-                detections.append(detection)
-        else:
-            for obj in objs:
-                detection: ObjectDetectionResult = {}
-                detection['boundingBox'] = (
-                    obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
-                detection['className'] = self.labels.get(obj.id, obj.id)
-                detection['score'] = obj.score
-                detections.append(detection)
+            detection: ObjectDetectionResult = {}
+            detection['boundingBox'] = (
+                obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
+            detection['className'] = self.labels.get(obj.id, obj.id)
+            detection['score'] = obj.score
+            detections.append(detection)
 
         if convert_to_src_size:
             detections = detection_result['detections']
@@ -155,16 +113,12 @@ class TensorFlowLitePlugin(DetectPlugin):
                 'score_threshold', score_threshold))
         return score_threshold
 
-    def run_detection_jpeg(self, detection_session: TrackerDetectionSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
+    def run_detection_jpeg(self, detection_session: TensorFlowLiteSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
         stream = io.BytesIO(image_bytes)
         image = Image.open(stream)
 
         _, scale = common.set_resized_input(
             self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
-
-        tracker = None
-        if detection_session:
-            tracker = detection_session.tracker
 
         score_threshold = self.parse_settings(settings)
         with self.mutex:
@@ -172,12 +126,12 @@ class TensorFlowLitePlugin(DetectPlugin):
             objs = detect.get_objects(
                 self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
-        return self.create_detection_result(objs, image.size, tracker=tracker)
+        return self.create_detection_result(objs, image.size)
 
     def get_detection_input_size(self, src_size):
         return input_size(self.interpreter)
 
-    def run_detection_gstsample(self, detection_session: TrackerDetectionSession, gstsample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         score_threshold = self.parse_settings(settings)
 
         gst_buffer = gstsample.get_buffer()
@@ -186,7 +140,7 @@ class TensorFlowLitePlugin(DetectPlugin):
             objs = detect.get_objects(
                 self.interpreter, score_threshold=score_threshold)
 
-        return self.create_detection_result(objs, src_size, detection_session.tracker, convert_to_src_size)
+        return self.create_detection_result(objs, src_size, convert_to_src_size)
 
     def create_detection_session(self):
-        return TrackerDetectionSession()
+        return TensorFlowLiteSession()

@@ -1,8 +1,6 @@
 
 import { EventDetails, EventListener, EventListenerRegister, Refresh, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { CharacteristicEventTypes, WithUUID } from 'hap-nodejs';
-import { Characteristic } from 'hap-nodejs/src';
-import { Accessory, Service, SnapshotRequest } from './hap';
+import { Accessory, Service, SnapshotRequest, Characteristic, CharacteristicEventTypes, WithUUID } from './hap';
 
 export interface DummyDevice {
     interfaces?: string[];
