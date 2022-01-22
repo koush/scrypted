@@ -87,16 +87,18 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         if (!this.session)
             throw new Error("not in call");
 
-
-        await this.session.activateCameraSpeaker();
-
         const ringRtpOptions = this.rtpDescription;
         const ringAudioLocation = {
             port: ringRtpOptions.audio.port,
             address: ringRtpOptions.address,
         };
+        let cameraSpeakerActive = false
         const audioOutForwarder = new RtpSplitter(({ message }) => {
-            // Splitter is needed so that transcoded audio can be sent out through the same port as audio in
+            if (!cameraSpeakerActive) {
+                cameraSpeakerActive = true
+                this.session.activateCameraSpeaker().catch(e => this.console.error('camera speaker activation error', e))
+            }
+
             this.session.audioSplitter.send(message, ringAudioLocation).catch(e => this.console.error('audio splitter error', e))
             return null
         });
@@ -116,7 +118,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         );
 
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
-        this.session.onCallEnded.subscribe(() => cp.kill('SIGKILL'));
+        cp.on('exit', () => this.console.log('two way audio ended'));
+        this.session.onCallEnded.subscribe(() => {
+            audioOutForwarder.close();
+            cp.kill('SIGKILL');
+        });
     }
 
     async stopIntercom(): Promise<void> {
