@@ -73,10 +73,10 @@ Want to write your own plugin? Full documentation is available here: https://dev
 
 1. Install Scrypted.
 2. Open https://localhost:10443/ (substitute localhost appropriately for a remote server).
-3. Install the Unifi, HikVision, ONVIF, or Amcrest camera plugin.
+3. Install the appropriate plugin for your camera. Using the manufacturer plugin, when available, is recommended. Many manufacturers also whitelabel their products under different brands. For example, Dahua and Amcrest are the same manufacturer, and you can use the Amcrest plugin for both cameras. If your camera does not have a dedicated plugin, check if it is ONVIF compatible (a standard camera protocol), and try that. If no dedicated plugin is available, use the RTSP or FFmpeg plugin.
    * HKSV requires cameras with motion alerts, and these plugins provide motion alerts.
-   * If there's no plugin for your camera, but it supports motion alerts using mail, use the generic RTSP, SMTP plugin, and Dummy Switch plugin. This will create a mail activated motion sensor.
-   * If there's no plugin or mail support for your camera, you can install the generic RTSP Plugin, Video Analysis Plugin and a motion detection plugin. This will use the processing power on your server to detect camera motion. The following motion detection plugins are available:
+   * If there's no plugin for your camera, but it supports motion alerts using mail, use the generic RTSP, SMTP plugin, and Dummy Switch plugin to create a motion sensor. Link this mail motion sensor to the camera's HomeKit settings within Scrypted.
+   * If there's no plugin *or* mail support for your camera, you can install the generic RTSP Plugin, Video Analysis Plugin and a motion detection plugin. This will use the processing power on your server to detect camera motion. The following motion detection plugins are available:
      * OpenCV (Higher memory and CPU usage, better results)
      * PAM Diff
 4. Install the HomeKit Plugin.
