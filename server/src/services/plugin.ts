@@ -62,8 +62,15 @@ export class PluginComponent {
         return this.scrypted.plugins[pluginId]?.kill();
     }
     async getPackageJson(pluginId: string) {
-        const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
-        return plugin.packageJson;
+        let packageJson;
+        if (this.scrypted.plugins[pluginId]) {
+            packageJson = this.scrypted.plugins[pluginId].packageJson;
+        }
+        else {
+            const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
+            packageJson = plugin.packageJson;
+        }
+        return packageJson;
     }
     async getDeviceInfo(id: string) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
@@ -75,14 +82,7 @@ export class PluginComponent {
         }
     }
     async getPluginInfo(pluginId: string) {
-        let packageJson;
-        if (this.scrypted.plugins[pluginId]) {
-            packageJson = this.scrypted.plugins[pluginId].packageJson;
-        }
-        else {
-            const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
-            packageJson = plugin.packageJson;
-        }
+        const packageJson = this.getPackageJson(pluginId);
         const host = this.scrypted.plugins[pluginId];
         let rpcObjects = 0;
         if (host.peer) {
