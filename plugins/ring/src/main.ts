@@ -31,11 +31,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
             this.session = undefined;
         }
 
-        // the ring-api-client can negotiate the sip connection and output the stream
-        // to a ffmpeg output target.
-        // provide a tcp socket to write, and then proxy that back as an ffmpeg input
-        // to the caller.
-
         // this is from sip
         const { clientPromise, url } = await listenZeroSingleClient();
         const camera = this.findCamera();
