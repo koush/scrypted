@@ -281,13 +281,13 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 }
             }
             catch (e) {
-                this.console.error('audio finished with error', e);
+                this.console.error('audio finished');
             }
             finally {
                 passthrough.end();
             }
 
-            this.cp.kill();
+            this.stopIntercom();
         });
         const port = await listenZero(server)
 
