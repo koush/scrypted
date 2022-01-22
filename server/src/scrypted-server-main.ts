@@ -171,11 +171,16 @@ async function start() {
                 return next();
             }
 
-            const user = await db.tryGet(ScryptedUser, username);
-            if (!user) {
-                console.warn('login not found');
-                return next();
-            }
+            // this database lookup on every web request is not necessary, the cookie
+            // itself is the auth, and is signed. furthermore, this is currently
+            // a single user setup anywyas. revisit this at some point when
+            // multiple users are implemented.
+
+            // const user = await db.tryGet(ScryptedUser, username);
+            // if (!user) {
+            //     console.warn('login not found');
+            //     return next();
+            // }
 
             res.locals.username = username;
         }
@@ -351,9 +356,9 @@ async function start() {
         res.send({});
     });
 
-    app.post('/login', async (req, res) => {
-        const hasLogin = await db.getCount(ScryptedUser) > 0;
+    let hasLogin = await db.getCount(ScryptedUser) > 0;
 
+    app.post('/login', async (req, res) => {
         const { username, password, change_password } = req.body;
         const timestamp = Date.now();
         const maxAge = 86400000;
@@ -410,6 +415,7 @@ async function start() {
         user.passwordHash = crypto.createHash('sha256').update(user.salt + password).digest().toString('hex');
         user.passwordDate = timestamp;
         await db.upsert(user);
+        hasLogin = true;
 
         const login_user_token = `${username}#${timestamp}`
         res.cookie('login_user_token', login_user_token, {
@@ -424,6 +430,7 @@ async function start() {
             expiration: maxAge,
         });
     });
+
 
     app.get('/login', async (req, res) => {
         if (req.protocol === 'https' && req.headers.authorization) {
@@ -448,7 +455,6 @@ async function start() {
             return;
         }
 
-        const hasLogin = await db.getCount(ScryptedUser) > 0;
         const { login_user_token } = req.signedCookies;
         if (!login_user_token) {
             res.send({
@@ -469,22 +475,27 @@ async function start() {
             return;
         }
 
-        const user = await db.tryGet(ScryptedUser, username);
-        if (!user) {
-            res.send({
-                error: 'User not found.',
-                hasLogin,
-            })
-            return;
-        }
+        // this database lookup on every web request is not necessary, the cookie
+        // itself is the auth, and is signed. furthermore, this is currently
+        // a single user setup anywyas. revisit this at some point when
+        // multiple users are implemented.
 
-        if (timestamp < user.passwordDate) {
-            res.send({
-                error: 'Login invalid. Password has changed.',
-                hasLogin,
-            })
-            return;
-        }
+        // const user = await db.tryGet(ScryptedUser, username);
+        // if (!user) {
+        //     res.send({
+        //         error: 'User not found.',
+        //         hasLogin,
+        //     })
+        //     return;
+        // }
+
+        // if (timestamp < user.passwordDate) {
+        //     res.send({
+        //         error: 'Login invalid. Password has changed.',
+        //         hasLogin,
+        //     })
+        //     return;
+        // }
 
         res.send({
             expiration: 86400000 - (Date.now() - timestamp),
