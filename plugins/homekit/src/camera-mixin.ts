@@ -176,20 +176,20 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                     }
 
                     settings.push({
-                        title: 'Object Detection Contact Sensors',
+                        title: 'Object Detection Sensors',
                         type: 'string',
                         choices: types.classes,
                         multiple: true,
                         key: 'objectDetectionContactSensors',
-                        description: 'Create HomeKit contact sensors that detect specific people or objects.',
+                        description: 'Create HomeKit occupancy sensors that detect specific people or objects.',
                         value,
                     });
 
                     settings.push({
-                        title: 'Object Detection Contact Sensor Timeout',
+                        title: 'Object Detection Timeout',
                         type: 'number',
                         key: 'objectDetectionContactSensorTimeout',
-                        description: 'Duration in seconds to keep the contact sensor open.',
+                        description: 'Duration in seconds the sensor will report as occupied, before resetting.',
                         value: this.storage.getItem('objectDetectionContactSensorTimeout') || defaultObjectDetectionContactSensorTimeout,
                     });
                 }

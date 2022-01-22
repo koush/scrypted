@@ -1,6 +1,6 @@
 
 import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { ContactSensor } from 'hap-nodejs/src/lib/definitions';
+import { ContactSensor, StatelessProgrammableSwitch } from 'hap-nodejs/src/lib/definitions';
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession, supportedTypes } from '../common'
 import { Characteristic, CharacteristicEventTypes, CharacteristicGetCallback, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -20,17 +20,23 @@ addSupportedType({
         const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitSession) : makeAccessory(device);
 
         const service = accessory.addService(Service.Doorbell);
-        const contact = new ContactSensor(`${device.name} Button`, 'Button');
-        accessory.addService(contact);
-        bindCharacteristic(device, ScryptedInterface.BinarySensor, contact, Characteristic.ContactSensorState,
-            () => device.binaryState ? Characteristic.ContactSensorState.CONTACT_NOT_DETECTED : Characteristic.ContactSensorState.CONTACT_DETECTED);
+
+        const stateless = new StatelessProgrammableSwitch(device.name, undefined);
+        stateless.getCharacteristic(Characteristic.ProgrammableSwitchEvent)
+            .setProps({
+                maxValue: Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS,
+            });
+
+        accessory.addService(stateless);
 
         device.listen({
             event: ScryptedInterface.BinarySensor,
             watch: false,
         }, () => {
-            if (device.binaryState)
+            if (device.binaryState) {
                 service.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
+                stateless.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
+            }
         });
 
         service

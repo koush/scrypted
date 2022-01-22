@@ -15,7 +15,7 @@ import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate,
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
-import { ContactSensor } from 'hap-nodejs/src/lib/definitions';
+import { ContactSensor, OccupancySensor } from 'hap-nodejs/src/lib/definitions';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createSnapshotHandler } from './camera/camera-snapshot';
 import { evalRequest } from './camera/camera-transcode';
@@ -637,21 +637,21 @@ addSupportedType({
             }
 
             for (const ojs of new Set(objectDetectionContactSensors)) {
-                const sensor = new ContactSensor(`${device.name}: ` + ojs, ojs);
+                const sensor = new OccupancySensor(`${device.name}: ` + ojs, ojs);
                 accessory.addService(sensor);
 
-                let contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
+                let contactState = Characteristic.OccupancyDetected.OCCUPANCY_NOT_DETECTED;
                 let timeout: NodeJS.Timeout;
 
                 const resetSensorTimeout = () => {
                     clearTimeout(timeout);
                     timeout = setTimeout(() => {
-                        contactState = Characteristic.ContactSensorState.CONTACT_DETECTED;
-                        sensor.updateCharacteristic(Characteristic.ContactSensorState, contactState);
+                        contactState = Characteristic.OccupancyDetected.OCCUPANCY_NOT_DETECTED;
+                        sensor.updateCharacteristic(Characteristic.OccupancyDetected, contactState);
                     }, (parseInt(storage.getItem('objectDetectionContactSensorTimeout')) || defaultObjectDetectionContactSensorTimeout) * 1000)
                 }
 
-                bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.ContactSensorState, (source, details, data) => {
+                bindCharacteristic(device, ScryptedInterface.ObjectDetector, sensor, Characteristic.OccupancyDetected, (source, details, data) => {
                     if (!source)
                         return contactState;
 
@@ -661,7 +661,7 @@ addSupportedType({
 
                     const objects = ed.detections.map(d => d.className);
                     if (objects.includes(ojs)) {
-                        contactState = Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+                        contactState = Characteristic.OccupancyDetected.OCCUPANCY_DETECTED;
                         resetSensorTimeout();
                     }
 
