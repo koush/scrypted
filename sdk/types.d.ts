@@ -1278,6 +1278,7 @@ export declare enum ScryptedMimeTypes {
     PushEndpoint = "text/x-push-endpoint",
     MediaStreamUrl = "text/x-media-url",
     FFmpegInput = "x-scrypted/x-ffmpeg-input",
+    RTCAVServerPrefix = "x-scrypted/x-scrypted-rtc-server-",
     RTCAVOffer = "x-scrypted/x-rtc-av-offer",
     RTCAVAnswer = "x-scrypted/x-rtc-av-answer"
 }

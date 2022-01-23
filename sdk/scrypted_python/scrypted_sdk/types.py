@@ -124,6 +124,7 @@ class ScryptedMimeTypes(Enum):
     PushEndpoint = "text/x-push-endpoint"
     RTCAVAnswer = "x-scrypted/x-rtc-av-answer"
     RTCAVOffer = "x-scrypted/x-rtc-av-offer"
+    RTCAVServerPrefix = "x-scrypted/x-scrypted-rtc-server-"
     Url = "text/x-uri"
 
 class TemperatureUnit(Enum):

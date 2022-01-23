@@ -1,10 +1,12 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty, BufferConverter, ScryptedMimeTypes } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
+import {} from '../../../common/src/wrtc-convertors';
+import { randomBytes } from 'crypto';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -45,11 +47,24 @@ function toNestMode(mode: ThermostatMode): string {
     }
 }
 
-class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor, BinarySensor {
+class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor, BinarySensor, BufferConverter {
     constructor(public provider: GoogleSmartDeviceAccess, public device: any) {
         super(device.name.split('/').pop());
         this.provider = provider;
         this.device = device;
+
+        // this plugin will return a media object mime that indicates it is an rtc signalling
+        // endpoint.
+
+        // create random mimes so signaling is directed to this camera.
+        if (!this.fromMimeType || !this.toMimeType) {
+            this.fromMimeType = ScryptedMimeTypes.RTCAVServerPrefix + this.nativeId;
+            this.toMimeType = '*/*';
+        }
+    }
+
+    convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
+        throw new Error('Method not implemented.');
     }
 
     createFFmpegMediaObject(result: any) {
@@ -73,10 +88,9 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
-                '-analyzeduration', '15000000',
-                '-probesize', '100000000',
-                "-reorder_queue_size",
-                "1024",
+                "-analyzeduration", "0",
+                "-probesize", "1000000",
+                "-reorder_queue_size", "1024",
                 "-max_delay",
                 "20000000",
                 "-i",
@@ -86,6 +100,8 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
     }
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        const isWebRtc = this.device?.traits?.['sdm.devices.traits.CameraLiveStream']?.supportedProtocols?.includes('WEB_RTC');
+
         if (options?.metadata?.streamExtensionToken) {
             const { streamExtensionToken } = options?.metadata;
             const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -98,12 +114,20 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
             return this.createFFmpegMediaObject(result);
         }
 
-        const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
-            command: "sdm.devices.commands.CameraLiveStream.GenerateRtspStream",
-            params: {}
-        });
-
-        return this.createFFmpegMediaObject(result);
+        if (isWebRtc) {
+            const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
+                command: "sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream",
+                params: {}
+            });
+            this.console.log(result);
+        }
+        else {
+            const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
+                command: "sdm.devices.commands.CameraLiveStream.GenerateRtspStream",
+                params: {}
+            });
+            return this.createFFmpegMediaObject(result);
+        }
     }
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         return;
@@ -159,6 +183,10 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
         this.device = device;
 
         this.reload();
+    }
+
+    async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {
+        // not supported by API. throw?
     }
 
     reload() {

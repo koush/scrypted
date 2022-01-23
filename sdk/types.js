@@ -669,6 +669,7 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["PushEndpoint"] = "text/x-push-endpoint";
     ScryptedMimeTypes["MediaStreamUrl"] = "text/x-media-url";
     ScryptedMimeTypes["FFmpegInput"] = "x-scrypted/x-ffmpeg-input";
+    ScryptedMimeTypes["RTCAVServerPrefix"] = "x-scrypted/x-scrypted-rtc-server-";
     ScryptedMimeTypes["RTCAVOffer"] = "x-scrypted/x-rtc-av-offer";
     ScryptedMimeTypes["RTCAVAnswer"] = "x-scrypted/x-rtc-av-answer";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));
