@@ -4,15 +4,22 @@ import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from 
 import { StorageSettings } from '../../../common/src/settings';
 import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
 import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
-import child_process from 'child_process';
+import child_process, { ChildProcess } from 'child_process';
 
 const { log, deviceManager, mediaManager } = sdk;
 
 class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
     session: SipSession;
     rtpDescription: RtpDescription;
+    audioOutForwarder: RtpSplitter;
+    audioOutProcess: ChildProcess;
+    ffmpegInput: FFMpegInput;
+    refreshTimeout: NodeJS.Timeout;
+
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
+        this.motionDetected = false;
+        this.binaryState = false;
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
@@ -25,19 +32,40 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         return;
     }
 
-    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+    resetStreamTimeout() {
+        this.console.log('starting/refreshing stream');
+        clearTimeout(this.refreshTimeout);
+        this.refreshTimeout = setTimeout(() => this.stopSession(), 60000);
+    }
+
+    stopSession() {
         if (this.session) {
+            this.console.log('ending stream');
             this.session.stop();
             this.session = undefined;
         }
+    }
 
-        // this is from sip
+    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        if (options?.refreshAt) {
+            if (!this.ffmpegInput?.mediaStreamOptions)
+                throw new Error("no stream to refresh");
+
+            const ffmpegInput = this.ffmpegInput;
+            ffmpegInput.mediaStreamOptions.refreshAt = Date.now() + 60000;
+            this.resetStreamTimeout();
+            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
+        }
+
+        this.stopSession();
+
         const { clientPromise, url } = await listenZeroSingleClient();
         const camera = this.findCamera();
 
         const sip = await camera.createSipSession({
             skipFfmpegCheck: true,
         });
+
         this.session = sip;
         sip.onCallEnded.subscribe(() => {
             sip.stop();
@@ -59,8 +87,13 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
 
         const ffmpegInput: FFMpegInput = {
             url: undefined,
+            mediaStreamOptions: {
+                refreshAt: Date.now() + 120000,
+            },
             inputArguments: ff.ffmpegInputArguments.filter(line => !!line).map(line => line.toString()),
         };
+        this.ffmpegInput = ffmpegInput;
+        this.resetStreamTimeout();
 
         return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
     }
@@ -79,26 +112,31 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
+        return;
         if (!this.session)
             throw new Error("not in call");
+
+        this.stopIntercom();
+
+        const ffmpegInput: FFMpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
         const ringRtpOptions = this.rtpDescription;
         const ringAudioLocation = {
             port: ringRtpOptions.audio.port,
             address: ringRtpOptions.address,
         };
-        let cameraSpeakerActive = false
+        let cameraSpeakerActive = false;
         const audioOutForwarder = new RtpSplitter(({ message }) => {
             if (!cameraSpeakerActive) {
-                cameraSpeakerActive = true
+                cameraSpeakerActive = true;
                 this.session.activateCameraSpeaker().catch(e => this.console.error('camera speaker activation error', e))
             }
 
             this.session.audioSplitter.send(message, ringAudioLocation).catch(e => this.console.error('audio splitter error', e))
-            return null
+            return null;
         });
+        this.audioOutForwarder = audioOutForwarder;
 
-        const ffmpegInput: FFMpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
         const args = ffmpegInput.inputArguments.slice();
         args.push(
             '-vn', '-dn', '-sn',
@@ -113,6 +151,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         );
 
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+        this.audioOutProcess = cp;
         cp.on('exit', () => this.console.log('two way audio ended'));
         this.session.onCallEnded.subscribe(() => {
             audioOutForwarder.close();
@@ -121,8 +160,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
     }
 
     async stopIntercom(): Promise<void> {
-        this.session?.stop();
-        this.session = undefined;
+        this.audioOutForwarder?.close();
+        this.audioOutProcess?.kill('SIGKILL');
+        this.audioOutProcess = undefined;
+        this.audioOutForwarder = undefined;
     }
 
     triggerBinaryState() {
@@ -137,8 +178,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
     findCamera() {
         return this.plugin.cameras.find(camera => camera.id.toString() === this.nativeId);
     }
-
-
 }
 
 class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
