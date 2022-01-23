@@ -1,4 +1,4 @@
-import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
@@ -8,7 +8,19 @@ import child_process, { ChildProcess } from 'child_process';
 
 const { log, deviceManager, mediaManager } = sdk;
 
-class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
+class RingCameraLight extends ScryptedDeviceBase implements OnOff {
+    constructor(public camera: RingCameraDevice) {
+        super(camera.id + '-light');
+    }
+    async turnOff(): Promise<void> {
+        await this.camera.findCamera().setLight(false);
+    }
+    async turnOn(): Promise<void> {
+        await this.camera.findCamera().setLight(true);
+    }
+}
+
+class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
     session: SipSession;
     rtpDescription: RtpDescription;
     audioOutForwarder: RtpSplitter;
@@ -20,6 +32,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
         super(nativeId);
         this.motionDetected = false;
         this.binaryState = false;
+    }
+
+    getDevice(nativeId: string) {
+        return new RingCameraLight(this);
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
@@ -112,7 +128,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, V
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
-        return;
         if (!this.session)
             throw new Error("not in call");
 
@@ -319,6 +334,9 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                     ScryptedInterface.BinarySensor,
                 );
             }
+            if (camera.hasLight) {
+                interfaces.push(ScryptedInterface.DeviceProvider);
+            }
             const device: Device = {
                 info: {
                     model: `${camera.model} (${camera.data.kind})`,
@@ -350,6 +368,29 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         await deviceManager.onDevicesChanged({
             devices,
         });
+
+        for (const camera of cameras) {
+            if (!camera.hasLight)
+                continue;
+            const nativeId = camera.id.toString();
+            const device: Device = {
+                providerNativeId: nativeId,
+                info: {
+                    model: `${camera.model} (${camera.data.kind})`,
+                    manufacturer: 'Ring',
+                    firmware: camera.data.firmware_version,
+                    serialNumber: camera.data.device_id
+                },
+                nativeId: nativeId + '-light',
+                name: camera.name + ' Light',
+                type: ScryptedDeviceType.Light,
+                interfaces: [ScryptedInterface.OnOff],
+            };
+            deviceManager.onDevicesChanged({
+                providerNativeId: nativeId,
+                devices: [device],
+            });
+        }
 
         for (const camera of cameras) {
             this.getDevice(camera.id.toString());
