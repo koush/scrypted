@@ -272,16 +272,16 @@ class PrebufferSession {
         const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
         mso = ffmpegInput.mediaStreamOptions
 
-        scheduleRefresh();
+        scheduleRefresh(ffmpegInput);
       };
 
-      const scheduleRefresh = () => {
+      const scheduleRefresh = (ffmpegInput: FFMpegInput) => {
         const when = ffmpegInput.mediaStreamOptions.refreshAt - Date.now() - 30000;
         this.console.log('refreshing media stream in', when);
         refreshTimeout = setTimeout(refreshStream, when);
       }
 
-      scheduleRefresh();
+      scheduleRefresh(ffmpegInput);
       session.events.on('killed', () => clearTimeout(refreshTimeout));
     }
 
