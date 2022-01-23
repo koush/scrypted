@@ -22,13 +22,7 @@ Supported accessories:
 
 # Installation
 
-## Run on Docker
-
-[Docker Installation Instructions](https://github.com/koush/scrypted/wiki/Docker)
-
-## Run Locally
-
-[Local Installation Instructions](https://github.com/koush/scrypted/wiki/Local-Installation)
+There are both [Docker and Local Installation options](https://github.com/koush/scrypted/wiki), as well as guides for connecting to HomeKit and Google Home.
 
 ## Development
 
