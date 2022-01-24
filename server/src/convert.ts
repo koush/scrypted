@@ -57,28 +57,33 @@ export async function convert(converters: BufferConverter[], mediaObject: MediaO
     nodes['mediaObject'] = mediaNode;
     nodes['output'] = {};
     for (const converter of converters) {
-        const inputMime = new MimeType(converter.fromMimeType);
-        const convertedMime = new MimeType(converter.toMimeType);
-        const targetId = converterIds.get(converter);
-        const node: any = nodes[targetId] = {};
-        for (const candidate of converters) {
-            try {
-                const candidateMime = new MimeType(candidate.fromMimeType);
-                if (!mimeMatches(convertedMime, candidateMime))
-                    continue;
-                const candidateId = converterIds.get(candidate);
-                node[candidateId] = 1;
+        try {
+            const inputMime = new MimeType(converter.fromMimeType);
+            const convertedMime = new MimeType(converter.toMimeType);
+            const targetId = converterIds.get(converter);
+            const node: any = nodes[targetId] = {};
+            for (const candidate of converters) {
+                try {
+                    const candidateMime = new MimeType(candidate.fromMimeType);
+                    if (!mimeMatches(convertedMime, candidateMime))
+                        continue;
+                    const candidateId = converterIds.get(candidate);
+                    node[candidateId] = 1;
+                }
+                catch (e) {
+                    console.warn('skipping converter due to error', e)
+                }
             }
-            catch (e) {
-                console.warn('skipping converter due to error', e)
-            }
-        }
 
-        if (mimeMatches(mediaMime, inputMime)) {
-            mediaNode[targetId] = 1;
+            if (mimeMatches(mediaMime, inputMime)) {
+                mediaNode[targetId] = 1;
+            }
+            if (mimeMatches(convertedMime, outputMime)) {
+                node['output'] = 1;
+            }
         }
-        if (mimeMatches(convertedMime, outputMime)) {
-            node['output'] = 1;
+        catch (e) {
+            console.warn('skipping converter due to error', e)
         }
     }
 
