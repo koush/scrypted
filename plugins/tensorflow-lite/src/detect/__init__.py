@@ -211,7 +211,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection_session.future.add_done_callback(
                     lambda _: self.end_session(detection_session))
 
-        if detection_session and time.time() - detection_session.last_sample > 30 and not mediaObject:
+        if not ending and detection_session and time.time() - detection_session.last_sample > 30 and not mediaObject:
             print('detection session has not received a sample in 30 seconds, terminating', detection_session.id)
             ending = True
 
