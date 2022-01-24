@@ -226,6 +226,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
         stream = await this.cameraDevice.getVideoStream(selectedStream);
       }
+      else {
+        stream = mediaManager.createMediaObject(Buffer.alloc(0), 'x-scrypted/x-internal-media-object');
+      }
 
       const session = await this.objectDetection?.detectObjects(stream, {
         detectionId: this.detectionId,
