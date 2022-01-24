@@ -4,7 +4,9 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   let selectedStream: MediaStreamOptions;
   try {
     const streams = await device.getVideoStreamOptions();
-    selectedStream = streams.find(stream => stream.container === 'rawvideo');
+    selectedStream = streams.find(stream => stream.container.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix));
+    if (!selectedStream)
+      selectedStream = streams.find(stream => stream.container === 'rawvideo');
   }
   catch (e) {
   }
@@ -15,13 +17,16 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   let json: RTCAVMessage;
   if (videoStream.mimeType.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) {
     trickle = false;
-    pc = new RTCPeerConnection();
+    pc = createPeerConnection({})
     pc.createDataChannel("dataSendChannel");
-
-    const offer = await pc.createOffer({
-      offerToReceiveAudio: !0,
-      offerToReceiveVideo: !0,
+    pc.addTransceiver("audio", {
+      direction: 'recvonly'
     });
+    pc.addTransceiver("video", {
+      direction: 'recvonly',
+    });
+
+    const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
   }
   else {
@@ -64,7 +69,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
           });
           await pc.setLocalDescription(offer);
 
-          const candidateObject: RTCAVMessage = {
+          const offerWithCandidates: RTCAVMessage = {
             id: undefined,
             candidates: [],
             description: {
@@ -74,7 +79,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
             configuration: {},
           };
           const mo = await mediaManager.createMediaObject(
-            Buffer.from(JSON.stringify(candidateObject)),
+            Buffer.from(JSON.stringify(offerWithCandidates)),
             ScryptedMimeTypes.RTCAVOffer
           );
           const result = await mediaManager.convertMediaObjectToBuffer(
