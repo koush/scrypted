@@ -32,6 +32,8 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
         super(nativeId);
         this.motionDetected = false;
         this.binaryState = false;
+        if (this.interfaces.includes(ScryptedInterface.Battery))
+            this.batteryLevel = this.findCamera()?.batteryLevel;
     }
 
     getDevice(nativeId: string) {
@@ -273,8 +275,10 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             return;
         }
 
-        if (!this.settingsStorage.values.email || !this.settingsStorage.values.password)
-            return;
+        if (!this.settingsStorage.values.email || !this.settingsStorage.values.password) {
+            this.log.a('Enter your Ring usernmae and password to complete setup.');
+            throw new Error('refresh token, username, and password are missing.');
+        }
 
         if (!code) {
             this.client = new RingRestClient({
@@ -292,7 +296,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 }
                 this.console.error(e);
                 this.log.a('Login failed.');
-                return;
+                throw e;
             }
         }
         else {
@@ -303,7 +307,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             catch (e) {
                 this.console.error(e);
                 this.log.a('Login failed.');
-                return;
+                throw e;
             }
         }
         await createRingApi();
@@ -329,14 +333,12 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.Intercom
             ];
-            if (camera.isDoorbot) {
-                interfaces.push(
-                    ScryptedInterface.BinarySensor,
-                );
-            }
-            if (camera.hasLight) {
+            if (camera.hasBattery)
+                interfaces.push(ScryptedInterface.Battery);
+            if (camera.isDoorbot)
+                interfaces.push(ScryptedInterface.BinarySensor);
+            if (camera.hasLight)
                 interfaces.push(ScryptedInterface.DeviceProvider);
-            }
             const device: Device = {
                 info: {
                     model: `${camera.model} (${camera.data.kind})`,
@@ -352,16 +354,21 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             devices.push(device);
 
             camera.onDoorbellPressed?.subscribe(() => {
-                const camera = this.devices.get(nativeId);
-                camera?.triggerBinaryState();
+                const scryptedDevice = this.devices.get(nativeId);
+                scryptedDevice?.triggerBinaryState();
             });
             camera.onMotionDetected?.subscribe(() => {
-                const camera = this.devices.get(nativeId);
-                camera?.triggerMotion();
+                const scryptedDevice = this.devices.get(nativeId);
+                scryptedDevice?.triggerMotion();
             });
             camera.onMotionStarted?.subscribe(() => {
-                const camera = this.devices.get(nativeId);
-                camera?.triggerMotion();
+                const scryptedDevice = this.devices.get(nativeId);
+                scryptedDevice?.triggerMotion();
+            });
+            camera.onBatteryLevel?.subscribe(() => {
+                const scryptedDevice = this.devices.get(nativeId);
+                if (scryptedDevice)
+                    scryptedDevice.batteryLevel = camera.batteryLevel;
             });
         }
 
