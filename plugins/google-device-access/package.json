@@ -22,6 +22,7 @@
       "name": "Google Device Access",
       "type": "DeviceProvider",
       "interfaces": [
+         "BufferConverter",
          "OauthClient",
          "DeviceProvider",
          "HttpRequestHandler",
@@ -34,7 +35,8 @@
       "client-oauth2": "^4.3.3",
       "lodash": "^4.17.21",
       "query-string": "^7.0.0",
-      "url-parse": "^1.5.1"
+      "url-parse": "^1.5.1",
+      "werift": "^0.14.5"
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",
