@@ -16,9 +16,6 @@
 [submodule "external/axios-digest-auth"]
 	path = external/axios-digest-auth
 	url = ../../koush/axios-digest-auth
-[submodule "external/sort"]
-	path = external/sort
-	url = ../../koush/sort.git
 [submodule "external/scrypted-ffmpeg"]
 	path = external/scrypted-ffmpeg
 	url = ../../koush/scrypted-ffmpeg
