@@ -5,7 +5,7 @@ import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -13,6 +13,20 @@ const refreshFrequency = 60;
 
 const SdmSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/';
 const SdmDeviceSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/x-';
+
+function getRtspMediaStreamOptions(): MediaStreamOptions {
+    return {
+        id: 'default',
+        name: 'Cloud RTSP',
+        container: 'rtsp',
+        video: {
+            codec: 'h264',
+        },
+        audio: {
+            codec: 'aac',
+        },
+    };
+}
 
 function fromNestMode(mode: string): ThermostatMode {
     switch (mode) {
@@ -74,11 +88,11 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         const [audioPart] = offerParts.splice(audioPartIndex, 1);
         offerParts.splice(1, 0, audioPart);
         offer.description.sdp = offerParts.join('m=');
-        const answer = await this.sendOffer(offer);
+        const {answer} = await this.sendOffer(offer);
         return Buffer.from(JSON.stringify(answer));
     }
 
-    async sendOffer(offer: RTCAVMessage): Promise<RTCAVMessage> {
+    async sendOffer(offer: RTCAVMessage): Promise<{result: any, answer: RTCAVMessage}> {
         const offerSdp = offer.description.sdp.replace('a=ice-options:trickle\r\n', '');
 
         const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -97,27 +111,31 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
             candidates: [],
             configuration: undefined,
         }
-        return answer;
+        return {result, answer};
+    }
+
+    addRefreshOptions(result: any, mso: MediaStreamOptions): MediaStreamOptions {
+        const { expiresAt, streamToken, streamExtensionToken, mediaSessionId } = result.data.results;
+        const expirationDate = new Date(expiresAt);
+        const refreshAt = expirationDate.getTime();
+        return Object.assign(mso, {
+            refreshAt,
+            metadata: {
+                expiresAt,
+                streamToken,
+                streamExtensionToken,
+                mediaSessionId,
+            },
+        });
     }
 
     createFFmpegMediaObject(result: any) {
         const u = result.data.results.streamUrls.rtspUrl;
         this.console.log('rtsp url', u);
-        const { expiresAt, streamToken, streamExtensionToken } = result.data.results;
-        this.console.log(result.data);
-        const expirationDate = new Date(expiresAt);
-        const refreshAt = expirationDate.getTime();
 
         return mediaManager.createFFmpegMediaObject({
             url: u,
-            mediaStreamOptions: {
-                refreshAt,
-                metadata: {
-                    expiresAt,
-                    streamToken,
-                    streamExtensionToken,
-                },
-            },
+            mediaStreamOptions: this.addRefreshOptions(result, getRtspMediaStreamOptions()),
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -138,11 +156,13 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         if (options?.metadata?.streamExtensionToken) {
-            const { streamExtensionToken } = options?.metadata;
+            const { streamExtensionToken, mediaSessionId } = options?.metadata;
+            const streamFormat = this.isWebRtc ? 'WebRtc' : 'Rtsp';
             const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
-                command: "sdm.devices.commands.CameraLiveStream.ExtendRtspStream",
+                command: `sdm.devices.commands.CameraLiveStream.Extend${streamFormat}Stream`,
                 params: {
                     streamExtensionToken,
+                    mediaSessionId,
                 }
             });
 
@@ -163,32 +183,19 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         if (!this.isWebRtc) {
             return [
-                {
-                    id: 'default',
-                    container: 'rtsp',
-                    video: {
-                        codec: 'h264',
-                    },
-                    audio: {
-                        codec: 'aac',
-                    },
-                },
+                getRtspMediaStreamOptions(),
             ]
         }
 
+        const wmso = getRTCMediaStreamOptions();
+        wmso.id = 'default';
+        wmso.name = 'MPEG-TS';
+
         return [
-            {
-                id: 'default',
-                container: 'sdp',
-                video: {
-                    codec: 'h264',
-                },
-                audio: {
-                    codec: 'opus',
-                },
-            },
+            wmso,
             {
                 id: 'webrtc',
+                name: 'WebRTC',
                 container: this.signalingMime,
                 video: {
                 },
@@ -446,7 +453,13 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 break;
             }
         }
-        const result = await createRTCPeerConnectionSource(device.console, mediaManager, offer => device.sendOffer(offer));
+        let streamResult;
+        const result = await createRTCPeerConnectionSource(device.console, mediaManager, async (offer) => {
+            const {result, answer} = await device.sendOffer(offer);
+            streamResult = result;
+            return answer;
+        });
+        device.addRefreshOptions(streamResult, result.ffmpegInput.mediaStreamOptions);
         return Buffer.from(JSON.stringify(result.ffmpegInput));
     }
 
