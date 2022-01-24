@@ -1,6 +1,6 @@
 import { ScryptedDevice, ScryptedMimeTypes, RTCAVMessage, MediaManager, VideoCamera, MediaStreamOptions, MediaObject } from '@scrypted/sdk/types';
 
-export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera, getVideo: () => HTMLVideoElement, createPeerConnection: (configuration: any) => RTCPeerConnection) {
+export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera, getVideo: () => HTMLVideoElement, createPeerConnection: (configuration: RTCConfiguration) => RTCPeerConnection) {
   let selectedStream: MediaStreamOptions;
   try {
     const streams = await device.getVideoStreamOptions();
@@ -9,12 +9,29 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   catch (e) {
   }
   const videoStream = await device.getVideoStream(selectedStream);
-  const offer = await mediaManager.convertMediaObjectToBuffer(
-    videoStream,
-    ScryptedMimeTypes.RTCAVOffer
-  );
-  const json = JSON.parse(offer.toString());
-  const pc = createPeerConnection(json.configuration);
+
+  let trickle = true;
+  let pc: RTCPeerConnection;
+  let json: RTCAVMessage;
+  if (videoStream.mimeType.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) {
+    trickle = false;
+    pc = new RTCPeerConnection();
+    pc.createDataChannel("dataSendChannel");
+
+    const offer = await pc.createOffer({
+      offerToReceiveAudio: !0,
+      offerToReceiveVideo: !0,
+    });
+    await pc.setLocalDescription(offer);
+  }
+  else {
+    const offer = await mediaManager.convertMediaObjectToBuffer(
+      videoStream,
+      ScryptedMimeTypes.RTCAVOffer
+    );
+    json = JSON.parse(offer.toString());
+    pc = createPeerConnection(json.configuration);
+  }
   try {
 
     pc.onconnectionstatechange = () => console.log(pc.connectionState);
@@ -39,8 +56,40 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
     };
 
     pc.onicecandidate = async (evt) => {
-      if (!evt.candidate)
+      if (!evt.candidate) {
+        if (!trickle) {
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+          });
+          await pc.setLocalDescription(offer);
+
+          const candidateObject: RTCAVMessage = {
+            id: undefined,
+            candidates: [],
+            description: {
+              sdp: offer.sdp,
+              type: 'offer',
+            },
+            configuration: {},
+          };
+          const mo = await mediaManager.createMediaObject(
+            Buffer.from(JSON.stringify(candidateObject)),
+            ScryptedMimeTypes.RTCAVOffer
+          );
+          const result = await mediaManager.convertMediaObjectToBuffer(
+            mo,
+            videoStream.mimeType
+          );
+          const answer: RTCAVMessage = JSON.parse(result.toString())
+          console.log(answer);
+          await pc.setRemoteDescription(answer.description);
+        }
         return;
+      }
+      if (!trickle) {
+        return;
+      }
       // console.log('local candidate', evt.candidate);
       const candidateObject: RTCAVMessage = {
         id: json.id,
@@ -58,6 +107,9 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
       );
       processCandidates(result);
     };
+
+    if (!trickle)
+      return pc;
 
     await pc.setRemoteDescription(json.description);
     const answer = await pc.createAnswer();
