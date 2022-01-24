@@ -170,7 +170,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         pass
 
-    def ensure_session(self, mediaObject: MediaObject, session: ObjectDetectionSession) -> Tuple[bool, DetectionSession, ObjectsDetected]:
+    def ensure_session(self, mediaObjectMimeType: str, session: ObjectDetectionSession) -> Tuple[bool, DetectionSession, ObjectsDetected]:
         settings = None
         duration = None
         detection_id = None
@@ -181,7 +181,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             duration = session.get('duration', None)
             settings = session.get('settings', None)
 
-        is_image = mediaObject and mediaObject.mimeType.startswith('image/')
+        is_image = mediaObjectMimeType and mediaObjectMimeType.startswith('image/')
 
         ending = False
         new_session = False
@@ -196,7 +196,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             if duration == None and not is_image:
                 ending = True
             elif detection_id and not detection_session:
-                if not mediaObject:
+                if not mediaObjectMimeType:
                     return (False, None, self.create_detection_result_status(detection_id, False))
 
                 new_session = True
@@ -211,7 +211,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 detection_session.future.add_done_callback(
                     lambda _: self.end_session(detection_session))
 
-        if not ending and detection_session and time.time() - detection_session.last_sample > 30 and not mediaObject:
+        if not ending and detection_session and time.time() - detection_session.last_sample > 30 and not mediaObjectMimeType:
             print('detection session has not received a sample in 30 seconds, terminating', detection_session.id)
             ending = True
 
@@ -250,7 +250,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             duration = session.get('duration', None)
             settings = session.get('settings', None)
 
-        create, detection_session, objects_detected = self.ensure_session(mediaObject, session)
+        create, detection_session, objects_detected = self.ensure_session(mediaObject and mediaObject.mimeType, session)
 
         if is_image:
             return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
@@ -330,9 +330,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         return user_callback
 
     def attach_pipeline(self, gstPipeline: GstPipelineBase, session: ObjectDetectionSession, valveName: str = None):
-        class DummyMediaObject:
-            mimeType = 'video/*'
-        create, detection_session, objects_detected = self.ensure_session(DummyMediaObject(), session)
+        create, detection_session, objects_detected = self.ensure_session('video/dummy', session)
 
         if detection_session and valveName:
             valve = setupPipelineValve(valveName, gstPipeline.gst)
