@@ -124,7 +124,7 @@ class PrebufferSession {
       {
         title: 'Audio Codec Transcoding',
         group,
-        description: 'Configuring your camera to output AAC, MP3, or MP2 is recommended. PCM/G711 cameras should set this to Reencode.',
+        description: 'Configuring your camera to output AAC, MP3, MP2, or Opus is recommended. PCM/G711 cameras should set this to Reencode.',
         type: 'string',
         key: this.AUDIO_CONFIGURATION,
         value: this.storage.getItem(this.AUDIO_CONFIGURATION) || DEFAULT_AUDIO,
@@ -150,7 +150,7 @@ class PrebufferSession {
         title: 'Detected Video/Audio Codecs',
         readonly: true,
         value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
-        description: 'Configuring your camera to H264 video and AAC/MP3/MP2 audio is recommended.'
+        description: 'Configuring your camera to H264 video and AAC/MP3/MP2/Opus audio is recommended.'
       },
       {
         key: 'detectedKeyframe',
@@ -185,7 +185,7 @@ class PrebufferSession {
     const probeAudioCodec = probe?.options?.[0]?.audio?.codec;
     this.incompatibleDetected = this.incompatibleDetected || (probeAudioCodec && !compatibleAudio.includes(probeAudioCodec));
     if (this.incompatibleDetected)
-      this.console.warn('configure your camera to output aac, mp3, or mp2 audio. incompatible audio codec detected', probeAudioCodec);
+      this.console.warn('configure your camera to output aac, mp3, mp2, or opus audio. incompatible audio codec detected', probeAudioCodec);
 
     const mo = await this.mixinDevice.getVideoStream(mso);
     const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
@@ -321,7 +321,7 @@ class PrebufferSession {
       if (!legacyAudio) {
         log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable MP2/MP3 Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
         this.legacyDetected = true;
-        // this will probably crash ffmpeg due to mp2/mp3 not supporting the aac bit stream filters,
+        // this will probably crash ffmpeg due to mp2/mp3/opus not supporting the aac bit stream filters,
         // and then it will automatically restart with legacy handling.
       }
     }
