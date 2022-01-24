@@ -23,7 +23,7 @@ const OTHER_AUDIO = 'Other Audio';
 const OTHER_AUDIO_DESCRIPTION = `${OTHER_AUDIO} (Transcode)`;
 const PCM_AUDIO = 'PCM or G.711 Audio';
 const PCM_AUDIO_DESCRIPTION = `${PCM_AUDIO} (Copy, Unstable)`;
-const compatibleAudio = ['aac', 'mp3', 'mp2', 'AAC', 'MP3', 'MP2', '', undefined, null];
+const compatibleAudio = ['aac', 'mp3', 'mp2', 'AAC', 'MP3', 'MP2', 'opus', 'OPUS', '', undefined, null];
 
 interface PrebufferStreamChunk {
   chunk: StreamChunk;
