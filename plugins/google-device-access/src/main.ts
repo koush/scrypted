@@ -6,7 +6,6 @@ import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
 import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
-import { randomBytes } from 'crypto';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
 
