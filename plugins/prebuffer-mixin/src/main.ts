@@ -531,14 +531,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
     await this.ensurePrebufferSessions();
 
-    let id = options?.id;
-    if (!id && !this.sessions.has(id)) {
-      const stream = await this.mixinDevice.getVideoStream(options);
-      const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(stream, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
-      id = ffmpegInput?.mediaStreamOptions?.id;
-      // this MAY be null.
-      this.sessions.set(options?.id, this.sessions.get(id));
-    }
+    const id = options?.id;
     let session = this.sessions.get(id);
     if (!session)
       return this.mixinDevice.getVideoStream(options);
@@ -567,6 +560,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         const name = mso?.name;
         session = new PrebufferSession(this, name, id);
         this.sessions.set(id, session);
+        if (id === msos?.[0]?.id)
+          this.sessions.set(undefined, session);
 
         (async () => {
           while (this.sessions.get(id) === session && !this.released) {

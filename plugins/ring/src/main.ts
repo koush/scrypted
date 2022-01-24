@@ -7,6 +7,7 @@ import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
 import child_process, { ChildProcess } from 'child_process';
 
 const { log, deviceManager, mediaManager } = sdk;
+const STREAM_TIMEOUT = 120000;
 
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
@@ -53,7 +54,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
     resetStreamTimeout() {
         this.console.log('starting/refreshing stream');
         clearTimeout(this.refreshTimeout);
-        this.refreshTimeout = setTimeout(() => this.stopSession(), 60000);
+        this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT);
     }
 
     stopSession() {
@@ -70,7 +71,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
                 throw new Error("no stream to refresh");
 
             const ffmpegInput = this.ffmpegInput;
-            ffmpegInput.mediaStreamOptions.refreshAt = Date.now() + 60000;
+            ffmpegInput.mediaStreamOptions.refreshAt = Date.now() + STREAM_TIMEOUT;
             this.resetStreamTimeout();
             return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
         }
@@ -106,7 +107,15 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
         const ffmpegInput: FFMpegInput = {
             url: undefined,
             mediaStreamOptions: {
-                refreshAt: Date.now() + 120000,
+                id: 'default',
+                video: {
+                    codec: 'h264',
+                },
+                audio: {
+                    // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
+                    codec: 'pcm',
+                },
+                refreshAt: Date.now() + STREAM_TIMEOUT,
             },
             inputArguments: ff.ffmpegInputArguments.filter(line => !!line).map(line => line.toString()),
         };
