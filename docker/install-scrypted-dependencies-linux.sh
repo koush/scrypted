@@ -22,6 +22,7 @@ RUN() {
 FROM() {
     echo 'Installing nodejs repo'
     RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+    RUN apt-get update
     RUN apt-get install -y nodejs
 }
 
