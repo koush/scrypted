@@ -5,7 +5,7 @@ import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { createRTCPeerConnectionSink } from '../../../common/src/wrtc-convertors';
+import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
 import { randomBytes } from 'crypto';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
@@ -165,6 +165,7 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         if (!this.isWebRtc) {
             return [
                 {
+                    id: 'default',
                     container: 'rtsp',
                     video: {
                         codec: 'h264',
@@ -178,12 +179,21 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
 
         return [
             {
-                container: this.signalingMime,
+                id: 'default',
+                container: 'sdp',
                 video: {
                     codec: 'h264',
                 },
                 audio: {
-                    codec: 'pcm',
+                    codec: 'opus',
+                },
+            },
+            {
+                id: 'webrtc',
+                container: this.signalingMime,
+                video: {
+                },
+                audio: {
                 },
             }
         ]
@@ -437,7 +447,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 break;
             }
         }
-        const result = await createRTCPeerConnectionSink(device.console, mediaManager, offer => device.sendOffer(offer));
+        const result = await createRTCPeerConnectionSource(device.console, mediaManager, offer => device.sendOffer(offer));
         return Buffer.from(JSON.stringify(result.ffmpegInput));
     }
 

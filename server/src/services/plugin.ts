@@ -82,7 +82,7 @@ export class PluginComponent {
         }
     }
     async getPluginInfo(pluginId: string) {
-        const packageJson = this.getPackageJson(pluginId);
+        const packageJson = await this.getPackageJson(pluginId);
         const host = this.scrypted.plugins[pluginId];
         let rpcObjects = 0;
         if (host.peer) {
