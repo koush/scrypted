@@ -6,8 +6,10 @@ services:
         container_name: scrypted
         restart: unless-stopped
         network_mode: host
-        environment:
-            - TZ=America/Seattle
         volumes:
             - ~/.scrypted/volume:/server/volume
-
+        logging:
+            driver: "json-file"
+            options:
+               max-size: "10m"
+               max-file: "10"
