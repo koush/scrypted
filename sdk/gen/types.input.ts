@@ -361,8 +361,8 @@ export interface MediaStreamOptions {
   /**
    * Prebuffer time in milliseconds.
    */
-  id?: string;
-  name?: string;
+  id: string;
+  name: string;
   prebuffer?: number;
   container?: string;
 
@@ -384,6 +384,14 @@ export interface MediaStreamOptions {
  * VideoCamera devices can capture video streams.
  */
 export interface VideoCamera {
+  /**
+   * Get a video stream.
+   * @param options The media stream to fetch. If the id is specified, the exact
+   * stream will be retrieved. Otherwise, the returned stream will be implementation
+   * dependent.
+   * If no options are provided at all, the implementation must return the
+   * first stream listed in getVideoStreamOptions.
+   */
   getVideoStream(options?: MediaStreamOptions): Promise<MediaObject>;
   /**
    * Get the available video streaming options.
@@ -1235,7 +1243,14 @@ export enum ScryptedMimeTypes {
   PushEndpoint = 'text/x-push-endpoint',
   MediaStreamUrl = 'text/x-media-url',
   FFmpegInput = 'x-scrypted/x-ffmpeg-input',
-  RTCAVServerPrefix = 'x-scrypted/x-scrypted-rtc-server-',
+  /**
+   * An RTC Signaling endpoint will handle x-scrypted-rtc-signaling-<unique-prefix>/x-<unique-suffix>.
+   * RTC clients can inspect the mime and try to convert it to an RTCAVOffer.
+   * If the client does not support WebRTC, it may try to convert it to an FFmpeg media object,
+   * which should also be trapped and handled by the endpoint using its internal signaling.
+   * The RTC device will handle the full unique mime, and the plugin can catch all the unique prefix.
+   */
+  RTCAVSignalingPrefix = 'x-scrypted-rtc-signaling-',
   RTCAVOffer = 'x-scrypted/x-rtc-av-offer',
   RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',
 }
