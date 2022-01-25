@@ -1,8 +1,5 @@
-import { RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes } from "@scrypted/sdk/types";
-import child_process from 'child_process';
-import net from 'net';
-import { listenZero, listenZeroSingleClient } from "./listen-cluster";
-import { ffmpegLogInitialOutput } from "./media-helpers";
+import { RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions} from "@scrypted/sdk/types";
+import { listenZeroSingleClient } from "./listen-cluster";
 import { RTCPeerConnection, RTCRtpCodecParameters } from "werift";
 import dgram from 'dgram';
 
@@ -28,7 +25,22 @@ a=sendrecv
 `;
 }
 
-export async function createRTCPeerConnectionSource(console: Console, mediaManager: MediaManager, sendOffer: (offer: RTCAVMessage) => Promise<RTCAVMessage>): Promise<{
+export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamOptions {
+    return {
+        // set by consumer
+        id,
+        name,
+        container: 'sdp',
+        video: {
+            codec: 'h264',
+        },
+        audio: {
+            codec: 'opus',
+        },
+    };
+}
+
+export async function createRTCPeerConnectionSource(id: string, name: string, console: Console, mediaManager: MediaManager, sendOffer: (offer: RTCAVMessage) => Promise<RTCAVMessage>): Promise<{
     ffmpegInput: FFMpegInput,
     peerConnection: RTCPeerConnection,
 }> {
@@ -68,10 +80,17 @@ export async function createRTCPeerConnectionSource(console: Console, mediaManag
         }
     });
 
+    let gotAudio = false;
+    let gotVideo = false;
+
     const audioTransceiver = pc.addTransceiver("audio", { direction: "recvonly" });
     audioTransceiver.onTrack.subscribe((track) => {
         audioTransceiver.sender.replaceTrack(track);
         track.onReceiveRtp.subscribe((rtp) => {
+            if (!gotAudio) {
+                gotAudio = true;
+                console.log('received first audio packet');
+            }
             udp!.send(rtp.serialize(), audioPort, "127.0.0.1");
         });
     });
@@ -80,6 +99,10 @@ export async function createRTCPeerConnectionSource(console: Console, mediaManag
     videoTransceiver.onTrack.subscribe((track) => {
         videoTransceiver.sender.replaceTrack(track);
         track.onReceiveRtp.subscribe((rtp) => {
+            if (!gotVideo) {
+                gotVideo = true;
+                console.log('received first video packet');
+            }
             udp!.send(rtp.serialize(), videoPort, "127.0.0.1");
         });
         track.onReceiveRtp.once(() => {
@@ -108,7 +131,9 @@ export async function createRTCPeerConnectionSource(console: Console, mediaManag
         peerConnection: pc,
         ffmpegInput: {
             url: undefined,
+            mediaStreamOptions: getRTCMediaStreamOptions(id, name),
             inputArguments: [
+                '-f', 'sdp',
                 '-i', sdpInput.url,
             ]
         },
