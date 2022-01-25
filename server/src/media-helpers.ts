@@ -44,9 +44,31 @@ export async function probeVideoCamera(device: VideoCamera) {
     catch (e) {
     }
 
+    // todo: uses the first stream to determine audio availability. buggy! fix this!
     const noAudio = options && options.length && options[0].audio === null;
     return {
         options,
         noAudio,
     };
+}
+
+export function safePrintFFmpegArguments(console: Console, args: string[]) {
+    const ret = [];
+    for (const arg of args) {
+        try {
+            const url = new URL(arg);
+            if (url.password) {
+                url.password = 'REDACTED';
+                ret.push(url.toString());
+            }
+            else {
+                ret.push(arg);
+            }
+        }
+        catch (e) {
+            ret.push(arg);
+        }
+    }
+
+    console.log(ret.join(' '));
 }
