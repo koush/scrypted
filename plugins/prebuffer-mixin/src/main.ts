@@ -685,6 +685,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     if (!enabledStreams) {
       ret.push({
+        id: 'default',
+        name: 'Default',
         prebuffer,
       });
     }
