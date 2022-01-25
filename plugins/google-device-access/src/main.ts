@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty, BufferConverter, ScryptedMimeTypes, RTCAVMessage, ScryptedDevice, RTCAVSource, Camera, PictureOptions, ObjectDetectionResult, ObjectsDetected, ObjectDetector, ObjectDetectionTypes } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSource, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -6,8 +6,8 @@ import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
+import { sleep } from '../../../common/src/sleep';
 import fs from 'fs';
-import { timeStamp } from 'console';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -213,7 +213,15 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
                 }
             });
 
-            return this.createFFmpegMediaObject(result);
+            const mso = this.isWebRtc ? getRTCMediaStreamOptions('webrtc', 'WebRTC') : getRtspMediaStreamOptions();
+            this.addRefreshOptions(result, mso);
+
+            const ffmpegInput: FFMpegInput = {
+                url: undefined,
+                mediaStreamOptions: mso,
+                inputArguments: undefined,
+            }
+            return mediaManager.createFFmpegMediaObject(ffmpegInput);
         }
 
         if (this.isWebRtc) {
@@ -234,10 +242,7 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
             ]
         }
 
-        const wmso = getRTCMediaStreamOptions('default', 'MPEG-TS');
-
         return [
-            // wmso,
             {
                 id: 'webrtc',
                 name: 'WebRTC',
@@ -684,12 +689,13 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         let data: any;
         while (true) {
             try {
+                // this call is throttled too, the sleep below is so the code doenst look weird
                 data = await this.refresh();
                 break;
             }
             catch (e) {
-                await new Promise(resolve => setTimeout(resolve, refreshFrequency * 1000));
                 this.console.error(e);
+                await sleep(1000);
             }
         }
 
@@ -728,7 +734,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     ScryptedInterface.VideoCamera,
                     ScryptedInterface.Camera,
                     ScryptedInterface.MotionSensor,
-                    ScryptedInterface.ObjectDetection,
+                    ScryptedInterface.ObjectDetector,
                 ];
 
                 let type = ScryptedDeviceType.Camera;
