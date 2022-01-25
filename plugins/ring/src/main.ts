@@ -57,8 +57,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     }
 
     async sendOffer(offer: RTCAVMessage) {
-        const sessionId = generateUuid();
         this.stopWebRtcSession();
+        const sessionId = generateUuid();
+        this.webrtcSession = sessionId;
         const answerSdp = await this.findCamera().startWebRtcSession(sessionId, offer.description.sdp);
 
         const answer: RTCAVMessage = {
@@ -74,9 +75,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     }
 
     async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
-        const sessionId = generateUuid();
-        const offer: RTCAVMessage = JSON.parse(data.toString());
         this.stopWebRtcSession();
+        const sessionId = generateUuid();
+        this.webrtcSession = sessionId;
+        const offer: RTCAVMessage = JSON.parse(data.toString());
         const answerSdp = await this.findCamera().startWebRtcSession(sessionId, offer.description.sdp);
 
         const answer: RTCAVMessage = {
