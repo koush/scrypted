@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty, BufferConverter, ScryptedMimeTypes, RTCAVMessage, ScryptedDevice, RTCAVSource, Camera, PictureOptions } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty, BufferConverter, ScryptedMimeTypes, RTCAVMessage, ScryptedDevice, RTCAVSource, Camera, PictureOptions, ObjectDetectionResult, ObjectsDetected, ObjectDetector, ObjectDetectionTypes } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -7,6 +7,7 @@ import axios from 'axios';
 import throttle from 'lodash/throttle';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
 import fs from 'fs';
+import { timeStamp } from 'console';
 
 const { deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -79,7 +80,7 @@ function toNestMode(mode: ThermostatMode): string {
     }
 }
 
-class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, BinarySensor, BufferConverter {
+class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, BinarySensor, BufferConverter, ObjectDetector {
     signalingMime: string;
 
     constructor(public provider: GoogleSmartDeviceAccess, public device: any) {
@@ -92,6 +93,18 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
         // create a mime unique to this this camera.
         this.fromMimeType = ScryptedMimeTypes.RTCAVOffer;
         this.toMimeType = this.signalingMime;
+    }
+
+    // not sure if this works? there is a camera snapshot generate image thing, but it
+    // does not exist on the new cameras.
+    getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject> {
+        throw new Error('Method not implemented.');
+    }
+
+    async getObjectTypes(): Promise<ObjectDetectionTypes> {
+        return {
+            classes: ['person'],
+        }
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
@@ -224,7 +237,7 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
         const wmso = getRTCMediaStreamOptions('default', 'MPEG-TS');
 
         return [
-            wmso,
+            // wmso,
             {
                 id: 'webrtc',
                 name: 'WebRTC',
@@ -520,12 +533,23 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             }
 
             if (events) {
-                if (events['sdm.devices.events.CameraMotion.Motion']) {
+                if (events['sdm.devices.events.CameraMotion.Motion']
+                    || events['sdm.devices.events.CameraPerson.Person']) {
                     const camera: NestCamera = this.devices.get(nativeId) as any;
                     if (camera) {
                         camera.motionDetected = true;
                         camera.storage.setItem('lastMotionEventId', events['sdm.devices.events.CameraMotion.Motion'].eventId);
                         setTimeout(() => camera.motionDetected = false, 30000);
+                        if (events['sdm.devices.events.CameraPerson.Person']) {
+                            this.onDeviceEvent(ScryptedInterface.ObjectDetection, {
+                                timestamp: Date.now(),
+                                detections: [
+                                    {
+                                        className: 'person',
+                                    },
+                                ],
+                            } as ObjectsDetected);
+                        }
                     }
                 }
 
@@ -704,6 +728,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     ScryptedInterface.VideoCamera,
                     ScryptedInterface.Camera,
                     ScryptedInterface.MotionSensor,
+                    ScryptedInterface.ObjectDetection,
                 ];
 
                 let type = ScryptedDeviceType.Camera;
