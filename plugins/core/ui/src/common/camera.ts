@@ -1,4 +1,4 @@
-import { ScryptedDevice, ScryptedMimeTypes, RTCAVMessage, MediaManager, VideoCamera, MediaStreamOptions, MediaObject } from '@scrypted/sdk/types';
+import { ScryptedDevice, ScryptedMimeTypes, RTCAVMessage, MediaManager, VideoCamera, MediaStreamOptions, MediaObject, RTCAVSource } from '@scrypted/sdk/types';
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera, getVideo: () => HTMLVideoElement, createPeerConnection: (configuration: RTCConfiguration) => RTCPeerConnection) {
   let selectedStream: MediaStreamOptions;
@@ -19,20 +19,22 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   if (videoStream.mimeType.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) {
     trickle = false;
 
-    const mic = await navigator.mediaDevices.getUserMedia({video: false, audio: true})
-    
+    const buffer = await mediaManager.convertMediaObjectToBuffer(
+      videoStream,
+      videoStream.mimeType,
+    );
+    const avsource: RTCAVSource = JSON.parse(buffer.toString());
 
     pc = createPeerConnection({})
-    for (const track of mic.getTracks()) {
-      pc.addTrack(track);
-    }
-    // pc.createDataChannel("dataSendChannel");
-    // const audioTrans = pc.addTransceiver("audio", {
-    //   direction: 'sendrecv',
-    // });
-    // pc.addTransceiver("video", {
-    //   direction: 'recvonly',
-    // });
+    // it's possible to do talkback to ring.
+    // const mic = await navigator.mediaDevices.getUserMedia({video: false, audio: true})
+    // for (const track of mic.getTracks()) {
+    //   pc.addTrack(track);
+    // }
+    if (avsource.datachannel)
+      pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
+    pc.addTransceiver("audio", avsource.audio);
+    pc.addTransceiver("video", avsource.video);
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);

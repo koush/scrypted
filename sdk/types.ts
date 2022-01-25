@@ -1860,6 +1860,15 @@ export enum ScryptedInterface {
 
 }
 
+export interface RTCAVSource {
+  audio: RTCRtpTransceiverInit;
+  video: RTCRtpTransceiverInit;
+  datachannel?: {
+    label: string;
+    dict?: RTCDataChannelInit;
+  }
+}
+
 export interface RTCAVMessage {
   id: string;
   description: RTCSessionDescriptionInit;
