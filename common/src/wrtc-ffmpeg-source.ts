@@ -83,9 +83,6 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
     let gotAudio = false;
     let gotVideo = false;
 
-    if (avsource.datachannel)
-      pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
-
     const audioTransceiver = pc.addTransceiver("audio", avsource.audio as any);
     audioTransceiver.onTrack.subscribe((track) => {
         audioTransceiver.sender.replaceTrack(track);
@@ -113,6 +110,9 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
         });
     });
 
+    if (avsource.datachannel)
+      pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
+
     let offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
@@ -125,6 +125,7 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
         },
         configuration: {},
     };
+
     const answer = await sendOffer(offerWithCandidates);
     await pc.setRemoteDescription(answer.description as any);
 
@@ -134,6 +135,8 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
             url: undefined,
             mediaStreamOptions: getRTCMediaStreamOptions(id, name),
             inputArguments: [
+                // '-analyzeduration', '50000000',
+                // '-probesize', '50000000',
                 '-f', 'sdp',
                 '-i', sdpInput.url,
             ]
