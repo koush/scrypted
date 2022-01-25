@@ -1,11 +1,13 @@
-import { ScryptedDevice, ScryptedMimeTypes, RTCAVMessage, MediaManager, VideoCamera, MediaStreamOptions, MediaObject, RTCAVSource } from '@scrypted/sdk/types';
+import { ScryptedDevice, ScryptedMimeTypes, RTCAVMessage, MediaManager, VideoCamera, MediaStreamOptions, MediaObject, RTCAVSource, RequestMediaStreamOptions } from '@scrypted/sdk/types';
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera, getVideo: () => HTMLVideoElement, createPeerConnection: (configuration: RTCConfiguration) => RTCPeerConnection) {
-  let selectedStream: MediaStreamOptions;
+  let selectedStream: RequestMediaStreamOptions;
   try {
     const streams = await device.getVideoStreamOptions();
     selectedStream = streams.find(stream => stream.container?.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix));
-    if (!selectedStream)
+    if (selectedStream)
+      selectedStream.directMediaStream = true;
+    else
       selectedStream = streams.find(stream => stream.container === 'rawvideo');
   }
   catch (e) {
