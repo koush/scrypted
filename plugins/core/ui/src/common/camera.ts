@@ -4,7 +4,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   let selectedStream: MediaStreamOptions;
   try {
     const streams = await device.getVideoStreamOptions();
-    selectedStream = streams.find(stream => stream.container.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix));
+    selectedStream = streams.find(stream => stream.container?.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix));
     if (!selectedStream)
       selectedStream = streams.find(stream => stream.container === 'rawvideo');
   }

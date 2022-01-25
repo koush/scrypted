@@ -6,3 +6,5 @@ fs
 src
 .vscode
 dist/*.js
+ui
+client
