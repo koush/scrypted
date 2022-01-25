@@ -15,16 +15,24 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   let trickle = true;
   let pc: RTCPeerConnection;
   let json: RTCAVMessage;
+  let sentSdp = false;
   if (videoStream.mimeType.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) {
     trickle = false;
+
+    const mic = await navigator.mediaDevices.getUserMedia({video: false, audio: true})
+    
+
     pc = createPeerConnection({})
-    pc.createDataChannel("dataSendChannel");
-    pc.addTransceiver("audio", {
-      direction: 'recvonly'
-    });
-    pc.addTransceiver("video", {
-      direction: 'recvonly',
-    });
+    for (const track of mic.getTracks()) {
+      pc.addTrack(track);
+    }
+    // pc.createDataChannel("dataSendChannel");
+    // const audioTrans = pc.addTransceiver("audio", {
+    //   direction: 'sendrecv',
+    // });
+    // pc.addTransceiver("video", {
+    //   direction: 'recvonly',
+    // });
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -39,7 +47,19 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   }
   try {
 
-    pc.onconnectionstatechange = () => console.log(pc.connectionState);
+    pc.onconnectionstatechange = async () => {
+      console.log(pc.connectionState);
+
+      const stats = await pc.getStats()
+      let selectedLocalCandidate
+      for (const { type, state, localCandidateId } of stats.values())
+        if (type === 'candidate-pair' && state === 'succeeded' && localCandidateId) {
+          selectedLocalCandidate = localCandidateId
+          break
+        }
+      const isLocal = !!selectedLocalCandidate && stats.get(selectedLocalCandidate)?.candidateType === 'relay'
+      console.log('isLocal', isLocal);
+    };
     pc.onsignalingstatechange = () => console.log(pc.connectionState);
     pc.ontrack = () => {
       const mediaStream = new MediaStream(
@@ -63,10 +83,14 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
     pc.onicecandidate = async (evt) => {
       if (!evt.candidate) {
         if (!trickle) {
+          if (sentSdp)
+            return;
+            sentSdp = true;
           const offer = await pc.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: true,
           });
+          console.log('offer', offer);
           await pc.setLocalDescription(offer);
 
           const offerWithCandidates: RTCAVMessage = {
@@ -87,7 +111,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
             videoStream.mimeType
           );
           const answer: RTCAVMessage = JSON.parse(result.toString())
-          console.log(answer);
+          console.log('answer', answer);
           await pc.setRemoteDescription(answer.description);
         }
         return;
