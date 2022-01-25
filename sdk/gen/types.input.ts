@@ -358,11 +358,11 @@ export interface AudioStreamOptions {
  * is requested when calling getVideoStream.
  */
 export interface MediaStreamOptions {
+  id: string;
+  name: string;
   /**
    * Prebuffer time in milliseconds.
    */
-  id: string;
-  name: string;
   prebuffer?: number;
   container?: string;
 
@@ -378,6 +378,16 @@ export interface MediaStreamOptions {
    * Stream specific metadata.
    */
   metadata?: any;
+}
+
+export interface RequestMediaStreamOptions extends MediaStreamOptions {
+  /**
+   * When retrieving media, setting disableMediaProxies=true
+   * will bypass any intermediaries (NVR, rebroadcast) and retrieve
+   * it directly from the source. This is useful in cases when
+   * peer to peer connections are possible and preferred, such as WebRTC.
+   */
+  directMediaStream?: boolean;
 }
 
 /**
