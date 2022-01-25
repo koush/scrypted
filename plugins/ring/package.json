@@ -20,6 +20,7 @@
       "name": "Ring Plugin",
       "type": "DeviceProvider",
       "interfaces": [
+         "BufferConverter",
          "DeviceProvider",
          "Settings"
       ]
@@ -36,5 +37,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.28"
+   "version": "0.0.29"
 }

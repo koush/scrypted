@@ -1,13 +1,26 @@
-import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RTCAVMessage, RTCAVSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
 import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
 import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
 import child_process, { ChildProcess } from 'child_process';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
+import { generateUuid } from '../../../external/ring-client-api/api/util';
 
 const { log, deviceManager, mediaManager } = sdk;
 const STREAM_TIMEOUT = 120000;
+
+const RingSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'ring/';
+const RingDeviceSignalingPrefix = RingSignalingPrefix + 'x-';
+const RingWebRtcAvSource: RTCAVSource = {
+    audio: {
+        direction: 'sendrecv',
+    },
+    video: {
+        direction: 'recvonly',
+    },
+};
 
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
@@ -21,7 +34,9 @@ class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
+class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, DeviceProvider, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
+    signalingMime: string;
+    webrtcSession: string;
     session: SipSession;
     rtpDescription: RtpDescription;
     audioOutForwarder: RtpSplitter;
@@ -35,6 +50,46 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
         this.binaryState = false;
         if (this.interfaces.includes(ScryptedInterface.Battery))
             this.batteryLevel = this.findCamera()?.batteryLevel;
+
+        this.signalingMime = RingDeviceSignalingPrefix + this.nativeId;
+        this.fromMimeType = ScryptedMimeTypes.RTCAVOffer;
+        this.toMimeType = this.signalingMime;
+    }
+
+    async sendOffer(offer: RTCAVMessage) {
+        const sessionId = generateUuid();
+        this.stopWebRtcSession();
+        const answerSdp = await this.findCamera().startWebRtcSession(sessionId, offer.description.sdp);
+
+        const answer: RTCAVMessage = {
+            id: undefined,
+            description: {
+                sdp: answerSdp,
+                type: 'answer',
+            },
+            candidates: [],
+            configuration: undefined,
+        }
+        return answer;
+    }
+
+    async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
+        const sessionId = generateUuid();
+        const offer: RTCAVMessage = JSON.parse(data.toString());
+        this.stopWebRtcSession();
+        const answerSdp = await this.findCamera().startWebRtcSession(sessionId, offer.description.sdp);
+
+        const answer: RTCAVMessage = {
+            id: undefined,
+            description: {
+                sdp: answerSdp,
+                type: 'answer',
+            },
+            candidates: [],
+            configuration: undefined,
+        }
+
+        return Buffer.from(JSON.stringify(answer));
     }
 
     getDevice(nativeId: string) {
@@ -59,13 +114,26 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
 
     stopSession() {
         if (this.session) {
-            this.console.log('ending stream');
+            this.console.log('ending sip session');
             this.session.stop();
             this.session = undefined;
         }
     }
 
+    stopWebRtcSession() {
+        if (this.webrtcSession) {
+            this.console.log('ending webrtc session');
+            this.findCamera().endWebRtcSession(this.webrtcSession);
+            this.webrtcSession = undefined;
+        }
+    }
+
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+        if (options?.id === 'webrtc') {
+
+            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(RingWebRtcAvSource)), this.signalingMime);
+        }
+
         if (options?.refreshAt) {
             if (!this.ffmpegInput?.mediaStreamOptions)
                 throw new Error("no stream to refresh");
@@ -106,17 +174,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
 
         const ffmpegInput: FFMpegInput = {
             url: undefined,
-            mediaStreamOptions: {
-                id: 'default',
-                video: {
-                    codec: 'h264',
-                },
-                audio: {
-                    // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
-                    codec: 'pcm',
-                },
+            mediaStreamOptions: Object.assign(this.getSipMediaStreamOptions(), {
                 refreshAt: Date.now() + STREAM_TIMEOUT,
-            },
+            }),
             inputArguments: ff.ffmpegInputArguments.filter(line => !!line).map(line => line.toString()),
         };
         this.ffmpegInput = ffmpegInput;
@@ -126,16 +186,36 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
     }
 
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-        return [{
-            id: 'default',
+        return [
+            this.getSipMediaStreamOptions(),
+            this.getWebRtcMediaStreamOptions(),
+        ]
+    }
+
+    getSipMediaStreamOptions(): MediaStreamOptions {
+        return {
+            id: 'sip',
+            name: 'SIP',
             video: {
                 codec: 'h264',
             },
             audio: {
                 // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
                 codec: 'pcm',
-            }
-        }]
+            },
+        };
+    }
+
+    getWebRtcMediaStreamOptions(): MediaStreamOptions {
+        return {
+            id: 'webrtc',
+            name: 'WebRTC',
+            container: this.signalingMime,
+            video: {
+            },
+            audio: {
+            },
+        };
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
@@ -206,7 +286,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Int
     }
 }
 
-class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
+class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DeviceProvider, DeviceDiscovery, Settings {
     client: RingRestClient;
     api: RingApi;
     devices = new Map<string, RingCameraDevice>();
@@ -252,6 +332,26 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
     constructor() {
         super();
         this.discoverDevices(0);
+
+        this.fromMimeType = RingSignalingPrefix + '*';
+        this.toMimeType = ScryptedMimeTypes.FFmpegInput;
+    }
+
+    async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
+        const nativeId = fromMimeType.substring(RingDeviceSignalingPrefix.length);
+        let device: RingCameraDevice;
+        for (const d of this.devices.values()) {
+            if (d.nativeId.toLowerCase() === nativeId) {
+                device = d as RingCameraDevice;
+                break;
+            }
+        }
+        const result = await createRTCPeerConnectionSource(RingWebRtcAvSource, 'default', 'MPEG-TS', device.console, async (offer) => {
+            const answer = await device.sendOffer(offer);
+            device.console.log('webrtc answer', answer);
+            return answer;
+        });
+        return Buffer.from(JSON.stringify(result.ffmpegInput));
     }
 
     async clearTryDiscoverDevices() {
@@ -340,9 +440,10 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 ScryptedInterface.Camera,
                 ScryptedInterface.VideoCamera,
                 ScryptedInterface.MotionSensor,
-                ScryptedInterface.Intercom
+                ScryptedInterface.Intercom,
+                ScryptedInterface.BufferConverter,
             ];
-            if (camera.hasBattery)
+            if (camera.operatingOnBattery)
                 interfaces.push(ScryptedInterface.Battery);
             if (camera.isDoorbot)
                 interfaces.push(ScryptedInterface.BinarySensor);
