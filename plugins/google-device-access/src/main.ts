@@ -122,11 +122,11 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
         const [audioPart] = offerParts.splice(audioPartIndex, 1);
         offerParts.splice(1, 0, audioPart);
         offer.description.sdp = offerParts.join('m=');
-        const {answer} = await this.sendOffer(offer);
+        const { answer } = await this.sendOffer(offer);
         return Buffer.from(JSON.stringify(answer));
     }
 
-    async sendOffer(offer: RTCAVMessage): Promise<{result: any, answer: RTCAVMessage}> {
+    async sendOffer(offer: RTCAVMessage): Promise<{ result: any, answer: RTCAVMessage }> {
         const offerSdp = offer.description.sdp.replace('a=ice-options:trickle\r\n', '');
 
         const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -135,7 +135,7 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
                 offerSdp,
             },
         });
-        const {answerSdp} = result.data.results;
+        const { answerSdp } = result.data.results;
         const answer: RTCAVMessage = {
             id: undefined,
             description: {
@@ -145,7 +145,7 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
             candidates: [],
             configuration: undefined,
         }
-        return {result, answer};
+        return { result, answer };
     }
 
     addRefreshOptions(result: any, mso: MediaStreamOptions): MediaStreamOptions {
@@ -475,7 +475,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         this.fromMimeType = SdmSignalingPrefix + '*';
         this.toMimeType = ScryptedMimeTypes.FFmpegInput;
     }
-    
+
     async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
         const nativeId = fromMimeType.substring(SdmDeviceSignalingPrefix.length);
         let device: NestCamera;
@@ -487,7 +487,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         }
         let streamResult: any;
         const result = await createRTCPeerConnectionSource(NestRTCAVSource, 'default', 'MPEG-TS', device.console, async (offer) => {
-            const {result, answer} = await device.sendOffer(offer);
+            const { result, answer } = await device.sendOffer(offer);
             streamResult = result;
             return answer;
         });
@@ -520,23 +520,20 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             }
 
             if (events) {
-                if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL') {
-                    if (events['sdm.devices.events.CameraMotion.Motion']) {
-                        const camera: NestCamera = this.devices.get(nativeId) as any;
-                        if (camera) {
-                            camera.motionDetected = true;
-                            camera.storage.setItem('lastMotionEventId', events['sdm.devices.events.CameraMotion.Motion'].eventId);
-                            setTimeout(() => camera.motionDetected = false, 30000);
-                        }
+                if (events['sdm.devices.events.CameraMotion.Motion']) {
+                    const camera: NestCamera = this.devices.get(nativeId) as any;
+                    if (camera) {
+                        camera.motionDetected = true;
+                        camera.storage.setItem('lastMotionEventId', events['sdm.devices.events.CameraMotion.Motion'].eventId);
+                        setTimeout(() => camera.motionDetected = false, 30000);
                     }
                 }
-                if (device.type === 'sdm.devices.types.DOORBELL') {
-                    if (events['sdm.devices.events.DoorbellChime.Chime']) {
-                        const camera: NestCamera = this.devices.get(nativeId) as any;
-                        if (camera) {
-                            camera.binaryState = true;
-                            setTimeout(() => camera.binaryState = false, 30000);
-                        }
+
+                if (events['sdm.devices.events.DoorbellChime.Chime']) {
+                    const camera: NestCamera = this.devices.get(nativeId) as any;
+                    if (camera) {
+                        camera.binaryState = true;
+                        setTimeout(() => camera.binaryState = false, 30000);
                     }
                 }
             }
@@ -697,7 +694,9 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     info,
                 })
             }
-            else if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL') {
+            else if (device.type === 'sdm.devices.types.CAMERA'
+                || device.type === 'sdm.devices.types.DOORBELL'
+                || device.type === 'sdm.devices.types.DISPLAY') {
                 this.nestDevices.set(nativeId, device);
 
                 const interfaces = [
@@ -721,6 +720,9 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     info,
                 })
             }
+            else {
+                this.console.log('unhandled device type', device.type);
+            }
         }
 
         await deviceManager.onDevicesChanged(deviceManifest);
@@ -739,7 +741,9 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             return;
         if (device.type === 'sdm.devices.types.THERMOSTAT')
             found = new NestThermostat(this, device);
-        else if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL')
+        else if (device.type === 'sdm.devices.types.CAMERA'
+            || device.type === 'sdm.devices.types.DOORBELL'
+            || device.type === 'sdm.devices.types.DISPLAY')
             found = new NestCamera(this, device);
 
         this.devices.set(nativeId, found);
