@@ -460,7 +460,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 break;
             }
         }
-        let streamResult;
+        let streamResult: any;
         const result = await createRTCPeerConnectionSource('default', 'MPEG-TS', device.console, mediaManager, async (offer) => {
             const {result, answer} = await device.sendOffer(offer);
             streamResult = result;
