@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty, BufferConverter, ScryptedMimeTypes, RTCAVMessage, ScryptedDevice } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedInterfaceProperty, BufferConverter, ScryptedMimeTypes, RTCAVMessage, ScryptedDevice, RTCAVSource } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -12,7 +12,7 @@ const { deviceManager, mediaManager, endpointManager } = sdk;
 const refreshFrequency = 60;
 
 const SdmSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/';
-const SdmDeviceSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/x-';
+const SdmDeviceSignalingPrefix = SdmSignalingPrefix + 'x-';
 
 function getRtspMediaStreamOptions(): MediaStreamOptions {
     return {
@@ -74,10 +74,8 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         this.signalingMime = SdmDeviceSignalingPrefix + this.nativeId;
 
         // create a mime unique to this this camera.
-        if (!this.fromMimeType || !this.toMimeType) {
-            this.fromMimeType = ScryptedMimeTypes.RTCAVOffer;
-            this.toMimeType = this.signalingMime;
-        }
+        this.fromMimeType = ScryptedMimeTypes.RTCAVOffer;
+        this.toMimeType = this.signalingMime;
     }
 
     async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer> {
@@ -155,7 +153,7 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
     }
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        if (options?.metadata?.streamExtensionToken) {
+        if (options?.metadata?.streamExtensionToken || options?.metadata?.mediaSessionId) {
             const { streamExtensionToken, mediaSessionId } = options?.metadata;
             const streamFormat = this.isWebRtc ? 'WebRtc' : 'Rtsp';
             const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -170,7 +168,18 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
         }
 
         if (this.isWebRtc) {
-            return mediaManager.createMediaObject(Buffer.alloc(0), this.signalingMime);
+            const avsource: RTCAVSource = {
+                audio: {
+                    direction: 'recvonly',
+                },
+                video: {
+                    direction: 'recvonly',
+                },
+                datachannel: {
+                    label: 'dataSendChannel',
+                },
+            }
+            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(avsource)), this.signalingMime);
         }
         else {
             const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -187,9 +196,7 @@ class NestCamera extends ScryptedDeviceBase implements VideoCamera, MotionSensor
             ]
         }
 
-        const wmso = getRTCMediaStreamOptions();
-        wmso.id = 'default';
-        wmso.name = 'MPEG-TS';
+        const wmso = getRTCMediaStreamOptions('default', 'MPEG-TS');
 
         return [
             wmso,
@@ -454,7 +461,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             }
         }
         let streamResult;
-        const result = await createRTCPeerConnectionSource(device.console, mediaManager, async (offer) => {
+        const result = await createRTCPeerConnectionSource('default', 'MPEG-TS', device.console, mediaManager, async (offer) => {
             const {result, answer} = await device.sendOffer(offer);
             streamResult = result;
             return answer;
