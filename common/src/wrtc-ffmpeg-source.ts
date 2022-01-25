@@ -1,4 +1,4 @@
-import { RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions} from "@scrypted/sdk/types";
+import { RTCAVSource, RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions} from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "./listen-cluster";
 import { RTCPeerConnection, RTCRtpCodecParameters } from "werift";
 import dgram from 'dgram';
@@ -40,7 +40,7 @@ export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamO
     };
 }
 
-export async function createRTCPeerConnectionSource(id: string, name: string, console: Console, mediaManager: MediaManager, sendOffer: (offer: RTCAVMessage) => Promise<RTCAVMessage>): Promise<{
+export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: string, name: string, console: Console, sendOffer: (offer: RTCAVMessage) => Promise<RTCAVMessage>): Promise<{
     ffmpegInput: FFMpegInput,
     peerConnection: RTCPeerConnection,
 }> {
@@ -83,7 +83,10 @@ export async function createRTCPeerConnectionSource(id: string, name: string, co
     let gotAudio = false;
     let gotVideo = false;
 
-    const audioTransceiver = pc.addTransceiver("audio", { direction: "recvonly" });
+    if (avsource.datachannel)
+      pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
+
+    const audioTransceiver = pc.addTransceiver("audio", avsource.audio as any);
     audioTransceiver.onTrack.subscribe((track) => {
         audioTransceiver.sender.replaceTrack(track);
         track.onReceiveRtp.subscribe((rtp) => {
@@ -95,7 +98,7 @@ export async function createRTCPeerConnectionSource(id: string, name: string, co
         });
     });
 
-    const videoTransceiver = pc.addTransceiver("video", { direction: "recvonly" });
+    const videoTransceiver = pc.addTransceiver("video", avsource.video as any);
     videoTransceiver.onTrack.subscribe((track) => {
         videoTransceiver.sender.replaceTrack(track);
         track.onReceiveRtp.subscribe((rtp) => {
@@ -109,8 +112,6 @@ export async function createRTCPeerConnectionSource(id: string, name: string, co
             setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 2000);
         });
     });
-
-    pc.createDataChannel('dataSendChannel', { id: 1 });
 
     let offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
