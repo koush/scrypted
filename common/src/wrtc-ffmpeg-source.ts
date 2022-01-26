@@ -25,12 +25,12 @@ a=sendrecv
 `;
 }
 
-export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamOptions {
+export function getRTCMediaStreamOptions(id: string, name: string, container: string): MediaStreamOptions {
     return {
         // set by consumer
         id,
         name,
-        container: 'sdp',
+        container,
         video: {
             codec: 'h264',
         },
@@ -133,7 +133,7 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
         peerConnection: pc,
         ffmpegInput: {
             url: undefined,
-            mediaStreamOptions: getRTCMediaStreamOptions(id, name),
+            mediaStreamOptions: getRTCMediaStreamOptions(id, name, 'sdp'),
             inputArguments: [
                 // '-analyzeduration', '50000000',
                 // '-probesize', '50000000',

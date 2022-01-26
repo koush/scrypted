@@ -475,6 +475,7 @@ export interface AudioStreamOptions {
     profile?: string;
     bitrate?: number;
 }
+export declare type MediaStreamSource = "local" | "cloud";
 /**
  * Options passed to VideoCamera.getVideoStream to
  * request specific media formats.
@@ -493,6 +494,11 @@ export interface MediaStreamOptions {
     container?: string;
     video?: VideoStreamOptions;
     audio?: AudioStreamOptions;
+    /**
+    * Stream specific metadata.
+    */
+    metadata?: any;
+    source?: MediaStreamSource;
 }
 export interface ResponseMediaStreamOptions extends MediaStreamOptions {
     /**
@@ -500,10 +506,6 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
      * via a call to getVideoStream.
      */
     refreshAt?: number;
-    /**
-     * Stream specific metadata.
-     */
-    metadata?: any;
 }
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
     /**

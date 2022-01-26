@@ -173,6 +173,7 @@ class ResponseMediaStreamOptions(TypedDict):
     name: str
     prebuffer: float
     refreshAt: float
+    source: MediaStreamSource
     video: VideoStreamOptions
     pass
 
@@ -186,6 +187,9 @@ class VideoStreamOptions(TypedDict):
     maxBitrate: float
     minBitrate: float
     width: float
+    pass
+
+class MediaStreamSource(TypedDict):
     pass
 
 class BufferConverter(TypedDict):
@@ -317,8 +321,10 @@ class MediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
     id: str
+    metadata: Any
     name: str
     prebuffer: float
+    source: MediaStreamSource
     video: VideoStreamOptions
     pass
 
@@ -365,8 +371,10 @@ class RequestMediaStreamOptions(TypedDict):
     container: str
     directMediaStream: bool
     id: str
+    metadata: Any
     name: str
     prebuffer: float
+    source: MediaStreamSource
     video: VideoStreamOptions
     pass
 

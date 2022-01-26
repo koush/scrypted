@@ -302,6 +302,8 @@ class PrebufferSession {
 
     session.once('killed', () => {
       this.parserSessionPromise = undefined;
+      if (this.parserSession === session)
+        this.parserSession = undefined;
     });
 
     if (!session.inputAudioCodec) {
@@ -706,7 +708,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     }
     catch (e) {
     }
-    return [msos[0]];
+    // do not enable rebroadcast on cloud streams by default.
+    const firstNonCloudStream = msos.find(mso => mso.source !== 'cloud');
+    return firstNonCloudStream ? [firstNonCloudStream] : [];
   }
 
   async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {

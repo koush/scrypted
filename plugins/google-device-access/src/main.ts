@@ -1,11 +1,11 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSource, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSource, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions as getRtcMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
 import { sleep } from '../../../common/src/sleep';
 import fs from 'fs';
 
@@ -17,7 +17,7 @@ const SdmSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/';
 const SdmDeviceSignalingPrefix = SdmSignalingPrefix + 'x-';
 const black = fs.readFileSync('black.jpg');
 
-function getRtspMediaStreamOptions(): MediaStreamOptions {
+function getSdmRtspMediaStreamOptions(): MediaStreamOptions {
     return {
         id: 'default',
         name: 'Cloud RTSP',
@@ -28,8 +28,16 @@ function getRtspMediaStreamOptions(): MediaStreamOptions {
         audio: {
             codec: 'aac',
         },
+        source: 'cloud',
     };
 }
+
+function getSdmRtcMediaStreamOptions(signalingMime: string): MediaStreamOptions {
+    const ret = getRtcMediaStreamOptions('webrtc', 'WebRTC', signalingMime);
+    ret.source = 'cloud';
+    return ret;
+}
+
 const NestRTCAVSource: RTCAVSource = {
     audio: {
         direction: 'recvonly',
@@ -182,7 +190,7 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
 
         return mediaManager.createFFmpegMediaObject({
             url: u,
-            mediaStreamOptions: this.addRefreshOptions(result, getRtspMediaStreamOptions()),
+            mediaStreamOptions: this.addRefreshOptions(result, getSdmRtspMediaStreamOptions()),
             inputArguments: [
                 "-rtsp_transport",
                 "tcp",
@@ -201,7 +209,7 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
         return this.device?.traits?.['sdm.devices.traits.CameraLiveStream']?.supportedProtocols?.includes('WEB_RTC');
     }
 
-    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+    async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         if (options?.metadata?.streamExtensionToken || options?.metadata?.mediaSessionId) {
             const { streamExtensionToken, mediaSessionId } = options?.metadata;
             const streamFormat = this.isWebRtc ? 'WebRtc' : 'Rtsp';
@@ -213,7 +221,7 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
                 }
             });
 
-            const mso = this.isWebRtc ? getRTCMediaStreamOptions('webrtc', 'WebRTC') : getRtspMediaStreamOptions();
+            const mso = this.isWebRtc ? getSdmRtcMediaStreamOptions(this.signalingMime) : getSdmRtspMediaStreamOptions();
             this.addRefreshOptions(result, mso);
 
             const ffmpegInput: FFMpegInput = {
@@ -238,20 +246,12 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         if (!this.isWebRtc) {
             return [
-                getRtspMediaStreamOptions(),
+                getSdmRtspMediaStreamOptions(),
             ]
         }
 
         return [
-            {
-                id: 'webrtc',
-                name: 'WebRTC',
-                container: this.signalingMime,
-                video: {
-                },
-                audio: {
-                },
-            }
+            getSdmRtcMediaStreamOptions(this.signalingMime),
         ]
     }
 }
