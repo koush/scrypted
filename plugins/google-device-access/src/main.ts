@@ -9,7 +9,7 @@ import { createRTCPeerConnectionSource, getRTCMediaStreamOptions as getRtcMediaS
 import { sleep } from '../../../common/src/sleep';
 import fs from 'fs';
 
-const { deviceManager, mediaManager, endpointManager } = sdk;
+const { deviceManager, mediaManager, endpointManager, systemManager } = sdk;
 
 const refreshFrequency = 60;
 
@@ -118,8 +118,18 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
         const hasEventImages = !!this.device?.traits?.['sdm.devices.traits.CameraEventImage'];
         const lastMotionEventId = this.storage.getItem('lastMotionEventId');
-        if (!lastMotionEventId || !hasEventImages)
+        if (!lastMotionEventId || !hasEventImages) {
+            const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+            try {
+                const msos = await realDevice.getVideoStreamOptions();
+                const prebuffered = msos.find(mso => mso.prebuffer);
+                if (prebuffered)
+                    return realDevice.getVideoStream(prebuffered);
+            }
+            catch (e) {
+            }
             return mediaManager.createMediaObject(black, 'image/jpeg');
+        }
 
         const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
             command: "sdm.devices.commands.CameraEventImage.GenerateImage",
