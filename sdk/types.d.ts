@@ -486,7 +486,7 @@ export declare type MediaStreamSource = "local" | "cloud";
  */
 export interface MediaStreamOptions {
     id: string;
-    name: string;
+    name?: string;
     /**
      * Prebuffer time in milliseconds.
      */
