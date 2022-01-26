@@ -1,8 +1,8 @@
 import { createServer, Server } from 'net';
-import child_process from 'child_process';
+import child_process, { StdioOptions } from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
-import { listenZero, listenZeroSingleClient } from './listen-cluster';
+import { listenZero } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
@@ -99,11 +99,11 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     let inputVideoCodec: string;
     let inputVideoResolution: string[];
 
-    let ffmpegSocketResolve: any;
-    let ffmpegSocketReject: any;
+    let ffmpegStartedResolve: any;
+    let ffmpegStartedReject: any;
     const connectPromise = new Promise((r, rj) => {
-        ffmpegSocketResolve = r;
-        ffmpegSocketReject = rj;
+        ffmpegStartedResolve = r;
+        ffmpegStartedReject = rj;
     });
 
     function kill() {
@@ -115,7 +115,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         cp?.kill();
         // might need this too?
         cp?.kill('SIGKILL');
-        ffmpegSocketReject(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
+        ffmpegStartedReject?.(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
         clearTimeout(dataTimeout);
         clearTimeout(ffmpegIncomingConnectionTimeout);
     }
@@ -138,36 +138,45 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
 
     ffmpegIncomingConnectionTimeout = setTimeout(kill, 30000);
 
+    // first see how many pipes are needed, and prep them for the child process
+    const stdio: StdioOptions = ['pipe', 'pipe', 'pipe']
+    let pipeCount = 3;
     for (const container of Object.keys(options.parsers)) {
         const parser = options.parsers[container];
-        const server = await listenZeroSingleClient();
-        server.clientPromise.then(async (socket) => {
-            ffmpegSocketResolve(undefined);
-
-            try {
-                for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
-                    events.emit(container, chunk);
-                    resetActivityTimer();
-                }
-            }
-            catch (e) {
-                console.error('rebroadcast parse error', e);
-                kill();
-            }
-        })
-
         args.push(
             ...parser.outputArguments,
-            server.url,
+            `pipe:${pipeCount}`,
         );
+        stdio.push('pipe');
+        pipeCount++;
     }
 
+    // start ffmpeg process with child process pipes
     args.unshift('-hide_banner');
     safePrintFFmpegArguments(console, args);
-    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
+        stdio,
+    });
     ffmpegLogInitialOutput(console, cp);
-
     cp.on('exit', kill);
+
+    // now parse the created pipes
+    Object.keys(options.parsers).forEach(async (container, index) => {
+        const pipe = cp.stdio[3 + index];
+        const parser = options.parsers[container];
+
+        try {
+            for await (const chunk of parser.parse(pipe, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                ffmpegStartedResolve?.(undefined);
+                events.emit(container, chunk);
+                resetActivityTimer();
+            }
+        }
+        catch (e) {
+            console.error('rebroadcast parse error', e);
+            kill();
+        }
+    });
 
     // tbh parsing stdout is super sketchy way of doing this.
     parseAudioCodec(cp).then(result => inputAudioCodec = result);
@@ -175,6 +184,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     parseResolution(cp).then(result => inputVideoResolution = result);
 
     await connectPromise;
+    ffmpegStartedResolve = undefined;
+    ffmpegStartedReject = undefined;
     clearTimeout(ffmpegIncomingConnectionTimeout);
 
     return {
