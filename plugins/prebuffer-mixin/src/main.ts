@@ -61,6 +61,7 @@ class PrebufferSession {
   storage: Storage;
 
   activeClients = 0;
+  inactivityTimeout: NodeJS.Timeout;
 
   AUDIO_CONFIGURATION = AUDIO_CONFIGURATION_TEMPLATE + '-' + this.streamId;
 
@@ -380,7 +381,8 @@ class PrebufferSession {
     if (this.activeClients)
       return;
     
-    setTimeout(() => {
+    clearTimeout(this.inactivityTimeout)
+    this.inactivityTimeout = setTimeout(() => {
       if (this.activeClients)
         return;
       this.console.log(this.streamName, 'terminating rebroadcast due to inactivity');
