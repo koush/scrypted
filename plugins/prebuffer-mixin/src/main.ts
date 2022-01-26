@@ -630,7 +630,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     try {
       const msos = await this.mixinDevice.getVideoStreamOptions();
       const enabledStreams = this.getEnabledMediaStreamOptions(msos);
-      if (enabledStreams && msos?.length > 1) {
+      if (msos?.length > 0) {
         settings.push(
           {
             title: 'Prebuffered Streams',
@@ -698,7 +698,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   getEnabledMediaStreamOptions(msos?: MediaStreamOptions[]) {
-    if (!msos || !msos.length)
+    if (!msos)
       return;
 
     try {
