@@ -374,6 +374,7 @@ class RequestMediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
+    refreshAt: float
     source: MediaStreamSource
     video: VideoStreamOptions
     pass

@@ -388,7 +388,7 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
    refreshAt?: number;
 }
 
-export interface RequestMediaStreamOptions extends MediaStreamOptions {
+export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
   /**
    * When retrieving media, setting disableMediaProxies=true
    * will bypass any intermediaries (NVR, rebroadcast) and retrieve
