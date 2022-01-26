@@ -369,15 +369,18 @@ export interface MediaStreamOptions {
   video?: VideoStreamOptions;
   audio?: AudioStreamOptions;
 
+}
+
+export interface ResponseMediaStreamOptions extends MediaStreamOptions {
   /**
    * The time in milliseconds that this stream must be refreshed again
    * via a call to getVideoStream.
    */
-  refreshAt?: number;
-  /**
-   * Stream specific metadata.
-   */
-  metadata?: any;
+   refreshAt?: number;
+   /**
+    * Stream specific metadata.
+    */
+   metadata?: any;
 }
 
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
@@ -402,7 +405,7 @@ export interface VideoCamera {
    * If no options are provided at all, the implementation must return the
    * first stream listed in getVideoStreamOptions.
    */
-  getVideoStream(options?: MediaStreamOptions): Promise<MediaObject>;
+  getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject>;
   /**
    * Get the available video streaming options.
    */
@@ -837,7 +840,7 @@ export interface MediaManager {
 export interface MediaStreamUrl {
   url: string;
   container?: string;
-  mediaStreamOptions?: MediaStreamOptions;
+  mediaStreamOptions?: ResponseMediaStreamOptions;
 }
 export interface FFMpegInput extends MediaStreamUrl {
   inputArguments?: string[];

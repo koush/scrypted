@@ -165,6 +165,17 @@ class PictureDimensions(TypedDict):
     width: float
     pass
 
+class ResponseMediaStreamOptions(TypedDict):
+    audio: AudioStreamOptions
+    container: str
+    id: str
+    metadata: Any
+    name: str
+    prebuffer: float
+    refreshAt: float
+    video: VideoStreamOptions
+    pass
+
 class VideoStreamOptions(TypedDict):
     bitrate: float
     codec: str
@@ -240,7 +251,7 @@ class EventListenerRegister(TypedDict):
 class FFMpegInput(TypedDict):
     container: str
     inputArguments: list[str]
-    mediaStreamOptions: MediaStreamOptions
+    mediaStreamOptions: ResponseMediaStreamOptions
     url: str
     pass
 
@@ -306,10 +317,8 @@ class MediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
     id: str
-    metadata: Any
     name: str
     prebuffer: float
-    refreshAt: float
     video: VideoStreamOptions
     pass
 
@@ -349,6 +358,16 @@ class Position(TypedDict):
     accuracyRadius: float
     latitude: float
     longitude: float
+    pass
+
+class RequestMediaStreamOptions(TypedDict):
+    audio: AudioStreamOptions
+    container: str
+    directMediaStream: bool
+    id: str
+    name: str
+    prebuffer: float
+    video: VideoStreamOptions
     pass
 
 class ScriptSource(TypedDict):
@@ -744,7 +763,7 @@ class UltravioletSensor:
     pass
 
 class VideoCamera:
-    async def getVideoStream(self, options: MediaStreamOptions = None) -> MediaObject:
+    async def getVideoStream(self, options: RequestMediaStreamOptions = None) -> MediaObject:
         pass
     async def getVideoStreamOptions(self) -> list[MediaStreamOptions]:
         pass
