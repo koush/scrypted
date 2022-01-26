@@ -28,17 +28,33 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
     const avsource: RTCAVSource = JSON.parse(buffer.toString());
 
     pc = createPeerConnection({})
-    // it's possible to do talkback to ring.
-    // const mic = await navigator.mediaDevices.getUserMedia({video: false, audio: true})
-    // for (const track of mic.getTracks()) {
-    //   pc.addTrack(track);
-    // }
     if (avsource.datachannel)
       pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
-    pc.addTransceiver("audio", avsource.audio);
+    // it's possible to do talkback to ring.
+    let useAudioTransceiver = false;
+    try {
+      if (avsource.audio?.direction === 'sendrecv') {
+        // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+        const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+        for (const track of mic.getTracks()) {
+          pc.addTrack(track);
+        }
+      }
+      else {
+        useAudioTransceiver = true;
+      }
+    }
+    catch (e) {
+      useAudioTransceiver = true;
+    }
+    if (useAudioTransceiver)
+      pc.addTransceiver("audio", avsource.audio);
     pc.addTransceiver("video", avsource.video);
 
-    const offer = await pc.createOffer();
+    const offer = await pc.createOffer({
+      offerToReceiveVideo: true,
+      offerToReceiveAudio: true,
+    });
     await pc.setLocalDescription(offer);
   }
   else {
@@ -89,7 +105,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
         if (!trickle) {
           if (sentSdp)
             return;
-            sentSdp = true;
+          sentSdp = true;
           const offer = await pc.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: true,
