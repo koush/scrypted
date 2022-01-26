@@ -1,4 +1,4 @@
-import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RTCAVMessage, RTCAVSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVMessage, RTCAVSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
@@ -130,7 +130,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
         }
     }
 
-    async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+    async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         if (options?.id === 'webrtc') {
 
             return mediaManager.createMediaObject(Buffer.from(JSON.stringify(RingWebRtcAvSource)), this.signalingMime);
@@ -205,6 +205,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
                 codec: 'pcm',
             },
+            source: 'cloud',
         };
     }
 
@@ -217,6 +218,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
             },
             audio: {
             },
+            source: 'cloud',
         };
     }
 
