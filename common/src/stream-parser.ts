@@ -147,12 +147,6 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
         }
     }
 }
-export interface MP4Atom {
-    header: Buffer;
-    length: number;
-    type: string;
-    data: Buffer;
-}
 
 export async function* parseFragmentedMP4(readable: Readable): AsyncGenerator<MP4Atom> {
     while (true) {
@@ -168,6 +162,13 @@ export async function* parseFragmentedMP4(readable: Readable): AsyncGenerator<MP
             data,
         };
     }
+}
+
+export interface MP4Atom {
+    header: Buffer;
+    length: number;
+    type: string;
+    data: Buffer;
 }
 
 export function createFragmentedMp4Parser(options?: StreamParserOptions): StreamParser {

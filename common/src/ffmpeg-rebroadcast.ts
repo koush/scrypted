@@ -1,11 +1,11 @@
 import { createServer, Server } from 'net';
 import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
-import { FFMpegInput } from '@scrypted/sdk/types';
-import { listenZero } from './listen-cluster';
+import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
+import { listenZero, listenZeroSingleClient } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk from "@scrypted/sdk";
-import { ffmpegLogInitialOutput } from './media-helpers';
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
 import { StreamChunk, StreamParser } from './stream-parser';
 
 const { mediaManager } = sdk;
@@ -17,45 +17,26 @@ export interface MP4Atom {
     data: Buffer;
 }
 
-export interface FFMpegRebroadcastSession<T extends string> {
-    cp: ChildProcess;
-    ffmpegInputs: { [container in T]?: FFMpegInput };
-    servers: Server[];
+export interface ParserSession<T extends string> {
+    mediaStreamOptions: MediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;
     inputVideoResolution?: string[];
     kill(): void;
     isActive(): boolean;
     resetActivityTimer(): void;
-    events: EventEmitter;
+
+    on(container: T, callback: (chunk: StreamChunk) => void): this;
+    on(event: 'killed', callback: () => void): this;
+    once(event: 'killed', callback: () => void): this;
+    removeListener(event: T | 'killed', callback: any): this;
+    once(event: string | symbol, listener: (...args: any[]) => void): this;
 }
 
-export interface FFMpegRebroadcastOptions<T extends string> {
+export interface ParserOptions<T extends string> {
     parsers: { [container in T]?: StreamParser };
     timeout?: number;
     console: Console;
-    parseOnly?: boolean;
-}
-
-export function safePrintFFmpegArguments(console: Console, args: string[]) {
-    const ret = [];
-    for (const arg of args) {
-        try {
-            const url = new URL(arg);
-            if (url.password) {
-                url.password = 'REDACTED';
-                ret.push(url.toString());
-            }
-            else {
-                ret.push(arg);
-            }
-        }
-        catch (e) {
-            ret.push(arg);
-        }
-    }
-
-    console.log(ret.join(' '));
 }
 
 export async function parseResolution(cp: ChildProcess) {
@@ -105,24 +86,24 @@ export async function parseAudioCodec(cp: ChildProcess) {
     return parseToken(cp, 'Audio');
 }
 
-export async function startRebroadcastSession<T extends string>(ffmpegInput: FFMpegInput, options: FFMpegRebroadcastOptions<T>): Promise<FFMpegRebroadcastSession<T>> {
-    let clients = 0;
+export async function startParserSession<T extends string>(ffmpegInput: FFMpegInput, options: ParserOptions<T>): Promise<ParserSession<T>> {
+    const { console } = options;
+
     let dataTimeout: NodeJS.Timeout;
     let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;
     let isActive = true;
     const events = new EventEmitter();
     events.on('error', e => console.error('rebroadcast error', e));
-    const { console } = options;
 
     let inputAudioCodec: string;
     let inputVideoCodec: string;
     let inputVideoResolution: string[];
 
-    let resolve: any;
-    let reject: any;
-    const socketPromise = new Promise((r, rj) => {
-        resolve = r;
-        reject = rj;
+    let ffmpegSocketResolve: any;
+    let ffmpegSocketReject: any;
+    const connectPromise = new Promise((r, rj) => {
+        ffmpegSocketResolve = r;
+        ffmpegSocketReject = rj;
     });
 
     function kill() {
@@ -134,100 +115,50 @@ export async function startRebroadcastSession<T extends string>(ffmpegInput: FFM
         cp?.kill();
         // might need this too?
         cp?.kill('SIGKILL');
-        for (const server of servers) {
-            server?.close();
-        }
-        reject(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
+        ffmpegSocketReject(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
         clearTimeout(dataTimeout);
         clearTimeout(ffmpegIncomingConnectionTimeout);
+    }
+
+    function dataKill() {
+        console.error('timeout waiting for data, killing parser session');
+        kill();
     }
 
     function resetActivityTimer() {
         if (!options.timeout)
             return;
         clearTimeout(dataTimeout);
-        dataTimeout = setTimeout(kill, options.timeout);
+        dataTimeout = setTimeout(dataKill, options.timeout);
     }
 
     resetActivityTimer();
 
-    const ffmpegInputs: { [container in T]: FFMpegInput } = {} as any;
-
     const args = ffmpegInput.inputArguments.slice();
-
-    const servers = [];
 
     ffmpegIncomingConnectionTimeout = setTimeout(kill, 30000);
 
     for (const container of Object.keys(options.parsers)) {
         const parser = options.parsers[container];
-
-        const eventName = container + '-data';
-
-        if (!options.parseOnly) {
-            const {server: rebroadcast, port: rebroadcastPort } = await createRebroadcaster({
-                connect: (writeData, destroy) => {
-                    clients++;
-                    clearTimeout(dataTimeout);
-
-                    const cleanup = () => {
-                        events.removeListener(eventName, writeData);
-                        events.removeListener('killed', destroy)
-                        clients--;
-                        if (clients === 0) {
-                            resetActivityTimer();
-                        }
-                        destroy();
-                    }
-                    events.on(eventName, writeData);
-                    events.once('killed', cleanup);
-
-                    return cleanup;
-                }
-            })
-
-            servers.push(rebroadcast);
-
-            const url = `tcp://127.0.0.1:${rebroadcastPort}`;
-            ffmpegInputs[container] = {
-                url,
-                mediaStreamOptions: ffmpegInput.mediaStreamOptions,
-                inputArguments: [
-                    '-f', container,
-                    '-i', url,
-                ],
-            };
-        }
-        else {
-            ffmpegInputs[container] = {
-                url: undefined,
-                mediaStreamOptions: ffmpegInput.mediaStreamOptions,
-            };
-        }
-
-        const server = createServer(async (socket) => {
-            server.close();
-
-            resolve(socket);
+        const server = await listenZeroSingleClient();
+        server.clientPromise.then(async (socket) => {
+            ffmpegSocketResolve(undefined);
 
             try {
-                const eventName = container + '-data';
                 for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
-                    events.emit(eventName, chunk);
+                    events.emit(container, chunk);
+                    resetActivityTimer();
                 }
             }
             catch (e) {
                 console.error('rebroadcast parse error', e);
                 kill();
             }
-        });
-        servers.push(server);
-
-        const serverPort = await listenZero(server);
+        })
 
         args.push(
             ...parser.outputArguments,
-            `tcp://127.0.0.1:${serverPort}`
+            server.url,
         );
     }
 
@@ -238,31 +169,44 @@ export async function startRebroadcastSession<T extends string>(ffmpegInput: FFM
 
     cp.on('exit', kill);
 
+    // tbh parsing stdout is super sketchy way of doing this.
     parseAudioCodec(cp).then(result => inputAudioCodec = result);
     parseVideoCodec(cp).then(result => inputVideoCodec = result);
     parseResolution(cp).then(result => inputVideoResolution = result);
 
-    await socketPromise;
+    await connectPromise;
     clearTimeout(ffmpegIncomingConnectionTimeout);
 
     return {
         inputAudioCodec,
         inputVideoCodec,
         inputVideoResolution,
-
-        events,
         resetActivityTimer,
         isActive() { return isActive },
         kill,
-        servers,
-        cp,
-        ffmpegInputs,
+        mediaStreamOptions: ffmpegInput.mediaStreamOptions || {
+            id: undefined,
+            name: undefined,
+        },
+        on(event: string, cb: any) {
+            events.on(event, cb);
+            return this;
+        },
+        once(event: any, cb: any) {
+            events.once(event, cb);
+            return this;
+        },
+        removeListener(event, cb) {
+            events.removeListener(event, cb);
+            return this;
+        }
     };
 }
 
 export interface Rebroadcaster {
     server: Server;
     port: number;
+    clients: number;
 }
 
 export interface RebroadcastSessionCleanup {
@@ -274,6 +218,7 @@ export interface RebroadcasterOptions {
 }
 
 export async function createRebroadcaster(options?: RebroadcasterOptions): Promise<Rebroadcaster> {
+    let clientCount = 0;
     const server = createServer(socket => {
         let first = true;
         const writeData = (data: StreamChunk) => {
@@ -299,13 +244,19 @@ export async function createRebroadcaster(options?: RebroadcasterOptions): Promi
         }
         let cleanupCallback = options?.connect(writeData, cleanup);
 
-        socket.on('end', cleanup);
-        socket.on('close', cleanup);
-        socket.on('error', cleanup);
+        socket.once('close', () => {
+            clientCount--;
+            cleanup();
+        });
+
+        clientCount++;
     });
     const port = await listenZero(server);
     return {
         server,
         port,
+        get clients() {
+            return clientCount;
+        }
     }
 }
