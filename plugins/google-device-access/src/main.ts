@@ -543,7 +543,9 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     const camera: NestCamera = this.devices.get(nativeId) as any;
                     if (camera) {
                         camera.motionDetected = true;
-                        camera.storage.setItem('lastMotionEventId', events['sdm.devices.events.CameraMotion.Motion'].eventId);
+                        camera.storage.setItem('lastMotionEventId',
+                            events['sdm.devices.events.CameraMotion.Motion']?.eventId
+                            || events['sdm.devices.events.CameraPerson.Person']?.eventId);
                         setTimeout(() => camera.motionDetected = false, 30000);
                         if (events['sdm.devices.events.CameraPerson.Person']) {
                             this.onDeviceEvent(ScryptedInterface.ObjectDetection, {
