@@ -14,7 +14,6 @@ You may use the device's webpage access or one of the following applications: `A
 The optimal/reliable codec settings can be found in the documentation for the [Homekit Plugin](https://github.com/koush/scrypted/tree/main/plugins/homekit).
 
 ## Amcrest Doorbells (e.g. AD110 and AD410)
-At this time, 2-way audio works for AD110 and not AD410.
 
 * Specify `Type` is `Doorbell`
 * `Username` admin
