@@ -313,6 +313,18 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
     }
 
+    async getPackageJson(pluginId: string) {
+        let packageJson;
+        if (this.plugins[pluginId]) {
+            packageJson = this.plugins[pluginId].packageJson;
+        }
+        else {
+            const plugin = await this.datastore.tryGet(Plugin, pluginId);
+            packageJson = plugin.packageJson;
+        }
+        return packageJson;
+    }
+
     handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
 
@@ -621,7 +633,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         const providedRoom = device.room;
         const isUsingDefaultRoom = getDisplayRoom(pluginDevice) === getProvidedRoomOrDefault(pluginDevice);
 
-        const providedInterfaces = PluginDeviceProxyHandler.sortInterfaces(device.interfaces);
+        let providedInterfaces = device.interfaces.slice();
+        if (!device.nativeId)
+            providedInterfaces.push(ScryptedInterface.ScryptedPlugin);
+        else
+            providedInterfaces = providedInterfaces.filter(iface => iface !== ScryptedInterface.ScryptedPlugin);
+        providedInterfaces = PluginDeviceProxyHandler.sortInterfaces(providedInterfaces);
         // assure final mixin resolved interface list has at least all the
         // interfaces from the provided. the actual list will resolve lazily.
         let mixinInterfaces: string[] = [];
@@ -671,10 +688,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return ret;
     }
 
-    async migrate(pluginDevice: PluginDevice) {
-        // nothing right now.
-    }
-
     killall() {
         for (const host of Object.values(this.plugins)) {
             host?.kill();
@@ -689,8 +702,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         process.on('SIGTERM', () => this.killall());
 
         for await (const pluginDevice of this.datastore.getAll(PluginDevice)) {
-            this.migrate(pluginDevice);
-
             // this may happen due to race condition around deletion/update. investigate.
             if (!pluginDevice.state) {
                 this.datastore.remove(pluginDevice);
@@ -699,8 +710,21 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
             this.pluginDevices[pluginDevice._id] = pluginDevice;
             let mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+
+            let dirty = false;
             if (mixins.includes(null) || mixins.includes(undefined)) {
+                dirty = true;
                 setState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(e => !!e));
+            }
+
+            const interfaces: string[] = getState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces);
+            if (!pluginDevice.nativeId && !interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
+                dirty = true;
+                interfaces.push(ScryptedInterface.ScryptedPlugin);
+                setState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, PluginDeviceProxyHandler.sortInterfaces(interfaces));
+            }
+
+            if (dirty) {
                 this.datastore.upsert(pluginDevice);
             }
         }

@@ -62,15 +62,7 @@ export class PluginComponent {
         return this.scrypted.plugins[pluginId]?.kill();
     }
     async getPackageJson(pluginId: string) {
-        let packageJson;
-        if (this.scrypted.plugins[pluginId]) {
-            packageJson = this.scrypted.plugins[pluginId].packageJson;
-        }
-        else {
-            const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);
-            packageJson = plugin.packageJson;
-        }
-        return packageJson;
+        return this.scrypted.getPackageJson(pluginId);
     }
     async getDeviceInfo(id: string) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);

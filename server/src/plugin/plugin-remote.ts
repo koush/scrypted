@@ -8,7 +8,7 @@ import { RpcPeer, RPCResultError, PROPERTY_PROXY_ONEWAY_METHODS, PROPERTY_JSON_D
 import { BufferSerializer } from './buffer-serializer';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
 import fs from 'fs';
-const {link} = require('linkfs');
+const { link } = require('linkfs');
 
 class DeviceLogger implements Logger {
     nativeId: ScryptedNativeId;
@@ -530,10 +530,18 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
                     pluginConsole?.log('plugin successfully loaded');
                     await options?.onPluginReady?.(ret, params, exports.default);
-                    return exports.default;
+
+                    const defaultExport = exports.default;
+                    // support exporting a plugin class, plugin main function,
+                    // or a plugin instance
+                    if (defaultExport.toString().startsWith('class '))
+                        return new defaultExport();
+                    if (typeof defaultExport === 'function')
+                        return await defaultExport();
+                    return defaultExport;
                 }
                 catch (e) {
-                    pluginConsole?.error('plugin failed to load', e);
+                    pluginConsole?.error('plugin failed to start', e);
                     throw e;
                 }
             },

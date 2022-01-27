@@ -402,6 +402,11 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             }
         }
 
+        if (method === 'getPluginJson'
+            && getState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces)?.includes(ScryptedInterface.ScryptedPlugin)) {
+            return this.scrypted.getPackageJson(pluginDevice.pluginId);
+        }
+
         if (!isValidInterfaceMethod(pluginDevice.state.interfaces.value, method))
             throw new PluginError(`device ${this.id} does not support method ${method}`);
 
