@@ -33,6 +33,9 @@ export interface ScryptedDevice {
   room?: string;
   type?: ScryptedDeviceType;
 }
+export interface ScryptedPlugin {
+  getPluginJson(): Promise<any>;
+}
 export interface EventListenerOptions {
   /**
    * This EventListener will denoise events, and will not be called unless the state changes.
@@ -1189,6 +1192,7 @@ export interface Setting {
 
 export enum ScryptedInterface {
   ScryptedDevice = "ScryptedDevice",
+  ScryptedPlugin = "ScryptedPlugin",
   OnOff = "OnOff",
   Brightness = "Brightness",
   ColorSettingTemperature = "ColorSettingTemperature",

@@ -80,6 +80,13 @@ exports.ScryptedInterfaceDescriptors = {
             'type'
         ]
     },
+    ScryptedPlugin: {
+        name: 'ScryptedPlugin',
+        methods: [
+            'getPluginJson'
+        ],
+        properties: []
+    },
     OnOff: {
         name: 'OnOff',
         methods: [
@@ -605,6 +612,7 @@ var MediaPlayerState;
 var ScryptedInterface;
 (function (ScryptedInterface) {
     ScryptedInterface["ScryptedDevice"] = "ScryptedDevice";
+    ScryptedInterface["ScryptedPlugin"] = "ScryptedPlugin";
     ScryptedInterface["OnOff"] = "OnOff";
     ScryptedInterface["Brightness"] = "Brightness";
     ScryptedInterface["ColorSettingTemperature"] = "ColorSettingTemperature";

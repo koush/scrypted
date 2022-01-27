@@ -181,6 +181,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       'type'
     ]
   },
+  ScryptedPlugin: {
+    name: 'ScryptedPlugin',
+    methods: [
+      'getPluginJson'
+    ],
+    properties: []
+  },
   OnOff: {
     name: 'OnOff',
     methods: [
@@ -664,6 +671,9 @@ export interface ScryptedDevice {
   providerId?: string;
   room?: string;
   type?: ScryptedDeviceType;
+}
+export interface ScryptedPlugin {
+  getPluginJson(): Promise<any>;
 }
 export interface EventListenerOptions {
   /**
@@ -1821,6 +1831,7 @@ export interface Setting {
 
 export enum ScryptedInterface {
   ScryptedDevice = "ScryptedDevice",
+  ScryptedPlugin = "ScryptedPlugin",
   OnOff = "OnOff",
   Brightness = "Brightness",
   ColorSettingTemperature = "ColorSettingTemperature",

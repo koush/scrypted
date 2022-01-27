@@ -106,6 +106,7 @@ class ScryptedInterface(Enum):
     Scene = "Scene"
     Scriptable = "Scriptable"
     ScryptedDevice = "ScryptedDevice"
+    ScryptedPlugin = "ScryptedPlugin"
     Settings = "Settings"
     SoftwareUpdate = "SoftwareUpdate"
     StartStop = "StartStop"
@@ -717,6 +718,11 @@ class ScryptedDevice:
     async def setRoom(self, room: str) -> None:
         pass
     async def setType(self, type: ScryptedDeviceType) -> None:
+        pass
+    pass
+
+class ScryptedPlugin:
+    async def getPluginJson(self) -> Any:
         pass
     pass
 
