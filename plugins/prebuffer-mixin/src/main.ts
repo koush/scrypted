@@ -13,7 +13,7 @@ const { mediaManager, log, systemManager, deviceManager } = sdk;
 const defaultPrebufferDuration = 10000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
-const AUDIO_CONFIGURATION_TEMPLATE = 'audioConfiguration';
+const AUDIO_CONFIGURATION_KEY_PREFIX = 'audioConfiguration-';
 const DEFAULT_AUDIO = 'Default';
 const COMPATIBLE_AUDIO = 'AAC or No Audio';
 const COMPATIBLE_AUDIO_DESCRIPTION = `${COMPATIBLE_AUDIO} (Copy)`;
@@ -62,13 +62,13 @@ class PrebufferSession {
 
   activeClients = 0;
   inactivityTimeout: NodeJS.Timeout;
-
-  AUDIO_CONFIGURATION = AUDIO_CONFIGURATION_TEMPLATE + '-' + this.streamId;
+  audioConfigurationKey: string;
 
   constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string, public stopInactive: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
+    this.audioConfigurationKey = AUDIO_CONFIGURATION_KEY_PREFIX + this.streamId;
   }
 
   clearPrebuffers() {
@@ -91,7 +91,7 @@ class PrebufferSession {
     legacyAudio: boolean,
     reencodeAudio: boolean,
   } {
-    const audioConfig = this.storage.getItem(this.AUDIO_CONFIGURATION) || '';
+    const audioConfig = this.storage.getItem(this.audioConfigurationKey) || '';
     // pcm audio only used when explicitly set.
     const pcmAudio = audioConfig.indexOf(PCM_AUDIO) !== -1;
     const legacyAudio = audioConfig.indexOf(LEGACY_AUDIO) !== -1;
@@ -129,8 +129,8 @@ class PrebufferSession {
         group,
         description: 'Configuring your camera to output AAC, MP3, MP2, or Opus is recommended. PCM/G711 cameras should set this to Reencode.',
         type: 'string',
-        key: this.AUDIO_CONFIGURATION,
-        value: this.storage.getItem(this.AUDIO_CONFIGURATION) || DEFAULT_AUDIO,
+        key: this.audioConfigurationKey,
+        value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
         choices: [
           DEFAULT_AUDIO,
           COMPATIBLE_AUDIO_DESCRIPTION,
