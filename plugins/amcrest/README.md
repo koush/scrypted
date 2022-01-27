@@ -1,4 +1,4 @@
-# Amcrest Plugin
+# Amcrest Plugin for Scrypted
 The Amcrest Plugin brings Amcrest-branded cameras, doorbells or NVR devices that are IP-based into Scrypted.
 Most commonly this plugin is used with 2 plugins: Rebroadcast and HomeKit.
 
