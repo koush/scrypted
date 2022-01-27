@@ -58,7 +58,7 @@ export class StorageSettings<T extends string> implements Settings {
             if (s.hide)
                 continue;
             s.key = key;
-            s.value = this.device.storage.getItem(key);
+            s.value = this.getItem(key as T);
             ret.push(s);
             delete s.onPut;
         }
