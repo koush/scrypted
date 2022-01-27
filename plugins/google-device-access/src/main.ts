@@ -455,6 +455,8 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     authorizationUri: string;
     client: ClientOAuth2;
 
+    apiHostname: string;
+
     startup: Promise<void>;
 
     updateClient() {
@@ -465,7 +467,8 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             this.log.a('Enter a valid project ID. Setup instructions for Nest: https://www.home-assistant.io/integrations/nest/');
         }
 
-        this.authorizationUri = `https://nestservices.google.com/partnerconnections/${this.projectId}/auth`
+        const authorizationHostname = this.storage.getItem('authorizationHostname') || 'nestservices.google.com';
+        this.authorizationUri = `https://${authorizationHostname}/partnerconnections/${this.projectId}/auth`
         this.client = new ClientOAuth2({
             clientId: this.clientId,
             clientSecret: this.clientSecret,
@@ -475,6 +478,8 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 'https://www.googleapis.com/auth/sdm.service',
             ]
         });
+
+        this.apiHostname = this.storage.getItem('apiHostname') || 'smartdevicemanagement.googleapis.com';
     }
 
     refreshThrottled = throttle(async () => {
@@ -678,7 +683,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
     async authGet(path: string) {
         await this.loadToken();
-        return axios(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${this.projectId}${path}`, {
+        return axios(`https://${this.apiHostname}/v1/enterprises/${this.projectId}${path}`, {
             // validateStatus() {
             //     return true;
             // },
@@ -690,7 +695,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
     async authPost(path: string, data: any) {
         await this.loadToken();
-        return axios.post(`https://smartdevicemanagement.googleapis.com/v1/enterprises/${this.projectId}${path}`, data, {
+        return axios.post(`https://${this.apiHostname}/v1/enterprises/${this.projectId}${path}`, data, {
             headers: {
                 Authorization: `Bearer ${this.token.accessToken}`
             }
