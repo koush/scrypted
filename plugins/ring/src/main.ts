@@ -5,7 +5,7 @@ import { StorageSettings } from '../../../common/src/settings';
 import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
 import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
 import child_process, { ChildProcess } from 'child_process';
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
+import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
 import { generateUuid } from '../../../external/ring-client-api/api/util';
 
 const { log, deviceManager, mediaManager } = sdk;
@@ -59,7 +59,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     async sendOffer(offer: RTCAVMessage) {
         this.stopWebRtcSession();
         const sessionId = generateUuid();
-        this.webrtcSession = sessionId;
+        // this.webrtcSession = sessionId;
         const answerSdp = await this.findCamera().startWebRtcSession(sessionId, offer.description.sdp);
 
         const answer: RTCAVMessage = {
@@ -77,7 +77,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
         this.stopWebRtcSession();
         const sessionId = generateUuid();
-        this.webrtcSession = sessionId;
+        // this.webrtcSession = sessionId;
         const offer: RTCAVMessage = JSON.parse(data.toString());
         const answerSdp = await this.findCamera().startWebRtcSession(sessionId, offer.description.sdp);
 
@@ -286,7 +286,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     }
 
     findCamera() {
-        return this.plugin.cameras.find(camera => camera.id.toString() === this.nativeId);
+        return this.plugin.cameras?.find(camera => camera.id.toString() === this.nativeId);
     }
 }
 
