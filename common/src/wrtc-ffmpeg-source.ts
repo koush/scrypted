@@ -1,4 +1,4 @@
-import { RTCAVSource, RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions} from "@scrypted/sdk/types";
+import { RTCAVSource, RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions } from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "./listen-cluster";
 import { RTCPeerConnection, RTCRtpCodecParameters } from "werift";
 import dgram from 'dgram';
@@ -111,9 +111,16 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
     });
 
     if (avsource.datachannel)
-      pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
+        pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
+
+    const gatheringPromise = new Promise(resolve => pc.iceGatheringStateChange.subscribe(resolve));
 
     let offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    await gatheringPromise;
+
+    offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
     const offerWithCandidates: RTCAVMessage = {
