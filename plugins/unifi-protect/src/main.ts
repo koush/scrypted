@@ -392,6 +392,51 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
+            for (const light of this.api.lights) {
+                const d: Device = {
+                    providerNativeId: this.nativeId,
+                    name: light.name,
+                    nativeId: light.id,
+                    info: {
+                        manufacturer: 'Ubiquiti',
+                        model: light.type,
+                        firmware: light.firmwareVersion,
+                        version: light.hardwareRevision,
+                        serialNumber: light.id,
+                    },
+                    interfaces: [
+                        // todo light sensor
+                        ScryptedInterface.OnOff,
+                        ScryptedInterface.Brightness,
+                        ScryptedInterface.MotionSensor,
+                    ],
+                    type: ScryptedDeviceType.Light,
+                };
+
+                devices.push(d);
+            }
+
+            for (const lock of this.api.doorlocks) {
+                const d: Device = {
+                    providerNativeId: this.nativeId,
+                    name: lock.name,
+                    nativeId: lock.id,
+                    info: {
+                        manufacturer: 'Ubiquiti',
+                        model: lock.type,
+                        firmware: lock.firmwareVersion,
+                        version: lock.hardwareRevision.toString(),
+                        serialNumber: lock.id,
+                    },
+                    interfaces: [
+                        ScryptedInterface.Lock,
+                    ],
+                    type: ScryptedDeviceType.Lock,
+                };
+
+                devices.push(d);
+            }
+
             await deviceManager.onDevicesChanged({
                 providerNativeId: this.nativeId,
                 devices,
