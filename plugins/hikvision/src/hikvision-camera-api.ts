@@ -62,7 +62,7 @@ export class HikVisionCameraAPI {
     async checkIsOldModel(): Promise<boolean> {
         // The old Hikvision DS-7608NI-E2 doesn't support channel capability checks, and the requests cause errors
         const model = await this.checkDeviceModel();
-        return model.match(/DS-7608NI-E2/) != undefined;
+        return !!model?.match(/DS-7608NI-E2/);
     }
 
     async checkStreamSetup(channel: string): Promise<HikVisionCameraStreamSetup> {
