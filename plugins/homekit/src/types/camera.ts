@@ -198,6 +198,7 @@ addSupportedType({
                         return;
 
                     const reconfigured: MediaStreamOptions = Object.assign({
+                        id: selectedStream?.id,
                         video: {
                         },
                     }, selectedStream || {});
