@@ -272,10 +272,16 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         j: FFMpegInput = json.loads(s)
         container = j.get('container', None)
         videosrc = j['url']
-        if container == 'mpegts' and videosrc.startswith('tcp://'):
+        if videosrc.startswith('tcp://'):
             parsed_url = urlparse(videosrc)
-            videosrc = 'tcpclientsrc port=%s host=%s ! tsdemux' % (
+            videosrc = 'tcpclientsrc port=%s host=%s' % (
                 parsed_url.port, parsed_url.hostname)
+            if container == 'mpegts':
+                videosrc += ' ! tsdemux'
+            elif container == 'sdp':
+                videosrc += ' ! sdpdemux'
+            else:
+                raise Exception('unknown container %s' % container)
         elif videosrc.startswith('rtsp'):
             videosrc = 'rtspsrc location=%s ! rtph264depay ! h264parse' % videosrc
         
