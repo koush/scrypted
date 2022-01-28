@@ -27,6 +27,7 @@ import rimraf from 'rimraf';
 
 export class PluginHost {
     static sharedWorker: child_process.ChildProcess;
+
     worker: child_process.ChildProcess;
     peer: RpcPeer;
     pluginId: string;
@@ -51,6 +52,9 @@ export class PluginHost {
     kill() {
         this.killed = true;
         this.api.removeListeners();
+        // things might get a bit race prone, so clear out the shared worker before killing.
+        if (this.worker === PluginHost.sharedWorker)
+            PluginHost.sharedWorker = undefined;
         this.worker.kill('SIGKILL');
         this.io.close();
         for (const s of Object.values(this.ws)) {
@@ -293,17 +297,22 @@ export class PluginHost {
                 Object.keys(this.packageJson.optionalDependencies || {}).length === 0;
             if (useSharedWorker) {
                 if (!PluginHost.sharedWorker) {
-                    PluginHost.sharedWorker = child_process.fork(require.main.filename, ['child', '@scrypted/shared'], {
+                    const worker = child_process.fork(require.main.filename, ['child', '@scrypted/shared'], {
                         stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
                         env: Object.assign({}, process.env, env),
                         serialization: 'advanced',
                         execArgv,
                     });
+                    PluginHost.sharedWorker = worker;
                     PluginHost.sharedWorker.setMaxListeners(100);
-                    PluginHost.sharedWorker.on('close', () => PluginHost.sharedWorker = undefined);
-                    PluginHost.sharedWorker.on('error', () => PluginHost.sharedWorker = undefined);
-                    PluginHost.sharedWorker.on('exit', () => PluginHost.sharedWorker = undefined);
-                    PluginHost.sharedWorker.on('disconnect', () => PluginHost.sharedWorker = undefined);
+                    const clearSharedWorker = () => {
+                        if (worker === PluginHost.sharedWorker)
+                            PluginHost.sharedWorker = undefined;
+                    };
+                    PluginHost.sharedWorker.on('close', () => clearSharedWorker);
+                    PluginHost.sharedWorker.on('error', () => clearSharedWorker);
+                    PluginHost.sharedWorker.on('exit', () => clearSharedWorker);
+                    PluginHost.sharedWorker.on('disconnect', () => clearSharedWorker);
                 }
                 PluginHost.sharedWorker.send({
                     type: 'start',
