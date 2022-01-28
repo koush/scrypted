@@ -14,16 +14,25 @@ const defaultPrebufferDuration = 10000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
 const AUDIO_CONFIGURATION_KEY_PREFIX = 'audioConfiguration-';
+const FFMPEG_INPUT_ARGUMENTS_KEY_PREFIX = 'ffmpegInputArguments-';
 const DEFAULT_AUDIO = 'Default';
-const COMPATIBLE_AUDIO = 'AAC or No Audio';
+const AAC_AUDIO = 'AAC or No Audio';
+const AAC_AUDIO_DESCRIPTION = `${AAC_AUDIO} (Copy)`;
+const COMPATIBLE_AUDIO = 'Compatible Audio'
 const COMPATIBLE_AUDIO_DESCRIPTION = `${COMPATIBLE_AUDIO} (Copy)`;
-const LEGACY_AUDIO = 'MP2/MP3 Audio'
-const LEGACY_AUDIO_DESCRIPTION = `${LEGACY_AUDIO} (Copy)`;
-const OTHER_AUDIO = 'Other Audio';
-const OTHER_AUDIO_DESCRIPTION = `${OTHER_AUDIO} (Transcode)`;
+const TRANSCODE_AUDIO = 'Other Audio';
+const TRANSCODE_AUDIO_DESCRIPTION = `${TRANSCODE_AUDIO} (Transcode)`;
 const PCM_AUDIO = 'PCM or G.711 Audio';
 const PCM_AUDIO_DESCRIPTION = `${PCM_AUDIO} (Copy, Unstable)`;
-const compatibleAudio = ['aac', 'mp3', 'mp2', 'AAC', 'MP3', 'MP2', 'opus', 'OPUS', '', undefined, null];
+const COMPATIBLE_AUDIO_CODECS = ['aac', 'mp3', 'mp2', 'opus'];
+const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
+
+const VALID_AUDIO_CONFIGS = [
+  AAC_AUDIO,
+  COMPATIBLE_AUDIO,
+  TRANSCODE_AUDIO,
+  PCM_AUDIO,
+];
 
 interface PrebufferStreamChunk {
   chunk: StreamChunk;
@@ -52,8 +61,7 @@ class PrebufferSession {
 
   detectedIdrInterval = 0;
   prevIdr = 0;
-  incompatibleDetected = false;
-  legacyDetected = false;
+  detectedAudioCodec: string;
   audioDisabled = false;
 
   mixinDevice: VideoCamera;
@@ -63,12 +71,14 @@ class PrebufferSession {
   activeClients = 0;
   inactivityTimeout: NodeJS.Timeout;
   audioConfigurationKey: string;
+  ffmpegInputArgumentsKey: string;
 
   constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string, public stopInactive: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
     this.audioConfigurationKey = AUDIO_CONFIGURATION_KEY_PREFIX + this.streamId;
+    this.ffmpegInputArgumentsKey = FFMPEG_INPUT_ARGUMENTS_KEY_PREFIX + this.streamId;
   }
 
   clearPrebuffers() {
@@ -86,21 +96,26 @@ class PrebufferSession {
   }
 
   getAudioConfig(): {
-    audioConfig: string,
-    pcmAudio: boolean,
-    legacyAudio: boolean,
+    isUsingDefaultAudioConfig: boolean,
+    aacAudio: boolean,
+    compatibleAudio: boolean,
     reencodeAudio: boolean,
+    pcmAudio: boolean,
   } {
-    const audioConfig = this.storage.getItem(this.audioConfigurationKey) || '';
+    let audioConfig = this.storage.getItem(this.audioConfigurationKey) || '';
+    if (!VALID_AUDIO_CONFIGS.includes(audioConfig))
+      audioConfig = '';
+    const aacAudio = audioConfig.indexOf(AAC_AUDIO) !== -1;
+    const compatibleAudio = audioConfig.indexOf(COMPATIBLE_AUDIO) !== -1;
+    // reencode audio will be used if explicitly set.
+    const reencodeAudio = audioConfig.indexOf(TRANSCODE_AUDIO) !== -1;
     // pcm audio only used when explicitly set.
     const pcmAudio = audioConfig.indexOf(PCM_AUDIO) !== -1;
-    const legacyAudio = audioConfig.indexOf(LEGACY_AUDIO) !== -1;
-    // reencode audio will be used if explicitly set.
-    const reencodeAudio = audioConfig.indexOf(OTHER_AUDIO) !== -1;
     return {
-      audioConfig,
+      isUsingDefaultAudioConfig: !(aacAudio || compatibleAudio || reencodeAudio || pcmAudio),
+      aacAudio,
       pcmAudio,
-      legacyAudio,
+      compatibleAudio,
       reencodeAudio,
     }
   }
@@ -133,12 +148,26 @@ class PrebufferSession {
         value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
         choices: [
           DEFAULT_AUDIO,
+          AAC_AUDIO_DESCRIPTION,
           COMPATIBLE_AUDIO_DESCRIPTION,
-          LEGACY_AUDIO_DESCRIPTION,
-          OTHER_AUDIO_DESCRIPTION,
+          TRANSCODE_AUDIO_DESCRIPTION,
           PCM_AUDIO_DESCRIPTION,
         ],
       },
+      {
+        title: 'FFmpeg Input Arguments Prefix',
+        group,
+        description: 'Optional/Advanced: Additional input arguments to pass to the ffmpeg command. These will be placed before the input arguments.',
+        key: this.ffmpegInputArgumentsKey,
+        value: this.storage.getItem(this.ffmpegInputArgumentsKey),
+        placeholder: DEFAULT_FFMPEG_INPUT_ARGUMENTS,
+        choices: [
+          DEFAULT_FFMPEG_INPUT_ARGUMENTS,
+          '-use_wallclock_as_timestamps 1',
+          '-v verbose',
+        ],
+        combobox: true,
+      }
     );
 
     if (session) {
@@ -191,28 +220,80 @@ class PrebufferSession {
     this.prebuffers.s16le = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
-    // todo: there's a bug here where probe's noAudio check looks at the first media stream option entry
-    const probe = await probeVideoCamera(this.mixinDevice);
     let mso: MediaStreamOptions;
-    if (probe.options) {
-      mso = probe.options.find(mso => mso.id === this.streamId);
+    try {
+      mso = (await this.mixinDevice.getVideoStreamOptions()).find(o => o.id === this.streamId);
     }
-    const probeAudioCodec = mso?.audio?.codec;
-    this.incompatibleDetected = this.incompatibleDetected || (probeAudioCodec && !compatibleAudio.includes(probeAudioCodec));
-    if (this.incompatibleDetected)
-      this.console.warn('configure your camera to output aac, mp3, mp2, or opus audio. incompatible audio codec detected', probeAudioCodec);
+    catch (e) {
+    }
+
+    // audio codecs are determined by probing the camera to see what it reports.
+    // if the camera does not specify a codec, rebroadcast will force audio off
+    // to determine the codec without causing a parse failure.
+    // camera may explicity request that its audio stream be muted via a null.
+    // respect that setting.
+    const audioSoftMuted = mso?.audio?.codec === null;
+    const advertisedAudioCodec = mso?.audio?.codec;
+
+    const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio, pcmAudio } = this.getAudioConfig();
+
+    let probingAudioCodec = false;
+    if (!audioSoftMuted && !advertisedAudioCodec && isUsingDefaultAudioConfig && this.detectedAudioCodec === undefined) {
+      this.console.warn('Camera did not report an audio codec, muting the audio stream and probing the codec.');
+      probingAudioCodec = true;
+    }
+
+    // complain to the user about the codec if necessary. upstream may send a audio
+    // stream but report none exists (to request muting).
+    if (!audioSoftMuted && advertisedAudioCodec && this.detectedAudioCodec !== undefined
+      && this.detectedAudioCodec !== advertisedAudioCodec) {
+      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, this.detectedAudioCodec);
+    }
+
+    // the assumed audio codec is the detected codec first and the reported codec otherwise.
+    const assumedAudioCodec = this.detectedAudioCodec === undefined
+      ? advertisedAudioCodec?.toLowerCase()
+      : this.detectedAudioCodec?.toLowerCase();
+
+    if (!probingAudioCodec) {
+      const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
+
+      if (audioIncompatible) {
+        // show an alert that rebroadcast needs an explicit setting by the user.
+        if (isUsingDefaultAudioConfig) {
+          log.a(`${this.mixin.name} is using the ${this.detectedAudioCodec} audio codec and has had its audio disabled. Select 'Disable Audio' or 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
+        }
+        this.console.warn('Configure your camera to output AAC, MP3, MP2, or Opus audio. Suboptimal audio codec in use:', this.detectedAudioCodec || advertisedAudioCodec);
+      }
+      else if (!audioSoftMuted && isUsingDefaultAudioConfig && advertisedAudioCodec === undefined && this.detectedAudioCodec !== undefined) {
+        // handling compatible codecs that were unspecified...
+        if (this.detectedAudioCodec === 'aac') {
+          log.a(`${this.mixin.name} did not report a codec and ${this.detectedAudioCodec} was found during probe. Select '${AAC_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert.`);
+        }
+        else {
+          log.a(`${this.mixin.name} did not report a codec and ${this.detectedAudioCodec} was found during probe. Select '${COMPATIBLE_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert.`);
+        }
+      }
+    }
 
     const mo = await this.mixinDevice.getVideoStream(mso);
     const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
     const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
 
-    const { audioConfig, pcmAudio, reencodeAudio, legacyAudio } = this.getAudioConfig();
-    const isUsingDefaultAudioConfig = !audioConfig || audioConfig === DEFAULT_AUDIO;
-    const forceNoAudio = this.incompatibleDetected && isUsingDefaultAudioConfig;
+    // aac needs to have the adts header stripped for mpegts and mp4.
+    // use this filter sparingly as it prevents ffmpeg from starting on a mismatch.
+    // however, not using it on an aac stream also prevents ffmpeg from parsing.
+    // so only use it when the detected or probe codec reports aac.
+    const aacFilters = ['-bsf:a', 'aac_adtstoasc'];
+    // compatible audio like mp3, mp2, opus can be muxed without issue.
+    const compatibleFilters = [];
 
     this.audioDisabled = false;
     let acodec: string[];
-    if (probe.noAudio || forceNoAudio) {
+
+    const detectedNoAudio = this.detectedAudioCodec === null;
+
+    if (audioSoftMuted || probingAudioCodec || detectedNoAudio) {
       // no audio? explicitly disable it.
       acodec = ['-an'];
       this.audioDisabled = true;
@@ -221,7 +302,6 @@ class PrebufferSession {
       acodec = ['-an'];
     }
     else if (reencodeAudio) {
-      // setting no audio codec will allow ffmpeg to do an implicit conversion.
       acodec = [
         '-bsf:a', 'aac_adtstoasc',
         '-acodec', 'libfdk_aac',
@@ -232,13 +312,31 @@ class PrebufferSession {
         '-ac', `1`,
       ];
     }
-    else {
-      // NOTE: if there is no audio track, this will still work fine.
+    else if (aacAudio) {
+      // NOTE: If there is no audio track, the aac filters will still work fine without complaints
+      // from ffmpeg. This is why AAC and No Audio can be grouped into a single setting.
       acodec = [
         '-acodec',
         'copy',
-        ...(legacyAudio || this.legacyDetected ? [] : ['-bsf:a', 'aac_adtstoasc']),
       ];
+      acodec.push(...aacFilters);
+    }
+    else if (compatibleAudio) {
+      acodec = [
+        '-acodec',
+        'copy',
+      ];
+      acodec.push(...compatibleFilters);
+    }
+    else {
+      acodec = [
+        '-acodec',
+        'copy',
+      ];
+
+      const filters = assumedAudioCodec === 'aac' ? aacFilters : compatibleFilters;
+
+      acodec.push(...filters);
     }
 
     const vcodec = [
@@ -262,17 +360,43 @@ class PrebufferSession {
     };
 
     // if pcm prebuffer is requested, create the the parser. don't do it if
-    // the camera wants to mute the audio though.
-    if (!probe.noAudio && !forceNoAudio && pcmAudio) {
+    // the camera wants to mute the audio though, or no audio was detected
+    // in a prior attempt.
+    if (pcmAudio && !audioSoftMuted && !detectedNoAudio) {
       rbo.parsers.s16le = createPCMParser();
     }
 
     this.parsers = rbo.parsers;
 
     // create missing pts from dts so mpegts and mp4 muxing does not fail
-    ffmpegInput.inputArguments.unshift('-fflags', '+genpts');
+    const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
+    ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
 
     const session = await startParserSession(ffmpegInput, rbo);
+
+    if (!session.inputAudioCodec) {
+      this.console.log('No audio stream detected.');
+    }
+    else if (!COMPATIBLE_AUDIO_CODECS.includes(session.inputAudioCodec?.toLowerCase())) {
+      this.console.log('Detected audio codec is not mp4/mpegts compatible.', session.inputAudioCodec);
+    }
+    else {
+      this.console.log('Detected audio codec is mp4/mpegts compatible.', session.inputAudioCodec);
+    }
+
+    // set/update the detected codec, set it to null if no audio was found.
+    this.detectedAudioCodec = session.inputAudioCodec || null;
+
+    if (session.inputVideoCodec !== 'h264') {
+      this.console.error(`Video codec is not h264. If there are errors, try changing your camera's encoder output.`);
+    }
+
+    if (probingAudioCodec) {
+      this.console.warn('Audio probe complete, ending rebroadcast session and restarting with detected codecs.');
+      session.kill();
+      return this.startPrebufferSession();
+    }
+
     this.parserSession = session;
 
     // cloud streams need a periodic token refresh.
@@ -306,33 +430,6 @@ class PrebufferSession {
       if (this.parserSession === session)
         this.parserSession = undefined;
     });
-
-    if (!session.inputAudioCodec) {
-      this.console.warn('no audio detected.');
-    }
-    else if (!compatibleAudio.includes(session.inputAudioCodec)) {
-      this.console.error('Detected audio codec is not mp4/mpegts compatible.', session.inputAudioCodec);
-      // show an alert if no audio config was explicitly specified. Force the user to choose/experiment.
-      if (isUsingDefaultAudioConfig && !probe.noAudio) {
-        log.a(`${this.mixin.name} is using the ${session.inputAudioCodec} audio codec and has had its audio disabled. Select Disable Audio on your Camera or select Transcode Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
-        this.incompatibleDetected = true;
-        // this will probably crash ffmpeg due to mp4/mpegts not being a valid container for pcm,
-        // and then it will automatically restart with pcm handling.
-      }
-    }
-    else if (session.inputAudioCodec?.toLowerCase() !== 'aac') {
-      this.console.error('Detected audio codec was not AAC.', session.inputAudioCodec);
-      if (!legacyAudio) {
-        log.a(`${this.mixin.name} is using ${session.inputAudioCodec} audio. Enable MP2/MP3 Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
-        this.legacyDetected = true;
-        // this will probably crash ffmpeg due to mp2/mp3/opus not supporting the aac bit stream filters,
-        // and then it will automatically restart with legacy handling.
-      }
-    }
-
-    if (session.inputVideoCodec !== 'h264') {
-      this.console.error(`video codec is not h264. If there are errors, try changing your camera's encoder output.`);
-    }
 
     // s16le will be a no-op if there's no pcm, no harm.
     for (const container of PrebufferParserValues) {
@@ -380,7 +477,7 @@ class PrebufferSession {
       return;
     if (this.activeClients)
       return;
-    
+
     clearTimeout(this.inactivityTimeout)
     this.inactivityTimeout = setTimeout(() => {
       if (this.activeClients)
@@ -465,7 +562,7 @@ class PrebufferSession {
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
-    const { audioConfig, pcmAudio, reencodeAudio } = this.getAudioConfig();
+    const { pcmAudio, reencodeAudio } = this.getAudioConfig();
 
     if (this.audioDisabled) {
       mediaStreamOptions.audio = null;
