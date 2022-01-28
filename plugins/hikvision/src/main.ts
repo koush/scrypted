@@ -2,13 +2,32 @@ import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { HikVisionCameraAPI } from "./hikvision-camera-api";
 import { Destroyable, UrlMediaStreamOptions, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
+import { sleep } from "../../../common/src/sleep";
 import { HikVisionCameraEvent } from "./hikvision-camera-api";
 const { mediaManager } = sdk;
 
 class HikVisionCamera extends RtspSmartCamera implements Camera {
-    hasCheckedCodec = false;
     channelIds: Promise<string[]>;
     client: HikVisionCameraAPI;
+
+    // bad hack, but whatever.
+    codecCheck = (async () => {
+        while (true) {
+            try {
+                const streamSetup = await this.client.checkStreamSetup(this.getRtspChannel(), await this.isOld());
+                if (streamSetup.videoCodecType !== 'H.264') {
+                    this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
+                }
+                if (!this.isAudioDisabled() && streamSetup.audioCodecType && streamSetup.audioCodecType !== 'AAC') {
+                    this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it for AAC is recommended for optimal performance.`);
+                }
+                break;
+            }
+            catch (e) {
+                await sleep(60000);
+            }
+        }
+    })();
 
     listenEvents() {
         let motionTimeout: NodeJS.Timeout;
@@ -84,19 +103,6 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
     getClient() {
         if (!this.client)
             this.client = this.createClient();
-        (async () => {
-            if (this.hasCheckedCodec)
-                return;
-            const streamSetup = await this.client.checkStreamSetup(this.getRtspChannel());
-            this.hasCheckedCodec = true;
-            if (streamSetup.videoCodecType !== 'H.264') {
-                this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
-            }
-            if (!this.isAudioDisabled() && streamSetup.audioCodecType && streamSetup.audioCodecType !== 'AAC') {
-                this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it for AAC is recommended for optimal performance.`);
-            }
-        })();
-
         return this.client;
     }
 
@@ -142,11 +148,25 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return this.storage.getItem('rtspUrlParams') || '?transportmode=unicast';
     }
 
+    async isOld() {
+        const client = this.getClient();
+        let isOld: boolean;
+        if (this.storage.getItem('isOld')) {
+            isOld = this.storage.getItem('isOld') === 'true';
+        }
+        else {
+            isOld = await client.checkIsOldModel();
+            this.storage.setItem('isOld', isOld?.toString());
+        }
+        return isOld;
+    }
+
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         if (!this.channelIds) {
             const client = this.getClient();
             this.channelIds = new Promise(async (resolve, reject) => {
-                const isOld = await client.checkIsOldModel();
+                const isOld = await this.isOld();
+
                 if (isOld) {
                     this.console.error('Old NVR. Defaulting to two camera configuration');
                     const camNumber = this.getCameraNumber() || '1';

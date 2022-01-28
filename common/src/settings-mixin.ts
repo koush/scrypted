@@ -37,12 +37,14 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
         }
         catch (e) {
             const name = this.name;
+            const description = `${name} Extension settings failed to load.`;
+            this.console.error(description, e)
             allSettings.push({
                 key: Math.random().toString(),
                 title: name,
                 value: 'Settings Error',
                 group: 'Errors',
-                description: `${name} Extension settings failed to load.`,
+                description,
                 readonly: true,
             });
         }
@@ -57,12 +59,14 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
         }
         catch (e) {
             const name = deviceManager.getDeviceState(this.mixinProviderNativeId).name;
+            const description = `${name} Extension settings failed to load.`;
+            this.console.error(description, e)
             allSettings.push({
                 key: Math.random().toString(),
                 title: name,
                 value: 'Settings Error',
                 group: 'Errors',
-                description: `${name} Extension settings failed to load.`,
+                description,
                 readonly: true,
             });
         }

@@ -1,6 +1,6 @@
 import { ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
 
-export function canMixin(type: ScryptedDeviceType, interfaces: string[]): boolean {
+export function isPublishable(type: ScryptedDeviceType, interfaces: string[]): boolean {
     const set = new Set(interfaces);
     set.delete(ScryptedInterface.ObjectDetection);
     set.delete(ScryptedInterface.DeviceDiscovery);
@@ -13,5 +13,6 @@ export function canMixin(type: ScryptedDeviceType, interfaces: string[]): boolea
     set.delete(ScryptedInterface.Settings);
     set.delete(ScryptedInterface.Readme);
     set.delete(ScryptedInterface.BufferConverter);
+    set.delete(ScryptedInterface.ScryptedPlugin);
     return !!set.size;
 }

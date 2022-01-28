@@ -59,6 +59,7 @@ class ScryptedDeviceType(Enum):
     Valve = "Valve"
 
 class ScryptedInterface(Enum):
+    AmbientLightSensor = "AmbientLightSensor"
     AudioSensor = "AudioSensor"
     Authenticator = "Authenticator"
     Battery = "Battery"
@@ -415,6 +416,10 @@ class Setting(TypedDict):
     title: str
     type: Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
+    pass
+
+class AmbientLightSensor:
+    ambientLight: float
     pass
 
 class AudioSensor:
@@ -935,6 +940,7 @@ class ScryptedInterfaceProperty(Enum):
     powerDetected = "powerDetected"
     audioDetected = "audioDetected"
     motionDetected = "motionDetected"
+    ambientLight = "ambientLight"
     occupied = "occupied"
     flooded = "flooded"
     ultraviolet = "ultraviolet"
@@ -1235,6 +1241,13 @@ class DeviceState:
     @motionDetected.setter
     def motionDetected(self, value: bool):
         self.setScryptedProperty("motionDetected", value)
+
+    @property
+    def ambientLight(self) -> float:
+        self.getScryptedProperty("ambientLight")
+    @ambientLight.setter
+    def ambientLight(self, value: float):
+        self.setScryptedProperty("ambientLight", value)
 
     @property
     def occupied(self) -> bool:

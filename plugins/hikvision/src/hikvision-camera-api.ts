@@ -52,21 +52,22 @@ export class HikVisionCameraAPI {
                     resolve(deviceModel);
                 } catch (e) {
                     this.console.error('error checking NVR model', e);
-                    resolve("unknown");
+                    resolve(undefined);
                 }
             });
         }
         return await this.deviceModel;
     }
 
-    async checkIsOldModel(): Promise<boolean> {
+    async checkIsOldModel() {
         // The old Hikvision DS-7608NI-E2 doesn't support channel capability checks, and the requests cause errors
         const model = await this.checkDeviceModel();
+        if (!model)
+            return;
         return !!model?.match(/DS-7608NI-E2/);
     }
 
-    async checkStreamSetup(channel: string): Promise<HikVisionCameraStreamSetup> {
-        const isOld = await this.checkIsOldModel();
+    async checkStreamSetup(channel: string, isOld: boolean): Promise<HikVisionCameraStreamSetup> {
         if (isOld) {
             this.console.error('NVR is old version.  Defaulting camera capabilities to H.264/AAC');
             return {

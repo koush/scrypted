@@ -42,6 +42,7 @@ export interface DeviceState {
   powerDetected?: boolean
   audioDetected?: boolean
   motionDetected?: boolean
+  ambientLight?: number
   occupied?: boolean
   flooded?: boolean
   ultraviolet?: number
@@ -93,6 +94,7 @@ export class DeviceBase implements DeviceState {
   powerDetected?: boolean
   audioDetected?: boolean
   motionDetected?: boolean
+  ambientLight?: number
   occupied?: boolean
   flooded?: boolean
   ultraviolet?: number
@@ -145,6 +147,7 @@ export enum ScryptedInterfaceProperty {
   powerDetected = "powerDetected",
   audioDetected = "audioDetected",
   motionDetected = "motionDetected",
+  ambientLight = "ambientLight",
   occupied = "occupied",
   flooded = "flooded",
   ultraviolet = "ultraviolet",
@@ -503,6 +506,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     methods: [],
     properties: [
       'motionDetected'
+    ]
+  },
+  AmbientLightSensor: {
+    name: 'AmbientLightSensor',
+    methods: [],
+    properties: [
+      'ambientLight'
     ]
   },
   OccupancySensor: {
@@ -1272,6 +1282,12 @@ export interface AudioSensor {
 export interface MotionSensor {
   motionDetected?: boolean;
 }
+export interface AmbientLightSensor {
+  /**
+   * The ambient light in lux.
+   */
+  ambientLight: number;
+}
 export interface OccupancySensor {
   occupied?: boolean;
 }
@@ -1869,6 +1885,7 @@ export enum ScryptedInterface {
   PowerSensor = "PowerSensor",
   AudioSensor = "AudioSensor",
   MotionSensor = "MotionSensor",
+  AmbientLightSensor = "AmbientLightSensor",
   OccupancySensor = "OccupancySensor",
   FloodSensor = "FloodSensor",
   UltravioletSensor = "UltravioletSensor",

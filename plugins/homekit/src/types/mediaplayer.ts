@@ -1,5 +1,5 @@
 
-import { VideoCamera, MediaPlayer, MediaPlayerState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
+import { VideoCamera, MediaPlayer, MediaPlayerState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Categories, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -12,7 +12,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.MediaPlayer);
     },
-    getAccessory: async (device: ScryptedDevice & MediaPlayer) => {
+    getAccessory: async (device: ScryptedDevice & MediaPlayer & StartStop) => {
         const accessory = makeAccessory(device);
         accessory.category = Categories.TELEVISION;
         const service = accessory.addService(Service.Television, "Television", "Television");
