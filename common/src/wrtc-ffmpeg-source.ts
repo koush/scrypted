@@ -139,7 +139,8 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
     return {
         peerConnection: pc,
         ffmpegInput: {
-            url: undefined,
+            container: 'sdp',
+            url: sdpInput.url,
             mediaStreamOptions: getRTCMediaStreamOptions(id, name, 'sdp'),
             inputArguments: [
                 // '-analyzeduration', '50000000',
