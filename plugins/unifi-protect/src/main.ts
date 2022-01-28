@@ -30,9 +30,6 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
     }
 
     handleUpdatePacket(packet: any): void {
-        if (packet.action?.modelKey !== "camera") {
-            return;
-        }
         if (packet.action.action !== "update") {
             return;
         }
@@ -42,6 +39,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         const device = this.api.cameras?.find(c => c.id === packet.action.id)
             || this.api.lights?.find(c => c.id === packet.action.id)
+            || this.api.doorlocks?.find(c => c.id === packet.action.id)
             || this.api.sensors?.find(c => c.id === packet.action.id);
 
         if (!device) {
@@ -69,6 +67,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
     listener = (event: Buffer) => {
         const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
+        this.console.log('update', updatePacket);
+
         this.handleUpdatePacket(updatePacket);
 
         if (!updatePacket) {
@@ -270,7 +270,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         if (!this.api) {
-            this.api = new ProtectApi(ip, username, password, this.console);
+            this.api = new ProtectApi(ip, username, password);
         }
 
         try {

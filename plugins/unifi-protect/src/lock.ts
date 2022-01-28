@@ -10,11 +10,15 @@ export class UnifiLock extends ScryptedDeviceBase implements Lock {
     }
 
     async lock(): Promise<void> {
-        await this.protect.loginFetch(this.protect.api.doorlocksUrl() + `/${this.nativeId}/close`);
+        await this.protect.loginFetch(this.protect.api.doorlocksUrl() + `/${this.nativeId}/close`, {
+            method: 'POST',
+        });
     }
 
     async unlock(): Promise<void> {
-        await this.protect.loginFetch(this.protect.api.doorlocksUrl() + `/${this.nativeId}/open`);
+        await this.protect.loginFetch(this.protect.api.doorlocksUrl() + `/${this.nativeId}/open`, {
+            method: 'POST',
+        });
     }
 
     findLock() {
