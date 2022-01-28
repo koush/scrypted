@@ -314,7 +314,7 @@ class PrebufferSession {
       this.console.error('Detected audio codec is not mp4/mpegts compatible.', session.inputAudioCodec);
       // show an alert if no audio config was explicitly specified. Force the user to choose/experiment.
       if (isUsingDefaultAudioConfig && !probe.noAudio) {
-        log.a(`${this.mixin.name} is using the ${session.inputAudioCodec} audio codec and has had its audio disabled. Select Disable Audio on your Camera or select Reencode Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
+        log.a(`${this.mixin.name} is using the ${session.inputAudioCodec} audio codec and has had its audio disabled. Select Disable Audio on your Camera or select Transcode Audio in Rebroadcast Settings Audio Configuration to suppress this alert.`);
         this.incompatibleDetected = true;
         // this will probably crash ffmpeg due to mp4/mpegts not being a valid container for pcm,
         // and then it will automatically restart with pcm handling.
