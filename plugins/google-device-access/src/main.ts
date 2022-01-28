@@ -90,6 +90,8 @@ function toNestMode(mode: ThermostatMode): string {
 
 class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, BinarySensor, BufferConverter, ObjectDetector {
     signalingMime: string;
+    lastMotionEventId: string;
+    lastImage: Promise<Buffer>;
 
     constructor(public provider: GoogleSmartDeviceAccess, public device: any) {
         super(device.name.split('/').pop());
@@ -116,29 +118,39 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
-        const hasEventImages = !!this.device?.traits?.['sdm.devices.traits.CameraEventImage'];
-        const lastMotionEventId = this.storage.getItem('lastMotionEventId');
-        if (!lastMotionEventId || !hasEventImages) {
-            const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
-            try {
-                const msos = await realDevice.getVideoStreamOptions();
-                const prebuffered = msos.find(mso => mso.prebuffer);
-                if (prebuffered)
-                    return realDevice.getVideoStream(prebuffered);
-            }
-            catch (e) {
-            }
-            return mediaManager.createMediaObject(black, 'image/jpeg');
+        // if this stream is prebuffered, its safe to use the prebuffer to generate an image
+        const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+        try {
+            const msos = await realDevice.getVideoStreamOptions();
+            const prebuffered = msos.find(mso => mso.prebuffer);
+            if (prebuffered)
+                return realDevice.getVideoStream(prebuffered);
+        }
+        catch (e) {
         }
 
-        const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
-            command: "sdm.devices.commands.CameraEventImage.GenerateImage",
-            params: {
-                eventId: lastMotionEventId,
-            },
-        });
+        // try to fetch the latest event image if one is queued
+        const hasEventImages = !!this.device?.traits?.['sdm.devices.traits.CameraEventImage'];
+        if (hasEventImages && this.lastMotionEventId) {
+            const eventId = this.lastMotionEventId;
+            this.lastMotionEventId = undefined;
+            const result = this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
+                command: "sdm.devices.commands.CameraEventImage.GenerateImage",
+                params: {
+                    eventId,
+                },
+            }).then(response => response.data);
+            this.lastImage = result;
+        }
 
-        return mediaManager.createMediaObject(result.data, 'image/jpeg');
+        // use the last event image
+        if (this.lastImage) {
+            const data = await this.lastImage;
+            return mediaManager.createMediaObject(data, 'image/jpeg');
+        }
+
+        // send "no snapshot available" image
+        return mediaManager.createMediaObject(black, 'image/jpeg');
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
@@ -558,9 +570,14 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     const camera: NestCamera = this.devices.get(nativeId) as any;
                     if (camera) {
                         camera.motionDetected = true;
-                        camera.storage.setItem('lastMotionEventId',
-                            events['sdm.devices.events.CameraMotion.Motion']?.eventId
-                            || events['sdm.devices.events.CameraPerson.Person']?.eventId);
+                        const eventId = events['sdm.devices.events.CameraMotion.Motion']?.eventId
+                            || events['sdm.devices.events.CameraPerson.Person']?.eventId;
+                        camera.lastMotionEventId = eventId;
+                        // images expire in 30 seconds after publish
+                        setTimeout(() => {
+                            if (camera.lastMotionEventId === eventId)
+                                camera.lastMotionEventId = undefined;
+                        }, 30);
                         setTimeout(() => camera.motionDetected = false, 30000);
                         if (events['sdm.devices.events.CameraPerson.Person']) {
                             this.onDeviceEvent(ScryptedInterface.ObjectDetection, {
