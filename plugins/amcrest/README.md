@@ -1,11 +1,11 @@
-# Amcrest Plugin
+# Amcrest Plugin for Scrypted
 The Amcrest Plugin brings Amcrest-branded cameras, doorbells or NVR devices that are IP-based into Scrypted.
 Most commonly this plugin is used with 2 plugins: Rebroadcast and HomeKit.
 
 Device must have built-in motion detection (most Amcrest cameras or NVR's have this).
 If the camera or NVR do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `dummy-switch`) and group it to the camera.
 
-## Amcrest Camera Codec Settings for HomeKit Compatibility
+## Codec Settings for HomeKit
 Configure optimal code settings (as required by HomeKit) using Amcrest configuration (not Scrypted).
 
 You may use the device's webpage access or one of the following applications: `Amcrest Smart Home` (mobile), `IP Config Software`, or `Amcrest Surveillance Pro`  (https://support.amcrest.com/hc/en-us/categories/201939038-All-Downloads).  
@@ -14,7 +14,6 @@ You may use the device's webpage access or one of the following applications: `A
 The optimal/reliable codec settings can be found in the documentation for the [Homekit Plugin](https://github.com/koush/scrypted/tree/main/plugins/homekit).
 
 ## Amcrest Doorbells (e.g. AD110 and AD410)
-At this time, 2-way audio works for AD110 and not AD410.
 
 * Specify `Type` is `Doorbell`
 * `Username` admin
