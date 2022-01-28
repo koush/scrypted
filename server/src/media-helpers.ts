@@ -48,6 +48,9 @@ export async function probeVideoCamera(device: VideoCamera) {
     const noAudio = options && options.length && options[0].audio === null;
     return {
         options,
+        /**
+         * @deprecated
+         */
         noAudio,
     };
 }
