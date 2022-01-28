@@ -633,6 +633,12 @@ export interface AudioSensor {
 export interface MotionSensor {
   motionDetected?: boolean;
 }
+export interface AmbientLightSensor {
+  /**
+   * The ambient light in lumens.
+   */
+  ambientLight: number;
+}
 export interface OccupancySensor {
   occupied?: boolean;
 }
@@ -1230,6 +1236,7 @@ export enum ScryptedInterface {
   PowerSensor = "PowerSensor",
   AudioSensor = "AudioSensor",
   MotionSensor = "MotionSensor",
+  AmbientLightSensor = "AmbientLightSensor",
   OccupancySensor = "OccupancySensor",
   FloodSensor = "FloodSensor",
   UltravioletSensor = "UltravioletSensor",

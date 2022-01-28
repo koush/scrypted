@@ -47,6 +47,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["powerDetected"] = "powerDetected";
     ScryptedInterfaceProperty["audioDetected"] = "audioDetected";
     ScryptedInterfaceProperty["motionDetected"] = "motionDetected";
+    ScryptedInterfaceProperty["ambientLight"] = "ambientLight";
     ScryptedInterfaceProperty["occupied"] = "occupied";
     ScryptedInterfaceProperty["flooded"] = "flooded";
     ScryptedInterfaceProperty["ultraviolet"] = "ultraviolet";
@@ -404,6 +405,13 @@ exports.ScryptedInterfaceDescriptors = {
             'motionDetected'
         ]
     },
+    AmbientLightSensor: {
+        name: 'AmbientLightSensor',
+        methods: [],
+        properties: [
+            'ambientLight'
+        ]
+    },
     OccupancySensor: {
         name: 'OccupancySensor',
         methods: [],
@@ -650,6 +658,7 @@ var ScryptedInterface;
     ScryptedInterface["PowerSensor"] = "PowerSensor";
     ScryptedInterface["AudioSensor"] = "AudioSensor";
     ScryptedInterface["MotionSensor"] = "MotionSensor";
+    ScryptedInterface["AmbientLightSensor"] = "AmbientLightSensor";
     ScryptedInterface["OccupancySensor"] = "OccupancySensor";
     ScryptedInterface["FloodSensor"] = "FloodSensor";
     ScryptedInterface["UltravioletSensor"] = "UltravioletSensor";
