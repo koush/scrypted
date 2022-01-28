@@ -1284,7 +1284,7 @@ export interface MotionSensor {
 }
 export interface AmbientLightSensor {
   /**
-   * The ambient light in lumens.
+   * The ambient light in lux.
    */
   ambientLight: number;
 }

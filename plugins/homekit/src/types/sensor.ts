@@ -1,5 +1,5 @@
 
-import { MotionSensor, BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, HumiditySensor, AudioSensor } from '@scrypted/sdk'
+import { MotionSensor, BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, HumiditySensor, AudioSensor, AmbientLightSensor } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -9,13 +9,19 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.Thermometer) || device.interfaces.includes(ScryptedInterface.BinarySensor) || device.interfaces.includes(ScryptedInterface.MotionSensor);
     },
-    getAccessory: async (device: ScryptedDevice & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor) => {
+    getAccessory: async (device: ScryptedDevice & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor) => {
         const accessory = makeAccessory(device);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
-            const contactSensorService = accessory.addService(Service.ContactSensor, device.name);
-            bindCharacteristic(device, ScryptedInterface.BinarySensor, contactSensorService, Characteristic.ContactSensorState,
+            const service = accessory.addService(Service.ContactSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ContactSensorState,
                 () => !!device.binaryState);
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.AmbientLightSensor)) {
+            const service = accessory.addService(Service.LightSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.AmbientLightSensor, service, Characteristic.CurrentAmbientLightLevel,
+                () => device.ambientLight || 0);
         }
 
         if (device.interfaces.includes(ScryptedInterface.AudioSensor)) {
@@ -25,8 +31,8 @@ addSupportedType({
         }
 
         if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
-            const motionSensorService = accessory.addService(Service.MotionSensor, device.name);
-            bindCharacteristic(device, ScryptedInterface.MotionSensor, motionSensorService, Characteristic.MotionDetected,
+            const service = accessory.addService(Service.MotionSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.MotionSensor, service, Characteristic.MotionDetected,
                 () => !!device.motionDetected, true);
         }
 
