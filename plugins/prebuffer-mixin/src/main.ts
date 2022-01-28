@@ -570,6 +570,14 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const enabledIds = enabled ? enabled.map(mso => mso.id) : [undefined];
     const ids = msos?.map(mso => mso.id) || [undefined];
 
+    if (this.storage.getItem('warnedCloud') !== 'true') {
+      const cloud = msos?.find(mso => mso.source === 'cloud');
+      if (cloud) {
+        this.storage.setItem('warnedCloud', 'true');
+        log.a(`${this.name} is a cloud camera. Prebuffering maintains a persistent stream and will not enabled by default. You must enable the Prebuffer stream manually.`)
+      }
+    }
+
     const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
 
     let active = 0;
