@@ -6,6 +6,8 @@ import { randomBytes } from 'crypto';
 const allInterfaceMethods: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.methods));
 const allInterfaceProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.properties));
 
+import { isPublishable} from '../../mqtt/src/publishable-types';
+
 const { systemManager, endpointManager, mediaManager } = sdk;
 
 const mediaObjectMethods = [
@@ -187,19 +189,7 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-        const set = new Set(interfaces);
-        set.delete(ScryptedInterface.ObjectDetection);
-        set.delete(ScryptedInterface.DeviceDiscovery);
-        set.delete(ScryptedInterface.DeviceCreator);
-        set.delete(ScryptedInterface.DeviceProvider);
-        set.delete(ScryptedInterface.MixinProvider);
-        set.delete(ScryptedInterface.PushHandler);
-        set.delete(ScryptedInterface.EngineIOHandler);
-        set.delete(ScryptedInterface.HttpRequestHandler);
-        set.delete(ScryptedInterface.Settings);
-        set.delete(ScryptedInterface.Readme);
-        set.delete(ScryptedInterface.BufferConverter);
-        if (!set.size)
+        if (!isPublishable(type, interfaces))
             return;
         return [
             ScryptedInterface.Settings,
