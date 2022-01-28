@@ -127,7 +127,7 @@ class PrebufferSession {
       {
         title: 'Audio Codec Transcoding',
         group,
-        description: 'Configuring your camera to output AAC, MP3, MP2, or Opus is recommended. PCM/G711 cameras should set this to Reencode.',
+        description: 'Configuring your camera to output AAC, MP3, MP2, or Opus is recommended. PCM/G711 cameras should set this to Transcode.',
         type: 'string',
         key: this.audioConfigurationKey,
         value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
