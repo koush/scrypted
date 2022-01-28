@@ -353,6 +353,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         const existing = this.plugins[pluginId];
         if (existing) {
             delete this.plugins[pluginId];
+
+            if (existing.worker === PluginHost.sharedWorker) {
+                PluginHost.sharedWorkerImmediateRestart = true;
+                setTimeout(() => PluginHost.sharedWorkerImmediateRestart = false, 10000);
+            }
             existing.kill();
         }
     }
@@ -491,11 +496,14 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     setupPluginHostAutoRestart(pluginHost: PluginHost) {
+        const usingSharedWorker = pluginHost.worker === PluginHost.sharedWorker;
+
         pluginHost.worker.once('exit', () => {
             if (pluginHost.killed)
                 return;
             pluginHost.kill();
-            console.error('plugin unexpectedly exited, restarting in 1 minute', pluginHost.pluginId);
+            const timeout = usingSharedWorker && PluginHost.sharedWorkerImmediateRestart ? 0 : 60000;
+            console.error(`plugin unexpectedly exited, restarting in ${timeout}ms`, pluginHost.pluginId);
             setTimeout(async () => {
                 const existing = this.plugins[pluginHost.pluginId];
                 if (existing !== pluginHost) {
@@ -515,7 +523,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 catch (e) {
                     console.error('error restarting plugin', plugin._id, e);
                 }
-            }, 60000);
+            }, timeout);
         });
     }
 

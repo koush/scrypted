@@ -27,6 +27,7 @@ import rimraf from 'rimraf';
 
 export class PluginHost {
     static sharedWorker: child_process.ChildProcess;
+    static sharedWorkerImmediateRestart = false;
 
     worker: child_process.ChildProcess;
     peer: RpcPeer;
