@@ -76,7 +76,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
     <key>EnvironmentVariables</key>
         <dict>
             <key>PATH</key>
-                <string>$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$(dirname $NPX_PATH):$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
         </dict>
