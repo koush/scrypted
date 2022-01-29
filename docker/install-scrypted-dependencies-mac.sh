@@ -69,17 +69,14 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
 EOF
 
 RUN launchctl load ~/Library/LaunchAgents/com.scrypted.server.plist
-RUN launchctl start ~/Library/LaunchAgents/com.scrypted.server.plist
 
 set +x
 echo
 echo
 echo
 echo
-echo "Launch Scrypted with the following:"
-echo "  npx -y scrypted serve"
-echo
-echo "Follow these instructions to create a service that runs on boot:"
-echo "  https://github.com/koush/scrypted/wiki/Local-Installation#mac"
+echo "Scrypted Service has been installed (and started). You can start and stop Scrypted with:"
+echo "  launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist"
+echo "  launchctl load ~/Library/LaunchAgents/com.scrypted.server.plist"
 echo
 echo
