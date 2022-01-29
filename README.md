@@ -17,6 +17,8 @@ Scrypted is a home automation platform primarily focusing on making camera exper
 
 ## Discord
 
+Chat on Discord for support, tips, announcements, and bug reporting. There is an active and helpful community.
+
 [Join Scrypted Discord](https://discord.gg/DcFzmBHYGq)
 
 ## Supported Platforms
