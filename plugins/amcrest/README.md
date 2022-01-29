@@ -1,25 +1,25 @@
 # Amcrest Plugin for Scrypted
 The Amcrest Plugin brings Amcrest-branded cameras, doorbells or NVR devices that are IP-based into Scrypted.
-Most commonly this plugin is used with 2 plugins: Rebroadcast and HomeKit.
+Most commonly this plugin is used with 2 plugins: `Rebroadcast` and `HomeKit`.
 
-Device must have built-in motion detection (most Amcrest cameras or NVR's have this).
-If the camera or NVR do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `dummy-switch`) and group it to the camera.
+Device must have built-in motion detection (most Amcrest cameras or NVRs have this).
+If the camera or NVR do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `opencv`, `pam-diff`, or `dummy-switch`) and group it to the camera.
 
 ## Codec Settings for HomeKit
 Configure optimal code settings (as required by HomeKit) using Amcrest configuration (not Scrypted).
 
-You may use the device's webpage access or one of the following applications: `Amcrest Smart Home` (mobile), `IP Config Software`, or `Amcrest Surveillance Pro`  (https://support.amcrest.com/hc/en-us/categories/201939038-All-Downloads).  
+You may use the device's webpage access or one of the following applications from [Amcrest website](https://support.amcrest.com/hc/en-us/categories/201939038-All-Downloads): `Amcrest Smart Home` (mobile), `IP Config Software`, or `Amcrest Surveillance Pro`.  
 **NOTE:** Amcrest Smart Home app may not expose all codec or stream settings. Use one of the other applications instead.
 
 The optimal/reliable codec settings can be found in the documentation for the [Homekit Plugin](https://github.com/koush/scrypted/tree/main/plugins/homekit).
 
 ## Amcrest Doorbells (e.g. AD110 and AD410)
 
-* Specify `Type` is `Doorbell`
+* Specify `Type` is `Doorbell` (at top under device Name)
 * `Username` admin
 * `Password` (see below)
 * `Default Stream` set to properly configured video codec stream (Main Stream = `Stream 1`; Sub Stream 1 = `Stream 2`; Sub Stream 2 = `Stream 3`; and so on)
-* `Amcrest Doorbell` is `checked` 
+* `Doorbell Type` is `Amcrest Doorbell` 
  
 The `admin` user account credentials is required to (1) add doorbell to Scrypted or (2) change codec settings with `IP Config Software` or `Amcrest Surveillance Pro` applications. 
 
@@ -34,7 +34,7 @@ Each 'Channel' or (camera) Device attached to the NVR must be configured as sepa
 **NOTE:** Snapshots may be inconsistent if using an NVR.  A workaround exists if you can access your camera on network without going through NVR (see below `Snapshot URL Override`).  If you can only access your camera through an NVR, then snapshots may not be supported.
 
 * `IP Address` NVR's IP Address
-* `Snapshot URL Override` camera's IP address (preferred) or specific port number of NVR for that camera (may work). That is: `http://<camera ip address>/cgi-bin/snapshot.cgi` or `http://<NVR ip address>:<NVR port # for camera>/cgi-bin/snapshot.cgi`
+* `Snapshot URL Override` camera's IP address (preferred) or specific port number of NVR for that camera (may work). That is: `http://<camera IP address>/cgi-bin/snapshot.cgi` or `http://<NVR IP address>:<NVR port # for camera>/cgi-bin/snapshot.cgi`
 * `Channel Number Override` camera's channel number as known to DVR
 * `Default Stream` Properly configured video codec stream (Main Stream = `Stream 1`; Sub Stream 1 = `Stream 2`; Sub Stream 2 = `Stream 3`; and so on)
 
