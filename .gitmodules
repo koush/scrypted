@@ -25,3 +25,6 @@
 [submodule "external/ring-client-api"]
 	path = external/ring-client-api
 	url = ../../koush/ring
+[submodule "plugins/vscode-typescript"]
+	path = plugins/vscode-typescript
+	url = ../../koush/scrypted-vscode-typescript/
