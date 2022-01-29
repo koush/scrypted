@@ -36,37 +36,12 @@ export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forev
     cp.on('exit', () => console.log('ffmpeg exited'));
 }
 
-export async function probeVideoCamera(device: VideoCamera) {
-    let options: MediaStreamOptions[];
-    try {
-      options = await device.getVideoStreamOptions() || [];
-    }
-    catch (e) {
-    }
-
-    // todo: uses the first stream to determine audio availability. buggy! fix this!
-    const noAudio = options && options.length && options[0].audio === null;
-    return {
-        options,
-        /**
-         * @deprecated
-         */
-        noAudio,
-    };
-}
-
 export function safePrintFFmpegArguments(console: Console, args: string[]) {
     const ret = [];
     for (const arg of args) {
         try {
             const url = new URL(arg);
-            if (url.password) {
-                url.password = 'REDACTED';
-                ret.push(url.toString());
-            }
-            else {
-                ret.push(arg);
-            }
+            ret.push(`${url.protocol}:[REDACTED]`)
         }
         catch (e) {
             ret.push(arg);

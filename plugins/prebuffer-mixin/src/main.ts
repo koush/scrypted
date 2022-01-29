@@ -4,7 +4,6 @@ import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { createRebroadcaster, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { probeVideoCamera } from '@scrypted/common/src/media-helpers';
 import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, createPCMParser, StreamParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 
@@ -302,14 +301,16 @@ class PrebufferSession {
       acodec = ['-an'];
     }
     else if (reencodeAudio) {
+      // these are what homekit typically requests.
       acodec = [
         '-bsf:a', 'aac_adtstoasc',
-        '-acodec', 'libfdk_aac',
-        '-profile:a', 'aac_low',
-        '-flags', '+global_header',
         '-ar', `8k`,
-        '-b:a', `100k`,
+        '-b:a', `24k`,
+        '-bufsize', '96k',
         '-ac', `1`,
+        '-acodec', 'libfdk_aac',
+        '-profile:a', 'aac_eld',
+        '-flags', '+global_header',
       ];
     }
     else if (aacAudio) {
@@ -501,6 +502,7 @@ class PrebufferSession {
       const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
       const { server, port } = await createRebroadcaster({
+        console: this.console,
         connect: (writeData, destroy) => {
           this.activeClients++;
           this.printActiveClients();
