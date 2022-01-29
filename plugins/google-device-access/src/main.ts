@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSource, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSource, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -16,6 +16,9 @@ const refreshFrequency = 60;
 const SdmSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/';
 const SdmDeviceSignalingPrefix = SdmSignalingPrefix + 'x-';
 const black = fs.readFileSync('black.jpg');
+
+const readmeV1 = fs.readFileSync('README-camera-v1.md').toString();
+const readmeV2 = fs.readFileSync('README-camera-v2.md').toString();
 
 function getSdmRtspMediaStreamOptions(): MediaStreamOptions {
     return {
@@ -88,7 +91,7 @@ function toNestMode(mode: ThermostatMode): string {
     }
 }
 
-class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor, BinarySensor, BufferConverter, ObjectDetector {
+class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCamera, MotionSensor, BinarySensor, BufferConverter, ObjectDetector {
     signalingMime: string;
     lastMotionEventId: string;
     lastImage: Promise<Buffer>;
@@ -103,6 +106,10 @@ class NestCamera extends ScryptedDeviceBase implements Camera, VideoCamera, Moti
         // create a mime unique to this this camera.
         this.fromMimeType = ScryptedMimeTypes.RTCAVOffer;
         this.toMimeType = this.signalingMime;
+    }
+
+    async getReadmeMarkdown(): Promise<string> {
+        return this.isWebRtc ? readmeV2 : readmeV1;
     }
 
     // not sure if this works? there is a camera snapshot generate image thing, but it
@@ -769,6 +776,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                     ScryptedInterface.Camera,
                     ScryptedInterface.MotionSensor,
                     ScryptedInterface.ObjectDetector,
+                    ScryptedInterface.Readme,
                 ];
 
                 let type = ScryptedDeviceType.Camera;
