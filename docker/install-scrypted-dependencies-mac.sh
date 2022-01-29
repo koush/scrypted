@@ -30,6 +30,7 @@ RUN pip3 install aiofiles debugpy typing_extensions typing opencv-python
 echo "Installing Scrypted..."
 RUN npx -y scrypted install-server
 
+RUN test $(which npx)
 RUN mkdir -p ~/Library/LaunchAgents
 RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
 <?xml version="1.0" encoding="UTF-8"?>
