@@ -301,16 +301,16 @@ class PrebufferSession {
     else if (pcmAudio) {
       acodec = ['-an'];
     }
-    else if (reencodeAudio) {
-      // these are what homekit typically requests.
+    else if (reencodeAudio || (advertisedAudioCodec && !COMPATIBLE_AUDIO_CODECS.includes(advertisedAudioCodec))) {
       acodec = [
         '-bsf:a', 'aac_adtstoasc',
         '-ar', `8k`,
-        '-b:a', `24k`,
-        '-bufsize', '96k',
+        '-b:a', `100k`,
+        '-bufsize', '400k',
         '-ac', `1`,
         '-acodec', 'libfdk_aac',
-        '-profile:a', 'aac_eld',
+        // can we change this to aac_eld somehow? mpegts does not support aac eld (AOT-39).
+        '-profile:a', 'aac_low',
         '-flags', '+global_header',
       ];
     }
@@ -575,7 +575,7 @@ class PrebufferSession {
       mediaStreamOptions.audio = {
         codec: 'aac',
         encoder: 'libfdk_aac',
-        profile: 'aac_eld',
+        profile: 'aac_low',
       }
     }
     else {
