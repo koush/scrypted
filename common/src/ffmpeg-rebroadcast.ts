@@ -226,6 +226,7 @@ export interface RebroadcastSessionCleanup {
 
 export interface RebroadcasterOptions {
     connect?: (writeData: (data: StreamChunk) => number, cleanup: () => void) => RebroadcastSessionCleanup|undefined;
+    console?: Console;
 }
 
 export async function createRebroadcaster(options?: RebroadcasterOptions): Promise<Rebroadcaster> {
@@ -259,6 +260,7 @@ export async function createRebroadcaster(options?: RebroadcasterOptions): Promi
             clientCount--;
             cleanup();
         });
+        socket.on('error', e => options.console?.log('client stream ended'));
 
         clientCount++;
     });
