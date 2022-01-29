@@ -99,10 +99,13 @@ echo
 echo
 echo
 echo
-echo "Scrypted Service has been installed (and started). You can start, stop, enable, or disable Scrypted with:"
+echo "Scrypted Service has been installed. You can start, stop, enable, or disable Scrypted with:"
 echo "  launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist"
 echo "  launchctl load ~/Library/LaunchAgents/com.scrypted.server.plist"
 echo "  launchctl enable ~/Library/LaunchAgents/com.scrypted.server.plist"
 echo "  launchctl disable ~/Library/LaunchAgents/com.scrypted.server.plist"
+echo
+echo "Scrypted is now running at: https://localhost:10443/"
+echo "Note that it is https and that you'll be asked to approve/ignore the website certificate."
 echo
 echo
