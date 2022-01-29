@@ -1,9 +1,9 @@
-# HikVision Plugin
+# HikVision Plugin for Scrypted
 The HikVision Plugin brings HikVision-branded cameras, doorbells or NVR devices that are IP-based into Scrypted.
 Most commonly this plugin is used with 2 plugins: Rebroadcast and HomeKit.
 
-Device must have built-in motion detection (most HikVision cameras or NVR's have this).
-If the camera or NVR do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `dummy-switch`) and group it to the camera.
+Device must have built-in motion detection (most HikVision cameras or NVRs have this).
+If the camera or NVR do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `opencv`, `pam-diff`, or `dummy-switch`) and group it to the camera.
 
 **NOTE:** 2-way audio is not currently supported.
 
