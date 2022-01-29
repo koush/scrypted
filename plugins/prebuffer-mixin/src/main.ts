@@ -61,6 +61,7 @@ class PrebufferSession {
   detectedIdrInterval = 0;
   prevIdr = 0;
   detectedAudioCodec: string;
+  detectedVideoCodec: string;
   audioDisabled = false;
 
   mixinDevice: VideoCamera;
@@ -102,7 +103,7 @@ class PrebufferSession {
     pcmAudio: boolean,
   } {
     let audioConfig = this.storage.getItem(this.audioConfigurationKey) || '';
-    if (!VALID_AUDIO_CONFIGS.includes(audioConfig))
+    if (!VALID_AUDIO_CONFIGS.find(config => audioConfig.startsWith(config)))
       audioConfig = '';
     const aacAudio = audioConfig.indexOf(AAC_AUDIO) !== -1;
     const compatibleAudio = audioConfig.indexOf(COMPATIBLE_AUDIO) !== -1;
@@ -387,6 +388,7 @@ class PrebufferSession {
 
     // set/update the detected codec, set it to null if no audio was found.
     this.detectedAudioCodec = session.inputAudioCodec || null;
+    this.detectedVideoCodec = session.inputVideoCodec || null;
 
     if (session.inputVideoCodec !== 'h264') {
       this.console.error(`Video codec is not h264. If there are errors, try changing your camera's encoder output.`);
