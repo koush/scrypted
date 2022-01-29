@@ -260,7 +260,7 @@ export async function createRebroadcaster(options?: RebroadcasterOptions): Promi
             clientCount--;
             cleanup();
         });
-        socket.on('error', e => options.console?.log('client stream ended'));
+        socket.on('error', e => options?.console?.log('client stream ended'));
 
         clientCount++;
     });
