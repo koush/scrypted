@@ -22,7 +22,7 @@ If HomeKit fails while pairing during a Docker install, ensure host networking i
 
 ### HomeKit Live Streaming Timeout (Recordings maybe working)
 
-This is a networking issue with multiple interfaces. This is the problem 100% of the time. Use the HomeKit Plugin Bridge Address setting, and set it to the IP Address of your ethernet manually.
+This is a networking issue with multiple interfaces. This is the problem 100% of the time. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to the IP Address of your ethernet manually.
 If your camera is on a separate VLAN, try disabling that to see if that is the issue.
 
 
