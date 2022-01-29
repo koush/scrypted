@@ -85,8 +85,10 @@ echo
 echo
 echo
 echo
-echo "Scrypted Service has been installed (and started). You can start and stop Scrypted with:"
+echo "Scrypted Service has been installed (and started). You can start, stop, enable, or disable Scrypted with:"
 echo "  systemctl start scrypted.service"
 echo "  systemctl stop scrypted.service"
+echo "  systemctl enable scrypted.service"
+echo "  systemctl disable scrypted.service"
 echo
 echo

@@ -31,6 +31,22 @@ echo "Installing Scrypted..."
 RUN npx -y scrypted install-server
 
 RUN mkdir -p ~/Library/LaunchAgents
+
+NPX_PATH=$(which npx)
+if [ -z "$NPX_PATH" ]
+then
+    echo "Unable to determine npx path."
+    exit 1
+fi
+
+BREW_PREFIX=$(brew --prefix)
+if [ -z "$BREW_PREFIX" ]
+then
+    echo "Unable to determine brew prefix."
+    exit 1
+fi
+
+
 RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -44,25 +60,25 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
         <string>com.scrypted.server</string>
     <key>ProgramArguments</key>
         <array>
-             <string>$(brew --prefix)/bin/npx</string>
+             <string>$BREW_PREFIX/bin/npx</string>
              <string>-y</string>
              <string>scrypted</string>
              <string>serve</string>
         </array>
     <key>WorkingDirectory</key>
-         <string>/Users/$(whoami)/.scrypted</string>
+         <string>/Users/$USER/.scrypted</string>
     <key>StandardOutPath</key>
-        <string>/Users/$(whoami)/.scrypted/scrypted.log</string>
+        <string>/Users/$USER/.scrypted/scrypted.log</string>
     <key>StandardErrorPath</key>
-        <string>/Users/$(whoami)/.scrypted/scrypted.log</string>
+        <string>/Users/$USER/.scrypted/scrypted.log</string>
     <key>UserName</key>
-        <string>$(whoami)</string>
+        <string>$USER</string>
     <key>EnvironmentVariables</key>
         <dict>
             <key>PATH</key>
-                <string>$(brew --prefix)/bin:$(brew --prefix)/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
-                <string>/Users/$(whoami)</string>
+                <string>/Users/$USER</string>
         </dict>
 </dict>
 </plist>
@@ -76,8 +92,10 @@ echo
 echo
 echo
 echo
-echo "Scrypted Service has been installed (and started). You can start and stop Scrypted with:"
+echo "Scrypted Service has been installed (and started). You can start, stop, enable, or disable Scrypted with:"
 echo "  launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist"
 echo "  launchctl load ~/Library/LaunchAgents/com.scrypted.server.plist"
+echo "  launchctl enable ~/Library/LaunchAgents/com.scrypted.server.plist"
+echo "  launchctl disable ~/Library/LaunchAgents/com.scrypted.server.plist"
 echo
 echo
