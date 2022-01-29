@@ -91,4 +91,7 @@ echo "  systemctl stop scrypted.service"
 echo "  systemctl enable scrypted.service"
 echo "  systemctl disable scrypted.service"
 echo
+echo "Scrypted is now running at: https://localhost:10443/"
+echo "Note that it is https and that you'll be asked to approve/ignore the website certificate."
+echo
 echo
