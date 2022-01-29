@@ -13,7 +13,12 @@ Scrypted is a home automation platform primarily focusing on making camera exper
  * Linux
    * [Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Linux) - This is the recommended method. Local installation may interfere with other software, like Homebridge, Home Assistant, or HOOBS.
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Linux) - Use this if Docker scares you or whatever.
- * [Mac](https://github.com/koush/scrypted/wiki/Installation:-Mac)
+ * Mac
+   * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Mac)
+   * [Docker Desktop](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop) is not supported.
+ * [Windows]
+   * WSL2 Installation
+   * [Docker Desktop](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop) is not supported.
 
 ## Discord
 
