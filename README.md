@@ -17,8 +17,8 @@ Scrypted is a home automation platform primarily focusing on making camera exper
  * Mac
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Mac)
    * [Docker Desktop](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop) is not supported.
- * [Windows]
-   * WSL2 Installation
+ * Windows
+   * [WSL2 Installation](https://github.com/koush/scrypted/wiki/Installation:-WSL2-Windows)
    * [Docker Desktop](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop) is not supported.
 
 ## Discord
