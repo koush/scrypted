@@ -336,7 +336,7 @@ addSupportedType({
                                 '-flags', '+global_header',
                                 '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
                                 '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
-                                "-bufsize", `${(request as StartStreamRequest).audio.max_bit_rate * 4}`,
+                                "-bufsize", `${(request as StartStreamRequest).audio.max_bit_rate * 4}k`,
                                 '-ac', `${(request as StartStreamRequest).audio.channel}`,
                                 "-payload_type",
                                 (request as StartStreamRequest).audio.pt.toString(),
