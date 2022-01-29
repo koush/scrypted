@@ -1,11 +1,11 @@
-import { BinarySensor, DeviceProvider, Lock, LockState, MotionSensor, OnOff, Scriptable, ScriptSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
+import { BinarySensor, DeviceProvider, Lock, LockState, MotionSensor, OccupancySensor, OnOff, Scriptable, ScriptSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { createMonacoEvalDefaults, scryptedEval } from '../../../common/src/scrypted-eval';
 import child_process from 'child_process';
 
 const { log, deviceManager } = sdk;
 
-class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, Scriptable, MotionSensor, BinarySensor, Settings {
+class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, Scriptable, OccupancySensor, MotionSensor, BinarySensor, Settings {
     language: string;
     timeout: NodeJS.Timeout;
 
@@ -69,6 +69,8 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
         this.running = false;
         this.motionDetected = false;
         this.binaryState = false;
+        this.occupied = false;
+
         this.evalSource();
     }
     async turnOn(): Promise<void> {
@@ -78,6 +80,7 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
         this.running = true;
         this.motionDetected = true;
         this.binaryState = true;
+        this.occupied = true;
 
         let reset = parseInt(this.storage.getItem('reset'));
         if (!reset && reset !== 0)
@@ -170,6 +173,7 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
                 ScryptedInterface.Scriptable,
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.BinarySensor,
+                ScryptedInterface.OccupancySensor,
                 ScryptedInterface.Settings,
             ],
             type: ScryptedDeviceType.Switch,
