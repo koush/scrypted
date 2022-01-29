@@ -68,6 +68,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
 </plist>
 EOF
 
+RUN launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist || echo ""
 RUN launchctl load ~/Library/LaunchAgents/com.scrypted.server.plist
 
 set +x
