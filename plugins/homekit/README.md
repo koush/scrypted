@@ -34,8 +34,8 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 
 2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. Sometimes the home hubs bug out and stop responding to motion. Try rebooting the home hub(s) when this happens. **iPads and HomePods, which are wireless, are not reliable home hubs.**
 
-3) The recordings are in a bad format that can't be used by HomeKit. See below for optimal HomeKit Codec Settings. Enabling Transcode Recordings may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load. 
+3) If HomeKit requested the video, but nothing showed up in the timeline, HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
 
-4) HomeKit decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
+4) The recordings are in a bad format that can't be used by HomeKit. See below for optimal HomeKit Codec Settings. Enabling Transcode Recordings may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load. 
 
 5) If your camera is on a separate VLAN, try disabling that to see if that is the issue.
