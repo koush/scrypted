@@ -39,6 +39,13 @@ then
     exit 1
 fi
 
+NPX_BIN_PATH=$(dirname $NPX_PATH)
+if [ -z "$NPX_BIN_PATH" ]
+then
+    echo "Unable to determine npx bin path."
+    exit 1
+fi
+
 BREW_PREFIX=$(brew --prefix)
 if [ -z "$BREW_PREFIX" ]
 then
@@ -60,7 +67,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
         <string>com.scrypted.server</string>
     <key>ProgramArguments</key>
         <array>
-             <string>$BREW_PREFIX/bin/npx</string>
+             <string>$NPX_PATH</string>
              <string>-y</string>
              <string>scrypted</string>
              <string>serve</string>
@@ -76,7 +83,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
     <key>EnvironmentVariables</key>
         <dict>
             <key>PATH</key>
-                <string>$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$NPX_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
         </dict>
