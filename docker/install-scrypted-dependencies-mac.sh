@@ -44,7 +44,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
         <string>com.scrypted.server</string>
     <key>ProgramArguments</key>
         <array>
-             <string>$(brew --prefix)/bin/npx</string>
+             <string>$(which npx)</string>
              <string>-y</string>
              <string>scrypted</string>
              <string>serve</string>
@@ -60,7 +60,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
     <key>EnvironmentVariables</key>
         <dict>
             <key>PATH</key>
-                <string>$(brew --prefix)/bin:$(brew --prefix)/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$(dirname $(which npx)):$(brew --prefix)/bin:$(brew --prefix)/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$(whoami)</string>
         </dict>
