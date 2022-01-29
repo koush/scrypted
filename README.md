@@ -7,6 +7,15 @@ Scrypted is a home automation platform primarily focusing on making camera exper
 
 <img width="400" alt="Scrypted_Management_Console" src="https://user-images.githubusercontent.com/73924/131903488-722d87ac-a0b0-40fe-b605-326e6b886e35.png">
 
+# Installation
+
+ * [Raspberry Pi](https://github.com/koush/scrypted/wiki/Raspberry-Pi-Installation)
+ * [Linux]
+   * [Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Linux)
+     * This is the recommended method. Local installation may interfere with other software, like Homebridge, Home Assistant, or HOOBS.
+   * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Linux)
+ * [Mac](https://github.com/koush/scrypted/wiki/Installation:-Mac)
+
 ## Discord
 
 [Join Scrypted Discord](https://discord.gg/DcFzmBHYGq)
@@ -20,9 +29,6 @@ Scrypted is a home automation platform primarily focusing on making camera exper
 Supported accessories: 
  * https://github.com/koush/scrypted/tree/main/plugins
 
-# Installation
-
-There are both [Docker and Local Installation options](https://github.com/koush/scrypted/wiki), as well as guides for connecting to HomeKit and Google Home.
 
 ## Development
 
