@@ -261,9 +261,9 @@ class PrebufferSession {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
-          log.a(`${this.mixin.name} is using the ${this.detectedAudioCodec} audio codec and has had its audio disabled. Select 'Disable Audio' or 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
+          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec and has had its audio disabled. Select 'Disable Audio' or 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
         }
-        this.console.warn('Configure your camera to output AAC, MP3, MP2, or Opus audio. Suboptimal audio codec in use:', this.detectedAudioCodec || advertisedAudioCodec);
+        this.console.warn('Configure your camera to output AAC, MP3, MP2, or Opus audio. Suboptimal audio codec in use:', assumedAudioCodec);
       }
       else if (!audioSoftMuted && isUsingDefaultAudioConfig && advertisedAudioCodec === undefined && this.detectedAudioCodec !== undefined) {
         // handling compatible codecs that were unspecified...
