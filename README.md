@@ -22,6 +22,8 @@ Select the appropriate guide. After installation is finished, remember to visit 
  * Windows
    * [WSL2 Installation](https://github.com/koush/scrypted/wiki/Installation:-WSL2-Windows)
    * [Docker Desktop](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop) is not supported.
+ * [ReadyNAS: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-ReadyNAS)
+ * [Synology: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Synology-NAS)
 
 ## Discord
 
