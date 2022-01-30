@@ -54,7 +54,7 @@ then
 fi
 
 
-RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
+RUN cat << EOF | tee ~/Library/LaunchAgents/app.scrypted.server.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -64,7 +64,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
     <key>KeepAlive</key>
         <true/>
     <key>Label</key>
-        <string>com.scrypted.server</string>
+        <string>app.scrypted.server</string>
     <key>ProgramArguments</key>
         <array>
              <string>$NPX_PATH</string>
@@ -91,8 +91,11 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/com.scrypted.server.plist
 </plist>
 EOF
 
-RUN launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist || echo ""
-RUN launchctl load ~/Library/LaunchAgents/com.scrypted.server.plist
+# previous script had the wrong domain. clear it.
+rm -f ~/Library/LaunchAgents/com.scrypted.server.plist
+# this may fail if its not loaded, do not use RUN
+launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
+RUN launchctl load ~/Library/LaunchAgents/app.scrypted.server.plist
 
 set +x
 echo
@@ -100,11 +103,9 @@ echo
 echo
 echo
 echo "Scrypted Service has been installed. You can start, stop, enable, or disable Scrypted with:"
-echo "  launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist"
-echo "  launchctl load ~/Library/LaunchAgents/com.scrypted.server.plist"
-echo "  launchctl enable ~/Library/LaunchAgents/com.scrypted.server.plist"
-echo "  launchctl disable ~/Library/LaunchAgents/com.scrypted.server.plist"
-echo
+echo "  launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist"
+echo "  launchctl load ~/Library/LaunchAgents/app.scrypted.server.plist"
+lanecho
 echo "Scrypted is now running at: https://localhost:10443/"
 echo "Note that it is https and that you'll be asked to approve/ignore the website certificate."
 echo
