@@ -24,7 +24,8 @@ Select the appropriate guide. After installation is finished, remember to visit 
 <!--    * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop). -->
  * [ReadyNAS: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-ReadyNAS)
  * [Synology: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Synology-NAS)
-
+ * [QNAP: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-QNAP-NAS)
+ 
 ## Discord
 
 Chat on Discord for support, tips, announcements, and bug reporting. There is an active and helpful community.
