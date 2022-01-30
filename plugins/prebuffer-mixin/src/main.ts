@@ -540,7 +540,7 @@ class PrebufferSession {
       const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
       if (this.parsers[container].parseDatagram) {
-        let sdp = Buffer.concat(session.sdp).toString();
+        let sdp = Buffer.concat(await session.sdp).toString();
         const audioPort = Math.round(Math.random() * 40000 + 10000);
         const videoPort = Math.round(Math.random() * 40000 + 10000);
         sdp = sdp.replace('m=audio 0', 'm=audio ' + audioPort);

@@ -19,7 +19,7 @@ export interface MP4Atom {
 }
 
 export interface ParserSession<T extends string> {
-    sdp: Buffer[];
+    sdp: Promise<Buffer[]>;
     mediaStreamOptions: MediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;
@@ -182,8 +182,13 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     ffmpegLogInitialOutput(console, cp);
     cp.on('exit', kill);
 
-    const sdp: Buffer[] = [];
-    (cp.stdio[pipeCount - 1]).on('data', buffer => sdp.push(buffer));
+    const sdp  = new Promise<Buffer[]>(resolve => {
+        const ret = [];
+        cp.stdio[pipeCount - 1].on('data', buffer => {
+            ret.push(buffer);
+            resolve(ret);
+        });
+    })
 
     // now parse the created pipes
     let pipeIndex = 0;
