@@ -167,7 +167,8 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         if (this.interfaces.includes(ScryptedInterface.ObjectDetector)) {
             try {
                 const types = await realDevice.getObjectTypes();
-                if (types.classes?.length) {
+                const classes = types?.classes?.filter(c => c !== 'motion');
+                if (classes?.length) {
                     const value: string[] = [];
                     try {
                         value.push(...JSON.parse(this.storage.getItem('objectDetectionContactSensors')));
@@ -178,7 +179,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                     settings.push({
                         title: 'Object Detection Sensors',
                         type: 'string',
-                        choices: types.classes,
+                        choices: classes,
                         multiple: true,
                         key: 'objectDetectionContactSensors',
                         description: 'Create HomeKit occupancy sensors that detect specific people or objects.',
