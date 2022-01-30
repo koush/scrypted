@@ -72,7 +72,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 title: 'Scrypted Server Address',
                 value: this.storage.getItem('addressOverride'),
                 key: 'addressOverride',
-                description: 'Optional: The network address used by the Scrypted bridge. Set this to the wired address to prevent usage of wireless address.',
+                description: 'Optional: The network address used by the Scrypted server. Set this to the wired address to prevent usage of wireless address.',
                 choices: addresses,
                 combobox: true,
             },
