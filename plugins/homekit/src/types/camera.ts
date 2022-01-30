@@ -11,7 +11,7 @@ import { once } from 'events';
 import debounce from 'lodash/debounce';
 
 import { CameraRecordingDelegate } from '../hap';
-import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { RtpDemuxer } from '../rtp/rtp-demuxer';
 import { HomeKitRtpSink, startRtpSink } from '../rtp/rtp-ffmpeg-input';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
@@ -360,7 +360,7 @@ addSupportedType({
                         return;
                     }
 
-                    console.log('ffmpeg args', args);
+                    safePrintFFmpegArguments(console, args);
 
                     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
                     ffmpegLogInitialOutput(console, cp);
