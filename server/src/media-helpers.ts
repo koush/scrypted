@@ -1,6 +1,4 @@
 import { ChildProcess } from "child_process";
-import { MediaStreamOptions, VideoCamera } from "@scrypted/sdk";
-
 
 const filtered = [
     'decode_slice_header error',
@@ -41,7 +39,7 @@ export function safePrintFFmpegArguments(console: Console, args: string[]) {
     for (const arg of args) {
         try {
             const url = new URL(arg);
-            ret.push(`${url.protocol}:[REDACTED]`)
+            ret.push(`${url.protocol}[REDACTED]`)
         }
         catch (e) {
             ret.push(arg);

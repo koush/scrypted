@@ -1,12 +1,14 @@
 import { once } from "events";
 import { Socket } from "net";
+import { Socket as DatagramSocket } from "dgram";
 import { Readable } from "stream";
 import { readLength } from "./read-length";
 
 export interface StreamParser {
     container: string;
     outputArguments: string[];
-    parse: (socket: Socket, width: number, height: number) => AsyncGenerator<StreamChunk>;
+    parse?: (socket: Socket, width: number, height: number) => AsyncGenerator<StreamChunk>;
+    parseDatagram?: (socket: DatagramSocket, width: number, height: number) => AsyncGenerator<StreamChunk>;
     findSyncFrame(streamChunks: StreamChunk[]): StreamChunk[];
 }
 
@@ -85,6 +87,30 @@ export function createPCMParser(): StreamParser {
             '-f', 's16le',
         ],
         parse: createLengthParser(512),
+        findSyncFrame,
+    }
+}
+
+export function createDgramParser() {
+    async function* parse(socket: DatagramSocket) {
+        while (true) {
+            const [buffer] = await once(socket, 'message');
+            yield {
+                chunks: [buffer],
+            }
+        }
+    };
+    return parse;
+}
+
+export function createRtpParser(...codec: string[]): StreamParser {
+    return {
+        container: 'sdp',
+        outputArguments: [
+            ...codec,
+            '-f', 'rtp',
+        ],
+        parseDatagram: createDgramParser(),
         findSyncFrame,
     }
 }

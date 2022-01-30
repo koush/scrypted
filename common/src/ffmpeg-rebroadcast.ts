@@ -2,11 +2,12 @@ import { createServer, Server } from 'net';
 import child_process, { StdioOptions } from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
-import { listenZero } from './listen-cluster';
+import { bindZero, listenZero } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
 import { StreamChunk, StreamParser } from './stream-parser';
+import dgram from 'dgram';
 
 const { mediaManager } = sdk;
 
@@ -18,6 +19,7 @@ export interface MP4Atom {
 }
 
 export interface ParserSession<T extends string> {
+    sdp: Buffer[];
     mediaStreamOptions: MediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;
@@ -142,14 +144,34 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     const stdio: StdioOptions = ['pipe', 'pipe', 'pipe']
     let pipeCount = 3;
     for (const container of Object.keys(options.parsers)) {
-        const parser = options.parsers[container];
-        args.push(
-            ...parser.outputArguments,
-            `pipe:${pipeCount}`,
-        );
-        stdio.push('pipe');
-        pipeCount++;
+        const parser: StreamParser = options.parsers[container];
+        if (parser.parseDatagram) {
+            const socket = dgram.createSocket('udp4')
+            const udp = await bindZero(socket);
+            args.push(
+                ...parser.outputArguments,
+                udp.url,
+            );
+
+            (async () => {
+                for await (const chunk of parser.parseDatagram(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                    ffmpegStartedResolve?.(undefined);
+                    events.emit(container, chunk);
+                    resetActivityTimer();
+                }
+            })();
+        }
+        else {
+            args.push(
+                ...parser.outputArguments,
+                `pipe:${pipeCount++}`,
+            );
+            stdio.push('pipe');
+        }
     }
+
+    args.push('-sdp_file', `pipe:${pipeCount++}`);
+    stdio.push('pipe');
 
     // start ffmpeg process with child process pipes
     args.unshift('-hide_banner');
@@ -160,13 +182,20 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     ffmpegLogInitialOutput(console, cp);
     cp.on('exit', kill);
 
+    const sdp: Buffer[] = [];
+    (cp.stdio[pipeCount - 1]).on('data', buffer => sdp.push(buffer));
+
     // now parse the created pipes
-    Object.keys(options.parsers).forEach(async (container, index) => {
-        const pipe = cp.stdio[3 + index];
-        const parser = options.parsers[container];
+    let pipeIndex = 0;
+    Object.keys(options.parsers).forEach(async (container) => {
+        const parser: StreamParser = options.parsers[container];
+        if (!parser.parse)
+            return;
+        const pipe = cp.stdio[3 + pipeIndex];
+        pipeIndex++;
 
         try {
-            for await (const chunk of parser.parse(pipe, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+            for await (const chunk of parser.parse(pipe as any, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
                 ffmpegStartedResolve?.(undefined);
                 events.emit(container, chunk);
                 resetActivityTimer();
@@ -189,6 +218,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     clearTimeout(ffmpegIncomingConnectionTimeout);
 
     return {
+        sdp,
         inputAudioCodec,
         inputVideoCodec,
         inputVideoResolution,
@@ -225,7 +255,7 @@ export interface RebroadcastSessionCleanup {
 }
 
 export interface RebroadcasterOptions {
-    connect?: (writeData: (data: StreamChunk) => number, cleanup: () => void) => RebroadcastSessionCleanup|undefined;
+    connect?: (writeData: (data: StreamChunk) => number, cleanup: () => void) => RebroadcastSessionCleanup | undefined;
     console?: Console;
 }
 

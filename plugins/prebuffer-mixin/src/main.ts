@@ -4,8 +4,10 @@ import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { createRebroadcaster, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, createPCMParser, StreamParser } from '@scrypted/common/src/stream-parser';
+import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, createPCMParser, StreamParser, createRtpParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
+import dgram from 'dgram';
+import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -14,6 +16,7 @@ const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
 const AUDIO_CONFIGURATION_KEY_PREFIX = 'audioConfiguration-';
 const FFMPEG_INPUT_ARGUMENTS_KEY_PREFIX = 'ffmpegInputArguments-';
+const REBROADCAST_MODE_KEY_PREFIX = 'rebroadcastMode-';
 const DEFAULT_AUDIO = 'Default';
 const AAC_AUDIO = 'AAC or No Audio';
 const AAC_AUDIO_DESCRIPTION = `${AAC_AUDIO} (Copy)`;
@@ -30,7 +33,7 @@ const VALID_AUDIO_CONFIGS = [
   AAC_AUDIO,
   COMPATIBLE_AUDIO,
   TRANSCODE_AUDIO,
-  PCM_AUDIO,
+  // PCM_AUDIO,
 ];
 
 interface PrebufferStreamChunk {
@@ -42,10 +45,12 @@ interface Prebuffers {
   mp4: PrebufferStreamChunk[];
   mpegts: PrebufferStreamChunk[];
   s16le: PrebufferStreamChunk[];
+  rtpvideo: PrebufferStreamChunk[];
+  rtpaudio: PrebufferStreamChunk[];
 }
 
-type PrebufferParsers = "mpegts" | "mp4" | "s16le";
-const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 's16le'];
+type PrebufferParsers = "mpegts" | "mp4" | "s16le" | "rtpvideo" | "rtpaudio";
+const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 's16le', 'rtpvideo', 'rtpaudio'];
 
 class PrebufferSession {
 
@@ -55,6 +60,8 @@ class PrebufferSession {
     mp4: [],
     mpegts: [],
     s16le: [],
+    rtpvideo: [],
+    rtpaudio: [],
   };
   parsers: { [container: string]: StreamParser };
 
@@ -72,6 +79,7 @@ class PrebufferSession {
   inactivityTimeout: NodeJS.Timeout;
   audioConfigurationKey: string;
   ffmpegInputArgumentsKey: string;
+  rebroadcastModeKey: string;
 
   constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string, public stopInactive: boolean) {
     this.storage = mixin.storage;
@@ -79,12 +87,15 @@ class PrebufferSession {
     this.mixinDevice = mixin.mixinDevice;
     this.audioConfigurationKey = AUDIO_CONFIGURATION_KEY_PREFIX + this.streamId;
     this.ffmpegInputArgumentsKey = FFMPEG_INPUT_ARGUMENTS_KEY_PREFIX + this.streamId;
+    this.rebroadcastModeKey = REBROADCAST_MODE_KEY_PREFIX + this.streamId;
   }
 
   clearPrebuffers() {
     this.prebuffers.mp4 = [];
     this.prebuffers.mpegts = [];
     this.prebuffers.s16le = [];
+    this.prebuffers.rtpaudio = [];
+    this.prebuffers.rtpvideo = [];
   }
 
   ensurePrebufferSession() {
@@ -167,6 +178,18 @@ class PrebufferSession {
           '-v verbose',
         ],
         combobox: true,
+      },
+      {
+        title: 'Rebroadcast Mode',
+        group,
+        description: 'The stream format to use when rebroadcasting. RTP will increase startup time but may resolve PCM audio issues.',
+        placeholder: 'MPEG-TS',
+        choices: [
+          'MPEG-TS',
+          'RTP',
+        ],
+        key: this.rebroadcastModeKey,
+        value: this.storage.getItem(this.rebroadcastModeKey) || 'MPEG-TS',
       }
     );
 
@@ -218,6 +241,8 @@ class PrebufferSession {
     this.prebuffers.mp4 = [];
     this.prebuffers.mpegts = [];
     this.prebuffers.s16le = [];
+    this.prebuffers.rtpvideo = [];
+    this.prebuffers.rtpaudio = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
     let mso: MediaStreamOptions;
@@ -354,12 +379,20 @@ class PrebufferSession {
           vcodec,
           acodec,
         }),
-        mpegts: createMpegTsParser({
-          vcodec,
-          acodec,
-        }),
       },
     };
+
+    const rtpMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTP';
+    if (!rtpMode) {
+      rbo.parsers.mpegts = createMpegTsParser({
+        vcodec,
+        acodec,
+      });
+    }
+    else {
+      rbo.parsers.rtpvideo = createRtpParser('-an', '-vcodec', 'copy');
+      rbo.parsers.rtpaudio = createRtpParser('-vn', '-acodec', 'copy');
+    }
 
     // if pcm prebuffer is requested, create the the parser. don't do it if
     // the camera wants to mute the audio though, or no audio was detected
@@ -436,6 +469,9 @@ class PrebufferSession {
 
     // s16le will be a no-op if there's no pcm, no harm.
     for (const container of PrebufferParserValues) {
+      if (this.parsers[container]?.parseDatagram)
+        continue;
+
       let shifts = 0;
 
       session.on(container, (chunk: StreamChunk) => {
@@ -503,6 +539,65 @@ class PrebufferSession {
     const createContainerServer = async (container: PrebufferParsers) => {
       const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
+      if (this.parsers[container].parseDatagram) {
+        let sdp = Buffer.concat(session.sdp).toString();
+        const audioPort = Math.round(Math.random() * 40000 + 10000);
+        const videoPort = Math.round(Math.random() * 40000 + 10000);
+        sdp = sdp.replace('m=audio 0', 'm=audio ' + audioPort);
+        sdp = sdp.replace('m=video 0', 'm=video ' + videoPort);
+
+        const d = dgram.createSocket('udp4');
+        d.bind();
+
+        const safeWriteData = (chunk: StreamChunk, port: number) => {
+          for (const c of chunk.chunks) {
+            d.send(c, port);
+          }
+        }
+
+        const wv = (chunk: StreamChunk) => safeWriteData(chunk, videoPort);
+        const wa = (chunk: StreamChunk) => safeWriteData(chunk, audioPort);
+        const cleanup = () => {
+          d.close();
+          session.removeListener('rtpvideo', wv);
+          session.removeListener('rtpaudio', wa);
+          session.removeListener('killed', cleanup);
+        }
+
+        session.once('killed', cleanup);
+
+        const sdpClient = await listenZeroSingleClient();
+        sdpClient.clientPromise.then(async (c) => {
+          this.activeClients++;
+          this.printActiveClients();
+
+          c.once('close', () => {
+            this.activeClients--;
+            this.inactivityCheck(session);
+            cleanup();
+          });
+          c.write(sdp);
+          c.end();
+
+          // await new Promise(resolve => setTimeout(resolve, 500));
+          // for (const prebuffer of this.prebuffers.rtpvideo) {
+          //   if (prebuffer.time < now - requestedPrebuffer)
+          //     continue;
+          //   safeWriteData(prebuffer.chunk, videoPort);
+          // }
+          // for (const prebuffer of this.prebuffers.rtpaudio) {
+          //   if (prebuffer.time < now - requestedPrebuffer)
+          //     continue;
+          //   safeWriteData(prebuffer.chunk, audioPort);
+          // }
+        })
+          .catch(cleanup);
+
+        session.on('rtpvideo', wv)
+        session.on('rtpaudio', wa);
+        return sdpClient.url;
+      }
+
       const { server, port } = await createRebroadcaster({
         console: this.console,
         connect: (writeData, destroy) => {
@@ -557,10 +652,13 @@ class PrebufferSession {
 
       setTimeout(() => server.close(), 30000);
 
-      return port;
+      return `tcp://127.0.0.1:${port}`;
     }
 
-    const container: PrebufferParsers = PrebufferParserValues.find(parser => parser === options?.container) || 'mpegts';
+    const rtpMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTP';
+    const defaultContainer = rtpMode ? 'rtpvideo' : 'mpegts';
+
+    const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
 
     const mediaStreamOptions: MediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
 
@@ -604,13 +702,13 @@ class PrebufferSession {
 
     const length = Math.max(500000, available).toString();
 
-    const url = `tcp://127.0.0.1:${await createContainerServer(container)}`;
+    const url = await createContainerServer(container);
     const ffmpegInput: FFMpegInput = {
       url,
       container,
       inputArguments: [
         '-analyzeduration', '0', '-probesize', length,
-        '-f', container,
+        '-f', this.parsers[container].container,
         '-i', url,
       ],
       mediaStreamOptions,
@@ -620,7 +718,7 @@ class PrebufferSession {
       ffmpegInput.inputArguments.push(
         '-analyzeduration', '0', '-probesize', length,
         '-f', 's16le',
-        '-i', `tcp://127.0.0.1:${await createContainerServer('s16le')}`,
+        '-i', await createContainerServer('s16le'),
       )
     }
 

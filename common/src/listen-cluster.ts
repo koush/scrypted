@@ -11,7 +11,11 @@ export async function listenZero(server: net.Server) {
 export async function bindZero(server: dgram.Socket) {
     server.bind(0);
     await once(server, 'listening');
-    return (server.address() as net.AddressInfo).port;
+    const { port } = server.address() as net.AddressInfo;
+    return {
+        port,
+        url: `udp://127.0.0.1:${port}`,
+    }
 }
 
 export async function listenZeroSingleClient() {
