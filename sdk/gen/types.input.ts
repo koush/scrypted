@@ -381,6 +381,7 @@ export interface MediaStreamOptions {
   metadata?: any;
 
   source?: MediaStreamSource;
+  userConfigurable?: boolean;
 }
 
 export interface ResponseMediaStreamOptions extends MediaStreamOptions {

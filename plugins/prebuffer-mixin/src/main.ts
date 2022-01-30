@@ -182,7 +182,7 @@ class PrebufferSession {
       {
         title: 'Rebroadcast Mode',
         group,
-        description: 'The stream format to use when rebroadcasting. RTP will increase startup time but may resolve PCM audio issues.',
+        description: 'THIS FEATURE IS IN TESTING. DO NOT CHANGE THIS FROM MPEG-TS. The stream format to use when rebroadcasting. RTP will increase startup time but may resolve PCM audio issues.',
         placeholder: 'MPEG-TS',
         choices: [
           'MPEG-TS',
@@ -280,9 +280,10 @@ class PrebufferSession {
       ? advertisedAudioCodec?.toLowerCase()
       : this.detectedAudioCodec?.toLowerCase();
 
-    if (!probingAudioCodec) {
-      const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
-
+    // after probing the audio codec is complete, alert the user with appropriate instructions.
+    // assume the codec is user configurable unless the camera explictly reports otherwise.
+    const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
+    if (!probingAudioCodec && mso?.userConfigurable !== false) {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
@@ -318,12 +319,19 @@ class PrebufferSession {
 
     const detectedNoAudio = this.detectedAudioCodec === null;
 
+    // if the camera reports audio is incompatible and the user can't do anything about it
+    // enable transcoding by default. however, still allow the user to change the settings
+    // in case something changed.
+    const mustTranscode = isUsingDefaultAudioConfig && audioIncompatible;
+    if (mustTranscode)
+      this.console.log('camera reports it is not user configurable. transcoding due to incompatible codec', assumedAudioCodec);
+
     if (audioSoftMuted || probingAudioCodec || detectedNoAudio) {
       // no audio? explicitly disable it.
       acodec = ['-an'];
       this.audioDisabled = true;
     }
-    else if (pcmAudio) {
+    else if (pcmAudio || mustTranscode) {
       acodec = ['-an'];
     }
     else if (reencodeAudio || (advertisedAudioCodec && !COMPATIBLE_AUDIO_CODECS.includes(advertisedAudioCodec))) {

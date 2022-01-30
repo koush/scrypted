@@ -206,6 +206,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 codec: 'pcm',
             },
             source: 'cloud',
+            userConfigurable: false,
         };
     }
 
@@ -219,6 +220,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
             audio: {
             },
             source: 'cloud',
+            userConfigurable: false,
         };
     }
 

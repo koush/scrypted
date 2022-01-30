@@ -176,6 +176,7 @@ class ResponseMediaStreamOptions(TypedDict):
     prebuffer: float
     refreshAt: float
     source: MediaStreamSource
+    userConfigurable: bool
     video: VideoStreamOptions
     pass
 
@@ -327,6 +328,7 @@ class MediaStreamOptions(TypedDict):
     name: str
     prebuffer: float
     source: MediaStreamSource
+    userConfigurable: bool
     video: VideoStreamOptions
     pass
 
@@ -378,6 +380,7 @@ class RequestMediaStreamOptions(TypedDict):
     prebuffer: float
     refreshAt: float
     source: MediaStreamSource
+    userConfigurable: bool
     video: VideoStreamOptions
     pass
 

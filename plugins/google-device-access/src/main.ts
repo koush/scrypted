@@ -32,12 +32,14 @@ function getSdmRtspMediaStreamOptions(): MediaStreamOptions {
             codec: 'aac',
         },
         source: 'cloud',
+        userConfigurable: false,
     };
 }
 
 function getSdmRtcMediaStreamOptions(signalingMime: string): MediaStreamOptions {
     const ret = getRtcMediaStreamOptions('webrtc', 'WebRTC', signalingMime);
     ret.source = 'cloud';
+    ret.userConfigurable = false;
     return ret;
 }
 
