@@ -18,10 +18,10 @@ Select the appropriate guide. After installation is finished, remember to visit 
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Linux) - Use this if Docker scares you or whatever.
  * Mac
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Mac)
-   * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop).
+<!--    * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop). -->
  * Windows
    * [WSL2 Installation](https://github.com/koush/scrypted/wiki/Installation:-WSL2-Windows)
-   * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop).
+<!--    * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop). -->
  * [ReadyNAS: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-ReadyNAS)
  * [Synology: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Synology-NAS)
 
