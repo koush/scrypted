@@ -54,7 +54,7 @@ then
 fi
 
 
-RUN cat << EOF | tee ~/Library/LaunchAgents/app.scrypted.server.plist
+RUN cat <<EOT > ~/Library/LaunchAgents/app.scrypted.server.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -89,7 +89,7 @@ RUN cat << EOF | tee ~/Library/LaunchAgents/app.scrypted.server.plist
         </dict>
 </dict>
 </plist>
-EOF
+EOT
 
 # previous script had the wrong domain. clear it.
 rm -f ~/Library/LaunchAgents/com.scrypted.server.plist
