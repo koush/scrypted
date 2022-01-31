@@ -257,7 +257,7 @@ class PrebufferSession {
     // to determine the codec without causing a parse failure.
     // camera may explicity request that its audio stream be muted via a null.
     // respect that setting.
-    const audioSoftMuted = mso?.audio?.codec === null;
+    const audioSoftMuted = mso?.audio === null;
     const advertisedAudioCodec = mso?.audio?.codec;
 
     const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio, pcmAudio } = this.getAudioConfig();
@@ -287,7 +287,7 @@ class PrebufferSession {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
-          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec and has had its audio disabled. Select 'Disable Audio' or 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
+          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec. Configuring your Camera to use AAC, MP3, MP2, or Opus audio is recommended. If this is not possible, Select 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
         }
         this.console.warn('Configure your camera to output AAC, MP3, MP2, or Opus audio. Suboptimal audio codec in use:', assumedAudioCodec);
       }
@@ -322,9 +322,16 @@ class PrebufferSession {
     // if the camera reports audio is incompatible and the user can't do anything about it
     // enable transcoding by default. however, still allow the user to change the settings
     // in case something changed.
-    const mustTranscode = isUsingDefaultAudioConfig && audioIncompatible;
-    if (mustTranscode)
-      this.console.log('camera reports it is not user configurable. transcoding due to incompatible codec', assumedAudioCodec);
+    let mustTranscode = false;
+    if (isUsingDefaultAudioConfig && audioIncompatible) {
+      if (mso?.userConfigurable === false) {
+        mustTranscode = true;
+        this.console.log('camera reports it is not user configurable. transcoding due to incompatible codec', assumedAudioCodec);
+      }
+      else if (!probingAudioCodec) {
+        mustTranscode = true;
+      }
+    }
 
     if (audioSoftMuted || probingAudioCodec || detectedNoAudio) {
       // no audio? explicitly disable it.
@@ -337,11 +344,11 @@ class PrebufferSession {
     else if (reencodeAudio || (advertisedAudioCodec && !COMPATIBLE_AUDIO_CODECS.includes(advertisedAudioCodec))) {
       acodec = [
         '-bsf:a', 'aac_adtstoasc',
+        '-acodec', 'libfdk_aac',
         '-ar', `8k`,
         '-b:a', `100k`,
         '-bufsize', '400k',
         '-ac', `1`,
-        '-acodec', 'libfdk_aac',
         // can we change this to aac_eld somehow? mpegts does not support aac eld (AOT-39).
         '-profile:a', 'aac_low',
         '-flags', '+global_header',
