@@ -283,7 +283,7 @@ class PrebufferSession {
     // after probing the audio codec is complete, alert the user with appropriate instructions.
     // assume the codec is user configurable unless the camera explictly reports otherwise.
     const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
-    if (!probingAudioCodec && mso?.userConfigurable !== false) {
+    if (!probingAudioCodec && mso?.userConfigurable !== false && !audioSoftMuted) {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
