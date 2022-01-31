@@ -146,11 +146,14 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     for (const container of Object.keys(options.parsers)) {
         const parser: StreamParser = options.parsers[container];
         if (parser.parseDatagram) {
-            const socket = dgram.createSocket('udp4')
-            // todo: fix these leaking sockets
+            const socket = dgram.createSocket('udp4');
             const udp = await bindZero(socket);
             const rtcp = dgram.createSocket('udp4');
             await bind(rtcp, udp.port + 1);
+            events.once('killed', () => {
+                socket.close();
+                rtcp.close();
+            })
             args.push(
                 ...parser.outputArguments,
                 udp.url.replace('udp://', 'rtp://'),
