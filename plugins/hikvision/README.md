@@ -8,7 +8,7 @@ If the camera or NVR do not have motion detection, you will have to use a separa
 **NOTE:** 2-way audio is not currently supported.
 
 ## Codec Settings for HomeKit
-Configure optimal code settings (as required by HomeKit) through HikVision's configuration webpage or device interface (not Scrypted).
+Configure optimal codec settings (as required by HomeKit) through HikVision's configuration webpage or device interface (not Scrypted).
 
 HikVision's [iVMS 4200 software](https://www.hikvision.com/en/support/tools/), or similar, may be utilized to configure device as well as create a motion detection grid (required for motion detection and hardware dependent).
 
@@ -29,6 +29,7 @@ The Channel number is the hundreds digit and (sub-)stream is ones digit:
 
 * `IP Address` NVR's IP Address
 * `Snapshot URL Override` camera's IP address (preferred) or specific port number of NVR for that camera (may work). That is: `http://<camera ip address>/ISAPI/Streaming/channels/<channel number>/picture` or `http://<NVR IP address>:<NVR port # for channel>/ISAPI/Streaming/channels/<channel number>/picture`. 720p snapshots seem to be more stable than 1080p or higher: `http://<NVR IP address>/ISAPI/Streaming/channels/<channel number>/picture?videoResolutionWidth=1280&videoResolutionHeight=720`
+* `HTTP Port Override` check your NVR device settings (it may be `1080` instead of `80`)
 * `Channel Number Override` camera's channel number as known to DVR (i.e., 101, 102, 103, etc.)
 * `Default Stream` Properly configured video codec stream (Main Stream = `Stream 1`; Sub Stream 1 = `Stream 2`; Sub Stream 2 = `Stream 3`; and so on)
 

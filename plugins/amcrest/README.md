@@ -6,7 +6,7 @@ Device must have built-in motion detection (most Amcrest cameras or NVRs have th
 If the camera or NVR do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `opencv`, `pam-diff`, or `dummy-switch`) and group it to the camera.
 
 ## Codec Settings for HomeKit
-Configure optimal code settings (as required by HomeKit) using Amcrest configuration (not Scrypted).
+Configure optimal codec settings (as required by HomeKit) using Amcrest configuration (not Scrypted).
 
 You may use the device's webpage access or one of the following applications from [Amcrest website](https://support.amcrest.com/hc/en-us/categories/201939038-All-Downloads): `Amcrest Smart Home` (mobile), `IP Config Software`, or `Amcrest Surveillance Pro`.  
 **NOTE:** Amcrest Smart Home app may not expose all codec or stream settings. Use one of the other applications instead.
@@ -23,7 +23,7 @@ The optimal/reliable codec settings can be found in the documentation for the [H
  
 The `admin` user account credentials is required to (1) add doorbell to Scrypted or (2) change codec settings with `IP Config Software` or `Amcrest Surveillance Pro` applications. 
 
-The password for `admin` username was set when first configuring device (see 2m49s mark of https://youtu.be/8RDgBMfIhgo).  
+The password for `admin` username was set when first configuring device (see 2m49s mark of [Amcrest setup video](https://youtu.be/8RDgBMfIhgo)).  
 The `admin` username credential is **not** your Amcrest Smart Home (cloud) account that uses an email address for user/login.
 (Unless you happened used the same password for both.)
 
