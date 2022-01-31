@@ -35,3 +35,23 @@ export async function readLength(readable: Readable, length: number): Promise<Bu
         readable.on('end', e);
     });
 }
+
+const CHARCODE_NEWLINE = '\n'.charCodeAt(0);
+
+export async function readUntil(readable: Readable, charCode: number) {
+  const data = [];
+  let count = 0;
+  while (true) {
+    const buffer = await readLength(readable, 1);
+    if (!buffer)
+      throw new Error("end of stream");
+    if (buffer[0] === charCode)
+      break;
+    data[count++] = buffer[0];
+  }
+  return Buffer.from(data).toString();
+}
+
+export async function readLine(readable: Readable) {
+  return readUntil(readable, CHARCODE_NEWLINE);
+}

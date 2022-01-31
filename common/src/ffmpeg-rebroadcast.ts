@@ -2,7 +2,7 @@ import { createServer, Server } from 'net';
 import child_process, { StdioOptions } from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
-import { bindZero, listenZero } from './listen-cluster';
+import { bind, bindZero, listenZero } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
@@ -147,14 +147,25 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         const parser: StreamParser = options.parsers[container];
         if (parser.parseDatagram) {
             const socket = dgram.createSocket('udp4')
+            // todo: fix these leaking sockets
             const udp = await bindZero(socket);
+            const rtcp = dgram.createSocket('udp4');
+            await bind(rtcp, udp.port + 1);
             args.push(
                 ...parser.outputArguments,
-                udp.url,
+                udp.url.replace('udp://', 'rtp://'),
             );
 
             (async () => {
                 for await (const chunk of parser.parseDatagram(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                    ffmpegStartedResolve?.(undefined);
+                    events.emit(container, chunk);
+                    resetActivityTimer();
+                }
+            })();
+
+            (async () => {
+                for await (const chunk of parser.parseDatagram(rtcp, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]), 'rtcp')) {
                     ffmpegStartedResolve?.(undefined);
                     events.emit(container, chunk);
                     resetActivityTimer();

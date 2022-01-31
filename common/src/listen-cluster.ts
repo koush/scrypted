@@ -18,6 +18,15 @@ export async function bindZero(server: dgram.Socket) {
     }
 }
 
+export async function bind(server: dgram.Socket, port: number) {
+    server.bind(port);
+    await once(server, 'listening');
+    return {
+        port,
+        url: `udp://127.0.0.1:${port}`,
+    }
+}
+
 export async function listenZeroSingleClient() {
     const server = new net.Server();
     const port = await listenZero(server);

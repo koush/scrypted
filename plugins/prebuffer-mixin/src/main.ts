@@ -8,6 +8,7 @@ import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, createPCMPa
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import dgram from 'dgram';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { RtspServer } from './rtsp-server';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -186,7 +187,7 @@ class PrebufferSession {
         placeholder: 'MPEG-TS',
         choices: [
           'MPEG-TS',
-          'RTP',
+          'RTSP',
         ],
         key: this.rebroadcastModeKey,
         value: this.storage.getItem(this.rebroadcastModeKey) || 'MPEG-TS',
@@ -397,8 +398,8 @@ class PrebufferSession {
       },
     };
 
-    const rtpMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTP';
-    if (!rtpMode) {
+    const rtspMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTSP';
+    if (!rtspMode) {
       rbo.parsers.mpegts = createMpegTsParser({
         vcodec,
         acodec,
@@ -484,9 +485,6 @@ class PrebufferSession {
 
     // s16le will be a no-op if there's no pcm, no harm.
     for (const container of PrebufferParserValues) {
-      if (this.parsers[container]?.parseDatagram)
-        continue;
-
       let shifts = 0;
 
       session.on(container, (chunk: StreamChunk) => {
@@ -556,22 +554,39 @@ class PrebufferSession {
 
       if (this.parsers[container].parseDatagram) {
         let sdp = Buffer.concat(await session.sdp).toString();
-        const audioPort = Math.round(Math.random() * 40000 + 10000);
-        const videoPort = Math.round(Math.random() * 40000 + 10000);
-        sdp = sdp.replace('m=audio 0', 'm=audio ' + audioPort);
-        sdp = sdp.replace('m=video 0', 'm=video ' + videoPort);
+
+        const sdpLines = sdp.split('\n').map(sdp => sdp.trim()).filter(sdp => sdp !== 'c=IN IP4 127.0.0.1');
+        let id = 0;
+        const addTrack = (type: string) => {
+          const index = sdpLines.findIndex(sdp => sdp.startsWith(`m=${type}`));
+          if (index !== -1) {
+            sdpLines.splice(index + 1, 0, 'a=recvonly', `a=control:trackID=${id}`);
+            id++;
+          }
+        }
+        addTrack('video');
+        addTrack('audio');
+        sdp = sdpLines.join('\r\n');
+        sdp = sdp.replace(/m=audio .*? /, 'm=audio 0 ')
+        sdp = sdp.replace(/m=video .*? /, 'm=video 0 ')
+        sdp = sdp.replace('t=0 0', 'c=IN IP4 127.0.0.1\r\nt=0 0\r\na=recvonly\r\na=control:*\r\na=range:npt=now-');
+        this.console.log(sdp);
 
         const d = dgram.createSocket('udp4');
         d.bind();
 
-        const safeWriteData = (chunk: StreamChunk, port: number) => {
-          for (const c of chunk.chunks) {
-            d.send(c, port);
+        let playing = false;
+        let server: RtspServer;
+        const safeWriteData = (send: (packet: Buffer, rtcp: boolean) => void) => {
+          return (chunk: StreamChunk) => {
+            if (!playing)
+              return;
+            send(chunk.chunks[0], chunk.type === 'rtcp');
           }
         }
 
-        const wv = (chunk: StreamChunk) => safeWriteData(chunk, videoPort);
-        const wa = (chunk: StreamChunk) => safeWriteData(chunk, audioPort);
+        const wv = safeWriteData((packet, rtcp) => server.sendVideo(packet, rtcp));
+        const wa = safeWriteData((packet, rtcp) => server.sendAudio(packet, rtcp));
         const cleanup = () => {
           d.close();
           session.removeListener('rtpvideo', wv);
@@ -591,26 +606,23 @@ class PrebufferSession {
             this.inactivityCheck(session);
             cleanup();
           });
-          c.write(sdp);
-          c.end();
 
-          // await new Promise(resolve => setTimeout(resolve, 500));
-          // for (const prebuffer of this.prebuffers.rtpvideo) {
-          //   if (prebuffer.time < now - requestedPrebuffer)
-          //     continue;
-          //   safeWriteData(prebuffer.chunk, videoPort);
-          // }
-          // for (const prebuffer of this.prebuffers.rtpaudio) {
-          //   if (prebuffer.time < now - requestedPrebuffer)
-          //     continue;
-          //   safeWriteData(prebuffer.chunk, audioPort);
-          // }
+          server = await new Promise(resolve => new RtspServer(c, sdp, server => resolve(server)));
+          playing = true;
+
+          for (const prebuffer of this.prebuffers.rtpvideo) {
+            if (prebuffer.time < now - requestedPrebuffer)
+              continue;
+            server.sendVideo(prebuffer.chunk.chunks[0], prebuffer.chunk.type === 'rtcp');
+          }
+
         })
           .catch(cleanup);
 
         session.on('rtpvideo', wv)
         session.on('rtpaudio', wa);
-        return sdpClient.url;
+        const url = sdpClient.url.replace('tcp://', 'rtsp://');
+        return url;
       }
 
       const { server, port } = await createRebroadcaster({
@@ -670,8 +682,8 @@ class PrebufferSession {
       return `tcp://127.0.0.1:${port}`;
     }
 
-    const rtpMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTP';
-    const defaultContainer = rtpMode ? 'rtpvideo' : 'mpegts';
+    const rtspMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTSP';
+    const defaultContainer = rtspMode ? 'rtpvideo' : 'mpegts';
 
     const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
 
@@ -723,6 +735,7 @@ class PrebufferSession {
       container,
       inputArguments: [
         '-analyzeduration', '0', '-probesize', length,
+        ...(this.parsers[container].inputArguments || []),
         '-f', this.parsers[container].container,
         '-i', url,
       ],
