@@ -15,17 +15,6 @@ You can use the admin page provided by your camera manufacturer to set the optim
 
 ## Troubleshooting
 
-### HomeKit Discovery and Pairing Issues
-
-If HomeKit is not discoverable, make sure LAN/WLAN multicast is enabled on your router.
-If HomeKit fails while pairing during a Docker install, ensure host networking is being used.
-
-### HomeKit Live Streaming Timeout (Recordings maybe working)
-
-This is a networking issue with multiple interfaces. This is the problem 100% of the time. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to the IP Address of your ethernet manually.
-If your camera is on a separate VLAN, try disabling that to see if that is the issue.
-
-
 ### HomeKit Secure Video Not Recording
 
 If recordings dont work, it's generally because of a few reasons, **follow the steps to determine where it is failing before asking for help**:
@@ -39,3 +28,20 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 4) The recordings are in a bad format that can't be used by HomeKit. See below for optimal HomeKit Codec Settings. Enabling Transcode Recordings may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load. 
 
 5) If your camera is on a separate VLAN, try disabling that to see if that is the issue.
+
+
+### HomeKit Discovery and Pairing Issues
+
+If HomeKit is not discoverable, make sure LAN/WLAN multicast is enabled on your router.
+If HomeKit fails while pairing during a Docker install, ensure host networking is being used.
+
+### HomeKit Live Streaming Timeout (Recordings maybe working)
+
+This is a networking issue with multiple interfaces. This is the problem 100% of the time. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to the IP Address of your ethernet manually.
+If your camera is on a separate VLAN, try disabling that to see if that is the issue.
+
+### HomeKit Remote Streaming not Working
+
+This almost always due to your camera bitrate being too high for remote streaming through Apple's servers. Workarounds:
+1) Use a lower bitrate substream for Remote Streaming.
+2) Enable Transcoding on Remote Streaming.
