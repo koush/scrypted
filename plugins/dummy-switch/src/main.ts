@@ -1,25 +1,20 @@
-import { BinarySensor, DeviceProvider, Lock, LockState, MotionSensor, OccupancySensor, OnOff, Scriptable, ScriptSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
+import { BinarySensor, DeviceProvider, Lock, LockState, MotionSensor, OccupancySensor, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { createMonacoEvalDefaults, scryptedEval } from '../../../common/src/scrypted-eval';
-import child_process from 'child_process';
 
 const { log, deviceManager } = sdk;
 
-class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, Scriptable, OccupancySensor, MotionSensor, BinarySensor, Settings {
-    language: string;
+class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, OccupancySensor, MotionSensor, BinarySensor, Settings {
     timeout: NodeJS.Timeout;
 
     constructor(nativeId: string) {
         super(nativeId);
 
-        if (nativeId.startsWith('typescript:'))
-            this.language = 'typescript';
-        else
-            this.language = 'shell';
-
-        this.motionDetected = this.motionDetected || false;
-        this.binaryState = this.binaryState || false;
         this.on = this.on || false;
+        this.lockState = this.lockState || LockState.Locked;
+        this.running = this.running || false;
+        this.motionDetected = false;
+        this.binaryState = false;
+        this.occupied = false;
     }
 
     lock(): Promise<void> {
@@ -50,14 +45,6 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
         clearTimeout(this.timeout);
     }
 
-    evalSource() {
-        try {
-            const source = JSON.parse(this.storage.getItem('source'));
-            return this.eval(source);
-        }
-        catch (e) {
-        }
-    }
     // note that turnOff locks the lock
     // this is because, the turnOff should put everything into a "safe"
     // state that does not get attention in the UI.
@@ -70,8 +57,6 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
         this.motionDetected = false;
         this.binaryState = false;
         this.occupied = false;
-
-        this.evalSource();
     }
     async turnOn(): Promise<void> {
         clearTimeout(this.timeout);
@@ -88,46 +73,6 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
         if (reset) {
             this.timeout = setTimeout(() => this.turnOff(), reset * 1000);
         }
-
-        this.evalSource();
-    }
-    async saveScript(script: ScriptSource): Promise<void> {
-        this.storage.setItem('source', JSON.stringify(script));
-    }
-    async loadScripts(): Promise<{ [filename: string]: ScriptSource; }> {
-        const filename = this.language === 'typescript' ? 'dummy-switch-script.ts' : 'dummy-switch-script.sh';
-        const ret: { [filename: string]: ScriptSource; } = {
-        };
-
-        try {
-            const source = JSON.parse(this.storage.getItem('source'));
-            ret[filename] = source;
-        }
-        catch (e) {
-            ret[filename] = {
-                script: '',
-            }
-        }
-        Object.assign(ret[filename], {
-            language: this.language,
-            name: 'Switch Script',
-            monacoEvalDefaults: this.language === 'typescript' ? createMonacoEvalDefaults({}) : undefined,
-        });
-        return ret;
-    }
-    async eval(source: ScriptSource, variables?: { [name: string]: any; }): Promise<any> {
-        if (this.language === 'typescript')
-            return scryptedEval(this, source.script, {}, {});
-        const cp = child_process.spawn('sh', {
-            env: {
-                DUMMY_ON: (!!this.on).toString(),
-            },
-        });
-        cp.stdin.write(source.script);
-        cp.stdin.end();
-        cp.stdout.on('data', data => this.console.log(data.toString()));
-        cp.stderr.on('data', data => this.console.log(data.toString()));
-        cp.on('exit', () => this.console.log('shell exited'));
     }
 }
 
@@ -170,7 +115,6 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
                 ScryptedInterface.OnOff,
                 ScryptedInterface.StartStop,
                 ScryptedInterface.Lock,
-                ScryptedInterface.Scriptable,
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.BinarySensor,
                 ScryptedInterface.OccupancySensor,
