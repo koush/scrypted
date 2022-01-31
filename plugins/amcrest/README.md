@@ -23,7 +23,7 @@ The optimal/reliable codec settings can be found in the documentation for the [H
  
 The `admin` user account credentials is required to (1) add doorbell to Scrypted or (2) change codec settings with `IP Config Software` or `Amcrest Surveillance Pro` applications. 
 
-The password for `admin` username was set when first configuring device (see 2m49s mark of https://youtu.be/8RDgBMfIhgo).  
+The password for `admin` username was set when first configuring device (see 2m49s mark of [Amcrest setup video](https://youtu.be/8RDgBMfIhgo)).  
 The `admin` username credential is **not** your Amcrest Smart Home (cloud) account that uses an email address for user/login.
 (Unless you happened used the same password for both.)
 
