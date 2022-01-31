@@ -18,6 +18,7 @@ RUN() {
 }
 
 echo "Installing Scrypted dependencies..."
+RUN brew update
 # needed by scrypted-ffmpeg
 RUN brew install sdl2
 # gstreamer plugins
@@ -91,8 +92,11 @@ RUN cat <<EOT > ~/Library/LaunchAgents/app.scrypted.server.plist
 </plist>
 EOT
 
+# added 1/30/2022 - delete this block at some point:
 # previous script had the wrong domain. clear it.
+launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist || echo ""
 rm -f ~/Library/LaunchAgents/com.scrypted.server.plist
+
 # this may fail if its not loaded, do not use RUN
 launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
 RUN launchctl load ~/Library/LaunchAgents/app.scrypted.server.plist
