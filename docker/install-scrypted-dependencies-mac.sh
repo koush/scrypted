@@ -76,9 +76,9 @@ RUN cat <<EOT > ~/Library/LaunchAgents/app.scrypted.server.plist
     <key>WorkingDirectory</key>
          <string>/Users/$USER/.scrypted</string>
     <key>StandardOutPath</key>
-        <string>/Users/$USER/.scrypted/scrypted.log</string>
+        <string>/dev/null</string>
     <key>StandardErrorPath</key>
-        <string>/Users/$USER/.scrypted/scrypted.log</string>
+        <string>/dev/null</string>
     <key>UserName</key>
         <string>$USER</string>
     <key>EnvironmentVariables</key>
