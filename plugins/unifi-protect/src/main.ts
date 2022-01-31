@@ -29,7 +29,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         recommendRebroadcast();
     }
 
-    handleUpdatePacket(packet: any): void {
+    handleUpdatePacket(packet: any) {
         if (packet.action.action !== "update") {
             return;
         }
@@ -47,6 +47,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         Object.assign(device, packet.payload);
+
+        return this.sensors.get(packet.action.id) ||
+            this.locks.get(packet.action.id) ||
+            this.cameras.get(packet.action.id) ||
+            this.lights.get(packet.action.id);
     }
 
     sanityCheckMotion(device: UnifiCamera | UnifiSensor | UnifiLight, payload: ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim) {
@@ -67,87 +72,36 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
     listener = (event: Buffer) => {
         const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
-        this.console.log('update', updatePacket);
-
-        this.handleUpdatePacket(updatePacket);
-
-        if (!updatePacket) {
-            this.console.error("%s: Unable to process message from the realtime update events API.", this.api.getNvrName());
+        if (!updatePacket)
             return;
-        }
+
+        const unifiDevice = this.handleUpdatePacket(updatePacket);
 
         switch (updatePacket.action.modelKey) {
-            case "sensor": {
-                const unifiSensor = this.sensors.get(updatePacket.action.id);
-                if (!unifiSensor) {
-                    return;
-                }
-                if (updatePacket.action.action !== "update") {
-                    unifiSensor.console.log('non update', updatePacket.action.action);
-                    return;
-                }
-
-                unifiSensor.updateState();
-
-                const payload = updatePacket.payload as any as ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim;
-                this.sanityCheckMotion(unifiSensor, payload);
-                break;
-            }
-            case "doorlock": {
-                const unifiDoorlock = this.locks.get(updatePacket.action.id);
-                if (!unifiDoorlock) {
-                    return;
-                }
-                if (updatePacket.action.action !== "update") {
-                    unifiDoorlock.console.log('non update', updatePacket.action.action);
-                    return;
-                }
-
-                unifiDoorlock.updateState();
-                break;
-            }
-            case "light": {
-                const unifiLight = this.lights.get(updatePacket.action.id);
-                if (!unifiLight) {
-                    return;
-                }
-                if (updatePacket.action.action !== "update") {
-                    unifiLight.console.log('non update', updatePacket.action.action);
-                    return;
-                }
-
-                unifiLight.updateState();
-
-                const payload = updatePacket.payload as any as ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim;
-                this.sanityCheckMotion(unifiLight, payload);
-                break;
-            }
+            case "sensor":
+            case "doorlock":
+            case "light":
             case "camera": {
-                const unifiCamera = this.cameras.get(updatePacket.action.id);
-
-                // We don't know about this camera - we're done.
-                if (!unifiCamera) {
-                    // this.console.log('unknown camera', updatePacket.action.id);
+                if (!unifiDevice) {
+                    this.console.log('unknown device, sync needed?', updatePacket.action.id);
                     return;
                 }
-
                 if (updatePacket.action.action !== "update") {
-                    unifiCamera.console.log('non update', updatePacket.action.action);
+                    unifiDevice.console.log('non update', updatePacket.action.action);
                     return;
                 }
+                unifiDevice.updateState();
 
-                unifiCamera.updateState();
-
-                // unifiCamera.console.log('update', updatePacket.payload);
+                if (updatePacket.action.modelKey === "doorlock")
+                    return;
 
                 const payload = updatePacket.payload as any as ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim;
-                this.sanityCheckMotion(unifiCamera, payload);
+                this.sanityCheckMotion(unifiDevice as any, payload);
 
-                if (unifiCamera.motionDetected && payload.lastSeen > payload.lastMotion + unifiCamera.getSensorTimeout()) {
-                    // something weird happened, lets set unset any motion state
-                    unifiCamera.setMotionDetected(false);
-                }
+                if (updatePacket.action.modelKey !== "camera")
+                    return;
 
+                const unifiCamera = unifiDevice as UnifiCamera;
                 if (payload.lastRing && unifiCamera.binaryState && payload.lastSeen > payload.lastRing + unifiCamera.getSensorTimeout()) {
                     // something weird happened, lets set unset any binary sensor state
                     unifiCamera.binaryState = false;
@@ -157,7 +111,6 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 break;
             }
             case "event": {
-                // We're only interested in add events.
                 if (updatePacket.action.action !== "add") {
                     if ((updatePacket?.payload as any)?.end && updatePacket.action.id) {
                         // unifi reports the event ended but it seems to take a moment before the snapshot
@@ -170,15 +123,13 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     return;
                 }
 
-                // Grab the right payload type, for event add payloads.
                 const payload = updatePacket.payload as ProtectNvrUpdatePayloadEventAdd;
+                if (!payload.camera)
+                    return;
+                const unifiCamera = this.cameras.get(payload.camera);
 
-                // Lookup the accessory associated with this camera.
-                const rtsp = this.cameras.get(payload.camera);
-
-                // We don't know about this camera - we're done.
-                if (!rtsp) {
-                    // this.console.log('unknown camera', payload.camera);
+                if (!unifiCamera) {
+                    this.console.log('unknown device event, sync needed?', payload.camera);
                     return;
                 }
 
@@ -196,12 +147,12 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 setTimeout(() => resolve(undefined), 60000);
 
 
-                rtsp.console.log('event', payload);
+                unifiCamera.console.log('event', payload);
 
                 let detections: ObjectDetectionResult[] = [];
 
                 if (payload.type === 'smartDetectZone') {
-                    rtsp.resetDetectionTimeout();
+                    unifiCamera.resetDetectionTimeout();
 
                     detections = payload.smartDetectTypes.map(type => ({
                         className: type,
@@ -215,14 +166,16 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     }];
 
                     if (payload.type === 'ring') {
-                        rtsp.binaryState = true;
-                        rtsp.lastRing = payload.start;
-                        rtsp.resetRingTimeout();
+                        unifiCamera.binaryState = true;
+                        unifiCamera.lastRing = payload.start;
+                        unifiCamera.resetRingTimeout();
                     }
                     else if (payload.type === 'motion') {
-                        rtsp.setMotionDetected(true);
-                        rtsp.lastMotion = payload.start;
-                        rtsp.resetMotionTimeout();
+                        unifiCamera.setMotionDetected(true);
+                        unifiCamera.lastMotion = payload.start;
+                        // i don't think this is necessary anymore?
+                        // the event stream will set and unset motion.
+                        unifiCamera.resetMotionTimeout();
                     }
                 }
 
@@ -233,13 +186,12 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     timestamp: Date.now(),
                     detections,
                 };
-                rtsp.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
+                unifiCamera.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
 
-                rtsp.lastSeen = payload.start;
+                unifiCamera.lastSeen = payload.start;
                 break;
             }
         }
-
     };
 
     debugLog(message: string, ...parameters: any[]) {
