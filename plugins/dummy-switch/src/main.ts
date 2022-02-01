@@ -1,4 +1,4 @@
-import { BinarySensor, DeviceProvider, Lock, LockState, MotionSensor, OccupancySensor, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
+import { BinarySensor, DeviceCreator, DeviceCreatorSettings, DeviceProvider, Lock, LockState, MotionSensor, OccupancySensor, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 
 const { log, deviceManager } = sdk;
@@ -76,8 +76,8 @@ class DummyDevice extends ScryptedDeviceBase implements OnOff, Lock, StartStop, 
     }
 }
 
-class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, Settings {
-    devices = new Map<string, any>();
+class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
+    devices = new Map<string, DummyDevice>();
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -88,27 +88,29 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
         }
 
     }
-    async getSettings(): Promise<Setting[]> {
+
+    async getCreateDeviceSettings(): Promise<Setting[]> {
         return [
             {
                 key: 'shell:',
-                title: 'Add Dummy Device (Shell Script)',
-                placeholder: 'Switch Name',
+                title: 'Dummy Switch Name',
+                placeholder: 'My Dummy Switch',
             },
-            {
-                key: 'typescript:',
-                title: 'Add Dummy Device (Typescript)',
-                placeholder: 'Switch Name',
-            },
-        ]
+        ];
     }
 
-    async putSetting(key: string, value: string | number) {
+    async createDevice(settings: DeviceCreatorSettings): Promise<string> {
         // generate a random id
-        const nativeId = key + Math.random().toString();
-        const name = value.toString();
+        const nativeId = 'shell:' + Math.random().toString();
+        const name = settings.name?.toString();
 
-        deviceManager.onDeviceDiscovered({
+        await this.onDiscovered(nativeId, name);
+
+        return nativeId;
+    }
+
+    async onDiscovered(nativeId: string, name: string) {
+        await deviceManager.onDeviceDiscovered({
             nativeId,
             name,
             interfaces: [
@@ -122,20 +124,18 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
             ],
             type: ScryptedDeviceType.Switch,
         });
-
-
-        var text = `New Dummy Device ${name} ready. Check the notification area to complete setup.`;
-        log.a(text);
-        log.clearAlert(text);
-    }
-
-    async discoverDevices(duration: number) {
     }
 
     getDevice(nativeId: string) {
         let ret = this.devices.get(nativeId);
         if (!ret) {
             ret = new DummyDevice(nativeId);
+
+            // remove legacy scriptable interface
+            if (ret.interfaces.includes(ScryptedInterface.Scriptable)) {
+                setTimeout(() => this.onDiscovered(ret.nativeId, ret.providedName), 2000);
+            }
+
             if (ret)
                 this.devices.set(nativeId, ret);
         }
