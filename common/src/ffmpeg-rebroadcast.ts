@@ -2,12 +2,13 @@ import { createServer, Server } from 'net';
 import child_process, { StdioOptions } from 'child_process';
 import { ChildProcess } from 'child_process';
 import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
-import { bind, bindZero, listenZero } from './listen-cluster';
+import { bind, bindZero, listenZero, listenZeroSingleClient } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
 import { StreamChunk, StreamParser } from './stream-parser';
 import dgram from 'dgram';
+import { Duplex } from 'stream';
 
 const { mediaManager } = sdk;
 
@@ -156,6 +157,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
             })
             args.push(
                 ...parser.outputArguments,
+                // using rtp instead of udp gives us the rtcp messages too.
                 udp.url.replace('udp://', 'rtp://'),
             );
 
@@ -172,6 +174,30 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
                     ffmpegStartedResolve?.(undefined);
                     events.emit(container, chunk);
                     resetActivityTimer();
+                }
+            })();
+        }
+        else if (parser.tcpProtocol) {
+            const tcp = await listenZeroSingleClient();
+            const url = new URL(parser.tcpProtocol);
+            url.port = tcp.port.toString();
+            args.push(
+                ...parser.outputArguments,
+                url.toString(),
+            );
+
+            (async() => {
+                const socket = await tcp.clientPromise;
+                try {
+                    for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                        ffmpegStartedResolve?.(undefined);
+                        events.emit(container, chunk);
+                        resetActivityTimer();
+                    }
+                }
+                catch (e) {
+                    console.error('rebroadcast parse error', e);
+                    kill();
                 }
             })();
         }
@@ -208,7 +234,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     let pipeIndex = 0;
     Object.keys(options.parsers).forEach(async (container) => {
         const parser: StreamParser = options.parsers[container];
-        if (!parser.parse)
+        if (!parser.parse || parser.tcpProtocol)
             return;
         const pipe = cp.stdio[3 + pipeIndex];
         pipeIndex++;
@@ -281,36 +307,8 @@ export interface RebroadcasterOptions {
 export async function createRebroadcaster(options?: RebroadcasterOptions): Promise<Rebroadcaster> {
     let clientCount = 0;
     const server = createServer(socket => {
-        let first = true;
-        const writeData = (data: StreamChunk) => {
-            if (first) {
-                first = false;
-                if (data.startStream) {
-                    socket.write(data.startStream)
-                }
-            }
-            for (const chunk of data.chunks) {
-                socket.write(chunk);
-            }
-
-            return socket.writableLength;
-        };
-
-        const cleanup = () => {
-            socket.removeAllListeners();
-            socket.destroy();
-            const cb = cleanupCallback;
-            cleanupCallback = undefined;
-            cb?.();
-        }
-        let cleanupCallback = options?.connect(writeData, cleanup);
-
-        socket.once('close', () => {
-            clientCount--;
-            cleanup();
-        });
-        socket.on('error', e => options?.console?.log('client stream ended'));
-
+        handleRebroadcasterClient(socket, options);
+        socket.once('close', () => clientCount--);
         clientCount++;
     });
     const port = await listenZero(server);
@@ -321,4 +319,36 @@ export async function createRebroadcaster(options?: RebroadcasterOptions): Promi
             return clientCount;
         }
     }
+}
+
+export async function handleRebroadcasterClient(duplex: Promise<Duplex> | Duplex, options?: RebroadcasterOptions) {
+    const socket = await duplex;
+    let first = true;
+    const writeData = (data: StreamChunk) => {
+        if (first) {
+            first = false;
+            if (data.startStream) {
+                socket.write(data.startStream)
+            }
+        }
+        for (const chunk of data.chunks) {
+            socket.write(chunk);
+        }
+
+        return socket.writableLength;
+    };
+
+    const cleanup = () => {
+        socket.removeAllListeners();
+        socket.destroy();
+        const cb = cleanupCallback;
+        cleanupCallback = undefined;
+        cb?.();
+    }
+    let cleanupCallback = options?.connect(writeData, cleanup);
+
+    socket.once('close', () => {
+        cleanup();
+    });
+    socket.on('error', e => options?.console?.log('client stream ended'));
 }

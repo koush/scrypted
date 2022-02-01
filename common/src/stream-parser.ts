@@ -1,14 +1,16 @@
 import { once } from "events";
+import { Duplex } from "stream";
 import { Socket } from "net";
 import { Socket as DatagramSocket } from "dgram";
 import { Readable } from "stream";
-import { readLength } from "./read-length";
+import { readLength } from "./read-stream";
 
 export interface StreamParser {
     container: string;
     inputArguments?: string[];
     outputArguments: string[];
-    parse?: (socket: Socket, width: number, height: number) => AsyncGenerator<StreamChunk>;
+    tcpProtocol?: string;
+    parse?: (duplex: Duplex, width: number, height: number) => AsyncGenerator<StreamChunk>;
     parseDatagram?: (socket: DatagramSocket, width: number, height: number, type?: string) => AsyncGenerator<StreamChunk>;
     findSyncFrame(streamChunks: StreamChunk[]): StreamChunk[];
 }
@@ -45,7 +47,7 @@ export interface StreamChunk {
 // }
 
 function createLengthParser(length: number, verify?: (concat: Buffer) => void) {
-    async function* parse(socket: Socket): AsyncGenerator<StreamChunk> {
+    async function* parse(socket: Duplex): AsyncGenerator<StreamChunk> {
         let pending: Buffer[] = [];
         let pendingSize = 0;
         while (true) {
@@ -76,20 +78,6 @@ function createLengthParser(length: number, verify?: (concat: Buffer) => void) {
     }
 
     return parse;
-}
-
-// -ac num channels? cameras are always mono?
-export function createPCMParser(): StreamParser {
-    return {
-        container: 's16le',
-        outputArguments: [
-            '-vn',
-            '-acodec', 'pcm_s16le',
-            '-f', 's16le',
-        ],
-        parse: createLengthParser(512),
-        findSyncFrame,
-    }
 }
 
 export function createDgramParser() {
@@ -213,7 +201,7 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
             '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
             '-f', 'mp4',
         ],
-        async *parse(socket: Socket): AsyncGenerator<StreamChunk> {
+        async *parse(socket: Duplex): AsyncGenerator<StreamChunk> {
             const parser = parseFragmentedMP4(socket);
             let ftyp: MP4Atom;
             let moov: MP4Atom;
@@ -290,7 +278,7 @@ export function createRawVideoParser(options?: RawVideoParserOptions): StreamPar
             '-pix_fmt', pixelFormat.name,
             '-f', 'rawvideo',
         ],
-        async *parse(socket: Socket, width: number, height: number): AsyncGenerator<StreamChunk> {
+        async *parse(socket: Duplex, width: number, height: number): AsyncGenerator<StreamChunk> {
             if (!width || !height)
                 throw new Error("error parsing rawvideo, unknown width and height");
 

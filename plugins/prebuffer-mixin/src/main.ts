@@ -3,12 +3,12 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { createRebroadcaster, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, createPCMParser, StreamParser, createRtpParser } from '@scrypted/common/src/stream-parser';
+import { createRebroadcaster, handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, createRtpParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import dgram from 'dgram';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { RtspServer } from './rtsp-server';
+import { createRtspParser, RtspServer } from './rtsp-server';
+import { Duplex } from 'stream';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -25,8 +25,6 @@ const COMPATIBLE_AUDIO = 'Compatible Audio'
 const COMPATIBLE_AUDIO_DESCRIPTION = `${COMPATIBLE_AUDIO} (Copy)`;
 const TRANSCODE_AUDIO = 'Other Audio';
 const TRANSCODE_AUDIO_DESCRIPTION = `${TRANSCODE_AUDIO} (Transcode)`;
-const PCM_AUDIO = 'PCM or G.711 Audio';
-const PCM_AUDIO_DESCRIPTION = `${PCM_AUDIO} (Copy, Unstable)`;
 const COMPATIBLE_AUDIO_CODECS = ['aac', 'mp3', 'mp2', 'opus'];
 const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
 
@@ -34,7 +32,6 @@ const VALID_AUDIO_CONFIGS = [
   AAC_AUDIO,
   COMPATIBLE_AUDIO,
   TRANSCODE_AUDIO,
-  // PCM_AUDIO,
 ];
 
 interface PrebufferStreamChunk {
@@ -45,13 +42,11 @@ interface PrebufferStreamChunk {
 interface Prebuffers {
   mp4: PrebufferStreamChunk[];
   mpegts: PrebufferStreamChunk[];
-  s16le: PrebufferStreamChunk[];
-  rtpvideo: PrebufferStreamChunk[];
-  rtpaudio: PrebufferStreamChunk[];
+  rtsp: PrebufferStreamChunk[];
 }
 
-type PrebufferParsers = "mpegts" | "mp4" | "s16le" | "rtpvideo" | "rtpaudio";
-const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 's16le', 'rtpvideo', 'rtpaudio'];
+type PrebufferParsers = 'mpegts' | 'mp4' | 'rtsp';
+const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 'rtsp'];
 
 class PrebufferSession {
 
@@ -60,16 +55,13 @@ class PrebufferSession {
   prebuffers: Prebuffers = {
     mp4: [],
     mpegts: [],
-    s16le: [],
-    rtpvideo: [],
-    rtpaudio: [],
+    rtsp: [],
   };
   parsers: { [container: string]: StreamParser };
+  sdp: Promise<string>;
 
   detectedIdrInterval = 0;
   prevIdr = 0;
-  detectedAudioCodec: string;
-  detectedVideoCodec: string;
   audioDisabled = false;
 
   mixinDevice: VideoCamera;
@@ -94,9 +86,7 @@ class PrebufferSession {
   clearPrebuffers() {
     this.prebuffers.mp4 = [];
     this.prebuffers.mpegts = [];
-    this.prebuffers.s16le = [];
-    this.prebuffers.rtpaudio = [];
-    this.prebuffers.rtpvideo = [];
+    this.prebuffers.rtsp = [];
   }
 
   ensurePrebufferSession() {
@@ -112,7 +102,6 @@ class PrebufferSession {
     aacAudio: boolean,
     compatibleAudio: boolean,
     reencodeAudio: boolean,
-    pcmAudio: boolean,
   } {
     let audioConfig = this.storage.getItem(this.audioConfigurationKey) || '';
     if (!VALID_AUDIO_CONFIGS.find(config => audioConfig.startsWith(config)))
@@ -121,12 +110,9 @@ class PrebufferSession {
     const compatibleAudio = audioConfig.indexOf(COMPATIBLE_AUDIO) !== -1;
     // reencode audio will be used if explicitly set.
     const reencodeAudio = audioConfig.indexOf(TRANSCODE_AUDIO) !== -1;
-    // pcm audio only used when explicitly set.
-    const pcmAudio = audioConfig.indexOf(PCM_AUDIO) !== -1;
     return {
-      isUsingDefaultAudioConfig: !(aacAudio || compatibleAudio || reencodeAudio || pcmAudio),
+      isUsingDefaultAudioConfig: !(aacAudio || compatibleAudio || reencodeAudio),
       aacAudio,
-      pcmAudio,
       compatibleAudio,
       reencodeAudio,
     }
@@ -163,7 +149,6 @@ class PrebufferSession {
           AAC_AUDIO_DESCRIPTION,
           COMPATIBLE_AUDIO_DESCRIPTION,
           TRANSCODE_AUDIO_DESCRIPTION,
-          PCM_AUDIO_DESCRIPTION,
         ],
       },
       {
@@ -183,7 +168,7 @@ class PrebufferSession {
       {
         title: 'Rebroadcast Mode',
         group,
-        description: 'THIS FEATURE IS IN TESTING. DO NOT CHANGE THIS FROM MPEG-TS. The stream format to use when rebroadcasting. RTP will increase startup time but may resolve PCM audio issues.',
+        description: 'THIS FEATURE IS IN TESTING. DO NOT CHANGE THIS FROM MPEG-TS. The stream format to use when rebroadcasting.',
         placeholder: 'MPEG-TS',
         choices: [
           'MPEG-TS',
@@ -241,9 +226,7 @@ class PrebufferSession {
   async startPrebufferSession() {
     this.prebuffers.mp4 = [];
     this.prebuffers.mpegts = [];
-    this.prebuffers.s16le = [];
-    this.prebuffers.rtpvideo = [];
-    this.prebuffers.rtpaudio = [];
+    this.prebuffers.rtsp = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
     let mso: MediaStreamOptions;
@@ -261,25 +244,29 @@ class PrebufferSession {
     const audioSoftMuted = mso?.audio === null;
     const advertisedAudioCodec = mso?.audio?.codec;
 
-    const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio, pcmAudio } = this.getAudioConfig();
+    const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio } = this.getAudioConfig();
+
+    let detectedAudioCodec = this.storage.getItem('lastDetectedAudioCodec') || undefined;
+    if (detectedAudioCodec === 'null')
+      detectedAudioCodec = null;
 
     let probingAudioCodec = false;
-    if (!audioSoftMuted && !advertisedAudioCodec && isUsingDefaultAudioConfig && this.detectedAudioCodec === undefined) {
+    if (!audioSoftMuted && !advertisedAudioCodec && isUsingDefaultAudioConfig && detectedAudioCodec === undefined) {
       this.console.warn('Camera did not report an audio codec, muting the audio stream and probing the codec.');
       probingAudioCodec = true;
     }
 
     // complain to the user about the codec if necessary. upstream may send a audio
     // stream but report none exists (to request muting).
-    if (!audioSoftMuted && advertisedAudioCodec && this.detectedAudioCodec !== undefined
-      && this.detectedAudioCodec !== advertisedAudioCodec) {
-      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, this.detectedAudioCodec);
+    if (!audioSoftMuted && advertisedAudioCodec && detectedAudioCodec !== undefined
+      && detectedAudioCodec !== advertisedAudioCodec) {
+      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
     }
 
     // the assumed audio codec is the detected codec first and the reported codec otherwise.
-    const assumedAudioCodec = this.detectedAudioCodec === undefined
+    const assumedAudioCodec = detectedAudioCodec === undefined
       ? advertisedAudioCodec?.toLowerCase()
-      : this.detectedAudioCodec?.toLowerCase();
+      : detectedAudioCodec?.toLowerCase();
 
     // after probing the audio codec is complete, alert the user with appropriate instructions.
     // assume the codec is user configurable unless the camera explictly reports otherwise.
@@ -292,14 +279,14 @@ class PrebufferSession {
         }
         this.console.warn('Configure your camera to output AAC, MP3, MP2, or Opus audio. Suboptimal audio codec in use:', assumedAudioCodec);
       }
-      else if (!audioSoftMuted && isUsingDefaultAudioConfig && advertisedAudioCodec === undefined && this.detectedAudioCodec !== undefined) {
+      else if (!audioSoftMuted && isUsingDefaultAudioConfig && advertisedAudioCodec === undefined && detectedAudioCodec !== undefined) {
         // handling compatible codecs that were unspecified...
-        if (this.detectedAudioCodec === 'aac') {
-          log.a(`${this.mixin.name} did not report a codec and ${this.detectedAudioCodec} was found during probe. Select '${AAC_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert.`);
-        }
-        else {
-          log.a(`${this.mixin.name} did not report a codec and ${this.detectedAudioCodec} was found during probe. Select '${COMPATIBLE_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert.`);
-        }
+        // if (detectedAudioCodec === 'aac') {
+        //   log.a(`${this.mixin.name} did not report a codec and ${detectedAudioCodec} was found during probe. Select '${AAC_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert and improve startup time.`);
+        // }
+        // else {
+        //   log.a(`${this.mixin.name} did not report a codec and ${detectedAudioCodec} was found during probe. Select '${COMPATIBLE_AUDIO}' in the camera stream's Rebroadcast settings to suppress this alert and improve startup time.`);
+        // }
       }
     }
 
@@ -318,31 +305,26 @@ class PrebufferSession {
     this.audioDisabled = false;
     let acodec: string[];
 
-    const detectedNoAudio = this.detectedAudioCodec === null;
+    const detectedNoAudio = detectedAudioCodec === null;
 
     // if the camera reports audio is incompatible and the user can't do anything about it
     // enable transcoding by default. however, still allow the user to change the settings
     // in case something changed.
     let mustTranscode = false;
-    if (isUsingDefaultAudioConfig && audioIncompatible) {
-      if (mso?.userConfigurable === false) {
-        mustTranscode = true;
+    if (!probingAudioCodec && isUsingDefaultAudioConfig && audioIncompatible) {
+      if (mso?.userConfigurable === false)
         this.console.log('camera reports it is not user configurable. transcoding due to incompatible codec', assumedAudioCodec);
-      }
-      else if (!probingAudioCodec) {
-        mustTranscode = true;
-      }
+      else
+        this.console.log('camera audio transcoding due to incompatible codec. configure the camera to use a compatible codec if possible.');
+      mustTranscode = true;
     }
 
-    if (audioSoftMuted || probingAudioCodec || detectedNoAudio) {
+    if (audioSoftMuted || probingAudioCodec) {
       // no audio? explicitly disable it.
       acodec = ['-an'];
       this.audioDisabled = true;
     }
-    else if (pcmAudio || mustTranscode) {
-      acodec = ['-an'];
-    }
-    else if (reencodeAudio || (advertisedAudioCodec && !COMPATIBLE_AUDIO_CODECS.includes(advertisedAudioCodec))) {
+    else if (reencodeAudio || mustTranscode) {
       acodec = [
         '-bsf:a', 'aac_adtstoasc',
         '-acodec', 'libfdk_aac',
@@ -355,9 +337,11 @@ class PrebufferSession {
         '-flags', '+global_header',
       ];
     }
-    else if (aacAudio) {
+    else if (aacAudio || detectedNoAudio) {
       // NOTE: If there is no audio track, the aac filters will still work fine without complaints
       // from ffmpeg. This is why AAC and No Audio can be grouped into a single setting.
+      // This is preferred, because failure and recovery is preferable to
+      // permanently muting camera audio due to erroneous detection.
       acodec = [
         '-acodec',
         'copy',
@@ -406,15 +390,9 @@ class PrebufferSession {
       });
     }
     else {
-      rbo.parsers.rtpvideo = createRtpParser('-an', '-vcodec', 'copy');
-      rbo.parsers.rtpaudio = createRtpParser('-vn', '-acodec', 'copy');
-    }
-
-    // if pcm prebuffer is requested, create the the parser. don't do it if
-    // the camera wants to mute the audio though, or no audio was detected
-    // in a prior attempt.
-    if (pcmAudio && !audioSoftMuted && !detectedNoAudio) {
-      rbo.parsers.s16le = createPCMParser();
+      const parser = createRtspParser();
+      this.sdp = parser.sdp;
+      rbo.parsers.rtsp = parser;
     }
 
     this.parsers = rbo.parsers;
@@ -422,6 +400,10 @@ class PrebufferSession {
     // create missing pts from dts so mpegts and mp4 muxing does not fail
     const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
     ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+
+    // before launching the parser session, clear out the last detected codec.
+    // an erroneous cached codec could cause ffmpeg to fail to start.
+    this.storage.removeItem('lastDetectedAudioCodec');
 
     const session = await startParserSession(ffmpegInput, rbo);
 
@@ -436,8 +418,7 @@ class PrebufferSession {
     }
 
     // set/update the detected codec, set it to null if no audio was found.
-    this.detectedAudioCodec = session.inputAudioCodec || null;
-    this.detectedVideoCodec = session.inputVideoCodec || null;
+    this.storage.setItem('lastDetectedAudioCodec', session.inputAudioCodec || 'null');
 
     if (session.inputVideoCodec !== 'h264') {
       this.console.error(`Video codec is not h264. If there are errors, try changing your camera's encoder output.`);
@@ -483,7 +464,6 @@ class PrebufferSession {
         this.parserSession = undefined;
     });
 
-    // s16le will be a no-op if there's no pcm, no harm.
     for (const container of PrebufferParserValues) {
       let shifts = 0;
 
@@ -552,86 +532,32 @@ class PrebufferSession {
     const createContainerServer = async (container: PrebufferParsers) => {
       const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
-      if (this.parsers[container].parseDatagram) {
-        let sdp = Buffer.concat(await session.sdp).toString();
+      let socketPromise: Promise<Duplex>;
+      let containerUrl: string;
 
-        const sdpLines = sdp.split('\n').map(sdp => sdp.trim()).filter(sdp => sdp !== 'c=IN IP4 127.0.0.1');
-        let id = 0;
-        const addTrack = (type: string) => {
-          const index = sdpLines.findIndex(sdp => sdp.startsWith(`m=${type}`));
-          if (index !== -1) {
-            sdpLines.splice(index + 1, 0, 'a=recvonly', `a=control:trackID=${id}`);
-            id++;
-          }
-        }
-        addTrack('video');
-        addTrack('audio');
-        sdp = sdpLines.join('\r\n');
-        sdp = sdp.replace(/m=audio .*? /, 'm=audio 0 ')
-        sdp = sdp.replace(/m=video .*? /, 'm=video 0 ')
-        sdp = sdp.replace('t=0 0', 'c=IN IP4 127.0.0.1\r\nt=0 0\r\na=recvonly\r\na=control:*\r\na=range:npt=now-');
-        this.console.log(sdp);
-
-        const d = dgram.createSocket('udp4');
-        d.bind();
-
-        let playing = false;
-        let server: RtspServer;
-        const safeWriteData = (send: (packet: Buffer, rtcp: boolean) => void) => {
-          return (chunk: StreamChunk) => {
-            if (!playing)
-              return;
-            send(chunk.chunks[0], chunk.type === 'rtcp');
-          }
-        }
-
-        const wv = safeWriteData((packet, rtcp) => server.sendVideo(packet, rtcp));
-        const wa = safeWriteData((packet, rtcp) => server.sendAudio(packet, rtcp));
-        const cleanup = () => {
-          d.close();
-          session.removeListener('rtpvideo', wv);
-          session.removeListener('rtpaudio', wa);
-          session.removeListener('killed', cleanup);
-        }
-
-        session.once('killed', cleanup);
-
-        const sdpClient = await listenZeroSingleClient();
-        sdpClient.clientPromise.then(async (c) => {
-          this.activeClients++;
-          this.printActiveClients();
-
-          c.once('close', () => {
-            this.activeClients--;
-            this.inactivityCheck(session);
-            cleanup();
-          });
-
-          server = await new Promise(resolve => new RtspServer(c, sdp, server => resolve(server)));
-          playing = true;
-
-          for (const prebuffer of this.prebuffers.rtpvideo) {
-            if (prebuffer.time < now - requestedPrebuffer)
-              continue;
-            server.sendVideo(prebuffer.chunk.chunks[0], prebuffer.chunk.type === 'rtcp');
-          }
-
+      if (container === 'rtsp') {
+        this.sdp.then(sdp => console.log(sdp));
+        const client = await listenZeroSingleClient();
+        socketPromise = client.clientPromise.then(async (socket) => {
+          let sdp = await this.sdp;
+          const server = new RtspServer(socket, sdp);
+          await server.handlePlayback();
+          return socket;
         })
-          .catch(cleanup);
-
-        session.on('rtpvideo', wv)
-        session.on('rtpaudio', wa);
-        const url = sdpClient.url.replace('tcp://', 'rtsp://');
-        return url;
+        containerUrl = client.url.replace('tcp://', 'rtsp://');
+      }
+      else {
+        const client = await listenZeroSingleClient();
+        socketPromise = client.clientPromise;
+        containerUrl = `tcp://127.0.0.1:${client.port}`
       }
 
-      const { server, port } = await createRebroadcaster({
+      handleRebroadcasterClient(socketPromise, {
         console: this.console,
         connect: (writeData, destroy) => {
           this.activeClients++;
           this.printActiveClients();
 
-          server.close();
           const now = Date.now();
 
           const safeWriteData = (chunk: StreamChunk) => {
@@ -677,13 +603,11 @@ class PrebufferSession {
         }
       })
 
-      setTimeout(() => server.close(), 30000);
-
-      return `tcp://127.0.0.1:${port}`;
+      return containerUrl;
     }
 
     const rtspMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTSP';
-    const defaultContainer = rtspMode ? 'rtpvideo' : 'mpegts';
+    const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
     const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
 
@@ -691,7 +615,7 @@ class PrebufferSession {
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
-    const { pcmAudio, reencodeAudio } = this.getAudioConfig();
+    const { reencodeAudio } = this.getAudioConfig();
 
     if (this.audioDisabled) {
       mediaStreamOptions.audio = null;
@@ -740,14 +664,6 @@ class PrebufferSession {
         '-i', url,
       ],
       mediaStreamOptions,
-    }
-
-    if (pcmAudio) {
-      ffmpegInput.inputArguments.push(
-        '-analyzeduration', '0', '-probesize', length,
-        '-f', 's16le',
-        '-i', await createContainerServer('s16le'),
-      )
     }
 
     const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
