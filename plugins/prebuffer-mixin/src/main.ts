@@ -3,8 +3,8 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { createRebroadcaster, handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, createRtpParser } from '@scrypted/common/src/stream-parser';
+import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createRtspParser, RtspServer } from './rtsp-server';
@@ -503,11 +503,17 @@ class PrebufferSession {
     this.console.log(this.streamName, 'active rebroadcast clients:', this.activeClients);
   }
 
-  inactivityCheck(session: ParserSession<PrebufferParsers>) {
+  inactivityCheck(session: ParserSession<PrebufferParsers>, refresh: boolean) {
     this.printActiveClients();
     if (!this.stopInactive)
       return;
     if (this.activeClients)
+      return;
+
+    // by default, clients disconnecting will reset the inactivity timeout.
+    // but in some cases, like optimistic prebuffer stream snapshots (google sdm)
+    // we do not want that behavior.
+    if (this.inactivityTimeout && !refresh)
       return;
 
     clearTimeout(this.inactivityTimeout)
@@ -519,7 +525,7 @@ class PrebufferSession {
     }, 30000);
   }
 
-  async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
+  async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
     this.ensurePrebufferSession();
 
     const session = await this.parserSessionPromise;
@@ -597,7 +603,7 @@ class PrebufferSession {
 
           return () => {
             this.activeClients--;
-            this.inactivityCheck(session);
+            this.inactivityCheck(session, options?.refresh !== false);
             cleanup();
           };
         }
@@ -872,18 +878,11 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const prebuffer = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
-    if (!enabledStreams) {
-      ret.push({
-        id: 'default',
-        name: 'Default',
-        prebuffer,
-      });
+    for (const mso of ret) {
+      if (this.sessions.get(mso.id)?.parserSession || enabledStreams.includes(mso))
+        mso.prebuffer = prebuffer;
     }
-    else {
-      for (const enabledStream of enabledStreams) {
-        enabledStream.prebuffer = prebuffer;
-      }
-    }
+
     return ret;
   }
 

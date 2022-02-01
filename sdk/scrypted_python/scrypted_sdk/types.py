@@ -378,6 +378,7 @@ class RequestMediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
+    refresh: bool
     refreshAt: float
     source: MediaStreamSource
     userConfigurable: bool

@@ -522,6 +522,13 @@ export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
      * peer to peer connections are possible and preferred, such as WebRTC.
      */
     directMediaStream?: boolean;
+    /**
+     * Specify the stream refresh behavior when this stream is requested.
+     * Use case is primarily for perioidic snapshot of streams
+     * while they are active.
+     * @default true
+     */
+    refresh?: boolean;
 }
 /**
  * VideoCamera devices can capture video streams.

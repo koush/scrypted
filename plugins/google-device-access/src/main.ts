@@ -131,7 +131,8 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
         try {
             const msos = await realDevice.getVideoStreamOptions();
-            const prebuffered = msos.find(mso => mso.prebuffer);
+            const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
+            prebuffered.refresh = false;
             if (prebuffered)
                 return realDevice.getVideoStream(prebuffered);
         }
@@ -223,8 +224,8 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
             url: u,
             mediaStreamOptions: this.addRefreshOptions(result, getSdmRtspMediaStreamOptions()),
             inputArguments: [
-                // "-rtsp_transport",
-                // "tcp",
+                "-rtsp_transport",
+                "tcp",
                 "-analyzeduration", "0",
                 "-probesize", "1000000",
                 "-reorder_queue_size", "1024",
