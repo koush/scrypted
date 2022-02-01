@@ -133,7 +133,9 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
         configuration: {},
     };
 
+    console.log('offer sdp', offer.sdp);
     const answer = await sendOffer(offerWithCandidates);
+    console.log('answer sdp', answer.description.sdp);
     await pc.setRemoteDescription(answer.description as any);
 
     return {
