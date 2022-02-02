@@ -92,7 +92,7 @@ class DummyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider, 
     async getCreateDeviceSettings(): Promise<Setting[]> {
         return [
             {
-                key: 'shell:',
+                key: 'name',
                 title: 'Dummy Switch Name',
                 placeholder: 'My Dummy Switch',
             },
