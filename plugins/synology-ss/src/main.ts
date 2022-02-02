@@ -115,16 +115,9 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
         return mediaManager.createFFmpegMediaObject({
             url: liveViewPaths[0].rtspPath,
             inputArguments: [
-                "-rtsp_transport",
-                "tcp",
-                '-analyzeduration', '15000000',
-                '-probesize', '100000000',
-                "-reorder_queue_size",
-                "1024",
-                "-max_delay",
-                "1000000",
-                "-i",
-                liveViewPaths[0].rtspPath,
+                "-rtsp_transport", "tcp",
+                "-max_delay", "1000000",
+                "-i", liveViewPaths[0].rtspPath,
             ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
         });
