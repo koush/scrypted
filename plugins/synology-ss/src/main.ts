@@ -122,7 +122,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
                 "-reorder_queue_size",
                 "1024",
                 "-max_delay",
-                "20000000",
+                "1000000",
                 "-i",
                 liveViewPaths[0].rtspPath,
             ],

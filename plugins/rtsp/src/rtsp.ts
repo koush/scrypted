@@ -82,7 +82,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
                 "-reorder_queue_size",
                 "1024",
                 "-max_delay",
-                "20000000",
+                "1000000",
                 "-i",
                 stringUrl,
             ],
