@@ -9,9 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@koush/werift": "^0.14.5-beta1",
     "@scrypted/sdk": "file:../sdk",
-    "typescript": "^4.4.3",
-    "werift": "^0.14.5"
+    "typescript": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^16.9.0"

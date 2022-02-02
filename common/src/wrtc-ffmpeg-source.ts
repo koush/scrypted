@@ -1,6 +1,6 @@
 import { RTCAVSource, RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions } from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "./listen-cluster";
-import { RTCPeerConnection, RTCRtpCodecParameters } from "werift";
+import { RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
 import dgram from 'dgram';
 
 function createSdpInput(audioPort: number, videoPort: number) {
