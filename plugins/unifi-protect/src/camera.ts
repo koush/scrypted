@@ -316,16 +316,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return mediaManager.createFFmpegMediaObject({
             url: u,
             inputArguments: [
-                "-rtsp_transport",
-                "tcp",
-                '-analyzeduration', '15000000',
-                '-probesize', '100000000',
-                "-reorder_queue_size",
-                "1024",
-                "-max_delay",
-                "1000000",
-                "-i",
-                u,
+                "-rtsp_transport", "tcp",
+                "-max_delay", "1000000",
+                "-i", u,
             ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
         });

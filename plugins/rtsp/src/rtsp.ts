@@ -75,16 +75,9 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         const ret: FFMpegInput = {
             url: stringUrl,
             inputArguments: [
-                "-rtsp_transport",
-                this.getRtspTransport(),
-                '-analyzeduration', '15000000',
-                '-probesize', '10000000',
-                "-reorder_queue_size",
-                "1024",
-                "-max_delay",
-                "1000000",
-                "-i",
-                stringUrl,
+                "-rtsp_transport", this.getRtspTransport(),
+                "-max_delay", "1000000",
+                "-i", stringUrl,
             ],
             mediaStreamOptions: vso,
         };

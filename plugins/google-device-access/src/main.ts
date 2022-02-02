@@ -225,15 +225,9 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
             url: u,
             mediaStreamOptions: this.addRefreshOptions(result, getSdmRtspMediaStreamOptions()),
             inputArguments: [
-                "-rtsp_transport",
-                "tcp",
-                "-analyzeduration", "0",
-                "-probesize", "1000000",
-                "-reorder_queue_size", "1024",
-                "-max_delay",
-                "1000000",
-                "-i",
-                u.toString(),
+                "-rtsp_transport", "tcp",
+                "-max_delay", "1000000",
+                "-i", u.toString(),
             ],
         });
     }
