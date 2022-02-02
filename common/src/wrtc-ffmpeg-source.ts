@@ -93,7 +93,10 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: s
             }
             udp!.send(rtp.serialize(), audioPort, "127.0.0.1");
         });
-    });
+        track.onReceiveRtp.once(() => {
+            setInterval(() => audioTransceiver.receiver.sendRtcpPLI(track.ssrc!), 2000);
+        });
+});
 
     const videoTransceiver = pc.addTransceiver("video", avsource.video as any);
     videoTransceiver.onTrack.subscribe((track) => {
