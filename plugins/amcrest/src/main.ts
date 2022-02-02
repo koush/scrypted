@@ -149,7 +149,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async getOtherSettings(): Promise<Setting[]> {
-        const ret: Setting[] = [
+        const ret = await super.getOtherSettings();
+        ret.push(
             {
                 title: 'Doorbell Type',
                 choices: [
@@ -158,10 +159,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     DAHUA_DOORBELL_TYPE,
                 ],
                 description: 'If this device is a doorbell, select the appropriate doorbell type.',
-                value: this.storage.getItem('doorbellType'),
+                value: this.storage.getItem('doorbellType') || 'Not a Doorbell',
                 key: 'doorbellType',
             },
-        ];
+        );
 
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
@@ -189,6 +190,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             {
                 key: 'rtspChannel',
                 title: 'Channel Number Override',
+                group: 'Advanced',
                 description: "The channel number to use for snapshots and video. E.g., 1, 2, etc.",
                 placeholder: '1',
                 value: this.storage.getItem('rtspChannel'),

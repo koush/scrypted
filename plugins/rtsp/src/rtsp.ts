@@ -76,7 +76,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
             url: stringUrl,
             inputArguments: [
                 "-rtsp_transport",
-                "tcp",
+                this.getRtspTransport(),
                 '-analyzeduration', '15000000',
                 '-probesize', '10000000',
                 "-reorder_queue_size",
@@ -113,6 +113,30 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
                 multiple: true,
             },
         ];
+    }
+
+    async getRtspTransportSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'rtspTransport',
+                title: 'RTSP Transport',
+                group: 'Advanced',
+                description: 'The RTSP Transport to use when streaming video. TCP is the default.',
+                value: this.getRtspTransport(),
+                choices: [
+                    'tcp',
+                    'udp',
+                ],
+            },
+        ]
+    }
+
+    getRtspTransport() {
+        return this.storage.getItem('rtspTransport') || 'tcp'
+    }
+
+    async getOtherSettings(): Promise<Setting[]> {
+        return this.getRtspTransportSettings();
     }
 
     async getUrlSettings(): Promise<Setting[]> {
@@ -191,6 +215,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return [
             {
                 key: 'snapshotUrl',
+                group: 'Advanced',
                 title: 'Snapshot URL Override',
                 placeholder: 'http://192.168.1.100[:80]/snapshot.jpg',
                 value: this.storage.getItem('snapshotUrl'),
@@ -252,6 +277,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return [
             {
                 key: 'httpPort',
+                group: 'Advanced',
                 title: 'HTTP Port Override',
                 placeholder: '80',
                 value: this.storage.getItem('httpPort'),
@@ -263,13 +289,14 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return true;
     }
 
-    getRtspPortOverrideSettings() {
+    getRtspPortOverrideSettings(): Setting[] {
         if (!this.showRtspPortOverride()) {
             return [];
         }
         return [
             {
                 key: 'rtspPort',
+                group: 'Advanced',
                 title: 'RTSP Port Override',
                 placeholder: '554',
                 value: this.storage.getItem('rtspPort'),

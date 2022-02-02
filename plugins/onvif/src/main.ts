@@ -244,6 +244,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
 
     async getOtherSettings(): Promise<Setting[]> {
         return [
+            ...await super.getOtherSettings(),
             {
                 title: 'Onvif Doorbell',
                 type: 'boolean',

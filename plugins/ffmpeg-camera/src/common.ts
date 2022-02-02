@@ -142,6 +142,7 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
             return [
                 {
                     title: 'Default Stream',
+                    group: 'Advanced',
                     key: 'defaultStream',
                     value: defaultStream?.name,
                     choices: vsos.map(vso => vso.name),
