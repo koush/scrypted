@@ -28,3 +28,6 @@
 [submodule "plugins/vscode-typescript"]
 	path = plugins/vscode-typescript
 	url = ../../koush/scrypted-vscode-typescript/
+[submodule "external/werift"]
+	path = external/werift
+	url = ../../koush/werift-webrtc

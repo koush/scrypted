@@ -27,9 +27,9 @@
    },
    "dependencies": {
       "@homebridge/camera-utils": "^2.0.4",
+      "@koush/ring-client-api": "^9.24.1",
       "@types/node": "^16.6.1",
-      "axios": "^0.24.0",
-      "ring-client-api": "../../external/ring-client-api"
+      "axios": "^0.24.0"
    },
    "optionalDependencies": {
       "got": "11.8.2"

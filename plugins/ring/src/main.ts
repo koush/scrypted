@@ -6,7 +6,7 @@ import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
 import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
 import child_process, { ChildProcess } from 'child_process';
 import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
-import { generateUuid } from '../../../external/ring-client-api/api/util';
+import { generateUuid } from './ring-client-api';
 
 const { log, deviceManager, mediaManager } = sdk;
 const STREAM_TIMEOUT = 120000;
