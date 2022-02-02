@@ -22,6 +22,8 @@ const RingWebRtcAvSource: RTCAVSource = {
     },
 };
 
+process.env.DEBUG='*';
+
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
         super(camera.id + '-light');
@@ -79,7 +81,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
         const sessionId = generateUuid();
         // this.webrtcSession = sessionId;
         const offer: RTCAVMessage = JSON.parse(data.toString());
+        this.console.log('offer sdp', offer.description.sdp);
         const answerSdp = await this.findCamera().startWebRtcSession(sessionId, offer.description.sdp);
+        this.console.log('answer sdp', answerSdp);
 
         const answer: RTCAVMessage = {
             id: undefined,
