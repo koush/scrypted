@@ -15,9 +15,6 @@ const { mediaManager, log, systemManager, deviceManager } = sdk;
 const defaultPrebufferDuration = 10000;
 const PREBUFFER_DURATION_MS = 'prebufferDuration';
 const SEND_KEYFRAME = 'sendKeyframe';
-const AUDIO_CONFIGURATION_KEY_PREFIX = 'audioConfiguration-';
-const FFMPEG_INPUT_ARGUMENTS_KEY_PREFIX = 'ffmpegInputArguments-';
-const REBROADCAST_MODE_KEY_PREFIX = 'rebroadcastMode-';
 const DEFAULT_AUDIO = 'Default';
 const AAC_AUDIO = 'AAC or No Audio';
 const AAC_AUDIO_DESCRIPTION = `${AAC_AUDIO} (Copy)`;
@@ -72,15 +69,17 @@ class PrebufferSession {
   inactivityTimeout: NodeJS.Timeout;
   audioConfigurationKey: string;
   ffmpegInputArgumentsKey: string;
+  lastDetectedAudioCodecKey: string;
   rebroadcastModeKey: string;
 
   constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string, public stopInactive: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
-    this.audioConfigurationKey = AUDIO_CONFIGURATION_KEY_PREFIX + this.streamId;
-    this.ffmpegInputArgumentsKey = FFMPEG_INPUT_ARGUMENTS_KEY_PREFIX + this.streamId;
-    this.rebroadcastModeKey = REBROADCAST_MODE_KEY_PREFIX + this.streamId;
+    this.audioConfigurationKey = 'audioConfiguration-' + this.streamId;
+    this.ffmpegInputArgumentsKey = 'ffmpegInputArguments-' + this.streamId;
+    this.rebroadcastModeKey = 'rebroadcastMode-' + this.streamId;
+    this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
   }
 
   clearPrebuffers() {
@@ -246,7 +245,7 @@ class PrebufferSession {
 
     const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio } = this.getAudioConfig();
 
-    let detectedAudioCodec = this.storage.getItem('lastDetectedAudioCodec') || undefined;
+    let detectedAudioCodec = this.storage.getItem(this.lastDetectedAudioCodecKey) || undefined;
     if (detectedAudioCodec === 'null')
       detectedAudioCodec = null;
 
@@ -403,7 +402,7 @@ class PrebufferSession {
 
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
-    this.storage.removeItem('lastDetectedAudioCodec');
+    this.storage.removeItem(this.lastDetectedAudioCodecKey);
 
     const session = await startParserSession(ffmpegInput, rbo);
 
@@ -418,7 +417,7 @@ class PrebufferSession {
     }
 
     // set/update the detected codec, set it to null if no audio was found.
-    this.storage.setItem('lastDetectedAudioCodec', session.inputAudioCodec || 'null');
+    this.storage.setItem(this.lastDetectedAudioCodecKey, session.inputAudioCodec || 'null');
 
     if (session.inputVideoCodec !== 'h264') {
       this.console.error(`Video codec is not h264. If there are errors, try changing your camera's encoder output.`);

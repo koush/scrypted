@@ -7,9 +7,12 @@ import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
 import child_process, { ChildProcess } from 'child_process';
 import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
 import { generateUuid } from './ring-client-api';
+import fs from 'fs';
+import { clientApi } from '@koush/ring-client-api/lib/api/rest-client';
 
 const { log, deviceManager, mediaManager } = sdk;
 const STREAM_TIMEOUT = 120000;
+const black = fs.readFileSync('black.jpg');
 
 const RingSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'ring/';
 const RingDeviceSignalingPrefix = RingSignalingPrefix + 'x-';
@@ -22,7 +25,7 @@ const RingWebRtcAvSource: RTCAVSource = {
     },
 };
 
-process.env.DEBUG='*';
+process.env.DEBUG = '*';
 
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
@@ -103,9 +106,22 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
+
+
+        // watch for snapshot being blocked due to live stream
         const camera = this.findCamera();
-        const snapshot = await camera.getSnapshot();
-        return mediaManager.createMediaObject(snapshot, 'image/jpeg');
+        if (!camera || camera.snapshotsAreBlocked) {
+            return mediaManager.createMediaObject(black, 'image/jpeg');
+        }
+
+        // trigger a refresh, but immediately use whatever is in cache.
+        camera.getSnapshot();
+        const buffer = await this.plugin.client.request<Buffer>({
+            url: clientApi(`snapshots/image/${camera.id}`),
+            responseType: 'buffer',
+        });
+
+        return mediaManager.createMediaObject(buffer, 'image/jpeg');
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
