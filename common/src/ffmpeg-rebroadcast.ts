@@ -39,6 +39,7 @@ export interface ParserOptions<T extends string> {
     parsers: { [container in T]?: StreamParser };
     timeout?: number;
     console: Console;
+    storage?: Storage;
 }
 
 export async function parseResolution(cp: ChildProcess) {
@@ -229,7 +230,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
         stdio,
     });
-    ffmpegLogInitialOutput(console, cp);
+    ffmpegLogInitialOutput(console, cp, undefined, options?.storage);
     cp.on('exit', kill);
 
     const sdp = new Promise<Buffer[]>(resolve => {
