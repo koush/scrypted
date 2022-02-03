@@ -452,7 +452,7 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: str | bytearray, fromMimeType: str) -> str | bytearray:
+    async def convert(self, data: str | bytearray, fromMimeType: str, toMimeType: str) -> str | bytearray:
         pass
     pass
 

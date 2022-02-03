@@ -1262,7 +1262,7 @@ export interface SoftwareUpdate {
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type. May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-  convert(data: string | Buffer, fromMimeType: string): Promise<Buffer | string>;
+  convert(data: string | Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer | string>;
 
   fromMimeType?: string;
   toMimeType?: string;
