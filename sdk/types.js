@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SCRYPTED_MEDIA_SCHEME = exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
+exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
 class DeviceBase {
 }
 exports.DeviceBase = DeviceBase;
@@ -696,6 +696,6 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["RTCAVSignalingPrefix"] = "x-scrypted-rtc-signaling-";
     ScryptedMimeTypes["RTCAVOffer"] = "x-scrypted/x-rtc-av-offer";
     ScryptedMimeTypes["RTCAVAnswer"] = "x-scrypted/x-rtc-av-answer";
+    ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));
-exports.SCRYPTED_MEDIA_SCHEME = 'scryped-media://';
 //# sourceMappingURL=types.js.map

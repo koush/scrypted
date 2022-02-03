@@ -1259,7 +1259,8 @@ export interface SoftwareUpdate {
   updateAvailable?: boolean;
 }
 /**
- * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type. May optionally accept string urls if accept-url is a fromMimeType parameter.
+ * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type.
+ * May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
   convert(data: string | Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer | string>;
@@ -1949,9 +1950,8 @@ export enum ScryptedMimeTypes {
   RTCAVSignalingPrefix = 'x-scrypted-rtc-signaling-',
   RTCAVOffer = 'x-scrypted/x-rtc-av-offer',
   RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',
+  SchemePrefix = 'x-scrypted/x-scrypted-scheme-',
 }
-
-export const SCRYPTED_MEDIA_SCHEME = 'scryped-media://';
 
 export interface ScryptedStatic {
   /**
