@@ -10,7 +10,7 @@ import os from 'os';
 import { getInstalledFfmpeg } from '@scrypted/ffmpeg'
 import { ffmpegLogInitialOutput } from "../media-helpers";
 
-function addBuiltins(console: Console, mediaManager: MediaManager) {
+function addBuiltins(console: Console, mediaManager: MediaManagerBase) {
     mediaManager.builtinConverters.push({
         fromMimeType: `${ScryptedMimeTypes.Url};${ScryptedMimeTypes.AcceptUrlParameter}=true`,
         toMimeType: ScryptedMimeTypes.FFmpegInput,
@@ -19,8 +19,7 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
             const args: FFMpegInput = {
                 url,
                 inputArguments: [
-                    '-i',
-                    url,
+                    '-i', url,
                 ],
             }
 
@@ -43,26 +42,14 @@ function addBuiltins(console: Console, mediaManager: MediaManager) {
             const mediaUrl: MediaStreamUrl = JSON.parse(data.toString());
 
             const inputArguments: string[] = [
-                '-i',
-                mediaUrl.url,
+                '-i', mediaUrl.url,
             ];
 
             if (mediaUrl.url.startsWith('rtsp://')) {
                 inputArguments.unshift(
-                    // should this be set here? configurable?
-                    // do we ever want udp?
-                    "-rtsp_transport",
-                    "tcp",
-                    // 10 seconds
-                    '-analyzeduration', '10000000',
-                    // 20mb
-                    '-probesize', '20000000',
-                    "-reorder_queue_size",
-                    "1024",
-                    "-max_delay",
-                    // 10 second delay
-                    "10000000",
-                )
+                    "-rtsp_transport", "tcp",
+                    "-max_delay", "1000000",
+                );
             }
 
             const ret: FFMpegInput = Object.assign({

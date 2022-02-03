@@ -109,7 +109,7 @@ export async function convert(converters: BufferConverter[], mediaObject: MediaO
         if (typeof value === 'string' && !inputMime.parameters.has(ScryptedMimeTypes.AcceptUrlParameter)) {
             value = await ensureBuffer(value);
         }
-        value = await converter.convert(value, valueMime.essence);
+        value = await converter.convert(value, valueMime.essence, converter.toMimeType);
         const type = targetMime.type === '*' ? valueMime.type : targetMime.type;
         const subtype = targetMime.subtype === '*' ? valueMime.subtype : targetMime.subtype;
         valueMime = new MimeType(`${type}/${subtype}`);
