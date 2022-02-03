@@ -106,8 +106,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
-
-
         // watch for snapshot being blocked due to live stream
         const camera = this.findCamera();
         if (!camera || camera.snapshotsAreBlocked) {
