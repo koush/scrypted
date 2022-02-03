@@ -1,5 +1,3 @@
-// webpack polyfill 'usage' does not seem to work on modules.
-// include directly.
 import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface, Battery } from '@scrypted/sdk';
 const { log } = sdk;
 import { myQApi, myQDevice } from '@hjdhjd/myq';
