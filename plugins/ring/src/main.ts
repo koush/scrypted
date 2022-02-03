@@ -114,12 +114,18 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
 
         // trigger a refresh, but immediately use whatever is in cache.
         camera.getSnapshot();
-        const buffer = await this.plugin.client.request<Buffer>({
-            url: clientApi(`snapshots/image/${camera.id}`),
-            responseType: 'buffer',
-        });
-
-        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+        try {
+            const buffer = await this.plugin.client.request<Buffer>({
+                url: clientApi(`snapshots/image/${camera.id}`),
+                responseType: 'buffer',
+            });
+    
+            return mediaManager.createMediaObject(buffer, 'image/jpeg');
+        }
+        catch (e) {
+            this.console.error('snapshot error', e);
+            return mediaManager.createMediaObject(black, 'image/jpeg');
+        }
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
