@@ -362,7 +362,9 @@ addSupportedType({
 
                     safePrintFFmpegArguments(console, args);
 
-                    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+                    const ffmpegPath = await mediaManager.getFFmpegPath();
+                    console.log('ffmpeg', ffmpegPath);
+                    const cp = child_process.spawn(ffmpegPath, args);
                     ffmpegLogInitialOutput(console, cp);
 
                     session.cp = cp;
