@@ -1,12 +1,13 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Device, ScryptedDeviceType, Entry, Refresh, OnOff, Settings, Setting, EntrySensor, ScryptedInterface, Battery } from '@scrypted/sdk';
 const { log } = sdk;
-import { myQApi, myQDevice } from '@hjdhjd/myq';
+import { myQApi, myQDevice, myQDeviceInterface } from '@hjdhjd/myq';
 import throttle from 'lodash/throttle';
 
 const { deviceManager } = sdk;
 
-function isValidGarageDoor(device_type: string) {
-  return device_type === 'wifigaragedooropener' || device_type === 'virtualgaragedooropener' || device_type === 'garagedooropener';
+function isValidGarageDoor(device: myQDeviceInterface) {
+  //return device_type === 'wifigaragedooropener' || device_type === 'virtualgaragedooropener' || device_type === 'garagedooropener';
+  return device.device_family === 'garagedoor'
 }
 
 class GarageController extends ScryptedDeviceBase implements DeviceProvider, Settings, Battery {
@@ -76,7 +77,7 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
     
     const devices: Device[] = [];
     for (const device of this.account.devices) {
-      if (!isValidGarageDoor(device.device_type)) {
+      if (!isValidGarageDoor(device)) {
         console.log('ignoring device', device);
         continue;
       }
@@ -101,7 +102,7 @@ class GarageController extends ScryptedDeviceBase implements DeviceProvider, Set
 
   async updateStates() {
     for (const device of this.account.devices) {
-      if (!isValidGarageDoor(device.device_type)) {
+      if (!isValidGarageDoor(device)) {
         console.log('ignoring device', device);
         continue;
       }
