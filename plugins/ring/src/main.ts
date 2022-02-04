@@ -551,15 +551,16 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
             };
             devices.push(device);
 
-            camera.onDoorbellPressed?.subscribe(() => {
+            camera.onNewDing.subscribe(e=> {
+                this.console.log(camera.name, 'onNewDing', e);
+            });
+            camera.onDoorbellPressed?.subscribe(e => {
+                this.console.log(camera.name, 'onDoorbellPressed', e);
                 const scryptedDevice = this.devices.get(nativeId);
                 scryptedDevice?.triggerBinaryState();
             });
-            camera.onMotionDetected?.subscribe(() => {
-                const scryptedDevice = this.devices.get(nativeId);
-                scryptedDevice?.triggerMotion();
-            });
             camera.onMotionStarted?.subscribe(() => {
+                this.console.log(camera.name, 'onMotionStarted');
                 const scryptedDevice = this.devices.get(nativeId);
                 scryptedDevice?.triggerMotion();
             });
