@@ -149,6 +149,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         }
     }
 
+    let needSdp = false;
+
     // first see how many pipes are needed, and prep them for the child process
     const stdio: StdioOptions = ['pipe', 'pipe', 'pipe']
     let pipeCount = 3;
@@ -156,6 +158,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         const parser: StreamParser = options.parsers[container];
 
         if (parser.parseDatagram) {
+            needSdp = true;
             const socket = dgram.createSocket('udp4');
             const udp = await bindZero(socket);
             const rtcp = dgram.createSocket('udp4');
@@ -223,8 +226,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         }
     }
 
-    args.push('-sdp_file', `pipe:${pipeCount++}`);
-    stdio.push('pipe');
+    if (needSdp) {
+        args.push('-sdp_file', `pipe:${pipeCount++}`);
+        stdio.push('pipe');
+    }
 
     // start ffmpeg process with child process pipes
     args.unshift('-hide_banner');
@@ -235,13 +240,19 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     ffmpegLogInitialOutput(console, cp, undefined, options?.storage);
     cp.on('exit', kill);
 
-    const sdp = new Promise<Buffer[]>(resolve => {
-        const ret = [];
-        cp.stdio[pipeCount - 1].on('data', buffer => {
-            ret.push(buffer);
-            resolve(ret);
-        });
-    })
+    let sdp: Promise<Buffer[]>;
+    if (needSdp) {
+        sdp = new Promise<Buffer[]>(resolve => {
+            const ret = [];
+            cp.stdio[pipeCount - 1].on('data', buffer => {
+                ret.push(buffer);
+                resolve(ret);
+            });
+        })
+    }
+    else {
+        sdp = Promise.resolve([]);
+    }
 
     // now parse the created pipes
     let pipeIndex = 0;
