@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
 
   const context = cast.framework.CastReceiverContext.getInstance();
   const playerManager = context.getPlayerManager();
+  const video = document.getElementById('media');
 
   // intercept the LOAD request to be able to read in a contentId and get data
   playerManager.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, loadRequestData => {
@@ -31,29 +32,54 @@ document.addEventListener("DOMContentLoaded", function (event) {
     };
 
     const socket = eio(`wss://${url.host}`, options);
-    socket.on('open', () => {
-      socket.send(token);
+    socket.on('open', async () => {
+      socket.send(JSON.stringify({
+        token,
+      }));
 
-      const video = document.getElementById('media');
+      socket.once('message', async (data) => {
+        const avsource = JSON.parse(data);
+        console.log(avsource);
 
-      let pc;
+        const pc = new RTCPeerConnection();
 
-      socket.on('message', async (data) => {
-        const json = JSON.parse(data);
-
-        if (pc) {
-          for (const candidate of json.candidates) {
-            pc.addIceCandidate(candidate);
+        const iceDone = new Promise(resolve => {
+          pc.onicecandidate = evt => {
+            if (!evt.candidate) {
+              resolve(undefined);
+            }
           }
-          return;
+        });
+
+        if (avsource.datachannel)
+          pc.createDataChannel(avsource.datachannel.label, avsource.datachannel.dict);
+        // it's possible to do talkback to ring.
+        let useAudioTransceiver = false;
+        if (avsource.audio?.direction === 'sendrecv') {
+          try {
+            // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+            const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+            for (const track of mic.getTracks()) {
+              pc.addTrack(track);
+            }
+          }
+          catch (e) {
+            let silence = () => {
+              let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+              let dst = oscillator.connect(ctx.createMediaStreamDestination());
+              oscillator.start();
+              return Object.assign(dst.stream.getAudioTracks()[0], { enabled: false });
+            }
+            pc.addTrack(silence());
+          }
         }
+        else {
+          useAudioTransceiver = true;
+        }
+        if (useAudioTransceiver)
+          pc.addTransceiver("audio", avsource.audio);
+        pc.addTransceiver("video", avsource.video);
 
-        const answerObject = {
-          id: json.id,
-          candidates: [],
-        };
-
-        pc = new RTCPeerConnection(json.configuration);
         const checkConn = () => {
           console.log(pc.connectionState, pc.iceConnectionState);
           if (pc.iceConnectionState === 'failed' || pc.connectionState === 'failed') {
@@ -72,25 +98,31 @@ document.addEventListener("DOMContentLoaded", function (event) {
           remoteAudio.srcObject = mediaStream;
           remoteAudio.play();
         };
-        pc.onicecandidate = async (evt) => {
-          if (!evt.candidate) {
-            return;
+
+        let offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        });
+        await pc.setLocalDescription(offer);
+        await iceDone;
+        offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        });
+        await pc.setLocalDescription(offer);
+        const message = {
+          token,
+          offer: {
+            description: offer,
           }
-
-          const candidatesObject = {
-            id: json.id,
-            candidates: [evt.candidate],
-          };
-
-          socket.send(JSON.stringify(candidatesObject));
         };
-        await pc.setRemoteDescription(json.description);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        answerObject.description = answer;
-        socket.send(JSON.stringify(answerObject));
-      })
+        socket.send(JSON.stringify(message));
 
+        socket.once('message', async (data) => {
+          const json = JSON.parse(data);
+          await pc.setRemoteDescription(json.description);
+        })
+      })
     });
 
     return null;

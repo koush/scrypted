@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSource, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSignalingOfferSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -43,20 +43,23 @@ function getSdmRtcMediaStreamOptions(signalingMime: string): MediaStreamOptions 
     return ret;
 }
 
-const NestRTCAVSource: RTCAVSource = {
-    audio: {
-        direction: 'recvonly',
-    },
-    video: {
-        direction: 'recvonly',
-    },
-    datachannel: {
-        label: 'dataSendChannel',
-        dict: {
-            id: 1,
+function createNestOfferSetup(signalingMimeType: string): RTCAVSignalingOfferSetup {
+    return {
+        signalingMimeType,
+        audio: {
+            direction: 'recvonly',
         },
-    },
-}
+        video: {
+            direction: 'recvonly',
+        },
+        datachannel: {
+            label: 'dataSendChannel',
+            dict: {
+                id: 1,
+            },
+        },
+    }
+};
 
 function fromNestMode(mode: string): ThermostatMode {
     switch (mode) {
@@ -260,7 +263,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         }
 
         if (this.isWebRtc) {
-            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(NestRTCAVSource)), this.signalingMime);
+            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(createNestOfferSetup(this.signalingMime))), this.signalingMime);
         }
         else {
             const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -536,7 +539,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
             }
         }
         let streamResult: any;
-        const result = await createRTCPeerConnectionSource(NestRTCAVSource, 'default', 'MPEG-TS', device.console, async (offer) => {
+        const result = await createRTCPeerConnectionSource(createNestOfferSetup(device.signalingMime), 'default', 'MPEG-TS', device.console, async (offer) => {
             const { result, answer } = await device.sendOffer(offer);
             streamResult = result;
             return answer;

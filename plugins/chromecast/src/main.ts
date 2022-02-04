@@ -1,9 +1,9 @@
 import util from 'util';
-import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCAVMessage, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCAVMessage, RTCAVSignalingOfferSetup, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
 import mdns from 'multicast-dns';
 import mime from 'mime';
-import { addBuiltins } from "../../../common/src/wrtc-convertors";
+import { addBuiltins, startRTCPeerConnection } from "../../../common/src/wrtc-convertors";
 
 const { mediaManager, endpointManager, deviceManager } = sdk;
 addBuiltins(console, mediaManager);
@@ -235,43 +235,50 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     const ws = new WebSocket(webSocketUrl);
 
     ws.onmessage = async (message) => {
-      const token = message.data as string;
-
-      const videoStream = this.tokens.get(token);
-      if (!videoStream) {
+      const json = JSON.parse(message.data as string);
+      const { token, } = json;
+      const mediaObject = this.tokens.get(token);
+      if (!mediaObject) {
         ws.close();
         return;
       }
 
-      const offer: RTCAVMessage = JSON.parse((await mediaManager.convertMediaObjectToBuffer(
-        videoStream,
-        ScryptedMimeTypes.RTCAVOffer
-      )).toString());
+      let setup: RTCAVSignalingOfferSetup;
+      try {
+        const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.RTCAVSignalingOfferSetup);
+        setup = JSON.parse(buffer.toString());
 
-      ws.send(JSON.stringify(offer));
+        ws.onmessage = async (message) => {
+          ws.onmessage = undefined;
+          const json = JSON.parse(message.data as string);
+          const { offer } = json;
 
-      const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data)) as string;
-      const mo = mediaManager.createMediaObject(Buffer.from(answer), ScryptedMimeTypes.RTCAVAnswer);
-      const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-      ws.send(result.toString());
+          const mo = mediaManager.createMediaObject(Buffer.from(JSON.stringify(offer)), ScryptedMimeTypes.RTCAVOffer)
+          const answer = await mediaManager.convertMediaObjectToBuffer(mo, setup.signalingMimeType);
+          ws.send(answer.toString());
+        }
+      }
+      catch (e) {
+        setup = {
+          audio: {
+            direction: 'recvonly',
+          },
+          video: {
+            direction: 'recvonly',
+          },
+          signalingMimeType: undefined,
+        }
 
-      ws.onmessage = async (message) => {
-        const mo = mediaManager.createMediaObject(Buffer.from(message.data), ScryptedMimeTypes.RTCAVAnswer);
-        const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-        ws.send(result.toString());
+        ws.onmessage = async (message) => {
+          ws.onmessage = undefined;
+          const json = JSON.parse(message.data as string);
+          const { offer } = json;
+          const { pc, answer } = await startRTCPeerConnection(mediaObject, offer);
+          ws.send(JSON.stringify(answer));
+        }
       }
 
-      const emptyObject = JSON.stringify({
-        description: null,
-        id: offer.id,
-        candidates: [],
-        configuration: null,
-      });
-      while (true) {
-        const mo = mediaManager.createMediaObject(Buffer.from(emptyObject), ScryptedMimeTypes.RTCAVAnswer);
-        const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-        ws.send(result.toString());
-      }
+      ws.send(JSON.stringify(setup));
     }
   }
 

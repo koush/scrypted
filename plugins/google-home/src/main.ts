@@ -1,4 +1,4 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, RTCAVMessage, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
+import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MixinProvider, Refresh, RequestMediaStreamOptions, RTCAVMessage, RTCAVSignalingOfferSetup, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
 import { supportedTypes } from './common';
@@ -16,10 +16,9 @@ import { canAccess } from './commands/camerastream';
 import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
 import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
-import { addBuiltins } from "../../../common/src/wrtc-convertors";
+import { addBuiltins, startRTCPeerConnection } from "../../../common/src/wrtc-convertors";
 
 import ciao, { Protocol } from '@homebridge/ciao';
-import os from 'os';
 
 const responder = ciao.getResponder();
 
@@ -136,7 +135,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 protocol: Protocol.TCP,
                 port: parseInt(url.port),
                 txt: { // optional
-                  key: "value",
+                    key: "value",
                 }
             });
             service.advertise();
@@ -193,44 +192,55 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         const ws = new WebSocket(webSocketUrl);
 
         ws.onmessage = async (message) => {
-            const token = message.data as string;
+            const json = JSON.parse(message.data as string);
+            const { token, offer } = json;
 
-            const device = canAccess(token);
-            if (!device) {
+            const camera = canAccess(token);
+            if (!camera) {
                 ws.close();
                 return;
             }
 
-            const videoStream = await device.getVideoStream();
-            const offer: RTCAVMessage = JSON.parse((await mediaManager.convertMediaObjectToBuffer(
-                videoStream,
-                ScryptedMimeTypes.RTCAVOffer
-            )).toString());
+            let setup: RTCAVSignalingOfferSetup;
 
-            ws.send(JSON.stringify(offer));
+            const msos = await camera.getVideoStreamOptions();
+            const found = msos.find(mso => mso.container?.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) as RequestMediaStreamOptions;
+            if (found) {
+                found.directMediaStream = true;
+                const mediaObject = await camera.getVideoStream(found);
+                const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, mediaObject.mimeType);
+                setup = JSON.parse(buffer.toString());
 
-            const answer = await new Promise(resolve => ws.onmessage = (message) => resolve(message.data)) as RTCAVMessage;
-            const mo = mediaManager.createMediaObject(Buffer.from(answer), ScryptedMimeTypes.RTCAVAnswer);
-            const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-            ws.send(result.toString());
+                ws.onmessage = async (message) => {
+                    ws.onmessage = undefined;
+                    const json = JSON.parse(message.data as string);
+                    const { offer } = json;
 
-            ws.onmessage = async (message) => {
-                const mo = mediaManager.createMediaObject(Buffer.from(message.data), ScryptedMimeTypes.RTCAVAnswer);
-                const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-                ws.send(result.toString());
+                    const mo = mediaManager.createMediaObject(Buffer.from(JSON.stringify(offer)), ScryptedMimeTypes.RTCAVOffer)
+                    const answer = await mediaManager.convertMediaObjectToBuffer(mo, setup.signalingMimeType);
+                    ws.send(answer.toString());
+                }
             }
+            else {
+                setup = {
+                    audio: {
+                        direction: 'recvonly',
+                    },
+                    video: {
+                        direction: 'recvonly',
+                    },
+                    signalingMimeType: undefined,
+                }
 
-            const emptyObject = JSON.stringify({
-                description: null,
-                id: offer.id,
-                candidates: [],
-                configuration: null,
-            });
-            while (true) {
-                const mo = mediaManager.createMediaObject(Buffer.from(emptyObject), ScryptedMimeTypes.RTCAVAnswer);
-                const result = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.RTCAVOffer);
-                ws.send(result.toString());
+                ws.onmessage = async (message) => {
+                    ws.onmessage = undefined;
+                    const json = JSON.parse(message.data as string);
+                    const { offer } = json;
+                    const { pc, answer } = await startRTCPeerConnection(await camera.getVideoStream(), offer);
+                    ws.send(JSON.stringify(answer));
+                }
             }
+            ws.send(JSON.stringify(setup));
         }
     }
 

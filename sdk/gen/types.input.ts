@@ -1267,13 +1267,14 @@ export enum ScryptedInterface {
 
 }
 
-export interface RTCAVSource {
+export interface RTCAVSignalingOfferSetup {
   audio: RTCRtpTransceiverInit;
   video: RTCRtpTransceiverInit;
   datachannel?: {
     label: string;
     dict?: RTCDataChannelInit;
-  }
+  },
+  signalingMimeType: string;
 }
 
 export interface RTCAVMessage {
@@ -1301,6 +1302,7 @@ export enum ScryptedMimeTypes {
   RTCAVSignalingPrefix = 'x-scrypted-rtc-signaling-',
   RTCAVOffer = 'x-scrypted/x-rtc-av-offer',
   RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',
+  RTCAVSignalingOfferSetup = 'x-scrypted/x-rtc-av-signalling-offer-setup',
   SchemePrefix = 'x-scrypted/x-scrypted-scheme-',
   MediaObject = 'x-scrypted/x-scrypted-media-object',
 }

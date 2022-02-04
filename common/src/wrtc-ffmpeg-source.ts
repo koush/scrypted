@@ -1,4 +1,4 @@
-import { RTCAVSource, RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions } from "@scrypted/sdk/types";
+import { RTCAVSignalingOfferSetup, RTCAVMessage, FFMpegInput, MediaManager, MediaStreamOptions } from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "./listen-cluster";
 import { RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
 import dgram from 'dgram';
@@ -40,7 +40,7 @@ export function getRTCMediaStreamOptions(id: string, name: string, container: st
     };
 }
 
-export async function createRTCPeerConnectionSource(avsource: RTCAVSource, id: string, name: string, console: Console, sendOffer: (offer: RTCAVMessage) => Promise<RTCAVMessage>): Promise<{
+export async function createRTCPeerConnectionSource(avsource: RTCAVSignalingOfferSetup, id: string, name: string, console: Console, sendOffer: (offer: RTCAVMessage) => Promise<RTCAVMessage>): Promise<{
     ffmpegInput: FFMpegInput,
     peerConnection: RTCPeerConnection,
 }> {

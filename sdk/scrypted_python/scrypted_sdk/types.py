@@ -127,6 +127,7 @@ class ScryptedMimeTypes(Enum):
     PushEndpoint = "text/x-push-endpoint"
     RTCAVAnswer = "x-scrypted/x-rtc-av-answer"
     RTCAVOffer = "x-scrypted/x-rtc-av-offer"
+    RTCAVSignalingOfferSetup = "x-scrypted/x-rtc-av-signalling-offer-setup"
     RTCAVSignalingPrefix = "x-scrypted-rtc-signaling-"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     Url = "text/x-uri"

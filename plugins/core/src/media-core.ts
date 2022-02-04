@@ -1,4 +1,4 @@
-import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes } from '@scrypted/sdk';
+import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
@@ -54,18 +54,26 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         const url = new URL(data.toString());
         const id = url.hostname;
         const path = url.pathname.split('/')[1];
-        let mo: MediaObject;
         if (path === ScryptedInterface.VideoCamera) {
-            mo = await systemManager.getDeviceById<VideoCamera>(id).getVideoStream();
+            const camera = systemManager.getDeviceById<VideoCamera>(id);
+            if (toMimeType === ScryptedMimeTypes.RTCAVSignalingOfferSetup) {
+                const msos = await camera.getVideoStreamOptions();
+                const found = msos.find(mso => mso.container?.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) as RequestMediaStreamOptions;
+                if (found) {
+                    found.directMediaStream = true;
+                    const mo = await camera.getVideoStream(found);
+                    const buffer = await mediaManager.convertMediaObjectToBuffer(mo, mo.mimeType);
+                    return mediaManager.createMediaObject(buffer, ScryptedMimeTypes.RTCAVSignalingOfferSetup);
+                }
+            }
+            return camera.getVideoStream();
         }
         else if (path === ScryptedInterface.Camera) {
-            mo = await systemManager.getDeviceById<Camera>(id).takePicture() as any;
+            return await systemManager.getDeviceById<Camera>(id).takePicture() as any;
         }
         else {
             throw new Error('Unrecognized Scrypted Media interface.')
         }
-
-        return mo;
     }
 
     getDevice(nativeId: string) {

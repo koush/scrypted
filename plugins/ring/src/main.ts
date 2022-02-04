@@ -1,4 +1,4 @@
-import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVMessage, RTCAVSource, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVMessage, RTCAVSignalingOfferSetup, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
@@ -16,14 +16,17 @@ const black = fs.readFileSync('black.jpg');
 
 const RingSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'ring/';
 const RingDeviceSignalingPrefix = RingSignalingPrefix + 'x-';
-const RingWebRtcAvSource: RTCAVSource = {
-    audio: {
-        direction: 'sendrecv',
-    },
-    video: {
-        direction: 'recvonly',
-    },
-};
+function createRingRTCAVSignalingOfferSetup(signalingMimeType: string): RTCAVSignalingOfferSetup {
+    return {
+        signalingMimeType,
+        audio: {
+            direction: 'sendrecv',
+        },
+        video: {
+            direction: 'recvonly',
+        },
+    };
+}
 
 process.env.DEBUG = '*';
 
@@ -79,7 +82,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
         return answer;
     }
 
-    async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
+    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
         this.stopWebRtcSession();
         const sessionId = generateUuid();
         // this.webrtcSession = sessionId;
@@ -120,7 +123,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 url: clientApi(`snapshots/image/${camera.id}`),
                 responseType: 'buffer',
             });
-    
+
             return mediaManager.createMediaObject(buffer, 'image/jpeg');
         }
         catch (e) {
@@ -158,7 +161,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         if (options?.id === 'webrtc') {
 
-            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(RingWebRtcAvSource)), this.signalingMime);
+            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(createRingRTCAVSignalingOfferSetup(this.signalingMime))), this.signalingMime);
         }
 
         if (options?.refreshAt) {
@@ -368,7 +371,7 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
         this.toMimeType = ScryptedMimeTypes.FFmpegInput;
     }
 
-    async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
+    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
         const nativeId = fromMimeType.substring(RingDeviceSignalingPrefix.length);
         let device: RingCameraDevice;
         for (const d of this.devices.values()) {
@@ -377,7 +380,7 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
                 break;
             }
         }
-        const result = await createRTCPeerConnectionSource(RingWebRtcAvSource, 'default', 'MPEG-TS', device.console, async (offer) => {
+        const result = await createRTCPeerConnectionSource(createRingRTCAVSignalingOfferSetup(device.signalingMime), 'default', 'MPEG-TS', device.console, async (offer) => {
             const answer = await device.sendOffer(offer);
             device.console.log('webrtc answer', answer);
             return answer;
