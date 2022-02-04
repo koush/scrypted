@@ -47,7 +47,7 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import cloneDeep from "lodash/cloneDeep";
-import { ScryptedInterface, SCRYPTED_MEDIA_SCHEME } from "@scrypted/sdk/types";
+import { ScryptedInterface } from "@scrypted/sdk/types";
 
 const supportedMediaInterfaces = [
   ScryptedInterface.VideoCamera,
@@ -118,7 +118,7 @@ export default {
         for (const iface of [...new Set(device.interfaces)]) {
           if (!supportedMediaInterfaces.includes(iface)) continue;
           ret.push({
-            value: `${SCRYPTED_MEDIA_SCHEME}${id}/${iface}`,
+            value: `scrypted-media://${id}/${iface}`,
             text: `${device.name} (${iface})`,
           });
         }

@@ -1,4 +1,4 @@
-import { MediaStreamUrl, BufferConverter, FFMpegInput, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
+import { MediaStreamUrl, BufferConverter, FFMpegInput, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes, MediaObject } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import mimeTypes from "mime-types";
 
@@ -45,7 +45,7 @@ export class UrlConverter extends ScryptedDeviceBase implements HttpRequestHandl
         throw new Error("Method not implemented.");
     }
 
-    async convert(buffer: Buffer, fromMimeType: string): Promise<Buffer|string> {
+    async convert(buffer: Buffer, fromMimeType: string): Promise<Buffer> {
         const uuid = uuidv4();
 
         const endpoint = await (this.secure ? endpointManager.getPublicLocalEndpoint(this.nativeId) : endpointManager.getInsecurePublicLocalEndpoint(this.nativeId));
@@ -55,6 +55,6 @@ export class UrlConverter extends ScryptedDeviceBase implements HttpRequestHandl
 
         this.hosted.set(`/${filename}`, { buffer, fromMimeType });
 
-        return `${endpoint}${filename}`;
+        return Buffer.from(`${endpoint}${filename}`);
     }
 }

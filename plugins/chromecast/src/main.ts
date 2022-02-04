@@ -81,13 +81,17 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
       const client = new Client();
 
       const cleanup = () => {
-        client.removeAllListeners();
-        client.close();
+        this.console.log('client close');
         if (this.clientPromise === promise) {
           this.clientPromise = undefined;
+          this.playerPromise = undefined;
+          this.mediaPlayerPromise = undefined;
         }
+
+        client.removeAllListeners();
+        client.close();
       }
-      client.on('close', cleanup);
+      client.client.on('close', cleanup);
       client.on('error', err => {
         this.console.log(`Client error: ${err.message}`);
         cleanup();
@@ -146,31 +150,40 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
   }
 
   async load(media: string | MediaObject, options: MediaPlayerOptions) {
+    let url: string;
+    let urlMimeType: string;
+
+    //        http(s)   other:/
+    // image   Direct   convert
+    // video   Direct       RTC
+
     // check to see if this is url friendly media.
     if (typeof media === 'string') {
-      media = await mediaManager.createMediaObjectFromUrl(media);
+      if (media.startsWith('http')) {
+        url = media;
+      }
+      else if (options?.mimeType?.startsWith('image/')) {
+        const mo = await mediaManager.createMediaObjectFromUrl(media, options?.mimeType);
+        url = await mediaManager.convertMediaObjectToInsecureLocalUrl(mo, options?.mimeType);
+      }
+    }
+    else {
+      try {
+        url = media.mimeType === ScryptedMimeTypes.InsecureLocalUrl || media.mimeType === ScryptedMimeTypes.LocalUrl
+          ? await mediaManager.convertMediaObjectToInsecureLocalUrl(media, media.mimeType)
+          : await mediaManager.convertMediaObjectToUrl(media, media.mimeType);
+        urlMimeType = media.mimeType;
+      }
+      catch (e) {
+        this.console.error('url conversion failed, falling back');
+      }
     }
 
-    let mimeType: string;
-    if (media.mimeType.startsWith('image/') ||
-      media.mimeType.startsWith('video/')) {
-      mimeType = media.mimeType;
-    }
-
-    if (media.mimeType === ScryptedMimeTypes.LocalUrl ||
-      media.mimeType === ScryptedMimeTypes.InsecureLocalUrl ||
-      media.mimeType === ScryptedMimeTypes.Url ||
-      media.mimeType.startsWith('image/') ||
-      media.mimeType.startsWith('video/')) {
-
-      // chromecast can handle insecure local urls, but not self signed secure urls.
-      const url = media.mimeType === ScryptedMimeTypes.InsecureLocalUrl || media.mimeType === ScryptedMimeTypes.LocalUrl
-        ? await mediaManager.convertMediaObjectToInsecureLocalUrl(media, media.mimeType)
-        : await mediaManager.convertMediaObjectToUrl(media, media.mimeType);
+    if (url?.startsWith('http')) {
       this.sendMediaToClient(options && (options as any).title,
         url,
         // prefer the provided mime type hint, otherwise infer from url.
-        mimeType || options.mimeType || mime.getType(new URL(url).pathname));
+        urlMimeType || options.mimeType || mime.getType(new URL(url).pathname));
       return;
     }
 
@@ -181,6 +194,9 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     const mo = mediaManager.createMediaObject(engineio, ScryptedMimeTypes.LocalUrl);
     const cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     const token = Math.random().toString();
+    if (typeof media === 'string') {
+      media = await mediaManager.createMediaObjectFromUrl(media, options.mimeType);
+    }
     this.tokens.set(token, media);
 
     const castMedia: any = {

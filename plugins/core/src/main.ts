@@ -1,6 +1,3 @@
-// https://developer.scrypted.app/#getting-started
-// package.json contains the metadata (name, interfaces) about this device
-// under the "scrypted" key.
 import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, ScryptedDeviceType } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
@@ -18,6 +15,7 @@ import net from 'net';
 import { Script } from './script';
 import { addBuiltins } from "../../../common/src/wrtc-convertors";
 import { updatePluginsData } from './update-plugins';
+import { MediaCore } from './media-core';
 
 addBuiltins(console, mediaManager);
 
@@ -62,8 +60,7 @@ async function reportAggregate(nativeId: string, interfaces: string[]) {
 class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider {
     router = Router();
     publicRouter = Router();
-    httpHost: UrlConverter;
-    httpsHost: UrlConverter;
+    mediaCore: MediaCore;
     automations = new Map<string, Automation>();
     aggregate = new Map<string, AggregateDevice>();
     scripts = new Map<string, Script>();
@@ -74,22 +71,13 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'HTTP file host',
-                    nativeId: 'http',
-                    interfaces: [ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
+                    name: 'Scrypted Media Core',
+                    nativeId: 'mediacore',
+                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.BufferConverter],
                     type: ScryptedDeviceType.API,
                 },
             );
-            await deviceManager.onDeviceDiscovered(
-                {
-                    name: 'HTTPS file host',
-                    nativeId: 'https',
-                    interfaces: [ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
-                    type: ScryptedDeviceType.API,
-                }
-            );
-            this.httpHost = new UrlConverter(false);
-            this.httpsHost = new UrlConverter(true);
+            this.mediaCore = new MediaCore('mediacore');
         })();
 
         for (const nativeId of deviceManager.getNativeIds()) {
@@ -172,10 +160,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     }
 
     getDevice(nativeId: string) {
-        if (nativeId === 'http')
-            return this.httpHost;
-        if (nativeId === 'https')
-            return this.httpsHost;
+        if (nativeId === 'mediacore')
+            return this.mediaCore;
         if (nativeId?.startsWith('automation:'))
             return this.automations.get(nativeId);
         if (nativeId?.startsWith('aggregate:'))

@@ -122,6 +122,7 @@ class ScryptedMimeTypes(Enum):
     FFmpegInput = "x-scrypted/x-ffmpeg-input"
     InsecureLocalUrl = "text/x-insecure-local-uri"
     LocalUrl = "text/x-local-uri"
+    MediaObject = "x-scrypted/x-scrypted-media-object"
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
     RTCAVAnswer = "x-scrypted/x-rtc-av-answer"
@@ -453,7 +454,7 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: str | bytearray, fromMimeType: str, toMimeType: str) -> str | bytearray:
+    async def convert(self, data: str | bytearray, fromMimeType: str, toMimeType: str) -> MediaObject | bytearray:
         pass
     pass
 

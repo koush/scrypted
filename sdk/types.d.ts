@@ -714,7 +714,7 @@ export interface SoftwareUpdate {
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-    convert(data: string | Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer | string>;
+    convert(data: string | Buffer, fromMimeType: string, toMimeType: string): Promise<MediaObject | Buffer>;
     fromMimeType?: string;
     toMimeType?: string;
 }
@@ -1340,7 +1340,8 @@ export declare enum ScryptedMimeTypes {
     RTCAVSignalingPrefix = "x-scrypted-rtc-signaling-",
     RTCAVOffer = "x-scrypted/x-rtc-av-offer",
     RTCAVAnswer = "x-scrypted/x-rtc-av-answer",
-    SchemePrefix = "x-scrypted/x-scrypted-scheme-"
+    SchemePrefix = "x-scrypted/x-scrypted-scheme-",
+    MediaObject = "x-scrypted/x-scrypted-media-object"
 }
 export interface ScryptedStatic {
     /**

@@ -697,5 +697,6 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["RTCAVOffer"] = "x-scrypted/x-rtc-av-offer";
     ScryptedMimeTypes["RTCAVAnswer"] = "x-scrypted/x-rtc-av-answer";
     ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
+    ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));
 //# sourceMappingURL=types.js.map
