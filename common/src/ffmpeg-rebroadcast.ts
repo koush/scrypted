@@ -92,7 +92,6 @@ export async function parseAudioCodec(cp: ChildProcess) {
 export async function startParserSession<T extends string>(ffmpegInput: FFMpegInput, options: ParserOptions<T>): Promise<ParserSession<T>> {
     const { console } = options;
 
-    let dataTimeout: NodeJS.Timeout;
     let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;
     let isActive = true;
     const events = new EventEmitter();
@@ -119,7 +118,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         // might need this too?
         cp?.kill('SIGKILL');
         ffmpegStartedReject?.(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
-        clearTimeout(dataTimeout);
         clearTimeout(ffmpegIncomingConnectionTimeout);
     }
 
@@ -129,6 +127,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     ffmpegIncomingConnectionTimeout = setTimeout(kill, 30000);
 
     const setupActivityTimer = (container: string) => {
+        let dataTimeout: NodeJS.Timeout;
+
         function dataKill() {
             console.error('timeout waiting for data, killing parser session', container);
             kill();
@@ -140,6 +140,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
             clearTimeout(dataTimeout);
             dataTimeout = setTimeout(dataKill, options.timeout);
         }
+
+        events.once('killed', () => clearTimeout(dataTimeout));
 
         resetActivityTimer();
         return {
