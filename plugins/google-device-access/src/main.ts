@@ -526,7 +526,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         this.toMimeType = ScryptedMimeTypes.FFmpegInput;
     }
 
-    async convert(data: string | Buffer, fromMimeType: string): Promise<string | Buffer> {
+    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
         const nativeId = fromMimeType.substring(SdmDeviceSignalingPrefix.length);
         let device: NestCamera;
         for (const d of this.devices.values()) {
