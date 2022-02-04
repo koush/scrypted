@@ -426,12 +426,12 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
                 break;
             }
         }
-        const result = await createRTCPeerConnectionSource(createRingRTCAVSignalingOfferSetup(device.signalingMime), 'default', 'MPEG-TS', device.console, async (offer) => {
+        const ffmpegInput = await createRTCPeerConnectionSource(createRingRTCAVSignalingOfferSetup(device.signalingMime), 'default', 'MPEG-TS', device.console, async (offer) => {
             const answer = await device.sendOffer(offer);
             device.console.log('webrtc answer', answer);
             return answer;
         });
-        return Buffer.from(JSON.stringify(result.ffmpegInput));
+        return Buffer.from(JSON.stringify(ffmpegInput));
     }
 
     async clearTryDiscoverDevices() {
