@@ -8,6 +8,7 @@ import throttle from 'lodash/throttle';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions as getRtcMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
 import { sleep } from '../../../common/src/sleep';
 import fs from 'fs';
+import { randomBytes } from 'crypto';
 
 const { deviceManager, mediaManager, endpointManager, systemManager } = sdk;
 
@@ -100,6 +101,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
     signalingMime: string;
     lastMotionEventId: string;
     lastImage: Promise<Buffer>;
+    streams = new Map<string, any>();
 
     constructor(public provider: GoogleSmartDeviceAccess, public device: any) {
         super(device.name.split('/').pop());
@@ -111,6 +113,10 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         // create a mime unique to this this camera.
         this.fromMimeType = ScryptedMimeTypes.RTCAVOffer;
         this.toMimeType = this.signalingMime;
+    }
+
+    trackStream(id: string, result: any) {
+        this.streams.set(id, result);
     }
 
     async getReadmeMarkdown(): Promise<string> {
@@ -205,25 +211,18 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         return { result, answer };
     }
 
-    addRefreshOptions(result: any, mso: MediaStreamOptions): MediaStreamOptions {
-        const { expiresAt, streamToken, streamExtensionToken, mediaSessionId } = result.data.results;
-        const expirationDate = new Date(expiresAt);
-        const refreshAt = expirationDate.getTime();
+    addRefreshOptions(trackerId: string, mso: MediaStreamOptions): MediaStreamOptions {
         return Object.assign(mso, {
-            refreshAt,
+            refreshAt: Date.now() + 4 * 60 * 1000,
             metadata: {
-                expiresAt,
-                streamToken,
-                streamExtensionToken,
-                mediaSessionId,
+                trackerId,
             },
         });
     }
 
-    createFFmpegMediaObject(result: any) {
+    createFFmpegMediaObject(trackerId: string, result: any) {
         const u = result.data.results.streamUrls.rtspUrl;
-        this.console.log('rtsp url', u);
-
+        this.trackStream(trackerId, result);
         return mediaManager.createFFmpegMediaObject({
             url: u,
             mediaStreamOptions: this.addRefreshOptions(result, getSdmRtspMediaStreamOptions()),
@@ -240,8 +239,9 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
     }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-        if (options?.metadata?.streamExtensionToken || options?.metadata?.mediaSessionId) {
-            const { streamExtensionToken, mediaSessionId } = options?.metadata;
+        if (options?.metadata?.trackerId) {
+            const { trackerId } = options?.metadata;
+            const { streamExtensionToken, mediaSessionId } = this.streams.get(trackerId);
             const streamFormat = this.isWebRtc ? 'WebRtc' : 'Rtsp';
             const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
                 command: `sdm.devices.commands.CameraLiveStream.Extend${streamFormat}Stream`,
@@ -251,8 +251,10 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
                 }
             });
 
+            this.trackStream(trackerId, result);
+
             const mso = this.isWebRtc ? getSdmRtcMediaStreamOptions(this.signalingMime) : getSdmRtspMediaStreamOptions();
-            this.addRefreshOptions(result, mso);
+            this.addRefreshOptions(trackerId, mso);
 
             const ffmpegInput: FFMpegInput = {
                 url: undefined,
@@ -270,7 +272,9 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
                 command: "sdm.devices.commands.CameraLiveStream.GenerateRtspStream",
                 params: {}
             });
-            return this.createFFmpegMediaObject(result);
+            const trackerId = randomBytes(8).toString('hex');
+            this.trackStream(trackerId, result);
+            return this.createFFmpegMediaObject(trackerId, result);
         }
     }
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
@@ -538,14 +542,14 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 break;
             }
         }
-        let streamResult: any;
-        const result = await createRTCPeerConnectionSource(createNestOfferSetup(device.signalingMime), 'default', 'MPEG-TS', device.console, async (offer) => {
+        const trackerId = randomBytes(8).toString('hex');
+        const ffmpegInput = await createRTCPeerConnectionSource(createNestOfferSetup(device.signalingMime), 'default', 'MPEG-TS', device.console, async (offer) => {
             const { result, answer } = await device.sendOffer(offer);
-            streamResult = result;
+            device.trackStream(trackerId, result);
             return answer;
         });
-        device.addRefreshOptions(streamResult, result.ffmpegInput.mediaStreamOptions);
-        return Buffer.from(JSON.stringify(result.ffmpegInput));
+        device.addRefreshOptions(trackerId, ffmpegInput.mediaStreamOptions);
+        return Buffer.from(JSON.stringify(ffmpegInput));
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {

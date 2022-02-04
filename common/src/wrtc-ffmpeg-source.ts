@@ -12,11 +12,13 @@ s=-
 c=IN IP4 127.0.0.1
 t=0 0
 m=audio ${audioPort} UDP 96
+a=control:trackID=audio
 a=rtpmap:96 opus/48000/2
 a=fmtp:96 minptime=10;useinbandfec=1
 a=rtcp-fb:96 transport-cc
 a=sendrecv
 m=video ${videoPort} UDP 97
+a=control:trackID=video
 a=rtpmap:97 H264/90000
 a=rtcp-fb:97 ccm fir
 a=rtcp-fb:97 nack
@@ -48,22 +50,29 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSignalingOffe
 
     const { clientPromise, port } = await listenZeroSingleClient();
 
-
     let ai: NodeJS.Timeout;
     let vi: NodeJS.Timeout;
     let pc: RTCPeerConnection;
     let socket: Socket;
+    // rtsp server must operate in udp forwarding mode to accomodate packet reordering.
+    let udp = dgram.createSocket('udp4');
 
     const cleanup = () => {
         pc?.close();
         socket?.destroy();
         clearInterval(ai);
         clearInterval(vi);
+        try {
+            udp.close();
+        }
+        catch(e) {
+        }
     };
 
     clientPromise.then(async (client) => {
         socket = client;
-        const rtspServer = new RtspServer(socket, createSdpInput(audioPort, videoPort));
+        const rtspServer = new RtspServer(socket, createSdpInput(audioPort, videoPort), udp);
+        rtspServer.console = console;
         rtspServer.audioChannel = 0;
         rtspServer.videoChannel = 2;
         await rtspServer.handleSetup();
@@ -179,7 +188,7 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSignalingOffe
         url,
         mediaStreamOptions: getRTCMediaStreamOptions(id, name, 'rtsp'),
         inputArguments: [
-            "-rtsp_transport", "tcp",
+            "-rtsp_transport", "udp",
             "-max_delay", "1000000",
             '-i', url,
         ]

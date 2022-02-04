@@ -2,6 +2,7 @@ import { readLength, readLine } from './read-stream';
 import { Duplex } from 'stream';
 import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser } from './stream-parser';
+import dgram from 'dgram';
 
 interface Headers {
     [header: string]: string
@@ -67,17 +68,23 @@ export class RtspServer {
     videoChannel = 0;
     audioChannel = 2;
     session: string;
+    console: Console;
+    udpPorts = {
+        video: 0,
+        audio: 0,
+    };
 
-    constructor(public duplex: Duplex, public sdp?: string) {
+    constructor(public client: Duplex, public sdp?: string, public udp?: dgram.Socket) {
         this.session = randomBytes(4).toString('hex');
     }
 
     async handleSetup() {
         let currentHeaders: string[] = [];
         while (true) {
-            let line = await readLine(this.duplex);
+            let line = await readLine(this.client);
             line = line.trim();
             if (!line) {
+                this.console?.log(currentHeaders.join('\n'))
                 if (!await this.headers(currentHeaders))
                     break;
                 currentHeaders = [];
@@ -85,7 +92,6 @@ export class RtspServer {
             }
             currentHeaders.push(line);
         }
-
     }
 
     async handlePlayback() {
@@ -99,9 +105,9 @@ export class RtspServer {
         packet: Buffer,
     }> {
         while (true) {
-            const header = await readLength(this.duplex, 4);
+            const header = await readLength(this.client, 4);
             const length = header.readUInt16BE(2);
-            const packet = await readLength(this.duplex, length);
+            const packet = await readLength(this.client, length);
             const id = header.readUInt8(1);
             yield {
                 type: id - (id % 2) === this.videoChannel ? 'video' : 'audio',
@@ -118,16 +124,31 @@ export class RtspServer {
         header.writeUInt8(channel, 1);
         header.writeUInt16BE(rtp.length, 2);
 
-        this.duplex.write(header);
-        this.duplex.write(Buffer.from(rtp));
+        this.client.write(header);
+        this.client.write(Buffer.from(rtp));
+    }
+
+    sendUdp(port: number, packet: Buffer, rtcp: boolean) {
+        // todo: support non local host?
+        this.udp.send(packet, rtcp ? port + 1 : port, '127.0.0.1');
     }
 
     sendVideo(packet: Buffer, rtcp: boolean) {
-        this.send(packet, rtcp ? this.videoChannel + 1 : this.videoChannel);
+        if (this.udp) {
+            this.sendUdp(this.udpPorts.video, packet, rtcp)
+        }
+        else {
+            this.send(packet, rtcp ? this.videoChannel + 1 : this.videoChannel);
+        }
     }
 
     sendAudio(packet: Buffer, rtcp: boolean) {
-        this.send(packet, rtcp ? this.audioChannel + 1 : this.audioChannel);
+        if (this.udp) {
+            this.sendUdp(this.udpPorts.audio, packet, rtcp)
+        }
+        else {
+            this.send(packet, rtcp ? this.audioChannel + 1 : this.audioChannel);
+        }
     }
 
     options(url: string, requestHeaders: Headers) {
@@ -146,8 +167,17 @@ export class RtspServer {
 
     setup(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
+        const transport = requestHeaders['transport'];
         headers['Transport'] = requestHeaders['transport'];
         headers['Session'] = this.session;
+        if (transport.includes('UDP')) {
+            const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/)
+            const [_, rtp, rtcp] = match;
+            if (url.includes('audio'))
+                this.udpPorts.audio = parseInt(rtp);
+            else
+                this.udpPorts.video = parseInt(rtp);
+        }
         this.respond(200, 'OK', requestHeaders, headers)
     }
 
@@ -161,7 +191,7 @@ export class RtspServer {
 
     async announce(url: string, requestHeaders: Headers) {
         const contentLength = parseInt(requestHeaders['content-length']);
-        const sdpBuffer = await readLength(this.duplex, contentLength);
+        const sdpBuffer = await readLength(this.client, contentLength);
         this.sdp = sdpBuffer.toString();
         const headers: Headers = {};
         headers['Session'] = this.session;
@@ -198,8 +228,8 @@ export class RtspServer {
             response += `${key}: ${value}\r\n`;
         }
         response += '\r\n';
-        this.duplex.write(response);
+        this.client.write(response);
         if (buffer)
-            this.duplex.write(buffer);
+            this.client.write(buffer);
     }
 }
