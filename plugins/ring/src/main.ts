@@ -12,7 +12,7 @@ import { clientApi } from '@koush/ring-client-api/lib/api/rest-client';
 import { RtspServer } from '../../../common/src/rtsp-server';
 import dgram from 'dgram';
 
-const { log, deviceManager, mediaManager } = sdk;
+const { log, deviceManager, mediaManager, systemManager } = sdk;
 const STREAM_TIMEOUT = 120000;
 const black = fs.readFileSync('black.jpg');
 
@@ -111,6 +111,19 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     }
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
+        // if this stream is prebuffered, its safe to use the prebuffer to generate an image
+        const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+        try {
+            const msos = await realDevice.getVideoStreamOptions();
+            const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
+            if (prebuffered) {
+                prebuffered.refresh = false;
+                return realDevice.getVideoStream(prebuffered);
+            }
+        }
+        catch (e) {
+        }
+
         // watch for snapshot being blocked due to live stream
         const camera = this.findCamera();
         if (!camera || camera.snapshotsAreBlocked) {
