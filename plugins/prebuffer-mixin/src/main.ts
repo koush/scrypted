@@ -7,7 +7,7 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSes
 import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { createRtspParser, RtspServer } from './rtsp-server';
+import { createRtspParser, RtspServer } from '../../../common/src/rtsp-server';
 import { Duplex } from 'stream';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;

@@ -8,14 +8,32 @@ export async function listenZero(server: net.Server) {
     return (server.address() as net.AddressInfo).port;
 }
 
-export async function bindZero(server: dgram.Socket) {
-    server.bind(0);
+export async function bindUdp(server: dgram.Socket, usePort: number) {
+    server.bind(usePort);
     await once(server, 'listening');
-    const { port } = server.address() as net.AddressInfo;
+    const port = server.address().port;
     return {
         port,
         url: `udp://127.0.0.1:${port}`,
     }
+}
+
+export async function bindZero(server: dgram.Socket) {
+    return bindUdp(server, 0);
+}
+
+export async function createBindZero() {
+    return createBindUdp(0);
+}
+
+export async function createBindUdp(usePort: number) {
+    const server = dgram.createSocket('udp4');
+    const {port, url} = await bindUdp(server, usePort);
+    return {
+        server,
+        port,
+        url,
+    };
 }
 
 export async function bind(server: dgram.Socket, port: number) {

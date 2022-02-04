@@ -2,13 +2,26 @@ import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceP
 import sdk from '@scrypted/sdk';
 import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
-import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
-import { encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
-import child_process, { ChildProcess } from 'child_process';
+import { bindUdp, bindZero, createBindUdp, createBindZero, listenZeroSingleClient } from '../../../common/src/listen-cluster';
+import { createCryptoLine, encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
+import child_process, { ChildProcess, StdioOptions } from 'child_process';
 import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
 import { generateUuid } from './ring-client-api';
 import fs from 'fs';
 import { clientApi } from '@koush/ring-client-api/lib/api/rest-client';
+import { createRtspParser, RtspServer } from '../../../common/src/rtsp-server';
+import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
+import dgram from 'dgram';
+import { Writable } from 'stream';
+
+function closeQuietly(server: dgram.Socket) {
+    try {
+        server.close();
+    }
+    catch (e) {
+
+    }
+}
 
 const { log, deviceManager, mediaManager } = sdk;
 const STREAM_TIMEOUT = 120000;
@@ -160,7 +173,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         if (options?.id === 'webrtc') {
-
             return mediaManager.createMediaObject(Buffer.from(JSON.stringify(createRingRTCAVSignalingOfferSetup(this.signalingMime))), this.signalingMime);
         }
 
@@ -176,38 +188,72 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
 
         this.stopSession();
 
-        const { clientPromise, url } = await listenZeroSingleClient();
-        const camera = this.findCamera();
 
-        const sip = await camera.createSipSession({
-            skipFfmpegCheck: true,
+        const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient();
+        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
+
+
+        playbackPromise.then(async (client) => {
+            let sip: SipSession;
+            try {
+                const video = await createBindZero();
+                const audio = await createBindZero();
+                const vrtcp = await createBindUdp(video.port + 1);
+                const artcp = await createBindUdp(audio.port + 1);
+                video.server.on('message', data => rtsp.sendVideo(data, false));
+                audio.server.on('message', data => rtsp.sendAudio(data, false));
+                vrtcp.server.on('message', data => rtsp.sendVideo(data, true));
+                artcp.server.on('message', data => rtsp.sendAudio(data, true));
+
+                const cleanup = () => {
+                    closeQuietly(video.server);
+                    closeQuietly(audio.server);
+                    closeQuietly(vrtcp.server);
+                    closeQuietly(artcp.server);
+                    client.destroy();
+                    if (this.session === sip)
+                        this.session = undefined;
+                    try {
+                        sip.stop();
+                    }
+                    catch (e) {
+                    }
+                }
+
+                client.on('close', cleanup);
+                client.on('error', cleanup);
+
+                const camera = this.findCamera();
+                sip = await camera.createSipSession({
+                    skipFfmpegCheck: true,
+                });
+                sip.onCallEnded.subscribe(cleanup);
+                this.rtpDescription = await sip.start();
+
+                const ff = sip.prepareTranscoder(true, [], this.rtpDescription, audio.port, video.port, '');
+
+                const rtsp = new RtspServer(client, ff.inputSdpLines.filter((x) => Boolean(x)).join('\n'));
+                rtsp.audioChannel = 0;
+                rtsp.videoChannel = 2;
+                await rtsp.handleSetup();
+
+                this.session = sip;
+            }
+            catch (e) {
+                sip?.stop();
+                throw e;
+            }
         });
-
-        this.session = sip;
-        sip.onCallEnded.subscribe(() => {
-            sip.stop();
-            if (this.session === sip)
-                this.session = undefined;
-        });
-        this.rtpDescription = await sip.start();
-        const videoPort = await sip.reservePort(1);
-        const audioPort = await sip.reservePort(1);
-
-        const ff = sip.prepareTranscoder(true, [], this.rtpDescription, audioPort, videoPort, url);
-        clientPromise.then(client => {
-            client.write(ff.inputSdpLines.filter((x) => Boolean(x)).join('\n'));
-            client.end();
-        });
-
-        const index = ff.ffmpegInputArguments.indexOf('-protocol_whitelist');
-        ff.ffmpegInputArguments.splice(index, 2);
 
         const ffmpegInput: FFMpegInput = {
-            url: undefined,
+            url: playbackUrl,
             mediaStreamOptions: Object.assign(this.getSipMediaStreamOptions(), {
                 refreshAt: Date.now() + STREAM_TIMEOUT,
             }),
-            inputArguments: ff.ffmpegInputArguments.filter(line => !!line).map(line => line.toString()),
+            inputArguments: [
+                '-rtsp_transport', 'tcp',
+                '-i', playbackUrl,
+            ],
         };
         this.ffmpegInput = ffmpegInput;
         this.resetStreamTimeout();

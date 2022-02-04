@@ -1,7 +1,7 @@
-import { readLength, readLine } from '../../../common/src/read-stream';
+import { readLength, readLine } from './read-stream';
 import { Duplex } from 'stream';
 import { randomBytes } from 'crypto';
-import { StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
+import { StreamChunk, StreamParser } from './stream-parser';
 
 interface Headers {
     [header: string]: string
@@ -64,7 +64,10 @@ function parseHeaders(headers: string[]): Headers {
 }
 
 export class RtspServer {
+    videoChannel = 0;
+    audioChannel = 2;
     session: string;
+
     constructor(public duplex: Duplex, public sdp?: string) {
         this.session = randomBytes(4).toString('hex');
     }
@@ -101,7 +104,7 @@ export class RtspServer {
             const packet = await readLength(this.duplex, length);
             const id = header.readUInt8(1);
             yield {
-                type: id < 2 ? 'video' : 'audio',
+                type: id - (id % 2) === this.videoChannel ? 'video' : 'audio',
                 rtcp: id % 2 === 1,
                 header,
                 packet,
@@ -120,11 +123,11 @@ export class RtspServer {
     }
 
     sendVideo(packet: Buffer, rtcp: boolean) {
-        this.send(packet, rtcp ? 1 : 0);
+        this.send(packet, rtcp ? this.videoChannel + 1 : this.videoChannel);
     }
 
     sendAudio(packet: Buffer, rtcp: boolean) {
-        this.send(packet, rtcp ? 3 : 2);
+        this.send(packet, rtcp ? this.audioChannel + 1 : this.audioChannel);
     }
 
     options(url: string, requestHeaders: Headers) {
