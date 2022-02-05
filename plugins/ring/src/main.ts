@@ -242,9 +242,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 rtsp.audioChannel = 0;
                 rtsp.videoChannel = 2;
                 await rtsp.handleSetup();
-                sip.requestKeyFrame();
 
                 const ff = sip.prepareTranscoder(true, [], this.rtpDescription, rtsp.udpPorts.audio, rtsp.udpPorts.video, '');
+                sip.requestKeyFrame();
                 this.session = sip;
             }
             catch (e) {
