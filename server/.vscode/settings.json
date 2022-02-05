@@ -2,7 +2,7 @@
     // could be useful for vscode ssh remote debugging. it forwards 10443, etc. to the remote host.
     "remote.autoForwardPorts": false,
     "python.analysis.extraPaths": [
-        "./node_modules/@scrypted/sdk",
+        "./node_modules/@scrypted/types",
         "./python",
     ]
 }

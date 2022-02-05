@@ -259,7 +259,7 @@ export class PluginHost {
                 // stdin, stdout, stderr, peer in, peer out
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                 env: Object.assign({
-                    PYTHONPATH: path.join(process.cwd(), 'node_modules/@scrypted/sdk'),
+                    PYTHONPATH: path.join(process.cwd(), 'node_modules/@scrypted/types'),
                 }, process.env, env),
             });
 

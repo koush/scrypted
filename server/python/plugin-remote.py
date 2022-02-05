@@ -15,7 +15,7 @@ import asyncio
 import rpc
 from collections.abc import Mapping
 from scrypted_python.scrypted_sdk.types import DeviceManifest, MediaManager, ScryptedInterfaceProperty
-import scrypted_python.scrypted_sdk
+import scrypted_python.scrypted_sdk.types
 from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
 import os
@@ -30,7 +30,7 @@ class SystemDeviceState(TypedDict):
     value: any
 
 
-class SystemManager(scrypted_python.scrypted_sdk.SystemManager):
+class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
     def __init__(self, api: Any, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
         super().__init__()
         self.api = api
@@ -39,8 +39,8 @@ class SystemManager(scrypted_python.scrypted_sdk.SystemManager):
     async def getComponent(self, id: str) -> Any:
         return await self.api.getComponent(id)
 
-class DeviceState(scrypted_python.scrypted_sdk.DeviceState):
-    def __init__(self, id: str, nativeId: str, systemManager: SystemManager, deviceManager: scrypted_python.scrypted_sdk.DeviceManager) -> None:
+class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):
+    def __init__(self, id: str, nativeId: str, systemManager: SystemManager, deviceManager: scrypted_python.scrypted_sdk.types.DeviceManager) -> None:
         super().__init__()
         self._id = id
         self.nativeId = nativeId
@@ -80,7 +80,7 @@ class DeviceStorage:
     storage: Mapping[str, str] = {}
 
 
-class DeviceManager(scrypted_python.scrypted_sdk.DeviceManager):
+class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
     def __init__(self, nativeIds: Mapping[str, DeviceStorage], systemManager: SystemManager) -> None:
         super().__init__()
         self.nativeIds = nativeIds

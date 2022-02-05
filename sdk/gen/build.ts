@@ -1,7 +1,7 @@
 import stringifyObject from 'stringify-object';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 import path from 'path';
-import fs from "fs";
+import fs, { mkdir } from "fs";
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schema.json')).toString());
 const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {};
@@ -216,9 +216,7 @@ class ${td.name}(TypedDict):
     seen = newSeen;
 }
 
-
-fs.writeFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/types.py'),
-    `from __future__ import annotations
+const pythonTypes = `from __future__ import annotations
 from enum import Enum
 from typing_extensions import TypedDict
 from typing import Any
@@ -228,4 +226,8 @@ from .other import *
 
 ${pythonEnums}
 ${python}
-`);
+`
+
+fs.writeFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/types.py'), pythonTypes);
+fs.writeFileSync(path.join(__dirname, '../types/scrypted_python/scrypted_sdk/types.py'), pythonTypes);
+fs.copyFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/other.py'), path.join(__dirname, '../types/scrypted_python/scrypted_sdk/other.py'));
