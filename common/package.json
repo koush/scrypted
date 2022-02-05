@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@koush/werift": "^0.14.5-beta1",
+    "@koush/werift": "^0.14.5-beta4",
     "@scrypted/sdk": "file:../sdk",
     "typescript": "^4.4.3"
   },
