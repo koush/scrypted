@@ -222,10 +222,10 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
 
     createFFmpegMediaObject(trackerId: string, result: any) {
         const u = result.data.results.streamUrls.rtspUrl;
-        this.trackStream(trackerId, result);
+        this.trackStream(trackerId, result.data.results);
         return mediaManager.createFFmpegMediaObject({
             url: u,
-            mediaStreamOptions: this.addRefreshOptions(result, getSdmRtspMediaStreamOptions()),
+            mediaStreamOptions: this.addRefreshOptions(trackerId, getSdmRtspMediaStreamOptions()),
             inputArguments: [
                 "-rtsp_transport", "tcp",
                 "-max_delay", "1000000",
