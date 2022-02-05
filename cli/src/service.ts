@@ -59,6 +59,7 @@ export function cwdInstallDir(): { volume: string, installDir: string } {
 
 export async function installServe() {
     const { installDir } = cwdInstallDir();
+    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', 'node-gyp');
     await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
     return installDir;
 }
