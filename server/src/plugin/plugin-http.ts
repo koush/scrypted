@@ -1,6 +1,6 @@
 import { Request, Response, Router } from 'express';
 import bodyParser from 'body-parser';
-import { HttpRequest } from '@scrypted/sdk/types';
+import { HttpRequest } from '@scrypted/types';
 import WebSocket, { Server as WebSocketServer } from "ws";
 import { ServerResponse } from 'http';
 

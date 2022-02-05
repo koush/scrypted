@@ -56,7 +56,7 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
 ${fs.readFileSync(path.join(__dirname, './types.input.ts'))}
 `;
 
-fs.writeFileSync(path.join(__dirname, '../types.ts'), contents);
+fs.writeFileSync(path.join(__dirname, '../types/index.ts'), contents);
 
 const dictionaryTypes = new Set<string>();
 dictionaryTypes.add('EventDetails');

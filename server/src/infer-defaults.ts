@@ -1,4 +1,4 @@
-import { ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from "@scrypted/sdk/types";
+import { ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from "@scrypted/types";
 import { PluginDevice } from "./db-types";
 import { getState } from "./state";
 

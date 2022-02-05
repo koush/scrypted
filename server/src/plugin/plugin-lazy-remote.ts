@@ -1,4 +1,4 @@
-import { ScryptedNativeId, SystemDeviceState } from '@scrypted/sdk/types'
+import { ScryptedNativeId, SystemDeviceState } from '@scrypted/types'
 import { PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 
 /**

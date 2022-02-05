@@ -1,4 +1,4 @@
-import { ScryptedInterfaceProperty, SystemDeviceState, MediaStreamUrl, VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager } from "@scrypted/sdk/types";
+import { ScryptedInterfaceProperty, SystemDeviceState, MediaStreamUrl, VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager } from "@scrypted/types";
 import { MediaObjectRemote } from "./plugin-api";
 import mimeType from 'mime'
 import child_process from 'child_process';

@@ -1,4 +1,4 @@
-import { ScryptedInterfaceProperty, ScryptedNativeId } from "@scrypted/sdk/types";
+import { ScryptedInterfaceProperty, ScryptedNativeId } from "@scrypted/types";
 import { ScryptedRuntime } from "../runtime";
 import { Plugin } from '../db-types';
 import { getState } from "../state";

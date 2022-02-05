@@ -1,5 +1,5 @@
 import { RpcMessage, RpcPeer } from '../rpc';
-import { SystemManager, DeviceManager, ScryptedNativeId } from '@scrypted/sdk/types'
+import { SystemManager, DeviceManager, ScryptedNativeId } from '@scrypted/types'
 import { attachPluginRemote, PluginReader } from './plugin-remote';
 import { PluginAPI } from './plugin-api';
 import { MediaManagerImpl } from './media';

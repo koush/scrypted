@@ -1,5 +1,5 @@
 import { ScryptedRuntime } from "./runtime";
-import { ScryptedNativeId, EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceProperty, SystemDeviceState } from "@scrypted/sdk/types";
+import { ScryptedNativeId, EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceProperty, SystemDeviceState } from "@scrypted/types";
 import { RefreshSymbol } from "./plugin/plugin-device";
 import throttle from 'lodash/throttle';
 import { sleep } from "./sleep";

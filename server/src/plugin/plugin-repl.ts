@@ -2,7 +2,7 @@ import { listenZero } from './listen-zero';
 import { Server } from 'net';
 import { once } from 'events';
 import repl from 'repl';
-import { ScryptedStatic } from '@scrypted/sdk';
+import { ScryptedStatic } from '@scrypted/types';
 
 export async function createREPLServer(scrypted: ScryptedStatic, params: any, plugin: any): Promise<number> {
     const { deviceManager, systemManager } = scrypted;

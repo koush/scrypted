@@ -1,4 +1,4 @@
-import { ScryptedNativeId } from '@scrypted/sdk/types'
+import { ScryptedNativeId } from '@scrypted/types'
 import { listenZero } from './listen-zero';
 import { Server } from 'net';
 import { once } from 'events';

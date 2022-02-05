@@ -1,0 +1,11 @@
+{
+  "name": "@scrypted/types",
+  "version": "0.0.2",
+  "description": "",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {},
+  "devDependencies": {},
+  "types": "index.d.ts"
+}

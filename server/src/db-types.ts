@@ -1,5 +1,5 @@
 import { LevelDocument } from "./level";
-import { ScryptedNativeId, SystemDeviceState } from "@scrypted/sdk/types";
+import { ScryptedNativeId, SystemDeviceState } from "@scrypted/types";
 
 export class ScryptedDocument implements LevelDocument {
     _id?: string;

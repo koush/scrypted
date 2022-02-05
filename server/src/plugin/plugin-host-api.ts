@@ -1,4 +1,4 @@
-import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaManager, HttpRequest } from '@scrypted/sdk/types'
+import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaManager, HttpRequest } from '@scrypted/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import { PluginAPI, PluginAPIManagedListeners } from './plugin-api';

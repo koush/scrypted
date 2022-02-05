@@ -700,4 +700,4 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
     ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));
-//# sourceMappingURL=types.js.map
+//# sourceMappingURL=index.js.map

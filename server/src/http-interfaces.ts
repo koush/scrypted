@@ -1,4 +1,4 @@
-import { HttpResponse, HttpResponseOptions } from "@scrypted/sdk/types";
+import { HttpResponse, HttpResponseOptions } from "@scrypted/types";
 import { Response } from "express";
 import mime from "mime";
 import { PROPERTY_PROXY_ONEWAY_METHODS } from "./rpc";

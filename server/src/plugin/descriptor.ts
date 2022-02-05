@@ -1,4 +1,4 @@
-import { ScryptedInterface, ScryptedInterfaceDescriptors } from "@scrypted/sdk/types";
+import { ScryptedInterface, ScryptedInterfaceDescriptors } from "@scrypted/types";
 
 export const allInterfaceMethods: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.methods));
 export const allInterfaceProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.properties));

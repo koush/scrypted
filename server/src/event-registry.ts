@@ -1,4 +1,4 @@
-import { EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterface, SystemDeviceState } from "@scrypted/sdk/types";
+import { EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterface, SystemDeviceState } from "@scrypted/types";
 
 export class EventListenerRegisterImpl implements EventListenerRegister {
     removeListener: () => void;

@@ -1,6 +1,6 @@
 import { RpcPeer } from '../rpc';
 import AdmZip from 'adm-zip';
-import { Device, EngineIOHandler } from '@scrypted/sdk/types'
+import { Device, EngineIOHandler } from '@scrypted/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import io, { Socket } from 'engine.io';

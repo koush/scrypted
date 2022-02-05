@@ -1,7 +1,7 @@
-import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty } from "@scrypted/sdk/types";
+import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty } from "@scrypted/types";
 import { ScryptedRuntime } from "../runtime";
 import { PluginDevice } from "../db-types";
-import { MixinProvider } from "@scrypted/sdk/types";
+import { MixinProvider } from "@scrypted/types";
 import { handleFunctionInvocations, PrimitiveProxyHandler } from "../rpc";
 import { getState } from "../state";
 import { getDisplayType } from "../infer-defaults";

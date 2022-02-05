@@ -1,6 +1,6 @@
 import { Level } from './level';
 import { PluginHost } from './plugin/plugin-host';
-import { ScryptedNativeId, Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk/types';
+import { ScryptedNativeId, Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/types';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { Plugin, PluginDevice, ScryptedAlert } from './db-types';
 import { getState, ScryptedStateManager, setState } from './state';
