@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, SCRYPTED_MEDIA_SCHEME, VideoCameraConfiguration, OnOff } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff } from "@scrypted/sdk";
 import { ProtectCameraChannelConfig, ProtectCameraConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "@koush/unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
@@ -393,7 +393,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             lcdMessage: payload,
         })
 
-        if (typeof media === 'string' && media.startsWith(SCRYPTED_MEDIA_SCHEME)) {
+        if (typeof media === 'string') {
             media = await mediaManager.createMediaObjectFromUrl(media);
         }
         if (media) {

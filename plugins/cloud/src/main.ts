@@ -42,9 +42,9 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
     }
 
 
-    async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer | string> {
+    async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer> {
         if (this.cloud.storage.getItem('hostname')) {
-            return `https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`;
+            return Buffer.from(`https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`);
         }
 
         const url = `http://localhost/push/${data}`;
@@ -59,11 +59,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     push: ScryptedPush;
     cloudMessagePath: Promise<string>;
 
-    async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer | string> {
+    async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
         const local = Url.parse(localUrl);
 
         if (this.storage.getItem('hostname')) {
-            return `${baseUrl}${local.path}`;
+            return Buffer.from(`${baseUrl}${local.path}`);
         }
 
         const token_info = this.storage.getItem('token_info');
@@ -84,7 +84,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         const url = `${baseUrl}${local.path}?${tokens}`;
-        return url;
+        return Buffer.from(url);
     }
 
 
@@ -130,7 +130,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         return hostname;
     }
 
-    async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer | string> {
+    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
         return this.whitelist(data.toString(), 10 * 365 * 24 * 60 * 60 * 1000, `https://${this.getHostname()}`);
     }
 

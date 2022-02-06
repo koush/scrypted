@@ -10,25 +10,8 @@ import net from 'net'
 import { installOptionalDependencies } from './plugin-npm-dependencies';
 import { createREPLServer } from './plugin-repl';
 
-export function startPluginRemote(pluginId: string) {
-    let peerSend: (message: RpcMessage, reject?: (e: Error) => void) => void;
-    let peerListener: NodeJS.MessageListener;
-
-    peerSend = (message, reject) => process.send(message, undefined, {
-        swallowErrors: !reject,
-    }, e => {
-        if (e)
-            reject?.(e);
-    });
-    peerListener = message => peer.handleMessage(message as RpcMessage);
-
+export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void) => void) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
-    peer.transportSafeArgumentTypes.add(Buffer.name);
-    process.on('message', peerListener);
-    process.on('disconnect', () => {
-        console.error('peer host disconnected, exiting.');
-        process.exit(1);
-    });
 
     let systemManager: SystemManager;
     let deviceManager: DeviceManager;
@@ -234,6 +217,9 @@ export function startPluginRemote(pluginId: string) {
         systemManager = scrypted.systemManager;
         deviceManager = scrypted.deviceManager;
 
+        process.removeAllListeners('uncaughtException');
+        process.removeAllListeners('unhandledRejection');
+
         process.on('uncaughtException', e => {
             getPluginConsole().error('uncaughtException', e);
             scrypted.log.e('uncaughtException ' + e?.toString());
@@ -242,5 +228,7 @@ export function startPluginRemote(pluginId: string) {
             getPluginConsole().error('unhandledRejection', e);
             scrypted.log.e('unhandledRejection ' + e?.toString());
         });
-    })
+    });
+
+    return peer;
 }

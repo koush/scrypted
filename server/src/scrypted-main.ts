@@ -9,16 +9,24 @@ if (!semver.gte(process.version, '16.0.0')) {
 
 startPeriodicGarbageCollection();
 
-process.on('unhandledRejection', error => {
-    if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
-        throw error;
-    }
-    console.warn('unhandled rejection of RPC Result', error);
-});
+if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
+    process.on('uncaughtException', e => {
+        console.error('uncaughtException', e);
+    });
+    process.on('unhandledRejection', e => {
+        console.error('unhandledRejection', e);
+    });
 
-if (process.argv[2] === 'child') {
     require('./scrypted-plugin-main');
 }
 else {
+    process.on('unhandledRejection', error => {
+        if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
+            console.error('wtf', error);
+            throw error;
+        }
+        console.warn('unhandled rejection of RPC Result', error);
+    });
+
     require('./scrypted-server-main');
 }

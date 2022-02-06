@@ -1,9 +1,9 @@
-import { RuntimeWorker, RuntimeWorkerOptions as RuntimeWorkerOptions } from "./runtime-worker";
+import { RuntimeWorkerOptions as RuntimeWorkerOptions } from "./runtime-worker";
 import child_process from 'child_process';
 import path from 'path';
-import { EventEmitter } from "ws";
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { ChildProcessWorker } from "./child-process-worker";
+import { getPluginNodePath } from "../plugin-npm-dependencies";
 
 export class NodeForkWorker extends ChildProcessWorker {
 
@@ -19,7 +19,9 @@ export class NodeForkWorker extends ChildProcessWorker {
 
         this.worker = child_process.fork(require.main.filename, ['child', this.pluginId], {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-            env: Object.assign({}, process.env, env),
+            env: Object.assign({}, process.env, env, {
+                NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),
+            }),
             serialization: 'advanced',
             execArgv,
         });

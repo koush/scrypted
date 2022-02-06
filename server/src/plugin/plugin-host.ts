@@ -27,6 +27,7 @@ import rimraf from 'rimraf';
 import { RuntimeWorker } from './runtime/runtime-worker';
 import { PythonRuntimeWorker } from './runtime/python-worker';
 import { NodeForkWorker } from './runtime/node-fork-worker';
+import { NodeThreadWorker } from './runtime/node-thread-worker';
 
 export class PluginHost {
     worker: RuntimeWorker;
@@ -98,9 +99,8 @@ export class PluginHost {
         const pluginVolume = ensurePluginVolume(this.pluginId);
 
         this.startPluginHost(logger, {
-            NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),
             SCRYPTED_PLUGIN_VOLUME: pluginVolume,
-        }, this.packageJson.scrypted.runtime, pluginDebug);
+        }, pluginDebug);
 
         this.io.on('connection', async (socket) => {
             try {
@@ -232,20 +232,28 @@ export class PluginHost {
         });
     }
 
-    startPluginHost(logger: Logger, env?: any, runtime?: string, pluginDebug?: PluginDebug) {
+    startPluginHost(logger: Logger, env: any, pluginDebug: PluginDebug) {
         let connected = true;
 
-        if (runtime === 'python') {
+        if (this.packageJson.scrypted.runtime === 'python') {
             this.worker =  new PythonRuntimeWorker(this.pluginId, {
                 env,
                 pluginDebug,
             });
         }
         else {
-            this.worker = new NodeForkWorker(this.pluginId, {
-                env: Object.assign({}, process.env, env),
-                pluginDebug,
-            });
+            if (process.env.SCRYPTED_SHARED_WORKER && this.packageJson.optionalDependencies && Object.keys(this.packageJson.optionalDependencies).length) {
+                this.worker = new NodeForkWorker(this.pluginId, {
+                    env,
+                    pluginDebug,
+                });
+            }
+            else {
+                this.worker = new NodeThreadWorker(this.pluginId, {
+                    env,
+                    pluginDebug,
+                });
+            }
         }
 
         this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
