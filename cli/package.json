@@ -1,6 +1,6 @@
 {
   "name": "scrypted",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "description": "",
   "main": "dist/main.js",
   "bin": {

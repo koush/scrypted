@@ -59,7 +59,12 @@ export function cwdInstallDir(): { volume: string, installDir: string } {
 
 export async function installServe() {
     const { installDir } = cwdInstallDir();
-    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', 'node-gyp');
+    // something about low memory environments is causing npm install of node-pty to fail?
+    // maybe too many concurrent post install things happening and node-gyp is failing to build?
+    // not entirely sure i need this anymore, since I fixed various other install related
+    // low memory issues.
+    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', 'node-pty');
+
     await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
     return installDir;
 }
