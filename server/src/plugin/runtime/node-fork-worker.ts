@@ -23,7 +23,6 @@ export class NodeForkWorker extends ChildProcessWorker {
             serialization: 'advanced',
             execArgv,
         });
-        this.worker.on('message', message => this.emit('message', message));
 
         this.setupWorker();
     }

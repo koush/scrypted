@@ -1,6 +1,8 @@
-import { startPluginRemote, startSharedPluginRemote } from "./plugin/plugin-remote-worker";
+import { startPluginRemote } from "./plugin/plugin-remote-worker";
 
-if (process.argv[3] !== '@scrypted/shared')
+if (process.argv[2] === 'child-thread') {
+
+}
+else {
     startPluginRemote(process.argv[3]);
-else
-    startSharedPluginRemote();
+}
