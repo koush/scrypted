@@ -95,7 +95,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             {
                 group: 'Performance',
                 title: 'HomeKit Hubs',
-                description: 'Optional: The addresses of your HomeKit Hubs used to serve lower resolution live streams for remote viewing.',
+                description: 'Optional: The addresses of your HomeKit Hubs. When HomeKit streams to outside of your local network, it is routed through a HomeKit hub. Scrypted can use a lower bitrate stream to keep your remote viewing session responsive.',
                 key: 'homekitHubs',
                 choices: [...this.homekitConnections],
                 value: this.getHomeKitHubs(),

@@ -37,10 +37,10 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             });
 
             settings.push({
-                title: 'Live Stream (Hub)',
+                title: 'Live Stream (remote streaming)',
                 key: 'streamingChannelHub',
                 value: this.storage.getItem('streamingChannelHub') || msos[0].name,
-                description: 'The media stream to use when streaming to a HomeKit Hub (remote viewing).',
+                description: 'The media stream to use when streaming from outside your home network.',
                 choices: msos.map(mso => mso.name),
             });
         }
@@ -84,21 +84,21 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
         settings.push({
-            title: 'Transcode Streaming (Hub)',
+            title: 'Transcode Streaming (remote streaming)',
             group: 'HomeKit Transcoding',
             type: 'boolean',
             key: 'transcodeStreamingHub',
             value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
-            description: 'Remote Viewing through a HomeKit Hub only: Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+            description: 'Remote Streaming via HomeKit Hub: Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
         if (this.interfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
             settings.push({
-                title: 'Dynamic Bitrate (Hub)',
+                title: 'Dynamic Bitrate (remote streaming)',
                 group: 'HomeKit Transcoding',
                 type: 'boolean',
                 key: 'dynamicBitrate',
                 value: (this.storage.getItem('dynamicBitrate') === 'true').toString(),
-                description: 'Remote Viewing through a HomeKit Hub only: Adjust the bitrate of the native camera stream on demand to accomodate available bandwidth. This setting should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
+                description: 'Remote Streaming via HomeKit Hub: Adjust the bitrate of the native camera stream on demand to accomodate available bandwidth. This setting should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
             });
         }
         let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true'
