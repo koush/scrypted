@@ -10,7 +10,8 @@ import { generateUuid } from './ring-client-api';
 import fs from 'fs';
 import { clientApi } from '@koush/ring-client-api/lib/api/rest-client';
 import { RtspServer } from '../../../common/src/rtsp-server';
-import dgram from 'dgram';
+import dgram, { Socket } from 'dgram';
+import { readLine } from '../../../common/src/read-stream';
 
 const { log, deviceManager, mediaManager, systemManager } = sdk;
 const STREAM_TIMEOUT = 120000;
@@ -196,6 +197,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
 
 
         playbackPromise.then(async (client) => {
+            client.setKeepAlive(true, 10000);
             let sip: SipSession;
             try {
                 const cleanup = () => {
@@ -203,6 +205,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                     if (this.session === sip)
                         this.session = undefined;
                     try {
+                        this.console.log('ending ring sip session.');
                         sip.stop();
                     }
                     catch (e) {
@@ -246,6 +249,16 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 const ff = sip.prepareTranscoder(true, [], this.rtpDescription, rtsp.udpPorts.audio, rtsp.udpPorts.video, '');
                 sip.requestKeyFrame();
                 this.session = sip;
+
+                try {
+                    await rtsp.handleSetup();
+                }
+                catch (e) {
+                    this.console.log('rtsp server ended ungracefully', e);
+                }
+                finally {
+                    cleanup();
+                }
             }
             catch (e) {
                 sip?.stop();

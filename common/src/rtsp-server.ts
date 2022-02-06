@@ -205,6 +205,12 @@ export class RtspServer {
         this.respond(200, 'OK', requestHeaders, headers);
     }
 
+    async teardown(url: string, requestHeaders: Headers) {
+        const headers: Headers = {};
+        headers['Session'] = this.session;
+        this.respond(200, 'OK', requestHeaders, headers);
+    }
+
     async headers(headers: string[]) {
         let [method, url] = headers[0].split(' ', 2);
         method = method.toLowerCase();

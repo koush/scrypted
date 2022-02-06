@@ -115,8 +115,9 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         }
         isActive = false;
         cp?.kill();
-        // might need this too?
-        cp?.kill('SIGKILL');
+        // sometimes ffmpeg hangs trying to clean up (RTSP teardown etc), so
+        // give it a bit and then really kill it..
+        setTimeout(() => cp?.kill('SIGKILL'), 1000);
         ffmpegStartedReject?.(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
         clearTimeout(ffmpegIncomingConnectionTimeout);
     }
