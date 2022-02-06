@@ -20,10 +20,13 @@ function tsCompile(source: string, options: TranspileOptions = null): string {
     return ts.transpileModule(source, options).outputText;
 }
 
+const scryptedTypesDefs = require('!!raw-loader!@scrypted/sdk/types/index.d.ts').default;
+const scryptedIndexDefs = require('!!raw-loader!@scrypted/sdk/index.d.ts').default;
+
 export async function scryptedEval(device: ScryptedDeviceBase, script: string, extraLibs: { [lib: string]: string }, params: { [name: string]: any }) {
     try {
         const libs = Object.assign({
-            types: require("!!raw-loader!!@scrypted/sdk/types.d.ts").default,
+            types: scryptedTypesDefs,
         }, extraLibs);
         const allScripts = Object.values(libs).join('\n').toString() + script;
         const compiled = tsCompile(allScripts);
@@ -72,8 +75,8 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
     const libs = Object.assign({
-        types: require("!!raw-loader!@scrypted/sdk/types.d.ts").default,
-        sdk: require("!!raw-loader!@scrypted/sdk/index.d.ts").default,
+        types: scryptedTypesDefs,
+        sdk: scryptedIndexDefs,
     }, extraLibs);
 
     function monacoEvalDefaultsFunction(monaco, libs) {
@@ -120,7 +123,7 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
         }
         `,
 
-            "node_modules/@types/scrypted__sdk/types.d.ts"
+            "node_modules/@types/scrypted__sdk/types/index.d.ts"
         );
 
         monaco.languages.typescript.typescriptDefaults.addExtraLib(
