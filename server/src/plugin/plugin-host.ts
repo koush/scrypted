@@ -24,12 +24,12 @@ import crypto from 'crypto';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import rimraf from 'rimraf';
+import { RuntimeWorker } from './runtime/runtime-worker';
+import { PythonRuntimeWorker } from './runtime/python-worker';
+import { NodeForkWorker } from './runtime/node-fork-worker';
 
 export class PluginHost {
-    static sharedWorker: child_process.ChildProcess;
-    static sharedWorkerImmediateRestart = false;
-
-    worker: child_process.ChildProcess;
+    worker: RuntimeWorker;
     peer: RpcPeer;
     pluginId: string;
     module: Promise<any>;
@@ -53,10 +53,7 @@ export class PluginHost {
     kill() {
         this.killed = true;
         this.api.removeListeners();
-        // things might get a bit race prone, so clear out the shared worker before killing.
-        if (this.worker === PluginHost.sharedWorker)
-            PluginHost.sharedWorker = undefined;
-        this.worker.kill('SIGKILL');
+        this.worker.kill();
         this.io.close();
         for (const s of Object.values(this.ws)) {
             s.close();
@@ -86,7 +83,7 @@ export class PluginHost {
         return pi._id;
     }
 
-    constructor(scrypted: ScryptedRuntime, plugin: Plugin, public pluginDebug?: PluginDebug) {
+    constructor(scrypted: ScryptedRuntime, plugin: Plugin, pluginDebug?: PluginDebug) {
         this.scrypted = scrypted;
         this.pluginId = plugin._id;
         this.pluginName = plugin.packageJson?.name;
@@ -103,7 +100,7 @@ export class PluginHost {
         this.startPluginHost(logger, {
             NODE_PATH: path.join(getPluginNodePath(this.pluginId), 'node_modules'),
             SCRYPTED_PLUGIN_VOLUME: pluginVolume,
-        }, this.packageJson.scrypted.runtime);
+        }, this.packageJson.scrypted.runtime, pluginDebug);
 
         this.io.on('connection', async (socket) => {
             try {
@@ -235,136 +232,32 @@ export class PluginHost {
         });
     }
 
-    startPluginHost(logger: Logger, env?: any, runtime?: string) {
+    startPluginHost(logger: Logger, env?: any, runtime?: string, pluginDebug?: PluginDebug) {
         let connected = true;
 
         if (runtime === 'python') {
-            const args: string[] = [
-                '-u',
-            ];
-            if (this.pluginDebug) {
-                args.push(
-                    '-m',
-                    'debugpy',
-                    '--listen',
-                    `0.0.0.0:${this.pluginDebug.inspectPort}`,
-                    '--wait-for-client',
-                )
-            }
-            args.push(
-                path.join(__dirname, '../../python', 'plugin-remote.py'),
-            )
-
-            this.worker = child_process.spawn('python3', args, {
-                // stdin, stdout, stderr, peer in, peer out
-                stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
-                env: Object.assign({
-                    PYTHONPATH: path.join(process.cwd(), 'node_modules/@scrypted/types'),
-                }, process.env, env),
-            });
-
-            const peerin = this.worker.stdio[3] as Writable;
-            const peerout = this.worker.stdio[4] as Readable;
-
-            peerin.on('error', e => connected = false);
-            peerout.on('error', e => connected = false);
-
-            this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
-                if (connected) {
-                    peerin.write(JSON.stringify(message) + '\n', e => e && reject?.(e));
-                }
-                else if (reject) {
-                    reject(new Error('peer disconnected'));
-                }
-            });
-
-            const readInterface = readline.createInterface({
-                input: peerout,
-                terminal: false,
-            });
-            readInterface.on('line', line => {
-                this.peer.handleMessage(JSON.parse(line));
+            this.worker =  new PythonRuntimeWorker(this.pluginId, {
+                env,
+                pluginDebug,
             });
         }
         else {
-            const execArgv: string[] = process.execArgv.slice();
-            if (this.pluginDebug) {
-                execArgv.push(`--inspect=0.0.0.0:${this.pluginDebug.inspectPort}`);
-            }
-
-            const useSharedWorker = process.env.SCRYPTED_SHARED_WORKER &&
-                this.packageJson.scrypted.sharedWorker !== false &&
-                this.packageJson.scrypted.realfs !== true &&
-                Object.keys(this.packageJson.optionalDependencies || {}).length === 0;
-            if (useSharedWorker) {
-                if (!PluginHost.sharedWorker) {
-                    const worker = child_process.fork(require.main.filename, ['child', '@scrypted/shared'], {
-                        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-                        env: Object.assign({}, process.env, env),
-                        serialization: 'advanced',
-                        execArgv,
-                    });
-                    PluginHost.sharedWorker = worker;
-                    PluginHost.sharedWorker.setMaxListeners(100);
-                    const clearSharedWorker = () => {
-                        if (worker === PluginHost.sharedWorker)
-                            PluginHost.sharedWorker = undefined;
-                    };
-                    PluginHost.sharedWorker.on('close', () => clearSharedWorker);
-                    PluginHost.sharedWorker.on('error', () => clearSharedWorker);
-                    PluginHost.sharedWorker.on('exit', () => clearSharedWorker);
-                    PluginHost.sharedWorker.on('disconnect', () => clearSharedWorker);
-                }
-                PluginHost.sharedWorker.send({
-                    type: 'start',
-                    pluginId: this.pluginId,
-                });
-                this.worker = PluginHost.sharedWorker;
-                this.worker.on('message', (message: any) => {
-                    if (message.pluginId === this.pluginId)
-                        this.peer.handleMessage(message.message)
-                });
-    
-                this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
-                    if (connected) {
-                        this.worker.send({
-                            type: 'message',
-                            pluginId: this.pluginId,
-                            message: message,
-                        }, undefined, e => {
-                            if (e && reject)
-                                reject(e);
-                        });
-                    }
-                    else if (reject) {
-                        reject(new Error('peer disconnected'));
-                    }
-                });
-            }
-            else {
-                this.worker = child_process.fork(require.main.filename, ['child', this.pluginId], {
-                    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-                    env: Object.assign({}, process.env, env),
-                    serialization: 'advanced',
-                    execArgv,
-                });
-                this.worker.on('message', message => this.peer.handleMessage(message as any));
-    
-                this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
-                    if (connected) {
-                        this.worker.send(message, undefined, e => {
-                            if (e && reject)
-                                reject(e);
-                        });
-                    }
-                    else if (reject) {
-                        reject(new Error('peer disconnected'));
-                    }
-                });
-            }
-
-            this.peer.transportSafeArgumentTypes.add(Buffer.name);
+            this.worker = new NodeForkWorker(this.pluginId, {
+                env: Object.assign({}, process.env, env),
+                pluginDebug,
+            });
         }
+
+        this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
+            if (connected) {
+                this.worker.send(message, reject);
+            }
+            else if (reject) {
+                reject(new Error('peer disconnected'));
+            }
+        });
+
+        this.worker.setupRpcPeer(this.peer);
 
         this.worker.stdout.on('data', data => console.log(data.toString()));
         this.worker.stderr.on('data', data => console.error(data.toString()));
