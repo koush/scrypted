@@ -84,7 +84,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
         settings.push({
-            title: 'Transcode Streaming (remote streaming)',
+            title: 'Transcode Remote Streaming',
             group: 'HomeKit Transcoding',
             type: 'boolean',
             key: 'transcodeStreamingHub',
@@ -93,7 +93,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         });
         if (this.interfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
             settings.push({
-                title: 'Dynamic Bitrate (remote streaming)',
+                title: 'Dynamic Bitrate (Remote Streaming)',
                 group: 'HomeKit Transcoding',
                 type: 'boolean',
                 key: 'dynamicBitrate',
