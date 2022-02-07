@@ -14,7 +14,7 @@ import { MqttDeviceBase } from './api/mqtt-device-base';
 import { MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { connect, Client } from 'mqtt';
-import { canMixin } from './publishable-types';
+import { isPublishable } from './publishable-types';
 
 const loopbackLight = require("!!raw-loader!./examples/loopback-light.ts").default;
 
@@ -476,7 +476,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
 
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-        return canMixin(type, interfaces) ? [ScryptedInterface.Settings] : undefined;
+        return isPublishable(type, interfaces) ? [ScryptedInterface.Settings] : undefined;
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
