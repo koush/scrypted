@@ -11,6 +11,7 @@ import fs from 'fs';
 import { clientApi } from '@koush/ring-client-api/lib/api/rest-client';
 import { RtspServer } from '../../../common/src/rtsp-server';
 import { RefreshPromise, singletonPromise, timeoutPromise } from './util';
+import { readLine } from '../../../common/src/read-stream';
 
 const { log, deviceManager, mediaManager, systemManager } = sdk;
 const STREAM_TIMEOUT = 120000;
@@ -210,7 +211,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                     if (this.session === sip)
                         this.session = undefined;
                     try {
-                        this.console.log('ending ring sip session.');
+                        this.console.log('stopping ring sip session.');
                         sip.stop();
                     }
                     catch (e) {
@@ -256,10 +257,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 this.session = sip;
 
                 try {
-                    await rtsp.handleSetup();
+                    await readLine(client);
+                    this.console.log('rtsp client ending sip session gracefully');
                 }
                 catch (e) {
-                    this.console.log('rtsp server ended ungracefully', e);
+                    this.console.log('rtsp client ended ungracefully', e);
                 }
                 finally {
                     cleanup();
