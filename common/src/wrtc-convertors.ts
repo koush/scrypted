@@ -1,4 +1,4 @@
-import {RTCAVSignalingOfferSetup,  RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes, MediaObject } from "@scrypted/sdk/types";
+import { RTCAVSignalingOfferSetup, RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes, MediaObject } from "@scrypted/sdk/types";
 import child_process from 'child_process';
 import net from 'net';
 import { listenZero, listenZeroSingleClient } from "./listen-cluster";
@@ -136,7 +136,7 @@ export interface RTCPeerConnectionMediaObjectSession {
 
 export async function getRTCSignalingOfferSetup(mediaObject: MediaObject): Promise<RTCAVSignalingOfferSetup> {
   const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.RTCAVSignalingOfferSetup);
-  const setup: RTCAVSignalingOfferSetup  = JSON.parse(buffer.toString());
+  const setup: RTCAVSignalingOfferSetup = JSON.parse(buffer.toString());
   return setup;
 }
 
@@ -301,9 +301,21 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput): P
     cp.stderr.on('data', parser);
   });
 
+  const cleanup = () => {
+    cp?.kill();
+    setTimeout(() => cp?.kill('SIGKILL'), 1000);
+  }
+
   const checkConn = () => {
-    if (pc.iceConnectionState === 'failed' || pc.connectionState === 'failed') {
-      cp.kill('SIGKILL');
+    if (pc.iceConnectionState === 'disconnected'
+      || pc.iceConnectionState === 'failed'
+      || pc.iceConnectionState === 'closed') {
+      cleanup();
+    }
+    if (pc.connectionState === 'closed'
+      || pc.connectionState === 'disconnected'
+      || pc.connectionState === 'failed') {
+      cleanup();
     }
   }
 
