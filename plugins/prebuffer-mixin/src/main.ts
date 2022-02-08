@@ -1,5 +1,5 @@
 
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
@@ -9,6 +9,8 @@ import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-p
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createRtspParser, RtspServer } from '../../../common/src/rtsp-server';
 import { Duplex } from 'stream';
+import net from 'net';
+import { readLength } from '@scrypted/common/src/read-stream';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -374,16 +376,16 @@ class PrebufferSession {
       console: this.console,
       timeout: 60000,
       parsers: {
-        mp4: createFragmentedMp4Parser({
-          vcodec,
-          acodec,
-        }),
       },
     };
 
     const rtspMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTSP';
     if (!rtspMode) {
       rbo.parsers.mpegts = createMpegTsParser({
+        vcodec,
+        acodec,
+      });
+      rbo.parsers.mp4 = createFragmentedMp4Parser({
         vcodec,
         acodec,
       });
@@ -910,9 +912,12 @@ function millisUntilMidnight() {
   return (midnight.getTime() - new Date().getTime());
 }
 
-class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider {
+class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider, BufferConverter {
   constructor(nativeId?: string) {
     super(nativeId);
+
+    this.fromMimeType = 'x-scrypted/x-rfc4571';
+    this.toMimeType = ScryptedMimeTypes.FFmpegInput;
 
     // trigger the prebuffer.
     for (const id of Object.keys(systemManager.getSystemState())) {
@@ -927,6 +932,56 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
     const twoAM = midnight + 2 * 60 * 60 * 1000;
     this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
     setTimeout(() => deviceManager.requestRestart(), twoAM);
+  }
+
+  async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer> {
+    const json = JSON.parse(data.toString());
+    const { url, sdp } = json;
+
+    const audioPt = parseInt((sdp as string).match(/m=audio.* ([0-9]+)/)?.[1]);
+    const videoPt = parseInt((sdp as string).match(/m=video.* ([0-9]+)/)?.[1]);
+    const u = new URL(url);
+    if (!u.protocol.startsWith('tcp'))
+      throw new Error('rfc4751 url must be tcp');
+    const { clientPromise, url: clientUrl } = await listenZeroSingleClient();
+    const ffmpeg: FFMpegInput = {
+      url: clientUrl,
+      inputArguments: [
+        "-rtsp_transport", "tcp",
+        "-max_delay", "1000000",
+        '-i', clientUrl.replace('tcp', 'rtsp'),
+      ]
+    };
+
+
+    clientPromise.then(async (client) => {
+      const rtsp = new RtspServer(client, sdp);
+      rtsp.console = this.console;
+      await rtsp.handlePlayback();
+      const socket = net.connect(parseInt(u.port), u.hostname);
+
+      client.on('close', () => {
+        socket.destroy();
+      });
+      socket.on('close', () => {
+        client.destroy();
+      })
+
+      while (true) {
+        const header = await readLength(socket, 2);
+        const length = header.readInt16BE(0);
+        const data = await readLength(socket, length);
+        const pt = data[1] & 0x7f;
+        if (pt === audioPt)
+          rtsp.sendAudio(data, false);
+        else if (pt === videoPt)
+          rtsp.sendVideo(data, false);
+        else
+          this.console.warn('unknown payload type', pt);
+      }
+    })
+
+    return Buffer.from(JSON.stringify(ffmpeg));
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
