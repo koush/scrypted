@@ -1,20 +1,7 @@
-import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, ScryptedInterfaceProperty, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions } from '@scrypted/sdk';
+import { ScryptedDeviceBase, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
-import Router from 'router';
-import { UserStorage } from './userStorage';
-import { RpcPeer } from '../../../server/src/rpc';
-import { setupPluginRemote } from '../../../server/src/plugin/plugin-remote';
-import { PluginAPIProxy } from '../../../server/src/plugin/plugin-api';
 import { UrlConverter } from './converters';
-import fs from 'fs';
-import { sendJSON } from './http-helpers';
-import { Automation } from './automation';
-import { AggregateDevice, createAggregateDevice } from './aggregate';
-import net from 'net';
-import { Script } from './script';
-import { addBuiltins } from "../../../common/src/wrtc-convertors";
-import { updatePluginsData } from './update-plugins';
 
 export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, BufferConverter {
     httpHost: UrlConverter;
