@@ -76,6 +76,8 @@ export class RtspServer {
 
     constructor(public client: Duplex, public sdp?: string, public udp?: dgram.Socket) {
         this.session = randomBytes(4).toString('hex');
+        if (sdp)
+            sdp = sdp.trim();
     }
 
     async handleSetup() {
@@ -171,12 +173,25 @@ export class RtspServer {
         headers['Transport'] = requestHeaders['transport'];
         headers['Session'] = this.session;
         if (transport.includes('UDP')) {
-            const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/)
+            const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/);
             const [_, rtp, rtcp] = match;
             if (url.includes('audio'))
                 this.udpPorts.audio = parseInt(rtp);
             else
                 this.udpPorts.video = parseInt(rtp);
+        }
+        else if (transport.includes('TCP')) {
+            const match = transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
+            if (match) {
+                const low = parseInt(match[1]);
+                const high = parseInt(match[2]);
+                if (url.includes('audio')) {
+                    this.audioChannel = low;
+                }
+                else {
+                    this.videoChannel = low;
+                }
+            }
         }
         this.respond(200, 'OK', requestHeaders, headers)
     }
@@ -225,6 +240,8 @@ export class RtspServer {
     }
 
     respond(code: number, message: string, requestHeaders: Headers, headers: Headers, buffer?: Buffer) {
+        // this.console?.log(requestHeaders);
+        // this.console?.log(headers);
         let response = `RTSP/1.0 ${code} ${message}\r\n`;
         if (requestHeaders['cseq'])
             headers['CSeq'] = requestHeaders['cseq'];
