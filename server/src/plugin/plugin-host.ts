@@ -242,7 +242,7 @@ export class PluginHost {
             });
         }
         else {
-            if (process.env.SCRYPTED_SHARED_WORKER && this.packageJson.optionalDependencies && Object.keys(this.packageJson.optionalDependencies).length) {
+            if (!process.env.SCRYPTED_SHARED_WORKER || (this.packageJson.optionalDependencies && Object.keys(this.packageJson.optionalDependencies).length)) {
                 this.worker = new NodeForkWorker(this.pluginId, {
                     env,
                     pluginDebug,

@@ -23,6 +23,13 @@ from os import sys
 import platform
 import shutil
 import gc
+import threading
+import gi
+gi.require_version('Gst', '1.0')
+
+from gi.repository import Gst, GLib
+
+Gst.init(None)
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -313,7 +320,7 @@ async def async_main(loop: AbstractEventLoop):
 
 
 def main():
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
 
     def gc_runner():
         gc.collect()
@@ -325,4 +332,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    worker = threading.Thread(target=main)
+    worker.start()
+
+    loop = GLib.MainLoop()
+    loop.run()
