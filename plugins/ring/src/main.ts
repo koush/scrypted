@@ -401,6 +401,11 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
     cameras: RingCamera[];
 
     settingsStorage = new StorageSettings(this, {
+        systemId: {
+            title: 'System ID',
+            description: 'Used to provide client uniqueness for retrieving the latest set of events.',
+            hide: true,
+        },
         email: {
             title: 'Email',
             onPut: async () => this.clearTryDiscoverDevices(),
@@ -443,6 +448,9 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
 
         this.fromMimeType = RingSignalingPrefix + '*';
         this.toMimeType = ScryptedMimeTypes.FFmpegInput;
+
+        if (!this.settingsStorage.values.systemId)
+            this.settingsStorage.values.systemId = generateUuid();
     }
 
     async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
@@ -481,6 +489,7 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
                 locationIds,
                 cameraDingsPollingSeconds,
                 cameraStatusPollingSeconds,
+                systemId: this.settingsStorage.values.systemId,
             });
         }
 
