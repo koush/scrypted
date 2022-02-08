@@ -2,16 +2,15 @@ import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceP
 import sdk from '@scrypted/sdk';
 import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
-import { createBindUdp, createBindZero, listenZeroSingleClient } from '../../../common/src/listen-cluster';
-import { createCryptoLine, encodeSrtpOptions, reservePorts, RtpSplitter } from '@homebridge/camera-utils'
+import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
+import { createCryptoLine, encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
 import child_process, { ChildProcess } from 'child_process';
 import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
 import { generateUuid } from './ring-client-api';
 import fs from 'fs';
 import { clientApi } from '@koush/ring-client-api/lib/api/rest-client';
 import { RtspServer } from '../../../common/src/rtsp-server';
-import dgram, { Socket } from 'dgram';
-import { readLine } from '../../../common/src/read-stream';
+import { RefreshPromise, singletonPromise, timeoutPromise } from './util';
 
 const { log, deviceManager, mediaManager, systemManager } = sdk;
 const STREAM_TIMEOUT = 120000;
@@ -54,6 +53,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     audioOutProcess: ChildProcess;
     ffmpegInput: FFMpegInput;
     refreshTimeout: NodeJS.Timeout;
+    picturePromise: RefreshPromise<Buffer>;
 
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
@@ -131,15 +131,20 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
             return mediaManager.createMediaObject(black, 'image/jpeg');
         }
 
-        // trigger a refresh, but immediately use whatever is available remotely.
-        camera.getSnapshot();
-        try {
-            // need to cache this and throttle or something.
-            const buffer = await this.plugin.client.request<Buffer>({
+        this.picturePromise = singletonPromise(this.picturePromise, () => {
+            // trigger a refresh, but immediately use whatever is available remotely.
+            camera.getSnapshot();
+
+            return this.plugin.client.request<Buffer>({
                 url: clientApi(`snapshots/image/${camera.id}`),
                 responseType: 'buffer',
             });
+        });
+        this.picturePromise.cacheDuration = 5000;
 
+        try {
+            // need to cache this and throttle or something.
+            const buffer = await timeoutPromise(1000, this.picturePromise.promise);
             return mediaManager.createMediaObject(buffer, 'image/jpeg');
         }
         catch (e) {
@@ -533,6 +538,7 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
         await this.tryLogin();
         this.console.log('login success, trying discovery');
         const cameras = await this.api.getCameras();
+        this.console.log('cameras discovered');
         this.cameras = cameras;
         const devices: Device[] = [];
         for (const camera of cameras) {
