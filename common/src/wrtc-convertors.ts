@@ -103,6 +103,14 @@ export function addBuiltins(console: Console, mediaManager: MediaManager) {
       };
       rtcSessions[id] = session;
 
+      pc.onicecandidate = evt => {
+        if (evt.candidate) {
+          // console.log('local candidate', evt.candidate);
+          session.pendingCandidates.push(evt.candidate);
+          session.resolve?.(null);
+        }
+      }
+
       const offer = await pc.createOffer({
         offerToReceiveAudio: false,
         offerToReceiveVideo: false,
