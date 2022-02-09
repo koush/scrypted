@@ -136,6 +136,11 @@ export abstract class MediaManagerBase implements MediaManager {
         });
     }
 
+    async convertMediaObjectToJSON<T>(mediaObject: MediaObject, toMimeType: string): Promise<T> {
+        const buffer = await this.convertMediaObjectToBuffer(mediaObject, toMimeType);
+        return JSON.parse(buffer.toString());
+    }
+
     abstract getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } };
     abstract getDeviceById<T>(id: string): T;
 
@@ -205,7 +210,15 @@ export abstract class MediaManagerBase implements MediaManager {
         return this.createMediaObject(Buffer.from(JSON.stringify(ffMpegInput)), ScryptedMimeTypes.FFmpegInput);
     }
 
-    createMediaObject(data: string | Buffer | Promise<string | Buffer>, mimeType?: string): MediaObjectRemote {
+    createMediaObject(data: any | Buffer | Promise<string | Buffer>, mimeType: string): MediaObjectRemote {
+        if (typeof data === 'string')
+            throw new Error('string is not a valid type. if you intended to send a url, use createMediaObjectFromUrl.');
+        if (!mimeType)
+            throw new Error('no mimeType provided');
+
+        if (data.constructor.name !== Buffer.name)
+            data = Buffer.from(JSON.stringify(data));
+
         class MediaObjectImpl implements MediaObjectRemote {
             __proxy_props = {
                 mimeType,
