@@ -16,7 +16,7 @@ commandHandlers['action.devices.commands.GetCameraStream'] = async (device: Scry
     const ret = executeResponse(device);
 
     const engineio = await endpointManager.getPublicLocalEndpoint() + 'engine.io/';
-    const mo = mediaManager.createMediaObject(engineio, ScryptedMimeTypes.LocalUrl);
+    const mo = mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
     const cameraStreamAccessUrl = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
 
     const cameraStreamAuthToken = `tok-${Math.round(Math.random() * 10000).toString(16)}`;

@@ -492,7 +492,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             return;
         }
         const { token_info } = cloudStorage;
-        const response = await axios.post('http://home.scrypted.app/_punch/reportState', report, {
+        const response = await axios.post('https://home.scrypted.app/_punch/reportState', report, {
             headers: {
                 Authorization: `Bearer ${token_info}`
             },
