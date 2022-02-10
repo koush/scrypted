@@ -1469,6 +1469,11 @@ export interface MediaManager {
   builtinConverters: BufferConverter[];
 
   /**
+   * Convert a media object to a Buffer of the given mime type, and them parse it as JSON.
+   */
+  convertMediaObjectToJSON<T>(mediaObject: MediaObject, toMimeType: string): Promise<T>;
+
+  /**
    * Convert a media object to a Buffer of the given mime type.
    */
   convertMediaObjectToBuffer(mediaObject: MediaObject, toMimeType: string): Promise<Buffer>;
@@ -1490,14 +1495,14 @@ export interface MediaManager {
 
   /**
    * Create a MediaObject. The media will be created from the provided FFmpeg input arguments.
-   * @deprecated
    */
   createFFmpegMediaObject(ffmpegInput: FFMpegInput): MediaObject;
 
   /**
-   * Create a MediaObject. The mime type needs to be provided up front, but the data can be a URL string, Buffer, or a Promise for a URL string or Buffer.
+   * Create a MediaObject.
+   * The data must be a Buffer, or a JSON object that will be serialized to a Buffer.
    */
-  createMediaObject(data: string | Buffer, mimeType: string): MediaObject;
+  createMediaObject(data: any | Buffer, mimeType: string): MediaObject;
 
   /**
    * Create a MediaObject from an URL. The mime type should be provided, but it may be inferred from the URL path.

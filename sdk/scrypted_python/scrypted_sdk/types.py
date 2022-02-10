@@ -876,13 +876,15 @@ class MediaManager:
         pass
     async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
+    async def convertMediaObjectToJSON(self, mediaObject: MediaObject, toMimeType: str) -> T:
+        pass
     async def convertMediaObjectToLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
     async def convertMediaObjectToUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
     def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput) -> MediaObject:
         pass
-    def createMediaObject(self, data: str | bytearray, mimeType: str) -> MediaObject:
+    def createMediaObject(self, data: Any, mimeType: str) -> MediaObject:
         pass
     async def createMediaObjectFromUrl(self, data: str, mimeType: str = None) -> MediaObject:
         pass

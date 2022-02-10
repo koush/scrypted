@@ -45,6 +45,8 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
     zip.writeZip(path.join(out, 'plugin.zip'));
 }
 else if (false) {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json').toString()));
+    const optionalDependencies = Object.keys(packageJson.optionalDependencies || {});
 
     let out;
     if (process.env.NODE_ENV == 'production')
@@ -62,8 +64,7 @@ else if (false) {
         format: 'cjs',
         // loader: { '.json': 'file' },
         external: [
-            'zwave-js/package.json',
-            '@zwave-js/config/package.json',
+            ...Object.keys(optionalDependencies),
         ],
         sourcemap: true,
     })

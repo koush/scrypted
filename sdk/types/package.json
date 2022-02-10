@@ -1,10 +1,14 @@
 {
   "name": "@scrypted/types",
-  "version": "0.0.3",
+  "version": "0.0.6",
   "description": "",
   "main": "index.js",
   "author": "",
   "license": "ISC",
+  "scripts": {
+    "prepublishOnly": "npm run build",
+    "build": "tsc"
+  },
   "dependencies": {},
   "devDependencies": {},
   "types": "index.d.ts"
