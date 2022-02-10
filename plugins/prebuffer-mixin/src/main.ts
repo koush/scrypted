@@ -1,5 +1,5 @@
 
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter, ResponseMediaStreamOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
@@ -11,6 +11,7 @@ import { createRtspParser, RtspServer } from '../../../common/src/rtsp-server';
 import { Duplex } from 'stream';
 import net from 'net';
 import { readLength } from '@scrypted/common/src/read-stream';
+import { startRFC4571Parser } from './rfc4571';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -291,10 +292,6 @@ class PrebufferSession {
       }
     }
 
-    const mo = await this.mixinDevice.getVideoStream(mso);
-    const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
-    const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
-
     // aac needs to have the adts header stripped for mpegts and mp4.
     // use this filter sparingly as it prevents ffmpeg from starting on a mismatch.
     // however, not using it on an aac stream also prevents ffmpeg from parsing.
@@ -380,6 +377,7 @@ class PrebufferSession {
     };
 
     const rtspMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTSP';
+    this.console.log('rebroadcast mode:', rtspMode ? 'rtsp' : 'mpegts');
     if (!rtspMode) {
       rbo.parsers.mpegts = createMpegTsParser({
         vcodec,
@@ -398,15 +396,28 @@ class PrebufferSession {
 
     this.parsers = rbo.parsers;
 
-    // create missing pts from dts so mpegts and mp4 muxing does not fail
-    const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
-    ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+    const mo = await this.mixinDevice.getVideoStream(mso);
+    let session: ParserSession<PrebufferParsers>;
+    let sessionMso: ResponseMediaStreamOptions;
 
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
 
-    const session = await startParserSession(ffmpegInput, rbo);
+    if (mo.mimeType === 'x-scrypted/x-rfc4571') {
+      session = await startRFC4571Parser(mo, rbo);
+      this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
+    }
+    else {
+      const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
+      const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
+      sessionMso = ffmpegInput.mediaStreamOptions;
+
+      // create missing pts from dts so mpegts and mp4 muxing does not fail
+      const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
+      ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+      session = await startParserSession(ffmpegInput, rbo);
+    }
 
     if (!session.inputAudioCodec) {
       this.console.log('No audio stream detected.');
@@ -434,8 +445,8 @@ class PrebufferSession {
     this.parserSession = session;
 
     // cloud streams need a periodic token refresh.
-    if (ffmpegInput.mediaStreamOptions?.refreshAt) {
-      let mso = ffmpegInput.mediaStreamOptions;
+    if (sessionMso?.refreshAt) {
+      let mso = sessionMso;
       let refreshTimeout: NodeJS.Timeout;
 
       const refreshStream = async () => {
@@ -444,18 +455,18 @@ class PrebufferSession {
         const mo = await this.mixinDevice.getVideoStream(mso);
         const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
         const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
-        mso = ffmpegInput.mediaStreamOptions
+        mso = ffmpegInput.mediaStreamOptions;
 
-        scheduleRefresh(ffmpegInput);
+        scheduleRefresh(mso);
       };
 
-      const scheduleRefresh = (ffmpegInput: FFMpegInput) => {
-        const when = ffmpegInput.mediaStreamOptions.refreshAt - Date.now() - 30000;
+      const scheduleRefresh = (refreshMso: ResponseMediaStreamOptions) => {
+        const when = refreshMso.refreshAt - Date.now() - 30000;
         this.console.log('refreshing media stream in', when);
         refreshTimeout = setTimeout(refreshStream, when);
       }
 
-      scheduleRefresh(ffmpegInput);
+      scheduleRefresh(mso);
       session.once('killed', () => clearTimeout(refreshTimeout));
     }
 
@@ -548,6 +559,7 @@ class PrebufferSession {
         socketPromise = client.clientPromise.then(async (socket) => {
           let sdp = await this.sdp;
           const server = new RtspServer(socket, sdp);
+          server.console = this.console;
           await server.handlePlayback();
           return socket;
         })
@@ -624,17 +636,25 @@ class PrebufferSession {
 
     const { reencodeAudio } = this.getAudioConfig();
 
-    if (this.audioDisabled) {
-      mediaStreamOptions.audio = null;
-    }
-    else if (reencodeAudio) {
-      mediaStreamOptions.audio = {
-        codec: 'aac',
-        encoder: 'libfdk_aac',
-        profile: 'aac_low',
+    if (!rtspMode) {
+      if (this.audioDisabled) {
+        mediaStreamOptions.audio = null;
+      }
+      else if (reencodeAudio) {
+        mediaStreamOptions.audio = {
+          codec: 'aac',
+          encoder: 'libfdk_aac',
+          profile: 'aac_low',
+        }
+      }
+      else {
+        mediaStreamOptions.audio = {
+          codec: session?.inputAudioCodec,
+        }
       }
     }
     else {
+      // rtsp mode never transcodes.
       mediaStreamOptions.audio = {
         codec: session?.inputAudioCodec,
       }
@@ -953,7 +973,6 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
       ]
     };
 
-
     clientPromise.then(async (client) => {
       const rtsp = new RtspServer(client, sdp);
       rtsp.console = this.console;
@@ -972,12 +991,17 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
         const length = header.readInt16BE(0);
         const data = await readLength(socket, length);
         const pt = data[1] & 0x7f;
-        if (pt === audioPt)
+        if (pt === audioPt) {
           rtsp.sendAudio(data, false);
-        else if (pt === videoPt)
+        }
+        else if (pt === videoPt) {
           rtsp.sendVideo(data, false);
-        else
-          this.console.warn('unknown payload type', pt);
+        }
+        else {
+          client.destroy();
+          socket.destroy();
+          throw new Error('unknown payload type ' + pt);
+        }
       }
     })
 
