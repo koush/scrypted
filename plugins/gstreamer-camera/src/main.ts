@@ -110,7 +110,7 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
             const gstreamerPort = await listenZero(gstreamerServer);
             const args = gstreamerInput.split(' ');
             args.push('!', 'mpegtsmux', '!', 'tcpclientsink', `port=${gstreamerPort}`, 'sync=false');
-            this.console.log(args);
+            this.console.log(args.join(' '));
             const singleInstance = this.storage.getItem('singleInstance') === 'true';
             if (this.currentProcess && singleInstance) {
                 this.currentProcess.kill();
