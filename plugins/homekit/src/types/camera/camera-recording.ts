@@ -91,7 +91,6 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             if (!(noAudio || transcodeRecording))
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
             audioArgs = [
-                '-bsf:a', 'aac_adtstoasc',
                 '-acodec', 'libfdk_aac',
                 ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
                     ['-profile:a', 'aac_low'] :
