@@ -4,6 +4,8 @@ import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser } from './stream-parser';
 import dgram from 'dgram';
 
+export const RTSP_FRAME_MAGIC = 36;
+
 interface Headers {
     [header: string]: string
 }
@@ -86,7 +88,6 @@ export class RtspServer {
             let line = await readLine(this.client);
             line = line.trim();
             if (!line) {
-                this.console?.log(currentHeaders.join('\n'))
                 if (!await this.headers(currentHeaders))
                     break;
                 currentHeaders = [];
@@ -108,6 +109,9 @@ export class RtspServer {
     }> {
         while (true) {
             const header = await readLength(this.client, 4);
+            // this is the magic
+            if (header[0] !== RTSP_FRAME_MAGIC)
+                throw new Error('RTSP frame magic expected, but got ' + header[0]);
             const length = header.readUInt16BE(2);
             const packet = await readLength(this.client, length);
             const id = header.readUInt8(1);
@@ -227,9 +231,12 @@ export class RtspServer {
     }
 
     async headers(headers: string[]) {
+        this.console?.log('request header', headers.join('\n'));
+
         let [method, url] = headers[0].split(' ', 2);
         method = method.toLowerCase();
         const requestHeaders = parseHeaders(headers);
+        this.console?.log('request headers', requestHeaders);
         if (!this[method]) {
             this.respond(400, 'Bad Request', requestHeaders, {});
             return;
@@ -240,8 +247,6 @@ export class RtspServer {
     }
 
     respond(code: number, message: string, requestHeaders: Headers, headers: Headers, buffer?: Buffer) {
-        // this.console?.log(requestHeaders);
-        // this.console?.log(headers);
         let response = `RTSP/1.0 ${code} ${message}\r\n`;
         if (requestHeaders['cseq'])
             headers['CSeq'] = requestHeaders['cseq'];
@@ -250,6 +255,7 @@ export class RtspServer {
         for (const [key, value] of Object.entries(headers)) {
             response += `${key}: ${value}\r\n`;
         }
+        this.console?.log('response header', response);
         response += '\r\n';
         this.client.write(response);
         if (buffer)
