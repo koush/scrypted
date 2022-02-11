@@ -1,6 +1,6 @@
 import process from 'process';
 import semver from 'semver';
-import { RPCResultError, startPeriodicGarbageCollection } from './rpc';
+import { RPCResultError, startPeriodicGarbageCollection } from '@scrypted/rpc';
 import { PluginError } from './plugin/plugin-error';
 
 if (!semver.gte(process.version, '16.0.0')) {

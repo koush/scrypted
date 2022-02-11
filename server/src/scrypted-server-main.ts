@@ -13,7 +13,7 @@ import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import axios from 'axios';
 import qs from 'query-string';
-import { RPCResultError } from './rpc';
+import { RPCResultError } from '@scrypted/rpc';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import { install as installSourceMapSupport } from 'source-map-support';

@@ -1,4 +1,4 @@
-import { RpcPeer } from '../rpc';
+import { RpcPeer } from '@scrypted/rpc';
 import AdmZip from 'adm-zip';
 import { Device, EngineIOHandler } from '@scrypted/types'
 import { ScryptedRuntime } from '../runtime';
