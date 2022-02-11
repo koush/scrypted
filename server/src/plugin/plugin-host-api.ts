@@ -6,7 +6,7 @@ import { Logger } from '../logger';
 import { getState } from '../state';
 import { PluginHost } from './plugin-host';
 import debounce from 'lodash/debounce';
-import { PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
+import { PROPERTY_PROXY_ONEWAY_METHODS } from '@scrypted/rpc';
 
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;

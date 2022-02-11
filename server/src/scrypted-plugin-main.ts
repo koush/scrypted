@@ -1,5 +1,5 @@
 import { startPluginRemote } from "./plugin/plugin-remote-worker";
-import { RpcMessage } from "./rpc";
+import { RpcMessage } from "@scrypted/rpc";
 import worker_threads from "worker_threads";
 import v8 from 'v8';
 

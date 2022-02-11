@@ -1,6 +1,6 @@
 import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger } from "@scrypted/types";
 import { PluginAPI } from "./plugin-api";
-import { handleFunctionInvocations, PrimitiveProxyHandler, PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
+import { handleFunctionInvocations, PrimitiveProxyHandler, PROPERTY_PROXY_ONEWAY_METHODS } from '@scrypted/rpc';
 import { EventRegistry } from "../event-registry";
 import { allInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
 

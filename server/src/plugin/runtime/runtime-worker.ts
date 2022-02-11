@@ -1,4 +1,4 @@
-import { RpcMessage, RpcPeer } from "../../rpc";
+import { RpcMessage, RpcPeer } from "@scrypted/rpc";
 import { PluginDebug } from "../plugin-debug";
 import {Readable} from "stream";
 
@@ -26,4 +26,3 @@ export interface RuntimeWorker {
 
     setupRpcPeer(peer: RpcPeer): void;
 }
-

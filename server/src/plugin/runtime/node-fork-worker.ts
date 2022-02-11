@@ -1,7 +1,7 @@
 import { RuntimeWorkerOptions as RuntimeWorkerOptions } from "./runtime-worker";
 import child_process from 'child_process';
 import path from 'path';
-import { RpcMessage, RpcPeer } from "../../rpc";
+import { RpcMessage, RpcPeer } from "@scrypted/rpc";
 import { ChildProcessWorker } from "./child-process-worker";
 import { getPluginNodePath } from "../plugin-npm-dependencies";
 
