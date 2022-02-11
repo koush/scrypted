@@ -1,7 +1,7 @@
 # Use the Scrypted SDK from the command line or web
 
 ```js
-import { connectScryptedClient, OnOff } from '@scrypted/web-sdk';
+import { connectScryptedClient, OnOff } from '@scrypted/client';
 
 async function example() {
     const sdk = await connectScryptedClient({

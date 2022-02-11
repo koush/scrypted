@@ -1,8 +1,8 @@
 {
-  "name": "@scrypted/web-sdk",
-  "version": "1.0.7",
+  "name": "@scrypted/client",
+  "version": "1.0.8",
   "description": "",
-  "main": "dist/packages/web-sdk/src/index.js",
+  "main": "dist/packages/client/src/index.js",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc --outDir dist",

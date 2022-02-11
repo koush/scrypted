@@ -64,7 +64,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
         socket.on('open', async function () {
             try {
-                const rpcPeer = new RpcPeer(clientName || 'web-sdk', "core", message => socket.send(JSON.stringify(message)));
+                const rpcPeer = new RpcPeer(clientName || 'engine.io-client', "core", message => socket.send(JSON.stringify(message)));
                 socket.on('message', data => rpcPeer.handleMessage(JSON.parse(data as string)));
 
                 const scrypted = await attachPluginRemote(rpcPeer, undefined);
