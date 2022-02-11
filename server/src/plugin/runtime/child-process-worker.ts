@@ -1,7 +1,7 @@
 import { EventEmitter } from "ws";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
 import child_process from 'child_process';
-import { RpcMessage, RpcPeer } from "@scrypted/rpc";
+import { RpcMessage, RpcPeer } from "../../rpc";
 
 export abstract class ChildProcessWorker extends EventEmitter implements RuntimeWorker {
     worker: child_process.ChildProcess;

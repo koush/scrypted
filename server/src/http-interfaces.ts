@@ -1,7 +1,7 @@
 import { HttpResponse, HttpResponseOptions } from "@scrypted/types";
 import { Response } from "express";
 import mime from "mime";
-import { PROPERTY_PROXY_ONEWAY_METHODS } from "@scrypted/rpc";
+import { PROPERTY_PROXY_ONEWAY_METHODS } from "./rpc";
 import { join as pathJoin } from 'path';
 import fs from 'fs';
 

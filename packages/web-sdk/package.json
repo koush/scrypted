@@ -1,0 +1,29 @@
+{
+  "name": "@scrypted/web-sdk",
+  "version": "1.0.3",
+  "description": "",
+  "main": "dist/packages/web-sdk/src/index.js",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsc --outDir dist",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/adm-zip": "^0.4.34",
+    "@types/engine.io-client": "^3.1.5",
+    "@types/node": "^17.0.17"
+  },
+  "dependencies": {
+    "@scrypted/rpc": "^1.0.4",
+    "@scrypted/types": "^0.0.6",
+    "adm-zip": "^0.5.9",
+    "axios": "^0.25.0",
+    "engine.io-client": "^5.2.0",
+    "linkfs": "^2.1.0",
+    "memfs": "^3.4.1",
+    "rimraf": "^3.0.2"
+  }
+}

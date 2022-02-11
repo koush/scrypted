@@ -69,7 +69,7 @@ export interface WebSocketMethods {
     close(message: string): void;
 }
 
-export function createWebSocketClass(__websocketConnect: WebSocketConnect) {
+export function createWebSocketClass(__websocketConnect: WebSocketConnect): any {
 
     // @ts-ignore
     class WebSocket extends WebSocketEventTarget {

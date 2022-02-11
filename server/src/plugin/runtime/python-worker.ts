@@ -3,7 +3,7 @@ import child_process from 'child_process';
 import path from 'path';
 import { EventEmitter } from "ws";
 import { Writable, Readable } from 'stream';
-import { RpcMessage, RpcPeer } from "@scrypted/rpc";
+import { RpcMessage, RpcPeer } from "../../rpc";
 import readline from 'readline';
 import { ChildProcessWorker } from "./child-process-worker";
 

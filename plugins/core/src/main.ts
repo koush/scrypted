@@ -3,7 +3,7 @@ import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
 import { UserStorage } from './userStorage';
-import { RpcPeer } from '../../../server/src/rpc';
+import { RpcPeer } from '@scrypted/rpc';
 import { setupPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { PluginAPIProxy } from '../../../server/src/plugin/plugin-api';
 import fs from 'fs';
@@ -57,8 +57,8 @@ async function reportAggregate(nativeId: string, interfaces: string[]) {
 }
 
 class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider {
-    router = Router();
-    publicRouter = Router();
+    router: any = Router();
+    publicRouter: any = Router();
     mediaCore: MediaCore;
     automations = new Map<string, Automation>();
     aggregate = new Map<string, AggregateDevice>();

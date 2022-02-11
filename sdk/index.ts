@@ -155,7 +155,7 @@ try {
   });
 }
 catch (e) {
-  console.error('sdk initialization error, import @scrypted/sdk/types instead', e);
+  console.error('sdk initialization error, import @scrypted/types or use @scrypted/web-sdk instead', e);
 }
 
 export default sdk;

@@ -1,4 +1,4 @@
-import { RpcSerializer } from "@scrypted/rpc";
+import { RpcSerializer } from "../rpc";
 
 export class BufferSerializer implements RpcSerializer {
     serialize(value: Buffer) {

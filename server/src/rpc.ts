@@ -17,9 +17,17 @@ export function startPeriodicGarbageCollection() {
         console.warn('rpc peer garbage collection not available: global.gc is not exposed.');
         return;
     }
-    return setInterval(() => {
-        global?.gc?.();
-    }, 10000);
+    try {
+        const g = global;
+        if (g.gc) {
+            return setInterval(() => {
+                g.gc!();
+            }, 10000);
+        }
+    }
+    catch (e) {
+
+    }
 }
 
 export interface RpcMessage {
@@ -32,7 +40,7 @@ interface RpcParam extends RpcMessage {
 }
 
 interface RpcApply extends RpcMessage {
-    id: string|undefined;
+    id: string | undefined;
     proxyId: string;
     args: any[];
     method: string;
@@ -51,8 +59,8 @@ interface RpcOob extends RpcMessage {
 }
 
 interface RpcRemoteProxyValue {
-    __remote_proxy_id: string|undefined;
-    __remote_proxy_finalizer_id: string|undefined;
+    __remote_proxy_id: string | undefined;
+    __remote_proxy_finalizer_id: string | undefined;
     __remote_constructor_name: string;
     __remote_proxy_props: any;
     __remote_proxy_oneway_methods: string[];
@@ -65,7 +73,7 @@ interface RpcLocalProxyValue {
 
 interface RpcFinalize extends RpcMessage {
     __local_proxy_id: string;
-    __local_proxy_finalizer_id: string|undefined;
+    __local_proxy_finalizer_id: string | undefined;
 }
 
 interface Deferred {
@@ -180,7 +188,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
 
 // todo: error constructor adds a "cause" variable in Chrome 93, Node v??
 export class RPCResultError extends Error {
-    constructor(peer: RpcPeer, message: string, public cause?: Error, options?: { name: string, stack: string|undefined}) {
+    constructor(peer: RpcPeer, message: string, public cause?: Error, options?: { name: string, stack: string | undefined }) {
         super(`${peer.selfName}:${peer.peerName}: ${message}`);
 
         if (options?.name) {
@@ -225,7 +233,7 @@ export interface RpcSerializer {
 
 interface LocalProxiedEntry {
     id: string;
-    finalizerId: string|undefined;
+    finalizerId: string | undefined;
 }
 
 export class RpcPeer {

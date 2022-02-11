@@ -1,5 +1,5 @@
 import Vue from "vue";
-import client from '../../client/index';
+import {connectScryptedClient} from '../../../../packages/web-sdk/src/index';
 import axios from 'axios';
 import store from './store';
 
@@ -23,7 +23,9 @@ function isValidDevice(id) {
 
 Vue.use(Vue => {
     Vue.prototype.$connectScrypted = () => {
-        const clientPromise = client.connect(null, '@scrypted/core');
+        const clientPromise = connectScryptedClient({
+            pluginId: '@scrypted/core',
+        });
 
         store.commit("setHasLogin", undefined);
         store.commit("setIsLoggedIn", undefined);
