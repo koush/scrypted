@@ -39,6 +39,8 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
             return;
         this.worker.kill('SIGKILL');
         this.worker.removeAllListeners();
+        this.worker.stdout.removeAllListeners();
+        this.worker.stderr.removeAllListeners();
         this.worker = undefined;
     }
 
