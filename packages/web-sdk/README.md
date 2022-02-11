@@ -1,3 +1,5 @@
+# Use the Scrypted SDK from the command line or web
+
 ```js
 import { connectScryptedClient, OnOff } from '@scrypted/web-sdk';
 
@@ -19,6 +21,8 @@ async function example() {
 
 example();
 ```
+
+# Running the Example
 
 ```sh
 npm -g install ts-node
