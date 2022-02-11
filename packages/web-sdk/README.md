@@ -19,3 +19,8 @@ async function example() {
 
 example();
 ```
+
+```sh
+npm -g install ts-node
+ts-node examples/example.ts
+```
