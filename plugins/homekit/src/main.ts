@@ -6,7 +6,7 @@ import './types'
 import { CameraMixin } from './camera-mixin';
 import { maybeAddBatteryService } from './battery';
 import { randomBytes } from 'crypto';
-import qrcode from 'qrcode';
+import qrcode from '@koush/qrcode-terminal';
 import packageJson from "../package.json";
 import { randomPinCode } from './pincode';
 import { EventedHTTPServer } from './hap';
@@ -229,13 +229,9 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             connection.on('closed', () => this.homekitConnections.delete(connection.remoteAddress));
         });
 
-
-        qrcode.toString(this.bridge.setupURI(), {
-            type: 'terminal',
-        }, (e, code) => {
-            this.console.log('Pairing QR Code:')
-            this.console.log(code);
-        })
+        const code = qrcode.generate(this.bridge.setupURI(), {small: true});
+        this.console.log('Pairing QR Code:')
+        this.console.log(code);
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)

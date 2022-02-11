@@ -137,6 +137,7 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
     const ffmpegInput: FFMpegInput = {
         url: undefined,
         mediaStreamOptions: {
+            id: undefined,
             video: null,
             audio: {
                 codec: 'aac',
