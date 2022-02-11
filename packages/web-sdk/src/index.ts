@@ -50,7 +50,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         }, axiosConfig);
 
         extraHeaders['Cookie'] = response.headers["set-cookie"][0];
-        console.log(extraHeaders);
     }
 
     return new Promise((resolve, reject) => {
