@@ -51,7 +51,11 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
     }
 
     kill(): void {
+        if (!this.worker)
+            return;
         this.worker.terminate();
+        this.worker.removeAllListeners();
+        this.worker = undefined;
     }
 
     send(message: RpcMessage, reject?: (e: Error) => void): void {

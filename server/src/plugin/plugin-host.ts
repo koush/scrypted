@@ -12,12 +12,8 @@ import WebSocket from 'ws';
 import { sleep } from '../sleep';
 import { PluginHostAPI } from './plugin-host-api';
 import path from 'path';
-import child_process from 'child_process';
 import { PluginDebug } from './plugin-debug';
-import readline from 'readline';
-import { Readable, Writable } from 'stream';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
-import { getPluginNodePath } from './plugin-npm-dependencies';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
 import { LazyRemote } from './plugin-lazy-remote';
 import crypto from 'crypto';
@@ -55,6 +51,8 @@ export class PluginHost {
         this.killed = true;
         this.api.removeListeners();
         this.worker.kill();
+        this.worker.stdout.removeAllListeners();
+        this.worker.stderr.removeAllListeners();
         this.io.close();
         for (const s of Object.values(this.ws)) {
             s.close();

@@ -35,7 +35,11 @@ export abstract class ChildProcessWorker extends EventEmitter implements Runtime
     }
 
     kill(): void {
+        if (!this.worker)
+            return;
         this.worker.kill('SIGKILL');
+        this.worker.removeAllListeners();
+        this.worker = undefined;
     }
 
     abstract send(message: RpcMessage, reject?: (e: Error) => void): void;
