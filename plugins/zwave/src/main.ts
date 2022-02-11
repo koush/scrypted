@@ -166,6 +166,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 key: 'serialPort',
                 value: this.storage.getItem('serialPort'),
                 description: 'Serial Port path or COM Port name',
+                placeholder: '/dev/tty.usbmodem14501',
             },
             {
                 title: 'Network Key',
