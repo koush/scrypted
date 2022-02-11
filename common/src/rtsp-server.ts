@@ -110,8 +110,8 @@ export class RtspServer {
         while (true) {
             const header = await readLength(this.client, 4);
             // this is the magic
-            if (header[0] !== RTSP_FRAME_MAGIC)
-                throw new Error('RTSP frame magic expected, but got ' + header[0]);
+            // if (header[0] !== RTSP_FRAME_MAGIC)
+            //     throw new Error('RTSP frame magic expected, but got ' + header[0]);
             const length = header.readUInt16BE(2);
             const packet = await readLength(this.client, length);
             const id = header.readUInt8(1);
