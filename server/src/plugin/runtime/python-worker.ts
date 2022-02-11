@@ -55,6 +55,13 @@ export class PythonRuntimeWorker extends  ChildProcessWorker {
     }
 
     send(message: RpcMessage, reject?: (e: Error) => void): void {
-        (this.worker.stdio[3] as Writable).write(JSON.stringify(message) + '\n', e => e && reject?.(e));
+        try {
+            if (!this.worker)
+                throw new Error('worked has been killed');
+                (this.worker.stdio[3] as Writable).write(JSON.stringify(message) + '\n', e => e && reject?.(e));
+            }
+        catch (e) {
+            reject?.(e);
+        }
     }
 }

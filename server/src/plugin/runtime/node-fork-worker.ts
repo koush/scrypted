@@ -35,10 +35,17 @@ export class NodeForkWorker extends ChildProcessWorker {
     }
 
     send(message: RpcMessage, reject?: (e: Error) => void): void {
-        this.worker.send(message, undefined, e => {
-            if (e && reject)
-                reject(e);
-        });
+        try {
+            if (!this.worker)
+                throw new Error('worked has been killed');
+            this.worker.send(message, undefined, e => {
+                if (e && reject)
+                    reject(e);
+            });
+        }
+        catch (e) {
+            reject?.(e);
+        }
     }
 
     get pid() {

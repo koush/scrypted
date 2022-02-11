@@ -60,6 +60,8 @@ export class NodeThreadWorker extends EventEmitter implements RuntimeWorker {
 
     send(message: RpcMessage, reject?: (e: Error) => void): void {
         try {
+            if (!this.worker)
+                throw new Error('worked has been killed');
             this.worker.postMessage(v8.serialize(message));
         }
         catch (e) {
