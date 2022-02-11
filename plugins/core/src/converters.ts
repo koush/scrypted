@@ -1,6 +1,6 @@
-import { MediaStreamUrl, BufferConverter, FFMpegInput, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes, MediaObject } from "@scrypted/sdk";
+import { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
-import mimeTypes from "mime-types";
+import mime from "mime/lite";
 
 const {endpointManager} = sdk;
 
@@ -49,7 +49,7 @@ export class UrlConverter extends ScryptedDeviceBase implements HttpRequestHandl
         const uuid = uuidv4();
 
         const endpoint = await (this.secure ? endpointManager.getPublicLocalEndpoint(this.nativeId) : endpointManager.getInsecurePublicLocalEndpoint(this.nativeId));
-        const extension = mimeTypes.extension(fromMimeType);
+        const extension = mime.getExtension(fromMimeType);
 
         const filename = uuid + (extension ? `.${extension}` : '');
 
