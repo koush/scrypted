@@ -31,8 +31,6 @@ function createRingRTCAVSignalingOfferSetup(signalingMimeType: string): RTCAVSig
     };
 }
 
-process.env.DEBUG = '*';
-
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
         super(camera.id + '-light');
@@ -132,9 +130,16 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
             return mediaManager.createMediaObject(black, 'image/jpeg');
         }
 
-        this.picturePromise = singletonPromise(this.picturePromise, () => {
-            // trigger a refresh, but immediately use whatever is available remotely.
-            camera.getSnapshot();
+        // trigger a refresh, but immediately use whatever is available remotely.
+        // ring-client-api debounces snapshot requests, so this is safe to call liberally.
+        camera.getSnapshot();
+
+        this.picturePromise = singletonPromise(this.picturePromise, async () => {
+            try {
+                return await timeoutPromise(1000, camera.getSnapshot());
+            }
+            catch (e) {
+            }
 
             return this.plugin.client.request<Buffer>({
                 url: clientApi(`snapshots/image/${camera.id}`),
@@ -145,7 +150,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
 
         try {
             // need to cache this and throttle or something.
-            const buffer = await timeoutPromise(1000, this.picturePromise.promise);
+            const buffer = await timeoutPromise(2000, this.picturePromise.promise);
             return mediaManager.createMediaObject(buffer, 'image/jpeg');
         }
         catch (e) {
@@ -248,6 +253,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                     'a=rtcp-mux'
                 ];
                 const rtsp = new RtspServer(client, inputSdpLines.filter((x) => Boolean(x)).join('\n'));
+                rtsp.console = this.console;
                 rtsp.audioChannel = 0;
                 rtsp.videoChannel = 2;
                 await rtsp.handleSetup();
@@ -257,8 +263,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 this.session = sip;
 
                 try {
-                    await readLine(client);
-                    this.console.log('rtsp client ending sip session gracefully');
+                    await rtsp.handleSetup();
                 }
                 catch (e) {
                     this.console.log('rtsp client ended ungracefully', e);
@@ -305,7 +310,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
             },
             audio: {
                 // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
-                codec: 'pcm',
+                codec: 'pcm_mulaw',
             },
             source: 'cloud',
             userConfigurable: false,
