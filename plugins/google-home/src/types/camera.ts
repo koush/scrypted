@@ -11,7 +11,7 @@ addSupportedType({
         ret.traits.push('action.devices.traits.CameraStream');
         ret.attributes = {
             cameraStreamSupportedProtocols: [
-                "progressive_mp4", "hls", "dash", "smooth_stream"
+                "webrtc", "progressive_mp4", "hls", "dash", "smooth_stream",
             ],
             cameraStreamNeedAuthToken: true,
             cameraStreamNeedDrmEncryption: false
