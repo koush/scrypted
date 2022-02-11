@@ -1,4 +1,6 @@
 export function isHex(s: string) {
+    if (!s)
+        return false;
     for (const c of s) {
         switch (c.toLowerCase()) {
             case '0':

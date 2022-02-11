@@ -50,59 +50,60 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     }
 
     startDriver() {
-        let networkKey = this.storage.getItem('networkKey');
-        let s2AccessControlKey = this.storage.getItem('s2AccessControlKey');
-        let s2AuthenticatedKey = this.storage.getItem('s2AuthenticatedKey');
-        let s2UnauthenticatedKey = this.storage.getItem('s2UnauthenticatedKey');
-
-        // 1/17/2022: the network key was stored as base64, but for consistency with HA
-        // and others, it was switched to hex. this is the data migration.
-        if (!isHex(networkKey)) {
-            networkKey = Buffer.from(networkKey, 'base64').toString('hex');
-            this.storage.setItem('networkKey', networkKey);
-        }
-
-        if (!networkKey) {
-            networkKey = randomBytes(16).toString('hex').toUpperCase();
-            this.storage.setItem('networkKey', networkKey);
-            this.log.a('No Network Key was present, so a random one was generated. You can change the Network Key in Settings.')
-        }
-
-        if (!s2AccessControlKey) {
-            s2AccessControlKey = randomBytes(16).toString('hex').toUpperCase();
-            this.storage.setItem('s2AccessControlKey', s2AccessControlKey);
-            this.log.a('No S2 Access Control Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');
-        }
-
-        if (!s2AuthenticatedKey) {
-            s2AuthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
-            this.storage.setItem('s2AuthenticatedKey', s2AuthenticatedKey);
-            this.log.a('No S2 Authenticated Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');            
-        }
-
-        if (!s2UnauthenticatedKey) {
-            s2UnauthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
-            this.storage.setItem('s2UnauthenticatedKey', s2UnauthenticatedKey);
-            this.log.a('No S2 Unauthenticated Key was present, so a random one was generated. You can change the S2 Unauthenticated Key in Settings.')
-        }
-        
-        const cacheDir = path.join(process.env['SCRYPTED_PLUGIN_VOLUME'], 'cache');
-        this.console.log(process.cwd());
-        const driver = new Driver(this.storage.getItem('serialPort'), {
-            securityKeys: {
-                S2_Unauthenticated: Buffer.from(s2UnauthenticatedKey, 'hex'),
-                S2_Authenticated: Buffer.from(s2AuthenticatedKey, 'hex'),
-                S2_AccessControl: Buffer.from(s2AccessControlKey, 'hex'),
-                S0_Legacy: Buffer.from(networkKey, 'hex')
-            },
-            storage: {
-                cacheDir,
-            }
-        });
-        this.driver = driver;
-        console.log(driver.cacheDir);
-
         this.driverReady = new Promise((resolve, reject) => {
+            let networkKey = this.storage.getItem('networkKey');
+            let s2AccessControlKey = this.storage.getItem('s2AccessControlKey');
+            let s2AuthenticatedKey = this.storage.getItem('s2AuthenticatedKey');
+            let s2UnauthenticatedKey = this.storage.getItem('s2UnauthenticatedKey');
+    
+            // 1/17/2022: the network key was stored as base64, but for consistency with HA
+            // and others, it was switched to hex. this is the data migration.
+            if (!isHex(networkKey) && networkKey) {
+                networkKey = Buffer.from(networkKey, 'base64').toString('hex');
+                this.storage.setItem('networkKey', networkKey);
+            }
+    
+            if (!networkKey) {
+                networkKey = randomBytes(16).toString('hex').toUpperCase();
+                this.storage.setItem('networkKey', networkKey);
+                this.log.a('No Network Key was present, so a random one was generated. You can change the Network Key in Settings.')
+            }
+    
+            if (!s2AccessControlKey) {
+                s2AccessControlKey = randomBytes(16).toString('hex').toUpperCase();
+                this.storage.setItem('s2AccessControlKey', s2AccessControlKey);
+                this.log.a('No S2 Access Control Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');
+            }
+    
+            if (!s2AuthenticatedKey) {
+                s2AuthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
+                this.storage.setItem('s2AuthenticatedKey', s2AuthenticatedKey);
+                this.log.a('No S2 Authenticated Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');            
+            }
+    
+            if (!s2UnauthenticatedKey) {
+                s2UnauthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
+                this.storage.setItem('s2UnauthenticatedKey', s2UnauthenticatedKey);
+                this.log.a('No S2 Unauthenticated Key was present, so a random one was generated. You can change the S2 Unauthenticated Key in Settings.')
+            }
+            
+            const cacheDir = path.join(process.env['SCRYPTED_PLUGIN_VOLUME'], 'cache');
+            this.console.log(process.cwd());
+
+            const driver = new Driver(this.storage.getItem('serialPort'), {
+                securityKeys: {
+                    S2_Unauthenticated: Buffer.from(s2UnauthenticatedKey, 'hex'),
+                    S2_Authenticated: Buffer.from(s2AuthenticatedKey, 'hex'),
+                    S2_AccessControl: Buffer.from(s2AccessControlKey, 'hex'),
+                    S0_Legacy: Buffer.from(networkKey, 'hex')
+                },
+                storage: {
+                    cacheDir,
+                }
+            });
+            this.driver = driver;
+            console.log(driver.cacheDir);
+            
             driver.on("error", (e) => {
                 console.error('driver error', e);
                 reject(e);
