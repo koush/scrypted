@@ -378,7 +378,7 @@ async function start() {
             const hash = crypto.createHash('sha256');
             hash.update(salted);
             const sha = hash.digest().toString('hex');
-            if (user.passwordHash !== sha) {
+            if (user.passwordHash !== sha && user.token !== password) {
                 res.send({
                     error: 'Incorrect password.',
                     hasLogin,

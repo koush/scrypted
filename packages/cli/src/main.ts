@@ -123,7 +123,14 @@ async function main() {
         if (!device)
             throw new Error('device not found: ' + idOrName);
         const method = process.argv[4];
-        const args = process.argv.slice(5);
+        const args = process.argv.slice(5).map(arg => () => {
+            try {
+                return JSON.parse(arg);
+            }
+            catch (e) {
+            }
+            return arg;
+        });
         await device[method](...args);
         sdk.disconnect();
     }
@@ -173,7 +180,7 @@ async function main() {
         console.log('   npx scrypted login [127.0.0.1[:10443]]');
         console.log('   npx scrypted serve');
         console.log('   npx scrypted serve@latest');
-        console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] command [arguments]');
+        console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
         process.exit(1);
     }

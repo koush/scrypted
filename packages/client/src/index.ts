@@ -19,6 +19,10 @@ export interface ScryptedClientOptions {
     pluginId: string;
     clientName?: string;
     username?: string;
+    /**
+     * The password, or preferably, login token for logging into Scrypted.
+     * The login token can be retrieved with "npx scrypted login".
+     */
     password?: string;
 }
 
@@ -34,6 +38,9 @@ export async function getLoginCookie(baseUrl: string, username: string, password
         username,
         password,
     }, axiosConfig);
+
+    if (response.status !== 200)
+        throw new Error('status ' + response.status);
 
     return response.headers["set-cookie"][0];
 }
