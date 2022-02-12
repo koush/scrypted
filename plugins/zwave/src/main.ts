@@ -4,7 +4,7 @@ import { CommandClassInfo, getCommandClass, getCommandClassIndex } from "./Comma
 import { ZwaveDeviceBase } from "./CommandClasses/ZwaveDeviceBase";
 import { getHash, getNodeHash, getInstanceHash } from "./Types";
 import debounce from "lodash/debounce";
-import { Driver, Endpoint, ZWaveController, ZWaveNode, CommandClass } from "zwave-js";
+import { Driver, Endpoint, ZWaveController, ZWaveNode, CommandClass, InclusionUserCallbacks, InclusionGrant, InclusionStrategy, NodeStatus } from "zwave-js";
 import { ValueID, CommandClasses } from "@zwave-js/core"
 import { randomBytes } from "crypto";
 import path from "path";
@@ -55,38 +55,38 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
             let s2AccessControlKey = this.storage.getItem('s2AccessControlKey');
             let s2AuthenticatedKey = this.storage.getItem('s2AuthenticatedKey');
             let s2UnauthenticatedKey = this.storage.getItem('s2UnauthenticatedKey');
-    
+
             // 1/17/2022: the network key was stored as base64, but for consistency with HA
             // and others, it was switched to hex. this is the data migration.
             if (!isHex(networkKey) && networkKey) {
                 networkKey = Buffer.from(networkKey, 'base64').toString('hex');
                 this.storage.setItem('networkKey', networkKey);
             }
-    
+
             if (!networkKey) {
                 networkKey = randomBytes(16).toString('hex').toUpperCase();
                 this.storage.setItem('networkKey', networkKey);
                 this.log.a('No Network Key was present, so a random one was generated. You can change the Network Key in Settings.')
             }
-    
+
             if (!s2AccessControlKey) {
                 s2AccessControlKey = randomBytes(16).toString('hex').toUpperCase();
                 this.storage.setItem('s2AccessControlKey', s2AccessControlKey);
                 this.log.a('No S2 Access Control Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');
             }
-    
+
             if (!s2AuthenticatedKey) {
                 s2AuthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
                 this.storage.setItem('s2AuthenticatedKey', s2AuthenticatedKey);
-                this.log.a('No S2 Authenticated Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');            
+                this.log.a('No S2 Authenticated Key was present, so a random one was generated. You can change the S2 Access Control Key in Settings.');
             }
-    
+
             if (!s2UnauthenticatedKey) {
                 s2UnauthenticatedKey = randomBytes(16).toString('hex').toUpperCase();
                 this.storage.setItem('s2UnauthenticatedKey', s2UnauthenticatedKey);
                 this.log.a('No S2 Unauthenticated Key was present, so a random one was generated. You can change the S2 Unauthenticated Key in Settings.')
             }
-            
+
             const cacheDir = path.join(process.env['SCRYPTED_PLUGIN_VOLUME'], 'cache');
             this.console.log(process.cwd());
 
@@ -103,12 +103,12 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
             });
             this.driver = driver;
             console.log(driver.cacheDir);
-            
+
             driver.on("error", (e) => {
                 console.error('driver error', e);
                 reject(e);
             });
-    
+
             driver.once("driver ready", () => {
                 this.controller = driver.controller;
                 const rebuildNode = async (node: ZWaveNode) => {
@@ -116,10 +116,15 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                         await this.rebuildInstance(endpoint);
                     }
                 }
-    
+
                 const bindNode = (node: ZWaveNode) => {
                     node.on('value added', node => rebuildNode(node));
-                    node.on('value removed', node => rebuildNode(node));
+                    node.on('value removed', node => {
+                        // node is being removed
+                        if (!this.controller.nodes.get(node.id))
+                            return;
+                        rebuildNode(node);
+                    });
                     node.on('value updated', (node, valueId) => {
                         const dirtyKey = getInstanceHash(this.controller.homeId, node.id, valueId.endpoint);
                         const device: ZwaveDeviceBase = this.devices[dirtyKey];
@@ -131,7 +136,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                     });
                     node.on('interview completed', node => rebuildNode(node));
                 }
-    
+
                 this.controller.on('node added', node => {
                     this.console.log('node added', node.nodeId);
                     bindNode(node);
@@ -140,7 +145,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 this.controller.on('node removed', node => {
                     this.console.log('node removed', node?.nodeId);
                 })
-    
+
                 driver.controller.nodes.forEach(node => {
                     this.console.log('node loaded', node.nodeId);
                     bindNode(node);
@@ -191,10 +196,67 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 key: 's2UnauthenticatedKey',
                 value: this.storage.getItem('s2UnauthenticatedKey'),
                 description: 'The 16 byte hex encoded S2 Unauthenticated Key',
-            }
+            },
+            {
+                title: 'Include Device',
+                key: 'inclusion',
+                type: 'button',
+                description: 'Enter inclusion mode and add devices.',
+            },
+            {
+                title: 'Exclude Device',
+                key: 'exclusion',
+                type: 'button',
+                description: 'Enter exclusion mode and remove devices.',
+            },
         ]
     }
+
+    async inclusion() {
+        const userCallbacks: InclusionUserCallbacks = {
+            grantSecurityClasses: async (requested: InclusionGrant): Promise<false | InclusionGrant> => {
+                this.console.log('grantSecurityClasses');
+                return requested;
+            },
+            validateDSKAndEnterPIN: async (dsk: string) => {
+                this.console.error('validateDSKAndEnterPIN not implemented in zwave plugin');
+                throw new Error("validateDSKAndEnterPIN Function not implemented.");
+            },
+            abort: function (): void {
+                this.console.log('abort');
+            }
+        }
+        await this.controller.stopExclusion();
+        await this.controller.stopInclusion();
+        const including = await this.driver.controller.beginInclusion({
+            userCallbacks,
+            strategy: InclusionStrategy.Default,
+        });
+        this.log.a('Including devices for 5 minutes.');
+        this.console.log('including', including);
+
+        setTimeout(() => this.driver.controller.stopInclusion(), 300000);
+    }
+
+    async exclusion() {
+        await this.controller.stopExclusion();
+        await this.controller.stopInclusion();
+        const excluding = await this.driver.controller.beginExclusion();
+        this.log.a('Excluding devices for 5 minutes.');
+        this.console.log('excluding', excluding);
+        setTimeout(() => this.driver.controller.stopExclusion(), 300000);
+    }
+
     async putSetting(key: string, value: string | number | boolean) {
+        if (key === 'inclusion') {
+            this.inclusion();
+            return;
+        }
+        if (key === 'exclusion') {
+            this.exclusion();
+            return;
+        }
+
         this.storage.setItem(key, value as string);
 
         await this.driver?.destroy();
@@ -229,6 +291,9 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     async rebuildInstance(instance: Endpoint) {
         const nativeId = getHash(this.controller, instance);
         let scryptedDevice: ZwaveDeviceBase = this.devices[nativeId];
+        if (this.controller.nodes.get(instance.nodeId).status === NodeStatus.Dead) {
+            scryptedDevice.log.a('Node is dead.');
+        }
         if (!scryptedDevice) {
             scryptedDevice = new ZwaveDeviceBase(this.controller, instance);
             scryptedDevice.zwaveController = this;
