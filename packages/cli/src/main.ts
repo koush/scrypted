@@ -7,6 +7,12 @@ import readline from 'readline-sync';
 import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
+import { connectScryptedClient } from '../../client/src/index';
+import semver from 'semver';
+
+if (!semver.gte(process.version, '16.0.0')) {
+    throw new Error('"node" version out of date. Please update node to v16 or higher.')
+}
 
 function getUserHome() {
     const ret = process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
@@ -24,15 +30,15 @@ function toIpAndPort(ip: string) {
     return ip;
 }
 
-async function doLogin(ip: string) {
-    ip = toIpAndPort(ip);
+async function doLogin(host: string) {
+    host = toIpAndPort(host);
 
     const username = readline.question('username: ');
     const password = readline.question('password: ', {
         hideEchoBack: true,
     });
 
-    const url = `https://${ip}/login`;
+    const url = `https://${host}/login`;
     const response = await axios(Object.assign({
         method: 'GET',
         auth: {
@@ -54,9 +60,28 @@ async function doLogin(ip: string) {
         login = {};
     login = login || {};
 
-    login[ip] = response.data;
+    login[host] = response.data;
     fs.writeFileSync(loginPath, JSON.stringify(login));
-    return login;
+    return response.data.token;
+}
+
+async function getOrDoLogin(host: string): Promise<{
+    username: string,
+    token: string,
+}> {
+    let login: any;
+    try {
+        login = JSON.parse(fs.readFileSync(loginPath).toString());
+        if (typeof login !== 'object')
+            login = {};
+
+        if (!login[host].username || !login[host].token)
+            throw new Error();
+    }
+    catch (e) {
+        login = await doLogin(host);
+    }
+    return login[host];
 }
 
 const axiosConfig: AxiosRequestConfig = {
@@ -78,8 +103,29 @@ async function main() {
     }
     else if (process.argv[2] === 'login') {
         const ip = process.argv[3] || '127.0.0.1';
-        await doLogin(ip);
-        console.log('login successful.')
+        const token = await doLogin(ip);
+        console.log('login successful. token:', token);
+    }
+    else if (process.argv[2] === 'command') {
+        const [idOrName, optionalHost] = process.argv[3].split('@');
+        const host = toIpAndPort(optionalHost || '127.0.0.1');
+
+        const login = await getOrDoLogin(host);
+
+        const sdk = await connectScryptedClient({
+            baseUrl: `https://${host}`,
+            pluginId: '@scrypted/core',
+            username: login.username,
+            password: login.token,
+        });
+
+        const device: any = sdk.systemManager.getDeviceById(idOrName) || sdk.systemManager.getDeviceByName(idOrName);
+        if (!device)
+            throw new Error('device not found: ' + idOrName);
+        const method = process.argv[4];
+        const args = process.argv.slice(5);
+        await device[method](...args);
+        sdk.disconnect();
     }
     else if (process.argv[2] === 'create-cert-json' && process.argv.length === 5) {
         const key = fs.readFileSync(process.argv[3]).toString();
@@ -107,25 +153,13 @@ async function main() {
             process.exit(1);
         }
 
-        let login: any;
-        try {
-            login = JSON.parse(fs.readFileSync(loginPath).toString());
-            if (typeof login !== 'object')
-                login = {};
-
-            if (!login[ip].username || !login[ip].token)
-                throw new Error();
-        }
-        catch (e) {
-            login = await doLogin(ip);
-        }
-
+        const login = await getOrDoLogin(ip);
         const url = `https://${ip}/web/component/script/install/${pkg}`;
         const response = await axios(Object.assign({
             method: 'POST',
             auth: {
-                username: login[ip].username,
-                password: login[ip].token,
+                username: login.username,
+                password: login.token,
             },
             url,
         }, axiosConfig));
@@ -139,6 +173,7 @@ async function main() {
         console.log('   npx scrypted login [127.0.0.1[:10443]]');
         console.log('   npx scrypted serve');
         console.log('   npx scrypted serve@latest');
+        console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] command [arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
         process.exit(1);
     }
