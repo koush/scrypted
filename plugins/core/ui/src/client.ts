@@ -1,5 +1,5 @@
 import Vue from "vue";
-import {connectScryptedClient} from '../../../../packages/web-sdk/src/index';
+import {connectScryptedClient} from '../../../../packages/client/src/index';
 import axios from 'axios';
 import store from './store';
 

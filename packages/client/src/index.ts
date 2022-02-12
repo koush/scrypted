@@ -28,6 +28,16 @@ const axiosConfig: AxiosRequestConfig = {
     })
 }
 
+export async function getLoginCookie(baseUrl: string, username: string, password: string) {
+    const url = `${baseUrl}/login`;
+    const response = await axios.post(url, {
+        username,
+        password,
+    }, axiosConfig);
+
+    return response.headers["set-cookie"][0];
+}
+
 /**
  * 
  * @param baseUrl The base url of the webserver, or undefined to use current url (browser only).
@@ -43,13 +53,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const extraHeaders: { [header: string]: string } = {};
 
     if (username && password) {
-        const url = `${baseUrl}/login`;
-        const response = await axios.post(url, {
-            username,
-            password,
-        }, axiosConfig);
-
-        extraHeaders['Cookie'] = response.headers["set-cookie"][0];
+        extraHeaders['Cookie'] = await getLoginCookie(baseUrl, username, password);
     }
 
     return new Promise((resolve, reject) => {
