@@ -30,6 +30,20 @@ function ensureAlias(name) {
     return sanitizedPath;
 }
 
+const plugins = [
+    new webpack.DefinePlugin({
+        'process.env.SSDP_COV': false,
+    }),
+];
+
+if (process.env.WEBPACK_ANALYZER) {
+    plugins.push(
+        new BundleAnalyzerPlugin({
+            generateStatsFile: true,
+        }),
+    );
+}
+
 const alias = {};
 const polyfills = [
     'adm-zip',
@@ -65,36 +79,16 @@ module.exports = {
         rules: [
             {
                 test: /\.(ts|js)x?$/,
-                // unsure if this is correct... need to transpile node modules at times.
-                // exclude: /(core-js|node_modules|bower_components)/,
                 exclude: /(core-js)/,
                 use: {
                     loader: 'babel-loader',
                     options: {
-                        "plugins": [
-                            "@babel/plugin-transform-modules-commonjs",
-                            "babel-plugin-const-enum",
-                            "@babel/plugin-transform-typescript",
-                            "@babel/plugin-proposal-class-properties",
-                            "@babel/plugin-proposal-optional-chaining",
-                            "@babel/plugin-proposal-nullish-coalescing-operator",
-                            "@babel/plugin-proposal-numeric-separator",
-                        ],
                         "presets": [
                             "@babel/preset-typescript",
                         ]
                     }
                 }
             },
-
-            // {
-            //     test: /\.tsx?$/,
-            //     loader: 'ts-loader',
-            //     exclude: /node_modules/,
-            //     options: {
-            //         configFile : path.join(__dirname, 'tsconfig.plugin.json'),
-            //     },
-            // }
         ]
     },
 
@@ -116,23 +110,12 @@ module.exports = {
         colors: true
     },
 
-    plugins: [
-        new webpack.DefinePlugin({
-            'process.env.SSDP_COV': false,
-        }),
-        // new BundleAnalyzerPlugin({
-        //     generateStatsFile: true
-        // }),
-    ],
+    plugins,
 
     optimization: {
         minimize: isProduction,
         minimizer: [
-            new TerserPlugin({
-                terserOptions: {
-                    keep_classnames: true,
-                }
-            }),
+            new TerserPlugin(),
         ],
     },
 

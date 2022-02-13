@@ -1019,7 +1019,15 @@ export interface MediaStreamOptions {
    * Prebuffer time in milliseconds.
    */
   prebuffer?: number;
+  /**
+   * The container type of this stream, ie: mp4, mpegts, rtsp.
+   */
   container?: string;
+  /**
+   * The tool used to generate the container. Ie, scrypted,
+   * the ffmpeg tools, gstreamer.
+   */
+  tool?: string;
 
   video?: VideoStreamOptions;
   audio?: AudioStreamOptions;
