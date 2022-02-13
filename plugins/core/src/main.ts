@@ -3,7 +3,7 @@ import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
 import { UserStorage } from './userStorage';
-import { RpcPeer } from '@scrypted/rpc';
+import { RpcPeer } from '../../../server/src/rpc';
 import { setupPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { PluginAPIProxy } from '../../../server/src/plugin/plugin-api';
 import fs from 'fs';

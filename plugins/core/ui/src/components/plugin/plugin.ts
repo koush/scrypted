@@ -32,6 +32,10 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
             found.tag = k;
         }
     }
+    const current: any = versions.find((version: any) => version.version === npmPackageVersion);
+    if (current) {
+        current.tag = 'installed';
+    }
     // make sure latest build is first instead of a beta.
     if (latest) {
         const index = versions.findIndex((v: any) => v.version === latest);
