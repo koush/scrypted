@@ -2,7 +2,7 @@ import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceP
 import sdk from '@scrypted/sdk';
 import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../../common/src/settings';
-import { listenZeroSingleClient } from '../../../common/src/listen-cluster';
+import { createBindZero, listenZeroSingleClient } from '../../../common/src/listen-cluster';
 import { createCryptoLine, encodeSrtpOptions, RtpSplitter } from '@homebridge/camera-utils'
 import child_process, { ChildProcess } from 'child_process';
 import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-ffmpeg-source';
@@ -11,6 +11,7 @@ import fs from 'fs';
 import { clientApi } from '@koush/ring-client-api/lib/api/rest-client';
 import { RtspServer } from '../../../common/src/rtsp-server';
 import { RefreshPromise, singletonPromise, timeoutPromise } from './util';
+import { isStunMessage } from '@koush/ring-client-api/lib/api/rtp-utils';
 
 const { log, deviceManager, mediaManager, systemManager } = sdk;
 const STREAM_TIMEOUT = 120000;
@@ -232,6 +233,14 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 sip.onCallEnded.subscribe(cleanup);
                 this.rtpDescription = await sip.start();
 
+                // const aport = await createBindZero();
+                // const vport = await createBindZero();
+
+                // sip.onCallEnded.subscribe(() => {
+                //     aport.server.close();
+                //     vport.server.close();
+                // });
+
                 const inputSdpLines = [
                     'v=0',
                     'o=105202070 3747 461 IN IP4 127.0.0.1',
@@ -255,9 +264,18 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 rtsp.console = this.console;
                 rtsp.audioChannel = 0;
                 rtsp.videoChannel = 2;
-                await rtsp.handleSetup();
+                await rtsp.handlePlayback();
+                sip.videoSplitter.addMessageHandler(({ isRtpMessage, message }) => {
+                    if (!isStunMessage(message))
+                        rtsp.sendVideo(message, !isRtpMessage);
+                    return null;
+                });
+                sip.audioSplitter.addMessageHandler(({ isRtpMessage, message }) => {
+                    if (!isStunMessage(message))
+                        rtsp.sendAudio(message, !isRtpMessage);
+                    return null;
+                });
 
-                const ff = sip.prepareTranscoder(true, [], this.rtpDescription, rtsp.udpPorts.audio, rtsp.udpPorts.video, '');
                 sip.requestKeyFrame();
                 this.session = sip;
 
@@ -284,7 +302,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                 refreshAt: Date.now() + STREAM_TIMEOUT,
             }),
             inputArguments: [
-                '-rtsp_transport', 'udp',
+                '-rtsp_transport', 'tcp',
                 '-i', playbackUrl,
             ],
         };
@@ -305,6 +323,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
         return {
             id: 'sip',
             name: 'SIP',
+            // note that the rtsp stream comes from scrypted,
+            // can bypass ffmpeg parsing.
+            tool: "scrypted",
+            container: 'rtsp',
             video: {
                 codec: 'h264',
             },
@@ -586,7 +608,7 @@ class RingPlugin extends ScryptedDeviceBase implements BufferConverter, DevicePr
             };
             devices.push(device);
 
-            camera.onNewDing.subscribe(e=> {
+            camera.onNewDing.subscribe(e => {
                 this.console.log(camera.name, 'onNewDing', e);
             });
             camera.onDoorbellPressed?.subscribe(e => {
