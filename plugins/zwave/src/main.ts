@@ -4,7 +4,7 @@ import { CommandClassInfo, getCommandClass, getCommandClassIndex } from "./Comma
 import { ZwaveDeviceBase } from "./CommandClasses/ZwaveDeviceBase";
 import { getHash, getNodeHash, getInstanceHash } from "./Types";
 import debounce from "lodash/debounce";
-import { Driver, Endpoint, ZWaveController, ZWaveNode, CommandClass, InclusionUserCallbacks, InclusionGrant, InclusionStrategy, NodeStatus } from "zwave-js";
+import { Driver, Endpoint, ZWaveController, ZWaveNode, InclusionUserCallbacks, InclusionGrant, InclusionStrategy, NodeStatus } from "zwave-js";
 import { ValueID, CommandClasses } from "@zwave-js/core"
 import { randomBytes } from "crypto";
 import path from "path";
@@ -141,10 +141,11 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                     this.console.log('node added', node.nodeId);
                     bindNode(node);
                     rebuildNode(node);
-                })
+                });
+
                 this.controller.on('node removed', node => {
                     this.console.log('node removed', node?.nodeId);
-                })
+                });
 
                 driver.controller.nodes.forEach(node => {
                     this.console.log('node loaded', node.nodeId);
