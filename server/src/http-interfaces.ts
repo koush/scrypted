@@ -1,9 +1,10 @@
 import { HttpResponse, HttpResponseOptions } from "@scrypted/types";
 import { Response } from "express";
-import mime from "mime";
 import { RpcPeer } from "./rpc";
 import { join as pathJoin } from 'path';
 import fs from 'fs';
+
+const  mime = require('mime/lite');
 
 export function createResponseInterface(res: Response, unzippedDir: string): HttpResponse {
     class HttpResponseImpl implements HttpResponse {
@@ -39,8 +40,12 @@ export function createResponseInterface(res: Response, unzippedDir: string): Htt
                 }
             }
 
-            if (!res.getHeader('Content-Type'))
-                res.contentType(mime.lookup(path));
+            if (!res.getHeader('Content-Type')) {
+                const type = mime.getType(path);
+                if (type) {
+                    res.contentType(mime.getExtension(type));
+                }
+            }
 
             const filePath = pathJoin(unzippedDir, 'fs', path);
             if (!fs.existsSync(filePath)) {
