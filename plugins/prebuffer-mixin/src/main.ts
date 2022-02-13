@@ -127,7 +127,8 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    for (const prebuffer of this.prebuffers.mp4) {
+    const { mp4Mode } = this.getRebroadcastMode();
+    for (const prebuffer of (mp4Mode ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunk.chunks) {
         total += chunk.byteLength;
