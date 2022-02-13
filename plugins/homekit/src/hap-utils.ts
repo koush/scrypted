@@ -26,8 +26,7 @@ class HAPLocalStorage {
 
 // HAP storage seems to be global?
 export function initializeHapStorage() {
-    HAPStorage.storage();
-    (HAPStorage as any).INSTANCE.localStore = new HAPLocalStorage();
+    HAPStorage.setStorage(new HAPLocalStorage());
 }
 
 
