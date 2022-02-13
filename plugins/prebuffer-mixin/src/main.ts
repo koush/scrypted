@@ -175,6 +175,7 @@ class PrebufferSession {
         choices: [
           'MPEG-TS',
           'RTSP',
+          'RTSP+MP4',
         ],
         key: this.rebroadcastModeKey,
         value: this.storage.getItem(this.rebroadcastModeKey) || 'MPEG-TS',
@@ -225,6 +226,15 @@ class PrebufferSession {
     return settings;
   }
 
+  getRebroadcastMode() {
+    const mode = this.storage.getItem(this.rebroadcastModeKey);
+    const rtspMode = mode?.startsWith('RTSP');
+    return {
+      rtspMode: mode?.startsWith('RTSP'),
+      mp4Mode: !rtspMode || mode?.includes('MP4'),
+    };
+  }
+
   async startPrebufferSession() {
     this.prebuffers.mp4 = [];
     this.prebuffers.mpegts = [];
@@ -270,10 +280,14 @@ class PrebufferSession {
       ? advertisedAudioCodec?.toLowerCase()
       : detectedAudioCodec?.toLowerCase();
 
+    // rtsp mode can handle any codec, and its generally better to allow it do that.
+    const { rtspMode, mp4Mode } = this.getRebroadcastMode();
+    const nonRtsp = !rtspMode || mp4Mode;
+
     // after probing the audio codec is complete, alert the user with appropriate instructions.
     // assume the codec is user configurable unless the camera explictly reports otherwise.
     const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
-    if (!probingAudioCodec && mso?.userConfigurable !== false && !audioSoftMuted) {
+    if (nonRtsp && !probingAudioCodec && mso?.userConfigurable !== false && !audioSoftMuted) {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
@@ -375,15 +389,11 @@ class PrebufferSession {
       parsers: {
       },
     };
+    this.parsers = rbo.parsers;
 
-    const rtspMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTSP';
     this.console.log('rebroadcast mode:', rtspMode ? 'rtsp' : 'mpegts');
     if (!rtspMode) {
       rbo.parsers.mpegts = createMpegTsParser({
-        vcodec,
-        acodec,
-      });
-      rbo.parsers.mp4 = createFragmentedMp4Parser({
         vcodec,
         acodec,
       });
@@ -394,9 +404,16 @@ class PrebufferSession {
       rbo.parsers.rtsp = parser;
     }
 
-    this.parsers = rbo.parsers;
+    if (mp4Mode) {
+      rbo.parsers.mp4 = createFragmentedMp4Parser({
+        vcodec,
+        acodec,
+      });
+    }
 
     const mo = await this.mixinDevice.getVideoStream(mso);
+    const isRfc4571 = mo.mimeType === 'x-scrypted/x-rfc4571';
+
     let session: ParserSession<PrebufferParsers>;
     let sessionMso: ResponseMediaStreamOptions;
 
@@ -404,7 +421,7 @@ class PrebufferSession {
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
 
-    if (mo.mimeType === 'x-scrypted/x-rfc4571') {
+    if (rtspMode && isRfc4571 && !mp4Mode) {
       session = await startRFC4571Parser(mo, rbo);
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
@@ -625,7 +642,7 @@ class PrebufferSession {
       return containerUrl;
     }
 
-    const rtspMode = this.storage.getItem(this.rebroadcastModeKey) === 'RTSP';
+    const { rtspMode, mp4Mode } = this.getRebroadcastMode();
     const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
     const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
@@ -636,7 +653,7 @@ class PrebufferSession {
 
     const { reencodeAudio } = this.getAudioConfig();
 
-    if (!rtspMode) {
+    if (!rtspMode || container !== 'rtsp') {
       if (this.audioDisabled) {
         mediaStreamOptions.audio = null;
       }
