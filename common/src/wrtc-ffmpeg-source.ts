@@ -186,7 +186,9 @@ export async function createRTCPeerConnectionSource(avsource: RTCAVSignalingOffe
     const url = `rtsp://127.0.0.1:${port}`;
     return {
         url,
-        mediaStreamOptions: getRTCMediaStreamOptions(id, name, 'rtsp'),
+        mediaStreamOptions: Object.assign(getRTCMediaStreamOptions(id, name, 'rtsp'), {
+            tool: 'scrypted',
+        }),
         inputArguments: [
             "-rtsp_transport", "udp",
             "-max_delay", "1000000",

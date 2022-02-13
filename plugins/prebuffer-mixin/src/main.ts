@@ -7,11 +7,11 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSes
 import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { createRtspParser, RtspServer } from '../../../common/src/rtsp-server';
+import { createRtspParser, RtspClient, RtspServer } from '../../../common/src/rtsp-server';
 import { Duplex } from 'stream';
 import net from 'net';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { startRFC4571Parser } from './rfc4571';
+import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -422,7 +422,11 @@ class PrebufferSession {
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
 
     if (rtspMode && isRfc4571 && !mp4Mode) {
-      session = await startRFC4571Parser(mo, rbo);
+
+      const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
+      const { url, sdp, mediaStreamOptions } = json;
+
+      session = await startRFC4571Parser(connectRFC4571Parser(url), sdp, mediaStreamOptions);
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
     else {
@@ -430,10 +434,23 @@ class PrebufferSession {
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
       sessionMso = ffmpegInput.mediaStreamOptions;
 
-      // create missing pts from dts so mpegts and mp4 muxing does not fail
-      const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
-      ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
-      session = await startParserSession(ffmpegInput, rbo);
+      if (ffmpegInput.mediaStreamOptions?.container === 'rtsp' && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
+        const rtspClient = new RtspClient(ffmpegInput.url);
+        await rtspClient.options();
+        const sdpResponse = await rtspClient.describe();
+        const sdp = sdpResponse.body.toString().trim();
+        this.sdp = Promise.resolve(sdp);
+        await rtspClient.setup(0, '/audio');
+        await rtspClient.setup(2, '/video');
+        const socket = await rtspClient.play();
+        session = await startRFC4571Parser(socket, sdp, ffmpegInput.mediaStreamOptions, true);
+      }
+      else {
+        // create missing pts from dts so mpegts and mp4 muxing does not fail
+        const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
+        ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+        session = await startParserSession(ffmpegInput, rbo);
+      }
     }
 
     if (!session.inputAudioCodec) {

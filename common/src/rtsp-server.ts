@@ -3,6 +3,7 @@ import { Duplex } from 'stream';
 import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser } from './stream-parser';
 import dgram from 'dgram';
+import net from 'net';
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -64,6 +65,101 @@ function parseHeaders(headers: string[]): Headers {
         ret[key] = value;
     }
     return ret;
+}
+
+export class RtspBase {
+    client: net.Socket;
+
+    write(line: string, headers: Headers, body?: Buffer) {
+        let response = `${line}\r\n`;
+        if (body)
+            headers['Content-Length'] = body.length.toString();
+        for (const [key, value] of Object.entries(headers)) {
+            response += `${key}: ${value}\r\n`;
+        }
+        response += '\r\n';
+        this.client.write(response);
+        if (body)
+            this.client.write(body);
+    }
+
+    async readMessage(): Promise<string[]> {
+        let currentHeaders: string[] = [];
+        while (true) {
+            let line = await readLine(this.client);
+            line = line.trim();
+            if (!line)
+                return currentHeaders;
+            currentHeaders.push(line);
+        }
+    }
+}
+
+// probably only works with scrypted rtsp server.
+export class RtspClient extends RtspBase {
+    cseq = 0;
+    session: string;
+
+    constructor(public url: string) {
+        super();
+        const u = new URL(url);
+        this.client = net.connect(parseInt(u.port) || 554, u.hostname);
+    }
+
+    async request(method: string, headers?: Headers, path?: string, body?: Buffer) {
+        headers = headers || {};
+
+        const line = `${method} ${this.url}${path || ''} RTSP/1.0`;
+        headers['CSeq'] = (this.cseq++).toString();
+        this.write(line, headers, body);
+
+        const response = parseHeaders(await this.readMessage());
+        const cl = parseInt(response['content-length']);
+        if (cl)
+            return { headers: response, body: await readLength(this.client, cl) };
+        return { headers: response, body: undefined };
+    }
+
+    async options() {
+        return this.request('OPTIONS');
+    }
+
+    async describe() {
+        return this.request('DESCRIBE', {
+            Accept: 'application/sdp',
+        });
+    }
+
+    async setup(channel: number, path?: string) {
+        const headers = {
+            Transport: `RTP/AVP/TCP;unicast;interleaved=${channel}-${channel + 1}`,
+        };
+        if (this.session)
+            headers['Session'] = this.session;
+        const response = await this.request('SETUP', headers, path)
+        if (response.headers.session)
+            this.session = response.headers.session;
+        return response;
+    }
+
+    async play() {
+        const headers = {
+            Range: 'npt=0.000-',
+        };
+        if (this.session)
+            headers['Session'] = this.session;
+        await this.request('PLAY', headers);
+        return this.client;
+    }
+
+    async teardown() {
+        try {
+            return await this.request('TEARDOWN');
+        }
+        finally {
+            this.client.destroy();
+        }
+    }
 }
 
 export class RtspServer {
@@ -235,12 +331,11 @@ export class RtspServer {
     }
 
     async headers(headers: string[]) {
-        this.console?.log('request header', headers.join('\n'));
+        this.console?.log('request headers', headers.join('\n'));
 
         let [method, url] = headers[0].split(' ', 2);
         method = method.toLowerCase();
         const requestHeaders = parseHeaders(headers);
-        this.console?.log('request headers', requestHeaders);
         if (!this[method]) {
             this.respond(400, 'Bad Request', requestHeaders, {});
             return;
@@ -259,7 +354,7 @@ export class RtspServer {
         for (const [key, value] of Object.entries(headers)) {
             response += `${key}: ${value}\r\n`;
         }
-        this.console?.log('response header', response);
+        this.console?.log('response headers', response);
         response += '\r\n';
         this.client.write(response);
         if (buffer)
