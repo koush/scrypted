@@ -975,8 +975,19 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
     const json = JSON.parse(data.toString());
     const { url, sdp } = json;
 
-    const audioPt = parseInt((sdp as string).match(/m=audio.* ([0-9]+)/)?.[1]);
-    const videoPt = parseInt((sdp as string).match(/m=video.* ([0-9]+)/)?.[1]);
+    const sdpString = sdp as string;
+    const audioPt = new Set<number>();
+    const videoPt = new Set<number>();
+    const addPts = (set: Set<number>, pts: string[]) => {
+      for (const pt of pts || []) {
+        set.add(parseInt(pt));
+      }
+    };
+    const audioPts = sdpString.match(/m=audio.*/)?.[0];
+    addPts(audioPt, audioPts?.split(' ').slice(3));
+    const videoPts = (sdp as string).match(/m=video.*/)?.[0];
+    addPts(videoPt, videoPts?.split(' ').slice(3));
+
     const u = new URL(url);
     if (!u.protocol.startsWith('tcp'))
       throw new Error('rfc4751 url must be tcp');
@@ -1008,10 +1019,10 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
         const length = header.readInt16BE(0);
         const data = await readLength(socket, length);
         const pt = data[1] & 0x7f;
-        if (pt === audioPt) {
+        if (audioPt.has(pt)) {
           rtsp.sendAudio(data, false);
         }
-        else if (pt === videoPt) {
+        else if (videoPt.has(pt)) {
           rtsp.sendVideo(data, false);
         }
         else {
