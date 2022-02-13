@@ -1,6 +1,6 @@
 import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger } from "@scrypted/types";
 import { PluginAPI } from "./plugin-api";
-import { handleFunctionInvocations, PrimitiveProxyHandler, PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
+import {  PrimitiveProxyHandler, RpcPeer } from '../rpc';
 import { EventRegistry } from "../event-registry";
 import { allInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
 
@@ -24,7 +24,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         if (p === 'id')
             return this.id;
 
-        const handled = handleFunctionInvocations(this, target, p, receiver);
+        const handled = RpcPeer.handleFunctionInvocations(this, target, p, receiver);
         if (handled)
             return handled;
 
@@ -96,10 +96,10 @@ class EventListenerRegisterImpl implements EventListenerRegister {
 
 function makeOneWayCallback<T>(input: T): T {
     const f: any = input;
-    const oneways: string[] = f[PROPERTY_PROXY_ONEWAY_METHODS] || [];
+    const oneways: string[] = f[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] || [];
     if (!oneways.includes(null))
         oneways.push(null);
-    f[PROPERTY_PROXY_ONEWAY_METHODS] = oneways;
+    f[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = oneways;
     return input;
 }
 

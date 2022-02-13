@@ -1,6 +1,8 @@
 import type { TranspileOptions } from "typescript";
 import sdk, { ScryptedDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
 import vm from "vm";
+import fs from 'fs';
+import { newThread } from '../../server/src/threading';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -20,16 +22,43 @@ function tsCompile(source: string, options: TranspileOptions = null): string {
     return ts.transpileModule(source, options).outputText;
 }
 
-const scryptedTypesDefs = require('!!raw-loader!@scrypted/sdk/types/index.d.ts').default;
-const scryptedIndexDefs = require('!!raw-loader!@scrypted/sdk/index.d.ts').default;
+async function tsCompileThread(source: string, options: TranspileOptions = null): Promise<string> {
+    return newThread({
+        source, options,
+        customRequire: '__webpack_require__',
+    }, ({ source, options }) => {
+        const ts = global.require("typescript");
+        const { ScriptTarget } = ts;
+
+        // Default options -- you could also perform a merge, or use the project tsconfig.json
+        if (null === options) {
+            options = {
+                compilerOptions: {
+                    target: ScriptTarget.ESNext,
+                    module: ts.ModuleKind.CommonJS
+                }
+            };
+        }
+        return ts.transpileModule(source, options).outputText;
+    });
+}
+
+function getTypeDefs() {
+    const scryptedTypesDefs = fs.readFileSync('sdk/types.d.ts').toString();
+    const scryptedIndexDefs = fs.readFileSync('sdk/index.d.ts').toString();
+    return {
+        scryptedIndexDefs,
+        scryptedTypesDefs,
+    };
+}
 
 export async function scryptedEval(device: ScryptedDeviceBase, script: string, extraLibs: { [lib: string]: string }, params: { [name: string]: any }) {
     try {
         const libs = Object.assign({
-            types: scryptedTypesDefs,
+            types: getTypeDefs().scryptedTypesDefs,
         }, extraLibs);
         const allScripts = Object.values(libs).join('\n').toString() + script;
-        const compiled = tsCompile(allScripts);
+        const compiled = await tsCompileThread(allScripts);
 
         const allParams = Object.assign({}, params, {
             systemManager,
@@ -74,10 +103,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 }
 
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
-    const libs = Object.assign({
-        types: scryptedTypesDefs,
-        sdk: scryptedIndexDefs,
-    }, extraLibs);
+    const libs = Object.assign(getTypeDefs(), extraLibs);
 
     function monacoEvalDefaultsFunction(monaco, libs) {
         monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(

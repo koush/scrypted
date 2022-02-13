@@ -50,6 +50,7 @@ export class PluginHost {
     kill() {
         this.killed = true;
         this.api.removeListeners();
+        this.peer.kill('plugin killed');
         this.worker.kill();
         this.io.close();
         for (const s of Object.values(this.ws)) {
@@ -60,14 +61,7 @@ export class PluginHost {
         const deviceIds = new Set<string>(Object.values(this.scrypted.pluginDevices).filter(d => d.pluginId === this.pluginId).map(d => d._id));
         this.scrypted.invalidateMixins(deviceIds);
 
-        this.consoleServer?.then(server => {
-            server.readServer.close();
-            server.writeServer.close();
-            for (const s of server.sockets) {
-                s.destroy();
-            }
-        });
-        setTimeout(() => this.peer.kill('plugin killed'), 500);
+        this.consoleServer.then(server => server.destroy());
     }
 
     toString() {
@@ -272,21 +266,26 @@ export class PluginHost {
             pluginConsole.log('starting plugin', this.pluginId, this.packageJson.version);
         });
 
-        this.worker.on('close', () => {
+        const disconnect = () => {
             connected = false;
+            this.peer.kill('plugin disconnected');
+        };
+
+        this.worker.on('close', () => {
             logger.log('e', `${this.pluginName} close`);
+            disconnect();
         });
         this.worker.on('disconnect', () => {
-            connected = false;
             logger.log('e', `${this.pluginName} disconnected`);
+            disconnect();
         });
         this.worker.on('exit', async (code, signal) => {
-            connected = false;
             logger.log('e', `${this.pluginName} exited ${code} ${signal}`);
+            disconnect();
         });
         this.worker.on('error', e => {
-            connected = false;
             logger.log('e', `${this.pluginName} error ${e}`);
+            disconnect();
         });
 
         this.peer.onOob = (oob: any) => {

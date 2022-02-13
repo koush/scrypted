@@ -101,6 +101,10 @@ export class RtspServer {
         return this.handleSetup();
     }
 
+    async handleTeardown() {
+        return this.handleSetup();
+    }
+
     async *handleRecord(): AsyncGenerator<{
         type: 'audio' | 'video',
         rtcp: boolean,
@@ -243,7 +247,7 @@ export class RtspServer {
         }
 
         await this[method](url, requestHeaders);
-        return method !== 'play' && method !== 'record';
+        return method !== 'play' && method !== 'record' && method !== 'teardown';
     }
 
     respond(code: number, message: string, requestHeaders: Headers, headers: Headers, buffer?: Buffer) {

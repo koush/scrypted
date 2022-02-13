@@ -10,9 +10,7 @@ export interface ConsoleServer {
     pluginConsole: Console;
     readPort: number,
     writePort: number,
-    readServer: net.Server,
-    writeServer: net.Server,
-    sockets: Set<net.Socket>;
+    destroy(): void;
 }
 
 export interface StdPassThroughs {
@@ -129,11 +127,22 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
     const writePort = await listenZero(writeServer);
 
     return {
+        destroy() {
+            for (const socket of sockets) {
+                socket.destroy();
+            }
+            sockets.clear();
+            outputs.clear();
+
+            try {
+                readServer.close();
+                writeServer.close();
+            }
+            catch (e) {
+            }
+        },
         pluginConsole,
         readPort,
         writePort,
-        readServer,
-        writeServer,
-        sockets,
     };
 }

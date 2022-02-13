@@ -1,13 +1,13 @@
 import { HttpResponse, HttpResponseOptions } from "@scrypted/types";
 import { Response } from "express";
 import mime from "mime";
-import { PROPERTY_PROXY_ONEWAY_METHODS } from "./rpc";
+import { RpcPeer } from "./rpc";
 import { join as pathJoin } from 'path';
 import fs from 'fs';
 
 export function createResponseInterface(res: Response, unzippedDir: string): HttpResponse {
     class HttpResponseImpl implements HttpResponse {
-        [PROPERTY_PROXY_ONEWAY_METHODS] = [
+        [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
             'send',
             'sendFile',
         ];

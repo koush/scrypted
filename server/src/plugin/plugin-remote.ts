@@ -4,7 +4,7 @@ import path from 'path';
 import { ScryptedNativeId, DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/types'
 import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { SystemManagerImpl } from './system';
-import { RpcPeer, RPCResultError, PROPERTY_PROXY_ONEWAY_METHODS, PROPERTY_JSON_DISABLE_SERIALIZATION } from '../rpc';
+import { RpcPeer, RPCResultError } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
 import fs from 'fs';
@@ -361,9 +361,9 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
         const localStorage = new StorageImpl(deviceManager, undefined);
 
-        const remote: PluginRemote & { [PROPERTY_JSON_DISABLE_SERIALIZATION]: boolean, [PROPERTY_PROXY_ONEWAY_METHODS]: string[] } = {
-            [PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
-            [PROPERTY_PROXY_ONEWAY_METHODS]: [
+        const remote: PluginRemote & { [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: boolean, [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS]: string[] } = {
+            [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
+            [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS]: [
                 'notify',
                 'updateDeviceState',
                 'setSystemState',

@@ -2,7 +2,7 @@ import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegist
 import { ScryptedRuntime } from "../runtime";
 import { PluginDevice } from "../db-types";
 import { MixinProvider } from "@scrypted/types";
-import { handleFunctionInvocations, PrimitiveProxyHandler } from "../rpc";
+import { RpcPeer, PrimitiveProxyHandler } from "../rpc";
 import { getState } from "../state";
 import { getDisplayType } from "../infer-defaults";
 import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
@@ -285,7 +285,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
     get(target: any, p: PropertyKey, receiver: any): any {
         if (p === 'constructor')
             return;
-        const handled = handleFunctionInvocations(this, target, p, receiver);
+        const handled = RpcPeer.handleFunctionInvocations(this, target, p, receiver);
         if (handled)
             return handled;
         const pluginDevice = this.scrypted.findPluginDeviceById(this.id);

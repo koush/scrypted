@@ -16,7 +16,6 @@ export interface RuntimeWorker {
     kill(): void;
 
     on(event: 'error', listener: (err: Error) => void): this;
-    on(event: 'error', listener: (err: Error) => void): this;
     on(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
     on(event: 'disconnect', listener: () => void): this;
     on(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;

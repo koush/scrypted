@@ -1,4 +1,5 @@
-import { Readable } from "stream";
+import { Readable } from 'stream';
+import { once } from 'events';
 
 export async function readLength(readable: Readable, length: number): Promise<Buffer> {
     if (!length) {
@@ -54,4 +55,15 @@ export async function readUntil(readable: Readable, charCode: number) {
 
 export async function readLine(readable: Readable) {
   return readUntil(readable, CHARCODE_NEWLINE);
+}
+
+export async function readString(readable: Readable | Promise<Readable>) {
+  let data = '';
+  readable = await readable;
+  readable.on('data', buffer => {
+    data += buffer.toString();
+  });
+  readable.resume();
+  await once(readable, 'end')
+  return data;
 }

@@ -6,12 +6,12 @@ import { Logger } from '../logger';
 import { getState } from '../state';
 import { PluginHost } from './plugin-host';
 import debounce from 'lodash/debounce';
-import { PROPERTY_PROXY_ONEWAY_METHODS } from '../rpc';
+import { RpcPeer } from '../rpc';
 
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;
 
-    [PROPERTY_PROXY_ONEWAY_METHODS] = [
+    [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
         'onMixinEvent',
         'onDeviceEvent',
         'setStorage',

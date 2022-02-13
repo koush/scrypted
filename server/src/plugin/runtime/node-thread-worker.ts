@@ -1,4 +1,3 @@
-import { Readable } from "stream";
 import { EventEmitter } from "ws";
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { RuntimeWorker, RuntimeWorkerOptions } from "./runtime-worker";
