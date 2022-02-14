@@ -240,7 +240,7 @@ export class RtspServer {
     }
 
     sendVideo(packet: Buffer, rtcp: boolean) {
-        if (this.udp) {
+        if (this.udp && this.udpPorts.video) {
             this.sendUdp(this.udpPorts.video, packet, rtcp)
         }
         else {
@@ -249,7 +249,7 @@ export class RtspServer {
     }
 
     sendAudio(packet: Buffer, rtcp: boolean) {
-        if (this.udp) {
+        if (this.udp && this.udpPorts.audio) {
             this.sendUdp(this.udpPorts.audio, packet, rtcp)
         }
         else {
