@@ -88,7 +88,7 @@ class EndpointManagerImpl implements EndpointManager {
     }
     async getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         const local = await this.getPublicLocalEndpoint(nativeId);
-        const mo = this.mediaManager.createMediaObject(local, ScryptedMimeTypes.LocalUrl);
+        const mo = this.mediaManager.createMediaObject(Buffer.from(local), ScryptedMimeTypes.LocalUrl);
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     }
     async getPublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {

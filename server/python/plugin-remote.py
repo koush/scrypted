@@ -25,6 +25,7 @@ import shutil
 import gc
 import threading
 import gi
+import resource
 gi.require_version('Gst', '1.0')
 
 from gi.repository import Gst, GLib
@@ -315,6 +316,23 @@ async def async_main(loop: AbstractEventLoop):
     peer.params['print'] = print
     peer.params['getRemote'] = lambda api, pluginId: PluginRemote(
         api, pluginId, loop)
+
+    def oob_runner():
+        ptime = round(time.process_time() * 1000000)
+        heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        oob = {
+            'type': 'stats',
+            'cpuUsage': {
+                'user': ptime,
+                'system': 0,
+            },
+            'memoryUsage': {
+                'heapTotal': heapTotal,
+            },
+        }
+        peer.sendOob(oob)
+        loop.call_later(10, oob_runner)
+    oob_runner()
 
     await readLoop(loop, peer, reader)
 

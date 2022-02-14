@@ -370,3 +370,9 @@ class RpcPeer:
             }
             self.send(paramMessage, reject)
         return await self.createPendingResult(send)
+
+    def sendOob(self, oob: Any):
+        self.send({
+            'type': 'oob',
+            'oob': oob,
+        })
