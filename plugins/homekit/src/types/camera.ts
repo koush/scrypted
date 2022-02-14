@@ -320,6 +320,7 @@ addSupportedType({
 
                         // homekit live streaming seems extremely picky about aac output.
                         // so currently always transcode audio.
+                        let hasAudio = true;
                         if (false && !transcodeStreaming) {
                             args.push(
                                 "-acodec", "copy",
@@ -329,7 +330,8 @@ addSupportedType({
                             args.push(
                                 '-acodec', ...(audioCodec === AudioStreamingCodecType.OPUS ?
                                     [
-                                        'libopus', '-application', 'lowdelay',
+                                        'libopus',
+                                        '-application', 'lowdelay',
                                         '-frame_duration', (request as StartStreamRequest).audio.packet_time.toString(),
                                     ] :
                                     ['libfdk_aac', '-profile:a', 'aac_eld']),
@@ -338,6 +340,14 @@ addSupportedType({
                                 '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
                                 "-bufsize", `${(request as StartStreamRequest).audio.max_bit_rate * 4}k`,
                                 '-ac', `${(request as StartStreamRequest).audio.channel}`,
+                            )
+                        }
+                        else {
+                            hasAudio = false;
+                            console.warn(device.name, 'unknown audio codec, audio will not be streamed.', request);
+                        }
+                        if (hasAudio) {
+                            args.push(
                                 "-payload_type",
                                 (request as StartStreamRequest).audio.pt.toString(),
                                 "-ssrc", session.audiossrc.toString(),
@@ -349,9 +359,6 @@ addSupportedType({
                                 "-f", "rtp",
                                 `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
                             )
-                        }
-                        else {
-                            console.warn(device.name, 'unknown audio codec, audio will not be streamed.', request);
                         }
                     }
 
@@ -610,7 +617,7 @@ addSupportedType({
                 bindCharacteristic(device, ScryptedInterface.OnOff, controller.cameraOperatingModeService, Characteristic.CameraOperatingModeIndicator, () => {
                     if (!linkStatusIndicator)
                         return storage.getItem(property) === 'true' ? 1 : 0;
-                    
+
                     return device.on ? 1 : 0;
                 });
                 indicator.on(CharacteristicEventTypes.SET, (value, callback) => {
