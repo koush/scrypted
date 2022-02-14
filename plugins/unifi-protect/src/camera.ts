@@ -1,5 +1,5 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff } from "@scrypted/sdk";
-import { ProtectCameraChannelConfig, ProtectCameraConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "@koush/unifi-protect";
+import { ProtectCameraChannelConfig, ProtectCameraConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import { fitHeightToWidth } from "../../../common/src/resolution-utils";
@@ -9,10 +9,13 @@ import WS from 'ws';
 import { once } from "events";
 import { FeatureFlagsShim } from "./shim";
 import { UnifiProtect } from "./main";
+import fs from 'fs';
 
 const { log, deviceManager, mediaManager } = sdk;
 
 export const defaultSensorTimeout = 30;
+
+const unavailable = fs.readFileSync('unavailable.jpg');
 
 export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor {
     constructor(public camera: UnifiCamera, nativeId: string) {
@@ -184,7 +187,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/events/${detectionId}/thumbnail`;
         const response = await this.protect.api.fetch(url);
         if (!response) {
-            throw new Error('Unifi Protect login refresh failed.');
+            throw new Error('Event snapshot unavailable.');
         }
         const data = await response.arrayBuffer();
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
@@ -289,9 +292,8 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/${suffix}?ts=${Date.now()}${size}`
 
         const response = await this.protect.loginFetch(url);
-        if (!response) {
-            throw new Error('Unifi Protect login refresh failed.');
-        }
+        if (!response)
+            return unavailable;
         const data = await response.arrayBuffer();
         return Buffer.from(data);
     }

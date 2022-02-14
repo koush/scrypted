@@ -1,6 +1,6 @@
 import { ScryptedDeviceBase, MotionSensor, TemperatureUnit, OnOff, Brightness } from "@scrypted/sdk";
 import { UnifiProtect } from "./main";
-import { ProtectLightConfig } from "@koush/unifi-protect";
+import { ProtectLightConfig } from "./unifi-protect";
 
 export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness, MotionSensor {
     constructor(public protect: UnifiProtect, nativeId: string, protectLight: Readonly<ProtectLightConfig>) {

@@ -1,5 +1,5 @@
 import { ScryptedDeviceBase, MotionSensor, BinarySensor, AudioSensor, HumiditySensor, Thermometer, TemperatureUnit } from "@scrypted/sdk";
-import { ProtectSensorConfig } from "@koush/unifi-protect";
+import { ProtectSensorConfig } from "./unifi-protect";
 import { UnifiProtect } from "./main";
 
 export class UnifiSensor extends ScryptedDeviceBase implements Thermometer, HumiditySensor, AudioSensor, BinarySensor, MotionSensor {

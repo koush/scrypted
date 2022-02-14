@@ -1,5 +1,5 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, Device, ScryptedInterface, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
-import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "@koush/unifi-protect";
+import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
 import { recommendRebroadcast } from "../../rtsp/src/recommend";
 import { RequestInfo, RequestInit, Response } from "node-fetch-cjs";

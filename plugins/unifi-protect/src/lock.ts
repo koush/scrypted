@@ -1,6 +1,6 @@
 import { ScryptedDeviceBase, Lock, LockState } from "@scrypted/sdk";
 import { UnifiProtect } from "./main";
-import { ProtectDoorLockConfig } from "@koush/unifi-protect";
+import { ProtectDoorLockConfig } from "./unifi-protect";
 
 export class UnifiLock extends ScryptedDeviceBase implements Lock {
     constructor(public protect: UnifiProtect, nativeId: string, protectLock: Readonly<ProtectDoorLockConfig>) {
