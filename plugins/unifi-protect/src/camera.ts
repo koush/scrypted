@@ -310,7 +310,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const vsos = await this.getVideoStreamOptions();
         const vso = vsos.find(check => check.id === options?.id) || this.getDefaultStream(vsos);
 
-        const rtspChannel = camera.channels.find(check => check.id === vso.id);
+        const rtspChannel = camera.channels.find(check => check.id.toString() === vso.id);
 
         const { rtspAlias } = rtspChannel;
         const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
@@ -328,7 +328,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
     createMediaStreamOptions(channel: ProtectCameraChannelConfig) {
         const ret: MediaStreamOptions = {
-            id: channel.id,
+            id: channel.id.toString(),
             name: channel.name,
             video: {
                 codec: 'h264',
@@ -361,7 +361,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             return;
 
         const camera = this.findCamera();
-        const channel = camera.channels.find(channel => channel.id === options.id);
+        const channel = camera.channels.find(channel => channel.id.toString() === options.id);
 
         const sanitizedBitrate = Math.min(channel.maxBitrate, Math.max(channel.minBitrate, bitrate));
         this.console.log('bitrate change requested', bitrate, 'clamped to', sanitizedBitrate);
