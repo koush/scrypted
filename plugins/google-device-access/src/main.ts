@@ -16,7 +16,7 @@ const refreshFrequency = 60;
 
 const SdmSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/';
 const SdmDeviceSignalingPrefix = SdmSignalingPrefix + 'x-';
-const black = fs.readFileSync('black.jpg');
+const black = fs.readFileSync('unavailable.jpg');
 
 const readmeV1 = fs.readFileSync('README-camera-v1.md').toString();
 const readmeV2 = fs.readFileSync('README-camera-v2.md').toString();
