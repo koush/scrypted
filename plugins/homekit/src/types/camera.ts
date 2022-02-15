@@ -240,7 +240,8 @@ addSupportedType({
                     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
                     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
-                    const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
+                    const mso = ffmpegInput.mediaStreamOptions;
+                    const noAudio = mso?.audio === null;
                     const args: string[] = [
                         '-hide_banner',
                     ];
@@ -319,9 +320,19 @@ addSupportedType({
                         );
 
                         // homekit live streaming seems extremely picky about aac output.
-                        // so currently always transcode audio.
+                        // be extremely sure that this is compatible.
+                        const matchAac = audioCodec === AudioStreamingCodecType.AAC_ELD
+                            && mso?.audio?.codec === 'aac'
+                            && mso?.audio?.encoder === 'libfdk_aac';
+
+                        const matchOpus = audioCodec === AudioStreamingCodecType.OPUS
+                            && mso?.audio?.codec === 'opus'
+                            && mso?.audio?.encoder === 'opusenc';
+
                         let hasAudio = true;
-                        if (false && !transcodeStreaming) {
+                        if (!transcodeStreaming
+                            && (matchAac || matchOpus)
+                            && mso?.tool === 'scrypted') {
                             args.push(
                                 "-acodec", "copy",
                             );
