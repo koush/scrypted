@@ -57,7 +57,6 @@ class PipelineValve:
 
     def open(self):
         with self.mutex:
-            print("open", self.name)
             if self.probe != None:
                 self.pad.remove_probe(self.probe)
                 self.probe = None
@@ -67,7 +66,6 @@ class PipelineValve:
                 self.pad.remove_probe(self.probe)
                 self.probe = None
             def probe(pad, info):
-                print("block", self.name)
                 return Gst.PadProbeReturn.OK
 
             self.probe = self.pad.add_probe(Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
