@@ -6,8 +6,6 @@ then
     exit 1
 fi
 
-set -x
-
 RUN() {
     $@
     if [ "$?" != "0" ]
