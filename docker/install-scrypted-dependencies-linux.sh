@@ -6,11 +6,10 @@ then
     exit 1
 fi
 
-set -x
-
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
+    echo "Running: $@"
     $@
     if [ "$?" != "0" ]
     then
