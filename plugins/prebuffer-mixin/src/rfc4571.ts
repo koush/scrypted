@@ -75,8 +75,8 @@ export async function startRFC4571Parser(socket: net.Socket, sdp: string, mediaS
 
     return {
         sdp: Promise.resolve([Buffer.from(sdp)]),
-        inputAudioCodec: 'pcm',
-        inputVideoCodec: 'h264',
+        inputAudioCodec: mediaStreamOptions.audio.codec,
+        inputVideoCodec: mediaStreamOptions.video.codec,
         inputVideoResolution: undefined,
         isActive() { return isActive },
         kill,

@@ -671,6 +671,7 @@ class PrebufferSession {
 
     const { reencodeAudio } = this.getAudioConfig();
 
+    let codecCopy = false;
     if (!rtspMode || container !== 'rtsp') {
       if (this.audioDisabled) {
         mediaStreamOptions.audio = null;
@@ -683,16 +684,25 @@ class PrebufferSession {
         }
       }
       else {
-        mediaStreamOptions.audio = {
-          codec: session?.inputAudioCodec,
-        }
+        codecCopy = true;
       }
     }
     else {
       // rtsp mode never transcodes.
-      mediaStreamOptions.audio = {
-        codec: session?.inputAudioCodec,
-      }
+      codecCopy = true;
+    }
+
+    if (codecCopy) {
+        // reported codecs may be wrong/cached/etc, so before blindly copying the audio codec info,
+        // verify what was found.
+        if (session?.mediaStreamOptions?.audio?.codec === session?.inputAudioCodec) {
+          mediaStreamOptions.audio = session?.mediaStreamOptions?.audio;
+        }
+        else {
+          mediaStreamOptions.audio = {
+            codec: session?.inputAudioCodec,
+          }
+        }
     }
 
     if (mediaStreamOptions.video && session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
