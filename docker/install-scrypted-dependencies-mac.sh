@@ -7,6 +7,7 @@ then
 fi
 
 RUN() {
+    echo "Running: $@"
     $@
     if [ "$?" != "0" ]
     then
