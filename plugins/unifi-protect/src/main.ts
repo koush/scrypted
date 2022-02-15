@@ -75,6 +75,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         if (!updatePacket)
             return;
 
+        // this.console.log('updatePacket', updatePacket);
+
         const unifiDevice = this.handleUpdatePacket(updatePacket);
 
         switch (updatePacket.action.modelKey) {
@@ -226,7 +228,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         try {
-            this.api.eventListener?.removeListener('message', this.listener);
+            this.api.eventsWs?.removeListener('message', this.listener);
             if (!await this.api.refreshDevices()) {
                 this.console.log('refresh failed, trying again in 10 seconds.');
                 setTimeout(() => {
@@ -234,8 +236,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 }, 10000);
                 return;
             }
-            this.api.eventListener?.on('message', this.listener);
-            this.api.eventListener?.on('close', async () => {
+            this.api.eventsWs?.on('message', this.listener);
+            this.api.eventsWs?.on('close', async () => {
                 this.console.error('Event Listener closed. Reconnecting in 10 seconds.');
                 await new Promise(resolve => setTimeout(resolve, 10000));
                 this.discoverDevices(0);
