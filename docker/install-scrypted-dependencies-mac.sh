@@ -29,6 +29,8 @@ RUN pip3 install aiofiles debugpy typing_extensions typing opencv-python
 echo "Installing Scrypted..."
 RUN npx -y scrypted install-server
 
+echo "Installing Scrypted Launch Agent..."
+
 RUN mkdir -p ~/Library/LaunchAgents
 
 NPX_PATH=$(which npx)
