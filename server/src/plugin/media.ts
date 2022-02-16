@@ -12,6 +12,7 @@ import Graph from 'node-dijkstra';
 import MimeType from 'whatwg-mimetype';
 import axios from 'axios';
 import https from 'https';
+import rimraf from "rimraf";
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -117,21 +118,25 @@ export abstract class MediaManagerBase implements MediaManager {
                 args.push(...ffInput.inputArguments);
 
                 const tmpfile = tmp.fileSync();
-                args.push('-y', "-vframes", "1", '-f', 'image2', tmpfile.name);
+                try {
+                    args.push('-y', "-vframes", "1", '-f', 'image2', tmpfile.name);
 
-                const cp = child_process.spawn(await this.getFFmpegPath(), args);
-                ffmpegLogInitialOutput(console, cp);
-                cp.on('error', (code) => {
-                    console.error('ffmpeg error code', code);
-                })
-                const to = setTimeout(() => {
-                    console.log('ffmpeg stream to image convesion timed out.');
-                    cp.kill('SIGKILL');
-                }, 10000);
-                await once(cp, 'exit');
-                clearTimeout(to);
-                const ret = fs.readFileSync(tmpfile.name);
-                return ret;
+                    const cp = child_process.spawn(await this.getFFmpegPath(), args);
+                    ffmpegLogInitialOutput(console, cp);
+                    cp.on('error', (code) => {
+                        console.error('ffmpeg error code', code);
+                    })
+                    const to = setTimeout(() => {
+                        console.log('ffmpeg stream to image convesion timed out.');
+                        cp.kill('SIGKILL');
+                    }, 10000);
+                    await once(cp, 'exit');
+                    clearTimeout(to);
+                    return fs.readFileSync(tmpfile.name);
+                }
+                finally {
+                    rimraf.sync(tmpfile.name);
+                }
             }
         });
     }
