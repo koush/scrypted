@@ -421,8 +421,9 @@ class PrebufferSession {
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
+    const canUseScryptedParser = rtspMode && isRfc4571 && !mp4Mode;
 
-    if (rtspMode && isRfc4571 && !mp4Mode) {
+    if (canUseScryptedParser) {
 
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
@@ -435,7 +436,7 @@ class PrebufferSession {
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
       sessionMso = ffmpegInput.mediaStreamOptions;
 
-      if (ffmpegInput.mediaStreamOptions?.container === 'rtsp' && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
+      if (canUseScryptedParser && ffmpegInput.mediaStreamOptions?.container === 'rtsp' && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
         const rtspClient = new RtspClient(ffmpegInput.url);
         await rtspClient.options();
         const sdpResponse = await rtspClient.describe();
@@ -594,7 +595,7 @@ class PrebufferSession {
         socketPromise = client.clientPromise.then(async (socket) => {
           let sdp = await this.sdp;
           const server = new RtspServer(socket, sdp);
-          server.console = this.console;
+          //server.console = this.console;
           await server.handlePlayback();
           return socket;
         })
@@ -1031,7 +1032,7 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
 
     clientPromise.then(async (client) => {
       const rtsp = new RtspServer(client, sdp);
-      rtsp.console = this.console;
+      //rtsp.console = this.console;
       await rtsp.handlePlayback();
       const socket = net.connect(parseInt(u.port), u.hostname);
 
