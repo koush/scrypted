@@ -1,5 +1,5 @@
 
-import { MotionSensor, BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, HumiditySensor, AudioSensor, AmbientLightSensor, OccupancySensor } from '@scrypted/sdk'
+import { MotionSensor, BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, HumiditySensor, AudioSensor, AmbientLightSensor, OccupancySensor, FloodSensor } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -13,6 +13,7 @@ const supportedSensors: string[] = [
     ScryptedInterface.MotionSensor,
     ScryptedInterface.Thermometer,
     ScryptedInterface.HumiditySensor,
+    ScryptedInterface.FloodSensor,
 ];
 
 addSupportedType({
@@ -24,7 +25,7 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor) => {
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor) => {
         const accessory = makeAccessory(device);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
@@ -67,6 +68,12 @@ addSupportedType({
             const service = accessory.addService(Service.HumiditySensor, device.name);
             bindCharacteristic(device, ScryptedInterface.HumiditySensor, service, Characteristic.CurrentRelativeHumidity,
                 () => device.humidity || 0);
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.FloodSensor)) {
+            const service = accessory.addService(Service.LeakSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.FloodSensor, service, Characteristic.LeakDetected,
+                () => !!device.flooded);
         }
 
         // todo: more sensors.
