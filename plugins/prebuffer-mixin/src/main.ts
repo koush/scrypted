@@ -421,9 +421,9 @@ class PrebufferSession {
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
-    const canUseScryptedParser = rtspMode && isRfc4571 && !mp4Mode;
+    const canUseScryptedParser = rtspMode && !mp4Mode;
 
-    if (canUseScryptedParser) {
+    if (canUseScryptedParser && isRfc4571) {
 
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
@@ -581,7 +581,7 @@ class PrebufferSession {
     const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) !== 'false';
     const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5 : 0);
 
-    this.console.log(this.streamName, 'prebuffer request started');
+    this.console.log(this.streamName, 'client request started');
 
     const createContainerServer = async (container: PrebufferParsers) => {
       const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
@@ -625,7 +625,7 @@ class PrebufferSession {
 
           const cleanup = () => {
             destroy();
-            this.console.log(this.streamName, 'prebuffer request ended');
+            this.console.log(this.streamName, 'client request ended');
             session.removeListener(container, safeWriteData);
             session.removeListener('killed', cleanup);
           }
@@ -954,14 +954,14 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   release() {
-    this.console.log('prebuffer releasing if started');
+    this.console.log('prebuffer session releasing if started');
     this.released = true;
     for (const session of this.sessions.values()) {
       if (!session)
         continue;
       session.clearPrebuffers();
       session.parserSessionPromise?.then(parserSession => {
-        this.console.log('prebuffer released');
+        this.console.log('prebuffer session released');
         parserSession.kill();
         session.clearPrebuffers();
       });
