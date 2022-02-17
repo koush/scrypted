@@ -19,6 +19,8 @@ const { mediaManager, deviceManager } = sdk;
 const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
 const v4v6Regex = /^::ffff:[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/;
 
+export const CAMERA_STREAM_FORCE_OPUS = false;
+
 
 async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket, port: number }> {
     const socket = dgram.createSocket(socketType || 'udp4');
@@ -196,7 +198,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             tryReconfigureBitrate();
 
             try {
-                if (false) {
+                if (CAMERA_STREAM_FORCE_OPUS) {
                     await startCameraStreamSrtp(device, console, selectedStream, session, () => killSession(request.sessionID));
                 }
                 else {

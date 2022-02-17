@@ -8,7 +8,7 @@ import sdk from '@scrypted/sdk';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 
-import { createCameraStreamingDelegate } from './camera/camera-streaming';
+import { CAMERA_STREAM_FORCE_OPUS, createCameraStreamingDelegate } from './camera/camera-streaming';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -29,7 +29,7 @@ addSupportedType({
         // that's what the talkback ffmpeg session in rtp-ffmpeg-input.ts will use.
         for (const type of [
             AudioStreamingCodecType.OPUS,
-            AudioStreamingCodecType.AAC_ELD
+            ...(CAMERA_STREAM_FORCE_OPUS ? [] : [AudioStreamingCodecType.AAC_ELD])
         ]) {
             for (const samplerate of [AudioStreamingSamplerate.KHZ_8, AudioStreamingSamplerate.KHZ_16, AudioStreamingSamplerate.KHZ_24]) {
                 codecs.push({

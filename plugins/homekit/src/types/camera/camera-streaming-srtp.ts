@@ -101,7 +101,7 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
                 firstTimestamp = rtp.header.timestamp;
 
             if (audioPt.has(rtp.header.payloadType)) {
-                rtp.header.timestamp = firstTimestamp + packetCount * 3 * 160;
+                //rtp.header.timestamp = firstTimestamp + packetCount * 3 * 160;
             }
 
             lastTimestamp = rtp.header.timestamp;
