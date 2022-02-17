@@ -179,7 +179,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     video: {
                     },
                 }, selectedStream || {});
-                const bitrate = 10000000;//request.video.max_bit_rate * 1000;
+                const bitrate = request.video.max_bit_rate * 1000;
                 reconfigured.video.bitrate = bitrate;
 
                 device.setVideoStreamOptions(reconfigured);
