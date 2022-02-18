@@ -103,7 +103,9 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
             if (audioPt.has(rtp.header.payloadType)) {
                 // from HAP spec:
                 // RTP Payload Format for Opus Speech and Audio Codec RFC 7587 with an exception
-                // that Opus audio RTP Timestamp shall be based on RFC 3550
+                // that Opus audio RTP Timestamp shall be based on RFC 3550.
+                /// RFC 3550 indicates that 24k audio (which is what HAP requests),
+                // should have an interval of 480.
                 rtp.header.timestamp = firstTimestamp + packetCount * 480;
             }
 
