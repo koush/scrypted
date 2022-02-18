@@ -1,4 +1,4 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MixinProvider, Refresh, RequestMediaStreamOptions, RTCAVMessage, RTCAVSignalingOfferSetup, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
+import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MixinProvider, Refresh, RequestMediaStreamOptions, RTCAVMessage, RTCAVSignalingSetup, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
 import { supportedTypes } from './common';
@@ -16,14 +16,14 @@ import { canAccess } from './commands/camerastream';
 import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
 import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
-import { addBuiltins, startRTCPeerConnection } from "../../../common/src/wrtc-convertors";
+import { addBuiltins, startRTCPeerConnection } from "../../../common/src/ffmpeg-to-wrtc";
 
 import ciao, { Protocol } from '@homebridge/ciao';
 
 const responder = ciao.getResponder();
 
 const { systemManager, mediaManager, endpointManager, deviceManager } = sdk;
-addBuiltins(console, mediaManager);
+addBuiltins(mediaManager);
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -201,7 +201,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 return;
             }
 
-            let setup: RTCAVSignalingOfferSetup;
+            let setup: RTCAVSignalingSetup;
 
             const msos = await camera.getVideoStreamOptions();
             const found = msos.find(mso => mso.container?.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) as RequestMediaStreamOptions;
@@ -217,26 +217,29 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                     const { offer } = json;
 
                     const mo = mediaManager.createMediaObject(Buffer.from(JSON.stringify(offer)), ScryptedMimeTypes.RTCAVOffer)
-                    const answer = await mediaManager.convertMediaObjectToBuffer(mo, setup.signalingMimeType);
+                    const answer = await mediaManager.convertMediaObjectToBuffer(mo, undefined);
                     ws.send(answer.toString());
                 }
             }
             else {
                 setup = {
+                    type: 'offer',
                     audio: {
                         direction: 'recvonly',
                     },
                     video: {
                         direction: 'recvonly',
                     },
-                    signalingMimeType: undefined,
                 }
 
                 ws.onmessage = async (message) => {
                     ws.onmessage = undefined;
                     const json = JSON.parse(message.data as string);
                     const { offer } = json;
-                    const { pc, answer } = await startRTCPeerConnection(await camera.getVideoStream(), offer);
+                    // chromecast and nest hub are super underpowered so cap the width
+                    const { pc, answer } = await startRTCPeerConnection(await camera.getVideoStream(), offer, {
+                        maxWidth: 960,
+                    });
                     ws.send(JSON.stringify(answer));
                 }
             }
