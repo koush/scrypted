@@ -8,3 +8,5 @@ scrypted.db.bak
 .exit
 .update
 __pycache__
+.venv
+.vscode
