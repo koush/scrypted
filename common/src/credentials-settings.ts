@@ -1,4 +1,4 @@
-import { ScryptedDeviceBase, Setting } from "../../server/node_modules/@scrypted/sdk";
+import { ScryptedDeviceBase, Setting } from "@scrypted/sdk";
 
 export interface CredentailSettingsOptions {
     userTitle?: string;

@@ -1,6 +1,5 @@
 import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 
-
 const { systemManager } = sdk;
 
 function parseValue(value: string, type: SettingValue, defaultValue: any) {
