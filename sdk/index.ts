@@ -1,7 +1,7 @@
-export * from './types'
-import { ScryptedInterfaceProperty, DeviceBase } from './types';
-import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager, EventListenerRegister } from './types';
-import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types';
+export * from './types/index'
+import { ScryptedInterfaceProperty, DeviceBase } from './types/index';
+import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager, EventListenerRegister } from './types/index';
+import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types/index';
 
 export class ScryptedDeviceBase extends DeviceBase {
   private _storage: Storage;

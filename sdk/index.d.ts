@@ -1,7 +1,7 @@
-export * from './types';
-import { DeviceBase } from './types';
-import type { ScryptedNativeId, EventListenerRegister } from './types';
-import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types';
+export * from './types/index';
+import { DeviceBase } from './types/index';
+import type { ScryptedNativeId, EventListenerRegister } from './types/index';
+import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types/index';
 export declare class ScryptedDeviceBase extends DeviceBase {
     nativeId?: string;
     private _storage;

@@ -1939,9 +1939,9 @@ export enum ScryptedInterface {
 export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidate) => Promise<void>;
 
 export interface RTCSignalingSession {
-  createLocalDescription: (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined|RTCSignalingSendIceCandidate) => Promise<RTCSessionDescription>;
-  setRemoteDescription: (description: RTCSessionDescription) => Promise<void>;
-  onIceCandidate: (candidate: RTCIceCandidate) => void;
+  createLocalDescription: (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined|RTCSignalingSendIceCandidate) => Promise<RTCSessionDescriptionInit>;
+  setRemoteDescription: (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => Promise<void>;
+  onIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
 }
 
 export interface RTCSignalingChannel {
@@ -1974,11 +1974,10 @@ export enum ScryptedMimeTypes {
   MediaStreamUrl = 'text/x-media-url',
   FFmpegInput = 'x-scrypted/x-ffmpeg-input',
   /**
-   * An RTC Signaling endpoint will handle x-scrypted-rtc-signaling-<unique-prefix>/x-<unique-suffix>.
-   * RTC clients can inspect the mime and try to convert it to an RTCAVOffer.
+   * An RTCSignalingChannel/VideoCamera will return x-scrypted-rtc-signaling-<unique-prefix>/x-<unique-suffix>.
+   * RTC clients can inspect the mime and convert the contents to a buffer containing the string device id.
    * If the client does not support WebRTC, it may try to convert it to an FFmpeg media object,
    * which should also be trapped and handled by the endpoint using its internal signaling.
-   * The RTC device will handle the full unique mime, and the plugin can catch all the unique prefix.
    */
   RTCAVSignalingPrefix = 'x-scrypted-rtc-signaling-',
   RTCAVOffer = 'x-scrypted/x-rtc-av-offer',

@@ -11,9 +11,9 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MixinDeviceBase = exports.ScryptedDeviceBase = void 0;
-__exportStar(require("./types"), exports);
-const types_1 = require("./types");
-class ScryptedDeviceBase extends types_1.DeviceBase {
+__exportStar(require("./types/index"), exports);
+const index_1 = require("./types/index");
+class ScryptedDeviceBase extends index_1.DeviceBase {
     constructor(nativeId) {
         super();
         this.nativeId = nativeId;
@@ -54,7 +54,7 @@ class ScryptedDeviceBase extends types_1.DeviceBase {
     }
 }
 exports.ScryptedDeviceBase = ScryptedDeviceBase;
-class MixinDeviceBase extends types_1.DeviceBase {
+class MixinDeviceBase extends index_1.DeviceBase {
     constructor(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId, _mixinStorageSuffix) {
         super();
         this.mixinDevice = mixinDevice;
@@ -112,7 +112,7 @@ exports.MixinDeviceBase = MixinDeviceBase;
             this._deviceState[state] = value;
         };
     }
-    for (var field of Object.values(types_1.ScryptedInterfaceProperty)) {
+    for (var field of Object.values(index_1.ScryptedInterfaceProperty)) {
         Object.defineProperty(ScryptedDeviceBase.prototype, field, {
             set: _createSetState(field),
             get: _createGetState(field),
