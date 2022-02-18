@@ -102,6 +102,7 @@ class ScryptedInterface(Enum):
     PowerSensor = "PowerSensor"
     Program = "Program"
     PushHandler = "PushHandler"
+    RTCSignalingChannel = "RTCSignalingChannel"
     Readme = "Readme"
     Refresh = "Refresh"
     Scene = "Scene"
@@ -373,6 +374,9 @@ class Position(TypedDict):
     accuracyRadius: float
     latitude: float
     longitude: float
+    pass
+
+class RTCSignalingSession(TypedDict):
     pass
 
 class RequestMediaStreamOptions(TypedDict):
@@ -678,6 +682,11 @@ class Program:
 
 class PushHandler:
     async def onPush(self, request: HttpRequest) -> None:
+        pass
+    pass
+
+class RTCSignalingChannel:
+    async def startRTCSignalingSession(self, session: RTCSignalingSession) -> None:
         pass
     pass
 

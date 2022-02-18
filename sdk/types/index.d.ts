@@ -1318,16 +1318,26 @@ export declare enum ScryptedInterface {
     ObjectDetector = "ObjectDetector",
     ObjectDetection = "ObjectDetection",
     HumiditySetting = "HumiditySetting",
-    Fan = "Fan"
+    Fan = "Fan",
+    RTCSignalingChannel = "RTCSignalingChannel"
 }
-export interface RTCAVSignalingOfferSetup {
+export declare type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidate) => Promise<void>;
+export interface RTCSignalingSession {
+    createLocalDescription: (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate) => Promise<RTCSessionDescription>;
+    setRemoteDescription: (description: RTCSessionDescription) => Promise<void>;
+    onIceCandidate: (candidate: RTCIceCandidate) => void;
+}
+export interface RTCSignalingChannel {
+    startRTCSignalingSession(session: RTCSignalingSession): Promise<void>;
+}
+export interface RTCAVSignalingSetup {
     audio: RTCRtpTransceiverInit;
     video: RTCRtpTransceiverInit;
     datachannel?: {
         label: string;
         dict?: RTCDataChannelInit;
     };
-    signalingMimeType: string;
+    type: 'offer' | 'answer';
 }
 export interface RTCAVMessage {
     id: string;

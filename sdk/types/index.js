@@ -541,6 +541,13 @@ exports.ScryptedInterfaceDescriptors = {
         properties: [
             'fan'
         ]
+    },
+    RTCSignalingChannel: {
+        name: 'RTCSignalingChannel',
+        methods: [
+            'startRTCSignalingSession'
+        ],
+        properties: []
     }
 };
 var ScryptedDeviceType;
@@ -676,6 +683,7 @@ var ScryptedInterface;
     ScryptedInterface["ObjectDetection"] = "ObjectDetection";
     ScryptedInterface["HumiditySetting"] = "HumiditySetting";
     ScryptedInterface["Fan"] = "Fan";
+    ScryptedInterface["RTCSignalingChannel"] = "RTCSignalingChannel";
 })(ScryptedInterface = exports.ScryptedInterface || (exports.ScryptedInterface = {}));
 var ScryptedMimeTypes;
 (function (ScryptedMimeTypes) {
