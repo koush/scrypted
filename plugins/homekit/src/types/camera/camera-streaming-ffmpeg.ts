@@ -174,7 +174,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
     console.log('ffmpeg', ffmpegPath);
     const cp = child_process.spawn(ffmpegPath, args);
-    ffmpegLogInitialOutput(console, cp);
+    ffmpegLogInitialOutput(console, cp,);
 
     session.cp = cp;
     cp.on('exit', killSession);
