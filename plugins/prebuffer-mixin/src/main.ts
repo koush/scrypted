@@ -436,7 +436,9 @@ class PrebufferSession {
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
       sessionMso = ffmpegInput.mediaStreamOptions;
 
-      if (canUseScryptedParser && ffmpegInput.mediaStreamOptions?.container === 'rtsp' && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
+      if (canUseScryptedParser
+        && ffmpegInput.mediaStreamOptions?.container === 'rtsp'
+        && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
         const rtspClient = new RtspClient(ffmpegInput.url);
         await rtspClient.options();
         const sdpResponse = await rtspClient.describe();
