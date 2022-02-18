@@ -1,21 +1,22 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, BufferConverter, ScryptedMimeTypes, RTCAVMessage, RTCAVSignalingOfferSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedMimeTypes, RTCAVMessage, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSignalingSession, BufferConverter } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions as getRtcMediaStreamOptions } from '../../../common/src/wrtc-ffmpeg-source';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions as getRtcMediaStreamOptions, startRTCSignalingSession } from '../../../common/src/wrtc-ffmpeg-source';
 import { sleep } from '../../../common/src/sleep';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
+
+const SdmSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/';
+const SdmDeviceSignalingPrefix = SdmSignalingPrefix + 'x-';
 
 const { deviceManager, mediaManager, endpointManager, systemManager } = sdk;
 
 const refreshFrequency = 60;
 
-const SdmSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'gda/';
-const SdmDeviceSignalingPrefix = SdmSignalingPrefix + 'x-';
 const black = fs.readFileSync('unavailable.jpg');
 
 const readmeV1 = fs.readFileSync('README-camera-v1.md').toString();
@@ -37,16 +38,18 @@ function getSdmRtspMediaStreamOptions(): MediaStreamOptions {
     };
 }
 
-function getSdmRtcMediaStreamOptions(signalingMime: string): MediaStreamOptions {
-    const ret = getRtcMediaStreamOptions('webrtc', 'WebRTC', signalingMime);
+const RtcMediaStreamOptionsId = 'webrtc';
+
+function getSdmRtcMediaStreamOptions(): MediaStreamOptions {
+    const ret = getRtcMediaStreamOptions(RtcMediaStreamOptionsId, 'WebRTC');
     ret.source = 'cloud';
     ret.userConfigurable = false;
     return ret;
 }
 
-function createNestOfferSetup(signalingMimeType: string): RTCAVSignalingOfferSetup {
+function createNestOfferSetup(): RTCAVSignalingSetup {
     return {
-        signalingMimeType,
+        type: 'offer',
         audio: {
             direction: 'recvonly',
         },
@@ -97,22 +100,46 @@ function toNestMode(mode: ThermostatMode): string {
     }
 }
 
-class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCamera, MotionSensor, BinarySensor, BufferConverter, ObjectDetector {
-    signalingMime: string;
+class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCamera, MotionSensor, BinarySensor, ObjectDetector, RTCSignalingChannel, BufferConverter {
     lastMotionEventId: string;
     lastImage: Promise<Buffer>;
     streams = new Map<string, any>();
+    signalingMime: string;
 
     constructor(public provider: GoogleSmartDeviceAccess, public device: any) {
         super(device.name.split('/').pop());
         this.provider = provider;
         this.device = device;
-
         this.signalingMime = SdmDeviceSignalingPrefix + this.nativeId;
 
-        // create a mime unique to this this camera.
-        this.fromMimeType = ScryptedMimeTypes.RTCAVOffer;
-        this.toMimeType = this.signalingMime;
+        this.fromMimeType = this.signalingMime;
+        this.toMimeType = ScryptedMimeTypes.FFmpegInput;
+    }
+
+    async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer> {
+        const ff = await createRTCPeerConnectionSource(this, RtcMediaStreamOptionsId);
+        const buffer = Buffer.from(JSON.stringify(ff));
+        return buffer;
+    }
+
+    async startRTCSignalingSession(session: RTCSignalingSession): Promise<void> {
+        await startRTCSignalingSession(session, undefined,
+            async () => createNestOfferSetup(),
+            async (description) => {
+                const offerSdp = description.sdp.replace('a=ice-options:trickle\r\n', '');
+
+                const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
+                    command: "sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream",
+                    params: {
+                        offerSdp,
+                    },
+                });
+                const { answerSdp } = result.data.results;
+                return {
+                    sdp: answerSdp,
+                    type: 'answer',
+                } as any;
+            })
     }
 
     trackStream(id: string, result: any) {
@@ -177,40 +204,6 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         return;
     }
 
-    async convert(data: string | Buffer, fromMimeType: string): Promise<Buffer> {
-        const offer: RTCAVMessage = JSON.parse(data.toString());
-        const offerSdp = offer.description.sdp;
-        const offerParts = offerSdp.split('m=');
-        const audioPartIndex = offerParts.findIndex(part => part.startsWith('audio'));
-        const [audioPart] = offerParts.splice(audioPartIndex, 1);
-        offerParts.splice(1, 0, audioPart);
-        offer.description.sdp = offerParts.join('m=');
-        const { answer } = await this.sendOffer(offer);
-        return Buffer.from(JSON.stringify(answer));
-    }
-
-    async sendOffer(offer: RTCAVMessage): Promise<{ result: any, answer: RTCAVMessage }> {
-        const offerSdp = offer.description.sdp.replace('a=ice-options:trickle\r\n', '');
-
-        const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
-            command: "sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream",
-            params: {
-                offerSdp,
-            },
-        });
-        const { answerSdp } = result.data.results;
-        const answer: RTCAVMessage = {
-            id: undefined,
-            description: {
-                sdp: answerSdp,
-                type: 'answer',
-            },
-            candidates: [],
-            configuration: undefined,
-        }
-        return { result, answer };
-    }
-
     addRefreshOptions(trackerId: string, mso: MediaStreamOptions): MediaStreamOptions {
         return Object.assign(mso, {
             refreshAt: Date.now() + 4 * 60 * 1000,
@@ -253,7 +246,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
 
             this.trackStream(trackerId, result);
 
-            const mso = this.isWebRtc ? getSdmRtcMediaStreamOptions(this.signalingMime) : getSdmRtspMediaStreamOptions();
+            const mso = this.isWebRtc ? getSdmRtcMediaStreamOptions() : getSdmRtspMediaStreamOptions();
             this.addRefreshOptions(trackerId, mso);
 
             const ffmpegInput: FFMpegInput = {
@@ -265,7 +258,8 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         }
 
         if (this.isWebRtc) {
-            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(createNestOfferSetup(this.signalingMime))), this.signalingMime);
+            const buffer = Buffer.from(this.id.toString());
+            return mediaManager.createMediaObject(buffer, this.signalingMime);
         }
         else {
             const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -285,7 +279,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         }
 
         return [
-            getSdmRtcMediaStreamOptions(this.signalingMime),
+            getSdmRtcMediaStreamOptions(),
         ]
     }
 }
@@ -467,7 +461,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
     }
 }
 
-class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient, DeviceProvider, Settings, HttpRequestHandler, BufferConverter {
+class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient, DeviceProvider, Settings, HttpRequestHandler {
     token: ClientOAuth2.Token;
     nestDevices = new Map<string, any>();
     devices = new Map<string, NestCamera | NestThermostat>();
@@ -528,28 +522,6 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                 }
             }
         })();
-
-        this.fromMimeType = SdmSignalingPrefix + '*';
-        this.toMimeType = ScryptedMimeTypes.FFmpegInput;
-    }
-
-    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
-        const nativeId = fromMimeType.substring(SdmDeviceSignalingPrefix.length);
-        let device: NestCamera;
-        for (const d of this.devices.values()) {
-            if (d.nativeId.toLowerCase() === nativeId) {
-                device = d as NestCamera;
-                break;
-            }
-        }
-        const trackerId = randomBytes(8).toString('hex');
-        const ffmpegInput = await createRTCPeerConnectionSource(createNestOfferSetup(device.signalingMime), 'default', 'MPEG-TS', device.console, async (offer) => {
-            const { result, answer } = await device.sendOffer(offer);
-            device.trackStream(trackerId, result);
-            return answer;
-        });
-        device.addRefreshOptions(trackerId, ffmpegInput.mediaStreamOptions);
-        return Buffer.from(JSON.stringify(ffmpegInput));
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
@@ -571,9 +543,6 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
                         thermostat?.reload();
                     }
                 }
-                // else if (device.type === 'sdm.devices.types.CAMERA' || device.type === 'sdm.devices.types.DOORBELL') {
-                //     new NestCamera(this, device);
-                // }
             }
 
             if (events) {
@@ -713,9 +682,6 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     async authGet(path: string) {
         await this.loadToken();
         return axios(`https://${this.apiHostname}/v1/enterprises/${this.projectId}${path}`, {
-            // validateStatus() {
-            //     return true;
-            // },
             headers: {
                 Authorization: `Bearer ${this.token.accessToken}`
             }
@@ -777,6 +743,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
                 const interfaces = [
                     ScryptedInterface.BufferConverter,
+                    ScryptedInterface.RTCSignalingChannel,
                     ScryptedInterface.VideoCamera,
                     ScryptedInterface.Camera,
                     ScryptedInterface.MotionSensor,

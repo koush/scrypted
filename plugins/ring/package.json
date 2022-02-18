@@ -20,14 +20,12 @@
       "name": "Ring Plugin",
       "type": "DeviceProvider",
       "interfaces": [
-         "BufferConverter",
          "DeviceProvider",
          "Settings"
       ]
    },
    "dependencies": {
-      "@homebridge/camera-utils": "^2.0.4",
-      "@koush/ring-client-api": "^9.24.1",
+      "@koush/ring-client-api": "^9.25.0-beta.2",
       "@types/node": "^16.6.1",
       "axios": "^0.24.0"
    },

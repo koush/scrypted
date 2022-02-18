@@ -22,7 +22,6 @@
       "name": "Google Device Access",
       "type": "DeviceProvider",
       "interfaces": [
-         "BufferConverter",
          "OauthClient",
          "DeviceProvider",
          "HttpRequestHandler",
