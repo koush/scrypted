@@ -19,7 +19,7 @@ export function connectRFC4571Parser(url: string) {
 }
 
 
-export async function startRFC4571Parser(socket: net.Socket, sdp: string, mediaStreamOptions: MediaStreamOptions, hasRstpPrefix?: boolean): Promise<ParserSession<"rtsp">> {
+export async function startRFC4571Parser(socket: net.Socket, sdp: string, mediaStreamOptions: MediaStreamOptions, hasRstpPrefix?: boolean, options?: ParserOptions<"rtsp">): Promise<ParserSession<"rtsp">> {
     let isActive = true;
     const events = new EventEmitter();
 
@@ -38,7 +38,33 @@ export async function startRFC4571Parser(socket: net.Socket, sdp: string, mediaS
     socket.on('close', kill);
     socket.on('error', kill);
 
+    const setupActivityTimer = (container: string) => {
+        let dataTimeout: NodeJS.Timeout;
+
+        function dataKill() {
+            console.error('timeout waiting for data, killing parser session', container);
+            kill();
+        }
+
+        function resetActivityTimer() {
+            if (!options.timeout)
+                return;
+            clearTimeout(dataTimeout);
+            dataTimeout = setTimeout(dataKill, options.timeout);
+        }
+
+        events.once('killed', () => clearTimeout(dataTimeout));
+
+        resetActivityTimer();
+        return {
+            resetActivityTimer,
+        }
+    }
+
+
     (async () => {
+        const { resetActivityTimer } = setupActivityTimer('rtsp');
+
         while (true) {
             let header: Buffer;
             let length: number;
@@ -69,6 +95,7 @@ export async function startRFC4571Parser(socket: net.Socket, sdp: string, mediaS
                 chunks: [header, data],
             }
             events.emit('rtsp', chunk);
+            resetActivityTimer();
         }
     })()
         .finally(kill);
