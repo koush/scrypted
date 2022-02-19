@@ -76,7 +76,6 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
             url: stringUrl,
             inputArguments: [
                 "-rtsp_transport", this.getRtspTransport(),
-                "-max_delay", "1000000",
                 "-i", stringUrl,
             ],
             mediaStreamOptions: vso,

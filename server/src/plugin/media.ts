@@ -86,7 +86,6 @@ export abstract class MediaManagerBase implements MediaManager {
                 if (mediaUrl.url.startsWith('rtsp://')) {
                     inputArguments.unshift(
                         "-rtsp_transport", "tcp",
-                        "-max_delay", "1000000",
                     );
                 }
 

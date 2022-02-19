@@ -116,7 +116,6 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
             url: liveViewPaths[0].rtspPath,
             inputArguments: [
                 "-rtsp_transport", "tcp",
-                "-max_delay", "1000000",
                 "-i", liveViewPaths[0].rtspPath,
             ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),

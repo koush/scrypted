@@ -244,7 +244,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
             // hint to ffmpeg for how long to wait for out of order packets.
             // is only used by udp, i think? unsure. but it causes severe jitter.
             // the jitter buffer should be on the actual rendering side.
-            "-max_delay", "0",
+            // "-max_delay", "0",
             '-i', url,
         ]
     };

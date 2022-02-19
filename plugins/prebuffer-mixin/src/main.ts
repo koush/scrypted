@@ -1017,7 +1017,6 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
       url: clientUrl,
       inputArguments: [
         "-rtsp_transport", "tcp",
-        "-max_delay", "1000000",
         '-i', clientUrl.replace('tcp', 'rtsp'),
       ]
     };
