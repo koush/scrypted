@@ -51,7 +51,6 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         const socketUrl = new URL(ffmpegInput.url);
         const socket = net.connect(parseInt(socketUrl.port), socketUrl.hostname);
         session = {
-            socket,
             cp: undefined,
             generator: parseFragmentedMP4(socket),
         }
@@ -101,8 +100,8 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         }
         else {
             audioArgs = [
+                '-acodec', 'copy',
                 '-bsf:a', 'aac_adtstoasc',
-                '-acodec', 'copy'
             ];
         }
 
@@ -136,11 +135,13 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     }
 
     console.log(`motion recording started`);
-    const { socket, cp, generator } = session;
+    const { cp, generator } = session;
     let pending: Buffer[] = [];
     try {
+        let i = 0;
         for await (const box of generator) {
             const { header, type, data } = box;
+            // console.log('motion fragment box', type);
 
             // every moov/moof frame designates an iframe?
             pending.push(header, data);
@@ -148,17 +149,17 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             if (type === 'moov' || type === 'mdat') {
                 const fragment = Buffer.concat(pending);
                 pending = [];
+                console.log(`motion fragment #${++i} sent. size:`, fragment.length);
                 yield fragment;
             }
-            // console.log('mp4 box type', type, length);
         }
         console.log(`motion recording finished`);
     }
     catch (e) {
         console.log(`motion recording complete ${e}`);
+        generator.throw(e);
     }
     finally {
-        socket.destroy();
         cp?.kill('SIGKILL');
     }
 }
