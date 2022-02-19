@@ -5,7 +5,7 @@ import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions as getRtcMediaStreamOptions, startRTCSignalingSession } from '../../../common/src/wrtc-ffmpeg-source';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions as getRtcMediaStreamOptions, startRTCSignalingSession } from '../../../common/src/wrtc-to-rtsp';
 import { sleep } from '../../../common/src/sleep';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
