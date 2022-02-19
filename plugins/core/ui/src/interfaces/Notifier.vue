@@ -47,7 +47,7 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import cloneDeep from "lodash/cloneDeep";
-import { ScryptedInterface } from "@scrypted/sdk/types";
+import { ScryptedInterface } from "@scrypted/types";
 
 const supportedMediaInterfaces = [
   ScryptedInterface.VideoCamera,

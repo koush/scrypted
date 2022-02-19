@@ -102,7 +102,7 @@
 <script>
 import InterfacesPicker from "./InterfacesPicker.vue";
 import EventsPicker from "./EventsPicker.vue";
-import { ScryptedInterface } from "@scrypted/sdk/types";
+import { ScryptedInterface } from "@scrypted/types";
 import { actionableEvents, actionableInterfaces } from "./interfaces";
 
 const includeContextual = [

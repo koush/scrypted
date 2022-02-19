@@ -398,7 +398,7 @@ import {
   hasFixedPhysicalLocation,
   getInterfaceFriendlyName,
 } from "./helpers";
-import { ScryptedInterface } from "@scrypted/sdk/types";
+import { ScryptedInterface } from "@scrypted/types";
 import Notifier from "../interfaces/Notifier.vue";
 import OnOff from "../interfaces/OnOff.vue";
 import Brightness from "../interfaces/Brightness.vue";

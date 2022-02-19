@@ -340,7 +340,7 @@ import {
   Card,
 } from "./layout";
 import { Menu } from "../../store";
-import { Settings as SettingsInterface, Setting, SettingValue } from "@scrypted/sdk/types";
+import { Settings as SettingsInterface, Setting, SettingValue } from "@scrypted/types";
 
 class CardComponentSettings implements SettingsInterface {
   cardComponent: CardComponent;

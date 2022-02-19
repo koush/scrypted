@@ -1,9 +1,7 @@
 <template>
   <v-dialog v-model="dialog" width="1024" :disabled="disabled">
     <template v-slot:activator="{ on }">
-      <a v-on="on" v-if="!hidePreview"
-        ><v-img :src="src"></v-img
-      ></a>
+      <a v-on="on" v-if="!hidePreview"><v-img :src="src"></v-img></a>
     </template>
     <div style="position: relative; overflow: hidden">
       <video
@@ -51,7 +49,7 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import { createBlobUrl, streamCamera } from "../common/camera";
-import { ScryptedInterface } from "@scrypted/sdk/types";
+import { ScryptedInterface } from "@scrypted/types";
 import ClipPathEditor from "../components/clippath/ClipPathEditor.vue";
 import cloneDeep from "lodash/cloneDeep";
 
@@ -139,11 +137,10 @@ export default {
       if (!val) {
         return;
       }
-      await streamCamera(
+      this.pc = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
-        () => this.$refs.video,
-        (configuration) => (this.pc = new RTCPeerConnection(configuration))
+        () => this.$refs.video
       );
     },
   },

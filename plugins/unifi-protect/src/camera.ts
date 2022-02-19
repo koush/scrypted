@@ -142,7 +142,6 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             "-profile:a", "aac_low",
             "-threads", "0",
             "-avioflags", "direct",
-            "-max_delay", "1000000",
             "-flush_packets", "1",
             "-flags", "+global_header",
             "-ar", camera.talkbackSettings.samplingRate.toString(),
@@ -319,7 +318,6 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             url: u,
             inputArguments: [
                 "-rtsp_transport", "tcp",
-                "-max_delay", "1000000",
                 "-i", u,
             ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),

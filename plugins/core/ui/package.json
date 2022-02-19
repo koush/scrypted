@@ -6,8 +6,7 @@
     "serve": "vue-cli-service serve --open",
     "serve-server": "cd ../../../server && npm run serve",
     "build": "vue-cli-service build --dest ../fs/dist",
-    "lint": "vue-cli-service lint",
-    "postinstall": "(cd ../../../server && npm install); (cd ../client && npm install)"
+    "lint": "vue-cli-service lint"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.15.4",
@@ -17,7 +16,7 @@
     "@fortawesome/free-solid-svg-icons": "^5.15.2",
     "@fortawesome/vue-fontawesome": "^0.1.10",
     "@radial-color-picker/vue-color-picker": "^2.3.0",
-    "@scrypted/client": "file:../client",
+    "@scrypted/types": "file:../../../sdk/types",
     "@scrypted/sdk": "file:../../../sdk",
     "apexcharts": "^3.28.3",
     "axios": "^0.19.2",

@@ -1,4 +1,4 @@
-import { ScryptedInterface } from '@scrypted/sdk/types';
+import { ScryptedInterface } from '@scrypted/types';
 
 export const actionableInterfaces = [
     ScryptedInterface.OnOff,

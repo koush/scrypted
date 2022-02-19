@@ -1,4 +1,4 @@
-import { ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk/types";
+import { ScryptedDeviceType, ScryptedInterface } from "@scrypted/types";
 
 export function typeToIcon(type) {
     switch (type) {

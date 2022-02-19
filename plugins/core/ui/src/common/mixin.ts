@@ -1,4 +1,4 @@
-import { MixinProvider, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, SystemManager } from "@scrypted/sdk/types";
+import { MixinProvider, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, SystemManager } from "@scrypted/types";
 
 export async function setMixin(systemManager: SystemManager, device: ScryptedDevice, mixinId: string, enabled: boolean) {
     const plugins = await systemManager.getComponent(

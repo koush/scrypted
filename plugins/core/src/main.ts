@@ -12,11 +12,11 @@ import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { Script } from './script';
-import { addBuiltins } from "../../../common/src/wrtc-convertors";
+import { addBuiltins } from "../../../common/src/ffmpeg-to-wrtc";
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
 
-addBuiltins(console, mediaManager);
+addBuiltins(mediaManager);
 
 const { pluginHostAPI } = sdk;
 

@@ -23,7 +23,7 @@
   </div>
 </template>
 <script>
-import { ScryptedInterface } from "@scrypted/sdk/types";
+import { ScryptedInterface } from "@scrypted/types";
 import DashboardBase from "./DashboardBase";
 import { createBlobUrl, streamCamera } from "../../common/camera";
 
@@ -51,11 +51,10 @@ export default {
       if (!val) {
         return;
       }
-      await streamCamera(
+      this.pc = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video,
-        (configuration) => (this.pc = new RTCPeerConnection(configuration))
       );
     },
   },
