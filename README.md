@@ -12,7 +12,6 @@ Scrypted is a home automation platform primarily focusing on making camera exper
 Select the appropriate guide. After installation is finished, remember to visit [HomeKit Secure Video Setup](https://github.com/koush/scrypted/wiki/HomeKit-Secure-Video-Setup).
 
  * [Raspberry Pi](https://github.com/koush/scrypted/wiki/Installation:-Raspberry-Pi)
-   * There is also a [Video Walkthrough](https://www.youtube.com/watch?v=ybc1YE3aUdg) on Youtube.
  * Linux
    * [Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Linux) - This is the recommended method. Local installation may interfere with other software, like Homebridge, Home Assistant, or HOOBS.
    * [Docker Compose](https://github.com/koush/scrypted/wiki/Installation:-Docker-Compose)
