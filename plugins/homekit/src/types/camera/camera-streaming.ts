@@ -225,7 +225,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                 const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
                 session.rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
-                    audioKey, (request as StartStreamRequest).audio.sample_rate, console);
+                    audioKey, session.startRequest.audio, console);
 
                 session.demuxer.on('rtp', (buffer: Buffer) => {
                     session.audioReturn.send(buffer, session.rtpSink.rtpPort);

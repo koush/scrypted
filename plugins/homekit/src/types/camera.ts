@@ -36,7 +36,15 @@ addSupportedType({
             AudioStreamingCodecType.OPUS,
             // AudioStreamingCodecType.AAC_ELD,
         ]) {
-            for (const samplerate of [AudioStreamingSamplerate.KHZ_8, AudioStreamingSamplerate.KHZ_16, AudioStreamingSamplerate.KHZ_24]) {
+            // force 24k, because various parts of the pipeline make that assumption.
+            // off the top of my head:
+            // 1) opus rtp timestamp mangling assumes 24k for the interval of 480
+            // 2) opus and aac_eld talkback generates an sdp with 24k
+            for (const samplerate of [
+                // AudioStreamingSamplerate.KHZ_8,
+                // AudioStreamingSamplerate.KHZ_16,
+                AudioStreamingSamplerate.KHZ_24
+            ]) {
                 codecs.push({
                     type,
                     samplerate,

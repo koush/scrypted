@@ -3,7 +3,7 @@ import { listenZero } from "@scrypted/common/src/listen-cluster";
 import { FFMpegInput } from "@scrypted/sdk";
 import { Socket, SocketType } from "dgram";
 import { createServer, Server } from "net";
-import { AudioStreamingSamplerate } from "../hap";
+import { AudioStreamingCodecType, AudioInfo, AudioStreamingSamplerate } from "../hap";
 
 function pickPort() {
     return Math.round(Math.abs(Math.random()) * 40000 + 10000);
@@ -38,9 +38,12 @@ export class HomeKitRtpSink {
     }
 }
 
-export async function startRtpSink(socketType: SocketType, address: string, srtp: Buffer, sampleRate: AudioStreamingSamplerate, console: Console) {
+export async function startRtpSink(socketType: SocketType, address: string, srtp: Buffer, audioInfo: AudioInfo, console: Console) {
     const sdpIpVersion = socketType === "udp6" ? "IP6 " : "IP4";
     const rtpPort = pickPort();
+
+    const isOpus = audioInfo.codec === AudioStreamingCodecType.OPUS;
+    const { sample_rate } = audioInfo;
 
     /*
     https://wiki.multimedia.cx/index.php?title=MPEG-4_Audio
@@ -92,8 +95,8 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
     let csdBuffer = Buffer.from(csd, 'hex');
     let b = csdBuffer[1];
     b &= 0b11100001;
-    let fi = sampleRate === AudioStreamingSamplerate.KHZ_8 ? 11
-        : sampleRate === AudioStreamingSamplerate.KHZ_24 ? 6 : 8;
+    let fi = sample_rate === AudioStreamingSamplerate.KHZ_8 ? 11
+        : sample_rate === AudioStreamingSamplerate.KHZ_24 ? 6 : 8;
     b |= (fi << 1);
     csdBuffer[1] = b;
     csd = csdBuffer.toString('hex').toUpperCase();
@@ -123,8 +126,15 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
         "t=0 0",
         "m=audio " + rtpPort + " RTP/AVP 110",
         "b=AS:24",
-        "a=rtpmap:110 MPEG4-GENERIC/16000/1",
-        "a=fmtp:110 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=" + csd,
+        ...(isOpus
+            ? [
+                "a=rtpmap:110 opus/24000/2",
+                "a=fmtp:101 minptime=10;useinbandfec=1",
+            ]
+            : [
+                "a=rtpmap:110 MPEG4-GENERIC/16000/1",
+                "a=fmtp:110 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=" + csd,
+            ]),
         "a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:" + srtp.toString("base64")
     ].join("\n");
 
@@ -139,14 +149,20 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
         mediaStreamOptions: {
             id: undefined,
             video: null,
-            audio: {
-                codec: 'aac',
-                encoder: 'libfdk_aac',
-            }
+            audio: isOpus
+                ? {
+                    codec: 'opus',
+                    encoder: 'libopus',
+                }
+                : {
+                    codec: 'aac',
+                    encoder: 'libfdk_aac',
+                },
         },
         inputArguments: [
             "-protocol_whitelist", "pipe,udp,rtp,file,crypto,tcp",
-            "-acodec", "libfdk_aac", '-ac', '1',
+            "-acodec", isOpus ? "libopus" : "libfdk_aac",
+            '-ac', '1',
             "-f", "sdp",
             "-i", "tcp://127.0.0.1:" + sdpServerPort,
         ]
