@@ -341,7 +341,8 @@ class PrebufferSession {
     else if (reencodeAudio || mustTranscode) {
       acodec = [
         '-bsf:a', 'aac_adtstoasc',
-        '-acodec', 'libfdk_aac',
+        // '-acodec', 'libfdk_aac',
+        '-acodec', 'aac',
         '-ar', `8k`,
         '-b:a', `100k`,
         '-bufsize', '400k',
@@ -582,7 +583,15 @@ class PrebufferSession {
     const session = await this.parserSessionPromise;
 
     const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) !== 'false';
-    const requestedPrebuffer = options?.prebuffer || (sendKeyframe ? Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5 : 0);
+    let requestedPrebuffer = options?.prebuffer;
+    if (requestedPrebuffer == null) {
+      if (sendKeyframe) {
+        requestedPrebuffer = Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5;
+      }
+      else {
+        requestedPrebuffer = 0;
+      }
+    }
 
     this.console.log(this.streamName, 'client request started');
 
@@ -664,10 +673,17 @@ class PrebufferSession {
       return containerUrl;
     }
 
-    const { rtspMode, mp4Mode } = this.getRebroadcastMode();
+    const { rtspMode } = this.getRebroadcastMode();
     const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
     const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
+
+    // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
+    // rewind a little bit earlier to gaurantee a full segment of that length
+    // is sent.
+    if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
+      requestedPrebuffer += 4000;
+    }
 
     const mediaStreamOptions: MediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
 
@@ -683,7 +699,7 @@ class PrebufferSession {
       else if (reencodeAudio) {
         mediaStreamOptions.audio = {
           codec: 'aac',
-          encoder: 'libfdk_aac',
+          encoder: 'aac',
           profile: 'aac_low',
         }
       }
