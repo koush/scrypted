@@ -9,7 +9,7 @@ fi
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
-    echo "Running: $@"
+    # echo "Running: $@"
     $@
     if [ "$?" != "0" ]
     then
