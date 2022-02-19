@@ -11,7 +11,12 @@ addSupportedType({
         ret.traits.push('action.devices.traits.CameraStream');
         ret.attributes = {
             cameraStreamSupportedProtocols: [
-                "webrtc", "progressive_mp4", "hls", "dash", "smooth_stream",
+                // this may be supported on gen 2 hub?
+                // "webrtc",
+                "progressive_mp4",
+                "hls",
+                "dash",
+                "smooth_stream",
             ],
             cameraStreamNeedAuthToken: true,
             cameraStreamNeedDrmEncryption: false
