@@ -1,6 +1,6 @@
 import { Camera, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, AudioSensor, Intercom, ObjectsDetected, VideoCameraConfiguration, OnOff } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
-import { CameraRecordingDelegate, AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID , AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, SRTPCryptoSuites } from '../hap';
+import { CameraRecordingDelegate, AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, SRTPCryptoSuites } from '../hap';
 import { makeAccessory } from './common';
 
 import sdk from '@scrypted/sdk';
@@ -27,13 +27,14 @@ addSupportedType({
         // webrtc cameras (like ring and nest) must provide opus.
         // use this hint to force opus usage. even if opus is not returned,
         // for whatever reason, it will be transcoded to opus and that path will be used.
-        const forceOpus = device.interfaces.includes(ScryptedInterface.RTCSignalingChannel);
+        const forceOpus = true;
 
         const codecs: AudioStreamingCodec[] = [];
         // homekit seems to prefer AAC_ELD if it is offered.
+        // so forcing opus must be done by not offering AAC_ELD.
         for (const type of [
             AudioStreamingCodecType.OPUS,
-            ...(forceOpus ? [] : [AudioStreamingCodecType.AAC_ELD])
+            // AudioStreamingCodecType.AAC_ELD,
         ]) {
             for (const samplerate of [AudioStreamingSamplerate.KHZ_8, AudioStreamingSamplerate.KHZ_16, AudioStreamingSamplerate.KHZ_24]) {
                 codecs.push({
@@ -102,7 +103,12 @@ addSupportedType({
                 samplerate.push(sr);
             }
 
-            for (const type of [AudioRecordingCodecType.AAC_LC]) {
+            // homekit seems to prefer AAC_ELD if it is offered.
+            // so forcing AAC_LC must be done by not offering AAC_ELD.
+            for (const type of [
+                AudioRecordingCodecType.AAC_LC,
+                // AudioRecordingCodecType.AAC_ELD,
+            ]) {
                 const entry: AudioRecordingCodec = {
                     type,
                     bitrateMode: 0,
@@ -118,7 +124,7 @@ addSupportedType({
 
             const h265Support = storage.getItem('h265Support') === 'true';
             const codecType = h265Support ? VideoCodecType.H265 : VideoCodecType.H264
-    
+
             recordingOptions = {
                 motionService: true,
                 prebufferLength: numberPrebufferSegments * iframeIntervalSeconds * 1000,

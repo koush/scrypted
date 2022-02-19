@@ -164,7 +164,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 const msos = await device.getVideoStreamOptions();
                 selectedStream = msos.find(mso => mso.name === streamingChannel);
             }
-            console.log('isHomeKitHub', session.isHomeKitHub, 'selected stream', selectedStream?.name || 'Default/undefined');
 
             const tryReconfigureBitrate = () => {
                 if (!session.isHomeKitHub)
@@ -197,6 +196,10 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 session.startRequest = request as StartStreamRequest;
             }
             tryReconfigureBitrate();
+
+            console.log('isHomeKitHub:', session.isHomeKitHub,
+                'selected stream:', selectedStream?.name || 'Default/undefined',
+                'audio.packet_time:', session.startRequest.audio.packet_time);
 
             try {
                 if (CAMERA_STREAM_FORCE_OPUS) {
