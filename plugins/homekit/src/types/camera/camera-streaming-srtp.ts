@@ -12,7 +12,7 @@ import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/we
 import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
-import { createSessionSender } from './camera-streaming-srtp-sender';
+import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
@@ -73,11 +73,11 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
 
     const startStreaming = async () => {
         try {
-            const videoSender = createSessionSender(vconfig, session.videoReturn,
+            const videoSender = createCameraStreamSender(vconfig, session.videoReturn,
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
                 session.startRequest.video.rtcp_interval, false);
-            const audioSender = createSessionSender(aconfig, session.audioReturn,
+            const audioSender = createCameraStreamSender(aconfig, session.audioReturn,
                 session.audiossrc, session.startRequest.audio.pt,
                 session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
                 session.startRequest.audio.rtcp_interval, true);

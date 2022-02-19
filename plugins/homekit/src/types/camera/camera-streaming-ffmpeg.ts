@@ -11,7 +11,7 @@ import { CameraStreamingSession, KillCameraStreamingSession } from './camera-str
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { createSessionSender } from './camera-streaming-srtp-sender';
+import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
 
 const { mediaManager } = sdk;
@@ -181,7 +181,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 };
 
                 const mangler = await createBindZero();
-                const sender = createSessionSender(aconfig, mangler.server,
+                const sender = createCameraStreamSender(aconfig, mangler.server,
                     session.audiossrc, session.startRequest.audio.pt,
                     session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
                     session.startRequest.audio.rtcp_interval, true
