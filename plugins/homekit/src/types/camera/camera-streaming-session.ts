@@ -18,6 +18,7 @@ export interface CameraStreamingSession {
     demuxer?: RtpDemuxer;
     rtpSink?: HomeKitRtpSink;
     isHomeKitHub: boolean;
+    opusMangler?: dgram.Socket;
 }
 
 export type KillCameraStreamingSession = () => void;

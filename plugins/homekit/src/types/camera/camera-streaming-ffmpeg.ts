@@ -8,6 +8,11 @@ import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/comm
 import { evalRequest } from '../camera/camera-transcode';
 
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
+import { createBindZero } from '@scrypted/common/src/listen-cluster';
+
+import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
+import { createSessionSender } from './camera-streaming-srtp-sender';
+import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
 
 const { mediaManager } = sdk;
 
@@ -111,17 +116,20 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         // homekit live streaming seems extremely picky about aac output.
         // be extremely sure that this is compatible.
-        const matchAac = audioCodec === AudioStreamingCodecType.AAC_ELD
+        const perfectAac = audioCodec === AudioStreamingCodecType.AAC_ELD
             && mso?.audio?.codec === 'aac'
             && mso?.audio?.encoder === 'libfdk_aac';
 
-        const matchOpus = audioCodec === AudioStreamingCodecType.OPUS
+        const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
+
+        // homekit opus does not need to be perfect, i don't think. need to test.
+        const perfectOpus = requestedOpus
             && mso?.audio?.codec === 'opus'
             && mso?.audio?.encoder === 'opusenc';
 
         let hasAudio = true;
         if (!transcodeStreaming
-            && (matchAac || matchOpus)
+            && (perfectAac || perfectOpus)
             && mso?.tool === 'scrypted') {
             args.push(
                 "-acodec", "copy",
@@ -129,7 +137,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
             args.push(
-                '-acodec', ...(audioCodec === AudioStreamingCodecType.OPUS ?
+                '-acodec', ...(requestedOpus ?
                     [
                         'libopus',
                         '-application', 'lowdelay',
@@ -158,8 +166,40 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 // not sure this has any effect? testing.
                 '-fflags', '+flush_packets', '-flush_packets', '1',
                 "-f", "rtp",
-                `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
-            )
+            );
+
+            if (requestedOpus) {
+                // opus requires timestamp mangling.
+                const aconfig = {
+                    keys: {
+                        localMasterKey: session.prepareRequest.audio.srtp_key,
+                        localMasterSalt: session.prepareRequest.audio.srtp_salt,
+                        remoteMasterKey: session.prepareRequest.audio.srtp_key,
+                        remoteMasterSalt: session.prepareRequest.audio.srtp_salt,
+                    },
+                    profile: ProtectionProfileAes128CmHmacSha1_80,
+                };
+
+                const mangler = await createBindZero();
+                const sender = createSessionSender(aconfig, mangler.server,
+                    session.audiossrc, session.startRequest.audio.pt,
+                    session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
+                    session.startRequest.audio.rtcp_interval, true
+                );
+                session.opusMangler = mangler.server;
+                mangler.server.on('message', data => {
+                    const packet = RtpPacket.deSerialize(data);
+                    sender(packet);
+                });
+                args.push(
+                    `rtp://127.0.0.1:${mangler.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
+                )
+            }
+            else {
+                args.push(
+                    `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
+                )
+            }
         }
     }
 

@@ -8,7 +8,7 @@ import sdk from '@scrypted/sdk';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 
-import { CAMERA_STREAM_FORCE_OPUS, createCameraStreamingDelegate } from './camera/camera-streaming';
+import { createCameraStreamingDelegate } from './camera/camera-streaming';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -24,12 +24,16 @@ addSupportedType({
         const storage = deviceManager.getMixinStorage(device.id, undefined);
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
+        // webrtc cameras (like ring and nest) must provide opus.
+        // use this hint to force opus usage. even if opus is not returned,
+        // for whatever reason, it will be transcoded to opus and that path will be used.
+        const forceOpus = device.interfaces.includes(ScryptedInterface.RTCSignalingChannel);
+
         const codecs: AudioStreamingCodec[] = [];
-        // multiple audio options can be provided but lets stick with AAC ELD 24k,
-        // that's what the talkback ffmpeg session in rtp-ffmpeg-input.ts will use.
+        // homekit seems to prefer AAC_ELD if it is offered.
         for (const type of [
             AudioStreamingCodecType.OPUS,
-            ...(CAMERA_STREAM_FORCE_OPUS ? [] : [AudioStreamingCodecType.AAC_ELD])
+            ...(forceOpus ? [] : [AudioStreamingCodecType.AAC_ELD])
         ]) {
             for (const samplerate of [AudioStreamingSamplerate.KHZ_8, AudioStreamingSamplerate.KHZ_16, AudioStreamingSamplerate.KHZ_24]) {
                 codecs.push({

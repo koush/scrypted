@@ -224,7 +224,14 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         if (!this.api) {
-            this.api = new ProtectApi(ip, username, password);
+            this.api = new ProtectApi(ip, username, password, {
+                debug() {},
+                error: (...args) => {
+                    this.console.error(...args);
+                },
+                info() {},
+                warn() {},
+            });
         }
 
         try {

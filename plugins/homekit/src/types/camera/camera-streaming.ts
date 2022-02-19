@@ -51,6 +51,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
         session.cp?.kill('SIGKILL');
         session.videoReturn?.close();
         session.audioReturn?.close();
+        session.opusMangler?.close();
         session.rtpSink?.destroy();
         if (twoWayAudio)
             device.stopIntercom();
