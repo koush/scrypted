@@ -31,3 +31,6 @@
 [submodule "plugins/zwave/file-stream-rotator"]
 	path = plugins/zwave/file-stream-rotator
 	url = ../../koush/file-stream-rotator.git
+[submodule "plugins/roborock/homebridge-xiaomi-roborock-vacuum"]
+	path = plugins/roborock/homebridge-xiaomi-roborock-vacuum
+	url = https://github.com/homebridge-xiaomi-roborock-vacuum/homebridge-xiaomi-roborock-vacuum.git

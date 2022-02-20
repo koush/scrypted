@@ -1,0 +1,2 @@
+# Roborock Plugin for Scrypted
+

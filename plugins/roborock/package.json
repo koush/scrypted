@@ -1,0 +1,37 @@
+{
+   "name": "@scrypted/roborock",
+   "version": "0.0.1",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "scrypted": {
+      "name": "Roborock Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "Settings",
+         "DeviceProvider",
+         "DeviceDiscovery"
+      ]
+   },
+   "dependencies": {
+      "@types/node": "^16.6.1",
+      "axios": "^0.24.0",
+      "axios-cookiejar-support": "^2.0.3",
+      "query-string": "^7.1.1",
+      "tough-cookie": "^4.0.0"
+   },
+   "optionalDependencies": {
+      "arc4": "^3.4.0"
+   },
+   "devDependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/tough-cookie": "^4.0.1"
+   }
+}
