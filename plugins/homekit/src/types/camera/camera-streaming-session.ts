@@ -3,7 +3,6 @@ import { PrepareStreamRequest, StartStreamRequest } from '../../hap';
 import { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 
-import { RtpDemuxer } from '../../rtp/rtp-demuxer';
 import { HomeKitRtpSink } from '../../rtp/rtp-ffmpeg-input';
 
 export interface CameraStreamingSession {
@@ -15,7 +14,6 @@ export interface CameraStreamingSession {
     cp: ChildProcess;
     videoReturn: dgram.Socket;
     audioReturn: dgram.Socket;
-    demuxer?: RtpDemuxer;
     rtpSink?: HomeKitRtpSink;
     isHomeKitHub: boolean;
     opusMangler?: dgram.Socket;

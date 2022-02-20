@@ -1,4 +1,3 @@
-import sdk from "@scrypted/sdk";
 import { listenZero } from "@scrypted/common/src/listen-cluster";
 import { FFMpegInput } from "@scrypted/sdk";
 import { Socket, SocketType } from "dgram";

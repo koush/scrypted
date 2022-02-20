@@ -6,7 +6,6 @@ import sdk from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 
-import { RtpDemuxer } from '../../rtp/rtp-demuxer';
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import os from 'os';
@@ -15,12 +14,13 @@ import { CameraStreamingSession } from './camera-streaming-session';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
 
-const { mediaManager, deviceManager } = sdk;
+import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
+
+const { mediaManager } = sdk;
 const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
 const v4v6Regex = /^::ffff:[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/;
 
-export const CAMERA_STREAM_FORCE_OPUS = false;
-
+export const CAMERA_STREAM_PERFECT_CODECS = false;
 
 async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket, port: number }> {
     const socket = dgram.createSocket(socketType || 'udp4');
@@ -202,7 +202,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 'audio.packet_time:', session.startRequest.audio.packet_time);
 
             try {
-                if (CAMERA_STREAM_FORCE_OPUS) {
+                if (CAMERA_STREAM_PERFECT_CODECS) {
                     await startCameraStreamSrtp(device, console, selectedStream, session, () => killSession(request.sessionID));
                 }
                 else {
@@ -220,19 +220,27 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             // audio talkback
             if (twoWayAudio) {
-                session.demuxer = new RtpDemuxer(console, session.audioReturn);
                 const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
 
                 const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
+
+                // this is a bit hacky, as it picks random ports and spams audio at it.
+                // the resultant port is returned as an ffmpeg input to the device intercom,
+                // if it has one. which, i guess works.
                 session.rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
                     audioKey, session.startRequest.audio, console);
 
-                session.demuxer.on('rtp', (buffer: Buffer) => {
-                    session.audioReturn.send(buffer, session.rtpSink.rtpPort);
-                });
-
-                session.demuxer.on('rtcp', (buffer: Buffer) => {
-                    session.rtpSink.heartbeat(session.audioReturn, buffer);
+                // demux the audio return socket to distinguish between rtp audio return
+                // packets and rtcp.
+                // send the audio return off to the rtp 
+                session.audioReturn.on('message', buffer => {
+                    const rtp = RtpPacket.deSerialize(buffer);
+                    if (rtp.header.payloadType === session.startRequest.audio.pt) {
+                        session.audioReturn.send(buffer, session.rtpSink.rtpPort);
+                    }
+                    else {
+                        session.rtpSink.heartbeat(session.audioReturn, buffer);
+                    }
                 });
 
                 const mo = mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput);
