@@ -17,7 +17,8 @@
    },
    "keywords": [
       "scrypted",
-      "plugin"
+      "plugin",
+      "rebroadcast"
    ],
    "scrypted": {
       "name": "Rebroadcast Plugin",
