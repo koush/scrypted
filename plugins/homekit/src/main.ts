@@ -351,7 +351,9 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             && mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera)) {
             ret = new CameraMixin(mixinDevice, mixinDeviceState, options);
         }
-        ret = new HomekitMixin(mixinDevice, mixinDeviceState, options);
+        else {
+            ret = new HomekitMixin(mixinDevice, mixinDeviceState, options);
+        }
 
         if (ret.storageSettings.values.standalone) {
             setTimeout(() => {
