@@ -1,4 +1,4 @@
-import { RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingChannel, RTCAVMessage, FFMpegInput, MediaStreamOptions } from "@scrypted/sdk/types";
+import { RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingChannel, FFMpegInput, MediaStreamOptions } from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "./listen-cluster";
 import { RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
 import dgram from 'dgram';
