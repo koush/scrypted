@@ -1,5 +1,6 @@
-import sdk, { Refresh, StartStop, Pause, Dock, Camera, MediaObject, ScryptedMimeTypes } from '@scrypted/sdk';
+import sdk, { Refresh, StartStop, Pause, Dock, Camera, MediaObject, ScryptedMimeTypes, PictureOptions } from '@scrypted/sdk';
 import {ScryptedDeviceBase} from '@scrypted/sdk';
+import axios from 'axios';
 const {mediaManager} = sdk;
 
 var botvac = require('node-botvac');
@@ -19,6 +20,10 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
             log.d(data);
             this._refresh();
         }
+    }
+
+    async getPictureOptions(): Promise<PictureOptions[]> {
+        return;
     }
 
     async getRefreshFrequency(): Promise<number> {
@@ -80,7 +85,10 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
             })
         });
         
-        return mediaManager.createMediaObject(url, 'image/*');
+        const response = await axios(url, {
+            responseType: 'arraybuffer',
+        });
+        return mediaManager.createMediaObject(Buffer.from(response.data), 'image/jpeg');
     }
 }
 
