@@ -1,4 +1,4 @@
-import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { RingApi, RingCamera, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../..//common/src/settings';
@@ -12,24 +12,12 @@ import { LiveCallNegotiation } from './ring-client-api';
 import dgram from 'dgram';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
-const STREAM_TIMEOUT = 120000;
 const black = fs.readFileSync('unavailable.jpg');
 
 const RtcMediaStreamOptionsId = 'webrtc';
 
 const RingSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'ring/';
 const RingDeviceSignalingPrefix = RingSignalingPrefix + 'x-';
-function createRingRTCAVSignalingSetup(): RTCAVSignalingSetup {
-    return {
-        type: 'answer',
-        audio: {
-            direction: 'sendrecv',
-        },
-        video: {
-            direction: 'recvonly',
-        },
-    };
-}
 
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
@@ -64,27 +52,66 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
         this.toMimeType = ScryptedMimeTypes.FFmpegInput;
     }
 
-    async startRTCSignalingSession(session: RTCSignalingSession) {
+    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions) {
         const camera = this.findCamera();
-        const callSignaling = new LiveCallNegotiation(await camera.startLiveCallNegotiation(), camera);
-        callSignaling.onMessage.subscribe(async (message) => {
-            if (message.method === 'sdp') {
-                await startRTCSignalingSession(session, message,
-                    async () => createRingRTCAVSignalingSetup(),
-                    async (description) => {
-                        callSignaling.sendAnswer(description);
-                        return undefined;
-                    }
-                )
-            }
-            else if (message.method === 'ice') {
-                session.onIceCandidate({
-                    candidate: message.ice,
-                    sdpMLineIndex: message.mlineindex,
-                })
-            }
-        })
-        await callSignaling.activate();
+
+        // ring has two webrtc endpoints. one is for the android/ios clients, wherein the ring server
+        // sends an offer, which only has h264 high in it, which causes some browsers 
+        // like Safari (and probably Chromecast) to fail on codec negotiation.
+        // if any video capabilities are offered, use the browser endpoint for safety.
+        // this should be improved further in the future by inspecting the capabilities
+        // since this currently defaults to using the baseline profile on Chrome when high is supported.
+        if (options?.capabilities.video) {
+            // the browser path will automatically activate the speaker on the ring.
+            startRTCSignalingSession(session, undefined, async () => {
+                return {
+                    type: 'offer',
+                    audio: {
+                        direction: 'sendrecv',
+                    },
+                    video: {
+                        direction: 'recvonly',
+                    },
+                };
+            }, async (description) => {
+                const answer = await camera.startWebRtcSession(generateUuid(), description.sdp);
+                return {
+                    type: 'answer',
+                    sdp: answer,
+                };
+            })
+        }
+        else {
+            const callSignaling = new LiveCallNegotiation(await camera.startLiveCallNegotiation(), camera);
+            callSignaling.onMessage.subscribe(async (message) => {
+                if (message.method === 'sdp') {
+                    await startRTCSignalingSession(session, message,
+                        async () => {
+                            return {
+                                type: 'answer',
+                                audio: {
+                                    direction: 'sendrecv',
+                                },
+                                video: {
+                                    direction: 'recvonly',
+                                },
+                            };
+                        },
+                        async (description) => {
+                            callSignaling.sendAnswer(description);
+                            return undefined;
+                        }
+                    )
+                }
+                else if (message.method === 'ice') {
+                    session.onIceCandidate({
+                        candidate: message.ice,
+                        sdpMLineIndex: message.mlineindex,
+                    })
+                }
+            });
+            await callSignaling.activate();
+        }
     }
 
     async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
