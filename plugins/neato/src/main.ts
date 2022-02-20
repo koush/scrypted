@@ -1,24 +1,30 @@
-import sdk, { Refresh, StartStop, Pause, Dock, Camera, MediaObject, ScryptedMimeTypes, PictureOptions } from '@scrypted/sdk';
-import {ScryptedDeviceBase} from '@scrypted/sdk';
+import sdk, { Refresh, StartStop, Pause, Dock, Camera, MediaObject, ScryptedMimeTypes, PictureOptions, DeviceProvider, DeviceDiscovery, ScryptedInterface, Device } from '@scrypted/sdk';
+import { ScryptedDeviceBase } from '@scrypted/sdk';
 import axios from 'axios';
-const {mediaManager} = sdk;
+import throttle from 'lodash/throttle';
 
-var botvac = require('node-botvac');
-var client = new botvac.Client();
+const botvac = require('node-botvac');
 
-const {deviceManager, log} = sdk;
+const { mediaManager } = sdk;
+
+const { deviceManager, log } = sdk;
 
 class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Dock, Camera {
-    refresher: Function;
     robot: any;
 
-    constructor(nativeId, robot) {
+    constructor(nativeId: string, robot: any) {
         super(nativeId);
         this.robot = robot;
+    }
 
-        this.refresher = (err, data) => {
-            log.d(data);
-            this._refresh();
+    refreshThrottled = throttle(() => {
+        this.refresh(undefined, undefined);
+    }, 10000);
+
+    async pollChanges() {
+        for (let i = 0; i < 20; i++) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            this.refreshThrottled();
         }
     }
 
@@ -30,49 +36,46 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
         return 60;
     }
 
-    async refresh(refreshInterface, userInitiated) {
-        this._refresh();
-    }
-
-    _refresh(cb?) {
-        this.robot.getState((error, state) => {
-            this.log.d(JSON.stringify(state));
+    async refresh(refreshInterface: string, userInitiated: boolean) {
+        this.robot.getState((error: Error, state: any) => {
+            this.console.log('state', state);
             this.running = (state && state.state != 1) || false
-            this.docked =  (state && state.details && state.details.isDocked) || false;
+            this.docked = (state && state.details && state.details.isDocked) || false;
             this.paused = (state && state.state == 3) || false;
             this.batteryLevel = (state && state.details && state.details.charge) || 0;
-
-            if (cb) {
-                cb();
-            }
-        })
+        });
     }
 
     async start() {
-        this._refresh(() => this.robot.startCleaning(this.refresher));
+        this.robot.startCleaning();
+        this.pollChanges();
     }
 
     async dock() {
-        this._refresh(() => this.robot.sendToBase(this.refresher));
+        this.robot.sendToBase();
+        this.pollChanges();
     }
 
     async pause() {
-        this._refresh(() => this.robot.pauseCleaning(this.refresher));
+        this.robot.pauseCleaning();
+        this.pollChanges();
     }
 
     async stop() {
-        this._refresh(() => this.robot.stopCleaning(this.refresher));
+        this.robot.stopCleaning();
+        this.pollChanges();
     }
 
     async resume() {
-        this._refresh(() => this.robot.resumeCleaning(this.refresher));
+        this.robot.resumeCleaning();
+        this.pollChanges();
     }
 
     async takePicture(): Promise<MediaObject> {
         const url = await new Promise<string>((resolve, reject) => {
             console.log(this.robot);
             this.robot.getMaps((err, result) => {
-                const {maps } = result;
+                const { maps } = result;
                 if (err) {
                     reject(new Error(JSON.stringify(err)));
                     return;
@@ -84,7 +87,7 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
                 resolve(maps[0].url);
             })
         });
-        
+
         const response = await axios(url, {
             responseType: 'arraybuffer',
         });
@@ -93,125 +96,135 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
 }
 
 
-function NeatoController() {
-}
+class NeatoController extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery {
+    client = new botvac.Client();
+    robots = new Map<string, Neato>();
 
-NeatoController.prototype.getDevice = function (id) {
-    return this.robots && this.robots[id];
-}
+    constructor() {
+        super();
 
-NeatoController.prototype.updateRobots = function (robots) {
-    var interfaces = ['StartStop', 'Pause', 'Dock', 'Battery', 'Camera', 'Refresh'];
+        const username = this.storage.getItem('username');
+        const password = this.storage.getItem('password');
+        const token = this.storage.getItem('token');
+        if (token) {
+            this.setClientToken(token);
+            this.discoverDevices();
+        }
+        else if (username && password) {
+            log.clearAlerts();
+            this.client.authorize(username, password, false, (error: Error) => {
+                if (error) {
+                    log.a(`Error authorizing with Neato servers: ${error}`);
+                    throw error;
+                }
 
-    this.robots = {};
-    for (var robot of robots) {
-        this.robots[robot._serial] = new Neato(robot._serial, robot);
+                this.discoverDevices();
+            });
+        }
+        else {
+            log.a('Use the Login button to sync your Neato vacuums.');
+        }
     }
 
-    var devices = robots.map(robot => {
-        return {
-            name: robot.name,
-            nativeId: robot._serial,
-            interfaces: interfaces,
-            type: 'Vacuum',
-        }
-    })
-
-    log.i(`found robots: ${JSON.stringify(devices)}`);
-
-    deviceManager.onDevicesChanged({
-        devices
-    });
-}
-
-NeatoController.prototype.getOauthUrl = function () {
-    var options = {
-        clientId: '44f85521f7730c9f213f25f5e36f080d1e274414f6138ff23fab614faa34fd22',
-        scopes: 'control_robots+maps',
-        redirectUrl: 'https://home.scrypted.app/oauth/callback'
-    }
-    var url = "https://apps.neatorobotics.com/oauth2/authorize?client_id=" + options["clientId"] + "&scope=" + options["scopes"] + "&response_type=token&redirect_uri=" + options["redirectUrl"];
-
-    return url;
-}
-
-function setClientToken(token) {
-    client._token = token;
-    client._tokenType = 'Bearer ';
-}
-
-NeatoController.prototype.onOauthCallback = function (callbackUrl) {
-    var params = callbackUrl.split('#')[1].split("&");
-
-    var token;
-    var authError;
-    var authErrorDescription;
-    params.forEach((item, index) => {
-        var key = item.split("=")[0] || "";
-        var value = item.split("=")[1] || "";
-
-        if (key.localeCompare("access_token") == 0) {
-            token = value;
-        }
-        else if (key.localeCompare("error") == 0) {
-            authError = value;
-        }
-        else if (key.localeCompare("error_description") == 0) {
-            authErrorDescription = value.replace(/\+/g, " ");
-        }
-    });
-
-    if (authError) {
-        log.a(`There was an error logging in with Neato: ${authError} ${authErrorDescription}`);
-        return;
-    }
-
-    localStorage.setItem('token', token);
-    setClientToken(token);
-    getRobots();
-}
-
-var neatoController = new NeatoController();
-
-//authorize
-
-function getRobots() {
-    log.clearAlerts();
-    //get your robots
-    client.getRobots(function (error, robots) {
-        if (error) {
-            log.a(`Error retrieving Neato robots: ${error}`);
-            throw error;
-        }
+    async discoverDevices(duration?: number) {
         log.clearAlerts();
+        //get your robots
+        this.client.getRobots((error: Error, robots: any) => {
+            if (error) {
+                this.console.error('Error retrieving Neato robots', error);
+                throw error;
+            }
+            log.clearAlerts();
 
-        var validRobots = robots
-            .filter(robot => robot._serial && robot._secret);
+            const validRobots = robots
+                .filter((robot: any) => robot._serial && robot._secret);
 
-        neatoController.updateRobots(validRobots);
-    });
-}
+            this.updateRobots(validRobots);
+        });
+    }
 
-const username = localStorage.getItem('username');
-const password = localStorage.getItem('password');
-const token = localStorage.getItem('token');
-if (token) {
-    setClientToken(token);
-    getRobots();
-}
-else if (username && password) {
-    log.clearAlerts();
-    client.authorize(username, password, false, function (error) {
-        if (error) {
-            log.a(`Error authorizing with Neato servers: ${error}`);
-            throw error;
+    getDevice(nativeId: string) {
+        return this.robots && this.robots[nativeId];
+    }
+
+    updateRobots(robots: any) {
+        const interfaces = [
+            ScryptedInterface.StartStop,
+            ScryptedInterface.Pause,
+            ScryptedInterface.Dock,
+            ScryptedInterface.Battery,
+            ScryptedInterface.Camera,
+            ScryptedInterface.Refresh
+        ];
+
+        for (const robot of robots) {
+            this.robots.set(robot._serial, new Neato(robot._serial, robot));
         }
 
-        getRobots();
-    });
-}
-else {
-    log.a('You must provide "username" and "password" values in your Script Settings or use the Login button to Log in with Neato.');
+        const devices = robots.map(robot => {
+            return {
+                name: robot.name,
+                nativeId: robot._serial,
+                interfaces: interfaces,
+                type: 'Vacuum',
+                info: {
+                    manufacturer: 'Neato Robotics',
+                    serialNumber: robot._serial,
+                }
+            } as Device
+        })
+
+        deviceManager.onDevicesChanged({
+            devices
+        });
+    }
+
+    getOauthUrl() {
+        const options = {
+            clientId: '44f85521f7730c9f213f25f5e36f080d1e274414f6138ff23fab614faa34fd22',
+            scopes: 'control_robots+maps',
+            redirectUrl: 'https://home.scrypted.app/oauth/callback'
+        }
+        const url = "https://apps.neatorobotics.com/oauth2/authorize?client_id=" + options["clientId"] + "&scope=" + options["scopes"] + "&response_type=token&redirect_uri=" + options["redirectUrl"];
+
+        return url;
+    }
+
+    setClientToken(token) {
+        this.client._token = token;
+        this.client._tokenType = 'Bearer ';
+    }
+
+    onOauthCallback(callbackUrl) {
+        const params = callbackUrl.split('#')[1].split("&");
+
+        let token: string;
+        let authError: string;
+        let authErrorDescription: string;
+        params.forEach((item: string) => {
+            const key = item.split("=")[0] || "";
+            const value = item.split("=")[1] || "";
+
+            if (key.localeCompare("access_token") == 0) {
+                token = value;
+            }
+            else if (key.localeCompare("error") == 0) {
+                authError = value;
+            }
+            else if (key.localeCompare("error_description") == 0) {
+                authErrorDescription = value.replace(/\+/g, " ");
+            }
+        });
+
+        if (authError) {
+            log.a(`There was an error logging in with Neato: ${authError} ${authErrorDescription}`);
+            return;
+        }
+
+        localStorage.setItem('token', token);
+        this.setClientToken(token);
+        this.discoverDevices();
+    }
 }
 
-export default neatoController;
+export default new NeatoController();
