@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/roborock",
-   "version": "0.0.1",
+   "version": "0.0.3",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -10,6 +10,12 @@
       "scrypted-deploy": "scrypted-deploy",
       "scrypted-webpack": "scrypted-webpack"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "xiaomi",
+      "roborock"
+   ],
    "scrypted": {
       "name": "Roborock Plugin",
       "type": "DeviceProvider",
@@ -20,7 +26,6 @@
       ]
    },
    "dependencies": {
-      "@types/node": "^16.6.1",
       "axios": "^0.24.0",
       "axios-cookiejar-support": "^2.0.3",
       "query-string": "^7.1.1",
@@ -30,8 +35,10 @@
       "arc4": "^3.4.0"
    },
    "devDependencies": {
+      "@types/node": "^16.6.1",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
+      "@types/lodash": "^4.14.178",
       "@types/tough-cookie": "^4.0.1"
    }
 }

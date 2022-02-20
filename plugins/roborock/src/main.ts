@@ -1,11 +1,13 @@
 import axios from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
-import { DeviceDiscovery, DeviceProvider, Dock, OnOff, Pause, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
+import { Battery, DeviceDiscovery, DeviceProvider, Dock, OnOff, Pause, Refresh, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/common/src/settings";
 import qs from 'query-string';
 import crypto from 'crypto';
+import throttle from 'lodash/throttle';
+
 const rc4 = require('arc4');
 
 
@@ -93,7 +95,7 @@ jar.setCookie("sdkVersion=accountsdk-18.8.15", 'http://xiaomi.com');
 jar.setCookie(`deviceId=${deviceId}`, 'http://mi.com');
 jar.setCookie(`deviceId=${deviceId}`, 'http://xiaomi.com');
 
-class RoborockVacuum extends ScryptedDeviceBase implements StartStop, Pause, Dock {
+class RoborockVacuum extends ScryptedDeviceBase implements StartStop, Pause, Dock, Refresh, Battery {
     storageSettings = new StorageSettings(this, {
         ip: {
             title: 'IP Address',
@@ -103,9 +105,34 @@ class RoborockVacuum extends ScryptedDeviceBase implements StartStop, Pause, Doc
             title: 'Token',
             description: 'The token used to authenticate with the device.',
         },
-    })
+    });
+
+    refreshThrottled = throttle(() => {
+        this.refresh(undefined, undefined);
+    }, 10000);
+
     constructor(nativeId: string) {
         super(nativeId);
+    }
+
+    async getRefreshFrequency() {
+        return 30;
+    }
+
+    async pollChanges() {
+        for (let i = 0; i < 20; i++) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            this.refreshThrottled();
+        }
+    }
+
+    async refresh(refreshInterface: string, userInitiated: boolean) {
+        const device = await this.findDevice();
+        const state = await device.state();
+        this.running = !state.charging || state.cleaning;
+        this.docked = state.charging;
+        this.paused = !state.charging && !state.cleaning;
+        this.batteryLevel = state.batteryLevel;
     }
 
     async findDevice() {
@@ -118,22 +145,27 @@ class RoborockVacuum extends ScryptedDeviceBase implements StartStop, Pause, Doc
     async start() {
         const device = await this.findDevice();
         await device.activateCleaning();
+        this.pollChanges();
     }
     async stop() {
         const device = await this.findDevice();
         await device.deactivateCleaning();
+        this.pollChanges();
     }
     async pause() {
         const device = await this.findDevice();
         await device.pause();
+        this.pollChanges();
     }
     async resume() {
         const device = await this.findDevice();
         await device.activateCleaning();
+        this.pollChanges();
     }
     async dock() {
         const device = await this.findDevice();
         await device.activateCharging();
+        this.pollChanges();
     }
 }
 
@@ -288,6 +320,8 @@ class RoborockPlugin extends ScryptedDeviceBase implements DeviceDiscovery, Devi
                         type: ScryptedDeviceType.Vacuum,
                         nativeId: device.mac,
                         interfaces: [
+                            ScryptedInterface.Refresh,
+                            ScryptedInterface.Battery,
                             ScryptedInterface.StartStop,
                             ScryptedInterface.Pause,
                             ScryptedInterface.Dock,
