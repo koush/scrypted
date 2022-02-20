@@ -1,4 +1,4 @@
-import { Settings, Setting, MixinDeviceBase, ScryptedInterface } from "@scrypted/sdk";
+import { Settings, Setting, MixinDeviceBase, ScryptedInterface, SettingValue } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 
 const { deviceManager } = sdk;
@@ -24,7 +24,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
     }
 
     abstract getMixinSettings(): Promise<Setting[]>;
-    abstract putMixinSetting(key: string, value: string | number | boolean): Promise<void>;
+    abstract putMixinSetting(key: string, value: SettingValue): Promise<void>;
 
     async getSettings(): Promise<Setting[]> {
         const settingsPromise = this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings) ? this.mixinDevice.getSettings() : undefined;
@@ -74,7 +74,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
         return allSettings;
     }
 
-    async putSetting(key: string, value: string | number | boolean) {
+    async putSetting(key: string, value: SettingValue) {
         const prefix = this.settingsGroupKey + ':';
         if (!key?.startsWith(prefix)) {
             return this.mixinDevice.putSetting(key, value);
