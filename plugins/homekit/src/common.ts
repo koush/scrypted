@@ -12,6 +12,7 @@ export interface SnapshotThrottle {
 }
 
 export interface HomeKitSession {
+    storage: Storage;
     snapshotThrottles: Map<string, SnapshotThrottle>;
     isHomeKitHub(ip: string): boolean;
     detectedHomeKitHub(ip: string): void;
@@ -21,7 +22,6 @@ interface SupportedType {
     type: ScryptedDeviceType;
     probe(device: DummyDevice): boolean;
     getAccessory: (device: ScryptedDevice & any, homekitSession: HomeKitSession) => Promise<Accessory>;
-    noBridge?: boolean;
 }
 
 export const supportedTypes: { [type: string]: SupportedType } = {};

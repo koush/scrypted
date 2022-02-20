@@ -1,19 +1,15 @@
 import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue, MediaStreamOptions, ScryptedInterfaceProperty } from "@scrypted/sdk";
-import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
 import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmpeg-hardware-acceleration";
+import { HomekitMixin } from "./homekit-mixin";
 
 const { log, systemManager, deviceManager } = sdk;
 
 export const defaultObjectDetectionContactSensorTimeout = 60;
 
-export class CameraMixin extends SettingsMixinDeviceBase<any> implements Settings {
-    constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
-        super(mixinDevice, mixinDeviceState, {
-            providerNativeId,
-            mixinDeviceInterfaces,
-            group: "HomeKit Settings",
-            groupKey: "homekit",
-        });
+export class CameraMixin extends HomekitMixin<any> {
+    constructor(mixinDevice: any, mixinDeviceState: { [key: string]: any }, options: SettingsMixinDeviceOptions) {
+        super(mixinDevice, mixinDeviceState, options);
     }
 
     async getMixinSettings(): Promise<Setting[]> {
@@ -27,7 +23,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         catch (e) {
         }
 
-        if (msos?.length) {
+        if (msos?.length > 1) {
             settings.push({
                 title: 'Live Stream',
                 key: 'streamingChannel',
@@ -47,7 +43,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
 
         const hasMotionSensor = this.storage.getItem('linkedMotionSensor') || this.interfaces.includes(ScryptedInterface.MotionSensor);
         if (hasMotionSensor) {
-            if (msos?.length) {
+            if (msos?.length > 1) {
                 settings.push({
                     title: 'Recording Stream',
                     key: 'recordingChannel',
@@ -57,6 +53,26 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
                 });
             }
         }
+
+        settings.push(
+            {
+                title: 'Linked Motion Sensor',
+                key: 'linkedMotionSensor',
+                type: 'device',
+                deviceFilter: 'interfaces.includes("MotionSensor")',
+                value: this.storage.getItem('linkedMotionSensor') || null,
+                placeholder: this.interfaces.includes(ScryptedInterface.MotionSensor)
+                    ? 'Built-In Motion Sensor' : 'None',
+                description: "Link motion sensor used to trigger HomeKit Secure Video recordings.",
+            },
+            {
+                title: 'Never Wait for Snapshots',
+                value: (this.storage.getItem('blankSnapshots') === 'true').toString(),
+                key: 'blankSnapshots',
+                description: 'Send blank images instead of waiting snapshots. Improves HomeKit responsiveness with slow cameras.',
+                type: 'boolean'
+            }
+        );
 
         // settings.push({
         //     title: 'H265 Streams',
@@ -143,17 +159,6 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             });
         }
 
-        settings.push({
-            title: 'Linked Motion Sensor',
-            key: 'linkedMotionSensor',
-            type: 'device',
-            deviceFilter: 'interfaces.includes("MotionSensor")',
-            value: this.storage.getItem('linkedMotionSensor') || null,
-            placeholder: this.interfaces.includes(ScryptedInterface.MotionSensor)
-                ? 'Built-In Motion Sensor' : 'None',
-            description: "Link motion sensor used to trigger HomeKit Secure Video recordings.",
-        })
-
         if (this.interfaces.includes(ScryptedInterface.AudioSensor)) {
             settings.push({
                 title: 'Audio Activity Detection',
@@ -210,10 +215,14 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
             });
         }
 
-        return settings;
+        return [...settings, ...await super.getMixinSettings()];
     }
 
     async putMixinSetting(key: string, value: SettingValue) {
+        if (this.storageSettings.settings[key]) {
+            return super.putMixinSetting(key, value);
+        }
+
         if (key === 'videoDecoderArguments') {
             const decoderArgs = getH264DecoderArgs();
             value = decoderArgs[value.toString()]?.join(' ') || value;
@@ -244,7 +253,7 @@ export class CameraMixin extends SettingsMixinDeviceBase<any> implements Setting
         }
 
         if (key === 'detectAudio' || key === 'linkedMotionSensor' || key === 'objectDetectionContactSensors') {
-            log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);
+            super.alertReload();
         }
 
         deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);

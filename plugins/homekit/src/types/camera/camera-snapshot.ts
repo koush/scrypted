@@ -9,7 +9,7 @@ const { mediaManager } = sdk;
 
 const black = fs.readFileSync('black.jpg');
 
-export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, homekitSession: HomeKitSession) {
+export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitSession: HomeKitSession) {
     let lastPictureTime = 0;
     let lastPicture: Buffer;
     let pendingPicture: Promise<Buffer>;
@@ -97,7 +97,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             snapshotAll(request);
 
             // path to return blank snapshots
-            if (localStorage.getItem('blankSnapshots') === 'true') {
+            if (storage.getItem('blankSnapshots') === 'true') {
                 if (lastPicture && lastPictureTime > Date.now() - 15000) {
                     callback(null, lastPicture);
                 }

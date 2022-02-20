@@ -1,4 +1,5 @@
-import { HAPStorage } from './hap';
+import { ScryptedDeviceType } from '@scrypted/sdk';
+import { Categories, HAPStorage } from './hap';
 import './types'
 
 
@@ -43,5 +44,36 @@ export function getHAPUUID(storage: Storage) {
         uuid = createHAPUUID();
         storage.setItem('uuid', uuid);
     }
-    return uuid;   
+    return uuid;
+}
+
+export function typeToCategory(type: ScryptedDeviceType): Categories {
+    switch (type) {
+        case ScryptedDeviceType.Camera:
+            return Categories.CAMERA;
+        case ScryptedDeviceType.Doorbell:
+            return Categories.VIDEO_DOORBELL;
+        case ScryptedDeviceType.Fan:
+            return Categories.FAN;
+        case ScryptedDeviceType.Garage:
+            return Categories.GARAGE_DOOR_OPENER;
+        case ScryptedDeviceType.Irrigation:
+            return Categories.SPRINKLER;
+        case ScryptedDeviceType.Light:
+            return Categories.LIGHTBULB;
+        case ScryptedDeviceType.Lock:
+            return Categories.DOOR_LOCK;
+        case ScryptedDeviceType.Display:
+            return Categories.TELEVISION;
+        case ScryptedDeviceType.Outlet:
+            return Categories.OUTLET;
+        case ScryptedDeviceType.Sensor:
+            return Categories.SENSOR;
+        case ScryptedDeviceType.Switch:
+            return Categories.SWITCH;
+        case ScryptedDeviceType.Thermostat:
+            return Categories.THERMOSTAT;
+        case ScryptedDeviceType.Vacuum:
+            return Categories.OUTLET;
+    }
 }

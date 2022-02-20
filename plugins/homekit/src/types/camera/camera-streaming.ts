@@ -58,7 +58,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
     }
 
     const delegate: CameraStreamingDelegate = {
-        handleSnapshotRequest: createSnapshotHandler(device, homekitSession),
+        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitSession),
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
 
             const videossrc = CameraController.generateSynchronisationSource();
@@ -99,7 +99,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             }
 
             // plugin scope or device scope?
-            const addressOverride = localStorage.getItem('addressOverride');
+            const addressOverride = homekitSession.storage.getItem('addressOverride');
             if (addressOverride) {
                 console.log('using address override', addressOverride);
                 response.addressOverride = addressOverride;
