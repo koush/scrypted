@@ -1,18 +1,14 @@
-import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVMessage, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { SipSession, RingApi, RingCamera, RtpDescription, RingRestClient } from './ring-client-api';
+import { RingApi, RingCamera, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../..//common/src/settings';
-import { createBindZero, listenZeroSingleClient } from '../../../common/src/listen-cluster';
-import { createCryptoLine, encodeSrtpOptions } from './srtp-utils';
-import child_process, { ChildProcess } from 'child_process';
+import { ChildProcess } from 'child_process';
 import { createRTCPeerConnectionSource, startRTCSignalingSession } from '../../../common/src/wrtc-to-rtsp';
 import { generateUuid } from './ring-client-api';
 import fs from 'fs';
 import { clientApi } from './ring-client-api';
-import { RtspServer } from '../../../common/src/rtsp-server';
 import { RefreshPromise, singletonPromise, timeoutPromise } from './util';
 import { LiveCallNegotiation } from './ring-client-api';
-import { isStunMessage } from './ring-client-api';
 import dgram from 'dgram';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
@@ -50,8 +46,6 @@ class RingCameraLight extends ScryptedDeviceBase implements OnOff {
 class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, DeviceProvider, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor, RTCSignalingChannel {
     signalingMime: string;
     webrtcSession: string;
-    session: SipSession;
-    rtpDescription: RtpDescription;
     audioOutForwarder: dgram.Socket;
     audioOutProcess: ChildProcess;
     ffmpegInput: FFMpegInput;
@@ -156,173 +150,15 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
         return;
     }
 
-    resetStreamTimeout() {
-        this.console.log('starting/refreshing stream');
-        clearTimeout(this.refreshTimeout);
-        this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT);
-    }
-
-    stopSession() {
-        if (this.session) {
-            this.console.log('ending sip session');
-            this.session.stop();
-            this.session = undefined;
-        }
-    }
-
-    stopWebRtcSession() {
-        if (this.webrtcSession) {
-            this.console.log('ending webrtc session');
-            this.findCamera().endWebRtcSession(this.webrtcSession);
-            this.webrtcSession = undefined;
-        }
-    }
-
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-        if (options?.id === RtcMediaStreamOptionsId) {
-            const buffer = Buffer.from(this.id.toString());
-            return mediaManager.createMediaObject(buffer, this.signalingMime);
-        }
-
-        if (options?.refreshAt) {
-            if (!this.ffmpegInput?.mediaStreamOptions)
-                throw new Error("no stream to refresh");
-
-            const ffmpegInput = this.ffmpegInput;
-            ffmpegInput.mediaStreamOptions.refreshAt = Date.now() + STREAM_TIMEOUT;
-            this.resetStreamTimeout();
-            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
-        }
-
-        this.stopSession();
-
-
-        const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient();
-        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
-
-
-        playbackPromise.then(async (client) => {
-            client.setKeepAlive(true, 10000);
-            let sip: SipSession;
-            try {
-                const cleanup = () => {
-                    client.destroy();
-                    if (this.session === sip)
-                        this.session = undefined;
-                    try {
-                        this.console.log('stopping ring sip session.');
-                        sip.stop();
-                    }
-                    catch (e) {
-                    }
-                }
-
-                client.on('close', cleanup);
-                client.on('error', cleanup);
-
-                const camera = this.findCamera();
-                sip = await camera.createSipSession({
-                    skipFfmpegCheck: true,
-                });
-                sip.onCallEnded.subscribe(cleanup);
-                this.rtpDescription = await sip.start();
-
-                const inputSdpLines = [
-                    'v=0',
-                    'o=105202070 3747 461 IN IP4 127.0.0.1',
-                    's=Talk',
-                    'c=IN IP4 127.0.0.1',
-                    'b=AS:380',
-                    't=0 0',
-                    'a=rtcp-xr:rcvr-rtt=all:10000 stat-summary=loss,dup,jitt,TTL voip-metrics',
-                    `m=audio 0 RTP/SAVP 0 101`,
-                    'a=control:trackID=audio',
-                    'a=rtpmap:0 PCMU/8000',
-                    createCryptoLine(this.rtpDescription.audio),
-                    'a=rtcp-mux',
-                    `m=video 0 RTP/SAVP 99`,
-                    'a=control:trackID=video',
-                    'a=rtpmap:99 H264/90000',
-                    createCryptoLine(this.rtpDescription.video),
-                    'a=rtcp-mux'
-                ];
-                const rtsp = new RtspServer(client, inputSdpLines.filter((x) => Boolean(x)).join('\n'));
-                rtsp.console = this.console;
-                rtsp.audioChannel = 0;
-                rtsp.videoChannel = 2;
-                await rtsp.handlePlayback();
-                sip.videoSplitter.addMessageHandler(({ isRtpMessage, message }) => {
-                    if (!isStunMessage(message))
-                        rtsp.sendVideo(message, !isRtpMessage);
-                    return null;
-                });
-                sip.audioSplitter.addMessageHandler(({ isRtpMessage, message }) => {
-                    if (!isStunMessage(message))
-                        rtsp.sendAudio(message, !isRtpMessage);
-                    return null;
-                });
-
-                sip.requestKeyFrame();
-                this.session = sip;
-
-                try {
-                    await rtsp.handleTeardown();
-                    this.console.log('rtsp client ended');
-                }
-                catch (e) {
-                    this.console.log('rtsp client ended ungracefully', e);
-                }
-                finally {
-                    cleanup();
-                }
-            }
-            catch (e) {
-                sip?.stop();
-                throw e;
-            }
-        });
-
-        const ffmpegInput: FFMpegInput = {
-            url: playbackUrl,
-            mediaStreamOptions: Object.assign(this.getSipMediaStreamOptions(), {
-                refreshAt: Date.now() + STREAM_TIMEOUT,
-            }),
-            inputArguments: [
-                '-rtsp_transport', 'tcp',
-                '-i', playbackUrl,
-            ],
-        };
-        this.ffmpegInput = ffmpegInput;
-        this.resetStreamTimeout();
-
-        return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
+        const buffer = Buffer.from(this.id.toString());
+        return mediaManager.createMediaObject(buffer, this.signalingMime);
     }
 
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         return [
-            this.getSipMediaStreamOptions(),
             this.getWebRtcMediaStreamOptions(),
         ]
-    }
-
-    getSipMediaStreamOptions(): MediaStreamOptions {
-        return {
-            id: 'sip',
-            name: 'SIP',
-            // note that the rtsp stream comes from scrypted,
-            // can bypass ffmpeg parsing.
-            tool: "scrypted",
-            container: 'rtsp',
-            video: {
-                codec: 'h264',
-            },
-            audio: {
-                // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
-                codec: 'pcm_mulaw',
-            },
-            source: 'cloud',
-            userConfigurable: false,
-        };
     }
 
     getWebRtcMediaStreamOptions(): MediaStreamOptions {
@@ -342,50 +178,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
-        if (!this.session)
-            throw new Error("not in call");
 
-        this.stopIntercom();
-
-        const ffmpegInput: FFMpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
-
-        const ringRtpOptions = this.rtpDescription;
-        const ringAudioLocation = {
-            port: ringRtpOptions.audio.port,
-            address: ringRtpOptions.address,
-        };
-        let cameraSpeakerActive = false;
-        const { server: audioOutForwarder, port: audioOutPort } = await createBindZero();
-        this.audioOutForwarder = audioOutForwarder;
-        audioOutForwarder.on('message', message => {
-            if (!cameraSpeakerActive) {
-                cameraSpeakerActive = true;
-                this.session.activateCameraSpeaker().catch(e => this.console.error('camera speaker activation error', e))
-            }
-
-            this.session.audioSplitter.send(message, ringAudioLocation).catch(e => this.console.error('audio splitter error', e))
-        });
-
-        const args = ffmpegInput.inputArguments.slice();
-        args.push(
-            '-vn', '-dn', '-sn',
-            '-acodec', 'pcm_mulaw',
-            '-flags', '+global_header',
-            '-ac', '1',
-            '-ar', '8k',
-            '-f', 'rtp',
-            '-srtp_out_suite', 'AES_CM_128_HMAC_SHA1_80',
-            '-srtp_out_params', encodeSrtpOptions(this.session.rtpOptions.audio),
-            `srtp://127.0.0.1:${audioOutPort}?pkt_size=188`,
-        );
-
-        const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
-        this.audioOutProcess = cp;
-        cp.on('exit', () => this.console.log('two way audio ended'));
-        this.session.onCallEnded.subscribe(() => {
-            audioOutForwarder.close();
-            cp.kill('SIGKILL');
-        });
     }
 
     async stopIntercom(): Promise<void> {
