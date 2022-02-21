@@ -328,6 +328,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
 
+        if (!pluginHost || !pluginDevice) {
+            console.error('plugin does not exist or is still starting up.');
+            res.writeHead(500);
+            res.end();
+            return;
+        }
+
         (req as any).scrypted = {
             endpointRequest,
             pluginDevice,
