@@ -1,9 +1,9 @@
-import { RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes, MediaObject } from "@scrypted/sdk/types";
 import child_process from 'child_process';
 import net from 'net';
 import { listenZero } from "./listen-cluster";
 import { ffmpegLogInitialOutput } from "./media-helpers";
-import sdk from "@scrypted/sdk";
+import sdk, { RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
+import { RpcPeer } from "../../server/src/rpc";
 
 const { mediaManager } = sdk;
 
@@ -38,6 +38,7 @@ interface RTCSession {
   resolve?: (value: any) => void;
 }
 
+// todo: remove this legacy path
 export function addBuiltins(mediaManager: MediaManager) {
   // older scrypted runtime won't have this property, and wrtc will be built in.
   if (!mediaManager.builtinConverters)
@@ -127,11 +128,6 @@ export function addBuiltins(mediaManager: MediaManager) {
       return Buffer.from(JSON.stringify(ret));
     }
   })
-}
-
-export interface RTCPeerConnectionMediaObjectSession {
-  pc: RTCPeerConnection;
-  answer: RTCAVMessage;
 }
 
 export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, options?: {
@@ -333,46 +329,79 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   return pc;
 }
 
-export async function startRTCPeerConnection(mediaObject: MediaObject, offer: RTCAVMessage, options?: {
+export async function startRTCPeerConnection(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingChannelOptions & {
   maxWidth: number,
-}): Promise<RTCPeerConnectionMediaObjectSession> {
-  const configuration: RTCConfiguration = {
-    iceServers: [
-      {
-        urls: ["turn:turn0.clockworkmod.com", "turn:n0.clockworkmod.com", "turn:n1.clockworkmod.com"],
-        username: "foo",
-        credential: "bar",
-      },
-    ],
-  };
-
+}) {
   const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput);
   const ffInput = JSON.parse(buffer.toString());
 
   const pc = await startRTCPeerConnectionFFmpegInput(ffInput, options);
 
-  const done = new Promise(resolve => {
+  try {
     pc.onicecandidate = ev => {
-      if (!ev.candidate)
-        resolve(undefined);
+      if (ev.candidate) {
+        console.log('local candidate', ev.candidate);
+        session.addIceCandidate(JSON.parse(JSON.stringify(ev.candidate)));
+      }
     }
-  })
-  await pc.setRemoteDescription(offer.description);
-  for (const c of offer.candidates || []) {
-    pc.addIceCandidate(c);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const setup: RTCAVSignalingSetup = {
+      type: 'offer',
+      audio: {
+        direction: 'recvonly',
+      },
+      video: {
+        direction: 'recvonly',
+      }
+    };
+    await session.setRemoteDescription(offer, setup);
+
+    const answer = await session.createLocalDescription('answer', setup, async (candidate) => {
+      console.log('remote candidate', candidate);
+      pc.addIceCandidate(candidate);
+    });
+
+    await pc.setRemoteDescription(answer);
   }
-  let answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  await done;
+  catch (e) {
+    pc.close();
+    throw e;
+  }
+}
 
+export async function startBrowserRTCSignaling(camera: ScryptedDevice & RTCSignalingChannel & VideoCamera, ws: WebSocket, console: Console) {
+  try {
+    const peer = new RpcPeer("google-home", "cast-receiver", (message, reject) => {
+      const json = JSON.stringify(message);
+      try {
+        ws.send(json);
+      }
+      catch (e) {
+        reject?.(e);
+      }
+    });
+    ws.onmessage = message => {
+      const json = JSON.parse(message.data);
+      peer.handleMessage(json);
+    };
 
-  return {
-    pc,
-    answer: {
-      id: undefined,
-      candidates: undefined,
-      description: pc.currentLocalDescription,
-      configuration,
+    const session: RTCSignalingSession = await peer.getParam('session');
+    const options: RTCSignalingChannelOptions = await peer.getParam('options');
+
+    if (camera.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
+      camera.startRTCSignalingSession(session, options);
     }
-  };
+    else {
+      startRTCPeerConnection(console, await camera.getVideoStream(), session, Object.assign({
+        maxWidth: 960,
+      }, options));
+    }
+  }
+  catch (e) {
+    console.error("error negotiating browser RTCC signaling", e);
+    ws.close();
+    throw e;
+  }
 }

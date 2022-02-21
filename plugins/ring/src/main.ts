@@ -3,7 +3,8 @@ import sdk from '@scrypted/sdk';
 import { RingApi, RingCamera, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../..//common/src/settings';
 import { ChildProcess } from 'child_process';
-import { createRTCPeerConnectionSource, startRTCSignalingSession } from '../../../common/src/wrtc-to-rtsp';
+import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-to-rtsp';
+import { startRTCSignalingSession } from '../../../common/src/rtc-signaling';
 import { generateUuid } from './ring-client-api';
 import fs from 'fs';
 import { clientApi } from './ring-client-api';
@@ -104,7 +105,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
                     )
                 }
                 else if (message.method === 'ice') {
-                    session.onIceCandidate({
+                    session.addIceCandidate({
                         candidate: message.ice,
                         sdpMLineIndex: message.mlineindex,
                     })

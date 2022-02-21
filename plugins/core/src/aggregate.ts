@@ -1,7 +1,7 @@
 import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, MediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
-import { startParserSession, ParserSession, createParserRebroadcaster, Rebroadcaster, createRebroadcaster } from "../../../common/src/ffmpeg-rebroadcast";
-import { createMpegTsParser, StreamParser } from "../../../common/src/stream-parser";
+import { startParserSession, ParserSession, createParserRebroadcaster, Rebroadcaster, createRebroadcaster } from "@scrypted/common/src/ffmpeg-rebroadcast";
+import { createMpegTsParser, StreamParser } from "@scrypted/common/src/stream-parser";
 const { systemManager, mediaManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {

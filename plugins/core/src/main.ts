@@ -1,4 +1,4 @@
-import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, DeviceProvider, ScryptedInterface, ScryptedDeviceType } from '@scrypted/sdk';
+import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, DeviceProvider, ScryptedInterface, ScryptedDeviceType, RTCSignalingChannel, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
@@ -12,9 +12,10 @@ import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { Script } from './script';
-import { addBuiltins } from "../../../common/src/ffmpeg-to-wrtc";
+import { addBuiltins } from "@scrypted/common/src/ffmpeg-to-wrtc";
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
+import { startBrowserRTCSignaling } from "@scrypted/common/src/ffmpeg-to-wrtc";
 
 addBuiltins(mediaManager);
 
@@ -169,12 +170,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.scripts.get(nativeId);
     }
 
-    async discoverDevices(duration: number) {
+    checkEngineIoEndpoint(request: HttpRequest, name: string) {
+        const check = `/endpoint/@scrypted/core/engine.io/${name}/`;
+        if (!request.url.startsWith(check))
+            return null;
+        return check;
     }
 
     async checkService(request: HttpRequest, ws: WebSocket, name: string): Promise<boolean> {
-        const check = `/endpoint/@scrypted/core/engine.io/${name}/`;
-        if (!request.url.startsWith(check))
+        const check = this.checkEngineIoEndpoint(request, name);
+        if (!check)
             return false;
         const deviceId = request.url.substr(check.length).split('/')[0];
         const plugins = await systemManager.getComponent('plugins');
@@ -194,6 +199,17 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         const ws = new WebSocket(webSocketUrl);
 
         if (await this.checkService(request, ws, 'console') || await this.checkService(request, ws, 'repl')) {
+            return;
+        }
+
+        if (this.checkEngineIoEndpoint(request, 'videocamera')) {
+            const url  = new URL(`http://localhost${request.url}`);
+            const deviceId = url.searchParams.get('deviceId');
+            const camera = systemManager.getDeviceById<VideoCamera & RTCSignalingChannel>(deviceId);
+            if (!camera)
+                ws.close();
+            else
+                startBrowserRTCSignaling(camera, ws, this.console);
             return;
         }
 

@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@scrypted/sdk": "file:../../../../sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.18"
+  }
+}

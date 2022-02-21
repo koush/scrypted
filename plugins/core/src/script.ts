@@ -1,5 +1,5 @@
 import { Scriptable, Program, ScryptedDeviceBase, ScriptSource } from "@scrypted/sdk";
-import { createMonacoEvalDefaults } from "../../../common/src/scrypted-eval";
+import { createMonacoEvalDefaults } from "@scrypted/common/src/scrypted-eval";
 import { scryptedEval } from "./scrypted-eval";
 
 const monacoEvalDefaults = createMonacoEvalDefaults({});

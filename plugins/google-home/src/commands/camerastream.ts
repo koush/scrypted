@@ -1,4 +1,4 @@
-import { Brightness, OnOff, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import { Brightness, OnOff, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import { executeResponse } from "../common";
 import { commandHandlers } from "../handlers";
 
@@ -7,9 +7,9 @@ const {mediaManager, endpointManager, systemManager } = sdk;
 
 const tokens: { [token: string]: string } = {};
 
-export function canAccess(token: string): ScryptedDevice & VideoCamera {
+export function canAccess(token: string): ScryptedDevice & VideoCamera & RTCSignalingChannel {
     const id = tokens[token];
-    return systemManager.getDeviceById(id) as ScryptedDevice & VideoCamera;
+    return systemManager.getDeviceById(id) as ScryptedDevice & VideoCamera & RTCSignalingChannel;
 }
 
 commandHandlers['action.devices.commands.GetCameraStream'] = async (device: ScryptedDevice & VideoCamera, execution) => {
@@ -24,6 +24,7 @@ commandHandlers['action.devices.commands.GetCameraStream'] = async (device: Scry
 
     ret.states = {
         cameraStreamAccessUrl,
+        // cameraStreamReceiverAppId: "9E3714BD",
         cameraStreamReceiverAppId: "00F7C5DD",
         cameraStreamAuthToken,
     }

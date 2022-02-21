@@ -3,11 +3,11 @@ import {connectScryptedClient} from '../../../../packages/client/src/index';
 import axios from 'axios';
 import store from './store';
 
-function hasValue(state, property) {
+function hasValue(state: any, property: string) {
     return state[property] && state[property].value;
 }
 
-function isValidDevice(id) {
+function isValidDevice(id: string) {
     const state = store.state.systemState[id];
     for (const property of [
         "name",

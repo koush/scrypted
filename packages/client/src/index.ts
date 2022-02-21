@@ -1,5 +1,5 @@
-import { ScryptedStatic } from "@scrypted/types";
-export * from "@scrypted/types";
+import { ScryptedStatic } from "../../../sdk/types/index";
+export * from "../../../sdk/types/index";
 import { SocketOptions } from 'engine.io-client';
 import eio from 'engine.io-client';
 import { attachPluginRemote } from  '../../../server/src/plugin/plugin-remote';

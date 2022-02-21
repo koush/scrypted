@@ -1,4 +1,4 @@
-import { RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingChannel, FFMpegInput, MediaStreamOptions } from "@scrypted/sdk/types";
+import { RTCAVSignalingSetup, RTCSignalingChannel, FFMpegInput, MediaStreamOptions } from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "./listen-cluster";
 import { RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
 import dgram from 'dgram';
@@ -53,23 +53,6 @@ export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamO
             codec: 'opus',
         },
     };
-}
-
-export async function startRTCSignalingSession(session: RTCSignalingSession, offer: RTCSessionDescriptionInit,
-    createSetup: () => Promise<RTCAVSignalingSetup>,
-    sendRemoteDescription: (remoteDescription: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit>,
-    sendCandidate?: (candidate: RTCIceCandidate) => Promise<void>) {
-    const setup = await createSetup();
-    if (!offer) {
-        const offer = await session.createLocalDescription('offer', setup, sendCandidate);
-        const answer = await sendRemoteDescription(offer);
-        await session.setRemoteDescription(answer, setup);
-    }
-    else {
-        await session.setRemoteDescription(offer, setup);
-        const answer = await session.createLocalDescription('answer', setup, sendCandidate);
-        await sendRemoteDescription(answer);
-    }
 }
 
 export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase & RTCSignalingChannel, id: string): Promise<FFMpegInput> {
@@ -228,7 +211,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                 rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
                 await rtspServer.handleSetup();
             },
-            onIceCandidate: async (candidate: RTCIceCandidateInit) => {
+            addIceCandidate: async (candidate: RTCIceCandidateInit) => {
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
             }
         });

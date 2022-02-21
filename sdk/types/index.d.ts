@@ -1325,7 +1325,7 @@ export declare type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidate) 
 export interface RTCSignalingSession {
     createLocalDescription: (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate) => Promise<RTCSessionDescriptionInit>;
     setRemoteDescription: (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => Promise<void>;
-    onIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
+    addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
 }
 export interface RTCSignalingChannelOptions {
     capabilities?: {

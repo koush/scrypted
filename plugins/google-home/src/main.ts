@@ -1,4 +1,4 @@
-import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MixinProvider, Refresh, RequestMediaStreamOptions, RTCAVMessage, RTCAVSignalingSetup, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes } from '@scrypted/sdk';
+import { EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, Refresh, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import type { SmartHomeV1DisconnectRequest, SmartHomeV1DisconnectResponse, SmartHomeV1ExecuteRequest, SmartHomeV1ExecuteResponse, SmartHomeV1ExecuteResponseCommands } from 'actions-on-google/dist/service/smarthome/api/v1';
 import { supportedTypes } from './common';
@@ -16,14 +16,13 @@ import { canAccess } from './commands/camerastream';
 import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
 import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
-import { addBuiltins, startRTCPeerConnection } from "../../../common/src/ffmpeg-to-wrtc";
+import { startBrowserRTCSignaling } from "@scrypted/common/src/ffmpeg-to-wrtc";
 
 import ciao, { Protocol } from '@homebridge/ciao';
 
 const responder = ciao.getResponder();
 
-const { systemManager, mediaManager, endpointManager, deviceManager } = sdk;
-addBuiltins(mediaManager);
+const { systemManager, endpointManager } = sdk;
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -90,12 +89,12 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             this.defaultIncluded = {};
         }
 
-        systemManager.listen((source, details, data) => {
+        systemManager.listen((source, details) => {
             if (source && details.changed && details.property)
                 this.queueReportState(source);
         });
 
-        systemManager.listen((eventSource, eventDetails, eventData) => {
+        systemManager.listen((eventSource, eventDetails) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
                 return;
 
@@ -193,7 +192,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
         ws.onmessage = async (message) => {
             const json = JSON.parse(message.data as string);
-            const { token, offer } = json;
+            const { token } = json;
 
             const camera = canAccess(token);
             if (!camera) {
@@ -201,49 +200,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 return;
             }
 
-            let setup: RTCAVSignalingSetup;
-
-            const msos = await camera.getVideoStreamOptions();
-            const found = msos.find(mso => mso.container?.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) as RequestMediaStreamOptions;
-            if (found) {
-                found.directMediaStream = true;
-                const mediaObject = await camera.getVideoStream(found);
-                const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, mediaObject.mimeType);
-                setup = JSON.parse(buffer.toString());
-
-                ws.onmessage = async (message) => {
-                    ws.onmessage = undefined;
-                    const json = JSON.parse(message.data as string);
-                    const { offer } = json;
-
-                    const mo = mediaManager.createMediaObject(Buffer.from(JSON.stringify(offer)), ScryptedMimeTypes.RTCAVOffer)
-                    const answer = await mediaManager.convertMediaObjectToBuffer(mo, undefined);
-                    ws.send(answer.toString());
-                }
-            }
-            else {
-                setup = {
-                    type: 'offer',
-                    audio: {
-                        direction: 'recvonly',
-                    },
-                    video: {
-                        direction: 'recvonly',
-                    },
-                }
-
-                ws.onmessage = async (message) => {
-                    ws.onmessage = undefined;
-                    const json = JSON.parse(message.data as string);
-                    const { offer } = json;
-                    // chromecast and nest hub are super underpowered so cap the width
-                    const { pc, answer } = await startRTCPeerConnection(await camera.getVideoStream(), offer, {
-                        maxWidth: 960,
-                    });
-                    ws.send(JSON.stringify(answer));
-                }
-            }
-            ws.send(JSON.stringify(setup));
+            await startBrowserRTCSignaling(camera, ws, this.console);
         }
     }
 
