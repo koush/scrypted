@@ -1,12 +1,11 @@
 import util from 'util';
-import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCAVMessage, RTCAVSignalingOfferSetup, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
 import mdns from 'multicast-dns';
 import mime from 'mime';
-import { addBuiltins, startRTCPeerConnection } from "../../../common/src/wrtc-convertors";
+import { createBrowserSignalingSession, startRTCPeerConnectionForBrowser } from "@scrypted/common/src/ffmpeg-to-wrtc";
 
 const { mediaManager, endpointManager, deviceManager } = sdk;
-addBuiltins(console, mediaManager);
 
 const { DefaultMediaReceiver } = require('castv2-client');
 const Client = require('castv2-client').Client;
@@ -191,7 +190,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     // try to make a webrtc a/v session to handle it.
 
     const engineio = await endpointManager.getPublicLocalEndpoint(this.nativeId) + 'engine.io/';
-    const mo = mediaManager.createMediaObject(engineio, ScryptedMimeTypes.LocalUrl);
+    const mo = mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
     const cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     const token = Math.random().toString();
     if (typeof media === 'string') {
@@ -243,42 +242,8 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         return;
       }
 
-      let setup: RTCAVSignalingOfferSetup;
-      try {
-        const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.RTCAVSignalingOfferSetup);
-        setup = JSON.parse(buffer.toString());
-
-        ws.onmessage = async (message) => {
-          ws.onmessage = undefined;
-          const json = JSON.parse(message.data as string);
-          const { offer } = json;
-
-          const mo = mediaManager.createMediaObject(Buffer.from(JSON.stringify(offer)), ScryptedMimeTypes.RTCAVOffer)
-          const answer = await mediaManager.convertMediaObjectToBuffer(mo, setup.signalingMimeType);
-          ws.send(answer.toString());
-        }
-      }
-      catch (e) {
-        setup = {
-          audio: {
-            direction: 'recvonly',
-          },
-          video: {
-            direction: 'recvonly',
-          },
-          signalingMimeType: undefined,
-        }
-
-        ws.onmessage = async (message) => {
-          ws.onmessage = undefined;
-          const json = JSON.parse(message.data as string);
-          const { offer } = json;
-          const { pc, answer } = await startRTCPeerConnection(mediaObject, offer);
-          ws.send(JSON.stringify(answer));
-        }
-      }
-
-      ws.send(JSON.stringify(setup));
+      const { session, options } = await createBrowserSignalingSession(ws);
+      startRTCPeerConnectionForBrowser(this.console, mediaObject, session, options);
     }
   }
 

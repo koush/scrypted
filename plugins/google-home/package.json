@@ -43,5 +43,5 @@
       "@types/lodash": "^4.14.168",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.40"
+   "version": "0.0.41"
 }

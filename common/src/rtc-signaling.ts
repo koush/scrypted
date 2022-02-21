@@ -29,6 +29,8 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
     constructor(public pc: RTCPeerConnection, cleanup: () => void) {
         const checkConn = () => {
+            console.log('iceConnectionState state', pc.iceConnectionState);
+            console.log('connectionState', pc.connectionState);
             if (pc.iceConnectionState === 'disconnected'
                 || pc.iceConnectionState === 'failed'
                 || pc.iceConnectionState === 'closed') {

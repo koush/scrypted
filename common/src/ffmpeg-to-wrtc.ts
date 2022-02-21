@@ -371,32 +371,44 @@ export async function startRTCPeerConnection(console: Console, mediaObject: Medi
   }
 }
 
+export function startRTCPeerConnectionForBrowser(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingChannelOptions) {
+  return startRTCPeerConnection(console, mediaObject, session, Object.assign({
+    maxWidth: 960,
+  }, options || {}));
+}
+
+export async function createBrowserSignalingSession(ws: WebSocket) {
+  const peer = new RpcPeer("google-home", "cast-receiver", (message, reject) => {
+    const json = JSON.stringify(message);
+    try {
+      ws.send(json);
+    }
+    catch (e) {
+      reject?.(e);
+    }
+  });
+  ws.onmessage = message => {
+    const json = JSON.parse(message.data);
+    peer.handleMessage(json);
+  };
+
+  const session: RTCSignalingSession = await peer.getParam('session');
+  const options: RTCSignalingChannelOptions = await peer.getParam('options');
+  return {
+    session,
+    options,
+  }
+}
+
 export async function startBrowserRTCSignaling(camera: ScryptedDevice & RTCSignalingChannel & VideoCamera, ws: WebSocket, console: Console) {
   try {
-    const peer = new RpcPeer("google-home", "cast-receiver", (message, reject) => {
-      const json = JSON.stringify(message);
-      try {
-        ws.send(json);
-      }
-      catch (e) {
-        reject?.(e);
-      }
-    });
-    ws.onmessage = message => {
-      const json = JSON.parse(message.data);
-      peer.handleMessage(json);
-    };
-
-    const session: RTCSignalingSession = await peer.getParam('session');
-    const options: RTCSignalingChannelOptions = await peer.getParam('options');
+    const { session, options } = await createBrowserSignalingSession(ws);
 
     if (camera.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
       camera.startRTCSignalingSession(session, options);
     }
     else {
-      startRTCPeerConnection(console, await camera.getVideoStream(), session, Object.assign({
-        maxWidth: 960,
-      }, options));
+      startRTCPeerConnectionForBrowser(console, await camera.getVideoStream(), session, options);
     }
   }
   catch (e) {

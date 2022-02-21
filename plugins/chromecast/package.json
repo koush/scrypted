@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/chromecast",
-   "version": "0.1.41",
+   "version": "0.1.43",
    "description": "Send video, audio, and text to speech notifications to Chromecast and Google Home devices",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -31,6 +31,7 @@
    },
    "dependencies": {
       "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/common": "file:../../common",
       "castv2-promise": "^1.0.0",
       "memoize-one": "^5.1.1",
       "mime": "^2.5.2",
