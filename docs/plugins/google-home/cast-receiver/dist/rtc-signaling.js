@@ -23,6 +23,8 @@ export class BrowserSignalingSession {
     constructor(pc, cleanup) {
         this.pc = pc;
         const checkConn = () => {
+            console.log('iceConnectionState state', pc.iceConnectionState);
+            console.log('connectionState', pc.connectionState);
             if (pc.iceConnectionState === 'disconnected'
                 || pc.iceConnectionState === 'failed'
                 || pc.iceConnectionState === 'closed') {
