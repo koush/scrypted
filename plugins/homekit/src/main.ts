@@ -195,7 +195,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                             port: 0,
                             pincode: this.pincode,
                             category: standaloneCategory,
-                            addIdentifyingMaterial: true,
+                            // addIdentifyingMaterial: true,
                             advertiser: this.getAdvertiser(),
                         });
                     }

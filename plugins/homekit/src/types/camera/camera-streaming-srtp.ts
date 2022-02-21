@@ -76,11 +76,11 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
             const videoSender = createCameraStreamSender(vconfig, session.videoReturn,
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
-                session.startRequest.video.rtcp_interval, false);
+                session.startRequest.video.rtcp_interval);
             const audioSender = createCameraStreamSender(aconfig, session.audioReturn,
                 session.audiossrc, session.startRequest.audio.pt,
                 session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
-                session.startRequest.audio.rtcp_interval, true);
+                session.startRequest.audio.rtcp_interval, session.startRequest.audio.packet_time);
             while (true) {
                 // trim the rtsp framing
                 if (isRtsp)

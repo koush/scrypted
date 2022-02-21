@@ -184,7 +184,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 const sender = createCameraStreamSender(aconfig, mangler.server,
                     session.audiossrc, session.startRequest.audio.pt,
                     session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
-                    session.startRequest.audio.rtcp_interval, true
+                    session.startRequest.audio.rtcp_interval, session.startRequest.audio.packet_time,
                 );
                 session.opusMangler = mangler.server;
                 mangler.server.on('message', data => {

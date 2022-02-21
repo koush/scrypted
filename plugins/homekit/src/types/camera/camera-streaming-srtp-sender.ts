@@ -10,7 +10,7 @@ import { RtcpSenderInfo, RtcpSrPacket } from '../../../../../external/werift/pac
 import { Config } from '../../../../../external/werift/packages/rtp/src/srtp/session';
 import { ntpTime } from './camera-utils';
 
-export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, isAudio: boolean) {
+export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, audioPacketTime?: number) {
     const srtpSession = new SrtpSession(config);
     const srtcpSession = new SrtcpSession(config);
 
@@ -34,13 +34,18 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
         if (!firstTimestamp)
             firstTimestamp = rtp.header.timestamp;
 
-        if (isAudio) {
+        if (audioPacketTime) {
             // from HAP spec:
             // RTP Payload Format for Opus Speech and Audio Codec RFC 7587 with an exception
             // that Opus audio RTP Timestamp shall be based on RFC 3550.
-            /// RFC 3550 indicates that 24k audio (which is we advertise to HAP and it requests),
-            // should have an interval of 480.
-            rtp.header.timestamp = firstTimestamp + packetCount * 480;
+            // RFC 3550 indicates that 24k audio (which we advertise to HAP and it requests),
+            // should have an interval of 480 when the packet time is 20.
+            // HAP spec also states that it may request packet times of 20, 30, 40, or 60.
+            // In practice, it requests 20 on LAN and 60 over LTE.
+            // So the RTP timestamp must scale accordingly.
+            // TODO: Support more sample rates from Opus besides 24k, to possibly
+            // codec copy and repacketize?
+            rtp.header.timestamp = firstTimestamp + packetCount * 480 * audioPacketTime / 20;
         }
 
         lastTimestamp = rtp.header.timestamp;
