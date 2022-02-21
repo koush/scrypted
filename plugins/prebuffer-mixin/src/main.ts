@@ -816,7 +816,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
 
     let active = 0;
-    const total = ids.length;
+    const total = enabledIds.length;
     for (const id of ids) {
       let session = this.sessions.get(id);
       if (!session) {
