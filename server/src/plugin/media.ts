@@ -219,6 +219,8 @@ export abstract class MediaManagerBase implements MediaManager {
             throw new Error('string is not a valid type. if you intended to send a url, use createMediaObjectFromUrl.');
         if (!mimeType)
             throw new Error('no mimeType provided');
+        if (mimeType === ScryptedMimeTypes.MediaObject)
+            return data;
 
         if (data.constructor.name !== Buffer.name)
             data = Buffer.from(JSON.stringify(data));
@@ -239,8 +241,19 @@ export abstract class MediaManagerBase implements MediaManager {
     async createMediaObjectFromUrl(data: string): Promise<MediaObject> {
         const url = new URL(data);
         const scheme = url.protocol.slice(0, -1);
-        const fromMimeType = ScryptedMimeTypes.SchemePrefix + scheme;
-        return this.createMediaObject(data, fromMimeType);
+        const mimeType = ScryptedMimeTypes.SchemePrefix + scheme;
+
+        class MediaObjectImpl implements MediaObjectRemote {
+            __proxy_props = {
+                mimeType,
+            }
+
+            mimeType = mimeType;
+            async getData(): Promise<Buffer | string> {
+                return Promise.resolve(data);
+            }
+        }
+        return new MediaObjectImpl();
     }
 
     async convert(converters: BufferConverter[], mediaObject: MediaObjectRemote, toMimeType: string): Promise<{ data: Buffer | string, mimeType: string }> {
