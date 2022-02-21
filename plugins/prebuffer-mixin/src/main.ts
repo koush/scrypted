@@ -845,9 +845,11 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         (async () => {
           while (this.sessions.get(id) === session && !this.released) {
             session.ensurePrebufferSession();
+            let wasActive = false;
             try {
               const ps = await session.parserSessionPromise;
               active++;
+              wasActive = true;
               this.online = active == total;
               await once(ps, 'killed');
               this.console.error('prebuffer session ended');
@@ -856,7 +858,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
               this.console.error('prebuffer session ended with error', e);
             }
             finally {
-              active--;
+              if (wasActive)
+                active--;
+              wasActive = false;
               this.online = active == total;
             }
             this.console.log('restarting prebuffer session in 5 seconds');

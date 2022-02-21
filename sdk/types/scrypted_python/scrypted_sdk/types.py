@@ -376,6 +376,10 @@ class Position(TypedDict):
     longitude: float
     pass
 
+class RTCSignalingChannelOptions(TypedDict):
+    capabilities: Any
+    pass
+
 class RTCSignalingSession(TypedDict):
     pass
 
@@ -686,7 +690,7 @@ class PushHandler:
     pass
 
 class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession) -> None:
+    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingChannelOptions = None) -> None:
         pass
     pass
 

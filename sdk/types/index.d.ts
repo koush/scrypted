@@ -1327,8 +1327,14 @@ export interface RTCSignalingSession {
     setRemoteDescription: (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => Promise<void>;
     onIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
 }
+export interface RTCSignalingChannelOptions {
+    capabilities?: {
+        video?: RTCRtpCapabilities;
+        audio?: RTCRtpCapabilities;
+    };
+}
 export interface RTCSignalingChannel {
-    startRTCSignalingSession(session: RTCSignalingSession): Promise<void>;
+    startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<void>;
 }
 export interface RTCAVSignalingSetup {
     audio: RTCRtpTransceiverInit;

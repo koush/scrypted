@@ -1288,8 +1288,15 @@ export interface RTCSignalingSession {
   onIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
 }
 
+export interface RTCSignalingChannelOptions {
+  capabilities?: {
+    video?: RTCRtpCapabilities;
+    audio?: RTCRtpCapabilities;
+  }
+}
+
 export interface RTCSignalingChannel {
-  startRTCSignalingSession(session: RTCSignalingSession): Promise<void>;
+  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<void>;
 }
 
 export interface RTCAVSignalingSetup {

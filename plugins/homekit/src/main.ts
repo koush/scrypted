@@ -1,5 +1,5 @@
-import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/sdk';
-import { Accessory, Bridge, Categories, Characteristic, MDNSAdvertiser, PublishInfo, Service } from './hap';
+import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, Online } from '@scrypted/sdk';
+import { Accessory, Bridge, Categories, Characteristic, MDNSAdvertiser, PublishInfo, Service, ControllerStorage } from './hap';
 import os from 'os';
 import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
 import './types'
@@ -12,6 +12,7 @@ import { randomPinCode } from './pincode';
 import { EventedHTTPServer } from './hap';
 import { getHAPUUID, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin } from './homekit-mixin';
+import { sleep } from '@scrypted/common/src/sleep';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -136,7 +137,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         const accessoryIds = new Set<string>();
 
         for (const id of Object.keys(systemManager.getSystemState())) {
-            const device = systemManager.getDeviceById(id);
+            const device = systemManager.getDeviceById<Online>(id);
             const supportedType = supportedTypes[device.type];
             if (!supportedType?.probe(device))
                 continue;
@@ -184,15 +185,56 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 const standalone = mixinStorage.getItem('standalone') === 'true';
                 const standaloneCategory = typeToCategory(device.type);
                 if (standalone && standaloneCategory) {
-                    accessory.publish({
-                        username: this.getUsername(mixinStorage),
-                        port: 0,
-                        pincode: this.pincode,
-                        category: standaloneCategory,
-                        addIdentifyingMaterial: true,
-                        advertiser: this.getAdvertiser(),
-                    });
                     this.standalones.set(device.id, accessory);
+
+                    let published = false;
+                    const publish = () => {
+                        published = true;
+                        accessory.publish({
+                            username: this.getUsername(mixinStorage),
+                            port: 0,
+                            pincode: this.pincode,
+                            category: standaloneCategory,
+                            addIdentifyingMaterial: true,
+                            advertiser: this.getAdvertiser(),
+                        });
+                    }
+
+                    const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
+                    const maybeUnpublish = async () => {
+                        // wait a bit for things to settle before unpublishing
+                        sleep(5000);
+                        // maybe it was already unpublished due to a weird race condition.
+                        if (!published)
+                            return;
+                        // the online state may no longer be applicable (rebroadcast removed)
+                        if (!device.interfaces.includes(ScryptedInterface.Online))
+                            return;
+
+                        mixinConsole.warn('Device is in accessory mode has gone offline. HomeKit services are being unpublished. ')
+                        published = false;
+                        // hack to allow republishing.
+                        accessory.controllerStorage = new ControllerStorage(accessory);
+                        accessory.unpublish();
+                    }
+
+                    if (device.interfaces.includes(ScryptedInterface.Online)) {
+                        if (device.online) {
+                            publish();
+                        }
+                        else {
+                            mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
+                        }
+                        device.listen(ScryptedInterface.Online, () => {
+                            if (device.online && !published)
+                                publish();
+                            else if (!device.online)
+                                maybeUnpublish();
+                        });
+                    }
+                    else {
+                        publish();
+                    }
                 }
                 else {
                     if (standalone)
