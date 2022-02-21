@@ -52,6 +52,16 @@ document.addEventListener("DOMContentLoaded", function (event) {
       const session = new BrowserSignalingSession(pc, () => window.close());
       rpcPeer.params['session'] = session;
       rpcPeer.params['options'] = session.options;
+
+      pc.ontrack = () => {
+        const mediaStream = new MediaStream(
+          pc.getReceivers().map((receiver) => receiver.track)
+        );
+        video.srcObject = mediaStream;
+        const remoteAudio = document.createElement("audio");
+        remoteAudio.srcObject = mediaStream;
+        remoteAudio.play();
+      };
     });
 
     return null;
