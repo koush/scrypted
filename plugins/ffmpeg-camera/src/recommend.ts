@@ -5,3 +5,10 @@ export async function recommendRebroadcast() {
         '@scrypted/prebuffer-mixin': 'Rebroadcast',
     });
 }
+
+export async function recommendDumbPlugins() {
+    alertRecommendedPlugins({
+        '@scrypted/snapshot': 'Snapshot Plugin',
+        '@scrypted/opencv': 'OpenCV Motion Detection',
+    });
+}

@@ -1,18 +1,18 @@
-import sdk, { Setting, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, PictureOptions, SettingValue } from "@scrypted/sdk";
+import sdk, { Setting, MediaObject, ScryptedInterface, FFMpegInput, PictureOptions, SettingValue } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
-import https from 'https';
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 import url from 'url';
+import { recommendDumbPlugins } from "./../../ffmpeg-camera/src/recommend";
 
 export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
-const { log, deviceManager, mediaManager } = sdk;
-
-const httpsAgent = new https.Agent({
-    rejectUnauthorized: false
-});
+const { mediaManager } = sdk;
 
 export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
+    takePictureThrottled(option?: PictureOptions): Promise<MediaObject> {
+        throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
+    }
+
     createRtspMediaStreamOptions(url: string, index: number) {
         return {
             id: `channel${index}`,
@@ -133,7 +133,6 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
 
     async getUrlSettings(): Promise<Setting[]> {
         return [
-            ...await this.getSnapshotUrlSettings(),
             ...await this.getRtspUrlSettings(),
         ];
     }
@@ -194,27 +193,10 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 
     async takePictureThrottled(option?: PictureOptions) {
-        if (this.showSnapshotUrlOverride() && this.getSnapshotUrl()) {
-            return super.takePictureThrottled(option);
-        }
-
         return this.takeSmartCameraPicture(option);;
     }
 
     abstract takeSmartCameraPicture(options?: PictureOptions): Promise<MediaObject>;
-
-    async getSnapshotUrlSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'snapshotUrl',
-                group: 'Advanced',
-                title: 'Snapshot URL Override',
-                placeholder: 'http://192.168.1.100[:80]/snapshot.jpg',
-                value: this.storage.getItem('snapshotUrl'),
-                description: 'Override the snapshot URL that will returns the current JPEG image.'
-            },
-        ];
-    }
 
     async getRtspUrlSettings(): Promise<Setting[]> {
         return [
@@ -250,12 +232,6 @@ export abstract class RtspSmartCamera extends RtspCamera {
 
             ret.push(
                 ... await this.getRtspUrlSettings(),
-            );
-        }
-
-        if (this.showSnapshotUrlOverride()) {
-            ret.push(
-                ... await this.getSnapshotUrlSettings(),
             );
         }
 
@@ -304,10 +280,6 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return true;
     }
 
-    showSnapshotUrlOverride() {
-        return true;
-    }
-
     getHttpAddress() {
         return `${this.getIPAddress()}:${this.storage.getItem('httpPort') || 80}`;
     }
@@ -316,7 +288,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         this.storage.setItem('httpPort', port);
     }
 
-    getRtspUrlOverride(options?: MediaStreamOptions) {
+    getRtspUrlOverride() {
         if (!this.showRtspUrlOverride())
             return;
         return this.storage.getItem('rtspUrlOverride');
@@ -350,6 +322,11 @@ export abstract class RtspSmartCamera extends RtspCamera {
 }
 
 export class RtspProvider extends CameraProviderBase<UrlMediaStreamOptions> {
+    constructor(nativeId?: string) {
+        super(nativeId);
+        recommendDumbPlugins();
+    }
+
     createCamera(nativeId: string): RtspCamera {
         return new RtspCamera(nativeId, this);
     }

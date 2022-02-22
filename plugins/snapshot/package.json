@@ -1,9 +1,7 @@
 {
-   "name": "@scrypted/ffmpeg-camera",
-   "version": "0.0.9",
-   "description": "FFmpeg Camera Plugin for Scrypted",
-   "author": "Scrypted",
-   "license": "Apache",
+   "name": "@scrypted/snapshot",
+   "version": "0.0.2",
+   "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -11,31 +9,28 @@
       "scrypted-deploy-debug": "scrypted-deploy-debug",
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
-      "scrypted-readme": "scrypted-readme",
-      "scrypted-package-json": "scrypted-package-json",
       "scrypted-webpack": "scrypted-webpack"
    },
    "keywords": [
       "scrypted",
       "plugin",
-      "ffmpeg",
+      "snapshot",
       "camera"
    ],
    "scrypted": {
-      "name": "FFmpeg Camera Plugin",
-      "type": "DeviceProvider",
+      "name": "Snapshot Plugin",
+      "type": "API",
       "interfaces": [
-         "DeviceProvider",
-         "DeviceCreator"
+         "MixinProvider"
       ]
-   },
-   "devDependencies": {
-      "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "@types/node": "^16.9.6"
    },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
-      "url-parse": "^1.4.7"
+      "@types/node": "^16.6.1",
+      "axios": "^0.24.0"
+   },
+   "devDependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
    }
 }

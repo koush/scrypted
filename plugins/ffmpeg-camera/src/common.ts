@@ -4,7 +4,7 @@ import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
 import { randomBytes } from "crypto";
 
-const { log, deviceManager, mediaManager } = sdk;
+const { deviceManager, mediaManager } = sdk;
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
@@ -22,8 +22,21 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
         super(nativeId);
     }
 
-    getSnapshotUrl() {
-        return this.storage.getItem('snapshotUrl');
+    protected async takePictureUrl(snapshotUrl: string) {
+        if (!this.snapshotAuth) {
+            this.snapshotAuth = new AxiosDigestAuth({
+                username: this.getUsername(),
+                password: this.getPassword(),
+            });
+        }
+        const response = await this.snapshotAuth.request({
+            httpsAgent,
+            method: "GET",
+            responseType: 'arraybuffer',
+            url: snapshotUrl,
+        });
+
+        return mediaManager.createMediaObject(Buffer.from(response.data), response.headers['Content-Type'] || 'image/jpeg');
     }
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {
@@ -35,28 +48,7 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
         return this.pendingPicture;
     }
 
-    async takePictureThrottled(option?: PictureOptions): Promise<MediaObject> {
-        const snapshotUrl = this.getSnapshotUrl();
-        if (!snapshotUrl) {
-            throw new Error('Camera has no snapshot URL');
-        }
-
-        if (!this.snapshotAuth) {
-            this.snapshotAuth = new AxiosDigestAuth({
-                username: this.getUsername(),
-                password: this.getPassword(),
-            });
-        }
-
-        const response = await this.snapshotAuth.request({
-            httpsAgent,
-            method: "GET",
-            responseType: 'arraybuffer',
-            url: snapshotUrl,
-        });
-
-        return mediaManager.createMediaObject(Buffer.from(response.data), response.headers['Content-Type'] || 'image/jpeg');
-    }
+    abstract takePictureThrottled(option?: PictureOptions): Promise<MediaObject>;
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
@@ -92,21 +84,8 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
 
     abstract createVideoStream(options?: T): Promise<MediaObject>;
 
-    async getSnapshotUrlSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'snapshotUrl',
-                title: 'Snapshot URL',
-                placeholder: 'http://192.168.1.100[:80]/snapshot.jpg',
-                value: this.getSnapshotUrl(),
-                description: 'Optional: The snapshot URL that will returns the current JPEG image.'
-            },
-        ];
-    }
-
     async getUrlSettings(): Promise<Setting[]> {
         return [
-            ...await this.getSnapshotUrlSettings(),
         ];
     }
 
@@ -130,7 +109,7 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
         defaultStreamIndex = defaultStreamIndex || 0;
         return vsos?.[defaultStreamIndex];
     }
-    
+
     async getStreamSettings(): Promise<Setting[]> {
         try {
             const vsos = await this.getVideoStreamOptions();
@@ -208,16 +187,6 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
 
     async putSetting(key: string, value: SettingValue) {
         this.putSettingBase(key, value);
-
-        if (key === 'snapshotUrl') {
-            let interfaces = this.providedInterfaces;
-            if (!value)
-                interfaces = interfaces.filter(iface => iface !== ScryptedInterface.Camera)
-            else
-                interfaces.push(ScryptedInterface.Camera);
-
-            this.provider.updateDevice(this.nativeId, this.providedName, interfaces);
-        }
     }
 }
 
@@ -271,7 +240,7 @@ export abstract class CameraProviderBase<T extends MediaStreamOptions> extends S
         });
     }
 
-    async putSetting(key: string, value: string | number) {
+    async putSetting(value: string | number) {
         // generate a random id
         const nativeId = randomBytes(4).toString('hex');
         const name = value.toString();

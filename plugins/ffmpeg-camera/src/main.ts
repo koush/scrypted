@@ -1,12 +1,17 @@
-import sdk, { FFMpegInput, Intercom, MediaObject, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
+import sdk, { FFMpegInput, Intercom, MediaObject, PictureOptions, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common";
 import { StorageSettings } from "../../../common/src/settings";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "../../../common/src/media-helpers";
 import child_process, { ChildProcess } from "child_process";
+import { recommendDumbPlugins } from "./recommend";
 
-const { log, deviceManager, mediaManager } = sdk;
+const { mediaManager } = sdk;
 
 class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom {
+    takePictureThrottled(option?: PictureOptions): Promise<MediaObject> {
+        throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
+    }
+
     storageSettings = new StorageSettings(this, {
         ffmpegInputs: {
             title: 'FFmpeg Input Stream Arguments',
@@ -52,7 +57,6 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
         // this might be usable as a url so check that.
         let url: string;
         try {
-            const parsedUrl = new URL(ffmpegInput);
         }
         catch (e) {
         }
@@ -96,7 +100,6 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
 
     async getUrlSettings(): Promise<Setting[]> {
         return [
-            ...await this.getSnapshotUrlSettings(),
             ...await this.getFFmpegInputSettings(),
         ];
     }
@@ -121,6 +124,11 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
 }
 
 class FFmpegProvider extends CameraProviderBase<UrlMediaStreamOptions> {
+    constructor(nativeId?: string) {
+        super(nativeId);
+        recommendDumbPlugins();
+    }
+
     createCamera(nativeId: string): FFmpegCamera {
         return new FFmpegCamera(nativeId, this);
     }
