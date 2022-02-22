@@ -258,6 +258,8 @@ class StorageImpl implements Storage {
         this.api.setStorage(this.nativeId, this.storage);
     }
     setItem(key: string, value: string): void {
+        if (this.storage[this.prefix + key] === value)
+            return;
         this.storage[this.prefix + key] = value;
         this.api.setStorage(this.nativeId, this.storage);
     }
