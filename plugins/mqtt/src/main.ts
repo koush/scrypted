@@ -15,21 +15,13 @@ import { MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { connect, Client } from 'mqtt';
 import { isPublishable } from './publishable-types';
+import { createScriptDevice, ScriptDeviceImpl } from '@scrypted/common/src/eval/scrypted-eval';
 
 const loopbackLight = require("!!raw-loader!./examples/loopback-light.ts").default;
-
-const methodInterfaces: { [method: string]: string } = {};
-for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
-    for (const method of desc.methods) {
-        methodInterfaces[method] = desc.name;
-    }
-}
 
 const { log, deviceManager, systemManager } = sdk;
 
 class MqttDevice extends MqttDeviceBase implements Scriptable {
-    handler: any;
-
     constructor(nativeId: string) {
         super(nativeId);
 
@@ -75,8 +67,6 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
     }): Promise<any> {
         const { script } = source;
         try {
-            this.handler = undefined;
-
             const client = this.connectClient();
             client.on('connect', () => this.console.log('mqtt client connected'));
             client.on('disconnect', () => this.console.log('mqtt client disconnected'));
@@ -84,12 +74,7 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
                 this.console.log('mqtt client error', e);
             });
 
-            const allInterfaces: string[] = [
-                ScryptedInterface.Scriptable,
-                ScryptedInterface.Settings,
-            ]
-
-            const mqtt: MqttClient = {
+            const mqtt: MqttClient & ScriptDeviceImpl = {
                 subscribe: (subscriptions: MqttSubscriptions, options?: any) => {
                     for (const topic of Object.keys(subscriptions)) {
                         const fullTopic = this.pathname + topic;
@@ -122,32 +107,23 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
                         });
                     }
                 },
-                handle: <T>(handler?: T & object) => {
-                    this.handler = handler;
-                },
-                handleTypes: (...interfaces: ScryptedInterface[]) => {
-                    allInterfaces.push(...interfaces);
-                },
                 publish: async (topic: string, value: any) => {
                     if (typeof value === 'object')
                         value = JSON.stringify(value);
                     if (value.constructor.name !== Buffer.name)
                         value = value.toString();
                     client.publish(this.pathname + topic, value);
-                }
+                },
+                ...createScriptDevice([
+                    ScryptedInterface.Scriptable,
+                    ScryptedInterface.Settings,
+                ])
             }
             await scryptedEval(this, script, {
                 mqtt,
             });
 
-            const handler = this.handler || {};
-            for (const method of Object.keys(handler)) {
-                const iface = methodInterfaces[method];
-                if (iface)
-                    allInterfaces.push(iface);
-            }
-
-            Object.assign(this, handler);
+            const allInterfaces = mqtt.mergeHandler(this);
 
             await deviceManager.onDeviceDiscovered({
                 nativeId: this.nativeId,

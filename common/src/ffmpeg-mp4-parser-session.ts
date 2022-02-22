@@ -3,11 +3,12 @@ import { ChildProcess } from 'child_process';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput } from './media-helpers';
 import { MP4Atom, parseFragmentedMP4 } from './stream-parser';
-import { Readable } from 'stream';
+import { Duplex, Readable } from 'stream';
 
 const { mediaManager } = sdk;
 
 export interface FFMpegFragmentedMP4Session {
+    socket: Duplex;
     cp: ChildProcess;
     generator: AsyncGenerator<MP4Atom>;
 }
@@ -32,6 +33,7 @@ export async function startFFMPegFragmetedMP4Session(inputArguments: string[], a
     ffmpegLogInitialOutput(console, cp);
 
     return {
+        socket: undefined,
         cp,
         generator: parseFragmentedMP4(cp.stdio[3] as Readable),
     };

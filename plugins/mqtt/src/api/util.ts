@@ -1,4 +1,4 @@
-import type { ScryptedDeviceBase, ScryptedInterface } from "@scrypted/sdk";
+import type { ScryptedDeviceBase } from "@scrypted/sdk";
 import type { MqttClient, MqttEvent, MqttSubscriptions } from "./mqtt-client";
 
 declare const device: ScryptedDeviceBase;

@@ -1,10 +1,11 @@
-import { Scriptable, Program, ScryptedDeviceBase, ScriptSource } from "@scrypted/sdk";
-import { createMonacoEvalDefaults } from "@scrypted/common/src/scrypted-eval";
+import sdk, { Scriptable, Program, ScryptedDeviceBase, ScriptSource, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
 import { scryptedEval } from "./scrypted-eval";
+import { monacoEvalDefaults } from "./monaco";
+import { createScriptDevice, ScriptDeviceImpl } from "@scrypted/common/src/eval/scrypted-eval";
 
-const monacoEvalDefaults = createMonacoEvalDefaults({});
+const { log, deviceManager, systemManager } = sdk;
 
-export class Script extends ScryptedDeviceBase implements Scriptable, Program {
+export class Script extends ScryptedDeviceBase implements Scriptable, Program, ScriptDeviceImpl {
     constructor(nativeId: string) {
         super(nativeId);
     }
@@ -40,18 +41,63 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program {
         }
     }
 
-    run(variables?: { [name: string]: any; }): Promise<any> {
+    async postRunScript() {
+        const allInterfaces = this.mergeHandler(this);
+        if (allInterfaces.length !== 2) {
+            await deviceManager.onDeviceDiscovered({
+                nativeId: this.nativeId,
+                interfaces: allInterfaces,
+                type: ScryptedDeviceType.Unknown,
+                name: this.providedName,
+            });
+        }
+    }
+
+    prepareScript() {
+        Object.assign(this, createScriptDevice([
+            ScryptedInterface.Scriptable,
+            ScryptedInterface.Program,
+        ]));
+        }
+
+    async run(variables?: { [name: string]: any; }): Promise<any> {
+        this.prepareScript();
+
         try {
             const data = JSON.parse(this.storage.getItem('data'));
-            return scryptedEval(this, data['script.ts'], variables);
+
+            const ret = await scryptedEval(this, data['script.ts'], Object.assign({
+                device: this,
+            }, variables));
+
+            await this.postRunScript();
+            return ret;
         }
         catch (e) {
-            this.log.e('error loading script');
-            this.console.error(e);
+            this.console.error('error loading script', e);
+            throw e;
         }
     }
 
     async eval(source: ScriptSource, variables: { [name: string]: any }) {
-        return scryptedEval(this, source.script, variables);
+        this.prepareScript();
+
+        const ret = await scryptedEval(this, source.script, Object.assign({
+            device: this,
+        }, variables));
+
+        await this.postRunScript();
+        return ret;
+    }
+
+    // will be done at runtime
+    mergeHandler(device: ScryptedDeviceBase): string[] {
+        throw new Error("Method not implemented.");
+    }
+    handle<T>(handler?: T & object): void {
+        throw new Error("Method not implemented.");
+    }
+    handleTypes(...interfaces: string[]): void {
+        throw new Error("Method not implemented.");
     }
 }

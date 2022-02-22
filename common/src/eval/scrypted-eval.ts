@@ -1,8 +1,11 @@
 import type { TranspileOptions } from "typescript";
-import sdk, { ScryptedDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, MixinDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
 import vm from "vm";
 import fs from 'fs';
-import { newThread } from '../../server/src/threading';
+import { newThread } from '../../../server/src/threading';
+import { ScriptDevice } from "./monaco/script-device";
+import { ScryptedInterfaceDescriptors } from "@scrypted/sdk/types";
+import fetch from 'node-fetch-commonjs';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -44,8 +47,8 @@ async function tsCompileThread(source: string, options: TranspileOptions = null)
 }
 
 function getTypeDefs() {
-    const scryptedTypesDefs = fs.readFileSync('sdk/types.d.ts').toString();
-    const scryptedIndexDefs = fs.readFileSync('sdk/index.d.ts').toString();
+    const scryptedTypesDefs = fs.readFileSync('@types/sdk/types.d.ts').toString();
+    const scryptedIndexDefs = fs.readFileSync('@types/sdk/index.d.ts').toString();
     return {
         scryptedIndexDefs,
         scryptedTypesDefs,
@@ -53,59 +56,71 @@ function getTypeDefs() {
 }
 
 export async function scryptedEval(device: ScryptedDeviceBase, script: string, extraLibs: { [lib: string]: string }, params: { [name: string]: any }) {
+    const libs = Object.assign({
+        types: getTypeDefs().scryptedTypesDefs,
+    }, extraLibs);
+    const allScripts = Object.values(libs).join('\n').toString() + script;
+    let compiled: string;
     try {
-        const libs = Object.assign({
-            types: getTypeDefs().scryptedTypesDefs,
-        }, extraLibs);
-        const allScripts = Object.values(libs).join('\n').toString() + script;
-        const compiled = await tsCompileThread(allScripts);
-
-        const allParams = Object.assign({}, params, {
-            systemManager,
-            deviceManager,
-            endpointManager,
-            mediaManager,
-            log: device.log,
-            console: device.console,
-            localStorage: device.storage,
-            device,
-            exports: {},
-            ScryptedInterface,
-            ScryptedDeviceType,
-        });
-
-        try {
-            const asyncWrappedCompiled = `(async function() {\n${compiled}\n})()`;
-            const f = vm.compileFunction(asyncWrappedCompiled, Object.keys(allParams), {
-                filename: 'script.js',
-            });
-
-            try {
-                return await f(...Object.values(allParams));
-            }
-            catch (e) {
-                device.log.e('Error running script.');
-                device.console.error(e);
-                throw e;
-            }
-        }
-        catch (e) {
-            device.log.e('Error evaluating script.');
-            device.console.error(e);
-            throw e;
-        }
+        compiled = await tsCompileThread(allScripts);
     }
     catch (e) {
-        device.log.e('Error compiling script.');
+        device.log.e('Error compiling typescript.');
+        device.console.error(e);
+        throw e;
+    }
+
+    const allParams = Object.assign({}, params, {
+        fetch,
+        ScryptedDeviceBase,
+        MixinDeviceBase,
+        systemManager,
+        deviceManager,
+        endpointManager,
+        mediaManager,
+        log: device.log,
+        console: device.console,
+        localStorage: device.storage,
+        device,
+        exports: {},
+        ScryptedInterface,
+        ScryptedDeviceType,
+    });
+
+    const asyncWrappedCompiled = `return (async function() {\n${compiled}\n})`;
+    let asyncFunction: any;
+    try {
+        const functionGenerator = vm.compileFunction(asyncWrappedCompiled, Object.keys(allParams), {
+            filename: 'script.js',
+        });
+        asyncFunction = functionGenerator(...Object.values(allParams));
+    }
+    catch (e) {
+        device.log.e('Error evaluating javascript.');
+        device.console.error(e);
+        throw e;
+    }
+
+    try {
+        return await asyncFunction();
+    }
+    catch (e) {
+        device.log.e('Error running script.');
         device.console.error(e);
         throw e;
     }
 }
 
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
+    const bufferTypeDefs = fs.readFileSync('@types/node/buffer.d.ts').toString();
+
+    const safeLibs =  {
+        bufferTypeDefs,
+    };
+
     const libs = Object.assign(getTypeDefs(), extraLibs);
 
-    function monacoEvalDefaultsFunction(monaco, libs) {
+    function monacoEvalDefaultsFunction(monaco, safeLibs, libs) {
         monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(
             Object.assign(
                 {},
@@ -156,14 +171,55 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
             libs['sdk'],
             "node_modules/@types/scrypted__sdk/index.d.ts"
         );
+
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(
+            safeLibs.bufferTypeDefs,
+            "node_modules/@types/node/buffer.d.ts"
+        );
     }
 
     return `(function() {
+    const safeLibs = ${JSON.stringify(safeLibs)};
     const libs = ${JSON.stringify(libs)};
 
     return (monaco) => {
-        (${monacoEvalDefaultsFunction})(monaco, libs);
+        (${monacoEvalDefaultsFunction})(monaco, safeLibs, libs);
     }
     })();
     `;
+}
+
+export interface ScriptDeviceImpl extends ScriptDevice {
+    mergeHandler(device: ScryptedDeviceBase): string[];
+}
+
+const methodInterfaces: { [method: string]: string } = {};
+for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
+    for (const method of desc.methods) {
+        methodInterfaces[method] = desc.name;
+    }
+}
+
+export function createScriptDevice(baseInterfaces: string[]): ScriptDeviceImpl {
+    let scriptHandler: any;
+    const allInterfaces = baseInterfaces.slice();
+
+    return {
+        handle: <T>(handler?: T & object) => {
+            scriptHandler = handler;
+        },
+        handleTypes: (...interfaces: ScryptedInterface[]) => {
+            allInterfaces.push(...interfaces);
+        },
+        mergeHandler: (device: ScryptedDeviceBase) => {
+            const handler = scriptHandler || {};
+            for (const method of Object.keys(handler)) {
+                const iface = methodInterfaces[method];
+                if (iface)
+                    allInterfaces.push(iface);
+            }
+            Object.assign(device, handler);
+            return allInterfaces;
+        },
+    };
 }

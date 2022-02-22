@@ -63,7 +63,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     mediaCore: MediaCore;
     automations = new Map<string, Automation>();
     aggregate = new Map<string, AggregateDevice>();
-    scripts = new Map<string, Script>();
+    scripts = new Map<string, Promise<Script>>();
 
     constructor() {
         super();
@@ -93,8 +93,15 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             }
             else if (nativeId?.startsWith('script:')) {
                 const script = new Script(nativeId);
-                this.scripts.set(nativeId, script);
-                reportScript(nativeId);
+                this.scripts.set(nativeId, (async () => {
+                    if (script.providedInterfaces.length > 2) {
+                        await script.run();
+                    }
+                    else {
+                        reportScript(nativeId);
+                    }
+                    return script;
+                })());
             }
         }
 
@@ -124,7 +131,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             const nativeId = `script:${Math.random()}`;
             await reportScript(nativeId);
             const script = new Script(nativeId);
-            this.scripts.set(nativeId, script);
+            this.scripts.set(nativeId, Promise.resolve(script));
             const { id } = script;
             sendJSON(res, {
                 id,
@@ -159,15 +166,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         });
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         if (nativeId === 'mediacore')
             return this.mediaCore;
         if (nativeId?.startsWith('automation:'))
             return this.automations.get(nativeId);
         if (nativeId?.startsWith('aggregate:'))
             return this.aggregate.get(nativeId);
-        if (nativeId?.startsWith('script:'))
+        if (nativeId?.startsWith('script:')) {
             return this.scripts.get(nativeId);
+        }
     }
 
     checkEngineIoEndpoint(request: HttpRequest, name: string) {
@@ -203,7 +211,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         }
 
         if (this.checkEngineIoEndpoint(request, 'videocamera')) {
-            const url  = new URL(`http://localhost${request.url}`);
+            const url = new URL(`http://localhost${request.url}`);
             const deviceId = url.searchParams.get('deviceId');
             const camera = systemManager.getDeviceById<VideoCamera & RTCSignalingChannel>(deviceId);
             if (!camera)

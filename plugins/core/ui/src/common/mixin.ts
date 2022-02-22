@@ -22,12 +22,16 @@ export async function getDeviceAvailableMixins(systemManager: SystemManager, dev
     const results = await Promise.all(getAllDevices<MixinProvider>(systemManager).map(async (check) => {
         try {
             if (check.interfaces.includes(ScryptedInterface.MixinProvider)) {
+                console.time('mixin provider'  + check.name);
                 if (await check.canMixin(device.type, device.interfaces))
                     return check;
             }
         }
         catch (e) {
             console.error("mixin check error", check.id, e);
+        }
+        finally {
+            console.timeEnd('mixin provider'  + check.name);
         }
     }));
 

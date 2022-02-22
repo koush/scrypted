@@ -1,3 +1,5 @@
+import { ScriptDevice } from '@scrypted/common/src/eval/monaco/script-device';
+
 export interface MqttEvent {
     buffer?: Buffer;
     json?: any;
@@ -8,9 +10,7 @@ export interface MqttSubscriptions {
     [topic: string]: (event: MqttEvent) => void;
 }
 
-export interface MqttClient {
+export interface MqttClient extends ScriptDevice {
     subscribe(subscriptions: MqttSubscriptions, options?: any): void;
-    handle<T>(handler?: T & object): void;
-    handleTypes(...interfaces: string[]): void;
     publish(topic: string, value: any): Promise<void>;
 }

@@ -1,1 +1,0 @@
-../../../sdk/types/index.d.ts

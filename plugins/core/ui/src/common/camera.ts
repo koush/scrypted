@@ -45,6 +45,8 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
     remoteAudio.play();
     console.log('received track', ev.track);
   };
+
+  return pc;
 }
 
 export async function createBlobUrl(mediaManager: MediaManager, mediaObject: MediaObject): Promise<string> {
