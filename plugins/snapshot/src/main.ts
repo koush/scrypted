@@ -74,7 +74,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
 class SnapshotPlugin extends ScryptedDeviceBase implements MixinProvider {
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-        if (type === ScryptedDeviceType.Camera && interfaces.includes(ScryptedInterface.VideoCamera))
+        if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && interfaces.includes(ScryptedInterface.VideoCamera))
             return [ScryptedInterface.Camera, ScryptedInterface.Settings];
         return undefined;
 
