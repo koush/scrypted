@@ -51,6 +51,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         const socketUrl = new URL(ffmpegInput.url);
         const socket = net.connect(parseInt(socketUrl.port), socketUrl.hostname);
         session = {
+            socket,
             cp: undefined,
             generator: parseFragmentedMP4(socket),
         }
@@ -135,7 +136,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     }
 
     console.log(`motion recording started`);
-    const { cp, generator } = session;
+    const { socket, cp, generator } = session;
     let pending: Buffer[] = [];
     try {
         let i = 0;
@@ -160,6 +161,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         generator.throw(e);
     }
     finally {
+        socket?.destroy();
         cp?.kill('SIGKILL');
     }
 }
