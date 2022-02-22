@@ -158,7 +158,6 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     }
     catch (e) {
         console.log(`motion recording complete ${e}`);
-        generator.throw(e);
     }
     finally {
         socket?.destroy();
