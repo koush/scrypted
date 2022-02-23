@@ -617,7 +617,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
     }
 
-    upsertDevice(pluginId: string, device: Device, invalidate?: boolean): Promise<PluginDevice> {
+    upsertDevice(pluginId: string, device: Device) {
         // JSON stringify over rpc turns undefined into null.
         if (device.nativeId === null)
             device.nativeId = undefined;
@@ -678,12 +678,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             logger.log('a', 'New Device Added.');
         }
 
-        if (invalidate && interfacesChanged) {
-            console.log('invalidating on request');
-            this.invalidatePluginDevice(pluginDevice._id);
-        }
-
-        return ret;
+        return {
+            pluginDevicePromise: ret,
+            interfacesChanged,
+        };
     }
 
     notifyPluginDeviceDescriptorChanged(pluginDevice: PluginDevice) {

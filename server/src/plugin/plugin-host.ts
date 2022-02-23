@@ -69,8 +69,29 @@ export class PluginHost {
     }
 
     async upsertDevice(upsert: Device) {
-        const pi = await this.scrypted.upsertDevice(this.pluginId, upsert, true);
+        const { pluginDevicePromise, interfacesChanged } = this.scrypted.upsertDevice(this.pluginId, upsert);
+        const pi = await pluginDevicePromise;
         await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
+        // if the device descriptor is changed for any reason by the plugin,
+        // fetch a new device. plugin may return the same instance.
+        process.nextTick(async () => {
+            let needInvalidate = interfacesChanged;
+            if (!needInvalidate) {
+                // may also need to invalidate if the the plugin did not previously return a device
+                // because it was not had not yet completed the discovery process.
+                const device = this.scrypted.devices[pi._id];
+                try {
+                    if (device.handler?.mixinTable)
+                        needInvalidate = !(await device.handler.mixinTable?.[device.handler.mixinTable.length - 1].entry).proxy;
+                }
+                catch (e) {
+                    // device retrieval had previously failed, fetch again.
+                    needInvalidate = true;
+                }
+            }
+            if (needInvalidate)
+                this.scrypted.invalidatePluginDevice(pi._id);
+        });
         return pi._id;
     }
 
@@ -226,7 +247,7 @@ export class PluginHost {
         let connected = true;
 
         if (this.packageJson.scrypted.runtime === 'python') {
-            this.worker =  new PythonRuntimeWorker(this.pluginId, {
+            this.worker = new PythonRuntimeWorker(this.pluginId, {
                 env,
                 pluginDebug,
             });
