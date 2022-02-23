@@ -144,7 +144,7 @@ class NeatoController extends ScryptedDeviceBase implements DeviceProvider, Devi
     }
 
     getDevice(nativeId: string) {
-        return this.robots && this.robots[nativeId];
+        return this.robots.get(nativeId);
     }
 
     updateRobots(robots: any) {
