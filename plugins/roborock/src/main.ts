@@ -332,8 +332,7 @@ class RoborockPlugin extends ScryptedDeviceBase implements DeviceDiscovery, Devi
                             serialNumber: device.mac,
                         },
                     });
-                    const vacuum = new RoborockVacuum(device.mac);
-                    this.devices.set(vacuum.nativeId, vacuum);
+                    const vacuum = this.getDevice(device.mac);
                     vacuum.storageSettings.values.token = device.token;
                     vacuum.storageSettings.values.ip = device.localip;
                 }
@@ -341,12 +340,16 @@ class RoborockPlugin extends ScryptedDeviceBase implements DeviceDiscovery, Devi
             catch (e) {
                 this.console.error('error retrieving devices from server', server);
             }
-
         }
     }
 
     getDevice(nativeId: string) {
-        return this.devices.get(nativeId);
+        let vacuum = this.devices.get(nativeId);
+        if (!vacuum) {
+            vacuum = new RoborockVacuum(nativeId);
+            this.devices.set(vacuum.nativeId, vacuum);
+        }
+        return vacuum;
     }
 }
 
