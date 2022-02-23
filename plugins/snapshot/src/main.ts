@@ -14,6 +14,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     storageSettings = new StorageSettings(this, {
         snapshotUrl: {
             title: 'Snapshot URL',
+            description: 'The http(s) URL that points that retrieves the latest image from your camera.',
+            placeholder: 'https://ip:1234/cgi-bin/snapshot.jpg',
         }
     });
     axiosClient: Axios | AxiosDigestAuth;
@@ -35,7 +37,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings)) {
                 const settings = await this.mixinDevice.getSettings();
                 username = settings?.find(setting => setting.key === 'username')?.value?.toString();
-                password = settings?.find(setting => setting.key === 'userpasswordname')?.value?.toString();
+                password = settings?.find(setting => setting.key === 'password')?.value?.toString();
             }
 
             if (username && password) {
