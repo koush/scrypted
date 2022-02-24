@@ -8,7 +8,7 @@ import { startRTCSignalingSession } from '../../../common/src/rtc-signaling';
 import { generateUuid } from './ring-client-api';
 import fs from 'fs';
 import { clientApi } from './ring-client-api';
-import { RefreshPromise, singletonPromise, timeoutPromise } from './util';
+import { RefreshPromise, singletonPromise, timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { LiveCallNegotiation } from './ring-client-api';
 import dgram from 'dgram';
 

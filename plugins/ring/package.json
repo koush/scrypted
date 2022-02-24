@@ -33,6 +33,7 @@
       "got": "11.8.2"
    },
    "devDependencies": {
+      "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk"
    },
    "version": "0.0.59"
