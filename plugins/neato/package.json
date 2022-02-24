@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/neato",
-   "version": "0.1.26",
+   "version": "0.1.27",
    "description": "A Neato plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -26,6 +26,9 @@
       "interfaces": [
          "DeviceProvider",
          "OauthClient"
+      ],
+      "pluginDependencies": [
+         "@scrypted/cloud"
       ]
    },
    "devDependencies": {

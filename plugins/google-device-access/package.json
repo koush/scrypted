@@ -26,6 +26,10 @@
          "DeviceProvider",
          "HttpRequestHandler",
          "Settings"
+      ],
+      "pluginDependencies": [
+         "@scrypted/cloud",
+         "@scrypted/prebuffer-mixin"
       ]
    },
    "dependencies": {
@@ -44,5 +48,5 @@
       "@types/node": "^14.17.11",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.88"
+   "version": "0.0.89"
 }
