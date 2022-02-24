@@ -4,11 +4,23 @@ import { Plugin } from '../db-types';
 import { getState } from "../state";
 import axios from 'axios';
 import semver from 'semver';
+import { sleep } from "../sleep";
 
 export class PluginComponent {
     scrypted: ScryptedRuntime;
     constructor(scrypted: ScryptedRuntime) {
         this.scrypted = scrypted;
+    }
+
+    async renameDeviceId(id: string, newId: string) {
+        const pluginDevice = this.scrypted.findPluginDeviceById(id);
+        await this.kill(pluginDevice.pluginId);
+        // wait for everything to settle.
+        await sleep(2000);
+        await this.scrypted.removeDevice(pluginDevice);
+        pluginDevice._id = newId;
+        await this.scrypted.datastore.upsert(pluginDevice);
+        await this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
     }
 
     getNativeId(id: string) {

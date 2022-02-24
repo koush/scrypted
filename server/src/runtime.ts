@@ -493,7 +493,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }
         catch (e) {
         }
-        await this.upsertDevice(plugin._id, device);
+        this.upsertDevice(plugin._id, device);
         return this.runPlugin(plugin, pluginDebug);
     }
 
