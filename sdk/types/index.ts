@@ -1866,7 +1866,7 @@ export interface Setting {
   group?: string;
   description?: string;
   placeholder?: string;
-  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath';
+  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface';
   readonly?: boolean;
   choices?: string[];
   combobox?: boolean;

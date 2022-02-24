@@ -432,7 +432,7 @@ class Setting(TypedDict):
     placeholder: str
     readonly: bool
     title: str
-    type: Any | Any | Any | Any | Any | Any | Any | Any
+    type: Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
     pass
 
