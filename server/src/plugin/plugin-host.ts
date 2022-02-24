@@ -72,13 +72,16 @@ export class PluginHost {
         const { pluginDevicePromise, interfacesChanged } = this.scrypted.upsertDevice(this.pluginId, upsert);
         const pi = await pluginDevicePromise;
         await this.remote.setNativeId(pi.nativeId, pi._id, pi.storage || {});
-        // if the device descriptor is changed for any reason by the plugin,
-        // fetch a new device. plugin may return the same instance.
+        // fetch a new device instance if the descriptor changed.
+        // plugin may return the same instance.
+        // this avoids device and mixin churn.
+        // do this on next tick, after this call has returned an id, so the plugin can handle
+        // any subsequent requests.
         process.nextTick(async () => {
             let needInvalidate = interfacesChanged;
             if (!needInvalidate) {
                 // may also need to invalidate if the the plugin did not previously return a device
-                // because it was not had not yet completed the discovery process.
+                // because it had not yet completed the discovery process.
                 const device = this.scrypted.devices[pi._id];
                 try {
                     if (device.handler?.mixinTable)
