@@ -1,7 +1,6 @@
-import { BufferConverter, FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, OnOff, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import { FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { ffmpegLogInitialOutput } from "../../../common/src/media-helpers";
-import { alertRecommendedPlugins } from "../../../common/src/alert-recommended-plugins";
 
 import child_process, { ChildProcess } from 'child_process';
 
@@ -22,13 +21,6 @@ interface PamDiffSession {
 
 class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
     sessions = new Map<string, PamDiffSession>();
-
-    constructor() {
-        super();
-        alertRecommendedPlugins({
-            '@scrypted/objectdetector': 'Video Analysis Plugin',
-        });
-    }
 
     endSession(pds: PamDiffSession) {
         this.sessions.delete(pds.id);

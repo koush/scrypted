@@ -3,7 +3,6 @@ import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common"
 import { StorageSettings } from "../../../common/src/settings";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "../../../common/src/media-helpers";
 import child_process, { ChildProcess } from "child_process";
-import { recommendDumbPlugins } from "./recommend";
 
 const { mediaManager } = sdk;
 
@@ -124,11 +123,6 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
 }
 
 class FFmpegProvider extends CameraProviderBase<UrlMediaStreamOptions> {
-    constructor(nativeId?: string) {
-        super(nativeId);
-        recommendDumbPlugins();
-    }
-
     createCamera(nativeId: string): FFmpegCamera {
         return new FFmpegCamera(nativeId, this);
     }

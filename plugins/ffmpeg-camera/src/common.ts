@@ -1,5 +1,4 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings } from "@scrypted/sdk";
-import { recommendRebroadcast } from "./recommend";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
 import { randomBytes } from "crypto";
@@ -200,8 +199,6 @@ export abstract class CameraProviderBase<T extends MediaStreamOptions> extends S
             if (camId)
                 this.getDevice(camId);
         }
-
-        recommendRebroadcast();
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {

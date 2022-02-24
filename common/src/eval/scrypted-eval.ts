@@ -114,7 +114,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
 export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
     const bufferTypeDefs = fs.readFileSync('@types/node/buffer.d.ts').toString();
 
-    const safeLibs =  {
+    const safeLibs = {
         bufferTypeDefs,
     };
 
@@ -193,10 +193,10 @@ export interface ScriptDeviceImpl extends ScriptDevice {
     mergeHandler(device: ScryptedDeviceBase): string[];
 }
 
-const methodInterfaces: { [method: string]: string } = {};
+const methodInterfaces = new Map<string, string>();
 for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
     for (const method of desc.methods) {
-        methodInterfaces[method] = desc.name;
+        methodInterfaces.set(method, desc.name);
     }
 }
 
@@ -213,12 +213,19 @@ export function createScriptDevice(baseInterfaces: string[]): ScriptDeviceImpl {
         },
         mergeHandler: (device: ScryptedDeviceBase) => {
             const handler = scriptHandler || {};
-            for (const method of Object.keys(handler)) {
-                const iface = methodInterfaces[method];
-                if (iface)
+            let keys: string[];
+            if (handler.constructor === Object)
+                keys = Object.keys(handler);
+            else
+                keys = Object.getOwnPropertyNames(handler.__proto__);
+
+            for (const method of keys) {
+                const iface = methodInterfaces.get(method);
+                if (iface) {
                     allInterfaces.push(iface);
+                    device[method] = handler[method].bind(handler);
+                }
             }
-            Object.assign(device, handler);
             return allInterfaces;
         },
     };

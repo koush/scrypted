@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/ffmpeg-camera",
-   "version": "0.0.9",
+   "version": "0.0.15",
    "description": "FFmpeg Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -27,6 +27,11 @@
       "interfaces": [
          "DeviceProvider",
          "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin",
+         "@scrypted/pam-diff",
+         "@scrypted/snapshot"
       ]
    },
    "devDependencies": {

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/rtsp",
-   "version": "0.0.47",
+   "version": "0.0.50",
    "description": "RTSP Cameras and Streams Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -27,6 +27,11 @@
       "interfaces": [
          "DeviceProvider",
          "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin",
+         "@scrypted/pam-diff",
+         "@scrypted/snapshot"
       ]
    },
    "devDependencies": {

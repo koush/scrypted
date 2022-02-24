@@ -25,10 +25,13 @@
       "type": "API",
       "interfaces": [
          "ObjectDetection"
+      ],
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
       ]
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.40"
+   "version": "0.0.43"
 }
