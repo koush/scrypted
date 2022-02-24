@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/snapshot",
-   "version": "0.0.5",
+   "version": "0.0.6",
    "description": "Snapshot Plugin for Scrypted",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
@@ -23,6 +23,9 @@
       "interfaces": [
          "MixinProvider"
       ]
+   },
+   "optionalDependencies": {
+      "jimp": "^0.16.1"
    },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
