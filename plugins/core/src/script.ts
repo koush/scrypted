@@ -2,6 +2,7 @@ import sdk, { Scriptable, Program, ScryptedDeviceBase, ScriptSource, ScryptedInt
 import { scryptedEval } from "./scrypted-eval";
 import { monacoEvalDefaults } from "./monaco";
 import { createScriptDevice, ScriptDeviceImpl } from "@scrypted/common/src/eval/scrypted-eval";
+import { ScriptCoreNativeId } from "./script-core";
 
 const { log, deviceManager, systemManager } = sdk;
 
@@ -45,6 +46,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         const allInterfaces = this.mergeHandler(this);
         if (allInterfaces.length !== 2) {
             await deviceManager.onDeviceDiscovered({
+                providerNativeId: ScriptCoreNativeId,
                 nativeId: this.nativeId,
                 interfaces: allInterfaces,
                 type: ScryptedDeviceType.Unknown,

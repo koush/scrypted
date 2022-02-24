@@ -1,3 +1,4 @@
+import { SystemManager } from '@scrypted/types';
 import axios from 'axios';
 import semver from 'semver';
 
@@ -48,11 +49,34 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
     };
 }
 
-export async function installNpm(npmPackage: string, version?: string): Promise<string> {
+export function installNpm(systemManager: SystemManager, npmPackage: string, version?: string, installedSet?: Set<string>): Promise<string> {
+    if (!installedSet)
+        installedSet = new Set();
+    if (installedSet.has(npmPackage))
+        return;
+    installedSet.add(npmPackage);
     let suffix = version ? `/${version}` : '';
-    return axios.post(
+    const scryptedId = axios.post(
         `${componentPath}/install/${npmPackage}${suffix}`
     ).then(response => response.data.id);
+
+    scryptedId.then(async (id) => {
+        const plugins = await systemManager.getComponent('plugins');
+        const packageJson = await plugins.getPackageJson(npmPackage);
+        for (const dep of packageJson.scrypted.pluginDependencies || []) {
+            try {
+                const depId = await plugins.getIdForPluginId(dep);
+                if (depId)
+                    throw new Error('Plugin already installed.');
+                installNpm(systemManager, dep, undefined, installedSet);
+            }
+            catch (e) {
+                console.log('Skipping', dep, ':', e.message);
+            }
+        }
+    });
+
+    return scryptedId;
 }
 
 export function getNpmPath(npmPackage) {

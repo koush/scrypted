@@ -16,6 +16,7 @@ import { addBuiltins } from "@scrypted/common/src/ffmpeg-to-wrtc";
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
 import { startBrowserRTCSignaling } from "@scrypted/common/src/ffmpeg-to-wrtc";
+import { ScriptCore, ScriptCoreNativeId } from './script-core';
 
 addBuiltins(mediaManager);
 
@@ -37,15 +38,6 @@ async function reportAutomation(nativeId: string, name?: string) {
     await deviceManager.onDeviceDiscovered(device);
 }
 
-async function reportScript(nativeId: string) {
-    const device: Device = {
-        name: undefined,
-        nativeId,
-        type: ScryptedDeviceType.Program,
-        interfaces: [ScryptedInterface.Scriptable, ScryptedInterface.Program]
-    }
-    await deviceManager.onDeviceDiscovered(device);
-}
 
 async function reportAggregate(nativeId: string, interfaces: string[]) {
     const device: Device = {
@@ -61,9 +53,9 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     router: any = Router();
     publicRouter: any = Router();
     mediaCore: MediaCore;
+    scriptCore: ScriptCore;
     automations = new Map<string, Automation>();
     aggregate = new Map<string, AggregateDevice>();
-    scripts = new Map<string, Promise<Script>>();
 
     constructor() {
         super();
@@ -71,13 +63,24 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'Scrypted Media Core',
+                    name: 'Media Core',
                     nativeId: 'mediacore',
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.BufferConverter],
                     type: ScryptedDeviceType.API,
                 },
             );
             this.mediaCore = new MediaCore('mediacore');
+        })();
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Scripting Core',
+                    nativeId: ScriptCoreNativeId,
+                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.API,
+                },
+            );
+            this.scriptCore = new ScriptCore(ScriptCoreNativeId);
         })();
 
         for (const nativeId of deviceManager.getNativeIds()) {
@@ -90,18 +93,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 const aggregate = createAggregateDevice(nativeId);
                 this.aggregate.set(nativeId, aggregate);
                 reportAggregate(nativeId, aggregate.computeInterfaces());
-            }
-            else if (nativeId?.startsWith('script:')) {
-                const script = new Script(nativeId);
-                this.scripts.set(nativeId, (async () => {
-                    if (script.providedInterfaces.length > 2) {
-                        await script.run();
-                    }
-                    else {
-                        reportScript(nativeId);
-                    }
-                    return script;
-                })());
             }
         }
 
@@ -122,17 +113,6 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             const automation = new Automation(nativeId);
             this.automations.set(nativeId, automation);
             const { id } = automation;
-            sendJSON(res, {
-                id,
-            });
-        });
-
-        this.router.post('/api/new/script', async (req: RoutedHttpRequest, res: HttpResponse) => {
-            const nativeId = `script:${Math.random()}`;
-            await reportScript(nativeId);
-            const script = new Script(nativeId);
-            this.scripts.set(nativeId, Promise.resolve(script));
-            const { id } = script;
             sendJSON(res, {
                 id,
             });
@@ -169,13 +149,12 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     async getDevice(nativeId: string) {
         if (nativeId === 'mediacore')
             return this.mediaCore;
+        if (nativeId === ScriptCoreNativeId)
+            return this.scriptCore;
         if (nativeId?.startsWith('automation:'))
             return this.automations.get(nativeId);
         if (nativeId?.startsWith('aggregate:'))
             return this.aggregate.get(nativeId);
-        if (nativeId?.startsWith('script:')) {
-            return this.scripts.get(nativeId);
-        }
     }
 
     checkEngineIoEndpoint(request: HttpRequest, name: string) {

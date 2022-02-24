@@ -72,7 +72,7 @@
 import debounce from "lodash/debounce";
 import md5 from "md5";
 import axios from "axios";
-import { getComponentWebPath, getDeviceViewPath } from "../helpers";
+import { getDeviceViewPath } from "../helpers";
 import { installNpm } from "./plugin";
 
 export default {
@@ -87,7 +87,7 @@ export default {
   },
   methods: {
     install(packageName) {
-      installNpm(packageName).then((id) =>
+      installNpm(this.$scrypted.systemManager, packageName).then((id) =>
         this.$router.push(getDeviceViewPath(id))
       );
     },

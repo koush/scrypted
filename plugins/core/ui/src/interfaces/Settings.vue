@@ -27,7 +27,7 @@
         <Setting
           v-if="
             setting.value.choices ||
-            setting.value.type === 'device' ||
+            setting.value.type === 'device' || setting.value.type === 'interface' ||
             !setting.value.multiple
           "
           :device="device"

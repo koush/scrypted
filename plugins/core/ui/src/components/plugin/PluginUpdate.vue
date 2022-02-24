@@ -38,7 +38,7 @@ export default {
   methods: {
     doInstall() {
       this.updating = true;
-      installNpm(this.device.pluginId).then(id => {
+      installNpm(this.$scrypted.systemManager, this.device.pluginId).then(id => {
         this.updateAvailable = false;
       })
       .finally(() => this.updating = false);

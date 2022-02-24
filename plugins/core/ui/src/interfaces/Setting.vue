@@ -87,6 +87,25 @@
         </v-btn>
       </template>
     </DevicePicker>
+    <DevicePicker
+      v-else-if="lazyValue.type === 'interface'"
+      v-model="lazyValue.value"
+      :multiple="lazyValue.multiple"
+      :devices="interfaces"
+      :title="lazyValue.title"
+      :description="lazyValue.description"
+    >
+      <template v-slot:append-outer>
+        <v-btn
+          v-if="dirty && device"
+          color="success"
+          @click="save"
+          class="shift-up"
+        >
+          <v-icon>send</v-icon>
+        </v-btn>
+      </template>
+    </DevicePicker>
     <div v-else-if="lazyValue.type === 'clippath'" class="mb-2">
       <v-btn small block @click="editZone">{{ lazyValue.title }} </v-btn>
       <Camera
@@ -100,7 +119,10 @@
       ></Camera>
     </div>
     <v-text-field
-      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
       v-else
       dense
       :readonly="lazyValue.readonly"
@@ -209,19 +231,62 @@ export default {
       }
       return ret;
     },
+    interfaces() {
+      var expression;
+      try {
+        expression = this.lazyValue.deviceFilter || "true;";
+        // var interfaces = this.$scrypted.systemManager.getDeviceById(id).interfaces.map(iface => `var ${iface} = true`);
+      } catch (e) {
+        expression = "true;";
+      }
+      var ret = this.$store.state.scrypted.devices
+        .map((id) => {
+          const device = this.$scrypted.systemManager.getDeviceById(id)
+          return device.interfaces.map(iface => ({
+            device,
+            deviceInterface: iface,
+          }))
+        })
+        .flat()
+        .filter(({device, deviceInterface}) => {
+          try {
+            return eval(
+              `(function() { var interfaces = ${JSON.stringify(
+                device.interfaces
+              )}; var deviceInterface = '${deviceInterface}'}; var type='${device.type}'; return ${expression} })`
+            )();
+          } catch (e) {
+            return true;
+          }
+        })
+        .map(({device, deviceInterface}) => ({
+          id: device.id + '#' + deviceInterface,
+          text: device.name + ` (${deviceInterface})`,
+        }));
+      if (!this.lazyValue.multiple) {
+        ret.splice(0, 0, {
+          id: null,
+          text: this.lazyValue.placeholder || "Select an Interface",
+        });
+      }
+      return ret;
+    },
   },
   methods: {
     onChange() {},
     editingZoneChanged(value) {
       this.editingZone = value;
       if (!value) {
-        this.rpc().putSetting(this.lazyValue.key, this.createInputValue().value);
+        this.rpc().putSetting(
+          this.lazyValue.key,
+          this.createInputValue().value
+        );
         this.onInput();
       }
     },
     createLazyValue() {
       var type = this.value.type || "";
-      if (type.indexOf("[]") == -1 && type !== 'clippath') {
+      if (type.indexOf("[]") == -1 && type !== "clippath") {
         return cloneDeep(this.value);
       }
 
@@ -231,7 +296,7 @@ export default {
     },
     createInputValue() {
       var type = this.lazyValue.type || "";
-      if (type.indexOf("[]") == -1 && type !== 'clippath') {
+      if (type.indexOf("[]") == -1 && type !== "clippath") {
         return this.lazyValue;
       }
 

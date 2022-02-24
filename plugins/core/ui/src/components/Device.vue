@@ -436,7 +436,6 @@ import Storage from "../common/Storage.vue";
 import { checkUpdate } from "./plugin/plugin";
 import AggregateDevice from "./aggregate/AggregateDevice.vue";
 import Automation from "./automation/Automation.vue";
-import Script from "./script/Script.vue";
 import PluginAdvancedUpdate from "./plugin/PluginAdvancedUpdate.vue";
 import Vue from "vue";
 import {
@@ -563,7 +562,6 @@ export default {
     AggregateDevice,
     Automation,
     Program,
-    Script,
     Scriptable,
   },
   data() {

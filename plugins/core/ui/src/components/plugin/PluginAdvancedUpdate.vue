@@ -49,6 +49,7 @@ export default {
     },
     async installVersion(version) {
       await installNpm(
+        this.$scrypted.systemManager,
         this.pluginData.pluginId,
         version === this.pluginData.updateAvailable ? undefined : version
       );
