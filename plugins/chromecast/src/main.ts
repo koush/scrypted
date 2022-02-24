@@ -156,29 +156,27 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     // image   Direct   convert
     // video   Direct       RTC
 
-    // check to see if this is url friendly media.
+
+    // convert this into a chromecast friendly url, or a media object that must be streamed.
     if (typeof media === 'string') {
-      if (media.startsWith('http')) {
-        url = media;
-      }
-      else if (options?.mimeType?.startsWith('image/')) {
+      // always fetch images up front.
+      if (options?.mimeType?.startsWith('image/')) {
         const mo = await mediaManager.createMediaObjectFromUrl(media, options?.mimeType);
         url = await mediaManager.convertMediaObjectToInsecureLocalUrl(mo, options?.mimeType);
       }
+      else if (media.startsWith('http')) {
+        // eh might not work, but whatever.
+        url = media;
+      }
+      else {
+        media = await mediaManager.createMediaObjectFromUrl(media, options?.mimeType);
+      }
     }
-    else {
-      try {
-        url = media.mimeType === ScryptedMimeTypes.InsecureLocalUrl || media.mimeType === ScryptedMimeTypes.LocalUrl
-          ? await mediaManager.convertMediaObjectToInsecureLocalUrl(media, media.mimeType)
-          : await mediaManager.convertMediaObjectToUrl(media, media.mimeType);
-        urlMimeType = media.mimeType;
-      }
-      catch (e) {
-        this.console.error('url conversion failed, falling back');
-      }
+    else if (options?.mimeType?.startsWith('image/')) {
+      url = await mediaManager.convertMediaObjectToInsecureLocalUrl(media, options?.mimeType);
     }
 
-    if (url?.startsWith('http')) {
+    if (url) {
       this.sendMediaToClient(options && (options as any).title,
         url,
         // prefer the provided mime type hint, otherwise infer from url.
