@@ -11,7 +11,6 @@ import { sendJSON } from './http-helpers';
 import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
-import { Script } from './script';
 import { addBuiltins } from "@scrypted/common/src/ffmpeg-to-wrtc";
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
