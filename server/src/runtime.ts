@@ -613,7 +613,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             await this.datastore.removeId(Plugin, device.pluginId);
         }
         else {
-            await plugin.remote.setNativeId(device.nativeId, undefined, undefined);
+            try {
+                await plugin.remote.setNativeId(device.nativeId, undefined, undefined);
+            }
+            catch (e) {
+                // may throw if the plugin is killed, etc.
+                console.warn('error while reporting device removal to plugin remote', e);
+            }
         }
     }
 

@@ -17,10 +17,15 @@ export class PluginComponent {
         await this.kill(pluginDevice.pluginId);
         // wait for everything to settle.
         await sleep(2000);
+        // removing will also clear the state.
+        const { state } = pluginDevice;
         await this.scrypted.removeDevice(pluginDevice);
         pluginDevice._id = newId;
+        pluginDevice.state = state;
         await this.scrypted.datastore.upsert(pluginDevice);
+        this.scrypted.pluginDevices[pluginDevice._id] = pluginDevice;
         await this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
+        await this.reload(pluginDevice.pluginId);
     }
 
     getNativeId(id: string) {
