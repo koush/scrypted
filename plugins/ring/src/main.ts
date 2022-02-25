@@ -32,7 +32,7 @@ class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, DeviceProvider, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor, RTCSignalingChannel {
+class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferConverter, DeviceProvider, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor, RTCSignalingChannel {
     signalingMime: string;
     webrtcSession: string;
     audioOutForwarder: dgram.Socket;
@@ -40,6 +40,16 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
     ffmpegInput: FFMpegInput;
     refreshTimeout: NodeJS.Timeout;
     picturePromise: RefreshPromise<Buffer>;
+    storageSettings = new StorageSettings(this, {
+        motionTimeout: {
+            title: 'Motion Timeout',
+            description: 'The duration in seconds to wait before resetting the motion sensor.',
+            type: 'number',
+            defaultValue: 30,
+        }
+    });
+    buttonTimeout: NodeJS.Timeout;
+    motionTimeout: NodeJS.Timeout;
 
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
@@ -51,6 +61,13 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
         this.signalingMime = RingDeviceSignalingPrefix + this.nativeId;
         this.fromMimeType = this.signalingMime;
         this.toMimeType = ScryptedMimeTypes.FFmpegInput;
+    }
+
+    getSettings(): Promise<Setting[]> {
+        return this.storageSettings.getSettings();
+    }
+    putSetting(key: string, value: SettingValue): Promise<void> {
+        return this.storageSettings.putSetting(key, value);
     }
 
     async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions) {
@@ -218,11 +235,14 @@ class RingCameraDevice extends ScryptedDeviceBase implements BufferConverter, De
 
     triggerBinaryState() {
         this.binaryState = true;
-        setTimeout(() => this.binaryState = false, 10000);
+        clearTimeout(this.buttonTimeout);
+        this.buttonTimeout = setTimeout(() => this.binaryState = false, 10000);
     }
+
     triggerMotion() {
         this.motionDetected = true;
-        setTimeout(() => this.motionDetected = false, 10000);
+        clearTimeout(this.motionTimeout)
+        this.motionTimeout = setTimeout(() => this.motionDetected = false, this.storageSettings.values.motionTimeout);
     }
 
     findCamera() {
@@ -280,7 +300,8 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
 
     constructor() {
         super();
-        this.discoverDevices(0);
+        this.discoverDevices(0)
+        .catch(e => this.console.error('discovery failure', e));
 
         if (!this.settingsStorage.values.systemId)
             this.settingsStorage.values.systemId = generateUuid();
@@ -377,6 +398,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 ScryptedInterface.Intercom,
                 ScryptedInterface.BufferConverter,
                 ScryptedInterface.RTCSignalingChannel,
+                ScryptedInterface.Settings,
             ];
             if (camera.operatingOnBattery)
                 interfaces.push(ScryptedInterface.Battery);
