@@ -55,7 +55,7 @@ chown -R $SERVICE_USER /home/$SERVICE_USER/.scrypted
 echo "Installing Scrypted..."
 RUN sudo -u $SERVICE_USER npx -y scrypted install-server
 
-cat <<EOT > /etc/systemd/system/scrypted.service
+cat > /etc/systemd/system/scrypted.service <<EOT
 
 [Unit]
 Description=Scrypted service
