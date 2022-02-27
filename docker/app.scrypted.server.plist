@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>RunAtLoad</key>
+        <true/>
+    <key>KeepAlive</key>
+        <true/>
+    <key>Label</key>
+        <string>app.scrypted.server</string>
+    <key>ProgramArguments</key>
+        <array>
+             <string>$NPX_PATH</string>
+             <string>-y</string>
+             <string>scrypted</string>
+             <string>serve</string>
+        </array>
+    <key>WorkingDirectory</key>
+         <string>/Users/$USER/.scrypted</string>
+    <key>StandardOutPath</key>
+        <string>/dev/null</string>
+    <key>StandardErrorPath</key>
+        <string>/dev/null</string>
+    <key>UserName</key>
+        <string>$USER</string>
+    <key>EnvironmentVariables</key>
+        <dict>
+            <key>PATH</key>
+                <string>$NPX_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+            <key>HOME</key>
+                <string>/Users/$USER</string>
+        </dict>
+</dict>
+</plist>
