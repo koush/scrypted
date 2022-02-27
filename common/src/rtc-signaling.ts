@@ -22,8 +22,14 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     hasSetup = false;
     options: RTCSignalingChannelOptions = {
         capabilities: {
-            audio: RTCRtpReceiver.getCapabilities('audio'),
-            video: RTCRtpReceiver.getCapabilities('video'),
+            audio: RTCRtpReceiver.getCapabilities?.('audio') || {
+                codecs: undefined,
+                headerExtensions: undefined,
+            },
+            video: RTCRtpReceiver.getCapabilities?.('video') || {
+                codecs: undefined,
+                headerExtensions: undefined,
+            },
         }
     };
 
