@@ -328,6 +328,10 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 cameraStatusPollingSeconds,
                 systemId: this.settingsStorage.values.systemId,
             });
+
+            this.api.onRefreshTokenUpdated.subscribe(({newRefreshToken}) => {
+                this.settingsStorage.values.refreshToken = newRefreshToken;
+            });
         }
 
         if (this.settingsStorage.values.refreshToken) {
