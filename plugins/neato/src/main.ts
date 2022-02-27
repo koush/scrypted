@@ -47,7 +47,7 @@ class Neato extends ScryptedDeviceBase implements Refresh, StartStop, Pause, Doc
     }
 
     async start() {
-        this.robot.startCleaning();
+        this.robot.startCleaning(1);
         this.pollChanges();
     }
 
