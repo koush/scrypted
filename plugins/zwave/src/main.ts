@@ -303,7 +303,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
             if (node.supportsCC(CommandClasses['Node Naming and Location'])) {
                 try {
                     const nodeNaming = instance.getNodeUnsafe().commandClasses["Node Naming and Location"];
-                    name = await nodeNaming?.getName();
+                    name = await nodeNaming?.getName() || 'Z-Wave Device';
                 }
                 catch (e) {
                     // have seen this fail, even though it is supposedly available
