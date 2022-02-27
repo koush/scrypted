@@ -301,8 +301,13 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
             const node = instance.getNodeUnsafe();
             let name: string;
             if (node.supportsCC(CommandClasses['Node Naming and Location'])) {
-                const nodeNaming = instance.getNodeUnsafe().commandClasses["Node Naming and Location"];
-                name = await nodeNaming?.getName();
+                try {
+                    const nodeNaming = instance.getNodeUnsafe().commandClasses["Node Naming and Location"];
+                    name = await nodeNaming?.getName();
+                }
+                catch (e) {
+                    // have seen this fail, even though it is supposedly available
+                }
             }
             scryptedDevice.device = {
                 name,
@@ -315,7 +320,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         for (let cc of instance.getSupportedCCInstances()) {
             var type = getCommandClass(cc.ccId);
             if (type) {
-                await this._addType(scryptedDevice, instance, type, null);
+                this._addType(scryptedDevice, instance, type, null);
                 continue;
             }
         }
@@ -348,8 +353,13 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         // todo: watch for name change and sync to zwave controller
         const node = instance.getNodeUnsafe();
         if (node.supportsCC(CommandClasses['Node Naming and Location'])) {
-            const naming = instance.getNodeUnsafe().commandClasses?.['Node Naming and Location'];
-            naming?.setName(scryptedDevice.name);
+            try {
+                const naming = instance.getNodeUnsafe().commandClasses?.['Node Naming and Location'];
+                await naming?.setName(scryptedDevice.name);
+            }
+            catch (e) {
+                // have seen this fail, even though it is supposedly available
+            }
         }
 
         if (scryptedDevice.device.interfaces.includes(ScryptedInterface.Battery)) {
