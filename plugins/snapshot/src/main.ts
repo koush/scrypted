@@ -39,6 +39,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 'Timeout',
             ],
             defaultValue: 'Normal',
+        },
+        snapshotResolution: {
+            title: 'Snapshot Resolution',
+            description: 'Set resolution of the snapshots requested from the camera.',
+            choices: [
+                'Default',
+                'Full Resolution',
+            ],
+            defaultValue: 'Default',
+            hide: !this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera),
         }
     });
     axiosClient: Axios | AxiosDigestAuth;
@@ -58,7 +68,13 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
         let takePicture: () => Promise<Buffer>;
         if (!this.storageSettings.values.snapshotUrl && this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
-            takePicture = () => this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'));
+            takePicture = async () => {
+                // if operating in full resolution mode, nuke any picture options containing
+                // the requested dimensions that are sent.
+                if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
+                    options.picture = undefined;
+                return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
+            };
         }
         else {
 
