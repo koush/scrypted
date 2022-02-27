@@ -207,6 +207,7 @@ class SnapshotPlugin extends ScryptedDeviceBase implements MixinProvider {
     }
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {
+        await mixinDevice.release()
     }
 }
 
