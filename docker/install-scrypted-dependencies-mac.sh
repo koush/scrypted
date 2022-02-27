@@ -55,51 +55,15 @@ then
     exit 1
 fi
 
-
-cat <<EOT > ~/Library/LaunchAgents/app.scrypted.server.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>RunAtLoad</key>
-        <true/>
-    <key>KeepAlive</key>
-        <true/>
-    <key>Label</key>
-        <string>app.scrypted.server</string>
-    <key>ProgramArguments</key>
-        <array>
-             <string>$NPX_PATH</string>
-             <string>-y</string>
-             <string>scrypted</string>
-             <string>serve</string>
-        </array>
-    <key>WorkingDirectory</key>
-         <string>/Users/$USER/.scrypted</string>
-    <key>StandardOutPath</key>
-        <string>/dev/null</string>
-    <key>StandardErrorPath</key>
-        <string>/dev/null</string>
-    <key>UserName</key>
-        <string>$USER</string>
-    <key>EnvironmentVariables</key>
-        <dict>
-            <key>PATH</key>
-                <string>$NPX_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-            <key>HOME</key>
-                <string>/Users/$USER</string>
-        </dict>
-</dict>
-</plist>
-EOT
+RUN curl https://raw.githubusercontent.com/koush/scrypted/main/docker/app.scrypted.server.plist --output ~/Library/LaunchAgents/app.scrypted.server.plist
 
 # added 1/30/2022 - delete this block at some point:
 # previous script had the wrong domain. clear it.
-launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist || echo ""
+launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist
 rm -f ~/Library/LaunchAgents/com.scrypted.server.plist
 
 # this may fail if its not loaded, do not use RUN
-launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
+launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist
 RUN launchctl load ~/Library/LaunchAgents/app.scrypted.server.plist
 
 set +x
