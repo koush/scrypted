@@ -5,35 +5,21 @@ import dgram from 'dgram';
 import { RtspServer } from "./rtsp-server";
 import { Socket } from "net";
 import { ScryptedDeviceBase } from "@scrypted/sdk";
-import { parsePayloadTypes } from './sdp-utils';
-
 
 // this is an sdp corresponding to what is requested from webrtc.
 // h264 baseline and opus are required codecs that all webrtc implementations must provide.
 function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
-    const { audioPayloadTypes, videoPayloadTypes } = parsePayloadTypes(sdp);
+    let outputSdp = sdp
+        .replace(/m=audio \d+/, `m=audio ${audioPort}`)
+        .replace(/m=video \d+/, `m=video ${videoPort}`);
 
-    return `v=0
-o=- 0 0 IN IP4 127.0.0.1
-s=-
-c=IN IP4 127.0.0.1
-t=0 0
-m=audio ${audioPort} UDP ${[...audioPayloadTypes].join(' ')}
-a=control:trackID=audio
-a=rtpmap:101 opus/48000/2
-a=fmtp:101 minptime=10;useinbandfec=1
-a=rtcp-fb:101 transport-cc
-a=sendrecv
-m=video ${videoPort} UDP ${[...videoPayloadTypes].join(' ')}
-a=control:trackID=video
-a=rtpmap:96 H264/90000
-a=rtcp-fb:96 ccm fir
-a=rtcp-fb:96 nack
-a=rtcp-fb:96 nack pli
-a=rtcp-fb:96 goog-remb
-a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
-a=sendrecv
-`;
+    const lines = outputSdp.split('\n').map(line => line.trim());
+    const vindex = lines.findIndex(line => line.startsWith('m=video'));
+    lines.splice(vindex + 1, 0, 'a=control:trackID=video');
+    const aindex = lines.findIndex(line => line.startsWith('m=audio'));
+    lines.splice(aindex + 1, 0, 'a=control:trackID=audio');
+    outputSdp = lines.join('\r\n')
+    return outputSdp;
 }
 
 const useUdp = false;
@@ -62,19 +48,17 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
 
     const { clientPromise, port } = await listenZeroSingleClient();
 
-    let ai: NodeJS.Timeout;
-    let vi: NodeJS.Timeout;
+    let pictureLossInterval: NodeJS.Timeout;
     let pc: RTCPeerConnection;
     let socket: Socket;
     // rtsp server must operate in udp forwarding mode to accomodate packet reordering.
     let udp = dgram.createSocket('udp4');
 
     const cleanup = () => {
-        console.log('cleanup');
+        console.log('webrtc/rtsp cleaning up');
         pc?.close();
         socket?.destroy();
-        clearInterval(ai);
-        clearInterval(vi);
+        clearInterval(pictureLossInterval);
         try {
             udp.close();
         }
@@ -82,7 +66,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
         }
     };
 
-    clientPromise.then(async (client) => {
+    clientPromise.then((client) => {
         socket = client;
         const rtspServer = new RtspServer(socket, undefined, udp);
         // rtspServer.console = console;
@@ -163,12 +147,12 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                 });
                 track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendVideo(rtcp.serialize(), true))
                 track.onReceiveRtp.once(() => {
-                    vi = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 2000);
+                    pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
                 });
             });
         }
 
-        channel.startRTCSignalingSession({
+        return channel.startRTCSignalingSession({
             createLocalDescription: async (type, setup, sendIceCandidate) => {
                 if (type === 'offer')
                     doSetup(setup);

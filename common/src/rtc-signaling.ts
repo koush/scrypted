@@ -1,20 +1,36 @@
-import type { RTCSignalingSession, RTCAVSignalingSetup, ScryptedDevice, RTCSignalingChannel } from "@scrypted/sdk/types";
+import type { RTCSignalingSession, RTCAVSignalingSetup } from "@scrypted/sdk/types";
 import type { RTCSignalingChannelOptions, RTCSignalingSendIceCandidate } from "@scrypted/sdk";
 
 export async function startRTCSignalingSession(session: RTCSignalingSession, offer: RTCSessionDescriptionInit,
+    console: Console,
     createSetup: () => Promise<RTCAVSignalingSetup>,
     setRemoteDescription: (remoteDescription: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit>,
     addIceCandidate?: (candidate: RTCIceCandidate) => Promise<void>) {
-    const setup = await createSetup();
-    if (!offer) {
-        const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-        const answer = await setRemoteDescription(offer);
-        await session.setRemoteDescription(answer, setup);
+    try {
+        const setup = await createSetup();
+        console.log('offer', offer?.sdp, 'rtc setup', setup);
+        if (!offer) {
+            console.log('session.createLocalDescription');
+            const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
+            console.log('rtc offer', offer.sdp);
+            const answer = await setRemoteDescription(offer);
+            console.log('rtc answer', answer);
+            await session.setRemoteDescription(answer, setup);
+            console.log('session.setRemoteDescription done');
+        }
+        else {
+            console.log('session.setRemoteDescription');
+            await session.setRemoteDescription(offer, setup);
+            console.log('session.createLocalDescription');
+            const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
+            console.log('rtc answer', answer.sdp);
+            await setRemoteDescription(answer);
+            console.log('session.setRemoteDescription done');
+        }
     }
-    else {
-        await session.setRemoteDescription(offer, setup);
-        const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-        await setRemoteDescription(answer);
+    catch (e) {
+        console.error('RTC signaling failed', e);
+        throw e;
     }
 }
 

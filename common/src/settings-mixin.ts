@@ -84,7 +84,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
         deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, null);
     }
 
-    release() {
-        deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, null);
+    async release() {
+        await deviceManager.onMixinEvent(this.id, this, ScryptedInterface.Settings, null);
     }
 }
