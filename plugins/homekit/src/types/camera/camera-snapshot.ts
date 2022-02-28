@@ -9,7 +9,7 @@ const { mediaManager } = sdk;
 
 const black = fs.readFileSync('black.jpg');
 
-export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitSession: HomeKitSession) {
+export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitSession: HomeKitSession, console: Console) {
     let lastPictureTime = 0;
     let lastPicture: Buffer;
     let pendingPicture: Promise<Buffer>;
@@ -28,6 +28,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             pendingPicture = mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
         }
         else {
+            // todo: remove this in favor of snapshot plugin requirement?
             pendingPicture = device.getVideoStream().then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
         }
 
@@ -80,6 +81,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
         try {
             // non zero reason is for homekit secure video... or something else.
             if (request.reason) {
+                console.log('snapshot requested for reason:', request.reason);
                 callback(null, await takePicture(request));
                 return;
             }
@@ -102,6 +104,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
                     callback(null, lastPicture);
                 }
                 else {
+                    // todo: remove this in favor of snapshot plugin?
                     callback(null, black);
                 }
                 return;

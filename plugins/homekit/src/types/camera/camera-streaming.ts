@@ -58,7 +58,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
     }
 
     const delegate: CameraStreamingDelegate = {
-        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitSession),
+        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitSession, console),
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
 
             const videossrc = CameraController.generateSynchronisationSource();
