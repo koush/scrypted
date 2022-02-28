@@ -1,4 +1,4 @@
-import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue } from "@scrypted/sdk";
+import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin"
 import { StorageSettings } from "@scrypted/common/src/settings"
 import AxiosDigestAuth from '@koush/axios-digest-auth';
@@ -6,6 +6,8 @@ import https from 'https';
 import axios, { Axios } from "axios";
 import { TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import jimp from 'jimp';
+
+const { systemManager } = sdk;
 
 const { mediaManager } = sdk;
 const httpsAgent = new https.Agent({
@@ -29,6 +31,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 : '')
                 + 'The http(s) URL that points that retrieves the latest image from your camera.',
             placeholder: 'https://ip:1234/cgi-bin/snapshot.jpg',
+        },
+        snapshotsFromPrebuffer: {
+            title: 'Snapshots from Prebuffer',
+            description: 'Prefer snapshots from the Rebroadcast Plugin prebuffer when available.',
+            type: 'boolean',
         },
         snapshotMode: {
             title: 'Snapshot Mode',
@@ -65,70 +72,93 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         });
     }
 
-    async takePicture(options?: PictureOptions): Promise<MediaObject> {
+    async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
         let takePicture: () => Promise<Buffer>;
-        if (!this.storageSettings.values.snapshotUrl && this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
-            takePicture = async () => {
-                // if operating in full resolution mode, nuke any picture options containing
-                // the requested dimensions that are sent.
-                if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
-                    options.picture = undefined;
-                return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
-            };
-        }
-        else {
-
-            if (!this.axiosClient) {
-                let username: string;
-                let password: string;
-
-                if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings)) {
-                    const settings = await this.mixinDevice.getSettings();
-                    username = settings?.find(setting => setting.key === 'username')?.value?.toString();
-                    password = settings?.find(setting => setting.key === 'password')?.value?.toString();
-                }
-
-                if (username && password) {
-                    this.axiosClient = new AxiosDigestAuth({
-                        username,
-                        password,
-                    });
-                }
-                else {
-                    this.axiosClient = axios;
+        if (this.storageSettings.values.snapshotsFromPrebuffer) {
+            try {
+                const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+                const msos = await realDevice.getVideoStreamOptions();
+                for (const mso of msos) {
+                    if (mso.prebuffer) {
+                        const request = mso as RequestMediaStreamOptions;
+                        request.refresh = false;
+                        takePicture = async () => mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
+                        // a prebuffer snapshot should wipe out any pending pictures
+                        // that may not have come from the prebuffer to allow a safe-ish/fast refresh.
+                        this.pendingPicture = undefined;
+                        this.console.log('snapshotting active prebuffer');
+                        break;
+                    }
                 }
             }
+            catch (e) {
+            }
+        }
 
-            takePicture = () => this.axiosClient.request({
-                httpsAgent,
-                method: "GET",
-                responseType: 'arraybuffer',
-                url: this.storageSettings.values.snapshotUrl,
-            }).then((response: { data: any; }) => response.data);
+        if (!takePicture) {
+            if (!this.storageSettings.values.snapshotUrl && this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
+                takePicture = async () => {
+                    // if operating in full resolution mode, nuke any picture options containing
+                    // the requested dimensions that are sent.
+                    if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
+                        options.picture = undefined;
+                    return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
+                };
+            }
+            else {
+
+                if (!this.axiosClient) {
+                    let username: string;
+                    let password: string;
+
+                    if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Settings)) {
+                        const settings = await this.mixinDevice.getSettings();
+                        username = settings?.find(setting => setting.key === 'username')?.value?.toString();
+                        password = settings?.find(setting => setting.key === 'password')?.value?.toString();
+                    }
+
+                    if (username && password) {
+                        this.axiosClient = new AxiosDigestAuth({
+                            username,
+                            password,
+                        });
+                    }
+                    else {
+                        this.axiosClient = axios;
+                    }
+                }
+
+                takePicture = () => this.axiosClient.request({
+                    httpsAgent,
+                    method: "GET",
+                    responseType: 'arraybuffer',
+                    url: this.storageSettings.values.snapshotUrl,
+                }).then((response: { data: any; }) => response.data);
+            }
         }
 
         if (!this.pendingPicture) {
-            this.pendingPicture = takePicture().then(lastPicture => {
+            const pendingPicture = takePicture().then(lastPicture => {
                 this.lastPicture = lastPicture;
+                const lp = this.lastPicture;
+                setTimeout(() => {
+                    if (this.lastPicture === lp) {
+                        this.lastPicture = undefined;
+                    }
+                }, 30000);
                 this.outdatedPicture = this.lastPicture;
                 return lastPicture;
-            })
-                .finally(() => this.pendingPicture = undefined);
-        }
-
-        const clearLastPicture = () => {
-            const lp = this.lastPicture;
-            setTimeout(() => {
-                if (this.lastPicture === lp) {
-                    this.lastPicture = undefined;
-                }
-            }, 30000);
+            });
+            this.pendingPicture = pendingPicture;
+            pendingPicture.finally(() => {
+                if (this.pendingPicture === pendingPicture)
+                    this.pendingPicture = undefined;
+            });
         }
 
         let data: Buffer;
         if (this.storageSettings.values.snapshotMode === 'Normal') {
             data = await this.pendingPicture;
-            clearLastPicture();
         }
         else {
             try {
@@ -142,7 +172,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }
                 else {
                     data = await timeoutPromise(1000, this.pendingPicture);
-                    clearLastPicture();
                 }
             }
             catch (e) {
