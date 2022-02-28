@@ -121,7 +121,8 @@ export abstract class MediaManagerBase implements MediaManager {
                     args.push('-y', "-vframes", "1", '-f', 'image2', tmpfile.name);
 
                     const cp = child_process.spawn(await this.getFFmpegPath(), args);
-                    ffmpegLogInitialOutput(console, cp);
+                    console.log('converting ffmpeg input to image.');
+                    // ffmpegLogInitialOutput(console, cp);
                     cp.on('error', (code) => {
                         console.error('ffmpeg error code', code);
                     })
