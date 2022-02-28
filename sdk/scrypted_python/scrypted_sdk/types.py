@@ -399,6 +399,15 @@ class RequestMediaStreamOptions(TypedDict):
     video: VideoStreamOptions
     pass
 
+class RequestPictureOptions(TypedDict):
+    bulkRequest: bool
+    id: str
+    name: str
+    periodicRequest: bool
+    picture: PictureDimensions
+    reason: Any | Any
+    pass
+
 class ScriptSource(TypedDict):
     language: str
     monacoEvalDefaults: str
@@ -473,7 +482,7 @@ class BufferConverter:
 class Camera:
     async def getPictureOptions(self) -> list[PictureOptions]:
         pass
-    async def takePicture(self, options: PictureOptions = None) -> MediaObject:
+    async def takePicture(self, options: RequestPictureOptions = None) -> MediaObject:
         pass
     pass
 

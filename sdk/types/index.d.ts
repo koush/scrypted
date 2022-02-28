@@ -451,11 +451,22 @@ export interface PictureOptions {
     name?: string;
     picture?: PictureDimensions;
 }
+export interface RequestPictureOptions extends PictureOptions {
+    reason?: 'user' | 'event';
+    /**
+     * Flag that hints whether this user request is happening due to a periodic refresh.
+     */
+    periodicRequest?: boolean;
+    /**
+     * Flag that hints whether multiple cameras are being refreshed by this user request. Can be used to prefetch the snapshots.
+     */
+    bulkRequest?: boolean;
+}
 /**
  * Camera devices can take still photos.
  */
 export interface Camera {
-    takePicture(options?: PictureOptions): Promise<MediaObject>;
+    takePicture(options?: RequestPictureOptions): Promise<MediaObject>;
     getPictureOptions(): Promise<PictureOptions[]>;
 }
 export interface VideoStreamOptions {
