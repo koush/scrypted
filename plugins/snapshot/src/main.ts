@@ -140,24 +140,32 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
 
         if (!this.pendingPicture) {
-            const pendingPicture = takePicture().then(lastPicture => {
-                this.lastPicture = lastPicture;
-                const lp = this.lastPicture;
+            const pendingPicture = (async() => {
+                let picture: Buffer;
+                try {
+                    picture = await takePicture();
+                    this.rawLastPicture = picture;
+                }
+                catch (e) {
+                    picture = await this.createErrorImage(e);
+                }
+                this.lastPicture = picture;
                 setTimeout(() => {
-                    if (this.lastPicture === lp) {
+                    if (this.lastPicture === picture) {
                         this.lastPicture = undefined;
                     }
                 }, 30000);
-                this.rawLastPicture = this.lastPicture;
-                return lastPicture;
-            });
+                return picture;
+            })();
+
             this.pendingPicture = pendingPicture;
-            pendingPicture.catch(e => {
-                this.createErrorImage(e);
-            });
+            // prevent infinite loop from onDeviceEvent triggering picture updates.
+            // retain this promise for a bit while everything settles.
             pendingPicture.finally(() => {
-                if (this.pendingPicture === pendingPicture)
-                    this.pendingPicture = undefined;
+                setTimeout(() => {
+                    if (this.pendingPicture === pendingPicture)
+                        this.pendingPicture = undefined;
+                }, 5000);
             });
         }
 
@@ -171,17 +179,18 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     if (!this.lastPicture) {
                         // this triggers an event to refresh the web ui.
                         this.pendingPicture.then(() => this.onDeviceEvent(ScryptedInterface.Camera, undefined));
-                        throw new NeverWaitError();
+                        data = await this.createErrorImage(new NeverWaitError());
                     }
-                    data = this.lastPicture;
+                    else {
+                        data = this.lastPicture;
+                    }
                 }
                 else {
                     data = await timeoutPromise(1000, this.pendingPicture);
                 }
             }
             catch (e) {
-                await this.createErrorImage(e);
-                data = this.lastPicture;
+                data = await this.createErrorImage(e);
             }
         }
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
@@ -204,7 +213,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
                 alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
             }, img.getWidth(), img.getHeight());
-            this.lastPicture = await img.getBufferAsync('image/jpeg');
+            return img.getBufferAsync('image/jpeg');
         }
         else {
             const img = await jimp.read(this.rawLastPicture);
@@ -217,10 +226,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
                 alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
             }, img.getWidth(), img.getHeight());
-            this.lastPicture = await img.getBufferAsync('image/jpeg');
+            return img.getBufferAsync('image/jpeg');
         }
-        if (!(e instanceof NeverWaitError))
-            this.onDeviceEvent(ScryptedInterface.Camera, undefined);
     }
 
     async getPictureOptions() {
