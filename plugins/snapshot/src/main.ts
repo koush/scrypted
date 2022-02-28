@@ -60,8 +60,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     });
     axiosClient: Axios | AxiosDigestAuth;
     pendingPicture: Promise<Buffer>;
+    // this will contain the last picture retrieved,
+    // or an outdated picture blurred with an error overlay.
     lastPicture: Buffer;
-    outdatedPicture: Buffer;
+    rawLastPicture: Buffer;
 
     constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }, providerNativeId: string) {
         super(mixinDevice, mixinDeviceState, {
@@ -146,10 +148,13 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         this.lastPicture = undefined;
                     }
                 }, 30000);
-                this.outdatedPicture = this.lastPicture;
+                this.rawLastPicture = this.lastPicture;
                 return lastPicture;
             });
             this.pendingPicture = pendingPicture;
+            pendingPicture.catch(e => {
+                this.createErrorImage(e);
+            });
             pendingPicture.finally(() => {
                 if (this.pendingPicture === pendingPicture)
                     this.pendingPicture = undefined;
@@ -175,40 +180,47 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 }
             }
             catch (e) {
-                let text: string;
-                if (e instanceof TimeoutError)
-                    text = 'Snapshot Timed Out';
-                else if (e instanceof NeverWaitError)
-                    text = 'Snapshot in Progress';
-                else
-                    text = 'Snapshot Failed';
-                data = this.lastPicture || this.outdatedPicture;
-                if (!data) {
-                    const img = await jimp.create(1920 / 2, 1080 / 2);
-                    const font = await fontPromise;
-                    img.print(font, 0, 0, {
-                        text,
-                        alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                        alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-                    }, img.getWidth(), img.getHeight());
-                    data = await img.getBufferAsync('image/jpeg');
-                }
-                else {
-                    const img = await jimp.read(data);
-                    img.resize(1920 / 2, jimp.AUTO);
-                    img.blur(15);
-                    img.brightness(-.2);
-                    const font = await fontPromise;
-                    img.print(font, 0, 0, {
-                        text,
-                        alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                        alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-                    }, img.getWidth(), img.getHeight());
-                    data = await img.getBufferAsync('image/jpeg');
-                }
+                await this.createErrorImage(e);
+                data = this.lastPicture;
             }
         }
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
+    }
+
+    async createErrorImage(e: any) {
+        this.console.log('creating error snapshot', e);
+        let text: string;
+        if (e instanceof TimeoutError)
+            text = 'Snapshot Timed Out';
+        else if (e instanceof NeverWaitError)
+            text = 'Snapshot in Progress';
+        else
+            text = 'Snapshot Failed';
+        if (!this.rawLastPicture) {
+            const img = await jimp.create(1920 / 2, 1080 / 2);
+            const font = await fontPromise;
+            img.print(font, 0, 0, {
+                text,
+                alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
+                alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
+            }, img.getWidth(), img.getHeight());
+            this.lastPicture = await img.getBufferAsync('image/jpeg');
+        }
+        else {
+            const img = await jimp.read(this.rawLastPicture);
+            img.resize(1920 / 2, jimp.AUTO);
+            img.blur(15);
+            img.brightness(-.2);
+            const font = await fontPromise;
+            img.print(font, 0, 0, {
+                text,
+                alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
+                alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
+            }, img.getWidth(), img.getHeight());
+            this.lastPicture = await img.getBufferAsync('image/jpeg');
+        }
+        if (!(e instanceof NeverWaitError))
+            this.onDeviceEvent(ScryptedInterface.Camera, undefined);
     }
 
     async getPictureOptions() {
