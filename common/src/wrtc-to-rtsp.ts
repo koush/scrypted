@@ -4,7 +4,7 @@ import { RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
 import dgram from 'dgram';
 import { RtspServer } from "./rtsp-server";
 import { Socket } from "net";
-import { ScryptedDeviceBase } from "@scrypted/sdk";
+import { RTCEndSession, ScryptedDeviceBase } from "@scrypted/sdk";
 
 // this is an sdp corresponding to what is requested from webrtc.
 // h264 baseline and opus are required codecs that all webrtc implementations must provide.
@@ -22,7 +22,7 @@ function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
     return outputSdp;
 }
 
-const useUdp = false;
+const useUdp = true;
 
 export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamOptions {
     return {
@@ -53,6 +53,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
     let socket: Socket;
     // rtsp server must operate in udp forwarding mode to accomodate packet reordering.
     let udp = dgram.createSocket('udp4');
+    let endSession: RTCEndSession;
 
     const cleanup = () => {
         console.log('webrtc/rtsp cleaning up');
@@ -64,9 +65,10 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
         }
         catch (e) {
         }
+        endSession?.().catch(() => {});
     };
 
-    clientPromise.then((client) => {
+    clientPromise.then(async (client) => {
         socket = client;
         const rtspServer = new RtspServer(socket, undefined, udp);
         // rtspServer.console = console;
@@ -103,19 +105,19 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
         socket.on('error', cleanup);
         pc.iceConnectionStateChange.subscribe(() => {
             console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
-            // if (pc.iceConnectionState === 'disconnected'
-            //     || pc.iceConnectionState === 'failed'
-            //     || pc.iceConnectionState === 'closed') {
-            //     cleanup();
-            // }
+            if (pc.iceConnectionState === 'disconnected'
+                || pc.iceConnectionState === 'failed'
+                || pc.iceConnectionState === 'closed') {
+                cleanup();
+            }
         });
         pc.connectionStateChange.subscribe(() => {
             console.log('connectionStateChange', pc.connectionState, pc.iceConnectionState);
-            // if (pc.connectionState === 'closed'
-            //     || pc.connectionState === 'disconnected'
-            //     || pc.connectionState === 'failed') {
-            //     cleanup();
-            // }
+            if (pc.connectionState === 'closed'
+                || pc.connectionState === 'disconnected'
+                || pc.connectionState === 'failed') {
+                cleanup();
+            }
         });
 
         const doSetup = async (setup: RTCAVSignalingSetup) => {
@@ -146,13 +148,13 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                     rtspServer.sendVideo(rtp.serialize(), false);
                 });
                 track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendVideo(rtcp.serialize(), true))
-                track.onReceiveRtp.once(() => {
-                    pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
-                });
+                // track.onReceiveRtp.once(() => {
+                //     pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
+                // });
             });
         }
 
-        return channel.startRTCSignalingSession({
+        endSession = await channel.startRTCSignalingSession({
             createLocalDescription: async (type, setup, sendIceCandidate) => {
                 if (type === 'offer')
                     doSetup(setup);
@@ -191,28 +193,67 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
             setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
                 if (description.type === 'offer')
                     doSetup(setup);
-                await pc.setRemoteDescription(description as any);
                 rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
-                await rtspServer.handleSetup();
+
+                if (useUdp) {
+                    rtspServer.udpPorts = {
+                        video: videoPort,
+                        audio: audioPort,
+                    };
+                    rtspServer.client.write(rtspServer.sdp + '\r\n');
+                    rtspServer.client.end();
+                    rtspServer.client.on('data', () => {});
+                    // rtspServer.client.destroy();
+                    console.log('sdp sent');
+                }
+                else {
+                    await rtspServer.handleSetup();
+                }
+                await pc.setRemoteDescription(description as any);
             },
             addIceCandidate: async (candidate: RTCIceCandidateInit) => {
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
-            }
+            },
         });
     })
         .catch(e => cleanup);
 
-    const url = `rtsp://127.0.0.1:${port}`;
-    return {
-        url,
-        mediaStreamOptions: getRTCMediaStreamOptions(id, name),
-        inputArguments: [
-            "-rtsp_transport", useUdp ? "udp" : "tcp",
-            // hint to ffmpeg for how long to wait for out of order packets.
-            // is only used by udp, i think? unsure. but it causes severe jitter.
-            // the jitter buffer should be on the actual rendering side.
-            // "-max_delay", "0",
-            '-i', url,
-        ]
-    };
+
+    const mediaStreamOptions = getRTCMediaStreamOptions(id, name);
+    if (useUdp) {
+        const url = `tcp://127.0.0.1:${port}`;
+
+        mediaStreamOptions.container = 'sdp';
+        return {
+            url,
+            mediaStreamOptions,
+            inputArguments: [
+                '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
+                '-acodec', 'libopus',
+                "-f", "sdp",
+                // hint to ffmpeg for how long to wait for out of order packets.
+                // is only used by udp, i think? unsure. but it causes severe jitter
+                // when there are late or missing packets.
+                // the jitter buffer should be on the actual rendering side.
+                // "-max_delay", "0",
+                '-i', url,
+            ]
+        };
+    }
+    else {
+        const url = `rtsp://127.0.0.1:${port}`;
+        return {
+            url,
+            mediaStreamOptions,
+            inputArguments: [
+                "-rtsp_transport", "tcp",
+                // hint to ffmpeg for how long to wait for out of order packets.
+                // is only used by udp, i think? unsure. but it causes severe jitter
+                // when there are late or missing packets.
+                // the jitter buffer should be on the actual rendering side.
+                // "-max_delay", "0",
+                '-i', url,
+            ]
+        };
+    }
 }

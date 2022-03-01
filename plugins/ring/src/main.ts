@@ -1,4 +1,4 @@
-import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCAVSignalingSetup, RTCEndSession, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { RingApi, RingCamera, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../..//common/src/settings';
@@ -6,14 +6,11 @@ import { ChildProcess } from 'child_process';
 import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-to-rtsp';
 import { startRTCSignalingSession } from '../../../common/src/rtc-signaling';
 import { generateUuid } from './ring-client-api';
-import fs from 'fs';
 import { clientApi } from './ring-client-api';
-import { RefreshPromise, singletonPromise, timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { LiveCallNegotiation } from './ring-client-api';
 import dgram from 'dgram';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
-const black = fs.readFileSync('unavailable.jpg');
 
 const RtcMediaStreamOptionsId = 'webrtc';
 
@@ -39,7 +36,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
     audioOutProcess: ChildProcess;
     ffmpegInput: FFMpegInput;
     refreshTimeout: NodeJS.Timeout;
-    picturePromise: RefreshPromise<Buffer>;
     storageSettings = new StorageSettings(this, {
         motionTimeout: {
             title: 'Motion Timeout',
@@ -70,8 +66,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         return this.storageSettings.putSetting(key, value);
     }
 
-    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions) {
+    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<undefined|RTCEndSession> {
         const camera = this.findCamera();
+
+        let endSession: RTCEndSession;
 
         // ring has two webrtc endpoints. one is for the android/ios clients, wherein the ring server
         // sends an offer, which only has h264 high in it, which causes some browsers 
@@ -81,55 +79,69 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         // since this currently defaults to using the baseline profile on Chrome when high is supported.
         if (options?.capabilities.video) {
             // the browser path will automatically activate the speaker on the ring.
-            startRTCSignalingSession(session, undefined, async () => {
-                return {
-                    type: 'offer',
-                    audio: {
-                        direction: 'sendrecv',
-                    },
-                    video: {
-                        direction: 'recvonly',
-                    },
-                };
-            }, async (description) => {
-                const answer = await camera.startWebRtcSession(generateUuid(), description.sdp);
-                return {
-                    type: 'answer',
-                    sdp: answer,
-                };
-            })
+            await startRTCSignalingSession(session, undefined, this.console,
+                async () => {
+                    return {
+                        type: 'offer',
+                        audio: {
+                            direction: 'sendrecv',
+                        },
+                        video: {
+                            direction: 'recvonly',
+                        },
+                    };
+                }, async (description) => {
+                    const answer = await camera.startWebRtcSession(generateUuid(), description.sdp);
+                    return {
+                        type: 'answer',
+                        sdp: answer,
+                    };
+                })
         }
         else {
             const callSignaling = new LiveCallNegotiation(await camera.startLiveCallNegotiation(), camera);
-            callSignaling.onMessage.subscribe(async (message) => {
-                if (message.method === 'sdp') {
-                    await startRTCSignalingSession(session, message,
-                        async () => {
-                            return {
-                                type: 'answer',
-                                audio: {
-                                    direction: 'sendrecv',
-                                },
-                                video: {
-                                    direction: 'recvonly',
-                                },
-                            };
-                        },
-                        async (description) => {
-                            callSignaling.sendAnswer(description);
-                            return undefined;
-                        }
-                    )
-                }
-                else if (message.method === 'ice') {
-                    session.addIceCandidate({
-                        candidate: message.ice,
-                        sdpMLineIndex: message.mlineindex,
-                    })
-                }
+            endSession = async () => {
+                callSignaling.endCall();
+            };
+            await new Promise((resolve, reject) => {
+                callSignaling.onMessage.subscribe(async (message) => {
+                    // this.console.log('call signaling', message);
+                    if (message.method === 'sdp') {
+                        resolve(startRTCSignalingSession(session, message, this.console,
+                            async () => {
+                                return {
+                                    type: 'answer',
+                                    audio: {
+                                        direction: 'sendrecv',
+                                    },
+                                    video: {
+                                        direction: 'recvonly',
+                                    },
+                                };
+                            },
+                            async (description) => {
+                                callSignaling.sendAnswer(description);
+                                return undefined;
+                            }
+                        ));
+                    }
+                    else if (message.method === 'ice') {
+                        this.console.log(message.ice);
+                        session.addIceCandidate({
+                            candidate: message.ice,
+                            sdpMLineIndex: message.mlineindex,
+                        })
+                    }
+                    else if (message.method === 'close') {
+                        reject(new Error(message.reason.text));
+                    }
+                });
+
+                callSignaling.activate().catch(reject);
             });
-            await callSignaling.activate();
         }
+
+        return endSession;
     }
 
     async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
@@ -142,7 +154,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         return new RingCameraLight(this);
     }
 
-    async takePicture(options?: PictureOptions): Promise<MediaObject> {
+    async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
         // if this stream is prebuffered, its safe to use the prebuffer to generate an image
         const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
         try {
@@ -156,39 +168,40 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         catch (e) {
         }
 
-        // watch for snapshot being blocked due to live stream
+        let buffer: Buffer;
+
         const camera = this.findCamera();
-        if (!camera || camera.snapshotsAreBlocked) {
-            return mediaManager.createMediaObject(black, 'image/jpeg');
-        }
+        if (!camera)
+            throw new Error('camera unavailable');
 
-        // trigger a refresh, but immediately use whatever is available remotely.
-        // ring-client-api debounces snapshot requests, so this is safe to call liberally.
-        camera.getSnapshot();
-
-        this.picturePromise = singletonPromise(this.picturePromise, async () => {
+            // watch for snapshot being blocked due to live stream
+        if (!camera.snapshotsAreBlocked) {
             try {
-                return await timeoutPromise(1000, camera.getSnapshot());
+                buffer = await this.plugin.api.restClient.request<Buffer>({
+                    url: `https://app-snaps.ring.com/snapshots/next/${camera.id}`,
+                    responseType: 'buffer',
+                    searchParams: {
+                      extras: 'force',
+                    },
+                    headers: {
+                      accept: 'image/jpeg',
+                    },
+                    allowNoResponse: true,
+                });
             }
             catch (e) {
+                this.console.error('snapshot failed, falling back to cache');
             }
-
-            return this.plugin.client.request<Buffer>({
+        }
+        if (!buffer) {
+            buffer = await this.plugin.api.restClient.request<Buffer>({
                 url: clientApi(`snapshots/image/${camera.id}`),
                 responseType: 'buffer',
+                allowNoResponse: true,
             });
-        });
-        this.picturePromise.cacheDuration = 5000;
+        }
 
-        try {
-            // need to cache this and throttle or something.
-            const buffer = await timeoutPromise(2000, this.picturePromise.promise);
-            return mediaManager.createMediaObject(buffer, 'image/jpeg');
-        }
-        catch (e) {
-            this.console.error('snapshot error', e);
-            return mediaManager.createMediaObject(black, 'image/jpeg');
-        }
+        return mediaManager.createMediaObject(buffer, 'image/jpeg');
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
@@ -239,19 +252,13 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         this.buttonTimeout = setTimeout(() => this.binaryState = false, 10000);
     }
 
-    triggerMotion() {
-        this.motionDetected = true;
-        clearTimeout(this.motionTimeout)
-        this.motionTimeout = setTimeout(() => this.motionDetected = false, this.storageSettings.values.motionTimeout);
-    }
-
     findCamera() {
         return this.plugin.cameras?.find(camera => camera.id.toString() === this.nativeId);
     }
 }
 
 class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
-    client: RingRestClient;
+    loginClient: RingRestClient;
     api: RingApi;
     devices = new Map<string, RingCameraDevice>();
     cameras: RingCamera[];
@@ -301,7 +308,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
     constructor() {
         super();
         this.discoverDevices(0)
-        .catch(e => this.console.error('discovery failure', e));
+            .catch(e => this.console.error('discovery failure', e));
 
         if (!this.settingsStorage.values.systemId)
             this.settingsStorage.values.systemId = generateUuid();
@@ -309,7 +316,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
 
     async clearTryDiscoverDevices() {
         this.settingsStorage.values.refreshToken = undefined;
-        this.client = undefined;
         await this.discoverDevices(0);
         this.console.log('discovery completed successfully');
     }
@@ -329,15 +335,12 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 systemId: this.settingsStorage.values.systemId,
             });
 
-            this.api.onRefreshTokenUpdated.subscribe(({newRefreshToken}) => {
+            this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) => {
                 this.settingsStorage.values.refreshToken = newRefreshToken;
             });
         }
 
         if (this.settingsStorage.values.refreshToken) {
-            this.client = new RingRestClient({
-                refreshToken: this.settingsStorage.values.refreshToken,
-            });
             await createRingApi();
             return;
         }
@@ -348,16 +351,16 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         }
 
         if (!code) {
-            this.client = new RingRestClient({
+            this.loginClient = new RingRestClient({
                 email: this.settingsStorage.values.email,
                 password: this.settingsStorage.values.password,
             });
             try {
-                const auth = await this.client.getCurrentAuth();
+                const auth = await this.loginClient.getCurrentAuth();
                 this.settingsStorage.values.refreshToken = auth.refresh_token;
             }
             catch (e) {
-                if (this.client.promptFor2fa) {
+                if (this.loginClient.promptFor2fa) {
                     this.log.a('Check your email or texts for your Ring login code, then enter it into the Two Factor Code setting to conplete login.');
                     return;
                 }
@@ -368,7 +371,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         }
         else {
             try {
-                const auth = await this.client.getAuth(code);
+                const auth = await this.loginClient.getAuth(code);
                 this.settingsStorage.values.refreshToken = auth.refresh_token;
             }
             catch (e) {
@@ -432,10 +435,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 const scryptedDevice = this.devices.get(nativeId);
                 scryptedDevice?.triggerBinaryState();
             });
-            camera.onMotionStarted?.subscribe(() => {
-                this.console.log(camera.name, 'onMotionStarted');
+            camera.onMotionDetected?.subscribe((motionDetected) => {
+                this.console.log(camera.name, 'onMotionDetected');
                 const scryptedDevice = this.devices.get(nativeId);
-                scryptedDevice?.triggerMotion();
+                if (scryptedDevice)
+                    scryptedDevice.motionDetected = motionDetected;
             });
             camera.onBatteryLevel?.subscribe(() => {
                 const scryptedDevice = this.devices.get(nativeId);

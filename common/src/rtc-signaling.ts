@@ -8,13 +8,13 @@ export async function startRTCSignalingSession(session: RTCSignalingSession, off
     addIceCandidate?: (candidate: RTCIceCandidate) => Promise<void>) {
     try {
         const setup = await createSetup();
-        console.log('offer', offer?.sdp, 'rtc setup', setup);
+        // console.log('offer', offer?.sdp, 'rtc setup', setup);
         if (!offer) {
             console.log('session.createLocalDescription');
             const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-            console.log('rtc offer', offer.sdp);
+            console.log('rtc offer received');
             const answer = await setRemoteDescription(offer);
-            console.log('rtc answer', answer);
+            console.log('rtc answer received');
             await session.setRemoteDescription(answer, setup);
             console.log('session.setRemoteDescription done');
         }
@@ -23,7 +23,7 @@ export async function startRTCSignalingSession(session: RTCSignalingSession, off
             await session.setRemoteDescription(offer, setup);
             console.log('session.createLocalDescription');
             const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-            console.log('rtc answer', answer.sdp);
+            console.log('rtc answer received');
             await setRemoteDescription(answer);
             console.log('session.setRemoteDescription done');
         }
@@ -135,8 +135,12 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         await this.pc.setRemoteDescription(description);
 
     }
+
     async addIceCandidate(candidate: RTCIceCandidateInit) {
         console.log("remote candidate", candidate);
         await this.pc.addIceCandidate(candidate);
+    }
+
+    async endSession() {
     }
 }
