@@ -7,8 +7,9 @@ import readline from 'readline-sync';
 import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
-import { connectScryptedClient } from '../../client/src/index';
+import { connectScryptedClient, ScryptedMimeTypes, FFMpegInput } from '../../client/src/index';
 import semver from 'semver';
+import child_process from 'child_process';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -90,6 +91,38 @@ const axiosConfig: AxiosRequestConfig = {
     })
 }
 
+async function runCommand() {
+    const [idOrName, optionalHost] = process.argv[3].split('@');
+    const host = toIpAndPort(optionalHost || '127.0.0.1');
+
+    const login = await getOrDoLogin(host);
+
+    const sdk = await connectScryptedClient({
+        baseUrl: `https://${host}`,
+        pluginId: '@scrypted/core',
+        username: login.username,
+        password: login.token,
+    });
+
+    const device: any = sdk.systemManager.getDeviceById(idOrName) || sdk.systemManager.getDeviceByName(idOrName);
+    if (!device)
+        throw new Error('device not found: ' + idOrName);
+    const method = process.argv[4];
+    const args = process.argv.slice(5).map(arg => () => {
+        try {
+            return JSON.parse(arg);
+        }
+        catch (e) {
+        }
+        return arg;
+    });
+
+    return {
+        sdk,
+        pendingResult: device[method](...args),
+    };
+}
+
 async function main() {
     if (process.argv[2] === 'serve') {
         await serveMain(false);
@@ -107,31 +140,14 @@ async function main() {
         console.log('login successful. token:', token);
     }
     else if (process.argv[2] === 'command') {
-        const [idOrName, optionalHost] = process.argv[3].split('@');
-        const host = toIpAndPort(optionalHost || '127.0.0.1');
-
-        const login = await getOrDoLogin(host);
-
-        const sdk = await connectScryptedClient({
-            baseUrl: `https://${host}`,
-            pluginId: '@scrypted/core',
-            username: login.username,
-            password: login.token,
-        });
-
-        const device: any = sdk.systemManager.getDeviceById(idOrName) || sdk.systemManager.getDeviceByName(idOrName);
-        if (!device)
-            throw new Error('device not found: ' + idOrName);
-        const method = process.argv[4];
-        const args = process.argv.slice(5).map(arg => () => {
-            try {
-                return JSON.parse(arg);
-            }
-            catch (e) {
-            }
-            return arg;
-        });
-        await device[method](...args);
+        const { sdk, pendingResult } = await runCommand();
+        sdk.disconnect();
+    }
+    else if (process.argv[2] === 'ffplay') {
+        const { sdk, pendingResult } = await runCommand();
+        const ffinput = await sdk.mediaManager.convertMediaObjectToJSON<FFMpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
+        console.log(ffinput);
+        child_process.spawn('ffplay', ffinput.inputArguments);
         sdk.disconnect();
     }
     else if (process.argv[2] === 'create-cert-json' && process.argv.length === 5) {
@@ -146,10 +162,10 @@ async function main() {
         console.log('Saved cert.json.');
         console.log();
         console.log('Start the Scrypted server with the following environment variable:');
-        console.log('   SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/cert.json')
+        console.log('   SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/cert.json');
         console.log();
         console.log('Docker users will need to mount the cert in a volume and use the following docker run arguments:');
-        console.log('   -e SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/cert.json')
+        console.log('   -e SCRYPTED_HTTPS_OPTIONS_FILE=/path/to/cert.json');
     }
     else if (process.argv[2] === 'install') {
         const ip = toIpAndPort(process.argv[4] || '127.0.0.1');
@@ -181,6 +197,7 @@ async function main() {
         console.log('   npx scrypted serve');
         console.log('   npx scrypted serve@latest');
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
+        console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
         process.exit(1);
     }
