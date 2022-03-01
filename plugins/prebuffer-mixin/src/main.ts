@@ -976,7 +976,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     return ret;
   }
 
-  release() {
+  async release() {
     this.console.log('prebuffer session releasing if started');
     this.released = true;
     for (const session of this.sessions.values()) {
