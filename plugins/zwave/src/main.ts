@@ -42,6 +42,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     driver: Driver;
     controller: ZWaveController;
     driverReady: Promise<void>;
+    dskDeferred: {reject: any, resolve: any};
 
     constructor() {
         super();
@@ -210,6 +211,11 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 type: 'button',
                 description: 'Enter exclusion mode and remove devices.',
             },
+            {
+                key: 'confirmPin',
+                title: 'Confirm PIN',
+                description: 'Some devices will require confirmation of a PIN while including them. Enter the PIN here when prompted.',
+            }
         ]
     }
 
@@ -220,8 +226,17 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 return requested;
             },
             validateDSKAndEnterPIN: async (dsk: string) => {
-                this.console.error('validateDSKAndEnterPIN not implemented in zwave plugin');
-                throw new Error("validateDSKAndEnterPIN Function not implemented.");
+                this.console.log('dsk received', sdk);
+                return new Promise((resolve, reject) => {
+                    if (this.dskDeferred) {
+                        this.dskDeferred.reject(new Error('new dsk received'));
+                        this.dskDeferred = undefined;
+                    }
+                    this.dskDeferred = {
+                        resolve,
+                        reject,
+                    };
+                });
             },
             abort: function (): void {
                 this.console.log('abort');
@@ -255,6 +270,11 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         }
         if (key === 'exclusion') {
             this.exclusion();
+            return;
+        }
+        if (key === 'confirmPin') {
+            this.dskDeferred?.resolve(value.toString());
+            this.dskDeferred = undefined;
             return;
         }
 
