@@ -147,7 +147,9 @@ async function main() {
         const { sdk, pendingResult } = await runCommand();
         const ffinput = await sdk.mediaManager.convertMediaObjectToJSON<FFMpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
         console.log(ffinput);
-        child_process.spawn('ffplay', ffinput.inputArguments);
+        child_process.spawn('ffplay', ffinput.inputArguments, {
+            stdio: 'inherit',
+        });
         sdk.disconnect();
     }
     else if (process.argv[2] === 'create-cert-json' && process.argv.length === 5) {
