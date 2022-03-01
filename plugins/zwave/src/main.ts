@@ -200,10 +200,10 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 description: 'The 16 byte hex encoded S2 Unauthenticated Key',
             },
             {
-                title: 'Include Device',
-                key: 'inclusion',
+                title: 'Heal Network',
+                key: 'heal',
                 type: 'button',
-                description: 'Enter inclusion mode and add devices.',
+                description: 'Heal the Z-Wave Network. This operation may take a long time and the network may become unreponsive while in progress.',
             },
             {
                 title: 'Exclude Device',
@@ -212,11 +212,23 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 description: 'Enter exclusion mode and remove devices.',
             },
             {
+                title: 'Include Device',
+                key: 'inclusion',
+                type: 'button',
+                description: 'Enter inclusion mode and add devices.',
+            },
+            {
                 key: 'confirmPin',
                 title: 'Confirm PIN',
                 description: 'Some devices will require confirmation of a PIN while including them. Enter the PIN here when prompted.',
             }
         ]
+    }
+
+    async stopOperations() {
+        this.controller.stopHealingNetwork();
+        await this.controller.stopExclusion();
+        await this.controller.stopInclusion();
     }
 
     async inclusion() {
@@ -242,8 +254,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 this.console.log('abort');
             }
         }
-        await this.controller.stopExclusion();
-        await this.controller.stopInclusion();
+        await this.stopOperations();
         const including = await this.driver.controller.beginInclusion({
             userCallbacks,
             strategy: InclusionStrategy.Default,
@@ -255,12 +266,17 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     }
 
     async exclusion() {
-        await this.controller.stopExclusion();
-        await this.controller.stopInclusion();
+        await this.stopOperations();
         const excluding = await this.driver.controller.beginExclusion();
         this.log.a('Excluding devices for 5 minutes.');
         this.console.log('excluding', excluding);
         setTimeout(() => this.driver.controller.stopExclusion(), 300000);
+    }
+
+    async healNetwork() {
+        await this.stopOperations();
+        const healing = this.controller.beginHealingNetwork();
+        this.console.log('healing network', healing);
     }
 
     async putSetting(key: string, value: string | number | boolean) {
@@ -275,6 +291,10 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         if (key === 'confirmPin') {
             this.dskDeferred?.resolve(value.toString());
             this.dskDeferred = undefined;
+            return;
+        }
+        if (key === 'heal') {
+            this.healNetwork();
             return;
         }
 
