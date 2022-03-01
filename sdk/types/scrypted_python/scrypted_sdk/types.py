@@ -445,6 +445,9 @@ class Setting(TypedDict):
     value: SettingValue
     pass
 
+class RTCEndSession(TypedDict):
+    pass
+
 class AmbientLightSensor:
     ambientLight: float
     pass
@@ -699,7 +702,7 @@ class PushHandler:
     pass
 
 class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingChannelOptions = None) -> None:
+    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingChannelOptions = None) -> RTCEndSession:
         pass
     pass
 

@@ -1962,8 +1962,9 @@ export interface RTCSignalingChannelOptions {
   }
 }
 
+export type RTCEndSession = () => Promise<void>;
 export interface RTCSignalingChannel {
-  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<void>;
+  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<RTCEndSession|undefined>;
 }
 
 export interface RTCAVSignalingSetup {
