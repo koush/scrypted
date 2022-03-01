@@ -164,7 +164,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                 "-srtp_out_params", audioKey.toString('base64'),
                 // not sure this has any effect? testing.
-                '-fflags', '+flush_packets', '-flush_packets', '1',
+                // '-fflags', '+flush_packets', '-flush_packets', '1',
                 "-f", "rtp",
             );
 
@@ -214,7 +214,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
     console.log('ffmpeg', ffmpegPath);
     const cp = child_process.spawn(ffmpegPath, args);
-    ffmpegLogInitialOutput(console, cp,);
+    ffmpegLogInitialOutput(console, cp);
 
     session.cp = cp;
     cp.on('exit', killSession);
