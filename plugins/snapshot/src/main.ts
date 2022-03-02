@@ -1,10 +1,11 @@
-import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin"
 import { StorageSettings } from "@scrypted/common/src/settings"
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
 import axios, { Axios } from "axios";
 import { TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import jimp from 'jimp';
 
 const { systemManager } = sdk;
@@ -36,6 +37,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             title: 'Snapshots from Prebuffer',
             description: 'Prefer snapshots from the Rebroadcast Plugin prebuffer when available.',
             type: 'boolean',
+            defaultValue: !this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera),
         },
         snapshotMode: {
             title: 'Snapshot Mode',
@@ -140,7 +142,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
 
         if (!this.pendingPicture) {
-            const pendingPicture = (async() => {
+            const pendingPicture = (async () => {
                 let picture: Buffer;
                 try {
                     picture = await takePicture();
@@ -243,15 +245,23 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 }
 
-class SnapshotPlugin extends ScryptedDeviceBase implements MixinProvider {
+class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider {
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && interfaces.includes(ScryptedInterface.VideoCamera))
             return [ScryptedInterface.Camera, ScryptedInterface.Settings];
         return undefined;
-
     }
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
         return new SnapshotMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
+    }
+
+    async shouldEnableMixin(device: ScryptedDevice) {
+        const { type, interfaces } = device;
+        // auto enable this on VideoCameras that do not have snapshot capability.
+        if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell)
+            && interfaces.includes(ScryptedInterface.VideoCamera) && !interfaces.includes(ScryptedInterface.Camera))
+            return true;
+        return false;
     }
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {
