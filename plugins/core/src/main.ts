@@ -1,6 +1,5 @@
 import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, DeviceProvider, ScryptedInterface, ScryptedDeviceType, RTCSignalingChannel, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import Router from 'router';
 import { UserStorage } from './userStorage';
 import { RpcPeer } from '../../../server/src/rpc';
@@ -11,15 +10,12 @@ import { sendJSON } from './http-helpers';
 import { Automation } from './automation';
 import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
-import { addBuiltins } from "@scrypted/common/src/ffmpeg-to-wrtc";
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
 import { startBrowserRTCSignaling } from "@scrypted/common/src/ffmpeg-to-wrtc";
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
 
-addBuiltins(mediaManager);
-
-const { pluginHostAPI } = sdk;
+const { pluginHostAPI, systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
 const indexHtml = fs.readFileSync('dist/index.html').toString();
 
