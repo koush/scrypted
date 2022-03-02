@@ -399,6 +399,7 @@ import {
   getInterfaceFriendlyName,
 } from "./helpers";
 import { ScryptedInterface } from "@scrypted/types";
+import RTCSignalingClient from "../interfaces/RTCSignalingClient.vue";
 import Notifier from "../interfaces/Notifier.vue";
 import OnOff from "../interfaces/OnOff.vue";
 import Brightness from "../interfaces/Brightness.vue";
@@ -468,6 +469,7 @@ const noCardAboveInterfaces = [ScryptedInterface.Scriptable];
 const cardInterfaces = [
   ScryptedInterface.Brightness,
   ScryptedInterface.ColorSettingTemperature,
+  ScryptedInterface.RTCSignalingClient,
   ScryptedInterface.Notifier,
   ScryptedInterface.ColorSettingHsv,
   ScryptedInterface.ColorSettingRgb,
@@ -527,6 +529,7 @@ export default {
     Brightness,
     ColorSettingRgb,
     ColorSettingHsv,
+    RTCSignalingClient,
     Notifier,
     Camera,
     VideoCamera,

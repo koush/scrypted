@@ -1,7 +1,6 @@
-import type { RTCSignalingSession, RTCAVSignalingSetup } from "@scrypted/sdk/types";
-import type { RTCSignalingChannelOptions, RTCSignalingSendIceCandidate } from "@scrypted/sdk";
+import type { RTCSignalingSendIceCandidate, RTCSignalingClientSession, RTCAVSignalingSetup, RTCSignalingClientOptions } from "@scrypted/sdk/types";
 
-export async function startRTCSignalingSession(session: RTCSignalingSession, offer: RTCSessionDescriptionInit,
+export async function startRTCSignalingSession(session: RTCSignalingClientSession, offer: RTCSessionDescriptionInit,
     console: Console,
     createSetup: () => Promise<RTCAVSignalingSetup>,
     setRemoteDescription: (remoteDescription: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit>,
@@ -34,9 +33,21 @@ export async function startRTCSignalingSession(session: RTCSignalingSession, off
     }
 }
 
-export class BrowserSignalingSession implements RTCSignalingSession {
+export async function connectRTCSignalingClients(
+    client1: RTCSignalingClientSession,
+    setup1: RTCAVSignalingSetup,
+    client2: RTCSignalingClientSession,
+    setup2: RTCAVSignalingSetup,
+) {
+    const offer = await client1.createLocalDescription('offer', setup1, candidate => client2.addIceCandidate(candidate));
+    await client2.setRemoteDescription(offer, setup2);
+    const answer = await client2.createLocalDescription('answer', setup2, candidate => client2.addIceCandidate(candidate));
+    await client1.setRemoteDescription(answer, setup1);
+}
+
+export class BrowserSignalingSession implements RTCSignalingClientSession {
     hasSetup = false;
-    options: RTCSignalingChannelOptions = {
+    options: RTCSignalingClientOptions = {
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
                 codecs: undefined,
@@ -49,19 +60,19 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
     };
 
-    constructor(public pc: RTCPeerConnection, cleanup: () => void) {
+    constructor(public pc: RTCPeerConnection, cleanup?: () => void) {
         const checkConn = () => {
             console.log('iceConnectionState state', pc.iceConnectionState);
             console.log('connectionState', pc.connectionState);
             if (pc.iceConnectionState === 'disconnected'
                 || pc.iceConnectionState === 'failed'
                 || pc.iceConnectionState === 'closed') {
-                cleanup();
+                cleanup?.();
             }
             if (pc.connectionState === 'closed'
                 || pc.connectionState === 'disconnected'
                 || pc.connectionState === 'failed') {
-                cleanup();
+                cleanup?.();
             }
         }
 
@@ -69,18 +80,58 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         pc.addEventListener('iceconnectionstatechange', checkConn);
     }
 
-    createPeerConnection(setup: RTCAVSignalingSetup) {
+    async getOptions(): Promise<RTCSignalingClientOptions> {
+        return this.options;
+    }
+
+    async createPeerConnection(setup: RTCAVSignalingSetup) {
         if (this.hasSetup)
             return;
         this.hasSetup = true;
         if (setup.datachannel)
             this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
-        this.pc.addTransceiver('audio', setup.audio);
-        this.pc.addTransceiver('video', setup.video);
+        if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
+            try {
+                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+                for (const track of mic.getTracks()) {
+                    this.pc.addTrack(track);
+                }
+            }
+            catch (e) {
+                let silence = () => {
+                    let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+                    const dest = ctx.createMediaStreamDestination();
+                    oscillator.connect(dest);
+                    oscillator.start();
+                    return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
+                }
+                this.pc.addTrack(silence());
+            }
+        }
+        else {
+            this.pc.addTransceiver('audio', setup.audio);
+        }
+
+        if (setup.video.direction === 'sendrecv' || setup.video.direction === 'sendonly') {
+            try {
+                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                const camera = await navigator.mediaDevices.getUserMedia({ video: true })
+                for (const track of camera.getTracks()) {
+                    this.pc.addTrack(track);
+                }
+            }
+            catch (e) {
+                // what now
+            }
+        }
+        else {
+            this.pc.addTransceiver('video', setup.video);
+        }
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
-        this.createPeerConnection(setup);
+        await this.createPeerConnection(setup);
 
         const gatheringPromise = new Promise(resolve => this.pc.onicegatheringstatechange = () => {
             if (this.pc.iceGatheringState === 'complete')

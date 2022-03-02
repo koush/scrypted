@@ -2,7 +2,7 @@ import child_process from 'child_process';
 import net from 'net';
 import { listenZero } from "./listen-cluster";
 import { ffmpegLogInitialOutput } from "./media-helpers";
-import sdk, { RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
+import sdk, { RTCAVMessage, FFMpegInput, MediaManager, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingClientOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingClientSession } from "@scrypted/sdk";
 import { RpcPeer } from "../../server/src/rpc";
 
 const { mediaManager } = sdk;
@@ -36,98 +36,6 @@ interface RTCSession {
   pc: RTCPeerConnection;
   pendingCandidates: RTCIceCandidate[];
   resolve?: (value: any) => void;
-}
-
-// todo: remove this legacy path
-export function addBuiltins(mediaManager: MediaManager) {
-  // older scrypted runtime won't have this property, and wrtc will be built in.
-  if (!mediaManager.builtinConverters)
-    return;
-
-  const rtcSessions: { [id: string]: RTCSession } = {};
-  mediaManager.builtinConverters.push({
-    fromMimeType: ScryptedMimeTypes.RTCAVAnswer,
-    toMimeType: ScryptedMimeTypes.RTCAVOffer,
-    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
-      const rtcInput: RTCAVMessage = JSON.parse(data.toString());
-      const { id } = rtcInput;
-      const session = rtcSessions[id];
-      const pc = rtcSessions[id].pc;
-      let pendingCandidates: RTCIceCandidateInit[] = [];
-
-      // safari sends the candidates before the RTC Answer? watch for that.
-      if (!pc.remoteDescription) {
-        if (!rtcInput.description) {
-          // can't do anything with this yet, candidates out of order.
-          pendingCandidates.push(...(rtcInput.candidates || []));
-        }
-        else {
-          await pc.setRemoteDescription(rtcInput.description);
-          if (!rtcInput.candidates)
-            rtcInput.candidates = [];
-          rtcInput.candidates.push(...pendingCandidates);
-          pendingCandidates = [];
-        }
-      }
-
-      if (pc.remoteDescription && rtcInput.candidates?.length) {
-        for (const candidate of rtcInput.candidates) {
-          pc.addIceCandidate(candidate);
-        }
-      }
-      else if (!session.pendingCandidates.length) {
-        // wait for candidates to come in.
-        await new Promise(resolve => session.resolve = resolve);
-      }
-      const ret: RTCAVMessage = {
-        id,
-        candidates: session.pendingCandidates,
-        description: null,
-        configuration: null,
-      };
-      session.pendingCandidates = [];
-      return Buffer.from(JSON.stringify(ret));
-    }
-  });
-
-  mediaManager.builtinConverters.push({
-    fromMimeType: ScryptedMimeTypes.FFmpegInput,
-    toMimeType: ScryptedMimeTypes.RTCAVOffer,
-    async convert(ffInputBuffer: Buffer, fromMimeType: string): Promise<Buffer> {
-      const ffInput: FFMpegInput = JSON.parse(ffInputBuffer.toString());
-
-      const pc = await startRTCPeerConnectionFFmpegInput(ffInput);
-      const id = Math.random().toString();
-      const session: RTCSession = {
-        pc,
-        pendingCandidates: [],
-      };
-      rtcSessions[id] = session;
-
-      pc.onicecandidate = evt => {
-        if (evt.candidate) {
-          // console.log('local candidate', evt.candidate);
-          session.pendingCandidates.push(evt.candidate);
-          session.resolve?.(null);
-        }
-      }
-
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: false,
-        offerToReceiveVideo: false,
-      });
-      await pc.setLocalDescription(offer);
-
-      const ret: RTCAVMessage = {
-        id,
-        candidates: [],
-        description: offer,
-        configuration,
-      }
-
-      return Buffer.from(JSON.stringify(ret));
-    }
-  })
 }
 
 export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, options?: {
@@ -329,7 +237,7 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   return pc;
 }
 
-export async function startRTCPeerConnection(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingChannelOptions & {
+export async function startRTCPeerConnection(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingClientOptions & {
   maxWidth: number,
 }) {
   const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput);
@@ -371,7 +279,7 @@ export async function startRTCPeerConnection(console: Console, mediaObject: Medi
   }
 }
 
-export function startRTCPeerConnectionForBrowser(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingChannelOptions) {
+export function startRTCPeerConnectionForBrowser(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingClientOptions) {
   return startRTCPeerConnection(console, mediaObject, session, Object.assign({
     maxWidth: 960,
   }, options || {}));
@@ -392,17 +300,14 @@ export async function createBrowserSignalingSession(ws: WebSocket) {
     peer.handleMessage(json);
   };
 
-  const session: RTCSignalingSession = await peer.getParam('session');
-  const options: RTCSignalingChannelOptions = await peer.getParam('options');
-  return {
-    session,
-    options,
-  }
+  const session: RTCSignalingClientSession = await peer.getParam('session');
+  return session;
 }
 
 export async function startBrowserRTCSignaling(camera: ScryptedDevice & RTCSignalingChannel & VideoCamera, ws: WebSocket, console: Console) {
   try {
-    const { session, options } = await createBrowserSignalingSession(ws);
+    const session = await createBrowserSignalingSession(ws);
+    const options = await session.getOptions();
 
     if (camera.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
       camera.startRTCSignalingSession(session, options);

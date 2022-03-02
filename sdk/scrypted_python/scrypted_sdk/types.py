@@ -103,6 +103,7 @@ class ScryptedInterface(Enum):
     Program = "Program"
     PushHandler = "PushHandler"
     RTCSignalingChannel = "RTCSignalingChannel"
+    RTCSignalingClient = "RTCSignalingClient"
     Readme = "Readme"
     Refresh = "Refresh"
     Scene = "Scene"
@@ -126,9 +127,6 @@ class ScryptedMimeTypes(Enum):
     MediaObject = "x-scrypted/x-scrypted-media-object"
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
-    RTCAVAnswer = "x-scrypted/x-rtc-av-answer"
-    RTCAVOffer = "x-scrypted/x-rtc-av-offer"
-    RTCAVSignalingOfferSetup = "x-scrypted/x-rtc-av-signalling-offer-setup"
     RTCAVSignalingPrefix = "x-scrypted-rtc-signaling-"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     Url = "text/x-uri"
@@ -376,8 +374,14 @@ class Position(TypedDict):
     longitude: float
     pass
 
-class RTCSignalingChannelOptions(TypedDict):
+class RTCSessionControl(TypedDict):
+    pass
+
+class RTCSignalingClientOptions(TypedDict):
     capabilities: Any
+    pass
+
+class RTCSignalingClientSession(TypedDict):
     pass
 
 class RTCSignalingSession(TypedDict):
@@ -443,9 +447,6 @@ class Setting(TypedDict):
     title: str
     type: Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
-    pass
-
-class RTCEndSession(TypedDict):
     pass
 
 class AmbientLightSensor:
@@ -702,7 +703,12 @@ class PushHandler:
     pass
 
 class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingChannelOptions = None) -> RTCEndSession:
+    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingClientOptions = None) -> RTCSessionControl:
+        pass
+    pass
+
+class RTCSignalingClient:
+    async def createRTCSignalingSession(self) -> RTCSignalingClientSession:
         pass
     pass
 

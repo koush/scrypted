@@ -4,7 +4,7 @@ import { RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
 import dgram from 'dgram';
 import { RtspServer } from "./rtsp-server";
 import { Socket } from "net";
-import { RTCEndSession, ScryptedDeviceBase } from "@scrypted/sdk";
+import { RTCSessionControl, ScryptedDeviceBase } from "@scrypted/sdk";
 
 // this is an sdp corresponding to what is requested from webrtc.
 // h264 baseline and opus are required codecs that all webrtc implementations must provide.
@@ -22,7 +22,7 @@ function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
     return outputSdp;
 }
 
-const useUdp = true;
+const useUdp = false;
 
 export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamOptions {
     return {
@@ -53,7 +53,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
     let socket: Socket;
     // rtsp server must operate in udp forwarding mode to accomodate packet reordering.
     let udp = dgram.createSocket('udp4');
-    let endSession: RTCEndSession;
+    let sessionControl: RTCSessionControl;
 
     const cleanup = () => {
         console.log('webrtc/rtsp cleaning up');
@@ -65,7 +65,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
         }
         catch (e) {
         }
-        endSession?.().catch(() => {});
+        sessionControl?.endSession().catch(() => {});
     };
 
     clientPromise.then(async (client) => {
@@ -139,7 +139,6 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
             videoTransceiver.onTrack.subscribe((track) => {
-                // videoTransceiver.sender.replaceTrack(track);
                 track.onReceiveRtp.subscribe((rtp) => {
                     if (!gotVideo) {
                         gotVideo = true;
@@ -147,14 +146,16 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                     }
                     rtspServer.sendVideo(rtp.serialize(), false);
                 });
-                track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendVideo(rtcp.serialize(), true))
-                // track.onReceiveRtp.once(() => {
-                //     pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
-                // });
+                track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendVideo(rtcp.serialize(), true));
+                // what is this for? it was in the example code, but as far as i can tell, it doesn't
+                // actually do anything?
+                track.onReceiveRtp.once(() => {
+                    pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
+                });
             });
         }
 
-        endSession = await channel.startRTCSignalingSession({
+        sessionControl = await channel.startRTCSignalingSession({
             createLocalDescription: async (type, setup, sendIceCandidate) => {
                 if (type === 'offer')
                     doSetup(setup);
@@ -231,11 +232,17 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                 '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
                 '-acodec', 'libopus',
                 "-f", "sdp",
+
                 // hint to ffmpeg for how long to wait for out of order packets.
                 // is only used by udp, i think? unsure. but it causes severe jitter
                 // when there are late or missing packets.
                 // the jitter buffer should be on the actual rendering side.
-                // "-max_delay", "0",
+                // using this in udp/sdp mode with rebroadcast busted
+                // the stream to an irrecoverable state.
+                // not actually sure that was the cause, because it worked again
+                // later.
+                "-max_delay", "0",
+
                 '-i', url,
             ]
         };
@@ -251,7 +258,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                 // is only used by udp, i think? unsure. but it causes severe jitter
                 // when there are late or missing packets.
                 // the jitter buffer should be on the actual rendering side.
-                // "-max_delay", "0",
+                "-max_delay", "0",
                 '-i', url,
             ]
         };

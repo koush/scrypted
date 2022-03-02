@@ -1,4 +1,4 @@
-import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCAVSignalingSetup, RTCEndSession, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { RingApi, RingCamera, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../..//common/src/settings';
@@ -9,6 +9,7 @@ import { generateUuid } from './ring-client-api';
 import { clientApi } from './ring-client-api';
 import { LiveCallNegotiation } from './ring-client-api';
 import dgram from 'dgram';
+import { LiveCall } from '@koush/ring-client-api';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
@@ -16,6 +17,15 @@ const RtcMediaStreamOptionsId = 'webrtc';
 
 const RingSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'ring/';
 const RingDeviceSignalingPrefix = RingSignalingPrefix + 'x-';
+
+class RingRTCSessionControl implements RTCSessionControl {
+    constructor(public liveCallNegtation: LiveCallNegotiation) {
+    }
+
+    async endSession() {
+        this.liveCallNegtation.endCall();
+    }
+}
 
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
@@ -66,10 +76,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         return this.storageSettings.putSetting(key, value);
     }
 
-    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<undefined|RTCEndSession> {
+    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<RTCSessionControl> {
         const camera = this.findCamera();
 
-        let endSession: RTCEndSession;
+        let sessionControl: RTCSessionControl;
 
         // ring has two webrtc endpoints. one is for the android/ios clients, wherein the ring server
         // sends an offer, which only has h264 high in it, which causes some browsers 
@@ -100,9 +110,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         }
         else {
             const callSignaling = new LiveCallNegotiation(await camera.startLiveCallNegotiation(), camera);
-            endSession = async () => {
-                callSignaling.endCall();
-            };
+            sessionControl = new RingRTCSessionControl(callSignaling);
             await new Promise((resolve, reject) => {
                 callSignaling.onMessage.subscribe(async (message) => {
                     // this.console.log('call signaling', message);
@@ -141,7 +149,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
             });
         }
 
-        return endSession;
+        return sessionControl;
     }
 
     async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {

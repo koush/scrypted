@@ -548,6 +548,13 @@ exports.ScryptedInterfaceDescriptors = {
             'startRTCSignalingSession'
         ],
         properties: []
+    },
+    RTCSignalingClient: {
+        name: 'RTCSignalingClient',
+        methods: [
+            'createRTCSignalingSession'
+        ],
+        properties: []
     }
 };
 var ScryptedDeviceType;
@@ -684,6 +691,7 @@ var ScryptedInterface;
     ScryptedInterface["HumiditySetting"] = "HumiditySetting";
     ScryptedInterface["Fan"] = "Fan";
     ScryptedInterface["RTCSignalingChannel"] = "RTCSignalingChannel";
+    ScryptedInterface["RTCSignalingClient"] = "RTCSignalingClient";
 })(ScryptedInterface = exports.ScryptedInterface || (exports.ScryptedInterface = {}));
 var ScryptedMimeTypes;
 (function (ScryptedMimeTypes) {
@@ -701,9 +709,6 @@ var ScryptedMimeTypes;
      * which should also be trapped and handled by the endpoint using its internal signaling.
      */
     ScryptedMimeTypes["RTCAVSignalingPrefix"] = "x-scrypted-rtc-signaling-";
-    ScryptedMimeTypes["RTCAVOffer"] = "x-scrypted/x-rtc-av-offer";
-    ScryptedMimeTypes["RTCAVAnswer"] = "x-scrypted/x-rtc-av-answer";
-    ScryptedMimeTypes["RTCAVSignalingOfferSetup"] = "x-scrypted/x-rtc-av-signalling-offer-setup";
     ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
     ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));

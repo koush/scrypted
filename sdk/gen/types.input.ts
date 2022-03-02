@@ -1289,9 +1289,14 @@ export enum ScryptedInterface {
   HumiditySetting = "HumiditySetting",
   Fan = "Fan",
   RTCSignalingChannel = "RTCSignalingChannel",
+  RTCSignalingClient = "RTCSignalingClient",
 }
 
 export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidate) => Promise<void>;
+
+export interface RTCSignalingClientSession extends RTCSignalingSession {
+  getOptions(): Promise<RTCSignalingClientOptions>;
+}
 
 export interface RTCSignalingSession {
   createLocalDescription: (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined|RTCSignalingSendIceCandidate) => Promise<RTCSessionDescriptionInit>;
@@ -1299,19 +1304,39 @@ export interface RTCSignalingSession {
   addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
 }
 
-export interface RTCSignalingChannelOptions {
+export interface RTCSignalingClientOptions {
   capabilities?: {
     video?: RTCRtpCapabilities;
     audio?: RTCRtpCapabilities;
   }
 }
 
-export type RTCEndSession = () => Promise<void>;
+export interface RTCSessionControl {
+  endSession(): Promise<void>;
+}
+
+/**
+ * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer. 
+ * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
+ */
+export interface RTCSignalingClient {
+  createRTCSignalingSession(): Promise<RTCSignalingClientSession>;
+}
+
+/**
+ * An inflexible RTC Signaling channel, typically a vendor, like Nest or Ring.
+ * They generally can only handle either offer or answer, but not both. Usually has
+ * strict requirements and expectations on client setup.
+ */
 export interface RTCSignalingChannel {
-  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<RTCEndSession|undefined>;
+  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl|undefined>;
 }
 
 export interface RTCAVSignalingSetup {
+  /**
+   * Mechanism to allow configuration of TURN/STUN servers, etc.
+   */
+  configuration?: RTCConfiguration;
   audio: RTCRtpTransceiverInit;
   video: RTCRtpTransceiverInit;
   datachannel?: {
@@ -1343,9 +1368,6 @@ export enum ScryptedMimeTypes {
    * which should also be trapped and handled by the endpoint using its internal signaling.
    */
   RTCAVSignalingPrefix = 'x-scrypted-rtc-signaling-',
-  RTCAVOffer = 'x-scrypted/x-rtc-av-offer',
-  RTCAVAnswer = 'x-scrypted/x-rtc-av-answer',
-  RTCAVSignalingOfferSetup = 'x-scrypted/x-rtc-av-signalling-offer-setup',
   SchemePrefix = 'x-scrypted/x-scrypted-scheme-',
   MediaObject = 'x-scrypted/x-scrypted-media-object',
 }

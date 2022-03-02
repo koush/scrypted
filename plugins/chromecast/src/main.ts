@@ -1,5 +1,5 @@
 import util from 'util';
-import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCSignalingClient, RTCSignalingClientSession, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
 import mdns from 'multicast-dns';
 import mime from 'mime';
@@ -17,7 +17,7 @@ function ScryptedMediaReceiver() {
 ScryptedMediaReceiver.APP_ID = '00F7C5DD';
 util.inherits(ScryptedMediaReceiver, DefaultMediaReceiver);
 
-class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, EngineIOHandler {
+class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, EngineIOHandler, RTCSignalingClient {
   constructor(public provider: CastDeviceProvider, nativeId: string) {
     super(nativeId);
   }
@@ -186,15 +186,22 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
 
     // this media object is something weird that can't be handled by a straightforward url.
     // try to make a webrtc a/v session to handle it.
-
-    const engineio = await endpointManager.getPublicLocalEndpoint(this.nativeId) + 'engine.io/';
-    const mo = mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
-    const cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     const token = Math.random().toString();
     if (typeof media === 'string') {
       media = await mediaManager.createMediaObjectFromUrl(media, options.mimeType);
     }
     this.tokens.set(token, media);
+
+    return this.loadRTCSession(token, options?.title || 'Scrypted');
+  }
+
+  async loadRTCSession(token: string, title: string) {
+    // this media object is something weird that can't be handled by a straightforward url.
+    // try to make a webrtc a/v session to handle it.
+
+    const engineio = await endpointManager.getPublicLocalEndpoint(this.nativeId) + 'engine.io/';
+    const mo = mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
+    const cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
 
     const castMedia: any = {
       contentId: cameraStreamAuthToken,
@@ -205,7 +212,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
       metadata: {
         type: 0,
         metadataType: 0,
-        title: options?.title || 'Scrypted',
+        title,
       },
 
       customData: {
@@ -228,23 +235,57 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
   }
 
 
+  sessionDeferred: {
+    resolve: any;
+    reject: any;
+  };
+
   async onConnection(request: HttpRequest, webSocketUrl: string) {
     const ws = new WebSocket(webSocketUrl);
 
     ws.onmessage = async (message) => {
       const json = JSON.parse(message.data as string);
-      const { token, } = json;
-      const mediaObject = this.tokens.get(token);
-      if (!mediaObject) {
-        ws.close();
-        return;
-      }
+      const { token } = json;
 
-      const { session, options } = await createBrowserSignalingSession(ws);
-      startRTCPeerConnectionForBrowser(this.console, mediaObject, session, options);
+      if (token === 'scrypted') {
+        if (!this.sessionDeferred) {
+          ws.close();
+          return;
+        }
+
+        const session = await createBrowserSignalingSession(ws);
+        this.sessionDeferred.resolve(session);
+        this.sessionDeferred = undefined;
+      }
+      else {
+        const mediaObject = this.tokens.get(token);
+        if (!mediaObject) {
+          ws.close();
+          return;
+        }
+
+        const session = await createBrowserSignalingSession(ws);
+        const options = await session.getOptions();
+        startRTCPeerConnectionForBrowser(this.console, mediaObject, session, options);
+      }
     }
   }
 
+  createRTCSignalingSession(): Promise<RTCSignalingClientSession> {
+    return new Promise((resolve, reject) => {
+      const sessionDeferred = this.sessionDeferred = {
+        resolve,
+        reject,
+      };
+
+      this.loadRTCSession('scrypted', 'Scrypted');
+      setTimeout(() => {
+        sessionDeferred.reject(new Error('Timed Out waiting for RTCSignalingClientSession'));
+        if (this.sessionDeferred === sessionDeferred)
+          this.sessionDeferred = undefined;
+      }, 30000)
+    })
+  }
 
   mediaPlayerPromise: Promise<any>;
   mediaPlayerStatus: any;
@@ -478,7 +519,12 @@ class CastDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
       ScryptedInterface.EngineIOHandler,
     ];
 
-    const type = (model && model.indexOf('Google Home') != -1 && model.indexOf('Hub') == -1) ? ScryptedDeviceType.Speaker : ScryptedDeviceType.Display;
+    const type = (model && model.indexOf('Google Home') !== -1 && model.indexOf('Hub') == -1)
+      ? ScryptedDeviceType.Speaker
+      : ScryptedDeviceType.Display;
+
+    if (type === ScryptedDeviceType.Display)
+      interfaces.push(ScryptedInterface.RTCSignalingClient)
 
     const device: Device = {
       nativeId: id,
