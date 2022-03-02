@@ -182,7 +182,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         if (!camera)
             throw new Error('camera unavailable');
 
-            // watch for snapshot being blocked due to live stream
+        // watch for snapshot being blocked due to live stream
         if (!camera.snapshotsAreBlocked) {
             try {
                 buffer = await this.plugin.api.restClient.request<Buffer>({

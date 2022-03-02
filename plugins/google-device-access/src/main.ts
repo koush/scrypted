@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedMimeTypes, RTCAVMessage, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSignalingSession, BufferConverter } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, ScryptedMimeTypes, RTCAVMessage, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSignalingSession, BufferConverter, RTCSignalingClientSession, RTCSessionControl } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -101,6 +101,20 @@ function toNestMode(mode: ThermostatMode): string {
     }
 }
 
+class NestRTCSessionControl implements RTCSessionControl {
+    constructor(public camera: NestCamera, public mediaSessionId: string) {
+    }
+
+    async endSession() {
+        await this.camera.provider.authPost(`/devices/${this.camera.nativeId}:executeCommand`, {
+            command: "sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream",
+            params: {
+                mediaSessionId: this.mediaSessionId,
+            },
+        });
+    }
+}
+
 class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCamera, MotionSensor, BinarySensor, ObjectDetector, RTCSignalingChannel, BufferConverter {
     lastMotionEventId: string;
     lastImage: Promise<Buffer>;
@@ -123,8 +137,10 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         return buffer;
     }
 
-    async startRTCSignalingSession(session: RTCSignalingSession): Promise<void> {
-        await startRTCSignalingSession(session, undefined,
+    async startRTCSignalingSession(session: RTCSignalingClientSession): Promise<RTCSessionControl> {
+        let mediaSessionId: string;
+
+        await startRTCSignalingSession(session, undefined, this.console,
             async () => createNestOfferSetup(),
             async (description) => {
                 const offerSdp = description.sdp.replace('a=ice-options:trickle\r\n', '');
@@ -135,12 +151,16 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
                         offerSdp,
                     },
                 });
-                const { answerSdp } = result.data.results;
+                const { answerSdp, mediaSessionId: msid, expiresAt } = result.data.results;
+                mediaSessionId = msid;
+
                 return {
                     sdp: answerSdp,
                     type: 'answer',
                 } as any;
-            })
+            });
+
+        return new NestRTCSessionControl(this, mediaSessionId);
     }
 
     trackStream(id: string, result: any) {

@@ -1329,7 +1329,7 @@ export interface RTCSignalingClient {
  * strict requirements and expectations on client setup.
  */
 export interface RTCSignalingChannel {
-  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl|undefined>;
+  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl|void>;
 }
 
 export interface RTCAVSignalingSetup {
