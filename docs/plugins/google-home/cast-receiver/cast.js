@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
 
       const session = new BrowserSignalingSession(pc, () => window.close());
       rpcPeer.params['session'] = session;
+      // this is deprecated, and part of the session now.
       rpcPeer.params['options'] = session.options;
 
       pc.ontrack = () => {

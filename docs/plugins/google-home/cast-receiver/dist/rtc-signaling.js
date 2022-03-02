@@ -1,14 +1,29 @@
-export async function startRTCSignalingSession(session, offer, createSetup, setRemoteDescription, addIceCandidate) {
-    const setup = await createSetup();
-    if (!offer) {
-        const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-        const answer = await setRemoteDescription(offer);
-        await session.setRemoteDescription(answer, setup);
+export async function startRTCSignalingSession(session, offer, console, createSetup, setRemoteDescription, addIceCandidate) {
+    try {
+        const setup = await createSetup();
+        // console.log('offer', offer?.sdp, 'rtc setup', setup);
+        if (!offer) {
+            console.log('session.createLocalDescription');
+            const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
+            console.log('rtc offer received');
+            const answer = await setRemoteDescription(offer);
+            console.log('rtc answer received');
+            await session.setRemoteDescription(answer, setup);
+            console.log('session.setRemoteDescription done');
+        }
+        else {
+            console.log('session.setRemoteDescription');
+            await session.setRemoteDescription(offer, setup);
+            console.log('session.createLocalDescription');
+            const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
+            console.log('rtc answer received');
+            await setRemoteDescription(answer);
+            console.log('session.setRemoteDescription done');
+        }
     }
-    else {
-        await session.setRemoteDescription(offer, setup);
-        const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-        await setRemoteDescription(answer);
+    catch (e) {
+        console.error('RTC signaling failed', e);
+        throw e;
     }
 }
 export class BrowserSignalingSession {
@@ -16,8 +31,14 @@ export class BrowserSignalingSession {
     hasSetup = false;
     options = {
         capabilities: {
-            audio: RTCRtpReceiver.getCapabilities('audio'),
-            video: RTCRtpReceiver.getCapabilities('video'),
+            audio: RTCRtpReceiver.getCapabilities?.('audio') || {
+                codecs: undefined,
+                headerExtensions: undefined,
+            },
+            video: RTCRtpReceiver.getCapabilities?.('video') || {
+                codecs: undefined,
+                headerExtensions: undefined,
+            },
         }
     };
     constructor(pc, cleanup) {
@@ -38,6 +59,9 @@ export class BrowserSignalingSession {
         };
         pc.addEventListener('connectionstatechange', checkConn);
         pc.addEventListener('iceconnectionstatechange', checkConn);
+    }
+    async getOptions() {
+        return this.options;
     }
     createPeerConnection(setup) {
         if (this.hasSetup)
@@ -101,6 +125,8 @@ export class BrowserSignalingSession {
     async addIceCandidate(candidate) {
         console.log("remote candidate", candidate);
         await this.pc.addIceCandidate(candidate);
+    }
+    async endSession() {
     }
 }
 //# sourceMappingURL=rtc-signaling.js.map
