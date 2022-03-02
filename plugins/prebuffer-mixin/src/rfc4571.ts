@@ -70,11 +70,11 @@ export async function startRFC4571Parser(socket: net.Socket, sdp: string, mediaS
             let length: number;
             if (hasRstpPrefix) {
                 header = await readLength(socket, 4);
-                length = header.readInt16BE(2);
+                length = header.readUInt16BE(2);
             }
             else {
                 header = await readLength(socket, 2);
-                length = header.readInt16BE(0);
+                length = header.readUInt16BE(0);
             }
             const data = await readLength(socket, length);
 

@@ -109,7 +109,13 @@ export class RtspClient extends RtspBase {
     async request(method: string, headers?: Headers, path?: string, body?: Buffer) {
         headers = headers || {};
 
-        const line = `${method} ${this.url}${path || ''} RTSP/1.0`;
+        let fullUrl: string;
+        if (path)
+            fullUrl = new URL(path, this.url).toString();
+        else
+            fullUrl = this.url;
+
+        const line = `${method} ${fullUrl} RTSP/1.0`;
         headers['CSeq'] = (this.cseq++).toString();
         this.write(line, headers, body);
 

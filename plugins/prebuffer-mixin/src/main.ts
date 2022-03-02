@@ -7,7 +7,7 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSes
 import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { parsePayloadTypes } from '@scrypted/common/src/sdp-utils';
+import { parsePayloadTypes, parseTrackIds } from '@scrypted/common/src/sdp-utils';
 import { createRtspParser, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
 import { Duplex } from 'stream';
 import net from 'net';
@@ -446,8 +446,10 @@ class PrebufferSession {
         const sdpResponse = await rtspClient.describe();
         const sdp = sdpResponse.body.toString().trim();
         this.sdp = Promise.resolve(sdp);
-        await rtspClient.setup(0, '/audio');
-        await rtspClient.setup(2, '/video');
+        const { audio, video } = parseTrackIds(sdp);
+        // handle no audio?
+        await rtspClient.setup(0, audio);
+        await rtspClient.setup(2, video);
         const socket = await rtspClient.play();
         session = await startRFC4571Parser(socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
       }
