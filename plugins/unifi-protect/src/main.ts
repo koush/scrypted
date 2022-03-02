@@ -1,8 +1,7 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, Device, ScryptedInterface, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
 import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
-import { recommendRebroadcast } from "../../rtsp/src/recommend";
-import { RequestInfo, RequestInit, Response } from "node-fetch-cjs";
+import fetch, { RequestInfo, RequestInit, Response } from "node-fetch";
 import { defaultSensorTimeout, UnifiCamera } from "./camera";
 import { FeatureFlagsShim, LastSeenShim } from "./shim";
 import { UnifiSensor } from "./sensor";
@@ -26,7 +25,6 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         super(nativeId);
 
         this.startup = this.discoverDevices(0)
-        recommendRebroadcast();
     }
 
     handleUpdatePacket(packet: any) {
@@ -61,13 +59,15 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
     }
 
-    public async loginFetch(url: RequestInfo, options: RequestInit = { method: "GET" }, logErrors = true, decodeResponse = true): Promise<Response | null> {
+    public async loginFetch(url: RequestInfo, options: RequestInit = { method: "GET" }): Promise<Response> {
         const api = this.api as any;
-        if (!(await api.login())) {
-            return null;
-        }
+        if (!(await api.login()))
+            throw new Error('Login failed.');
 
-        return this.api.fetch(url, options, logErrors, decodeResponse);
+        options.agent = api.httpsAgent;
+        options.headers = api.headers;
+
+        return fetch(url, options);
     }
 
     listener = (event: Buffer) => {
@@ -225,12 +225,12 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         if (!this.api) {
             this.api = new ProtectApi(ip, username, password, {
-                debug() {},
+                debug() { },
                 error: (...args) => {
                     this.console.error(...args);
                 },
-                info() {},
-                warn() {},
+                info() { },
+                warn() { },
             });
         }
 

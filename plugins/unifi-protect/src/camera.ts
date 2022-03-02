@@ -1,5 +1,5 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff } from "@scrypted/sdk";
-import { ProtectCameraChannelConfig, ProtectCameraConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl } from "@scrypted/sdk";
+import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import { fitHeightToWidth } from "../../../common/src/resolution-utils";
@@ -9,13 +9,10 @@ import WS from 'ws';
 import { once } from "events";
 import { FeatureFlagsShim } from "./shim";
 import { UnifiProtect } from "./main";
-import fs from 'fs';
 
 const { log, deviceManager, mediaManager } = sdk;
 
 export const defaultSensorTimeout = 30;
-
-const unavailable = fs.readFileSync('unavailable.jpg');
 
 export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, VideoCamera, MotionSensor {
     constructor(public camera: UnifiCamera, nativeId: string) {
@@ -80,7 +77,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
     get packageCameraNativeId() {
         return this.nativeId + '-packageCamera';
-   }
+    }
 
     ensurePackageCamera() {
         if (!this.packageCamera) {
@@ -292,7 +289,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
         const response = await this.protect.loginFetch(url);
         if (!response)
-            return unavailable;
+            throw new Error('login failed');
         const data = await response.arrayBuffer();
         return Buffer.from(data);
     }
@@ -314,14 +311,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const { rtspAlias } = rtspChannel;
         const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
 
-        return mediaManager.createFFmpegMediaObject({
+        return mediaManager.createMediaObject({
             url: u,
-            inputArguments: [
-                "-rtsp_transport", "tcp",
-                "-i", u,
-            ],
+            container: 'rtsp',
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
-        });
+        } as MediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     createMediaStreamOptions(channel: ProtectCameraChannelConfig) {
@@ -341,6 +335,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             audio: {
                 codec: 'aac',
             },
+            // mark this rtsp stream as created by scrypted, even though it is not.
+            // it's been tested as compatible with the scrypted RTSPClient.
+            // this allows bypassing usage of ffmpeg.
+            tool: 'scrypted',
+            container: 'rtsp',
         };
         return ret;
     }
