@@ -100,17 +100,23 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
 
         if (!takePicture) {
-            if (!this.storageSettings.values.snapshotUrl && this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
-                takePicture = async () => {
-                    // if operating in full resolution mode, nuke any picture options containing
-                    // the requested dimensions that are sent.
-                    if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
-                        options.picture = undefined;
-                    return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
-                };
+            if (!this.storageSettings.values.snapshotUrl) {
+                if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
+                    takePicture = async () => {
+                        // if operating in full resolution mode, nuke any picture options containing
+                        // the requested dimensions that are sent.
+                        if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
+                            options.picture = undefined;
+                        return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
+                    };
+                }
+                else {
+                    takePicture = () => {
+                        throw new Error('Snapshot Unavailable (snapshotUrl empty, and prebuffer not available or enabled)');
+                    }
+                }
             }
             else {
-
                 if (!this.axiosClient) {
                     let username: string;
                     let password: string;
