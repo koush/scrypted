@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser } from './stream-parser';
 import dgram from 'dgram';
 import net from 'net';
+import tls from 'tls';
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -103,7 +104,17 @@ export class RtspClient extends RtspBase {
     constructor(public url: string) {
         super();
         const u = new URL(url);
-        this.client = net.connect(parseInt(u.port) || 554, u.hostname);
+        const port = parseInt(u.port) || 554;
+        if (url.startsWith('rtsps')) {
+            this.client = tls.connect({
+                rejectUnauthorized: false,
+                port,
+                host: u.hostname,
+            })
+        }
+        else {
+            this.client = net.connect(port, u.hostname);
+        }
     }
 
     async request(method: string, headers?: Headers, path?: string, body?: Buffer) {

@@ -18,8 +18,6 @@ const { deviceManager, mediaManager, endpointManager, systemManager } = sdk;
 
 const refreshFrequency = 60;
 
-const black = fs.readFileSync('unavailable.jpg');
-
 const readmeV1 = fs.readFileSync('README-camera-v1.md').toString();
 const readmeV2 = fs.readFileSync('README-camera-v2.md').toString();
 
@@ -35,9 +33,19 @@ function getSdmRtspMediaStreamOptions(): MediaStreamOptions {
             codec: 'aac',
         },
         source: 'cloud',
+        tool: 'scrypted',
         userConfigurable: false,
     };
 }
+
+function deviceHasEventImages(device: any) {
+    return !!device?.traits?.['sdm.devices.traits.CameraEventImage'];
+}
+
+function deviceIsWebRtc(device: any) {
+    return device?.traits?.['sdm.devices.traits.CameraLiveStream']?.supportedProtocols?.includes('WEB_RTC');
+}
+
 
 const RtcMediaStreamOptionsId = 'webrtc';
 
@@ -198,7 +206,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         }
 
         // try to fetch the latest event image if one is queued
-        const hasEventImages = !!this.device?.traits?.['sdm.devices.traits.CameraEventImage'];
+        const hasEventImages = deviceHasEventImages(this.device);
         if (hasEventImages && this.lastMotionEventId) {
             const eventId = this.lastMotionEventId;
             this.lastMotionEventId = undefined;
@@ -217,8 +225,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
             return mediaManager.createMediaObject(data, 'image/jpeg');
         }
 
-        // send "no snapshot available" image
-        return mediaManager.createMediaObject(black, 'image/jpeg');
+        throw new Error('snapshot unavailable');
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
@@ -248,7 +255,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
     }
 
     get isWebRtc() {
-        return this.device?.traits?.['sdm.devices.traits.CameraLiveStream']?.supportedProtocols?.includes('WEB_RTC');
+        return deviceIsWebRtc(this.device);
     }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
@@ -763,13 +770,17 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
 
                 const interfaces = [
                     ScryptedInterface.BufferConverter,
-                    ScryptedInterface.RTCSignalingChannel,
                     ScryptedInterface.VideoCamera,
-                    ScryptedInterface.Camera,
                     ScryptedInterface.MotionSensor,
                     ScryptedInterface.ObjectDetector,
                     ScryptedInterface.Readme,
                 ];
+
+                if (deviceHasEventImages(device))
+                    interfaces.push(ScryptedInterface.Camera);
+
+                if (deviceIsWebRtc(device))
+                    interfaces.push(ScryptedInterface.RTCSignalingChannel);
 
                 let type = ScryptedDeviceType.Camera;
                 if (device.type === 'sdm.devices.types.DOORBELL') {

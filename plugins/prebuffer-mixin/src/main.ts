@@ -208,7 +208,7 @@ class PrebufferSession {
           title: 'Detected Keyframe Interval',
           description: "Configuring your camera to 4 seconds is recommended (IDR aka Frame Interval = FPS * 4 seconds).",
           readonly: true,
-          value: ((this.detectedIdrInterval || 0) / 1000).toString() || 'none',
+          value: (this.detectedIdrInterval || 0) / 1000 || 'unknown',
         },
       );
     }

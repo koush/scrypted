@@ -703,7 +703,7 @@ class PushHandler:
     pass
 
 class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingClientOptions = None) -> None | RTCSessionControl:
+    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingClientOptions = None) -> RTCSessionControl:
         pass
     pass
 
