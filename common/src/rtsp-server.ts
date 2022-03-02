@@ -56,7 +56,7 @@ export function createRtspParser(): RtspStreamParser {
 }
 
 function parseHeaders(headers: string[]): Headers {
-    const ret = {};
+    const ret: any = {};
     for (const header of headers.slice(1)) {
         const index = header.indexOf(':');
         let value = '';
@@ -148,7 +148,7 @@ export class RtspClient extends RtspBase {
     }
 
     async setup(channel: number, path?: string) {
-        const headers = {
+        const headers: any = {
             Transport: `RTP/AVP/TCP;unicast;interleaved=${channel}-${channel + 1}`,
         };
         if (this.session)
@@ -160,7 +160,7 @@ export class RtspClient extends RtspBase {
     }
 
     async play() {
-        const headers = {
+        const headers: any = {
             Range: 'npt=0.000-',
         };
         if (this.session)
@@ -353,12 +353,13 @@ export class RtspServer {
         let [method, url] = headers[0].split(' ', 2);
         method = method.toLowerCase();
         const requestHeaders = parseHeaders(headers);
-        if (!this[method]) {
+        const thisAny = this as any;
+        if (!thisAny[method]) {
             this.respond(400, 'Bad Request', requestHeaders, {});
             return;
         }
 
-        await this[method](url, requestHeaders);
+        await thisAny[method](url, requestHeaders);
         return method !== 'play' && method !== 'record' && method !== 'teardown';
     }
 
