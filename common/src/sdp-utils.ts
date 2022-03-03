@@ -18,21 +18,33 @@ export function parsePayloadTypes(sdp: string) {
 
 export function findTrack(sdp: string, type: string, directions: TrackDirection[] = ['recvonly']) {
     const tracks = sdp.split('m=').filter(track => track.startsWith(type));
+
     for (const track of tracks) {
+        const returnTrack = () => {
+            const lines = track.split('\n').map(line => line.trim());
+            const control = lines.find(line => line.startsWith('a=control:'));
+            return {
+                section: 'm=' + track,
+                trackId: control?.split('a=control:')?.[1],
+            };
+        }
+
         for (const dir of directions) {
             if (track.includes(`a=${dir}`)) {
-                const lines = track.split('\n').map(line => line.trim());
-                const control = lines.find(line => line.startsWith('a=control:'));
-                return {
-                    section: 'm=' + track,
-                    trackId: control?.split('a=control:')?.[1],
-                };
+                return returnTrack();
             }
+        }
+
+        // some sdp do not advertise a media flow direction. i think recvonly is the default?
+        if ((directions.includes('recvonly'))
+            && !track.includes('sendonly')
+            && !track.includes('inactive')) {
+            return returnTrack();
         }
     }
 }
 
-type TrackDirection = 'sendonly' | 'sendrecv' | 'recvonly';
+type TrackDirection = 'sendonly' | 'sendrecv' | 'recvonly' | 'inactive';
 
 export function parseTrackIds(sdp: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
     return {

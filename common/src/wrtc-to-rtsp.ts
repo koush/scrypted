@@ -10,10 +10,15 @@ import { RTCSessionControl, ScryptedDeviceBase } from "@scrypted/sdk";
 // h264 baseline and opus are required codecs that all webrtc implementations must provide.
 function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
     let outputSdp = sdp
+        .replace(/c=IN .*?/, `c=IN IP4 127.0.0.1`)
         .replace(/m=audio \d+/, `m=audio ${audioPort}`)
         .replace(/m=video \d+/, `m=video ${videoPort}`);
 
-    const lines = outputSdp.split('\n').map(line => line.trim());
+    let lines = outputSdp.split('\n').map(line => line.trim());
+    lines = lines
+        .filter(line => !line.includes('a=candidate'))
+        .filter(line => !line.includes('a=ice'));
+
     const vindex = lines.findIndex(line => line.startsWith('m=video'));
     lines.splice(vindex + 1, 0, 'a=control:trackID=video');
     const aindex = lines.findIndex(line => line.startsWith('m=audio'));
@@ -43,8 +48,8 @@ export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamO
 
 export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase & RTCSignalingChannel, id: string): Promise<FFMpegInput> {
     const { console, name } = channel;
-    const videoPort = Math.round(Math.random() * 10000 + 30000);
-    const audioPort = Math.round(Math.random() * 10000 + 30000);
+    const videoPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
+    const audioPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
 
     const { clientPromise, port } = await listenZeroSingleClient();
 
@@ -65,13 +70,13 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
         }
         catch (e) {
         }
-        sessionControl?.endSession().catch(() => {});
+        sessionControl?.endSession().catch(() => { });
     };
 
     clientPromise.then(async (client) => {
         socket = client;
         const rtspServer = new RtspServer(socket, undefined, udp);
-        // rtspServer.console = console;
+        rtspServer.console = console;
         rtspServer.audioChannel = 0;
         rtspServer.videoChannel = 2;
 
@@ -203,7 +208,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                     };
                     rtspServer.client.write(rtspServer.sdp + '\r\n');
                     rtspServer.client.end();
-                    rtspServer.client.on('data', () => {});
+                    rtspServer.client.on('data', () => { });
                     // rtspServer.client.destroy();
                     console.log('sdp sent');
                 }

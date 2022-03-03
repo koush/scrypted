@@ -14,10 +14,6 @@ interface Headers {
     [header: string]: string
 }
 
-function findSyncFrame(streamChunks: StreamChunk[]): StreamChunk[] {
-    return streamChunks;
-}
-
 export interface RtspStreamParser extends StreamParser {
     sdp: Promise<string>;
 }
@@ -141,14 +137,16 @@ export class RtspClient extends RtspBase {
         }
     }
 
-    writeRequest(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean) {
+    writeRequest(method: string, headers?: Headers, path?: string, body?: Buffer) {
         headers = headers || {};
 
-        let fullUrl: string;
-        if (path)
-            fullUrl = new URL(path, this.url).toString();
-        else
-            fullUrl = this.url;
+        let fullUrl = this.url;
+        if (path) {
+            // strangely, RTSP urls do not behave like expected from an HTTP-ish server.
+            // ffmpeg will happily suffix path segments after query strings:
+            // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
+            fullUrl += '/' + path;
+        }
 
         const sanitized = new URL(fullUrl);
         sanitized.username = '';
@@ -172,7 +170,7 @@ export class RtspClient extends RtspBase {
         headers: Headers,
         body: Buffer
     }> {
-        this.writeRequest(method, headers, path, body, authenticating);
+        this.writeRequest(method, headers, path, body);
 
         const message = await this.readMessage();
         const status = message[0];
@@ -381,6 +379,8 @@ export class RtspServer {
         this.respond(200, 'OK', requestHeaders, headers, Buffer.from(this.sdp))
     }
 
+    // todo: use the sdp itself to determine the audio/video track ids so
+    // rewriting is not necessary.
     setup(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
         const transport = requestHeaders['transport'];
@@ -391,7 +391,7 @@ export class RtspServer {
             const [_, rtp, rtcp] = match;
             if (url.includes('audio'))
                 this.udpPorts.audio = parseInt(rtp);
-            else
+            else if (url.includes('video'))
                 this.udpPorts.video = parseInt(rtp);
         }
         else if (transport.includes('TCP')) {
@@ -402,7 +402,7 @@ export class RtspServer {
                 if (url.includes('audio')) {
                     this.audioChannel = low;
                 }
-                else {
+                else if (url.includes('video')) {
                     this.videoChannel = low;
                 }
             }
