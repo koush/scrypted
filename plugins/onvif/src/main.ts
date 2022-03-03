@@ -1,9 +1,14 @@
-import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetection, ObjectDetector, ObjectDetectionTypes, ObjectsDetected, Settings } from "@scrypted/sdk";
+import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetector, ObjectDetectionTypes, ObjectsDetected, Settings, Intercom, SettingValue, FFMpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
+import { RtspClient } from "@scrypted/common/src/rtsp-server";
+import { findTrack } from "@scrypted/common/src/sdp-utils";
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
+import child_process from 'child_process';
 import xml2js from 'xml2js';
 import onvif from 'onvif';
+import { OnvifIntercom } from "./onvif-intercom";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -27,10 +32,11 @@ function convertAudioCodec(codec: string) {
     return codec?.toLowerCase();
 }
 
-class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
+class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
     eventStream: Stream;
     client: OnvifCameraAPI;
     rtspMediaStreamOptions: Promise<UrlMediaStreamOptions[]>;
+    intercom = new OnvifIntercom(this);
 
     getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject> {
         throw new Error("Method not implemented.");
@@ -243,14 +249,16 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
     }
 
     async getOtherSettings(): Promise<Setting[]> {
-        return [
+        const isDoorbell = !!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor);
+
+        const ret: Setting[] = [
             ...await super.getOtherSettings(),
             {
                 title: 'Onvif Doorbell',
                 type: 'boolean',
                 description: 'Enable if this device is a doorbell',
                 key: 'onvifDoorbell',
-                value: (!!this.providedInterfaces?.includes(ScryptedInterface.BinarySensor)).toString(),
+                value: isDoorbell.toString(),
             },
             {
                 title: 'Onvif Doorbell Event Name',
@@ -259,30 +267,62 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector {
                 key: "onvifDoorbellEvent",
                 value: this.storage.getItem('onvifDoorbellEvent'),
                 placeholder: 'EventName'
-            }
-        ]
+            },
+        ];
+
+        if (!isDoorbell) {
+            ret.push(
+                {
+                    title: 'Two Way Audio',
+                    type: 'boolean',
+                    key: 'onvifTwoWay',
+                    value: (!!this.providedInterfaces?.includes(ScryptedInterface.Intercom)).toString(),
+                }
+            )
+        }
+
+        return ret;
     }
 
     updateDevice() {
         const interfaces: string[] = [...this.provider.getInterfaces()];
         if (this.storage.getItem('onvifDetector') === 'true')
             interfaces.push(ScryptedInterface.ObjectDetector);
-        const doorbell = this.storage.getItem('onvifDoorbell');
-        if (doorbell === 'true')
-            this.provider.updateDevice(this.nativeId, this.name, [...interfaces, ScryptedInterface.BinarySensor], ScryptedDeviceType.Doorbell)
-        else
-            this.provider.updateDevice(this.nativeId, this.name, interfaces);
+        const doorbell = this.storage.getItem('onvifDoorbell') === 'true';
+        let type: ScryptedDeviceType;
+        if (doorbell) {
+            interfaces.push(ScryptedInterface.BinarySensor);
+            type = ScryptedDeviceType.Doorbell;
+        }
+
+        const twoWay = this.storage.getItem('onvifTwoWay') === 'true';
+        if (twoWay || doorbell)
+            interfaces.push(ScryptedInterface.Intercom);
+
+        this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
+        this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
     async putSetting(key: string, value: string) {
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
 
-        if (key !== 'onvifDoorbell')
+        if (key !== 'onvifDoorbell' && key !== 'onvifTwoWay')
             return super.putSetting(key, value);
 
         this.storage.setItem(key, value);
         this.updateDevice();
+    }
+
+    async startIntercom(media: MediaObject) {
+        const options = await this.getConstructedVideoStreamOptions();
+        const stream = options[0];
+        this.intercom.url = stream.url;
+        return this.intercom.startIntercom(media);
+    }
+
+    async stopIntercom() {
+        return this.intercom.stopIntercom();
     }
 }
 
@@ -345,13 +385,12 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
         })
     }
 
-    async putSetting(key: string, value: string | number): Promise<void> {
+    async putSetting(key: string, value: SettingValue): Promise<void> {
         if (key === 'autodiscovery') {
             this.storage.setItem(key, value.toString());
             this.onDeviceEvent(ScryptedInterface.Settings, undefined);
             return;
         }
-        super.putSetting(key, value);
     }
 
     async getSettings(): Promise<Setting[]> {

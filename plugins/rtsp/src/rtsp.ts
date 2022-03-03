@@ -1,8 +1,7 @@
-import sdk, { Setting, MediaObject, ScryptedInterface, FFMpegInput, PictureOptions, SettingValue } from "@scrypted/sdk";
+import sdk, { Setting, MediaObject, ScryptedInterface, FFMpegInput, PictureOptions, SettingValue, MediaStreamOptions } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 import url from 'url';
-import { recommendDumbPlugins } from "./../../ffmpeg-camera/src/recommend";
 
 export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
@@ -13,11 +12,12 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
     }
 
-    createRtspMediaStreamOptions(url: string, index: number) {
+    createRtspMediaStreamOptions(url: string, index: number): UrlMediaStreamOptions {
         return {
             id: `channel${index}`,
             name: `Stream ${index + 1}`,
             url,
+            container: 'rtsp',
             video: {
             },
             audio: this.isAudioDisabled() ? null : {},
@@ -322,11 +322,6 @@ export abstract class RtspSmartCamera extends RtspCamera {
 }
 
 export class RtspProvider extends CameraProviderBase<UrlMediaStreamOptions> {
-    constructor(nativeId?: string) {
-        super(nativeId);
-        recommendDumbPlugins();
-    }
-
     createCamera(nativeId: string): RtspCamera {
         return new RtspCamera(nativeId, this);
     }

@@ -237,14 +237,6 @@ export abstract class CameraProviderBase<T extends MediaStreamOptions> extends S
         });
     }
 
-    async putSetting(value: string | number) {
-        // generate a random id
-        const nativeId = randomBytes(4).toString('hex');
-        const name = value.toString();
-
-        this.updateDevice(nativeId, name, this.getInterfaces());
-    }
-
     abstract createCamera(nativeId: string): CameraBase<T>;
 
     getDevice(nativeId: string) {

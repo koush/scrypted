@@ -8,6 +8,7 @@ import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
 import net from 'net';
 import { listenZero } from "../../../common/src/listen-cluster";
 import { readLength } from "../../../common/src/read-stream";
+import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 
 const { mediaManager } = sdk;
 
@@ -19,6 +20,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     cp: ChildProcess;
     client: AmcrestCameraClient;
     maxExtraStreams: number;
+    onvifIntercom = new OnvifIntercom(this);
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -166,16 +168,28 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
-        if (!isDoorbell) {
-            ret.push(
-                {
-                    title: 'Two Way Audio',
-                    value: this.storage.getItem('twoWayAudio') === 'true',
-                    key: 'twoWayAudio',
-                    type: 'boolean',
-                },
-            )
-        }
+
+        let twoWayAudio = this.storage.getItem('twoWayAudio');
+        if (twoWayAudio === 'true')
+            twoWayAudio = 'Amcrest';
+
+        const choices = [
+            'Amcrest',
+            'ONVIF',
+        ];
+
+        if (!isDoorbell)
+            choices.unshift('None');
+
+        ret.push(
+            {
+                title: 'Two Way Audio',
+                value: twoWayAudio,
+                key: 'twoWayAudio',
+                description: 'Amcrest cameras may support both Amcrest and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
+                choices,
+            },
+        )
 
         return ret;
     }
@@ -201,6 +215,14 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     getRtspChannel() {
         return this.storage.getItem('rtspChannel');
     }
+
+
+    createRtspMediaStreamOptions(url: string, index: number) {
+        const ret = super.createRtspMediaStreamOptions(url, index);
+        ret.tool = 'scrypted';
+        return ret;
+    }
+
 
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         let mas = this.maxExtraStreams;
@@ -231,7 +253,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         super.putSetting(key, value);
         const doorbellType = this.storage.getItem('doorbellType');
         const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
-        const twoWayAudio = this.storage.getItem('twoWayAudio') === 'true';
+        // true is the legacy value before onvif was added.
+        const twoWayAudio = this.storage.getItem('twoWayAudio') === 'true'
+            || this.storage.getItem('twoWayAudio') === 'ONVIF'
+            || this.storage.getItem('twoWayAudio') === 'Amcrest';
 
         const interfaces = provider.getInterfaces();
         let type: ScryptedDeviceType = undefined;
@@ -246,6 +271,17 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
+        if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
+            const options = await this.getConstructedVideoStreamOptions();
+            const stream = options[0];
+            const url = new URL(stream.url);
+            // amcrest onvif requires this proto query parameter, or onvif two way
+            // will not activate.
+            url.searchParams.set('proto', 'Onvif');
+            this.onvifIntercom.url = url.toString();
+            return this.onvifIntercom.startIntercom(media);
+        }
+
         // not sure if this all works, since i don't actually have a doorbell.
         // good luck!
         const channel = this.getRtspChannel() || '1';
@@ -309,6 +345,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async stopIntercom(): Promise<void> {
+        if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
+            return this.onvifIntercom.stopIntercom();
+        }
+
         this.cp?.kill();
         this.cp = undefined;
     }
