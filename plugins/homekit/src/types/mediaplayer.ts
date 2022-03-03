@@ -1,6 +1,6 @@
 
 import { VideoCamera, MediaPlayer, MediaPlayerState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
 import { Categories, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 import sdk from '@scrypted/sdk';
@@ -12,8 +12,8 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.MediaPlayer);
     },
-    getAccessory: async (device: ScryptedDevice & MediaPlayer & StartStop) => {
-        const accessory = makeAccessory(device);
+    getAccessory: async (device: ScryptedDevice & MediaPlayer & StartStop, homekitSession: HomeKitSession) => {
+        const accessory = makeAccessory(device, homekitSession);
         accessory.category = Categories.TELEVISION;
         const service = accessory.addService(Service.Television, "Television", "Television");
         // service.setPrimaryService(true);

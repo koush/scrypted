@@ -1,6 +1,6 @@
 
 import { Lock, LockState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 
@@ -9,8 +9,8 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.Lock);
     },
-    getAccessory: async (device: ScryptedDevice & Lock) => {
-        const accessory = makeAccessory(device);
+    getAccessory: async (device: ScryptedDevice & Lock, homekitSession: HomeKitSession) => {
+        const accessory = makeAccessory(device, homekitSession);
         const service = accessory.addService(Service.LockMechanism, device.name);
 
         function toCurrentState(lockState: LockState) {

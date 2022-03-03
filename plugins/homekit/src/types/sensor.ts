@@ -1,6 +1,6 @@
 
 import { MotionSensor, BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, HumiditySensor, AudioSensor, AmbientLightSensor, OccupancySensor, FloodSensor } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
 
@@ -25,8 +25,8 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor) => {
-        const accessory = makeAccessory(device);
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor, homekitSession: HomeKitSession) => {
+        const accessory = makeAccessory(device, homekitSession);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name);

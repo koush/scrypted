@@ -16,7 +16,7 @@ addSupportedType({
         };
         faux.type = ScryptedDeviceType.Camera;
         const cameraCheck = supportedTypes[ScryptedInterface.Camera];
-        const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitSession) : makeAccessory(device);
+        const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitSession) : makeAccessory(device, homekitSession);
 
         const service = accessory.addService(Service.Doorbell);
 

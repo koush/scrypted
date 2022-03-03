@@ -88,7 +88,7 @@ addSupportedType({
         let recordingDelegate: CameraRecordingDelegate | undefined;
         let recordingOptions: CameraRecordingOptions | undefined;
 
-        const accessory = makeAccessory(device);
+        const accessory = makeAccessory(device, homekitSession);
 
         const detectAudio = storage.getItem('detectAudio') === 'true';
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;

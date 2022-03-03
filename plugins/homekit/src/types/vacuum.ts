@@ -1,6 +1,6 @@
 
 import { Dock, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice } from '../common'
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
 
@@ -9,8 +9,8 @@ addSupportedType({
     probe(device: DummyDevice): boolean {
         return device.interfaces.includes(ScryptedInterface.StartStop);
     },
-    getAccessory: async (device: ScryptedDevice & StartStop & Dock) => {
-        const accessory = makeAccessory(device);
+    getAccessory: async (device: ScryptedDevice & StartStop & Dock, homekitSession: HomeKitSession) => {
+        const accessory = makeAccessory(device, homekitSession);
 
         const service = accessory.addService(Service.Outlet, device.name);
         service.getCharacteristic(Characteristic.On)
