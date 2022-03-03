@@ -1,7 +1,7 @@
 import { ScryptedDeviceType } from '@scrypted/sdk';
 import { Categories, HAPStorage } from './hap';
 import './types'
-
+import os from 'os';
 
 class HAPLocalStorage {
     initSync() {

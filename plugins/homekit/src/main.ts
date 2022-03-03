@@ -1,6 +1,5 @@
 import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, Online } from '@scrypted/sdk';
 import { Accessory, Bridge, Categories, Characteristic, MDNSAdvertiser, PublishInfo, Service, ControllerStorage } from './hap';
-import os from 'os';
 import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
 import './types'
 import { CameraMixin } from './camera-mixin';
@@ -13,12 +12,18 @@ import { EventedHTTPServer } from './hap';
 import { getHAPUUID, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin } from './homekit-mixin';
 import { sleep } from '@scrypted/common/src/sleep';
+import os from 'os';
 
 const { systemManager, deviceManager } = sdk;
 
 initializeHapStorage();
-
 const includeToken = 4;
+
+
+function getAddresses() {
+    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
+    return addresses;
+}
 
 class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, HomeKitSession {
     bridge = new Bridge('Scrypted', getHAPUUID(this.storage));
@@ -48,7 +53,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     }
 
     async getSettings(): Promise<Setting[]> {
-        const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
         return [
             {
                 group: 'Pairing',
@@ -76,7 +80,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 value: this.storage.getItem('addressOverride'),
                 key: 'addressOverride',
                 description: 'Optional: The network address used by the Scrypted server. Set this to the wired address to prevent usage of wireless address.',
-                choices: addresses,
+                choices: getAddresses(),
                 combobox: true,
             },
             {
