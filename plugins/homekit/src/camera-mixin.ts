@@ -60,10 +60,10 @@ export class CameraMixin extends HomekitMixin<any> {
                 key: 'linkedMotionSensor',
                 type: 'device',
                 deviceFilter: 'interfaces.includes("MotionSensor")',
-                value: this.storage.getItem('linkedMotionSensor') || null,
+                value: this.storage.getItem('linkedMotionSensor') || this.id,
                 placeholder: this.interfaces.includes(ScryptedInterface.MotionSensor)
-                    ? 'Built-In Motion Sensor' : 'None',
-                description: "Link motion sensor used to trigger HomeKit Secure Video recordings.",
+                    ? undefined : 'None',
+                description: "Set the motion sensor used to trigger HomeKit Secure Video recordings. Defaults to the built-in motion sensor when available.",
             },
             {
                 title: 'Never Wait for Snapshots',
