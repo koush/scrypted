@@ -50,7 +50,22 @@ export function createRtspParser(): RtspStreamParser {
             '-acodec', 'copy',
             '-f', 'rtsp',
         ],
-        findSyncFrame,
+        findSyncFrame(streamChunks: StreamChunk[]) {
+            for (let i = 0; i < streamChunks.length; i++) {
+                const chunk = streamChunks[i];
+                if (chunk.type === 'rtp-video') {
+                    const fragmentType = chunk.chunks[1].readUInt8(12) & 0x1f;
+                    const second = chunk.chunks[1].readUInt8(13);
+                    const nalType = second & 0x1f;
+                    const startBit = second & 0x80;
+                    if (((fragmentType === 28 || fragmentType === 29) && nalType === 5 && startBit == 128) || fragmentType == 5) {
+                        console.log('sent', i, streamChunks.length);
+                        return streamChunks.slice(i);
+                    }
+                }
+            }
+            return streamChunks;
+        },
         sdp: new Promise<string>(r => resolve = r),
         async *parse(duplex, width, height) {
             const server = new RtspServer(duplex);

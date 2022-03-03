@@ -466,6 +466,8 @@ class PrebufferSession {
       }
     }
 
+    // if operating in RTSP mode, use a side band ffmpeg process to grab the mp4 segments.
+    // ffmpeg adds latency, as well as rewrites timestamps.
     if (usingScryptedParser && mp4Mode) {
       this.getVideoStream({
         id: this.streamId,
