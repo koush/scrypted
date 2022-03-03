@@ -571,6 +571,17 @@ class PrebufferSession {
             this.detectedIdrInterval = now - this.prevIdr;
           this.prevIdr = now;
         }
+        if (chunk.type === 'rtp-video') {
+          const fragmentType = chunk.chunks[1].readUInt8(12) & 0x1f;
+          const second = chunk.chunks[1].readUInt8(13);
+          const nalType = second & 0x1f;
+          const startBit = second & 0x80;
+          if (((fragmentType === 28 || fragmentType === 29) && nalType === 5 && startBit == 128) || fragmentType == 5) {
+            if (this.prevIdr)
+              this.detectedIdrInterval = now - this.prevIdr;
+            this.prevIdr = now;
+          }
+        }
 
         prebufferContainer.push({
           time: now,
@@ -627,11 +638,24 @@ class PrebufferSession {
     let requestedPrebuffer = options?.prebuffer;
     if (requestedPrebuffer == null) {
       if (sendKeyframe) {
+        // get into the general area of finding a sync frame.
         requestedPrebuffer = Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5;
       }
       else {
         requestedPrebuffer = 0;
       }
+    }
+
+    const { rtspMode } = this.getRebroadcastMode();
+    const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
+
+    const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
+
+    // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
+    // rewind a little bit earlier to gaurantee a full segment of that length
+    // is sent.
+    if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
+      requestedPrebuffer += (this.detectedIdrInterval || 4000) * 1.5;
     }
 
     const createContainerServer = async (container: PrebufferParsers) => {
@@ -720,18 +744,6 @@ class PrebufferSession {
       })
 
       return containerUrl;
-    }
-
-    const { rtspMode } = this.getRebroadcastMode();
-    const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
-
-    const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
-
-    // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
-    // rewind a little bit earlier to gaurantee a full segment of that length
-    // is sent.
-    if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
-      requestedPrebuffer += 4000;
     }
 
     const mediaStreamOptions: MediaStreamOptions = Object.assign({}, session.mediaStreamOptions);

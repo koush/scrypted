@@ -68,9 +68,9 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
                 length = header.readUInt16BE(0);
             }
             const data = await readLength(socket, length);
+            const pt = data[1] & 0x7f;
 
             if (!hasRstpPrefix) {
-                const pt = data[1] & 0x7f;
                 const prefix = Buffer.alloc(2);
                 prefix[0] = RTSP_FRAME_MAGIC;
                 if (pt === audioPt) {
@@ -82,9 +82,16 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
                 header = Buffer.concat([prefix, header]);
             }
 
+            let type: string;
+            if (pt === audioPt)
+                type = 'rtp-audio';
+            else if (pt === videoPt)
+                type = 'rtp-video';
+
             const chunk: StreamChunk = {
                 chunks: [header, data],
-            }
+                type,
+            };
             events.emit('rtsp', chunk);
             resetActivityTimer();
         }

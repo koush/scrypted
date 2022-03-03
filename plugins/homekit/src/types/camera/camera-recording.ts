@@ -5,7 +5,7 @@ import net from 'net';
 import sdk from '@scrypted/sdk';
 
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
-import { FFMpegFragmentedMP4Session, startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { FFMpegFragmentedMP4Session, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { evalRequest } from './camera-transcode';
 import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
 import { Duplex } from 'stream';
@@ -133,7 +133,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         }
 
         console.log(`motion recording starting`);
-        session = await startFFMPegFragmetedMP4Session(inputArguments, audioArgs, videoArgs, console);
+        session = await startFFMPegFragmentedMP4Session(inputArguments, audioArgs, videoArgs, console);
     }
 
     console.log(`motion recording started`);
@@ -141,6 +141,12 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     let pending: Buffer[] = [];
     try {
         let i = 0;
+        // if ffmpeg is being used to parse a prebuffered stream that is NOT mp4 (despite our request),
+        // it seems that ffmpeg outputs a bad first fragment. it may be missing various codec informations or
+        // starting on a non keyframe. unsure, so skip that one.
+        // rebroadcast plugin rtsp mode is the culprit here, and there's no fix. rebroadcast
+        // will send an extra fragment, so one can be skipped safely without any loss.
+        let needSkip = ffmpegInput.mediaStreamOptions?.prebuffer && ffmpegInput.container !== 'mp4';
         for await (const box of generator) {
             const { header, type, data } = box;
             // console.log('motion fragment box', type);
@@ -149,6 +155,11 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             pending.push(header, data);
 
             if (type === 'moov' || type === 'mdat') {
+                if (type === 'mdat' && needSkip) {
+                    pending = [];
+                    needSkip = false;
+                    continue;
+                }
                 const fragment = Buffer.concat(pending);
                 pending = [];
                 console.log(`motion fragment #${++i} sent. size:`, fragment.length);
