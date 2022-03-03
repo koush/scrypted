@@ -157,8 +157,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         }
         if (hasAudio) {
             args.push(
-                "-payload_type",
-                (request as StartStreamRequest).audio.pt.toString(),
+                "-payload_type", (request as StartStreamRequest).audio.pt.toString(),
                 "-ssrc", session.audiossrc.toString(),
                 "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
                 "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
