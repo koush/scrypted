@@ -8,6 +8,7 @@ import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordin
 import { FFMpegFragmentedMP4Session, startFFMPegFragmetedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { evalRequest } from './camera-transcode';
 import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
+import { Duplex } from 'stream';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -44,7 +45,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
     const incompatibleStream = noAudio || transcodeRecording || isDefinitelyNotAAC;
 
-    let session: FFMpegFragmentedMP4Session;
+    let session: FFMpegFragmentedMP4Session & { socket?: Duplex };
 
     if (ffmpegInput.container === 'mp4' && ffmpegInput.url.startsWith('tcp://') && !incompatibleStream) {
         console.log('prebuffer is tcp/mp4/h264/aac compatible. using direct tcp.');
