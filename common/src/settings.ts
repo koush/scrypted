@@ -34,6 +34,7 @@ function parseValue(value: string, type: SettingValue, defaultValue: any) {
 export interface StorageSetting extends Setting {
     defaultValue?: any;
     onPut?: (oldValue: any, newValue: any) => void;
+    mapPut?: (oldValue: any, newValue: any) => any;
     hide?: boolean;
     noStore?: boolean;
 }
@@ -60,16 +61,19 @@ export class StorageSettings<T extends string> implements Settings {
             s.value = this.getItem(key as T);
             ret.push(s);
             delete s.onPut;
+            delete s.mapPut;
         }
         return ret;
     }
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
-        const setting: StorageSetting = this.settings[key];
+        const setting: StorageSetting = this.settings[key as T];
         let oldValue: any;
         if (setting)
             oldValue = this.getItem(key as T);
         if (!setting?.noStore) {
+            if (setting.mapPut)
+                value = setting.mapPut(oldValue, value);
             if (typeof value === 'object')
                 this.device.storage.setItem(key, JSON.stringify(value));
             else
