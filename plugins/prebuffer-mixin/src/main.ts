@@ -478,8 +478,8 @@ class PrebufferSession {
           const mp4Session = await startFFMPegFragmentedMP4Session(ffmpegInput.inputArguments, acodec, vcodec, this.console);
 
           const kill = () => {
-            session.kill();
             mp4Session.cp.kill('SIGKILL');
+            session.kill();
             mp4Session.generator.throw(new Error('killed'));
           };
 
