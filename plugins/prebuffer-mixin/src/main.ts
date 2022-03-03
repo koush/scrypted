@@ -426,11 +426,11 @@ class PrebufferSession {
     const canUseScryptedParser = rtspMode && !mp4Mode;
 
     if (canUseScryptedParser && isRfc4571) {
-
+      this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
 
-      session = await startRFC4571Parser(connectRFC4571Parser(url), sdp, mediaStreamOptions, false, rbo);
+      session = await startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, false, rbo);
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
     else {
@@ -441,6 +441,7 @@ class PrebufferSession {
       if (canUseScryptedParser
         && ffmpegInput.mediaStreamOptions?.container === 'rtsp'
         && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
+        this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser')
         const rtspClient = new RtspClient(ffmpegInput.url);
         await rtspClient.options();
         const sdpResponse = await rtspClient.describe();
@@ -451,7 +452,7 @@ class PrebufferSession {
         await rtspClient.setup(0, audio);
         await rtspClient.setup(2, video);
         const socket = await rtspClient.play();
-        session = await startRFC4571Parser(socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
+        session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
       }
       else {
         // create missing pts from dts so mpegts and mp4 muxing does not fail
@@ -595,8 +596,6 @@ class PrebufferSession {
       }
     }
 
-    this.console.log(this.streamName, 'client request started');
-
     const createContainerServer = async (container: PrebufferParsers) => {
       const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
@@ -604,7 +603,6 @@ class PrebufferSession {
       let containerUrl: string;
 
       if (container === 'rtsp') {
-        this.sdp.then(sdp => console.log(sdp));
         const client = await listenZeroSingleClient();
         socketPromise = client.clientPromise.then(async (socket) => {
           let sdp = await this.sdp;
@@ -639,7 +637,6 @@ class PrebufferSession {
 
           const cleanup = () => {
             destroy();
-            this.console.log(this.streamName, 'client request ended');
             session.removeListener(container, safeWriteData);
             session.removeListener('killed', cleanup);
           }
