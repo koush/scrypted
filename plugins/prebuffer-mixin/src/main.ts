@@ -3,9 +3,10 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin";
-import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
+import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityTimer, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
+import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, MP4Atom, parseMp4StreamChunks } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
+import { startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { parsePayloadTypes, parseTrackIds } from '@scrypted/common/src/sdp-utils';
 import { createRtspParser, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
@@ -423,9 +424,11 @@ class PrebufferSession {
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
-    const canUseScryptedParser = rtspMode && !mp4Mode;
+    const canUseScryptedParser = rtspMode;// && !mp4Mode;
+    let usingScryptedParser = false;
 
     if (canUseScryptedParser && isRfc4571) {
+      usingScryptedParser = true;
       this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
@@ -441,6 +444,7 @@ class PrebufferSession {
       if (canUseScryptedParser
         && ffmpegInput.mediaStreamOptions?.container === 'rtsp'
         && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
+        usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser')
         const rtspClient = new RtspClient(ffmpegInput.url);
         await rtspClient.options();
@@ -460,6 +464,40 @@ class PrebufferSession {
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
         session = await startParserSession(ffmpegInput, rbo);
       }
+    }
+
+    if (usingScryptedParser && mp4Mode) {
+      this.getVideoStream({
+        id: this.streamId,
+        refresh: false,
+      })
+        .then(async (stream) => {
+          const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
+          const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(stream, ScryptedMimeTypes.FFmpegInput);
+          ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+          const mp4Session = await startFFMPegFragmentedMP4Session(ffmpegInput.inputArguments, acodec, vcodec, this.console);
+
+          const kill = () => {
+            session.kill();
+            mp4Session.cp.kill('SIGKILL');
+            mp4Session.generator.throw(new Error('killed'));
+          };
+
+          if (!session.isActive) {
+            kill();
+            return;
+          }
+
+          session.on('killed', kill);
+
+          const { resetActivityTimer } = setupActivityTimer('mp4', kill, session, rbo.timeout);
+
+          for await (const chunk of parseMp4StreamChunks(mp4Session.generator)) {
+            resetActivityTimer();
+            session.emit('mp4', chunk);
+          }
+        })
+        .catch(() => { });
     }
 
     if (!session.inputAudioCodec) {
@@ -558,7 +596,7 @@ class PrebufferSession {
     this.console.log(this.streamName, 'active rebroadcast clients:', this.activeClients);
   }
 
-  inactivityCheck(session: ParserSession<PrebufferParsers>, refresh: boolean) {
+  inactivityCheck(session: ParserSession<PrebufferParsers>) {
     this.printActiveClients();
     if (!this.stopInactive)
       return;
@@ -568,7 +606,7 @@ class PrebufferSession {
     // by default, clients disconnecting will reset the inactivity timeout.
     // but in some cases, like optimistic prebuffer stream snapshots (google sdm)
     // we do not want that behavior.
-    if (this.inactivityTimeout && !refresh)
+    if (this.inactivityTimeout)
       return;
 
     clearTimeout(this.inactivityTimeout)
@@ -619,11 +657,18 @@ class PrebufferSession {
         containerUrl = `tcp://127.0.0.1:${client.port}`
       }
 
+      const isActiveClient = options?.refresh !== false;
+
       handleRebroadcasterClient(socketPromise, {
         console: this.console,
         connect: (writeData, destroy) => {
-          this.activeClients++;
-          this.printActiveClients();
+          if (isActiveClient) {
+            this.activeClients++;
+            this.printActiveClients();
+          }
+          else {
+            this.console.log('passive client request started');
+          }
 
           const now = Date.now();
 
@@ -662,8 +707,13 @@ class PrebufferSession {
           }
 
           return () => {
-            this.activeClients--;
-            this.inactivityCheck(session, options?.refresh !== false);
+            if (isActiveClient) {
+              this.activeClients--;
+              this.inactivityCheck(session);
+            }
+            else {
+              this.console.log('passive client request ended');
+            }
             cleanup();
           };
         }

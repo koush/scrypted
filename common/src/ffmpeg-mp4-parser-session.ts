@@ -8,12 +8,11 @@ import { Duplex, Readable } from 'stream';
 const { mediaManager } = sdk;
 
 export interface FFMpegFragmentedMP4Session {
-    socket: Duplex;
     cp: ChildProcess;
     generator: AsyncGenerator<MP4Atom>;
 }
 
-export async function startFFMPegFragmetedMP4Session(inputArguments: string[], audioOutputArgs: string[], videoOutputArgs: string[], console: Console): Promise<FFMpegFragmentedMP4Session> {
+export async function startFFMPegFragmentedMP4Session(inputArguments: string[], audioOutputArgs: string[], videoOutputArgs: string[], console: Console): Promise<FFMpegFragmentedMP4Session> {
     const args = inputArguments.slice();
     args.push(
         ...videoOutputArgs,
@@ -33,7 +32,6 @@ export async function startFFMPegFragmetedMP4Session(inputArguments: string[], a
     ffmpegLogInitialOutput(console, cp);
 
     return {
-        socket: undefined,
         cp,
         generator: parseFragmentedMP4(cp.stdio[3] as Readable),
     };

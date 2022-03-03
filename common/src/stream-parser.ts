@@ -192,6 +192,30 @@ export interface MP4Atom {
     data: Buffer;
 }
 
+export async function* parseMp4StreamChunks(parser: AsyncGenerator<MP4Atom>) {
+    let ftyp: MP4Atom;
+    let moov: MP4Atom;
+    let startStream: Buffer;
+    for await (const atom of parser) {
+        if (!ftyp) {
+            ftyp = atom;
+        }
+        else if (!moov) {
+            moov = atom;
+        }
+
+        yield {
+            startStream,
+            chunks: [atom.header, atom.data],
+            type: atom.type,
+        };
+
+        if (ftyp && moov && !startStream) {
+            startStream = Buffer.concat([ftyp.header, ftyp.data, moov.header, moov.data])
+        }
+    }
+}
+
 export function createFragmentedMp4Parser(options?: StreamParserOptions): StreamParser {
     return {
         container: 'mp4',
@@ -203,27 +227,7 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
         ],
         async *parse(socket: Duplex): AsyncGenerator<StreamChunk> {
             const parser = parseFragmentedMP4(socket);
-            let ftyp: MP4Atom;
-            let moov: MP4Atom;
-            let startStream: Buffer;
-            for await (const atom of parser) {
-                if (!ftyp) {
-                    ftyp = atom;
-                }
-                else if (!moov) {
-                    moov = atom;
-                }
-
-                yield {
-                    startStream,
-                    chunks: [atom.header, atom.data],
-                    type: atom.type,
-                };
-
-                if (ftyp && moov && !startStream) {
-                    startStream = Buffer.concat([ftyp.header, ftyp.data, moov.header, moov.data])
-                }
-            }
+            yield* parseMp4StreamChunks(parser);
         },
         findSyncFrame,
     }

@@ -28,6 +28,7 @@ export interface ParserSession<T extends string> {
     kill(): void;
     isActive(): boolean;
 
+    emit(container: T, chunk: StreamChunk): this;
     on(container: T, callback: (chunk: StreamChunk) => void): this;
     on(event: 'killed', callback: () => void): this;
     once(event: 'killed', callback: () => void): this;
@@ -89,6 +90,32 @@ export async function parseAudioCodec(cp: ChildProcess) {
     return parseToken(cp, 'Audio');
 }
 
+export function setupActivityTimer (container: string, kill: () => void, events: {
+    once(event: 'killed', callback: () => void): void,
+}, timeout: number) {
+    let dataTimeout: NodeJS.Timeout;
+
+    function dataKill() {
+        console.error('timeout waiting for data, killing parser session', container);
+        kill();
+    }
+
+    function resetActivityTimer() {
+        if (!timeout)
+            return;
+        clearTimeout(dataTimeout);
+        dataTimeout = setTimeout(dataKill, timeout);
+    }
+
+    events.once('killed', () => clearTimeout(dataTimeout));
+
+    resetActivityTimer();
+    return {
+        resetActivityTimer,
+    }
+}
+
+
 export async function startParserSession<T extends string>(ffmpegInput: FFMpegInput, options: ParserOptions<T>): Promise<ParserSession<T>> {
     const { console } = options;
 
@@ -128,29 +155,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
 
     ffmpegIncomingConnectionTimeout = setTimeout(kill, 30000);
 
-    const setupActivityTimer = (container: string) => {
-        let dataTimeout: NodeJS.Timeout;
-
-        function dataKill() {
-            console.error('timeout waiting for data, killing parser session', container);
-            kill();
-        }
-
-        function resetActivityTimer() {
-            if (!options.timeout)
-                return;
-            clearTimeout(dataTimeout);
-            dataTimeout = setTimeout(dataKill, options.timeout);
-        }
-
-        events.once('killed', () => clearTimeout(dataTimeout));
-
-        resetActivityTimer();
-        return {
-            resetActivityTimer,
-        }
-    }
-
     let needSdp = false;
 
     // first see how many pipes are needed, and prep them for the child process
@@ -175,7 +179,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
                 udp.url.replace('udp://', 'rtp://'),
             );
 
-            const { resetActivityTimer } = setupActivityTimer(container);
+            const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
 
             (async () => {
                 for await (const chunk of parser.parseDatagram(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
@@ -202,7 +206,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
                 url.toString(),
             );
 
-            const { resetActivityTimer } = setupActivityTimer(container);
+            const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
 
             (async () => {
                 const socket = await tcp.clientPromise;
@@ -266,7 +270,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         pipeIndex++;
 
         try {
-            const { resetActivityTimer } = setupActivityTimer(container);
+            const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
 
             for await (const chunk of parser.parse(pipe as any, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
                 ffmpegStartedResolve?.(undefined);
@@ -300,6 +304,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         mediaStreamOptions: ffmpegInput.mediaStreamOptions || {
             id: undefined,
             name: undefined,
+        },
+        emit(container: T, chunk: StreamChunk) {
+            events.emit(container, chunk);
+            return this;
         },
         on(event: string, cb: any) {
             events.on(event, cb);

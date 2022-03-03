@@ -1,4 +1,4 @@
-import { ParserOptions, ParserSession } from "@scrypted/common/src/ffmpeg-rebroadcast";
+import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { readLength, readLine } from "@scrypted/common/src/read-stream";
 import sdk, { MediaObject, MediaStreamOptions } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
@@ -41,32 +41,8 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
     socket.on('close', kill);
     socket.on('error', kill);
 
-    const setupActivityTimer = (container: string) => {
-        let dataTimeout: NodeJS.Timeout;
-
-        function dataKill() {
-            console.error('timeout waiting for data, killing parser session', container);
-            kill();
-        }
-
-        function resetActivityTimer() {
-            if (!options.timeout)
-                return;
-            clearTimeout(dataTimeout);
-            dataTimeout = setTimeout(dataKill, options.timeout);
-        }
-
-        events.once('killed', () => clearTimeout(dataTimeout));
-
-        resetActivityTimer();
-        return {
-            resetActivityTimer,
-        }
-    }
-
-
     (async () => {
-        const { resetActivityTimer } = setupActivityTimer('rtsp');
+        const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.timeout);
 
         while (true) {
             let header: Buffer;
@@ -139,6 +115,10 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
         isActive() { return isActive },
         kill,
         mediaStreamOptions,
+        emit(container: 'rtsp', chunk: StreamChunk) {
+            events.emit(container, chunk);
+            return this;
+        },
         on(event: string, cb: any) {
             events.on(event, cb);
             return this;
