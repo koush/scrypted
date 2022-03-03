@@ -159,7 +159,12 @@ export class RtspClient extends RtspBase {
     }> {
         this.writeRequest(method, headers, path, body, authenticating);
 
-        const response = parseHeaders(await this.readMessage());
+        const message = await this.readMessage();
+        const status = message[0];
+        const response = parseHeaders(message);
+        if (!status.includes('200') && !response['www-authenticate'])
+            throw new Error(status);
+
         if (response['www-authenticate']) {
             if (authenticating)
                 throw new Error('auth failed');
