@@ -488,7 +488,7 @@ class PrebufferSession {
             return;
           }
 
-          session.on('killed', kill);
+          session.once('killed', kill);
 
           const { resetActivityTimer } = setupActivityTimer('mp4', kill, session, rbo.timeout);
 
