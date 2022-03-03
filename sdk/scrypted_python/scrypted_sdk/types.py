@@ -867,7 +867,7 @@ class DeviceManager:
         pass
     def getMixinConsole(self, mixinId: str, nativeId: str = None) -> Console:
         pass
-    def getMixinStorage(self, idOrToken: str, nativeId: str = None) -> Storage:
+    def getMixinStorage(self, id: str, nativeId: str = None) -> Storage:
         pass
     def getNativeIds(self) -> list[str]:
         pass
