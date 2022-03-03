@@ -16,21 +16,27 @@ export function parsePayloadTypes(sdp: string) {
     }
 }
 
-function getTrackId(track: string) {
-    if (!track)
-        return;
-    const lines = track.split('\n').map(line => line.trim());
-    const control = lines.find(line => line.startsWith('a=control:'));
-    return control?.split('a=control:')?.[1];
+export function findTrack(sdp: string, type: string, directions: TrackDirection[] = ['recvonly']) {
+    const tracks = sdp.split('m=').filter(track => track.startsWith(type));
+    for (const track of tracks) {
+        for (const dir of directions) {
+            if (track.includes(`a=${dir}`)) {
+                const lines = track.split('\n').map(line => line.trim());
+                const control = lines.find(line => line.startsWith('a=control:'));
+                return {
+                    section: 'm=' + track,
+                    trackId: control?.split('a=control:')?.[1],
+                };
+            }
+        }
+    }
 }
 
-export function parseTrackIds(sdp: string) {
-    const tracks = sdp.split('m=');
+type TrackDirection = 'sendonly' | 'sendrecv' | 'recvonly';
 
-    const audioTrack = tracks.find(track => track.startsWith('audio'));
-    const videoTrack = tracks.find(track => track.startsWith('video'));
+export function parseTrackIds(sdp: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
     return {
-        audio: getTrackId(audioTrack),
-        video: getTrackId(videoTrack),
+        audio: findTrack(sdp, 'audio', directions)?.trackId,
+        video: findTrack(sdp, 'video', directions)?.trackId,
     };
 }

@@ -95,6 +95,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;
     let isActive = true;
     const events = new EventEmitter();
+    // need this to prevent kill from throwing due to uncaught Error during cleanup
     events.on('error', e => console.error('rebroadcast error', e));
 
     let inputAudioCodec: string;
