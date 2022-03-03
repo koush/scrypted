@@ -32,10 +32,13 @@ addSupportedType({
         const codecs: AudioStreamingCodec[] = [];
         // homekit seems to prefer AAC_ELD if it is offered.
         // so forcing opus must be done by not offering AAC_ELD.
-        for (const type of [
+        const enabledAudioCodecTypes = [
             AudioStreamingCodecType.OPUS,
-            // AudioStreamingCodecType.AAC_ELD,
-        ]) {
+        ];
+        if (homekitSession.storage.getItem('forceOpus') !== 'true') {
+            enabledAudioCodecTypes.push(AudioStreamingCodecType.AAC_ELD);
+        }
+        for (const type of enabledAudioCodecTypes) {
             // force 24k, because various parts of the pipeline make that assumption.
             // off the top of my head:
             // 1) opus rtp timestamp mangling assumes 24k for the interval of 480

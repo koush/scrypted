@@ -109,6 +109,14 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 multiple: true,
                 combobox: true,
             },
+            {
+                key: 'forceOpus',
+                group: 'Performance',
+                title: 'Force Opus Audio Codec',
+                description: 'Adding or resetting a camera accessory will force HomeKit to use the Opus Audio codec rather than AAC-ELD.',
+                type: 'boolean',
+                value: this.storage.getItem('forceOpus') !== 'false',
+            }
         ]
     }
 
