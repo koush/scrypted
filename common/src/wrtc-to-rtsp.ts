@@ -10,12 +10,13 @@ import { RTCSessionControl, ScryptedDeviceBase } from "@scrypted/sdk";
 // h264 baseline and opus are required codecs that all webrtc implementations must provide.
 function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
     let outputSdp = sdp
-        .replace(/c=IN .*?/, `c=IN IP4 127.0.0.1`)
+        .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
         .replace(/m=audio \d+/, `m=audio ${audioPort}`)
         .replace(/m=video \d+/, `m=video ${videoPort}`);
 
     let lines = outputSdp.split('\n').map(line => line.trim());
     lines = lines
+    .filter(line => !line.includes('a=rtcp-mux'))
         .filter(line => !line.includes('a=candidate'))
         .filter(line => !line.includes('a=ice'));
 
@@ -24,10 +25,15 @@ function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
     const aindex = lines.findIndex(line => line.startsWith('m=audio'));
     lines.splice(aindex + 1, 0, 'a=control:trackID=audio');
     outputSdp = lines.join('\r\n')
+
+    outputSdp = outputSdp.split('m=')
+    .slice(1)
+    .map(line => 'm=' + line)
+    .join('');
     return outputSdp;
 }
 
-const useUdp = false;
+const useUdp = true;
 
 export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamOptions {
     return {
@@ -87,9 +93,39 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                         mimeType: "audio/opus",
                         clockRate: 48000,
                         channels: 2,
-                    })
+                    }),
+                    // new RTCRtpCodecParameters({
+                    //     mimeType: "audio/opus",
+                    //     clockRate: 8000,
+                    //     channels: 1,
+                    // }),
+                    // new RTCRtpCodecParameters({
+                    //     mimeType: "audio/PCMU",
+                    //     clockRate: 8000,
+                    //     channels: 1,
+                    // }),
+                    // new RTCRtpCodecParameters({
+                    //     mimeType: "audio/PCMA",
+                    //     clockRate: 8000,
+                    //     channels: 1,
+                    // }),
                 ],
                 video: [
+                    // h264 high
+                    // new RTCRtpCodecParameters(
+                    //     {
+                    //         clockRate: 90000,
+                    //         mimeType: "video/H264",
+                    //         rtcpFeedback: [
+                    //             { type: "transport-cc" },
+                    //             { type: "ccm", parameter: "fir" },
+                    //             { type: "nack" },
+                    //             { type: "nack", parameter: "pli" },
+                    //             { type: "goog-remb" },
+                    //         ],
+                    //         parameters: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f"
+                    //     },
+                    // ),
                     new RTCRtpCodecParameters({
                         mimeType: "video/H264",
                         clockRate: 90000,
@@ -139,7 +175,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                     }
                     rtspServer.sendAudio(rtp.serialize(), false);
                 });
-                track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendAudio(rtcp.serialize(), true));
+                // track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendAudio(rtcp.serialize(), true));
             });
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
@@ -151,12 +187,12 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                     }
                     rtspServer.sendVideo(rtp.serialize(), false);
                 });
-                track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendVideo(rtcp.serialize(), true));
+                // track.onReceiveRtcp.subscribe(rtcp => rtspServer.sendVideo(rtcp.serialize(), true));
                 // what is this for? it was in the example code, but as far as i can tell, it doesn't
                 // actually do anything?
-                track.onReceiveRtp.once(() => {
-                    pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
-                });
+                // track.onReceiveRtp.once(() => {
+                //     pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
+                // });
             });
         }
 
@@ -177,6 +213,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
 
                 if (type === 'answer') {
                     let answer = await pc.createAnswer();
+                    console.log(answer.sdp);
                     const set = pc.setLocalDescription(answer);
                     if (sendIceCandidate)
                         return answer as any;
@@ -187,6 +224,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                 }
                 else {
                     let offer = await pc.createOffer();
+                    // console.log(offer.sdp);
                     const set = pc.setLocalDescription(offer);
                     if (sendIceCandidate)
                         return offer as any;
@@ -200,6 +238,7 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                 if (description.type === 'offer')
                     doSetup(setup);
                 rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
+                console.log('rtsp sdp', rtspServer.sdp);
 
                 if (useUdp) {
                     rtspServer.udpPorts = {

@@ -11,7 +11,7 @@ export async function startRTCSignalingSession(session: RTCSignalingClientSessio
         if (!offer) {
             console.log('session.createLocalDescription');
             const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-            console.log('rtc offer received');
+            console.log('rtc offer created');
             const answer = await setRemoteDescription(offer);
             console.log('rtc answer received');
             await session.setRemoteDescription(answer, setup);
@@ -22,7 +22,7 @@ export async function startRTCSignalingSession(session: RTCSignalingClientSessio
             await session.setRemoteDescription(offer, setup);
             console.log('session.createLocalDescription');
             const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-            console.log('rtc answer received');
+            console.log('rtc answer created');
             await setRemoteDescription(answer);
             console.log('session.setRemoteDescription done');
         }
