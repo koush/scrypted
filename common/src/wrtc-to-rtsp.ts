@@ -312,11 +312,16 @@ export async function createRTCPeerConnectionSource(options: {
                 // is only used by udp, i think? unsure. but it causes severe jitter
                 // when there are late or missing packets.
                 // the jitter buffer should be on the actual rendering side.
-                // using this in udp/sdp mode with rebroadcast busted
-                // the stream to an irrecoverable state.
+
+                // using this managed to bust parsing rebroadcast permanently.
+                // unclear if it was recoverable, seems not.
                 // not actually sure that was the cause, because it worked again
-                // later.
-                "-max_delay", "0",
+                // later. have not seen the issue since.
+
+                // using this this also causes major issues with mp4 muxing, wherein
+                // entire seconds are chopped.
+
+                // "-max_delay", "0",
 
                 '-i', url,
             ]
@@ -329,10 +334,10 @@ export async function createRTCPeerConnectionSource(options: {
             mediaStreamOptions,
             inputArguments: [
                 "-rtsp_transport", "tcp",
-                // hint to ffmpeg for how long to wait for out of order packets.
-                // is only used by udp, i think? unsure. but it causes severe jitter
-                // when there are late or missing packets.
-                // the jitter buffer should be on the actual rendering side.
+                // see above for udp comments.
+                // unclear what this does in tcp. out of order packets in a tcp
+                // stream probably breaks things.
+                // should possibly use the werift jitter buffer in tcp mode to accomodate.
                 "-max_delay", "0",
                 '-i', url,
             ]
