@@ -1,5 +1,5 @@
 import { FFMpegInput, ScryptedDevice, ScryptedMimeTypes, VideoCamera, MediaStreamOptions } from '@scrypted/sdk'
-import { AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
+import { AudioStreamingSamplerate, AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
 
 import sdk from '@scrypted/sdk';
 import child_process from 'child_process';
@@ -180,10 +180,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 };
 
                 const mangler = await createBindZero();
+
                 const sender = createCameraStreamSender(aconfig, mangler.server,
                     session.audiossrc, session.startRequest.audio.pt,
                     session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
-                    session.startRequest.audio.rtcp_interval, session.startRequest.audio.packet_time,
+                    session.startRequest.audio.rtcp_interval,
+                    session.startRequest.audio.packet_time,
+                    session.startRequest.audio.sample_rate,
                 );
                 session.opusMangler = mangler.server;
                 mangler.server.on('message', data => {

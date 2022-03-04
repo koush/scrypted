@@ -1,5 +1,4 @@
 
-import sdk from '@scrypted/sdk';
 import dgram from 'dgram';
 
 
@@ -9,8 +8,9 @@ import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/r
 import { RtcpSenderInfo, RtcpSrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/sr';
 import { Config } from '../../../../../external/werift/packages/rtp/src/srtp/session';
 import { ntpTime } from './camera-utils';
+import { AudioStreamingSamplerate } from '../../hap';
 
-export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, audioPacketTime?: number) {
+export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, audioPacketTime?: number, audioSampleRate?: AudioStreamingSamplerate) {
     const srtpSession = new SrtpSession(config);
     const srtcpSession = new SrtcpSession(config);
 
@@ -19,6 +19,19 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
     let octetCount = 0;
     let lastRtcp = 0;
     let firstSequenceNumber = 0;
+
+    let audioIntervalScale = 1;
+    if (audioPacketTime) {
+        switch (audioSampleRate) {
+            case AudioStreamingSamplerate.KHZ_24:
+                audioIntervalScale = 3;
+                break;
+            case AudioStreamingSamplerate.KHZ_16:
+                audioIntervalScale = 2;
+                break;
+        }
+        audioIntervalScale = audioIntervalScale * audioPacketTime / 20;
+    }
 
     return (rtp: RtpPacket) => {
         const now = Date.now();
@@ -38,14 +51,13 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
             // from HAP spec:
             // RTP Payload Format for Opus Speech and Audio Codec RFC 7587 with an exception
             // that Opus audio RTP Timestamp shall be based on RFC 3550.
-            // RFC 3550 indicates that 24k audio (which we advertise to HAP and it requests),
-            // should have an interval of 480 when the packet time is 20.
+            // RFC 3550 indicates that PCM audio based with a sample rate of 8k and a packet
+            // time of 20ms would have a monotonic interval of 8k / (1000 / 20) = 160.
+            // So 24k audio would have a monotonic interval of (24k / 8k) * 160 = 480.
             // HAP spec also states that it may request packet times of 20, 30, 40, or 60.
-            // In practice, it requests 20 on LAN and 60 over LTE.
+            // In practice, HAP has been seen to request 20 on LAN and 60 over LTE.
             // So the RTP timestamp must scale accordingly.
-            // TODO: Support more sample rates from Opus besides 24k, to possibly
-            // codec copy and repacketize?
-            rtp.header.timestamp = firstTimestamp + packetCount * 480 * audioPacketTime / 20;
+            rtp.header.timestamp = firstTimestamp + packetCount * 180 * audioIntervalScale;
         }
 
         lastTimestamp = rtp.header.timestamp;
