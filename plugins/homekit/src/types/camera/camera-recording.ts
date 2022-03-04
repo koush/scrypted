@@ -9,6 +9,8 @@ import { FFMpegFragmentedMP4Session, startFFMPegFragmentedMP4Session } from '@sc
 import { evalRequest } from './camera-transcode';
 import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
 import { Duplex } from 'stream';
+import { HomeKitSession } from '../../common';
+// const fs = require('realfs');
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -16,7 +18,7 @@ const { log, mediaManager, deviceManager } = sdk;
 export const iframeIntervalSeconds = 4;
 
 export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console): AsyncGenerator<Buffer, void, unknown> {
+    configuration: CameraRecordingConfiguration, console: Console, homekitSession: HomeKitSession): AsyncGenerator<Buffer, void, unknown> {
 
     console.log(device.name, 'recording session starting', configuration);
 
@@ -78,7 +80,6 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
 
         inputArguments.push(...ffmpegInput.inputArguments)
 
-
         if (noAudio) {
             console.log(device.name, 'adding dummy audio track');
             // create a dummy audio track if none actually exists.
@@ -91,9 +92,16 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         if (noAudio || transcodeRecording || isDefinitelyNotAAC) {
             if (!(noAudio || transcodeRecording))
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
+
+            let aacLowEncoder = 'aac';
+            const forceOpus = homekitSession.storage.getItem('forceOpus') !== 'false';
+            if (!forceOpus) {
+                aacLowEncoder = 'libfdk_aac';
+            }
+
             audioArgs = [
                 ...(configuration.audioCodec.type === AudioRecordingCodecType.AAC_LC ?
-                    ['-acodec', 'aac', '-profile:a', 'aac_low'] :
+                    ['-acodec', aacLowEncoder, '-profile:a', 'aac_low'] :
                     ['-acodec', 'libfdk_aac', '-profile:a', 'aac_eld']),
                 '-ar', `${AudioRecordingSamplerateValues[configuration.audioCodec.samplerate]}k`,
                 '-b:a', `${configuration.audioCodec.bitrate}k`,
@@ -141,6 +149,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     let pending: Buffer[] = [];
     try {
         let i = 0;
+        console.time(`${device.name} mp4 recording`);
         // if ffmpeg is being used to parse a prebuffered stream that is NOT mp4 (despite our request),
         // it seems that ffmpeg outputs a bad first fragment. it may be missing various codec informations or
         // starting on a non keyframe. unsure, so skip that one.
@@ -149,7 +158,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         let needSkip = ffmpegInput.mediaStreamOptions?.prebuffer && ffmpegInput.container !== 'mp4';
         for await (const box of generator) {
             const { header, type, data } = box;
-            // console.log('motion fragment box', type);
+            console.log('motion fragment box', type);
 
             // every moov/moof frame designates an iframe?
             pending.push(header, data);
@@ -163,6 +172,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
                 const fragment = Buffer.concat(pending);
                 pending = [];
                 console.log(`motion fragment #${++i} sent. size:`, fragment.length);
+                // fs.writeFileSync(`/tmp/${device.id}-${i.toString().padStart(2, '0')}.mp4`, fragment);
                 yield fragment;
             }
         }
@@ -172,6 +182,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         console.log(`motion recording complete ${e}`);
     }
     finally {
+        console.timeEnd(`${device.name} mp4 recording`);
         socket?.destroy();
         cp?.kill('SIGKILL');
     }

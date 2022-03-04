@@ -1,6 +1,6 @@
 import { Camera, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, AudioSensor, Intercom, ObjectsDetected, VideoCameraConfiguration, OnOff } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
-import { CameraRecordingDelegate, AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, SRTPCryptoSuites } from '../hap';
+import { AudioBitrate, CameraRecordingDelegate, AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, SRTPCryptoSuites } from '../hap';
 import { makeAccessory } from './common';
 
 import sdk from '@scrypted/sdk';
@@ -27,31 +27,42 @@ addSupportedType({
         // webrtc cameras (like ring and nest) must provide opus.
         // use this hint to force opus usage. even if opus is not returned,
         // for whatever reason, it will be transcoded to opus and that path will be used.
-        const forceOpus = true;
+        const forceOpus = homekitSession.storage.getItem('forceOpus') !== 'false';
 
         const codecs: AudioStreamingCodec[] = [];
         // homekit seems to prefer AAC_ELD if it is offered.
         // so forcing opus must be done by not offering AAC_ELD.
-        const enabledAudioCodecTypes = [
+        const enabledStreamingCodecTypes = [
             AudioStreamingCodecType.OPUS,
         ];
-        if (homekitSession.storage.getItem('forceOpus') !== 'true') {
-            enabledAudioCodecTypes.push(AudioStreamingCodecType.AAC_ELD);
+        if (!forceOpus) {
+            enabledStreamingCodecTypes.push(AudioStreamingCodecType.AAC_ELD);
         }
-        for (const type of enabledAudioCodecTypes) {
+        for (const type of enabledStreamingCodecTypes) {
+            // todo: fix this. at some point we were forcing 24k for opus regarding
+            // this comment:
+
             // force 24k, because various parts of the pipeline make that assumption.
             // off the top of my head:
             // 1) opus rtp timestamp mangling assumes 24k for the interval of 480
             // 2) opus and aac_eld talkback generates an sdp with 24k
             for (const samplerate of [
-                // AudioStreamingSamplerate.KHZ_8,
-                // AudioStreamingSamplerate.KHZ_16,
+                AudioStreamingSamplerate.KHZ_8,
+                AudioStreamingSamplerate.KHZ_16,
                 AudioStreamingSamplerate.KHZ_24
             ]) {
                 codecs.push({
                     type,
                     samplerate,
+                    // AudioBitrate.VARIABLE
                     bitrate: 0,
+                    audioChannels: 1,
+                });
+                codecs.push({
+                    type,
+                    samplerate,
+                    // AudioBitrate.CONSTANT
+                    bitrate: 1,
                     audioChannels: 1,
                 });
             }
@@ -104,22 +115,32 @@ addSupportedType({
                 handleFragmentsRequests(connection: DataStreamConnection): AsyncGenerator<Buffer, void, unknown> {
                     homekitSession.detectedHomeKitHub(connection.remoteAddress);
                     const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
-                    return handleFragmentsRequests(device, configuration, console)
+                    return handleFragmentsRequests(device, configuration, console, homekitSession)
                 }
             };
 
             const recordingCodecs: AudioRecordingCodec[] = [];
             const samplerate: AudioRecordingSamplerate[] = [];
-            for (const sr of [AudioRecordingSamplerate.KHZ_32]) {
+            for (const sr of [
+                AudioRecordingSamplerate.KHZ_8,
+                AudioRecordingSamplerate.KHZ_16,
+                AudioRecordingSamplerate.KHZ_24,
+                AudioRecordingSamplerate.KHZ_32,
+                AudioRecordingSamplerate.KHZ_44_1,
+                AudioRecordingSamplerate.KHZ_48,
+            ]) {
                 samplerate.push(sr);
             }
 
             // homekit seems to prefer AAC_ELD if it is offered.
             // so forcing AAC_LC must be done by not offering AAC_ELD.
-            for (const type of [
+            const enabledRecordingCodecTypes = [
                 AudioRecordingCodecType.AAC_LC,
-                // AudioRecordingCodecType.AAC_ELD,
-            ]) {
+            ];
+            if (!forceOpus) {
+                enabledRecordingCodecTypes.push(AudioRecordingCodecType.AAC_ELD);
+            }
+            for (const type of enabledRecordingCodecTypes) {
                 const entry: AudioRecordingCodec = {
                     type,
                     bitrateMode: 0,
