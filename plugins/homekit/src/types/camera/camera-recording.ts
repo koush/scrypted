@@ -149,7 +149,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     let pending: Buffer[] = [];
     try {
         let i = 0;
-        console.time(`${device.name} mp4 recording`);
+        console.time('mp4 recording');
         // if ffmpeg is being used to parse a prebuffered stream that is NOT mp4 (despite our request),
         // it seems that ffmpeg outputs a bad first fragment. it may be missing various codec informations or
         // starting on a non keyframe. unsure, so skip that one.
@@ -158,7 +158,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         let needSkip = ffmpegInput.mediaStreamOptions?.prebuffer && ffmpegInput.container !== 'mp4';
         for await (const box of generator) {
             const { header, type, data } = box;
-            console.log('motion fragment box', type);
+            // console.log('motion fragment box', type);
 
             // every moov/moof frame designates an iframe?
             pending.push(header, data);
@@ -182,7 +182,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         console.log(`motion recording complete ${e}`);
     }
     finally {
-        console.timeEnd(`${device.name} mp4 recording`);
+        console.timeEnd('mp4 recording');
         socket?.destroy();
         cp?.kill('SIGKILL');
     }

@@ -8,8 +8,8 @@ const { log, systemManager, deviceManager } = sdk;
 export const defaultObjectDetectionContactSensorTimeout = 60;
 
 export class CameraMixin extends HomekitMixin<any> {
-    constructor(mixinDevice: any, mixinDeviceState: { [key: string]: any }, options: SettingsMixinDeviceOptions) {
-        super(mixinDevice, mixinDeviceState, options);
+    constructor(options: SettingsMixinDeviceOptions<VideoCamera>) {
+        super(options);
     }
 
     async getMixinSettings(): Promise<Setting[]> {

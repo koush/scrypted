@@ -13,6 +13,7 @@ import { getHAPUUID, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin } from './homekit-mixin';
 import { sleep } from '@scrypted/common/src/sleep';
 import os from 'os';
+import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -393,20 +394,21 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
-        const options = {
-            providerNativeId: this.nativeId,
+        const options: SettingsMixinDeviceOptions<any> = {
+            mixinProviderNativeId: this.nativeId,
             mixinDeviceInterfaces,
             group: "HomeKit Settings",
             groupKey: "homekit",
+            mixinDevice, mixinDeviceState,
         };
         let ret: CameraMixin | HomekitMixin<any>;
 
         if ((mixinDeviceState.type === ScryptedDeviceType.Camera || mixinDeviceState.type === ScryptedDeviceType.Doorbell)
             && mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera)) {
-            ret = new CameraMixin(mixinDevice, mixinDeviceState, options);
+            ret = new CameraMixin(options);
         }
         else {
-            ret = new HomekitMixin(mixinDevice, mixinDeviceState, options);
+            ret = new HomekitMixin(options);
         }
 
         if (ret.storageSettings.values.standalone) {

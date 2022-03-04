@@ -12,7 +12,7 @@ import ws from 'websocket-stream';
 import http from 'http';
 import { MqttDeviceBase } from './api/mqtt-device-base';
 import { MqttAutoDiscoveryProvider } from './autodiscovery/autodiscovery';
-import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
 import { connect, Client } from 'mqtt';
 import { isPublishable } from './publishable-types';
 import { createScriptDevice, ScriptDeviceImpl } from '@scrypted/common/src/eval/scrypted-eval';
@@ -151,13 +151,8 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
     device: ScryptedDevice;
     listener: EventListenerRegister;
 
-    constructor(public provider: MqttProvider, mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
-        super(mixinDevice, mixinDeviceState, {
-            mixinDeviceInterfaces,
-            providerNativeId: undefined,
-            group: 'MQTT',
-            groupKey: 'mqtt',
-        });
+    constructor(public provider: MqttProvider, options: SettingsMixinDeviceOptions<any>) {
+        super(options);
 
         this.device = systemManager.getDeviceById(this.id);
         this.connectClient();
@@ -268,7 +263,7 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         return this.client;
     }
 
-    release() {
+    async release() {
         this.client?.end();
         this.client = undefined;
         this.listener?.removeListener();
@@ -456,7 +451,14 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        return new MqttPublisherMixin(this, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
+        return new MqttPublisherMixin(this, {
+            mixinDevice,
+            mixinDeviceState,
+            mixinDeviceInterfaces,
+            mixinProviderNativeId: this.nativeId,
+            group: 'MQTT',
+            groupKey: 'mqtt',
+        });
     }
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {

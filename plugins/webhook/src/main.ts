@@ -197,9 +197,11 @@ class WebhookPlugin extends ScryptedDeviceBase implements Settings, MixinProvide
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        const ret = new WebhookMixin(mixinDevice, mixinDeviceState, {
+        const ret = new WebhookMixin({
+            mixinDevice,
+            mixinDeviceState,
             mixinDeviceInterfaces,
-            providerNativeId: this.nativeId,
+            mixinProviderNativeId: this.nativeId,
             group: "Webhook",
             groupKey: "webhook",
         });

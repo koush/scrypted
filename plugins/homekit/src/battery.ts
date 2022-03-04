@@ -8,7 +8,7 @@ export function maybeAddBatteryService(device: ScryptedDevice & Battery, accesso
 
     const battery = new HAPBattery();
     bindCharacteristic(device, ScryptedInterface.Battery, battery, Characteristic.BatteryLevel, () => {
-        return device.batteryLevel || 0;
+        return Math.min(Math.max(0, device.batteryLevel), 100) || 0;
     });
 
     bindCharacteristic(device, ScryptedInterface.Battery, battery, Characteristic.StatusLowBattery, () => {
