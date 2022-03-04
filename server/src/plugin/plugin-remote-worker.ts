@@ -29,8 +29,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
 
         const methods = [
             'log', 'warn',
-            'dir', 'time',
-            'timeEnd', 'timeLog',
+            'dir', 'timeLog',
             'trace', 'assert',
             'clear', 'count',
             'countReset', 'group',
