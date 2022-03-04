@@ -29,6 +29,10 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingChannel & VideoCam
     }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera) && options?.id !== 'webrtc') {
+            return this.mixinDevice.getVideoStream(options);
+        }
+
         const ffmpegInput = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
