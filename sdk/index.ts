@@ -54,22 +54,37 @@ export class ScryptedDeviceBase extends DeviceBase {
   }
 }
 
+export interface MixinDeviceOptions<T> {
+  mixinDevice: T;
+  mixinProviderNativeId: ScryptedNativeId;
+  mixinDeviceInterfaces: ScryptedInterface[];
+  mixinStorageSuffix?: string;
+  mixinDeviceState: DeviceState;
+}
 
 export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
+  mixinProviderNativeId: ScryptedNativeId;
+  mixinDevice: T;
+  mixinDeviceInterfaces: ScryptedInterface[];
   private _storage: Storage;
+  private mixinStorageSuffix: string;
   private _log: Logger;
   private _console: Console;
   private _deviceState: DeviceState;
   private _listeners = new Set<EventListenerRegister>();
 
-  constructor(public mixinDevice: T, public mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, public mixinProviderNativeId: ScryptedNativeId, private _mixinStorageSuffix?: string) {
+  constructor(options: MixinDeviceOptions<T>) {
     super();
-    this._deviceState = mixinDeviceState;
+    this.mixinDevice = options.mixinDevice;
+    this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
+    this.mixinStorageSuffix = options.mixinStorageSuffix;
+    this._deviceState = options.mixinDeviceState;
+    this.mixinProviderNativeId = options.mixinProviderNativeId;
   }
 
   get storage() {
     if (!this._storage) {
-      const mixinStorageSuffix = this._mixinStorageSuffix;
+      const mixinStorageSuffix = this.mixinStorageSuffix;
       const mixinStorageKey = this.id + (mixinStorageSuffix ? ':' + mixinStorageSuffix : '');
       this._storage = deviceManager.getMixinStorage(mixinStorageKey, this.mixinProviderNativeId);
     }

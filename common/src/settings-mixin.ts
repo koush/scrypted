@@ -1,22 +1,19 @@
-import { Settings, Setting, MixinDeviceBase, ScryptedInterface, SettingValue } from "@scrypted/sdk";
+import { Settings, Setting, MixinDeviceBase, ScryptedInterface, SettingValue, MixinDeviceOptions } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 
 const { deviceManager } = sdk;
 
-export interface SettingsMixinDeviceOptions {
-    providerNativeId: string;
-    mixinDeviceInterfaces: ScryptedInterface[];
+export interface SettingsMixinDeviceOptions<T> extends MixinDeviceOptions<T> {
     group: string;
     groupKey: string;
-    mixinStorageSuffix?: string;
 }
 
 export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Settings> implements Settings {
     settingsGroup: string;
     settingsGroupKey: string;
 
-    constructor(mixinDevice: any, mixinDeviceState: { [key: string]: any }, options: SettingsMixinDeviceOptions) {
-        super(mixinDevice, options.mixinDeviceInterfaces, mixinDeviceState, options.providerNativeId, options.mixinStorageSuffix);
+    constructor(options: SettingsMixinDeviceOptions<T & Settings>) {
+        super(options);
 
         this.settingsGroup = options.group;
         this.settingsGroupKey = options.groupKey;

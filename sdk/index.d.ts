@@ -18,17 +18,24 @@ export declare class ScryptedDeviceBase extends DeviceBase {
      */
     onDeviceEvent(eventInterface: string, eventData: any): Promise<void>;
 }
+export interface MixinDeviceOptions<T> {
+    mixinDevice: T;
+    mixinProviderNativeId: ScryptedNativeId;
+    mixinDeviceInterfaces: ScryptedInterface[];
+    mixinStorageSuffix?: string;
+    mixinDeviceState: DeviceState;
+}
 export declare class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
+    mixinProviderNativeId: ScryptedNativeId;
     mixinDevice: T;
     mixinDeviceInterfaces: ScryptedInterface[];
-    mixinProviderNativeId: ScryptedNativeId;
-    private _mixinStorageSuffix?;
     private _storage;
+    private mixinStorageSuffix;
     private _log;
     private _console;
     private _deviceState;
     private _listeners;
-    constructor(mixinDevice: T, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId, _mixinStorageSuffix?: string);
+    constructor(options: MixinDeviceOptions<T>);
     get storage(): Storage;
     get console(): Console;
     /**

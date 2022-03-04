@@ -55,18 +55,18 @@ class ScryptedDeviceBase extends index_1.DeviceBase {
 }
 exports.ScryptedDeviceBase = ScryptedDeviceBase;
 class MixinDeviceBase extends index_1.DeviceBase {
-    constructor(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId, _mixinStorageSuffix) {
+    constructor(options) {
         super();
-        this.mixinDevice = mixinDevice;
-        this.mixinDeviceInterfaces = mixinDeviceInterfaces;
-        this.mixinProviderNativeId = mixinProviderNativeId;
-        this._mixinStorageSuffix = _mixinStorageSuffix;
         this._listeners = new Set();
-        this._deviceState = mixinDeviceState;
+        this.mixinDevice = options.mixinDevice;
+        this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
+        this.mixinStorageSuffix = options.mixinStorageSuffix;
+        this._deviceState = options.mixinDeviceState;
+        this.mixinProviderNativeId = options.mixinProviderNativeId;
     }
     get storage() {
         if (!this._storage) {
-            const mixinStorageSuffix = this._mixinStorageSuffix;
+            const mixinStorageSuffix = this.mixinStorageSuffix;
             const mixinStorageKey = this.id + (mixinStorageSuffix ? ':' + mixinStorageSuffix : '');
             this._storage = deviceManager.getMixinStorage(mixinStorageKey, this.mixinProviderNativeId);
         }

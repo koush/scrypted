@@ -1,10 +1,12 @@
 import { RTCAVSignalingSetup, RTCSignalingChannel, FFMpegInput, MediaStreamOptions } from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "./listen-cluster";
-import { RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
+import { RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpCodecParameters } from "@koush/werift";
 import dgram from 'dgram';
 import { RtspServer } from "./rtsp-server";
 import { Socket } from "net";
-import { RTCSessionControl, ScryptedDeviceBase } from "@scrypted/sdk";
+import { RTCSessionControl, RTCSignalingSession } from "@scrypted/sdk";
+import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
+import { RpcPeer } from "../../server/src/rpc";
 
 // this is an sdp corresponding to what is requested from webrtc.
 // h264 baseline and opus are required codecs that all webrtc implementations must provide.
@@ -16,7 +18,7 @@ function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
 
     let lines = outputSdp.split('\n').map(line => line.trim());
     lines = lines
-    .filter(line => !line.includes('a=rtcp-mux'))
+        .filter(line => !line.includes('a=rtcp-mux'))
         .filter(line => !line.includes('a=candidate'))
         .filter(line => !line.includes('a=ice'));
 
@@ -27,13 +29,13 @@ function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
     outputSdp = lines.join('\r\n')
 
     outputSdp = outputSdp.split('m=')
-    .slice(1)
-    .map(line => 'm=' + line)
-    .join('');
+        .slice(1)
+        .map(line => 'm=' + line)
+        .join('');
     return outputSdp;
 }
 
-const useUdp = true;
+const useUdp = false;
 
 export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamOptions {
     return {
@@ -52,8 +54,12 @@ export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamO
     };
 }
 
-export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase & RTCSignalingChannel, id: string): Promise<FFMpegInput> {
-    const { console, name } = channel;
+export async function createRTCPeerConnectionSource(options: {
+    console: Console,
+    mediaStreamOptions: MediaStreamOptions,
+    channel: RTCSignalingChannel,
+}): Promise<FFMpegInput> {
+    const { mediaStreamOptions, channel, console } = options;
     const videoPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
     const audioPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
 
@@ -193,10 +199,31 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                 // track.onReceiveRtp.once(() => {
                 //     pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
                 // });
+
+                track.onReceiveRtp.once(() => {
+                    let firSequenceNumber = 0;
+                    pictureLossInterval = setInterval(() => {
+                        const fir = new FullIntraRequest({
+                            senderSsrc: videoTransceiver.receiver.rtcpSsrc,
+                            mediaSsrc: track.ssrc,
+                            fir: [
+                                {
+                                    sequenceNumber: firSequenceNumber++,
+                                    ssrc: track.ssrc,
+                                }
+                            ]
+                        });
+                        const packet = new RtcpPayloadSpecificFeedback({
+                            feedback: fir,
+                        });
+                        videoTransceiver.receiver.dtlsTransport.sendRtcp([packet]);
+                    }, 4000);
+                });
             });
         }
 
         sessionControl = await channel.startRTCSignalingSession({
+            [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
             createLocalDescription: async (type, setup, sendIceCandidate) => {
                 if (type === 'offer')
                     doSetup(setup);
@@ -220,7 +247,10 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                     await set;
                     await gatheringPromise;
                     answer = pc.localDescription || answer;
-                    return answer as any;
+                    return {
+                        sdp: answer.sdp,
+                        type: answer.type,
+                    };
                 }
                 else {
                     let offer = await pc.createOffer();
@@ -231,7 +261,10 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
                     await set;
                     await gatheringPromise;
                     offer = await pc.createOffer();
-                    return offer as any;
+                    return {
+                        sdp: offer.sdp,
+                        type: offer.type,
+                    };
                 }
             },
             setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
@@ -259,12 +292,11 @@ export async function createRTCPeerConnectionSource(channel: ScryptedDeviceBase 
             addIceCandidate: async (candidate: RTCIceCandidateInit) => {
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
             },
-        });
+        } as RTCSignalingSession);
     })
         .catch(e => cleanup);
 
 
-    const mediaStreamOptions = getRTCMediaStreamOptions(id, name);
     if (useUdp) {
         const url = `tcp://127.0.0.1:${port}`;
 
