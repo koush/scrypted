@@ -1,4 +1,4 @@
-import { BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingChannelOptions, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { RTCSignalingClientSession, BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { RingApi, RingCamera, RingRestClient } from './ring-client-api';
 import { StorageSettings } from '../../..//common/src/settings';
@@ -9,7 +9,6 @@ import { generateUuid } from './ring-client-api';
 import { clientApi } from './ring-client-api';
 import { LiveCallNegotiation } from './ring-client-api';
 import dgram from 'dgram';
-import { LiveCall } from '@koush/ring-client-api';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
@@ -76,7 +75,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         return this.storageSettings.putSetting(key, value);
     }
 
-    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingChannelOptions): Promise<RTCSessionControl> {
+    async startRTCSignalingSession(session: RTCSignalingClientSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl> {
         const camera = this.findCamera();
 
         let sessionControl: RTCSessionControl;
