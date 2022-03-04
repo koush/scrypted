@@ -5,7 +5,7 @@ import { findTrack } from "@scrypted/common/src/sdp-utils";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import child_process from 'child_process';
 
-const { mediaManager, systemManager, deviceManager } = sdk;
+const { mediaManager } = sdk;
 
 export class OnvifIntercom implements Intercom {
     intercomClient: RtspClient;
@@ -29,10 +29,11 @@ export class OnvifIntercom implements Intercom {
         const describe = await this.intercomClient.describe({
             Require,
         });
+        this.camera.console.log('ONVIF Backchannel SDP:');
+        this.camera.console.log(describe.body?.toString());
         const audioBackchannel = findTrack(describe.body.toString(), 'audio', ['sendonly']);
         if (!audioBackchannel)
             throw new Error('ONVIF audio backchannel not found');
-
 
         this.camera.console.log('audio back channel track:', audioBackchannel);
 
@@ -60,7 +61,6 @@ export class OnvifIntercom implements Intercom {
         const { server_port } = transportDict;
         const serverPorts = server_port.split('-');
         const serverRtp = parseInt(serverPorts[0]);
-        const serverRtcp = parseInt(serverPorts[1]);
 
         const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
@@ -80,7 +80,6 @@ export class OnvifIntercom implements Intercom {
 
         ffmpegLogInitialOutput(this.camera.console, cp);
 
-        const play = await this.intercomClient.play();
         this.camera.console.log('intercom playing');
     }
 

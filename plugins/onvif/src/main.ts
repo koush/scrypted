@@ -1,11 +1,7 @@
-import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetector, ObjectDetectionTypes, ObjectsDetected, Settings, Intercom, SettingValue, FFMpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetector, ObjectDetectionTypes, ObjectsDetected, Settings, Intercom, SettingValue } from "@scrypted/sdk";
 import { EventEmitter, Stream } from "stream";
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
-import { RtspClient } from "@scrypted/common/src/rtsp-server";
-import { findTrack } from "@scrypted/common/src/sdp-utils";
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
-import child_process from 'child_process';
 import xml2js from 'xml2js';
 import onvif from 'onvif';
 import { OnvifIntercom } from "./onvif-intercom";
