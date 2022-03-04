@@ -1312,6 +1312,8 @@ export interface RTCSignalingClientOptions {
 }
 
 export interface RTCSessionControl {
+  getRefreshAt(): Promise<number|void>;
+  extendSession(): Promise<void>;
   endSession(): Promise<void>;
 }
 

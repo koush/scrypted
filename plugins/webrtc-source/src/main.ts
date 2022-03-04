@@ -13,17 +13,27 @@ const supportedTypes = [
 
 class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingChannel & VideoCamera> implements VideoCamera {
     storageSettings = new StorageSettings(this, {
+        useUdp: {
+            title: 'Use SDP/UDP instead of RTSP/TCP',
+            description: 'Experimental',
+            type: 'boolean',
+        }
     });
 
     constructor(options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera>) {
         super(options)
     }
 
+    createVideoStreamOptions() {
+        return getRTCMediaStreamOptions('webrtc', 'WebRTC', this.storageSettings.values.useUdp);
+    }
+
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         const ffmpegInput = await createRTCPeerConnectionSource({
             console: this.console,
-            mediaStreamOptions: getRTCMediaStreamOptions('webrtc', 'WebRTC'),
+            mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
+            useUdp: this.storageSettings.values.useUdp,
         });
 
         return mediaManager.createFFmpegMediaObject(ffmpegInput);
@@ -34,7 +44,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingChannel & VideoCam
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera)) {
             ret = await this.mixinDevice.getVideoStreamOptions();
         }
-        ret.push(getRTCMediaStreamOptions('webrtc', 'WebRTC'));
+        ret.push(this.createVideoStreamOptions());
         return ret;
     }
 
@@ -61,6 +71,7 @@ class WebRTCSourcePlugin extends AutoenableMixinProvider {
 
         return [
             ScryptedInterface.VideoCamera,
+            ScryptedInterface.Settings,
         ];
     }
 

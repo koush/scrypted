@@ -1,24 +1,18 @@
-import { RTCSignalingClientSession, BinarySensor, BufferConverter, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
-import { RingApi, RingCamera, RingRestClient } from './ring-client-api';
-import { StorageSettings } from '../../..//common/src/settings';
-import { ChildProcess } from 'child_process';
-import { createRTCPeerConnectionSource } from '../../../common/src/wrtc-to-rtsp';
-import { startRTCSignalingSession } from '../../../common/src/rtc-signaling';
-import { generateUuid } from './ring-client-api';
-import { clientApi } from './ring-client-api';
-import { LiveCallNegotiation } from './ring-client-api';
-import dgram from 'dgram';
+import sdk, { RTCSignalingClientSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { LiveCallNegotiation, clientApi, generateUuid, RingApi, RingCamera, RingRestClient } from './ring-client-api';
+import { StorageSettings } from '@scrypted/common/src/settings';
+import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-const RtcMediaStreamOptionsId = 'webrtc';
-
-const RingSignalingPrefix = ScryptedMimeTypes.RTCAVSignalingPrefix + 'ring/';
-const RingDeviceSignalingPrefix = RingSignalingPrefix + 'x-';
-
 class RingRTCSessionControl implements RTCSessionControl {
     constructor(public liveCallNegtation: LiveCallNegotiation) {
+    }
+
+    async getRefreshAt() {
+    }
+
+    async extendSession() {
     }
 
     async endSession() {
@@ -38,23 +32,10 @@ class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferConverter, DeviceProvider, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor, RTCSignalingChannel {
-    signalingMime: string;
-    webrtcSession: string;
-    audioOutForwarder: dgram.Socket;
-    audioOutProcess: ChildProcess;
-    ffmpegInput: FFMpegInput;
-    refreshTimeout: NodeJS.Timeout;
+class RingCameraDevice extends ScryptedDeviceBase implements Settings, DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel {
     storageSettings = new StorageSettings(this, {
-        motionTimeout: {
-            title: 'Motion Timeout',
-            description: 'The duration in seconds to wait before resetting the motion sensor.',
-            type: 'number',
-            defaultValue: 30,
-        }
     });
     buttonTimeout: NodeJS.Timeout;
-    motionTimeout: NodeJS.Timeout;
 
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
@@ -62,10 +43,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         this.binaryState = false;
         if (this.interfaces.includes(ScryptedInterface.Battery))
             this.batteryLevel = this.findCamera()?.batteryLevel;
-
-        this.signalingMime = RingDeviceSignalingPrefix + this.nativeId;
-        this.fromMimeType = this.signalingMime;
-        this.toMimeType = ScryptedMimeTypes.FFmpegInput;
     }
 
     getSettings(): Promise<Setting[]> {
@@ -151,12 +128,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
         return sessionControl;
     }
 
-    async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
-        const ff = await createRTCPeerConnectionSource(this, RtcMediaStreamOptionsId);
-        const buffer = Buffer.from(JSON.stringify(ff));
-        return buffer;
-    }
-
     getDevice(nativeId: string) {
         return new RingCameraLight(this);
     }
@@ -213,44 +184,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, BufferCon
 
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
-    }
-
-    async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-        const buffer = Buffer.from(this.id.toString());
-        return mediaManager.createMediaObject(buffer, this.signalingMime);
-    }
-
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-        return [
-            this.getWebRtcMediaStreamOptions(),
-        ]
-    }
-
-    getWebRtcMediaStreamOptions(): MediaStreamOptions {
-        return {
-            id: RtcMediaStreamOptionsId,
-            name: 'WebRTC',
-            container: this.signalingMime,
-            video: {
-                codec: 'h264',
-            },
-            audio: {
-                codec: 'opus',
-            },
-            source: 'cloud',
-            userConfigurable: false,
-        };
-    }
-
-    async startIntercom(media: MediaObject): Promise<void> {
-
-    }
-
-    async stopIntercom(): Promise<void> {
-        this.audioOutForwarder?.close();
-        this.audioOutProcess?.kill('SIGKILL');
-        this.audioOutProcess = undefined;
-        this.audioOutForwarder = undefined;
     }
 
     triggerBinaryState() {
@@ -407,10 +340,8 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             const nativeId = camera.id.toString();
             const interfaces = [
                 ScryptedInterface.Camera,
-                ScryptedInterface.VideoCamera,
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.Intercom,
-                ScryptedInterface.BufferConverter,
                 ScryptedInterface.RTCSignalingChannel,
                 ScryptedInterface.Settings,
             ];

@@ -22,7 +22,8 @@ export async function startFFMPegFragmentedMP4Session(inputArguments: string[], 
         'pipe:3',
     );
 
-    args.unshift('-hide_banner');
+    args.unshift('-hide_banner',
+    '-use_wallclock_as_timestamps', '1');
     console.log(args.join(' '));
 
     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {

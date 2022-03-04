@@ -35,9 +35,7 @@ function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
     return outputSdp;
 }
 
-const useUdp = false;
-
-export function getRTCMediaStreamOptions(id: string, name: string): MediaStreamOptions {
+export function getRTCMediaStreamOptions(id: string, name: string, useUdp: boolean): MediaStreamOptions {
     return {
         // set by consumer
         id,
@@ -58,8 +56,9 @@ export async function createRTCPeerConnectionSource(options: {
     console: Console,
     mediaStreamOptions: MediaStreamOptions,
     channel: RTCSignalingChannel,
+    useUdp: boolean,
 }): Promise<FFMpegInput> {
-    const { mediaStreamOptions, channel, console } = options;
+    const { mediaStreamOptions, channel, console, useUdp } = options;
     const videoPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
     const audioPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
 
