@@ -92,6 +92,16 @@ export function parseHeaders(headers: string[]): Headers {
     return ret;
 }
 
+export function parseSemicolonDelimited(value: string) {
+    const dict: { [key: string]: string } = {};
+    for (const part of value.split(';')) {
+        const [key, value] = part.split('=', 2);
+        dict[key] = value;
+    }
+
+    return dict;
+}
+
 export class RtspBase {
     client: net.Socket;
 
@@ -232,11 +242,7 @@ export class RtspClient extends RtspBase {
         };
         const response = await this.request('SETUP', headers, path)
         if (response.headers.session) {
-            const sessionDict: { [key: string]: string } = {};
-            for (const part of response.headers.session.split(';')) {
-                const [key, value] = part.split('=', 2);
-                sessionDict[key] = value;
-            }
+            const sessionDict = parseSemicolonDelimited(response.headers.session);
             let timeout = parseInt(sessionDict['timeout']);
             if (timeout) {
                 // if a timeout is requested, need to keep the session alive with periodic refresh.
