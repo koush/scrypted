@@ -2,7 +2,7 @@
 import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter, ResponseMediaStreamOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
-import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin";
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityTimer, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, MP4Atom, parseMp4StreamChunks } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
@@ -651,11 +651,10 @@ class PrebufferSession {
     const { rtspMode } = this.getRebroadcastMode();
     const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
-    const container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
+    let container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
 
     // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
-    // rewind a little bit earlier to gaurantee a full segment of that length
-    // is sent.
+    // rewind a little bit earlier to gaurantee a full segment of that length is sent.
     if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
       requestedPrebuffer += (this.detectedIdrInterval || 4000) * 1.5;
     }
@@ -830,13 +829,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   released = false;
   sessions = new Map<string, PrebufferSession>();
 
-  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
-    super(mixinDevice, mixinDeviceState, {
-      providerNativeId,
-      mixinDeviceInterfaces,
-      group: "Prebuffer Settings",
-      groupKey: "prebuffer",
-    });
+  constructor(options: SettingsMixinDeviceOptions<VideoCamera>) {
+    super(options);
 
     this.delayStart();
   }
@@ -1147,7 +1141,14 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
     this.setHasEnabledMixin(mixinDeviceState.id);
-    return new PrebufferMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
+    return new PrebufferMixin({
+      mixinDevice,
+      mixinDeviceState,
+      mixinProviderNativeId: this.nativeId,
+      mixinDeviceInterfaces,
+      group: "Prebuffer Settings",
+      groupKey: "prebuffer",
+    });
   }
   async releaseMixin(id: string, mixinDevice: any) {
     mixinDevice.online = true;
