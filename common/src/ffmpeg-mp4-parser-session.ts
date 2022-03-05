@@ -1,7 +1,7 @@
 import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
 import sdk from "@scrypted/sdk";
-import { ffmpegLogInitialOutput } from './media-helpers';
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
 import { MP4Atom, parseFragmentedMP4 } from './stream-parser';
 import { Duplex, Readable } from 'stream';
 
@@ -22,9 +22,8 @@ export async function startFFMPegFragmentedMP4Session(inputArguments: string[], 
         'pipe:3',
     );
 
-    args.unshift('-hide_banner',
-    '-use_wallclock_as_timestamps', '1');
-    console.log(args.join(' '));
+    args.unshift('-hide_banner');
+    safePrintFFmpegArguments(console, args);
 
     const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
         stdio: ['pipe', 'pipe', 'pipe', 'pipe',]
