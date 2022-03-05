@@ -98,8 +98,9 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
     })()
         .finally(kill);
 
-    let inputAudioCodec = mediaStreamOptions.audio.codec;
-    let inputVideoCodec = mediaStreamOptions.video.codec;
+    let inputAudioCodec: string;
+    let inputVideoCodec: string;
+    // todo: multiple codecs may be offered, default is the first one in the sdp.
     const audio = findTrack(sdp, 'audio');
     const video = findTrack(sdp, 'video');
     if (audio) {

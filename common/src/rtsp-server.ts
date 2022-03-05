@@ -1,7 +1,7 @@
 import { readLength, readLine } from './read-stream';
 import { Duplex, Readable } from 'stream';
 import { randomBytes } from 'crypto';
-import { StreamChunk, StreamParser } from './stream-parser';
+import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
 import dgram from 'dgram';
 import net from 'net';
 import tls from 'tls';
@@ -29,7 +29,7 @@ export async function readMessage(client: Readable): Promise<string[]> {
     }
 }
 
-export function createRtspParser(): RtspStreamParser {
+export function createRtspParser(options?: StreamParserOptions): RtspStreamParser {
     let resolve: any;
 
     return {
@@ -42,8 +42,8 @@ export function createRtspParser(): RtspStreamParser {
         outputArguments: [
             '-rtsp_transport',
             'tcp',
-            '-vcodec', 'copy',
-            '-acodec', 'copy',
+            ...(options?.vcodec || []),
+            ...(options?.acodec || []),
             '-f', 'rtsp',
         ],
         findSyncFrame(streamChunks: StreamChunk[]) {

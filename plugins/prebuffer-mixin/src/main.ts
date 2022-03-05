@@ -403,7 +403,13 @@ class PrebufferSession {
       });
     }
     else {
-      const parser = createRtspParser();
+      const parser = createRtspParser({
+        vcodec,
+        // the rtsp parser should always stream copy unless audio is soft muted.
+        acodec: audioSoftMuted
+          ? ['-an']
+          : ['-acodec', 'copy'],
+      });
       this.sdp = parser.sdp;
       rbo.parsers.rtsp = parser;
     }
@@ -453,7 +459,8 @@ class PrebufferSession {
         this.sdp = Promise.resolve(sdp);
         const { audio, video } = parseTrackIds(sdp);
         // handle no audio?
-        await rtspClient.setup(0, audio);
+        if (!audioSoftMuted)
+          await rtspClient.setup(0, audio);
         await rtspClient.setup(2, video);
         const socket = await rtspClient.play();
         session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
