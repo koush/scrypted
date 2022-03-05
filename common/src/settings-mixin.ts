@@ -3,7 +3,7 @@ import sdk from "@scrypted/sdk";
 
 const { deviceManager } = sdk;
 
-export interface SettingsMixinDeviceOptions<T> extends MixinDeviceOptions<T> {
+export interface SettingsMixinDeviceOptions<T> extends MixinDeviceOptions<T & Settings> {
     group: string;
     groupKey: string;
 }
@@ -12,7 +12,7 @@ export abstract class SettingsMixinDeviceBase<T> extends MixinDeviceBase<T & Set
     settingsGroup: string;
     settingsGroupKey: string;
 
-    constructor(options: SettingsMixinDeviceOptions<T & Settings>) {
+    constructor(options: SettingsMixinDeviceOptions<T>) {
         super(options);
 
         this.settingsGroup = options.group;
