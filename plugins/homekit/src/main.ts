@@ -291,7 +291,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
         qrcode.generate(this.bridge.setupURI(), { small: true }, (code: string) => {
             this.console.log('Pairing QR Code:')
-            this.console.log(code);
+            this.console.log('\n' + code);
         });
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
@@ -420,7 +420,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 const accessory = this.standalones.get(mixinDeviceState.id);
                 qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
                     ret.console.log('Pairing QR Code:')
-                    ret.console.log(code);
+                    ret.console.log('\n' + code);
                 });
             }, 500);
         }
