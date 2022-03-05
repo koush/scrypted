@@ -178,7 +178,7 @@ class PrebufferSession {
         choices: [
           'MPEG-TS',
           'RTSP',
-          'RTSP+MP4',
+          // 'RTSP+MP4',
         ],
         key: this.rebroadcastModeKey,
         value: this.storage.getItem(this.rebroadcastModeKey) || 'MPEG-TS',
