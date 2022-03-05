@@ -17,6 +17,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingChannel & VideoCam
             title: 'Use SDP/UDP instead of RTSP/TCP',
             description: 'Experimental',
             type: 'boolean',
+            defaultValue: true,
         }
     });
 
