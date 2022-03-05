@@ -1,18 +1,13 @@
-import { FFMpegInput, ScryptedDevice, ScryptedMimeTypes, VideoCamera, MediaStreamOptions } from '@scrypted/sdk'
-import { AudioStreamingSamplerate, AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
-
-import sdk from '@scrypted/sdk';
-import child_process from 'child_process';
-
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import { evalRequest } from '../camera/camera-transcode';
-
-import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
-
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import sdk, { FFMpegInput, MediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import child_process from 'child_process';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
+import { AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
+import { evalRequest } from '../camera/camera-transcode';
+import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
+import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 

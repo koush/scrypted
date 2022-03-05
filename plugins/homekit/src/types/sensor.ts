@@ -1,6 +1,5 @@
-
-import { MotionSensor, BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, HumiditySensor, AudioSensor, AmbientLightSensor, OccupancySensor, FloodSensor } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
 

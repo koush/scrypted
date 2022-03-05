@@ -1,4 +1,4 @@
-import { H264Profile, H264Level } from "../../hap";
+import { H264Level, H264Profile } from "../../hap";
 
 export function profileToFfmpeg(profile: H264Profile): string {
     if (profile === H264Profile.HIGH)

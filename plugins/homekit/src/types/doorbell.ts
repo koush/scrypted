@@ -1,7 +1,6 @@
-
-import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { Characteristic, CharacteristicEventTypes, CharacteristicGetCallback, Service, ContactSensor, StatelessProgrammableSwitch } from '../hap';
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession, supportedTypes } from '../common'
+import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { addSupportedType, DummyDevice, HomeKitSession, supportedTypes } from '../common';
+import { Characteristic, CharacteristicEventTypes, Service, StatelessProgrammableSwitch } from '../hap';
 import { makeAccessory } from './common';
 
 addSupportedType({

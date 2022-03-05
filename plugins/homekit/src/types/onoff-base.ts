@@ -1,7 +1,6 @@
-
-import { OnOff, ScryptedDevice, ScryptedInterface } from '@scrypted/sdk'
-import { Accessory, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
+import { OnOff, ScryptedDevice, ScryptedInterface } from '@scrypted/sdk';
 import { bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
+import { Accessory, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
 
 export function probe(device: DummyDevice): boolean {

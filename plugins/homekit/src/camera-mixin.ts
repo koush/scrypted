@@ -1,6 +1,6 @@
-import sdk, { VideoCamera, Settings, Setting, ScryptedInterface, ObjectDetector, SettingValue, MediaStreamOptions, ScryptedInterfaceProperty } from "@scrypted/sdk";
-import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
+import sdk, { MediaStreamOptions, ObjectDetector, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmpeg-hardware-acceleration";
+import { SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
 import { HomekitMixin } from "./homekit-mixin";
 
 const { log, systemManager, deviceManager } = sdk;
@@ -65,13 +65,6 @@ export class CameraMixin extends HomekitMixin<any> {
                     ? undefined : 'None',
                 description: "Set the motion sensor used to trigger HomeKit Secure Video recordings. Defaults to the device provided motion sensor when available.",
             },
-            {
-                title: 'Never Wait for Snapshots',
-                value: (this.storage.getItem('blankSnapshots') === 'true').toString(),
-                key: 'blankSnapshots',
-                description: 'Send blank images instead of waiting snapshots. Improves HomeKit responsiveness with slow cameras.',
-                type: 'boolean'
-            }
         );
 
         // settings.push({

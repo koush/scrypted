@@ -1,6 +1,6 @@
 import { Camera, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, AudioSensor, Intercom, ObjectsDetected, VideoCameraConfiguration, OnOff } from '@scrypted/sdk'
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
-import { AudioBitrate, CameraRecordingDelegate, AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, SRTPCryptoSuites } from '../hap';
+import { CameraRecordingDelegate, AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, SRTPCryptoSuites } from '../hap';
 import { makeAccessory } from './common';
 
 import sdk from '@scrypted/sdk';

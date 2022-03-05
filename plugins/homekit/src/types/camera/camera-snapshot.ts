@@ -1,17 +1,11 @@
-import { Camera, MotionSensor, ScryptedDevice, ScryptedInterface, VideoCamera, AudioSensor, Intercom } from '@scrypted/sdk'
-import { SnapshotRequest, SnapshotRequestCallback } from "../../hap";
-import fs from "fs";
-import sdk from "@scrypted/sdk";
-import { HomeKitSession } from '../../common';
+import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import throttle from 'lodash/throttle';
+import { HomeKitSession } from '../../common';
+import { SnapshotRequest, SnapshotRequestCallback } from "../../hap";
 
 const { mediaManager } = sdk;
 
-const black = fs.readFileSync('black.jpg');
-
 export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitSession: HomeKitSession, console: Console) {
-    let lastPictureTime = 0;
-    let lastPicture: Buffer;
     let pendingPicture: Promise<Buffer>;
 
     const takePicture = async (request: SnapshotRequest) => {
@@ -38,13 +32,14 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             const timeout = setTimeout(() => {
                 timedOut = true;
                 pendingPicture = undefined;
+                const message = `${device.name} is offline or has slow snapshots. This will cause HomeKit to hang. Consider installing the Snapshot Plugin to keep HomeKit responsive. origin:/#/component/plugin/install/@scrypted/snapshot}`;
+                console.log(message);
+                homekitSession.log.a(message);
                 reject(new Error('snapshot timed out'));
-            }, 60000);
+            }, 3000);
 
             wrapped.then(picture => {
                 if (!timedOut) {
-                    lastPictureTime = Date.now();
-                    lastPicture = picture;
                     pendingPicture = undefined;
                     clearTimeout(timeout);
                     resolve(picture)
@@ -52,8 +47,6 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             })
                 .catch(e => {
                     if (!timedOut) {
-                        lastPictureTime = Date.now();
-                        lastPicture = undefined;
                         pendingPicture = undefined;
                         clearTimeout(timeout);
                         reject(e);
@@ -98,22 +91,13 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             snapshotAll(request);
             snapshotAll(request);
 
-            // path to return blank snapshots
-            if (storage.getItem('blankSnapshots') === 'true') {
-                if (lastPicture && lastPictureTime > Date.now() - 15000) {
-                    callback(null, lastPicture);
-                }
-                else {
-                    // todo: remove this in favor of snapshot plugin?
-                    callback(null, black);
-                }
-                return;
-            }
-
             callback(null, await throttledTakePicture(request));
         }
         catch (e) {
             console.error('snapshot error', e);
+            const message = `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`;
+            console.log(message);
+            homekitSession.log.a(message);
             callback(e);
         }
     }

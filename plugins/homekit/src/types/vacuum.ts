@@ -1,6 +1,5 @@
-
-import { Dock, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
+import { Dock, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
 

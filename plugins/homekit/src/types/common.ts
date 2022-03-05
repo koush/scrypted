@@ -1,6 +1,6 @@
 import sdk, { ScryptedDevice } from "@scrypted/sdk";
 import { HomeKitSession } from "../common";
-import { uuid, Accessory } from '../hap';
+import { Accessory, uuid } from '../hap';
 
 const { deviceManager } = sdk;
 

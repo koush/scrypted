@@ -1,8 +1,7 @@
-
-import { OnOff, ScryptedDevice, ScryptedDeviceType } from '@scrypted/sdk'
-import { addSupportedType, HomeKitSession } from '../common'
+import { OnOff, ScryptedDevice, ScryptedDeviceType } from '@scrypted/sdk';
+import { addSupportedType, HomeKitSession } from '../common';
 import { Service } from '../hap';
-import { probe, getAccessory } from './onoff-base';
+import { getAccessory, probe } from './onoff-base';
 
 addSupportedType({
     type: ScryptedDeviceType.Outlet,

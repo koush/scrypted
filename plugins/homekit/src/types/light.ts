@@ -1,8 +1,7 @@
-
-import { Brightness, ColorSettingHsv, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, HomeKitSession } from '../common'
-import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service, NodeCallback } from '../hap';
-import { probe, getAccessory } from './onoff-base';
+import { Brightness, ColorSettingHsv, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, HomeKitSession } from '../common';
+import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
+import { getAccessory, probe } from './onoff-base';
 
 addSupportedType({
     type: ScryptedDeviceType.Light,

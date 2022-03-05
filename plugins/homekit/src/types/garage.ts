@@ -1,6 +1,5 @@
-
-import { Entry, EntrySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
+import { Entry, EntrySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
 

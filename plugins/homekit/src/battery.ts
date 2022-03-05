@@ -1,6 +1,6 @@
 import { Battery, ScryptedDevice, ScryptedInterface } from "@scrypted/sdk";
-import { Battery as HAPBattery, StatusLowBattery, Accessory, Characteristic } from "./hap";
 import { bindCharacteristic } from "./common";
+import { Accessory, Battery as HAPBattery, Characteristic, StatusLowBattery } from "./hap";
 
 export function maybeAddBatteryService(device: ScryptedDevice & Battery, accessory: Accessory) {
     if (!device.interfaces.includes(ScryptedInterface.Battery))

@@ -1,5 +1,5 @@
-import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin";
 import { StorageSettings } from "@scrypted/common/src/settings";
+import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin";
 import sdk, { ScryptedInterface, SettingValue } from "@scrypted/sdk";
 import crypto from 'crypto';
 const { log } = sdk;

@@ -1,5 +1,5 @@
 
-import { EventDetails, EventListener, EventListenerRegister, Refresh, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { EventDetails, EventListener, EventListenerRegister, Logger, Refresh, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
 import { Accessory, Service, SnapshotRequest, Characteristic, CharacteristicEventTypes, WithUUID } from './hap';
 
 export interface DummyDevice {
@@ -17,6 +17,7 @@ export interface HomeKitSession {
     snapshotThrottles: Map<string, SnapshotThrottle>;
     isHomeKitHub(ip: string): boolean;
     detectedHomeKitHub(ip: string): void;
+    log: Logger;
 }
 
 interface SupportedType {

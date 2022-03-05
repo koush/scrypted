@@ -1,19 +1,18 @@
-import sdk, { Settings, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, Setting, ScryptedInterface, ScryptedInterfaceProperty, Online } from '@scrypted/sdk';
-import { Accessory, Bridge, Categories, Characteristic, MDNSAdvertiser, PublishInfo, Service, ControllerStorage } from './hap';
-import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
-import './types'
-import { CameraMixin } from './camera-mixin';
-import { maybeAddBatteryService } from './battery';
-import { randomBytes } from 'crypto';
 import qrcode from '@koush/qrcode-terminal';
+import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
+import { sleep } from '@scrypted/common/src/sleep';
+import sdk, { MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
+import { randomBytes } from 'crypto';
+import os from 'os';
 import packageJson from "../package.json";
-import { randomPinCode } from './pincode';
-import { EventedHTTPServer } from './hap';
+import { maybeAddBatteryService } from './battery';
+import { CameraMixin } from './camera-mixin';
+import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
+import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import { getHAPUUID, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin } from './homekit-mixin';
-import { sleep } from '@scrypted/common/src/sleep';
-import os from 'os';
-import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
+import { randomPinCode } from './pincode';
+import './types';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -36,6 +35,11 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     constructor() {
         super();
         this.start();
+
+        if (this.storage.getItem('blankSnapshots') === 'true') {
+            this.storage.removeItem('blankSnapshots');
+            this.log.a(`The "Never Wait for Snapshots" setting has been moved to the Snapshot Plugin. Install the plugin and enable it on your preferred cameras. origin:/#/component/plugin/install/@scrypted/snapshot`);
+        }
     }
 
     getUsername(storage: Storage) {

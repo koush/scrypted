@@ -1,6 +1,5 @@
-
-import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
+import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
 

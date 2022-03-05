@@ -1,8 +1,6 @@
-import { PrepareStreamRequest, StartStreamRequest } from '../../hap';
-
 import { ChildProcess } from 'child_process';
 import dgram from 'dgram';
-
+import { PrepareStreamRequest, StartStreamRequest } from '../../hap';
 import { HomeKitRtpSink } from '../../rtp/rtp-ffmpeg-input';
 
 export interface CameraStreamingSession {

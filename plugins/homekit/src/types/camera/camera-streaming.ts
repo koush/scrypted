@@ -1,20 +1,15 @@
-import { Camera, ScryptedDevice, ScryptedInterface, VideoCamera, Intercom, MediaStreamOptions, VideoCameraConfiguration } from '@scrypted/sdk'
-import { HomeKitSession } from '../../common'
-import { CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
-
-import sdk from '@scrypted/sdk';
+import sdk, { Camera, Intercom, MediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
-
+import os from 'os';
+import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
+import { HomeKitSession } from '../../common';
+import { CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
-import os from 'os';
-
-import { CameraStreamingSession } from './camera-streaming-session';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
+import { CameraStreamingSession } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
-
-import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 
 const { mediaManager } = sdk;
 const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/

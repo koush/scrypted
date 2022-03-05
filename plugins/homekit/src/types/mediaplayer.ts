@@ -1,9 +1,8 @@
 
-import { VideoCamera, MediaPlayer, MediaPlayerState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
+import sdk, { MediaPlayer, MediaPlayerState, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, StartStop, VideoCamera } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
 import { Categories, Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
-import sdk from '@scrypted/sdk';
 const { systemManager } = sdk;
 
 addSupportedType({
