@@ -45,7 +45,7 @@ export interface ParserOptions<T extends string> {
 
 export async function parseResolution(cp: ChildProcess) {
     return new Promise<string[]>(resolve => {
-        const parser = data => {
+        const parser = (data: Buffer) => {
             const stdout = data.toString();
             const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
             if (res) {
@@ -61,7 +61,7 @@ export async function parseResolution(cp: ChildProcess) {
 
 async function parseToken(cp: ChildProcess, token: string) {
     return new Promise<string>(resolve => {
-        const parser = data => {
+        const parser = (data: Buffer) => {
             const stdout: string = data.toString();
             const idx = stdout.indexOf(`${token}: `);
             if (idx !== -1) {
@@ -161,7 +161,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     const stdio: StdioOptions = ['pipe', 'pipe', 'pipe']
     let pipeCount = 3;
     for (const container of Object.keys(options.parsers)) {
-        const parser: StreamParser = options.parsers[container];
+        const parser: StreamParser = options.parsers[container as T];
 
         if (parser.parseDatagram) {
             needSdp = true;
@@ -249,7 +249,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     let sdp: Promise<Buffer[]>;
     if (needSdp) {
         sdp = new Promise<Buffer[]>(resolve => {
-            const ret = [];
+            const ret: Buffer[] = [];
             cp.stdio[pipeCount - 1].on('data', buffer => {
                 ret.push(buffer);
                 resolve(ret);
@@ -263,7 +263,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     // now parse the created pipes
     let pipeIndex = 0;
     Object.keys(options.parsers).forEach(async (container) => {
-        const parser: StreamParser = options.parsers[container];
+        const parser: StreamParser = options.parsers[container as T];
         if (!parser.parse || parser.tcpProtocol)
             return;
         const pipe = cp.stdio[3 + pipeIndex];

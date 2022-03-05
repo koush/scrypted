@@ -654,7 +654,7 @@ class PrebufferSession {
     let container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
 
     // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
-    // rewind a little bit earlier to gaurantee a full segment of that length is sent.
+    // rewind a little bit earlier to gaurantee a valid full segment of that length is sent.
     if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
       requestedPrebuffer += (this.detectedIdrInterval || 4000) * 1.5;
     }
