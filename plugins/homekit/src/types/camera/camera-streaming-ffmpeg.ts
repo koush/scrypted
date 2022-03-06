@@ -89,6 +89,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     else {
         args.push(
             "-vcodec", "copy",
+            "-bsf:v", "dump_extra",
         );
     }
 
