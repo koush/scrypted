@@ -1,3 +1,15 @@
+export function addTrackControls(sdp: string) {
+    let lines = sdp.split('\n').map(line => line.trim());
+    lines = lines.filter(line => !line.includes('a=control:'));
+    const vindex = lines.findIndex(line => line.startsWith('m=video'));
+    if (vindex !== -1)
+        lines.splice(vindex + 1, 0, 'a=control:trackID=video');
+    const aindex = lines.findIndex(line => line.startsWith('m=audio'));
+    if (aindex !== -1)
+        lines.splice(aindex + 1, 0, 'a=control:trackID=audio');
+    return lines.join('\r\n')
+}
+
 export function parsePayloadTypes(sdp: string) {
     const audioPayloadTypes = new Set<number>();
     const videoPayloadTypes = new Set<number>();
@@ -16,7 +28,7 @@ export function parsePayloadTypes(sdp: string) {
     }
 }
 
-export function findTrack(sdp: string, type: string, directions: TrackDirection[] = ['recvonly']) {
+export function findTrack(sdp: string, type: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
     const tracks = sdp.split('m=').filter(track => track.startsWith(type));
 
     for (const track of tracks) {

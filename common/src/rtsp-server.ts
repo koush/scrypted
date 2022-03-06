@@ -2,6 +2,7 @@ import { readLength, readLine } from './read-stream';
 import { Duplex, Readable } from 'stream';
 import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
+import { findTrack } from './sdp-utils';
 import dgram from 'dgram';
 import net from 'net';
 import tls from 'tls';
@@ -55,7 +56,6 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
                     const nalType = second & 0x1f;
                     const startBit = second & 0x80;
                     if (((fragmentType === 28 || fragmentType === 29) && nalType === 5 && startBit == 128) || fragmentType == 5) {
-                        console.log('sent', i, streamChunks.length);
                         return streamChunks.slice(i);
                     }
                 }
@@ -70,7 +70,7 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             for await (const { type, rtcp, header, packet } of server.handleRecord()) {
                 yield {
                     chunks: [header, packet],
-                    type,
+                    type: `${rtcp ? 'rtcp' : 'rtp'}-${type}`,
                     width,
                     height,
                 }
@@ -277,8 +277,8 @@ export class RtspClient extends RtspBase {
 }
 
 export class RtspServer {
-    videoChannel = 0;
-    audioChannel = 2;
+    videoChannel: number;
+    audioChannel: number;
     session: string;
     console: Console;
     udpPorts = {
@@ -358,6 +358,8 @@ export class RtspServer {
             this.sendUdp(this.udpPorts.video, packet, rtcp)
         }
         else {
+            if (this.videoChannel == null)
+                throw new Error('rtsp videoChannel not set up');
             this.send(packet, rtcp ? this.videoChannel + 1 : this.videoChannel);
         }
     }
@@ -367,6 +369,8 @@ export class RtspServer {
             this.sendUdp(this.udpPorts.audio, packet, rtcp)
         }
         else {
+            if (this.audioChannel == null)
+                throw new Error('rtsp audioChannel not set up');
             this.send(packet, rtcp ? this.audioChannel + 1 : this.audioChannel);
         }
     }
@@ -392,25 +396,30 @@ export class RtspServer {
         const transport = requestHeaders['transport'];
         headers['Transport'] = requestHeaders['transport'];
         headers['Session'] = this.session;
+        let audioTrack = findTrack(this.sdp, 'audio');
+        let videoTrack = findTrack(this.sdp, 'video');
         if (transport.includes('UDP')) {
             const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/);
             const [_, rtp, rtcp] = match;
-            if (url.includes('audio'))
+            if (audioTrack && url.includes(audioTrack.trackId))
                 this.udpPorts.audio = parseInt(rtp);
-            else if (url.includes('video'))
+            else if (videoTrack && url.includes(videoTrack.trackId))
                 this.udpPorts.video = parseInt(rtp);
+            else
+                this.console?.warn('unknown track id', url);
         }
         else if (transport.includes('TCP')) {
             const match = transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
             if (match) {
                 const low = parseInt(match[1]);
                 const high = parseInt(match[2]);
-                if (url.includes('audio')) {
+
+                if (audioTrack && url.includes(audioTrack.trackId))
                     this.audioChannel = low;
-                }
-                else if (url.includes('video')) {
+                else if (videoTrack && url.includes(videoTrack.trackId))
                     this.videoChannel = low;
-                }
+                else
+                    this.console?.warn('unknown track id', url);
             }
         }
         this.respond(200, 'OK', requestHeaders, headers)
@@ -418,7 +427,16 @@ export class RtspServer {
 
     play(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
-        headers['RTP-Info'] = `url=${url}/trackID=0;seq=0;rtptime=0,url=${url}/trackID=1;seq=0;rtptime=0`;
+        let audioTrack = findTrack(this.sdp, 'audio');
+        let videoTrack = findTrack(this.sdp, 'video');
+        let rtpInfo = '';
+        if (audioTrack)
+            rtpInfo = `url=${url}/trackID=${audioTrack.trackId};seq=0;rtptime=0`
+        if (audioTrack && videoTrack)
+            rtpInfo += ',';
+        if (videoTrack)
+            rtpInfo += `url=${url}/trackID=${videoTrack.trackId};seq=0;rtptime=0`;
+        headers['RTP-Info'] = rtpInfo;
         headers['Range'] = 'npt=now-';
         headers['Session'] = this.session;
         this.respond(200, 'OK', requestHeaders, headers);
