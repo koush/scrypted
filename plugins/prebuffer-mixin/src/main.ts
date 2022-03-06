@@ -472,6 +472,17 @@ class PrebufferSession {
         // create missing pts from dts so mpegts and mp4 muxing does not fail
         const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+        // Add SPS/PPS to all keyframes. Not all cameras do this!
+        // This isn't really necessary for a few reasons:
+        // MPEG-TS and MP4 will automatically do this, since there's no out of band
+        // way to get the SPS/PPS.
+        // RTSP mode may send the SPS/PPS out of band via the sdp, and then may not have
+        // SPS/PPS in the bit stream.
+        // Adding this argument isn't strictly necessary, but it normalizes the bitstream
+        // so consumers that expect the SPS/PPS will have it. Ran into an issue where
+        // the HomeKit plugin was blasting RTP packets out from RTSP mode,
+        // but the bitstream had no SPS/PPS information, resulting in the video never loading
+        // in the Home app.
         ffmpegInput.inputArguments.push('-bsf:v', 'dump_extra');
         session = await startParserSession(ffmpegInput, rbo);
       }
