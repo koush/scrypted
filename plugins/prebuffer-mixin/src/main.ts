@@ -723,7 +723,7 @@ class PrebufferSession {
             this.printActiveClients();
           }
           else {
-            this.console.log('passive client request started');
+            // this.console.log('passive client request started');
           }
 
           const now = Date.now();
@@ -768,7 +768,7 @@ class PrebufferSession {
               this.inactivityCheck(session);
             }
             else {
-              this.console.log('passive client request ended');
+              // this.console.log('passive client request ended');
             }
             cleanup();
           };
