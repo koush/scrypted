@@ -24,7 +24,7 @@ else {
     }));
 
     peer.transportSafeArgumentTypes.add(Buffer.name);
-    process.on('message', message=> peer.handleMessage(message as RpcMessage));
+    process.on('message', message => peer.handleMessage(message as RpcMessage));
     process.on('disconnect', () => {
         console.error('peer host disconnected, exiting.');
         process.exit(1);

@@ -1,5 +1,5 @@
 import { RpcMessage, RpcPeer } from '../rpc';
-import { SystemManager, DeviceManager, ScryptedNativeId } from '@scrypted/types'
+import { SystemManager, DeviceManager, ScryptedNativeId, ScryptedStatic } from '@scrypted/types'
 import { attachPluginRemote, PluginReader } from './plugin-remote';
 import { PluginAPI } from './plugin-api';
 import { MediaManagerImpl } from './media';
@@ -169,6 +169,8 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         return _pluginConsole;
     }
 
+    let postInstallSourceMapSupport: (scrypted: ScryptedStatic) => void;
+
     attachPluginRemote(peer, {
         createMediaManager: async (sm) => {
             systemManager = sm;
@@ -180,6 +182,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         },
         onPluginReady: async (scrypted, params, plugin) => {
             replPort = createREPLServer(scrypted, params, plugin);
+            postInstallSourceMapSupport(scrypted);
         },
         getPluginConsole,
         getDeviceConsole,
@@ -196,37 +199,42 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             const entry = pluginReader('main.nodejs.js.map')
             const map = entry?.toString();
 
-            installSourceMapSupport({
-                environment: 'node',
-                retrieveSourceMap(source) {
-                    if (source === '/plugin/main.nodejs.js' || source === `/${pluginId}/main.nodejs.js`) {
-                        if (!map)
-                            return null;
-                        return {
-                            url: '/plugin/main.nodejs.js',
-                            map,
+            // plugins may install their own sourcemap support during startup, so
+            // hook the sourcemap installation after everything is loaded.
+            postInstallSourceMapSupport = (scrypted) => {
+                process.removeAllListeners('uncaughtException');
+                process.removeAllListeners('unhandledRejection');
+
+                process.on('uncaughtException', e => {
+                    getPluginConsole().error('uncaughtException', e);
+                    scrypted.log.e('uncaughtException ' + e?.toString());
+                });
+                process.on('unhandledRejection', e => {
+                    getPluginConsole().error('unhandledRejection', e);
+                    scrypted.log.e('unhandledRejection ' + e?.toString());
+                });
+
+                installSourceMapSupport({
+                    environment: 'node',
+                    retrieveSourceMap(source) {
+                        if (source === '/plugin/main.nodejs.js' || source === `/${pluginId}/main.nodejs.js`) {
+                            if (!map)
+                                return null;
+                            return {
+                                url: '/plugin/main.nodejs.js',
+                                map,
+                            }
                         }
+                        return null;
                     }
-                    return null;
-                }
-            });
+                });
+            };
+
             await installOptionalDependencies(getPluginConsole(), packageJson);
         }
     }).then(scrypted => {
         systemManager = scrypted.systemManager;
         deviceManager = scrypted.deviceManager;
-
-        process.removeAllListeners('uncaughtException');
-        process.removeAllListeners('unhandledRejection');
-
-        process.on('uncaughtException', e => {
-            getPluginConsole().error('uncaughtException', e);
-            scrypted.log.e('uncaughtException ' + e?.toString());
-        });
-        process.on('unhandledRejection', e => {
-            getPluginConsole().error('unhandledRejection', e);
-            scrypted.log.e('unhandledRejection ' + e?.toString());
-        });
     });
 
     return peer;

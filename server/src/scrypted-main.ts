@@ -10,6 +10,8 @@ if (!semver.gte(process.version, '16.0.0')) {
 startPeriodicGarbageCollection();
 
 if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
+    // plugins should never crash. this handler will be removed, and then readded
+    // after the plugin source map is retrieved.
     process.on('uncaughtException', e => {
         console.error('uncaughtException', e);
     });
@@ -20,6 +22,7 @@ if (process.argv[2] === 'child' || process.argv[2] === 'child-thread') {
     require('./scrypted-plugin-main');
 }
 else {
+    // unhandled rejections are allowed if they are from a rpc/plugin call.
     process.on('unhandledRejection', error => {
         if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
             console.error('wtf', error);
