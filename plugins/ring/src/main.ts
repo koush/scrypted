@@ -1,7 +1,15 @@
-import sdk, { RTCSignalingClientSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
-import { LiveCallNegotiation, clientApi, generateUuid, RingApi, RingCamera, RingRestClient } from './ring-client-api';
+import sdk, { RTCSignalingClientSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera, MediaStreamOptions, FFMpegInput, ScryptedMimeTypes } from '@scrypted/sdk';
+import { SipSession, isStunMessage, LiveCallNegotiation, clientApi, generateUuid, RingApi, RingCamera, RingRestClient, RtpDescription } from './ring-client-api';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
+import { RefreshPromise } from "@scrypted/common/src/promise-utils"
+import { ChildProcess } from 'child_process';
+import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { RtspServer } from '@scrypted/common/src/rtsp-server'
+import dgram from 'dgram';
+import { createCryptoLine } from './srtp-utils';
+
+const STREAM_TIMEOUT = 120000;
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
@@ -32,10 +40,18 @@ class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class RingCameraDevice extends ScryptedDeviceBase implements Settings, DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel {
+class RingCameraDevice extends ScryptedDeviceBase implements Settings, DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel, VideoCamera {
     storageSettings = new StorageSettings(this, {
     });
     buttonTimeout: NodeJS.Timeout;
+
+    session: SipSession;
+    rtpDescription: RtpDescription;
+    audioOutForwarder: dgram.Socket;
+    audioOutProcess: ChildProcess;
+    ffmpegInput: FFMpegInput;
+    refreshTimeout: NodeJS.Timeout;
+    picturePromise: RefreshPromise<Buffer>;
 
     constructor(public plugin: RingPlugin, nativeId: string) {
         super(nativeId);
@@ -43,6 +59,163 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
         this.binaryState = false;
         if (this.interfaces.includes(ScryptedInterface.Battery))
             this.batteryLevel = this.findCamera()?.batteryLevel;
+    }
+
+
+    resetStreamTimeout() {
+        this.console.log('starting/refreshing stream');
+        clearTimeout(this.refreshTimeout);
+        this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT);
+    }
+
+    stopSession() {
+        if (this.session) {
+            this.console.log('ending sip session');
+            this.session.stop();
+            this.session = undefined;
+        }
+    }
+
+    async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+
+        if (options?.refreshAt) {
+            if (!this.ffmpegInput?.mediaStreamOptions)
+                throw new Error("no stream to refresh");
+
+            const ffmpegInput = this.ffmpegInput;
+            ffmpegInput.mediaStreamOptions.refreshAt = Date.now() + STREAM_TIMEOUT;
+            this.resetStreamTimeout();
+            return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
+        }
+
+        this.stopSession();
+
+
+        const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient();
+        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
+
+
+        playbackPromise.then(async (client) => {
+            client.setKeepAlive(true, 10000);
+            let sip: SipSession;
+            try {
+                const cleanup = () => {
+                    client.destroy();
+                    if (this.session === sip)
+                        this.session = undefined;
+                    try {
+                        this.console.log('stopping ring sip session.');
+                        sip.stop();
+                    }
+                    catch (e) {
+                    }
+                }
+
+                client.on('close', cleanup);
+                client.on('error', cleanup);
+
+                const camera = this.findCamera();
+                sip = await camera.createSipSession({
+                    skipFfmpegCheck: true,
+                });
+                sip.onCallEnded.subscribe(cleanup);
+                this.rtpDescription = await sip.start();
+
+                const inputSdpLines = [
+                    'v=0',
+                    'o=105202070 3747 461 IN IP4 127.0.0.1',
+                    's=Talk',
+                    'c=IN IP4 127.0.0.1',
+                    'b=AS:380',
+                    't=0 0',
+                    'a=rtcp-xr:rcvr-rtt=all:10000 stat-summary=loss,dup,jitt,TTL voip-metrics',
+                    `m=audio 0 RTP/SAVP 0 101`,
+                    'a=control:trackID=audio',
+                    'a=rtpmap:0 PCMU/8000',
+                    createCryptoLine(this.rtpDescription.audio),
+                    'a=rtcp-mux',
+                    `m=video 0 RTP/SAVP 99`,
+                    'a=control:trackID=video',
+                    'a=rtpmap:99 H264/90000',
+                    createCryptoLine(this.rtpDescription.video),
+                    'a=rtcp-mux'
+                ];
+                const rtsp = new RtspServer(client, inputSdpLines.filter((x) => Boolean(x)).join('\n'));
+                rtsp.console = this.console;
+                rtsp.audioChannel = 0;
+                rtsp.videoChannel = 2;
+                await rtsp.handlePlayback();
+                sip.videoSplitter.addMessageHandler(({ isRtpMessage, message }) => {
+                    if (!isStunMessage(message))
+                        rtsp.sendVideo(message, !isRtpMessage);
+                    return null;
+                });
+                sip.audioSplitter.addMessageHandler(({ isRtpMessage, message }) => {
+                    if (!isStunMessage(message))
+                        rtsp.sendAudio(message, !isRtpMessage);
+                    return null;
+                });
+
+                sip.requestKeyFrame();
+                this.session = sip;
+
+                try {
+                    await rtsp.handleTeardown();
+                    this.console.log('rtsp client ended');
+                }
+                catch (e) {
+                    this.console.log('rtsp client ended ungracefully', e);
+                }
+                finally {
+                    cleanup();
+                }
+            }
+            catch (e) {
+                sip?.stop();
+                throw e;
+            }
+        });
+
+        const ffmpegInput: FFMpegInput = {
+            url: playbackUrl,
+            mediaStreamOptions: Object.assign(this.getSipMediaStreamOptions(), {
+                refreshAt: Date.now() + STREAM_TIMEOUT,
+            }),
+            inputArguments: [
+                '-rtsp_transport', 'tcp',
+                '-i', playbackUrl,
+            ],
+        };
+        this.ffmpegInput = ffmpegInput;
+        this.resetStreamTimeout();
+
+        return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
+    }
+
+    getSipMediaStreamOptions(): MediaStreamOptions {
+        return {
+            id: 'sip',
+            name: 'SIP',
+            // note that the rtsp stream comes from scrypted,
+            // can bypass ffmpeg parsing.
+            tool: "scrypted",
+            container: 'rtsp',
+            video: {
+                codec: 'h264',
+            },
+            audio: {
+                // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
+                codec: 'pcm_mulaw',
+            },
+            source: 'cloud',
+            userConfigurable: false,
+        };
+    }
+
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+        return [
+            this.getSipMediaStreamOptions(),
+        ]
     }
 
     getSettings(): Promise<Setting[]> {
@@ -159,10 +332,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
                     url: `https://app-snaps.ring.com/snapshots/next/${camera.id}`,
                     responseType: 'buffer',
                     searchParams: {
-                      extras: 'force',
+                        extras: 'force',
                     },
                     headers: {
-                      accept: 'image/jpeg',
+                        accept: 'image/jpeg',
                     },
                     allowNoResponse: true,
                 });
@@ -339,6 +512,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         for (const camera of cameras) {
             const nativeId = camera.id.toString();
             const interfaces = [
+                ScryptedInterface.VideoCamera,
                 ScryptedInterface.Camera,
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.Intercom,
