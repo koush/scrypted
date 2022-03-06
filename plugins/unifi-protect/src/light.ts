@@ -6,12 +6,14 @@ export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness,
     constructor(public protect: UnifiProtect, nativeId: string, protectLight: Readonly<ProtectLightConfig>) {
         super(nativeId);
         this.temperatureUnit = TemperatureUnit.C;
+
+        this.updateState(protectLight);
     }
     async turnOff(): Promise<void> {
-        await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: true } });
+        await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: false } });
     }
     async turnOn(): Promise<void> {
-        await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: false } });
+        await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: true } });
     }
     async setBrightness(brightness: number): Promise<void> {
         const ledLevel = Math.round(((brightness as number) / 20) + 1);
