@@ -4,7 +4,7 @@ import { StorageSettings } from '@scrypted/common/src/settings';
 import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
 import { RefreshPromise } from "@scrypted/common/src/promise-utils"
 import { ChildProcess } from 'child_process';
-import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { RtspServer } from '@scrypted/common/src/rtsp-server'
 import dgram from 'dgram';
 import { createCryptoLine } from './srtp-utils';
@@ -98,6 +98,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
         playbackPromise.then(async (client) => {
             client.setKeepAlive(true, 10000);
             let sip: SipSession;
+            const udp = (await createBindZero()).server;
             try {
                 const cleanup = () => {
                     client.destroy();
@@ -106,6 +107,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
                     try {
                         this.console.log('stopping ring sip session.');
                         sip.stop();
+                    }
+                    catch (e) {
+                    }
+                    try {
+                        udp.close();
                     }
                     catch (e) {
                     }
@@ -133,17 +139,18 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
                     'a=control:trackID=audio',
                     'a=rtpmap:0 PCMU/8000',
                     createCryptoLine(this.rtpDescription.audio),
-                    'a=rtcp-mux',
+                    // 'a=rtcp-mux',
                     `m=video 0 RTP/SAVP 99`,
                     'a=control:trackID=video',
                     'a=rtpmap:99 H264/90000',
                     createCryptoLine(this.rtpDescription.video),
-                    'a=rtcp-mux'
+                    // 'a=rtcp-mux'
                 ];
-                const rtsp = new RtspServer(client, inputSdpLines.filter((x) => Boolean(x)).join('\n'));
+                const rtsp = new RtspServer(client, inputSdpLines.filter((x) => Boolean(x)).join('\n'), udp);
                 rtsp.console = this.console;
                 rtsp.audioChannel = 0;
                 rtsp.videoChannel = 2;
+
                 await rtsp.handlePlayback();
                 sip.videoSplitter.addMessageHandler(({ isRtpMessage, message }) => {
                     if (!isStunMessage(message))
@@ -182,7 +189,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
                 refreshAt: Date.now() + STREAM_TIMEOUT,
             }),
             inputArguments: [
-                '-rtsp_transport', 'tcp',
+                '-rtsp_transport', 'udp',
                 '-i', playbackUrl,
             ],
         };
@@ -198,7 +205,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
             name: 'SIP',
             // note that the rtsp stream comes from scrypted,
             // can bypass ffmpeg parsing.
-            tool: "scrypted",
+            // tool: "scrypted",
             container: 'rtsp',
             video: {
                 codec: 'h264',
