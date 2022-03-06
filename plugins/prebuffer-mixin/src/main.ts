@@ -13,6 +13,7 @@ import { createRtspParser, RtspClient, RtspServer } from '@scrypted/common/src/r
 import { Duplex } from 'stream';
 import net from 'net';
 import { readLength } from '@scrypted/common/src/read-stream';
+import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
@@ -458,10 +459,12 @@ class PrebufferSession {
         const sdp = sdpResponse.body.toString().trim();
         this.sdp = Promise.resolve(sdp);
         const { audio, video } = parseTrackIds(sdp);
-        // handle no audio?
-        if (!audioSoftMuted)
-          await rtspClient.setup(0, audio);
-        await rtspClient.setup(2, video);
+        let channel = 0;
+        if (!audioSoftMuted) {
+          await rtspClient.setup(channel, audio);
+          channel += 2;
+        }
+        await rtspClient.setup(channel, video);
         const socket = await rtspClient.play();
         session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
       }
@@ -469,6 +472,7 @@ class PrebufferSession {
         // create missing pts from dts so mpegts and mp4 muxing does not fail
         const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
+        ffmpegInput.inputArguments.push('-bsf:v', 'dump_extra');
         session = await startParserSession(ffmpegInput, rbo);
       }
     }
@@ -676,6 +680,7 @@ class PrebufferSession {
         const client = await listenZeroSingleClient();
         socketPromise = client.clientPromise.then(async (socket) => {
           let sdp = await this.sdp;
+          sdp = addTrackControls(sdp);
           const server = new RtspServer(socket, sdp);
           //server.console = this.console;
           await server.handlePlayback();
