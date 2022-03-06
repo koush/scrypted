@@ -135,6 +135,10 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         else {
             videoArgs = [
                 '-vcodec', 'copy',
+                // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
+                // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
+                // unless this flag is used.
+                "-bsf:v", "dump_extra",
             ];
         }
 

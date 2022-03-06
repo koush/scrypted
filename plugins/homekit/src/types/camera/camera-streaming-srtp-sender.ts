@@ -54,7 +54,7 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
             // HAP spec also states that it may request packet times of 20, 30, 40, or 60.
             // In practice, HAP has been seen to request 20 on LAN and 60 over LTE.
             // So the RTP timestamp must scale accordingly.
-            rtp.header.timestamp = firstTimestamp + packetCount * 180 * audioIntervalScale;
+            rtp.header.timestamp = (firstTimestamp + packetCount * 180 * audioIntervalScale) % 0xFFFFFFFF;
         }
 
         lastTimestamp = rtp.header.timestamp;
