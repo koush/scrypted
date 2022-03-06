@@ -16,7 +16,7 @@ import rimraf from "rimraf";
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
-    if (candidate === '*')
+    if (candidate === '*' || target === '*')
         return true;
     return target === candidate;
 }
