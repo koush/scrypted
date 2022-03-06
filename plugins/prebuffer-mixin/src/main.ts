@@ -385,17 +385,17 @@ class PrebufferSession {
 
     const vcodec = [
       '-vcodec', 'copy',
-        // Add SPS/PPS to all keyframes. Not all cameras do this!
-        // This isn't really necessary for a few reasons:
-        // MPEG-TS and MP4 will automatically do this, since there's no out of band
-        // way to get the SPS/PPS.
-        // RTSP mode may send the SPS/PPS out of band via the sdp, and then may not have
-        // SPS/PPS in the bit stream.
-        // Adding this argument isn't strictly necessary, but it normalizes the bitstream
-        // so consumers that expect the SPS/PPS will have it. Ran into an issue where
-        // the HomeKit plugin was blasting RTP packets out from RTSP mode,
-        // but the bitstream had no SPS/PPS information, resulting in the video never loading
-        // in the Home app.
+      // Add SPS/PPS to all keyframes. Not all cameras do this!
+      // This isn't really necessary for a few reasons:
+      // MPEG-TS and MP4 will automatically do this, since there's no out of band
+      // way to get the SPS/PPS.
+      // RTSP mode may send the SPS/PPS out of band via the sdp, and then may not have
+      // SPS/PPS in the bit stream.
+      // Adding this argument isn't strictly necessary, but it normalizes the bitstream
+      // so consumers that expect the SPS/PPS will have it. Ran into an issue where
+      // the HomeKit plugin was blasting RTP packets out from RTSP mode,
+      // but the bitstream had no SPS/PPS information, resulting in the video never loading
+      // in the Home app.
       '-bsf:v', 'dump_extra'
     ];
 
@@ -632,21 +632,30 @@ class PrebufferSession {
 
   inactivityCheck(session: ParserSession<PrebufferParsers>) {
     this.printActiveClients();
-    if (!this.stopInactive)
-      return;
     if (this.activeClients)
       return;
+    if (!this.stopInactive) {
+      if (this.activeClients === 0)
+        this.console.log('stopInactive false');
+      return;
+    }
 
     // by default, clients disconnecting will reset the inactivity timeout.
     // but in some cases, like optimistic prebuffer stream snapshots (google sdm)
     // we do not want that behavior.
-    if (this.inactivityTimeout)
+    if (this.inactivityTimeout) {
+      if (this.activeClients === 0)
+        this.console.log('0 active clients, inactivityTimeout already set');
       return;
+    }
 
     clearTimeout(this.inactivityTimeout)
     this.inactivityTimeout = setTimeout(() => {
-      if (this.activeClients)
+      this.inactivityTimeout = undefined;
+      if (this.activeClients) {
+        this.console.log('inactivity timeout found active clients.');
         return;
+      }
       this.console.log(this.streamName, 'terminating rebroadcast due to inactivity');
       session.kill();
     }, 30000);
