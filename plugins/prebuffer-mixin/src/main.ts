@@ -483,7 +483,8 @@ class PrebufferSession {
         // the HomeKit plugin was blasting RTP packets out from RTSP mode,
         // but the bitstream had no SPS/PPS information, resulting in the video never loading
         // in the Home app.
-        ffmpegInput.inputArguments.push('-bsf:v', 'dump_extra');
+        if (rtspMode)
+          ffmpegInput.inputArguments.push('-bsf:v', 'dump_extra');
         session = await startParserSession(ffmpegInput, rbo);
       }
     }
