@@ -418,9 +418,7 @@ class PrebufferSession {
       const parser = createRtspParser({
         vcodec,
         // the rtsp parser should always stream copy unless audio is soft muted.
-        acodec: audioSoftMuted
-          ? ['-an']
-          : ['-acodec', 'copy'],
+        acodec,
       });
       this.sdp = parser.sdp;
       rbo.parsers.rtsp = parser;
@@ -575,6 +573,7 @@ class PrebufferSession {
     }
 
     session.once('killed', () => {
+      clearTimeout(this.inactivityTimeout)
       this.parserSessionPromise = undefined;
       if (this.parserSession === session)
         this.parserSession = undefined;
@@ -785,23 +784,17 @@ class PrebufferSession {
     const { reencodeAudio } = this.getAudioConfig();
 
     let codecCopy = false;
-    if (!rtspMode || container !== 'rtsp') {
-      if (this.audioDisabled) {
-        mediaStreamOptions.audio = null;
-      }
-      else if (reencodeAudio) {
-        mediaStreamOptions.audio = {
-          codec: 'aac',
-          encoder: 'aac',
-          profile: 'aac_low',
-        }
-      }
-      else {
-        codecCopy = true;
+    if (this.audioDisabled) {
+      mediaStreamOptions.audio = null;
+    }
+    else if (reencodeAudio) {
+      mediaStreamOptions.audio = {
+        codec: 'aac',
+        encoder: 'aac',
+        profile: 'aac_low',
       }
     }
     else {
-      // rtsp mode never transcodes.
       codecCopy = true;
     }
 
@@ -1096,13 +1089,21 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
     this.fromMimeType = 'x-scrypted/x-rfc4571';
     this.toMimeType = ScryptedMimeTypes.FFmpegInput;
 
-    // trigger the prebuffer.
-    for (const id of Object.keys(systemManager.getSystemState())) {
-      const device = systemManager.getDeviceById<VideoCamera>(id);
-      if (!device.mixins?.includes(this.id))
-        continue;
-      device.getVideoStreamOptions();
-    }
+    // trigger the prebuffer. do this on next tick
+    // to allow the mixins to spin up from this provider.
+    process.nextTick(() => {
+      for (const id of Object.keys(systemManager.getSystemState())) {
+        const device = systemManager.getDeviceById<VideoCamera>(id);
+        if (!device.mixins?.includes(this.id))
+          continue;
+        try {
+          device.getVideoStreamOptions();
+        }
+        catch (e) {
+          this.console.error('error triggering prebuffer', device.name, e);
+        }
+      }
+    });
 
     // schedule restarts at 2am
     const midnight = millisUntilMidnight();
