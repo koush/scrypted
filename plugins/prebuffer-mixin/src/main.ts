@@ -668,12 +668,21 @@ class PrebufferSession {
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
         const now = Date.now();
 
+        const updateIdr = () => {
+          if (this.prevIdr) {
+            const sendEvent = !this.detectedIdrInterval;
+            this.detectedIdrInterval = now - this.prevIdr;
+            // only on the first idr update should we send a settings refresh.
+            if (sendEvent)
+              deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
+          }
+          this.prevIdr = now;
+        }
+
         // this is only valid for mp4, so its no op for everything else
         // used to detect idr interval.
         if (chunk.type === 'mdat') {
-          if (this.prevIdr)
-            this.detectedIdrInterval = now - this.prevIdr;
-          this.prevIdr = now;
+          updateIdr();
         }
         if (chunk.type === 'rtp-video') {
           const fragmentType = chunk.chunks[1].readUInt8(12) & 0x1f;
@@ -681,9 +690,7 @@ class PrebufferSession {
           const nalType = second & 0x1f;
           const startBit = second & 0x80;
           if (((fragmentType === 28 || fragmentType === 29) && nalType === 5 && startBit == 128) || fragmentType == 5) {
-            if (this.prevIdr)
-              this.detectedIdrInterval = now - this.prevIdr;
-            this.prevIdr = now;
+            updateIdr();
           }
         }
 
