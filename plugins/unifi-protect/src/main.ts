@@ -10,6 +10,19 @@ import { UnifiLock } from "./lock";
 
 const { deviceManager } = sdk;
 
+const filter = [
+    'recordingSchedules',
+    'stats',
+    'wifiConnectionState',
+    'upSince',
+    'uptime',
+    'lastSeen',
+    'eventStats',
+    'voltage',
+    'phyRate',
+    'wifiConnectionState',
+];
+
 export class UnifiProtect extends ScryptedDeviceBase implements Settings, DeviceProvider {
     authorization: string | undefined;
     accessKey: string | undefined;
@@ -46,10 +59,18 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
         Object.assign(device, packet.payload);
 
-        return this.sensors.get(packet.action.id) ||
+        const ret = this.sensors.get(packet.action.id) ||
             this.locks.get(packet.action.id) ||
             this.cameras.get(packet.action.id) ||
             this.lights.get(packet.action.id);
+
+        const keys = new Set(Object.keys(packet.payload));
+        for (const k of filter) {
+            keys.delete(k);
+        }
+        if (keys.size > 0)
+            ret.console.log('update packet', packet.payload);
+        return ret;
     }
 
     sanityCheckMotion(device: UnifiCamera | UnifiSensor | UnifiLight, payload: ProtectNvrUpdatePayloadCameraUpdate & LastSeenShim) {
