@@ -1,6 +1,6 @@
 import { Level } from './level';
 import { PluginHost } from './plugin/plugin-host';
-import { ScryptedNativeId, Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty } from '@scrypted/types';
+import { ScryptedNativeId, Device, EngineIOHandler, HttpRequest, HttpRequestHandler, OauthClient, PushHandler, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, DeviceInformation } from '@scrypted/types';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { Plugin, PluginDevice, ScryptedAlert } from './db-types';
 import { getState, ScryptedStateManager, setState } from './state';
@@ -750,11 +750,9 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             try {
                 const pluginDevice = this.findPluginDevice(plugin._id);
                 setState(pluginDevice, ScryptedInterfaceProperty.info, {
-                    info: {
-                        manufacturer: plugin.packageJson.name,
-                        version: plugin.packageJson.version,
-                    }
-                } as Device);
+                    manufacturer: plugin.packageJson.name,
+                    version: plugin.packageJson.version,
+                } as DeviceInformation);
                 this.runPlugin(plugin);
             }
             catch (e) {
