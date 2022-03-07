@@ -33,6 +33,7 @@ const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
 
 const SCRYPTED_PARSER = 'Scrypted';
 const FFMPEG_PARSER = 'FFmpeg';
+const STRING_DEFAULT = 'Default';
 
 const VALID_AUDIO_CONFIGS = [
   AAC_AUDIO,
@@ -128,6 +129,36 @@ class PrebufferSession {
     }
   }
 
+  canUseRtspParser(muxingMp4: boolean) {
+    if (muxingMp4)
+      return false;
+    // The RTSP demuxer can only be used when not transcoding audio.
+    const { isUsingDefaultAudioConfig, compatibleAudio, aacAudio } = this.getAudioConfig();
+    const canUseRtspParser = isUsingDefaultAudioConfig || compatibleAudio || aacAudio;
+    return canUseRtspParser;
+  }
+
+  getParser(rtspMode: boolean, muxingMp4: boolean, mediaStreamOptions: MediaStreamOptions) {
+    if (!this.canUseRtspParser(muxingMp4))
+      return FFMPEG_PARSER;
+
+    const defaultValue = rtspMode && mediaStreamOptions?.tool === 'scrypted' ?
+      SCRYPTED_PARSER : FFMPEG_PARSER;
+    const rtspParser = this.storage.getItem(this.rtspParserKey);
+    const value = !rtspParser ? defaultValue : rtspParser === SCRYPTED_PARSER ? SCRYPTED_PARSER : FFMPEG_PARSER;
+    return value;
+  }
+
+  getRebroadcastMode() {
+    const mode = this.storage.getItem(this.rebroadcastModeKey);
+    const rtspMode = mode?.startsWith('RTSP');
+
+    return {
+      rtspMode: mode?.startsWith('RTSP'),
+      muxingMp4: !rtspMode || mode?.includes('MP4'),
+    };
+  }
+
   async getMixinSettings(): Promise<Setting[]> {
     const settings: Setting[] = [];
 
@@ -135,8 +166,8 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    const { mp4Mode, rtspMode } = this.getRebroadcastMode();
-    for (const prebuffer of (mp4Mode ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
+    const { muxingMp4, rtspMode } = this.getRebroadcastMode();
+    for (const prebuffer of (muxingMp4 ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunk.chunks) {
         total += chunk.byteLength;
@@ -163,51 +194,69 @@ class PrebufferSession {
         ],
       },
       {
-        title: 'FFmpeg Input Arguments Prefix',
-        group,
-        description: 'Optional/Advanced: Additional input arguments to pass to the ffmpeg command. These will be placed before the input arguments.',
-        key: this.ffmpegInputArgumentsKey,
-        value: this.storage.getItem(this.ffmpegInputArgumentsKey),
-        placeholder: DEFAULT_FFMPEG_INPUT_ARGUMENTS,
-        choices: [
-          DEFAULT_FFMPEG_INPUT_ARGUMENTS,
-          '-use_wallclock_as_timestamps 1',
-          '-v verbose',
-        ],
-        combobox: true,
-      },
-      {
         title: 'Rebroadcast Container',
         group,
-        description: 'Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP may have lower latency and better responsiveness.',
+        description: 'Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP is lower latency. The default is "MPEG-TS" for this camera.',
         placeholder: 'MPEG-TS',
         choices: [
+          STRING_DEFAULT,
           'MPEG-TS',
           'RTSP',
           // 'RTSP+MP4',
         ],
         key: this.rebroadcastModeKey,
-        value: this.storage.getItem(this.rebroadcastModeKey) || 'MPEG-TS',
+        value: this.storage.getItem(this.rebroadcastModeKey) || STRING_DEFAULT,
       }
     );
 
+    const addFFmpegInputArgumentsSettings = () => {
+      settings.push(
+        {
+          title: 'FFmpeg Input Arguments Prefix',
+          group,
+          description: 'Optional/Advanced: Additional input arguments to pass to the ffmpeg command. These will be placed before the input arguments.',
+          key: this.ffmpegInputArgumentsKey,
+          value: this.storage.getItem(this.ffmpegInputArgumentsKey),
+          placeholder: DEFAULT_FFMPEG_INPUT_ARGUMENTS,
+          choices: [
+            DEFAULT_FFMPEG_INPUT_ARGUMENTS,
+            '-use_wallclock_as_timestamps 1',
+            '-v verbose',
+          ],
+          combobox: true,
+        },
+      )
+    };
+
     if (session) {
-      // The RTSP demuxer can only be used if also muxing RTSP.
-      if (rtspMode && session.mediaStreamOptions?.container === 'rtsp') {
-        const value = this.getParser(rtspMode, session.mediaStreamOptions);
+      if (this.canUseRtspParser(muxingMp4)
+        && rtspMode
+        && session.mediaStreamOptions?.container === 'rtsp') {
+
+        const value = this.getParser(rtspMode, muxingMp4, session.mediaStreamOptions);
+
         settings.push(
           {
             key: this.rtspParserKey,
             group,
             title: 'RTSP Parser',
-            description: 'Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser may have lower latency and better responsiveness.',
-            value,
+            description: `Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser is lower latency. The Scrypted Parser is only available when the Audo Codec is not Transcoding and the Rebroadcast Container is RTSP. The default is "${value}" for this camera.`,
+            value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
             choices: [
+              STRING_DEFAULT,
               FFMPEG_PARSER,
               SCRYPTED_PARSER,
             ],
           }
         );
+
+        if (value !== SCRYPTED_PARSER) {
+          // ffmpeg parser is being used, so add ffmpeg input arguments option.
+          addFFmpegInputArgumentsSettings();
+        }
+      }
+      else {
+        addFFmpegInputArgumentsSettings();
       }
 
       settings.push(
@@ -238,6 +287,10 @@ class PrebufferSession {
       );
     }
     else {
+      // adding this option even when using the scrypted parser is a failsafe
+      // in case the parsing won't start.
+      addFFmpegInputArgumentsSettings();
+
       settings.push(
         {
           title: 'Status',
@@ -251,24 +304,6 @@ class PrebufferSession {
     }
 
     return settings;
-  }
-
-  getParser(rtspMode: boolean, mediaStreamOptions: MediaStreamOptions) {
-    const defaultValue = rtspMode && mediaStreamOptions?.tool === 'scrypted' ?
-      SCRYPTED_PARSER : FFMPEG_PARSER;
-    const rtspParser = this.storage.getItem(this.rtspParserKey);
-    const value = !rtspParser ? defaultValue : rtspParser === SCRYPTED_PARSER ? SCRYPTED_PARSER : FFMPEG_PARSER;
-    return value;
-  }
-
-  getRebroadcastMode() {
-    const mode = this.storage.getItem(this.rebroadcastModeKey);
-    const rtspMode = mode?.startsWith('RTSP');
-
-    return {
-      rtspMode: mode?.startsWith('RTSP'),
-      mp4Mode: !rtspMode || mode?.includes('MP4'),
-    };
   }
 
   async startPrebufferSession() {
@@ -294,12 +329,20 @@ class PrebufferSession {
 
     const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio } = this.getAudioConfig();
 
+    const { rtspMode, muxingMp4 } = this.getRebroadcastMode();
+
     let detectedAudioCodec = this.storage.getItem(this.lastDetectedAudioCodecKey) || undefined;
     if (detectedAudioCodec === 'null')
       detectedAudioCodec = null;
 
+    // only need to probe the audio under specific circumstances.
+    // rtsp only mode (ie, no mp4 mux) does not need probing.
     let probingAudioCodec = false;
-    if (!audioSoftMuted && !advertisedAudioCodec && isUsingDefaultAudioConfig && detectedAudioCodec === undefined) {
+    if (muxingMp4
+      && !audioSoftMuted
+      && !advertisedAudioCodec
+      && isUsingDefaultAudioConfig
+      && detectedAudioCodec === undefined) {
       this.console.warn('Camera did not report an audio codec, muting the audio stream and probing the codec.');
       probingAudioCodec = true;
     }
@@ -316,14 +359,11 @@ class PrebufferSession {
       ? advertisedAudioCodec?.toLowerCase()
       : detectedAudioCodec?.toLowerCase();
 
-    // rtsp mode can handle any codec, and its generally better to allow it do that.
-    const { rtspMode, mp4Mode } = this.getRebroadcastMode();
-    const nonRtsp = !rtspMode || mp4Mode;
 
     // after probing the audio codec is complete, alert the user with appropriate instructions.
     // assume the codec is user configurable unless the camera explictly reports otherwise.
     const audioIncompatible = !COMPATIBLE_AUDIO_CODECS.includes(assumedAudioCodec);
-    if (nonRtsp && !probingAudioCodec && mso?.userConfigurable !== false && !audioSoftMuted) {
+    if (muxingMp4 && !probingAudioCodec && mso?.userConfigurable !== false && !audioSoftMuted) {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
@@ -460,7 +500,7 @@ class PrebufferSession {
       rbo.parsers.rtsp = parser;
     }
 
-    if (mp4Mode) {
+    if (muxingMp4) {
       rbo.parsers.mp4 = createFragmentedMp4Parser({
         vcodec,
         acodec,
@@ -492,7 +532,7 @@ class PrebufferSession {
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
       sessionMso = ffmpegInput.mediaStreamOptions;
 
-      const parser = this.getParser(rtspMode, ffmpegInput.mediaStreamOptions);
+      const parser = this.getParser(rtspMode, muxingMp4, ffmpegInput.mediaStreamOptions);
       if (parser === SCRYPTED_PARSER) {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser')
@@ -521,7 +561,7 @@ class PrebufferSession {
 
     // if operating in RTSP mode, use a side band ffmpeg process to grab the mp4 segments.
     // ffmpeg adds latency, as well as rewrites timestamps.
-    if (usingScryptedParser && mp4Mode) {
+    if (usingScryptedParser && muxingMp4) {
       this.getVideoStream({
         id: this.streamId,
         refresh: false,
