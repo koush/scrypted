@@ -104,6 +104,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
                             ret.push({
                                 id: $.token,
                                 name: name,
+                                container: 'rtsp',
                                 url: await client.getStreamUrl($.token),
                                 video: {
                                     fps: videoEncoderConfiguration?.rateControl?.frameRateLimit,

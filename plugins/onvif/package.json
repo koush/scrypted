@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/onvif",
-   "version": "0.0.82",
+   "version": "0.0.83",
    "description": "ONVIF Camera Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
