@@ -145,8 +145,13 @@ class PrebufferSession {
     const defaultValue = rtspMode && mediaStreamOptions?.tool === 'scrypted' ?
       SCRYPTED_PARSER : FFMPEG_PARSER;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
-    const value = !rtspParser ? defaultValue : rtspParser === SCRYPTED_PARSER ? SCRYPTED_PARSER : FFMPEG_PARSER;
-    return value;
+    if (!rtspParser || rtspParser === STRING_DEFAULT)
+      return defaultValue;
+    if (rtspParser === SCRYPTED_PARSER)
+      return SCRYPTED_PARSER;
+    if (rtspParser === FFMPEG_PARSER)
+      return FFMPEG_PARSER;
+    return defaultValue;
   }
 
   getRebroadcastMode() {
