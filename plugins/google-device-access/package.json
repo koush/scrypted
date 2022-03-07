@@ -28,6 +28,8 @@
          "Settings"
       ],
       "pluginDependencies": [
+         "@scrypted/snapshot",
+         "@scrypted/webrtc-source",
          "@scrypted/cloud",
          "@scrypted/prebuffer-mixin"
       ]
@@ -47,5 +49,5 @@
       "@types/node": "^14.17.11",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.89"
+   "version": "0.0.92"
 }
