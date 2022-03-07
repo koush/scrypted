@@ -479,7 +479,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     async installPlugin(plugin: Plugin, pluginDebug?: PluginDebug): Promise<PluginHost> {
-        const device: Device = Object.assign({}, plugin.packageJson.scrypted);
+        const device: Device = Object.assign({}, plugin.packageJson.scrypted, {
+            info: {
+                manufacturer: plugin.packageJson.name,
+                version: plugin.packageJson.version,
+            }
+        } as Device);
         try {
             if (!device.interfaces.includes(ScryptedInterface.Readme)) {
                 const zipData = Buffer.from(plugin.zip, 'base64');
@@ -743,6 +748,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         for await (const plugin of this.datastore.getAll(Plugin)) {
             try {
+                const pluginDevice = this.findPluginDevice(plugin._id);
+                setState(pluginDevice, ScryptedInterfaceProperty.info, {
+                    info: {
+                        manufacturer: plugin.packageJson.name,
+                        version: plugin.packageJson.version,
+                    }
+                } as Device);
                 this.runPlugin(plugin);
             }
             catch (e) {
