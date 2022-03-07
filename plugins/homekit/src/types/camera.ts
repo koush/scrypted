@@ -122,12 +122,14 @@ addSupportedType({
             const recordingCodecs: AudioRecordingCodec[] = [];
             const samplerate: AudioRecordingSamplerate[] = [];
             for (const sr of [
-                AudioRecordingSamplerate.KHZ_8,
-                AudioRecordingSamplerate.KHZ_16,
-                AudioRecordingSamplerate.KHZ_24,
+                // i believe more options may be causing issues with recordings
+                // (see other half of change).
+                // AudioRecordingSamplerate.KHZ_8,
+                // AudioRecordingSamplerate.KHZ_16,
+                // AudioRecordingSamplerate.KHZ_24,
                 AudioRecordingSamplerate.KHZ_32,
-                AudioRecordingSamplerate.KHZ_44_1,
-                AudioRecordingSamplerate.KHZ_48,
+                // AudioRecordingSamplerate.KHZ_44_1,
+                // AudioRecordingSamplerate.KHZ_48,
             ]) {
                 samplerate.push(sr);
             }

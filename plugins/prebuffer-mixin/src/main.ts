@@ -385,6 +385,7 @@ class PrebufferSession {
 
     const vcodec = [
       '-vcodec', 'copy',
+      // 3/6/2022
       // Add SPS/PPS to all keyframes. Not all cameras do this!
       // This isn't really necessary for a few reasons:
       // MPEG-TS and MP4 will automatically do this, since there's no out of band
@@ -396,7 +397,10 @@ class PrebufferSession {
       // the HomeKit plugin was blasting RTP packets out from RTSP mode,
       // but the bitstream had no SPS/PPS information, resulting in the video never loading
       // in the Home app.
-      '-bsf:v', 'dump_extra'
+      // 3/7/2022
+      // I believe this is causing errors in recordings and possibly streaming as well
+      // for some users. This may need to be a homekit specific transcoding argument.
+      // '-bsf:v', 'dump_extra',
     ];
 
     const rbo: ParserOptions<PrebufferParsers> = {
@@ -639,15 +643,6 @@ class PrebufferSession {
       return;
     }
 
-    // by default, clients disconnecting will reset the inactivity timeout.
-    // but in some cases, like optimistic prebuffer stream snapshots (google sdm)
-    // we do not want that behavior.
-    if (this.inactivityTimeout) {
-      if (this.activeClients === 0)
-        this.console.log('0 active clients, inactivityTimeout already set');
-      return;
-    }
-
     clearTimeout(this.inactivityTimeout)
     this.inactivityTimeout = setTimeout(() => {
       this.inactivityTimeout = undefined;
@@ -715,7 +710,7 @@ class PrebufferSession {
       const isActiveClient = options?.refresh !== false;
 
       handleRebroadcasterClient(socketPromise, {
-        console: this.console,
+        // console: this.console,
         connect: (writeData, destroy) => {
           if (isActiveClient) {
             this.activeClients++;

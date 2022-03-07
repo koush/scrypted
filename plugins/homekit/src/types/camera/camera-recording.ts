@@ -138,7 +138,8 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
                 // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
                 // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
                 // unless this flag is used.
-                "-bsf:v", "dump_extra",
+                // I believe this is causing issues. I think inly FTYP/MOOV should have SPS/PPS?
+                // "-bsf:v", "dump_extra",
             ];
         }
 
