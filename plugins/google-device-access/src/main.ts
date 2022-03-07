@@ -692,6 +692,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     }
 
     async authGet(path: string) {
+        this.console.log('SDM request', path);
         await this.loadToken();
         return axios(`https://${this.apiHostname}/v1/enterprises/${this.projectId}${path}`, {
             headers: {
@@ -701,6 +702,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
     }
 
     async authPost(path: string, data: any) {
+        this.console.log('SDM request', path);
         await this.loadToken();
         return axios.post(`https://${this.apiHostname}/v1/enterprises/${this.projectId}${path}`, data, {
             headers: {
