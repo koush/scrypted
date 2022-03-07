@@ -31,6 +31,9 @@ const TRANSCODE_AUDIO_DESCRIPTION = `${TRANSCODE_AUDIO} (Transcode)`;
 const COMPATIBLE_AUDIO_CODECS = ['aac', 'mp3', 'mp2', 'opus'];
 const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
 
+const SCRYPTED_PARSER = 'Scrypted';
+const FFMPEG_PARSER = 'FFmpeg';
+
 const VALID_AUDIO_CONFIGS = [
   AAC_AUDIO,
   COMPATIBLE_AUDIO,
@@ -77,6 +80,7 @@ class PrebufferSession {
   ffmpegInputArgumentsKey: string;
   lastDetectedAudioCodecKey: string;
   rebroadcastModeKey: string;
+  rtspParserKey: string;
 
   constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string, public stopInactive: boolean) {
     this.storage = mixin.storage;
@@ -86,6 +90,7 @@ class PrebufferSession {
     this.ffmpegInputArgumentsKey = 'ffmpegInputArguments-' + this.streamId;
     this.rebroadcastModeKey = 'rebroadcastMode-' + this.streamId;
     this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
+    this.rtspParserKey = 'rtspParser-' + this.streamId;
   }
 
   clearPrebuffers() {
@@ -130,7 +135,7 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    const { mp4Mode } = this.getRebroadcastMode();
+    const { mp4Mode, rtspMode } = this.getRebroadcastMode();
     for (const prebuffer of (mp4Mode ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunk.chunks) {
@@ -172,9 +177,9 @@ class PrebufferSession {
         combobox: true,
       },
       {
-        title: 'Rebroadcast Mode',
+        title: 'Rebroadcast Container',
         group,
-        description: 'THIS FEATURE IS IN TESTING. DO NOT CHANGE THIS FROM MPEG-TS. The stream format to use when rebroadcasting.',
+        description: 'Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP may have lower latency and better responsiveness.',
         placeholder: 'MPEG-TS',
         choices: [
           'MPEG-TS',
@@ -187,6 +192,24 @@ class PrebufferSession {
     );
 
     if (session) {
+      // The RTSP demuxer can only be used if also muxing RTSP.
+      if (rtspMode && session.mediaStreamOptions?.container === 'rtsp') {
+        const value = this.getParser(rtspMode, session.mediaStreamOptions);
+        settings.push(
+          {
+            key: this.rtspParserKey,
+            group,
+            title: 'RTSP Parser',
+            description: 'Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser may have lower latency and better responsiveness.',
+            value,
+            choices: [
+              FFMPEG_PARSER,
+              SCRYPTED_PARSER,
+            ],
+          }
+        );
+      }
+
       settings.push(
         {
           key: 'detectedResolution',
@@ -230,9 +253,18 @@ class PrebufferSession {
     return settings;
   }
 
+  getParser(rtspMode: boolean, mediaStreamOptions: MediaStreamOptions) {
+    const defaultValue = rtspMode && mediaStreamOptions?.tool === 'scrypted' ?
+      SCRYPTED_PARSER : FFMPEG_PARSER;
+    const rtspParser = this.storage.getItem(this.rtspParserKey);
+    const value = !rtspParser ? defaultValue : rtspParser === SCRYPTED_PARSER ? SCRYPTED_PARSER : FFMPEG_PARSER;
+    return value;
+  }
+
   getRebroadcastMode() {
     const mode = this.storage.getItem(this.rebroadcastModeKey);
     const rtspMode = mode?.startsWith('RTSP');
+
     return {
       rtspMode: mode?.startsWith('RTSP'),
       mp4Mode: !rtspMode || mode?.includes('MP4'),
@@ -444,10 +476,9 @@ class PrebufferSession {
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
-    const canUseScryptedParser = rtspMode;// && !mp4Mode;
     let usingScryptedParser = false;
 
-    if (canUseScryptedParser && isRfc4571) {
+    if (rtspMode && isRfc4571) {
       usingScryptedParser = true;
       this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
@@ -461,9 +492,8 @@ class PrebufferSession {
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
       sessionMso = ffmpegInput.mediaStreamOptions;
 
-      if (canUseScryptedParser
-        && ffmpegInput.mediaStreamOptions?.container === 'rtsp'
-        && ffmpegInput.mediaStreamOptions?.tool === 'scrypted') {
+      const parser = this.getParser(rtspMode, ffmpegInput.mediaStreamOptions);
+      if (parser === SCRYPTED_PARSER) {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser')
         const rtspClient = new RtspClient(ffmpegInput.url);
@@ -549,6 +579,9 @@ class PrebufferSession {
     }
 
     this.parserSession = session;
+
+    // settings ui refresh
+    deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
 
     // cloud streams need a periodic token refresh.
     if (sessionMso?.refreshAt) {
