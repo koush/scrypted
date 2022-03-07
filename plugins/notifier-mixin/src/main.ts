@@ -17,8 +17,8 @@ async function audioFetch(body: string): Promise<string> {
 var memoizedAudioFetch = memoizeOne(audioFetch);
 
 class NotifierMixin extends MixinDeviceBase<MediaPlayer> implements Notifier {
-  constructor(mixinDevice: MediaPlayer, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string) {
-    super(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, providerNativeId);
+  constructor(mixinDevice: MediaPlayer, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, mixinProviderNativeId: string) {
+    super({mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId});
   }
 
   async sendNotification(title: string, body: string, media: string | MediaObject, mimeType: string): Promise<void> {
