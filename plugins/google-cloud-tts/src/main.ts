@@ -1,8 +1,6 @@
 // https://developer.scrypted.app/#getting-started
 import axios from 'axios';
 import sdk, { BufferConverter, ScryptedDeviceBase, Settings, Setting } from "@scrypted/sdk";
-import { title } from 'process';
-const { log } = sdk;
 
 class GoogleCloudTts extends ScryptedDeviceBase implements BufferConverter, Settings {
   constructor() {
