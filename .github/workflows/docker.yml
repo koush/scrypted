@@ -53,10 +53,10 @@ jobs:
           push: true
           tags: |
             koush/scrypted:${{ matrix.node }}
-            ${{ matrix.node == '16-bullseye' && ('koush/scrypted:' + steps.package-version.outputs.current-version) || '' }}
+            ${{ matrix.node == '16-bullseye' && format('koush/scrypted:{0}', steps.package-version.outputs.current-version) || '' }}
             ${{ matrix.node == '16-bullseye' && 'koush/scrypted:latest' || '' }}
             ghcr.io/koush/scrypted:${{ matrix.node }}
-            ${{ matrix.node == '16-bullseye' && ('ghcr.io/koush/scrypted:' + steps.package-version.outputs.current-version) || '' }}
+            ${{ matrix.node == '16-bullseye' && format('ghcr.io/koush/scrypted:{0}', steps.package-version.outputs.current-version) || '' }}
             ${{ matrix.node == '16-bullseye' && 'ghcr.io/koush/scrypted:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
