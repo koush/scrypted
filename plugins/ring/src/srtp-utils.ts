@@ -23,3 +23,11 @@ export function createCryptoLine(srtpOptions: SrtpOptions) {
 
     return `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${encodedOptions}`
 }
+
+export function isRtpMessagePayloadType(payloadType: number) {
+    return payloadType > 90 || payloadType === 0
+}
+
+export function getPayloadType(message: Buffer) {
+    return message.readUInt8(1) & 0x7f
+}

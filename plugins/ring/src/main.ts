@@ -1,4 +1,4 @@
-import sdk, { RTCSignalingClientSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera, MediaStreamOptions, FFMpegInput, ScryptedMimeTypes } from '@scrypted/sdk';
+import sdk, { RTCSignalingClientSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera, MediaStreamOptions, FFMpegInput, ScryptedMimeTypes, Intercom } from '@scrypted/sdk';
 import { SipSession, isStunMessage, LiveCallNegotiation, clientApi, generateUuid, RingApi, RingCamera, RingRestClient, RtpDescription } from './ring-client-api';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
@@ -7,7 +7,7 @@ import { ChildProcess } from 'child_process';
 import { createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { RtspServer } from '@scrypted/common/src/rtsp-server'
 import dgram from 'dgram';
-import { createCryptoLine } from './srtp-utils';
+import { createCryptoLine, getPayloadType, isRtpMessagePayloadType } from './srtp-utils';
 
 const STREAM_TIMEOUT = 120000;
 
@@ -40,8 +40,13 @@ class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class RingCameraDevice extends ScryptedDeviceBase implements Settings, DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel, VideoCamera {
+class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings, DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel, VideoCamera {
     storageSettings = new StorageSettings(this, {
+        ffmpegDirectCapture: {
+            title: 'SIP FFmpeg Direct Capture',
+            description: 'Experimental: May be faster. May not work.',
+            type: 'boolean',
+        }
     });
     buttonTimeout: NodeJS.Timeout;
 
@@ -59,6 +64,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
         this.binaryState = false;
         if (this.interfaces.includes(ScryptedInterface.Battery))
             this.batteryLevel = this.findCamera()?.batteryLevel;
+    }
+
+    async startIntercom(media: MediaObject): Promise<void> {
+    }
+    async stopIntercom(): Promise<void> {
     }
 
 
@@ -91,9 +101,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
         this.stopSession();
 
 
-        const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient();
-        const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
+        const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient();
 
+        const useRtsp = !this.storageSettings.values.ffmpegDirectCapture;
+
+        const playbackUrl = useRtsp ? `rtsp://127.0.0.1:${playbackPort}` : clientUrl;
 
         playbackPromise.then(async (client) => {
             client.setKeepAlive(true, 10000);
@@ -119,62 +131,120 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
 
                 client.on('close', cleanup);
                 client.on('error', cleanup);
-
                 const camera = this.findCamera();
-                sip = await camera.createSipSession({
-                    skipFfmpegCheck: true,
-                });
+                sip = await camera.createSipSession(undefined);
                 sip.onCallEnded.subscribe(cleanup);
                 this.rtpDescription = await sip.start();
 
+                const videoPort = useRtsp ? 0 : sip.videoSplitter.address().port;
+                const audioPort = useRtsp ? 0 : sip.audioSplitter.address().port;
+
                 const inputSdpLines = [
                     'v=0',
-                    'o=105202070 3747 461 IN IP4 127.0.0.1',
+                    'o=105202070 3747 461 IN IP4 0.0.0.0',
                     's=Talk',
-                    'c=IN IP4 127.0.0.1',
+                    'c=IN IP4 0.0.0.0',
                     'b=AS:380',
                     't=0 0',
                     'a=rtcp-xr:rcvr-rtt=all:10000 stat-summary=loss,dup,jitt,TTL voip-metrics',
-                    `m=audio 0 RTP/SAVP 0 101`,
+                    `m=audio ${audioPort} RTP/SAVP 0 101`,
                     'a=control:trackID=audio',
                     'a=rtpmap:0 PCMU/8000',
                     createCryptoLine(this.rtpDescription.audio),
-                    // 'a=rtcp-mux',
-                    `m=video 0 RTP/SAVP 99`,
+                    'a=rtcp-mux',
+                    `m=video ${videoPort} RTP/SAVP 99`,
                     'a=control:trackID=video',
                     'a=rtpmap:99 H264/90000',
                     createCryptoLine(this.rtpDescription.video),
-                    // 'a=rtcp-mux'
+                    'a=rtcp-mux'
                 ];
-                const rtsp = new RtspServer(client, inputSdpLines.filter((x) => Boolean(x)).join('\n'), udp);
-                rtsp.console = this.console;
-                rtsp.audioChannel = 0;
-                rtsp.videoChannel = 2;
 
-                await rtsp.handlePlayback();
-                sip.videoSplitter.addMessageHandler(({ isRtpMessage, message }) => {
-                    if (!isStunMessage(message))
-                        rtsp.sendVideo(message, !isRtpMessage);
-                    return null;
-                });
-                sip.audioSplitter.addMessageHandler(({ isRtpMessage, message }) => {
-                    if (!isStunMessage(message))
-                        rtsp.sendAudio(message, !isRtpMessage);
-                    return null;
-                });
+                const sdp = inputSdpLines.filter((x) => Boolean(x)).join('\n');
+                if (useRtsp) {
+                    const rtsp = new RtspServer(client, sdp, udp);
+                    rtsp.console = this.console;
+                    rtsp.audioChannel = 0;
+                    rtsp.videoChannel = 2;
 
-                sip.requestKeyFrame();
-                this.session = sip;
+                    await rtsp.handlePlayback();
+                    sip.videoSplitter.on('message', message => {
+                        if (!isStunMessage(message)) {
+                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                            if (!isRtpMessage)
+                                this.console.log('rtcp')
+                            rtsp.sendVideo(message, !isRtpMessage);
+                        }
+                    });
+                    sip.audioSplitter.on('message', message => {
+                        if (!isStunMessage(message)) {
+                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                            if (!isRtpMessage)
+                                this.console.log('rtcp')
+                            rtsp.sendAudio(message, !isRtpMessage);
+                        }
+                    });
 
-                try {
-                    await rtsp.handleTeardown();
-                    this.console.log('rtsp client ended');
+                    // sip.requestKeyFrame();
+                    this.session = sip;
+
+                    try {
+                        await rtsp.handleTeardown();
+                        this.console.log('rtsp client ended');
+                    }
+                    catch (e) {
+                        this.console.log('rtsp client ended ungracefully', e);
+                    }
+                    finally {
+                        cleanup();
+                    }
                 }
-                catch (e) {
-                    this.console.log('rtsp client ended ungracefully', e);
-                }
-                finally {
-                    cleanup();
+                else {
+                    const rtsp = new RtspServer(client, sdp, udp);
+                    rtsp.udpPorts = {
+                        video: videoPort,
+                        audio: audioPort,
+                    };
+                    rtsp.console = this.console;
+                    rtsp.audioChannel = 0;
+                    rtsp.videoChannel = 2;
+
+                    const packetWaiter = new Promise(resolve => sip.videoSplitter.once('message', resolve));
+
+                    sip.videoSplitter.on('message', message => {
+                        if (!isStunMessage(message)) {
+                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                            if (!isRtpMessage)
+                                this.console.log('rtcp')
+                            rtsp.sendVideo(message, !isRtpMessage);
+                        }
+                        else {
+                            this.console.log('stun')
+                        }
+                    });
+                    sip.audioSplitter.on('message', message => {
+                        if (!isStunMessage(message)) {
+                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                            if (!isRtpMessage)
+                                this.console.log('rtcp')
+                            rtsp.sendAudio(message, !isRtpMessage);
+                        }
+                        else {
+                            this.console.log('stun')
+                        }
+                    });
+
+                    // sip.requestKeyFrame();
+                    this.session = sip;
+
+                    await packetWaiter;
+
+                    await new Promise(resolve => sip.videoSplitter.close(() => resolve(undefined)));
+                    await new Promise(resolve => sip.audioSplitter.close(() => resolve(undefined)));
+                    await new Promise(resolve => sip.videoRtcpSplitter.close(() => resolve(undefined)));
+                    await new Promise(resolve => sip.audioRtcpSplitter.close(() => resolve(undefined)));
+
+                    client.write(sdp + '\r\n');
+                    client.end();
                 }
             }
             catch (e) {
@@ -189,7 +259,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements Settings, DevicePro
                 refreshAt: Date.now() + STREAM_TIMEOUT,
             }),
             inputArguments: [
-                '-rtsp_transport', 'udp',
+                ...(useRtsp
+                    ? ['-rtsp_transport', 'udp']
+                    : ['-f', 'sdp']),
                 '-i', playbackUrl,
             ],
         };
