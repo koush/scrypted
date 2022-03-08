@@ -1,0 +1,13 @@
+name: Curl
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy Stage
+      id: packagejson
+      uses: fjogeleit/http-request-action@v1
+      with:
+        url: 'https://registry.npmjs.org/@scrypted/server/'
+    - name: Print
+      run: echo ${{ steps.packageJson.outputs.response.data['dist-tags'].latest }}
