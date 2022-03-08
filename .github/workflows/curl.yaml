@@ -14,6 +14,4 @@ jobs:
         url: 'https://registry.npmjs.org/@scrypted/server/'
         method: 'GET'
     - name: Print
-      run: echo ${{ steps.packagejson.outputs.response.data }}
-    - name: Print
-      run: echo ${{ steps.packagejson.outputs.response }}
+      run: echo ${{ fromJSON(steps.packagejson.outputs.response).data }}
