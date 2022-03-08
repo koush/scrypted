@@ -7,6 +7,9 @@
       <v-btn @click="customizing = true" width="100px">
         {{ "Add Points" }}
       </v-btn>
+      <v-btn @click="clearPoints" width="100px">
+        {{ "Clear Points" }}
+      </v-btn>
     </v-btn-toggle>
     <section
       @click="addHandle"
@@ -97,6 +100,11 @@ export default {
 
       this.onInput();
     },
+
+    clearPoints() {
+      this.customizing = true;
+      this.lazyValue.splice(0, this.lazyValue.length);
+    }
   },
 };
 </script>

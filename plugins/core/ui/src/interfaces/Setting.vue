@@ -291,7 +291,12 @@ export default {
       }
 
       var ret = cloneDeep(this.value);
-      ret.value = JSON.parse(ret.value);
+      try {
+        ret.value = JSON.parse(ret.value);
+      }
+      catch (e) {
+        ret.value = [];
+      }
       return ret;
     },
     createInputValue() {
