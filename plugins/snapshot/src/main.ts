@@ -1,5 +1,5 @@
 import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
-import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin"
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin"
 import { StorageSettings } from "@scrypted/common/src/settings"
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
@@ -58,7 +58,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             ],
             defaultValue: 'Default',
             hide: !this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera),
-        }
+        },
+        snapshotCropScale: {
+            title: 'Crop and Scale',
+            description: 'Set the approximate region to crop and scale to 16:9 snapshots.',
+            type: 'clippath',
+        },
     });
     axiosClient: Axios | AxiosDigestAuth;
     pendingPicture: Promise<Buffer>;
@@ -67,13 +72,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     lastPicture: Buffer;
     rawLastPicture: Buffer;
 
-    constructor(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }, providerNativeId: string) {
-        super(mixinDevice, mixinDeviceState, {
-            providerNativeId,
-            mixinDeviceInterfaces,
-            group: 'Snapshot',
-            groupKey: 'snapshot',
-        });
+    constructor(options: SettingsMixinDeviceOptions<Camera>) {
+        super(options);
     }
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
@@ -152,6 +152,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 let picture: Buffer;
                 try {
                     picture = await takePicture();
+                    picture = await this.cropAndScale(picture);
                     this.rawLastPicture = picture;
                 }
                 catch (e) {
@@ -202,6 +203,30 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
+    }
+
+    async cropAndScale(buffer: Buffer) {
+        if (!this.storageSettings.values.snapshotCropScale?.length)
+            return buffer;
+
+        const xmin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
+        const ymin = Math.min(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
+        const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
+        const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
+
+        this.console.log(xmin, ymin, xmax, ymax);
+        const img = await jimp.read(buffer);
+        let pw = xmax - xmin;
+        let ph = pw / (16 / 9);
+
+        const x = Math.round(xmin * img.getWidth());
+        const w = Math.round(xmax * img.getWidth()) - x;
+        const ymid = (ymin + ymax) / 2;
+        let y = Math.round((ymid - ph / 2) * img.getHeight());
+        let h = Math.round((ymid + ph / 2) * img.getHeight()) - y;
+        img.crop(x, y, w, h);
+        const cropped = await img.getBufferAsync('image/jpeg');
+        return cropped;
     }
 
     async createErrorImage(e: any) {
@@ -258,7 +283,14 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider {
         return undefined;
     }
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        return new SnapshotMixin(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, this.nativeId);
+        return new SnapshotMixin({
+            mixinDevice,
+            mixinDeviceInterfaces,
+            mixinDeviceState,
+            mixinProviderNativeId: this.nativeId,
+            group: 'Snapshot',
+            groupKey: 'snapshot',
+        });
     }
 
     async shouldEnableMixin(device: ScryptedDevice) {
