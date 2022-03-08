@@ -89,14 +89,17 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     else {
         args.push(
             "-vcodec", "copy",
-            // 3/6/2022
-            // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
-            // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
-            // unless this flag is used.
-            // 3/7/2022
-            // I believe this is causing issues with some users.
-            // "-bsf:v", "dump_extra",
         );
+
+        // 3/6/2022
+        // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
+        // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
+        // unless this flag is used.
+        // 3/7/2022
+        // This flag was enabled by default, but I believe this is causing issues with some users.
+        // Make it a setting.
+        if (storage.getItem('needsExtraData') === 'true')
+            args.push("-bsf:v", "dump_extra");
     }
 
     args.push(

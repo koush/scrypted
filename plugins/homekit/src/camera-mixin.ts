@@ -82,34 +82,17 @@ export class CameraMixin extends HomekitMixin<any> {
             value: 'WARNING',
             readonly: true,
             description: 'Transcoding audio and video for HomeKit is not recommended. Configure your camera using the camera web portal or app to output the correct HomeKit compatible codecs (h264/aac/2000kbps).',
-        })
+        });
 
         settings.push({
-            title: 'Transcode Streaming',
             group: 'HomeKit Transcoding',
+            key: 'needsExtraData',
+            title: 'Add H264 Extra Data',
+            description: 'Some cameras do not include H264 extra data in the stream and this causes live streaming to always fail (but recordings may be working). This is a inexpensive video filter and does not perform a transcode. Enable this setting only as necessary.',
+            value: (this.storage.getItem('needsExtraData') === 'true').toString(),
             type: 'boolean',
-            key: 'transcodeStreaming',
-            value: (this.storage.getItem('transcodeStreaming') === 'true').toString(),
-            description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
-        settings.push({
-            title: 'Transcode Remote Streaming',
-            group: 'HomeKit Transcoding',
-            type: 'boolean',
-            key: 'transcodeStreamingHub',
-            value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
-            description: 'Remote Streaming via HomeKit Hub: Use FFMpeg to transcode streaming to a format supported by HomeKit.',
-        });
-        if (this.interfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
-            settings.push({
-                title: 'Dynamic Bitrate (Remote Streaming)',
-                group: 'HomeKit Transcoding',
-                type: 'boolean',
-                key: 'dynamicBitrate',
-                value: (this.storage.getItem('dynamicBitrate') === 'true').toString(),
-                description: 'Remote Streaming via HomeKit Hub: Adjust the bitrate of the native camera stream on demand to accomodate available bandwidth. This setting should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
-            });
-        }
+
         let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true'
             || this.storage.getItem('transcodeStreamingHub') === 'true';
 
@@ -120,10 +103,52 @@ export class CameraMixin extends HomekitMixin<any> {
                 key: 'transcodeRecording',
                 type: 'boolean',
                 value: (this.storage.getItem('transcodeRecording') === 'true').toString(),
-                description: 'Use FFMpeg to transcode recording to a format supported by HomeKit Secure Video.',
+                description: 'Use FFMpeg to transcode recordings to a format supported by HomeKit Secure Video.',
             });
 
             showTranscodeArgs = showTranscodeArgs || this.storage.getItem('transcodeRecording') === 'true';
+        }
+
+        settings.push({
+            title: 'Transcode Streaming',
+            group: 'HomeKit Transcoding',
+            type: 'boolean',
+            key: 'transcodeStreaming',
+            value: (this.storage.getItem('transcodeStreaming') === 'true').toString(),
+            description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+        });
+
+        if (this.interfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
+            let value = this.storage.getItem('hubStreamingMode');
+            if (!value) {
+                if (this.storage.getItem('dynamicBitrate') === 'true')
+                    value = 'Dynamic Bitrate';
+                else if (this.storage.getItem('transcodeStreamingHub') === 'true')
+                    value = 'Transcode';
+            }
+
+            settings.push({
+                title: 'Transcode Remote Streaming',
+                group: 'HomeKit Transcoding',
+                key: 'hubStreamingMode',
+                value: value || 'Disabled',
+                choices: [
+                    'Disabled',
+                    'Transcode',
+                    'Dynamic Bitrate',
+                ],
+                description: 'Remote Streaming via HomeKit Hub: Transcode will use FFmpeg to stream a format supported by HomeKit. Dynamic Bitrate adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Dynamic Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
+            });
+        }
+        else {
+            settings.push({
+                title: 'Transcode Remote Streaming',
+                group: 'HomeKit Transcoding',
+                type: 'boolean',
+                key: 'transcodeStreamingHub',
+                value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
+                description: 'Remote Streaming via HomeKit Hub: Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+            });
         }
 
         if (showTranscodeArgs) {
@@ -236,6 +261,21 @@ export class CameraMixin extends HomekitMixin<any> {
             }
             const substitute = args?.join(' ');
             value = substitute ? `\`${substitute}\`` : value;
+        }
+
+        if (key === 'hubStreamingMode') {
+            if (value === 'Dynamic Bitrate') {
+                this.storage.setItem('dynamicBitrate', 'true');
+                this.storage.removeItem('transcodeStreamingHub');
+            }
+            else if (value === 'transcodeStreamingHub') {
+                this.storage.setItem('transcodeStreamingHub', 'true');
+                this.storage.removeItem('dynamicBitrate');
+            }
+            else {
+                this.storage.removeItem('dynamicBitrate');
+                this.storage.removeItem('transcodeStreamingHub');
+            }
         }
 
         if (key === 'objectDetectionContactSensors') {
