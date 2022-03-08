@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 import imutils
 from gi.repository import Gst
-from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected
+from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 
 class OpenCVDetectionSession(DetectionSession):
     def __init__(self) -> None:
@@ -72,6 +72,18 @@ class OpenCVPlugin(DetectPlugin):
                 'placeholder': defaultInterval,
                 'type': 'number',
             },
+            {
+                'title': "Decoder",
+                'description': "The gstreamer element used to decode the stream",
+                'combobox': True,
+                'value': 'decodebin',
+                'placeholder': 'decodebin',
+                'key': 'decoder',
+                'choices': [
+                    'decodebin',
+                    'vtdec_hw',
+                ],
+            }
         ]
         d['settings'] = settings
         return d

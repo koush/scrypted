@@ -73,7 +73,19 @@ class TensorFlowLitePlugin(DetectPlugin):
             'value': defaultThreshold,
             'placeholder': defaultThreshold,
         }
-        d['settings'] = [setting]
+        decoderSetting: Setting = {
+            'title': "Decoder",
+            'description': "The gstreamer element used to decode the stream",
+            'combobox': True,
+            'value': 'decodebin',
+            'placeholder': 'decodebin',
+            'key': 'decoder',
+            'choices': [
+                'decodebin',
+                'vtdec_hw',
+            ],
+        }
+        d['settings'] = [setting, decoderSetting]
         return d
 
     def create_detection_result(self, objs, size, convert_to_src_size=None):
@@ -96,7 +108,8 @@ class TensorFlowLitePlugin(DetectPlugin):
             for detection in detections:
                 bb = detection['boundingBox']
                 x, y, valid = convert_to_src_size((bb[0], bb[1]), True)
-                x2, y2, valid2 = convert_to_src_size((bb[0] + bb[2], bb[1] + bb[3]), True)
+                x2, y2, valid2 = convert_to_src_size(
+                    (bb[0] + bb[2], bb[1] + bb[3]), True)
                 if not valid or not valid2:
                     # print("filtering out", detection['className'])
                     continue

@@ -283,7 +283,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         elif videosrc.startswith('rtsp'):
             videosrc = 'rtspsrc location=%s protocols=tcp ! rtph264depay ! h264parse' % videosrc
         
-        videosrc += " ! decodebin "
+        decoder = settings.get('decoder', 'decodebin')
+        videosrc += " ! %s " % decoder
 
         width = optional_chain(j, 'mediaStreamOptions', 'video', 'width') or 1920
         height = optional_chain(j, 'mediaStreamOptions', 'video', 'height') or 1080
@@ -371,6 +372,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                                           appsink_name=type(self).__name__,
                                           appsink_size=inference_size,
                                           video_input=video_input,
-                                          pixel_format=self.get_pixel_format())
+                                          pixel_format=self.get_pixel_format(),
+                                          )
         task = pipeline.run()
         asyncio.ensure_future(task)
