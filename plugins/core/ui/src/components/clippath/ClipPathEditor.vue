@@ -95,15 +95,13 @@ export default {
 
     removeHandle(i) {
       this.lazyValue.splice(i, 1);
-
-      // Event.$emit("handleRemoved");
-
       this.onInput();
     },
 
     clearPoints() {
       this.customizing = true;
       this.lazyValue.splice(0, this.lazyValue.length);
+      this.onInput();
     }
   },
 };
