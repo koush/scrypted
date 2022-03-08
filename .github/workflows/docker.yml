@@ -24,6 +24,10 @@ jobs:
         with:
           path: server
 
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
 
@@ -54,9 +58,11 @@ jobs:
           tags: |
             koush/scrypted:${{ matrix.node }}
             ${{ matrix.node == '16-bullseye' && format('koush/scrypted:{0}', steps.package-version.outputs.current-version) || '' }}
+            ${{ matrix.node == '16-bullseye' && format('koush/scrypted:nightly-{0}', steps.date.outputs.date) || '' }}
             ${{ matrix.node == '16-bullseye' && 'koush/scrypted:latest' || '' }}
             ghcr.io/koush/scrypted:${{ matrix.node }}
             ${{ matrix.node == '16-bullseye' && format('ghcr.io/koush/scrypted:{0}', steps.package-version.outputs.current-version) || '' }}
+            ${{ matrix.node == '16-bullseye' && format('ghcr.io/koush/scrypted:nightly-{0}', steps.date.outputs.date) || '' }}
             ${{ matrix.node == '16-bullseye' && 'ghcr.io/koush/scrypted:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
