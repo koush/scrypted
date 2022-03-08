@@ -44,8 +44,24 @@ export class StorageSettings<T extends string> implements Settings {
 
     constructor(public device: ScryptedDeviceBase | MixinDeviceBase<any>, public settings: { [key in T]: StorageSetting }) {
         for (const key of Object.keys(settings)) {
+            const setting = settings[key as T];
+            const rawGet = () => this.getItem(key as T);
+            let get: () => any;
+            if (setting.type !== 'clippath') {
+                get = rawGet;
+            }
+            else {
+                // maybe need a mapPut. clippath is the only complex type at the moment.
+                get = () => {
+                    try {
+                        return JSON.parse(rawGet());
+                    }
+                    catch (e) {
+                    }
+                };
+            }
             Object.defineProperty(this.values, key, {
-                get: () => this.getItem(key as T),
+                get,
                 set: value => this.putSetting(key, value),
             });
         }
