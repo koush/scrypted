@@ -14,4 +14,6 @@ jobs:
         url: 'https://registry.npmjs.org/@scrypted/server/'
         method: 'GET'
     - name: Print
-      run: echo ${{ steps.packagejson.outputs.response.data['dist-tags'].latest }}
+      run: echo ${{ steps.packagejson.outputs.response.data }}
+    - name: Print
+      run: echo ${{ steps.packagejson.outputs.response }}
