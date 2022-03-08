@@ -18,6 +18,12 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
       
+      - name: get-npm-version
+        id: package-version
+        uses: martinbeentjes/npm-get-version-action@master
+        with:
+          path: server
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
 
@@ -47,8 +53,10 @@ jobs:
           push: true
           tags: |
             koush/scrypted:${{ matrix.node }}
+            koush/scrypted:${{ matrix.node }}-${{ steps.package-version.outputs.current-version}}
             ${{ matrix.node == '16-bullseye' && 'koush/scrypted:latest' || '' }}
             ghcr.io/koush/scrypted:${{ matrix.node }}
+            ghcr.io/koush/scrypted:${{ matrix.node }}-${{ steps.package-version.outputs.current-version}}
             ${{ matrix.node == '16-bullseye' && 'ghcr.io/koush/scrypted:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
