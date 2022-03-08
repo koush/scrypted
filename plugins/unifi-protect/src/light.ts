@@ -10,10 +10,14 @@ export class UnifiLight extends ScryptedDeviceBase implements OnOff, Brightness,
         this.updateState(protectLight);
     }
     async turnOff(): Promise<void> {
-        await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: false } });
+        const result = await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: false } });
+        if (!result)
+            this.console.error('turnOff failed.');
     }
     async turnOn(): Promise<void> {
-        await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: true } });
+        const result = await this.protect.api.updateLight(this.findLight(), { lightOnSettings: { isLedForceOn: true } });
+        if (!result)
+            this.console.error('turnOn failed.');
     }
     async setBrightness(brightness: number): Promise<void> {
         const ledLevel = Math.round(((brightness as number) / 20) + 1);
