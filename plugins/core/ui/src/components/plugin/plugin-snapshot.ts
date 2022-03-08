@@ -24,7 +24,7 @@ for (const pluginId of Object.keys(snapshot)) {
             console.log('\x1b[33m%s\x1b[0m', `${pluginVersion} not installed. Installing..`);
         }
 
-        // await plugins.installNpm(pluginId, snapshot[pluginId])
+        await plugins.installNpm(pluginId, snapshot[pluginId])
         console.log('\x1b[32m%s\x1b[0m', `${pluginVersion} installed.`);
 
     }
