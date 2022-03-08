@@ -1,6 +1,15 @@
+import { ScryptedStatic } from '@scrypted/types';
+import { DeviceManager } from '@scrypted/types';
+import { DeviceCreator } from '@scrypted/types';
+import { ScryptedInterface } from '@scrypted/types';
+import { Scriptable } from '@scrypted/types';
 import { SystemManager } from '@scrypted/types';
 import axios from 'axios';
 import semver from 'semver';
+const pluginSnapshot = require("!!raw-loader!./plugin-snapshot.ts").default.split('\n')
+.filter(line => !line.includes('SCRYPTED_FILTER_EXAMPLE_LINE'))
+.join('\n')
+.trim();
 
 import { getComponentWebPath } from "../helpers";
 const componentPath = getComponentWebPath('script');
@@ -79,6 +88,35 @@ export function installNpm(systemManager: SystemManager, npmPackage: string, ver
     return scryptedId;
 }
 
-export function getNpmPath(npmPackage) {
+export function getNpmPath(npmPackage: string) {
     return `https://www.npmjs.com/package/${npmPackage}`;
+}
+
+export async function snapshotCurrentPlugins(scrypted: ScryptedStatic): Promise<string> {
+    const { systemManager, deviceManager } = scrypted;
+
+    const plugins = await systemManager.getComponent("plugins");
+    const id = await plugins.getIdForNativeId('@scrypted/core', 'scriptcore');
+    const scriptCore = systemManager.getDeviceById<DeviceCreator & Scriptable>(id);
+    const backupId = await scriptCore.createDevice({
+        name: 'Plugins Snapshot: ' + new Date().toDateString(),
+    });
+
+    const installedPlugins: { [pluginId: string]: string } = {};
+
+    Object.keys(systemManager.getSystemState())
+        .map(id => systemManager.getDeviceById(id))
+        .filter(device => device.interfaces.includes(ScryptedInterface.ScryptedPlugin))
+        .forEach(plugin => installedPlugins[plugin.info.manufacturer] = plugin.info.version);
+
+    const script = `const snapshot = ${JSON.stringify(installedPlugins, undefined, 2)};\n${pluginSnapshot}`;
+    console.log(script);
+    const backup = systemManager.getDeviceById<Scriptable>(backupId);
+    backup.saveScript({
+        script: `// Running the script will restore your plugins to the versions
+// contained in this snapshot. Your settings will remain.
+// You can view the progress and errors in the console.
+const snapshot = ${JSON.stringify(installedPlugins, undefined, 2)};\n${pluginSnapshot}`,
+    })
+    return backupId;
 }

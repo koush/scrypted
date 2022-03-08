@@ -4,6 +4,7 @@ import PluginUpdate from "./PluginUpdate.vue";
 import PluginPid from "./PluginPid.vue";
 import PluginStats from "./PluginStats.vue";
 import { getDeviceViewPath } from "../helpers";
+import { snapshotCurrentPlugins } from "./plugin";
 
 export default {
   mixins: [BasicComponent],
@@ -24,6 +25,10 @@ export default {
       );
       this.$router.push(getDeviceViewPath(id));
     },
+    async snapshotCurrentPlugins() {
+      const id = await snapshotCurrentPlugins(this.$scrypted);
+      this.$router.push(getDeviceViewPath(id));
+    },
   },
   data() {
     var self = this;
@@ -41,9 +46,15 @@ export default {
               },
             },
             {
-              title: "Configure Autoupdater",
+              title: "Setup Auto Updates",
               click() {
                 self.openAutoupdater();
+              },
+            },
+            {
+              title: "Snapshot Current Plugins",
+              click() {
+                self.snapshotCurrentPlugins();
               },
             },
           ],
@@ -97,7 +108,9 @@ export default {
         });
 
         await Promise.allSettled(promises);
-        devices.sort((d1, d2) => d1.name < d2.name ? -1 : d2.name < d1.name ? 1 : 0);
+        devices.sort((d1, d2) =>
+          d1.name < d2.name ? -1 : d2.name < d1.name ? 1 : 0
+        );
 
         return [
           {
