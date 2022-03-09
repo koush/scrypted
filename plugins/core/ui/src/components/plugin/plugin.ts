@@ -99,8 +99,12 @@ export async function snapshotCurrentPlugins(scrypted: ScryptedStatic): Promise<
     const id = await plugins.getIdForNativeId('@scrypted/core', 'scriptcore');
     const scriptCore = systemManager.getDeviceById<DeviceCreator & Scriptable>(id);
     const backupId = await scriptCore.createDevice({
-        name: 'Plugins Snapshot: ' + new Date().toDateString(),
     });
+    // need to set the name so it doesn't get clobbered by ScriptCore reporting a
+    // blank providedName later.
+    const name = 'Plugins Snapshot: ' + new Date().toDateString();
+    const backup = systemManager.getDeviceById<Scriptable>(backupId);
+    await backup.setName(name);
 
     const installedPlugins: { [pluginId: string]: string } = {};
 
@@ -111,12 +115,11 @@ export async function snapshotCurrentPlugins(scrypted: ScryptedStatic): Promise<
 
     const script = `const snapshot = ${JSON.stringify(installedPlugins, undefined, 2)};\n${pluginSnapshot}`;
     console.log(script);
-    const backup = systemManager.getDeviceById<Scriptable>(backupId);
-    backup.saveScript({
+    await backup.saveScript({
         script: `// Running the script will restore your plugins to the versions
 // contained in this snapshot. Your settings will remain.
 // You can view the progress and errors in the console.
 const snapshot = ${JSON.stringify(installedPlugins, undefined, 2)};\n${pluginSnapshot}`,
-    })
+    });
     return backupId;
 }

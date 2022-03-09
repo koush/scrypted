@@ -149,7 +149,8 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   args.push('-vcodec', 'rawvideo');
   args.push('-pix_fmt', 'yuv420p');
   if (options?.maxWidth) {
-    args.push('-vf', `scale=${options.maxWidth}:-1`);
+    // args.push('-vf', `scale=${options.maxWidth}:-1`);
+    args.push('-vf', 'scale=w=iw/2:h=ih/2');
   }
   args.push('-f', 'rawvideo');
   args.push(`tcp://127.0.0.1:${videoPort}`);
