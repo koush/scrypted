@@ -420,13 +420,10 @@ class PrebufferSession {
     else if (reencodeAudio || mustTranscode) {
       acodec = [
         '-bsf:a', 'aac_adtstoasc',
-        // '-acodec', 'libfdk_aac',
         '-acodec', 'aac',
-        '-ar', `8k`,
-        '-b:a', `100k`,
-        '-bufsize', '400k',
+        '-ar', `32k`,
+        '-b:a', `32k`,
         '-ac', `1`,
-        // can we change this to aac_eld somehow? mpegts does not support aac eld (AOT-39).
         '-profile:a', 'aac_low',
         '-flags', '+global_header',
       ];
