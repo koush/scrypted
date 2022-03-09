@@ -90,7 +90,9 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
                 if (!deviceInterfaces)
                     return;
 
-                let interfaces = [];
+                let interfaces = [
+                    '@scrypted/mqtt',
+                ];
                 interfaces.push(...deviceInterfaces);
                 // try combine into existing device if this mqtt device presents
                 // a node id, which may imply multiple interfaces.

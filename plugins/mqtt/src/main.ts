@@ -117,6 +117,7 @@ class MqttDevice extends MqttDeviceBase implements Scriptable {
                 ...createScriptDevice([
                     ScryptedInterface.Scriptable,
                     ScryptedInterface.Settings,
+                    '@scrypted/mqtt'
                 ])
             }
             await scryptedEval(this, script, {
@@ -393,7 +394,10 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
             deviceManager.onDeviceDiscovered({
                 nativeId,
                 name: name,
-                interfaces: [ScryptedInterface.Scriptable, ScryptedInterface.Settings],
+                interfaces: [ScryptedInterface.Scriptable,
+                    ScryptedInterface.Settings,
+                    '@scrypted/mqtt'
+                ],
                 type: ScryptedDeviceType.Unknown,
             });
 
@@ -447,6 +451,8 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
 
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
+        if (interfaces.includes('@scrypted/mqtt'))
+            return;
         return isPublishable(type, interfaces) ? [ScryptedInterface.Settings] : undefined;
     }
 
