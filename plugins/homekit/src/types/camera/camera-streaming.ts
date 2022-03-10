@@ -2,7 +2,12 @@ import sdk, { Camera, Intercom, MediaStreamOptions, ScryptedDevice, ScryptedInte
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
+import { RtcpReceiverInfo, RtcpRrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/rr';
+import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
+import { RtcpSrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/sr';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
+import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
+import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
 import { HomeKitSession } from '../../common';
 import { CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
@@ -33,6 +38,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
     homekitSession: HomeKitSession) {
     const sessions = new Map<string, CameraStreamingSession>();
     const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
+    let idleTimeout: NodeJS.Timeout;
 
     function killSession(sessionID: string) {
         const session = sessions.get(sessionID);
@@ -41,12 +47,12 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             return;
 
         console.log('streaming session killed');
+        clearTimeout(idleTimeout);
         sessions.delete(sessionID);
         session.killed = true;
         session.cp?.kill('SIGKILL');
         session.videoReturn?.close();
         session.audioReturn?.close();
-        session.opusMangler?.close();
         session.rtpSink?.destroy();
         if (twoWayAudio)
             device.stopIntercom();
@@ -160,14 +166,58 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 selectedStream = msos.find(mso => mso.name === streamingChannel);
             }
 
+            const minBitrate = selectedStream?.video?.minBitrate;
+            const maxBitrate = selectedStream?.video?.maxBitrate;
+
+            const dynamicBitrate = storage.getItem('dynamicBitrate') === 'true'
+                && session.isHomeKitHub
+                && device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration);
+
+            let currentBitrate: number;
+            let lastPerfectBitrate: number;
+            let lastTotalPacketsLost = 0;
+            const tryRtcpReconfigureBitrate = (rr: RtcpRrPacket) => {
+                if (!dynamicBitrate)
+                    return;
+
+                let totalPacketsLost = 0;
+                for (const report of rr.reports) {
+                    totalPacketsLost += report.packetsLost;
+                }
+
+                const packetsLost = totalPacketsLost - lastTotalPacketsLost;
+                lastTotalPacketsLost = totalPacketsLost;
+                if (packetsLost === 0) {
+                    lastPerfectBitrate = currentBitrate;
+                    // what is a good rampup?
+                    if (currentBitrate >= maxBitrate)
+                        return;
+                    currentBitrate = Math.round(currentBitrate * 1.25);
+                }
+                else {
+                    if (currentBitrate <= minBitrate)
+                        return;
+                    // slow creep back up
+                    if (currentBitrate > lastPerfectBitrate)
+                        currentBitrate = lastPerfectBitrate * 1.05;
+                    else
+                        currentBitrate = Math.round(currentBitrate / 2);
+                }
+
+                currentBitrate = Math.max(minBitrate, currentBitrate);
+                currentBitrate = Math.min(maxBitrate, currentBitrate);
+
+                const reconfigured: MediaStreamOptions = Object.assign({
+                    id: selectedStream?.id,
+                    video: {
+                    },
+                }, selectedStream || {});
+                reconfigured.video.bitrate = currentBitrate;
+                console.log('Reconfigure bitrate (rtcp feedback):', currentBitrate, 'Packets lost:', packetsLost);
+                device.setVideoStreamOptions(reconfigured);
+            };
+
             const tryReconfigureBitrate = () => {
-                if (!session.isHomeKitHub)
-                    return;
-
-                if (!device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration))
-                    return;
-
-                const dynamicBitrate = storage.getItem('dynamicBitrate') === 'true';
                 if (!dynamicBitrate)
                     return;
 
@@ -176,11 +226,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     video: {
                     },
                 }, selectedStream || {});
-                const bitrate = request.video.max_bit_rate * 1000;
-                reconfigured.video.bitrate = bitrate;
+                currentBitrate = request.video.max_bit_rate * 1000;
+                reconfigured.video.bitrate = currentBitrate;
 
+                console.log('reconfigure bitrate (request):', currentBitrate);
                 device.setVideoStreamOptions(reconfigured);
-                console.log('reconfigure selected stream', selectedStream);
             }
 
             if (request.type === StreamRequestTypes.RECONFIGURE) {
@@ -191,6 +241,53 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 session.startRequest = request as StartStreamRequest;
             }
             tryReconfigureBitrate();
+
+            const vconfig = {
+                keys: {
+                    localMasterKey: session.prepareRequest.video.srtp_key,
+                    localMasterSalt: session.prepareRequest.video.srtp_salt,
+                    remoteMasterKey: session.prepareRequest.video.srtp_key,
+                    remoteMasterSalt: session.prepareRequest.video.srtp_salt,
+                },
+                profile: ProtectionProfileAes128CmHmacSha1_80,
+            };
+
+
+            // watch for data to verify other side is alive.
+            const resetIdleTimeout = () => {
+                clearTimeout(idleTimeout);
+                idleTimeout = setTimeout(() => {
+                    console.log('HomeKit Streaming RTCP timed out. Terminating Streaming.');
+                    killSession(request.sessionID);
+                }, 30000);
+            }
+
+            const vrtcp = new SrtcpSession(vconfig);
+            session.videoReturn.on('message', data => {
+                resetIdleTimeout();
+                if (!dynamicBitrate)
+                    return;
+                const d = vrtcp.decrypt(data);
+                const rtcp = RtcpPacketConverter.deSerialize(d);
+                const rr = rtcp.find(packet => packet.type === 201);
+                if (!rr)
+                    return;
+                tryRtcpReconfigureBitrate(rr as RtcpRrPacket);
+            });
+            if (dynamicBitrate) {
+                // reset the video bitrate to max after a dynanic bitrate session ends.
+                session.videoReturn.on('close', async () => {
+                    const reconfigured: MediaStreamOptions = Object.assign({
+                        id: selectedStream?.id,
+                        video: {
+                        },
+                    }, selectedStream || {});
+                    reconfigured.video.bitrate = maxBitrate;
+                    console.log('reconfigure bitrate (reset)', maxBitrate);
+                    await device.setVideoStreamOptions(reconfigured);
+                })
+            }
+            resetIdleTimeout();
 
             console.log('isHomeKitHub:', session.isHomeKitHub,
                 'selected stream:', selectedStream?.name || 'Default/undefined',
@@ -216,7 +313,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             // audio talkback
             if (twoWayAudio) {
                 const socketType = session.prepareRequest.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-
                 const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
                 // this is a bit hacky, as it picks random ports and spams audio at it.

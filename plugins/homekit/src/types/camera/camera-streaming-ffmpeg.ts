@@ -110,7 +110,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
         "-srtp_out_params", videoKey.toString('base64'),
         `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
-    )
+    );
 
     if (!noAudio) {
         // audio encoding
@@ -184,22 +184,22 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                     profile: ProtectionProfileAes128CmHmacSha1_80,
                 };
 
-                const mangler = await createBindZero();
+                const audioForwarder = await createBindZero();
+                session.audioReturn.on('close', () => audioForwarder.server.close());
 
-                const sender = createCameraStreamSender(aconfig, mangler.server,
+                const audioSender = createCameraStreamSender(aconfig, session.audioReturn,
                     session.audiossrc, session.startRequest.audio.pt,
                     session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
                     session.startRequest.audio.rtcp_interval,
                     session.startRequest.audio.packet_time,
                     session.startRequest.audio.sample_rate,
                 );
-                session.opusMangler = mangler.server;
-                mangler.server.on('message', data => {
+                audioForwarder.server.on('message', data => {
                     const packet = RtpPacket.deSerialize(data);
-                    sender(packet);
+                    audioSender(packet);
                 });
                 args.push(
-                    `rtp://127.0.0.1:${mangler.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
+                    `rtp://127.0.0.1:${audioForwarder.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
                 )
             }
             else {
