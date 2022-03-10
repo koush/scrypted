@@ -25,6 +25,7 @@ Select the appropriate guide. After installation is finished, remember to visit 
  * [ReadyNAS: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-ReadyNAS)
  * [Synology: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Synology-NAS)
  * [QNAP: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-QNAP-NAS)
+ * [Unraid: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Unraid)
  
 ## Discord
 
