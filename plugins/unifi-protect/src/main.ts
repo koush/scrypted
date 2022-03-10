@@ -11,6 +11,7 @@ import { UnifiLock } from "./lock";
 const { deviceManager } = sdk;
 
 const filter = [
+    'channels',
     'recordingSchedules',
     'stats',
     'wifiConnectionState',

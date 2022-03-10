@@ -189,17 +189,6 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
 
-    getDefaultOrderedVideoStreamOptions(vsos: MediaStreamOptions[]) {
-        if (!vsos || !vsos.length)
-            return vsos;
-        const defaultStream = this.getDefaultStream(vsos);
-        if (!defaultStream)
-            return vsos;
-        vsos = vsos.filter(vso => vso.id !== defaultStream?.id);
-        vsos.unshift(defaultStream);
-        return vsos;
-    }
-
     getDefaultStream(vsos: MediaStreamOptions[]) {
         let defaultStreamIndex = vsos.findIndex(vso => vso.id === this.storage.getItem('defaultStream'));
         if (defaultStreamIndex === -1)
@@ -309,13 +298,14 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const rtspChannel = camera.channels.find(check => check.id.toString() === vso.id);
 
         const { rtspAlias } = rtspChannel;
-        const u = `rtsp://${this.protect.getSetting('ip')}:7447/${rtspAlias}`
+        const u = `rtsps://${this.protect.getSetting('ip')}:7441/${rtspAlias}`
 
-        return mediaManager.createMediaObject({
+        const data = Buffer.from(JSON.stringify({
             url: u,
             container: 'rtsp',
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
-        } as MediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
+        } as MediaStreamUrl));
+        return mediaManager.createMediaObject(data, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     createMediaStreamOptions(channel: ProtectCameraChannelConfig) {
@@ -346,10 +336,10 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
     async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
         const camera = this.findCamera();
-        const video: MediaStreamOptions[] = camera.channels
+        const vsos = camera.channels
             .map(channel => this.createMediaStreamOptions(channel));
 
-        return this.getDefaultOrderedVideoStreamOptions(video);
+        return vsos;
     }
 
     async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
@@ -361,7 +351,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const channel = camera.channels.find(channel => channel.id.toString() === options.id);
 
         const sanitizedBitrate = Math.min(channel.maxBitrate, Math.max(channel.minBitrate, bitrate));
-        this.console.log('bitrate change requested', bitrate, 'clamped to', sanitizedBitrate);
+        this.console.log(channel.name, 'bitrate change requested', bitrate, 'clamped to', sanitizedBitrate);
         channel.bitrate = sanitizedBitrate;
         const cameraResult = await this.protect.api.updateCameraChannels(camera);
         if (!cameraResult) {
