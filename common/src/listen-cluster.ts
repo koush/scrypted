@@ -1,4 +1,4 @@
-import net, { AddressInfo } from 'net';
+import net from 'net';
 import { once } from 'events';
 import dgram from 'dgram';
 
@@ -6,6 +6,16 @@ export async function listenZero(server: net.Server) {
     server.listen(0);
     await once(server, 'listening');
     return (server.address() as net.AddressInfo).port;
+}
+
+export function closeQuiet(socket: dgram.Socket) {
+    if (!socket)
+        return;
+    try {
+        socket.close()
+    }
+    catch (e) {
+    }
 }
 
 export async function bindUdp(server: dgram.Socket, usePort: number) {

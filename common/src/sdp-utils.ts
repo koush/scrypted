@@ -1,3 +1,11 @@
+export function replacePorts(sdp: string, audioPort: number, videoPort: number) {
+    let outputSdp = sdp
+        .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
+        .replace(/m=audio \d+/, `m=audio ${audioPort}`)
+        .replace(/m=video \d+/, `m=video ${videoPort}`);
+    return outputSdp;
+}
+
 export function addTrackControls(sdp: string) {
     let lines = sdp.split('\n').map(line => line.trim());
     lines = lines.filter(line => !line.includes('a=control:'));
