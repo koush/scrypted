@@ -27,6 +27,9 @@
       "interfaces": [
          "DeviceProvider",
          "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin"
       ]
    },
    "dependencies": {
