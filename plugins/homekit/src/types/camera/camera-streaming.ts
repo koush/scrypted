@@ -2,9 +2,8 @@ import sdk, { Camera, Intercom, MediaStreamOptions, ScryptedDevice, ScryptedInte
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
-import { RtcpReceiverInfo, RtcpRrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/rr';
+import { RtcpRrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/rr';
 import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
-import { RtcpSrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/sr';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
@@ -12,6 +11,7 @@ import { HomeKitSession } from '../../common';
 import { CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
+import { DynamicBitrateSession } from './camera-dynamic-bitrate';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
@@ -68,11 +68,10 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
             const { socket: videoReturn, port: videoPort } = await getPort(socketType);
             const { socket: audioReturn, port: audioPort } = await getPort(socketType);
-            const isHomeKitHub = homekitSession.isHomeKitHub(request.targetAddress);
+
 
             const session: CameraStreamingSession = {
                 killed: false,
-                isHomeKitHub,
                 prepareRequest: request,
                 startRequest: null,
                 videossrc,
@@ -80,6 +79,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 cp: null,
                 videoReturn,
                 audioReturn,
+                isLowBandwidth: undefined,
             }
 
             sessions.set(request.sessionID, session);
@@ -156,9 +156,19 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             callback();
 
+            if (request.type === StreamRequestTypes.RECONFIGURE) {
+                session?.tryReconfigureBitrate('reconfigure', request.video.max_bit_rate * 1000);
+                return;
+            }
+
+            session.startRequest = request as StartStreamRequest;
+
             let selectedStream: MediaStreamOptions;
 
-            const streamingChannel = session.isHomeKitHub
+            const isLowBandwidthDevice = request.audio.packet_time !== 20;
+            session.isLowBandwidth = isLowBandwidthDevice;
+
+            const streamingChannel = isLowBandwidthDevice
                 ? storage.getItem('streamingChannelHub')
                 : storage.getItem('streamingChannel');
             if (streamingChannel) {
@@ -166,92 +176,67 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 selectedStream = msos.find(mso => mso.name === streamingChannel);
             }
 
+            selectedStream = selectedStream || {
+                id: undefined,
+            };
+            if (isLowBandwidthDevice)
+                selectedStream.prebuffer = 0;
+
             const minBitrate = selectedStream?.video?.minBitrate;
             const maxBitrate = selectedStream?.video?.maxBitrate;
 
             const dynamicBitrate = storage.getItem('dynamicBitrate') === 'true'
-                && session.isHomeKitHub
+                && isLowBandwidthDevice
                 && device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration);
+            session.startRequest = request as StartStreamRequest;
 
-            let currentBitrate: number;
-            let lastPerfectBitrate: number;
-            let lastTotalPacketsLost = 0;
-            const tryRtcpReconfigureBitrate = (rr: RtcpRrPacket) => {
-                if (!dynamicBitrate)
-                    return;
+            if (dynamicBitrate) {
+                const initialBitrate = request.video.max_bit_rate * 1000;
+                const dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate);
 
-                let totalPacketsLost = 0;
-                for (const report of rr.reports) {
-                    totalPacketsLost += report.packetsLost;
+                session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
+                    dynamicBitrateSession.onBitrateReconfigured(bitrate);
+                    const reconfigured: MediaStreamOptions = Object.assign({
+                        id: selectedStream?.id,
+                        video: {
+                        },
+                    }, selectedStream || {});
+                    reconfigured.video.bitrate = bitrate;
+
+                    console.log(`reconfigure bitrate (${reason}) ${bitrate}`);
+                    device.setVideoStreamOptions(reconfigured);
                 }
 
-                const packetsLost = totalPacketsLost - lastTotalPacketsLost;
-                lastTotalPacketsLost = totalPacketsLost;
-                if (packetsLost === 0) {
-                    lastPerfectBitrate = currentBitrate;
-                    // what is a good rampup?
-                    if (currentBitrate >= maxBitrate)
-                        return;
-                    currentBitrate = Math.round(currentBitrate * 1.25);
-                }
-                else {
-                    if (currentBitrate <= minBitrate)
-                        return;
-                    // slow creep back up
-                    if (currentBitrate > lastPerfectBitrate)
-                        currentBitrate = lastPerfectBitrate * 1.05;
-                    else
-                        currentBitrate = Math.round(currentBitrate / 2);
-                }
+                session.tryReconfigureBitrate('start', initialBitrate);
 
-                currentBitrate = Math.max(minBitrate, currentBitrate);
-                currentBitrate = Math.min(maxBitrate, currentBitrate);
-
-                const reconfigured: MediaStreamOptions = Object.assign({
-                    id: selectedStream?.id,
-                    video: {
+                const vconfig = {
+                    keys: {
+                        localMasterKey: session.prepareRequest.video.srtp_key,
+                        localMasterSalt: session.prepareRequest.video.srtp_salt,
+                        remoteMasterKey: session.prepareRequest.video.srtp_key,
+                        remoteMasterSalt: session.prepareRequest.video.srtp_salt,
                     },
-                }, selectedStream || {});
-                reconfigured.video.bitrate = currentBitrate;
-                console.log('Reconfigure bitrate (rtcp feedback):', currentBitrate, 'Packets lost:', packetsLost);
-                device.setVideoStreamOptions(reconfigured);
-            };
+                    profile: ProtectionProfileAes128CmHmacSha1_80,
+                };
+                const vrtcp = new SrtcpSession(vconfig);
 
-            const tryReconfigureBitrate = () => {
-                if (!dynamicBitrate)
-                    return;
+                session.videoReturn.on('message', data => {
+                    if (!dynamicBitrate)
+                        return;
+                    const d = vrtcp.decrypt(data);
+                    const rtcp = RtcpPacketConverter.deSerialize(d);
+                    const rr = rtcp.find(packet => packet.type === 201);
+                    if (!rr)
+                        return;
+                    if (dynamicBitrateSession.shouldReconfigureBitrate(rr as RtcpRrPacket))
+                        session.tryReconfigureBitrate('rtcp', dynamicBitrateSession.currentBitrate)
+                });
 
-                const reconfigured: MediaStreamOptions = Object.assign({
-                    id: selectedStream?.id,
-                    video: {
-                    },
-                }, selectedStream || {});
-                currentBitrate = request.video.max_bit_rate * 1000;
-                reconfigured.video.bitrate = currentBitrate;
-
-                console.log('reconfigure bitrate (request):', currentBitrate);
-                device.setVideoStreamOptions(reconfigured);
+                // reset the video bitrate to max after a dynanic bitrate session ends.
+                session.videoReturn.on('close', async () => {
+                    session.tryReconfigureBitrate('stop', maxBitrate);
+                });
             }
-
-            if (request.type === StreamRequestTypes.RECONFIGURE) {
-                tryReconfigureBitrate();
-                return;
-            }
-            else {
-                session.startRequest = request as StartStreamRequest;
-            }
-            tryReconfigureBitrate();
-
-            const vconfig = {
-                keys: {
-                    localMasterKey: session.prepareRequest.video.srtp_key,
-                    localMasterSalt: session.prepareRequest.video.srtp_salt,
-                    remoteMasterKey: session.prepareRequest.video.srtp_key,
-                    remoteMasterSalt: session.prepareRequest.video.srtp_salt,
-                },
-                profile: ProtectionProfileAes128CmHmacSha1_80,
-            };
-
 
             // watch for data to verify other side is alive.
             const resetIdleTimeout = () => {
@@ -262,36 +247,13 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }, 30000);
             }
 
-            const vrtcp = new SrtcpSession(vconfig);
-            session.videoReturn.on('message', data => {
+            session.videoReturn.on('message', () => {
                 resetIdleTimeout();
-                if (!dynamicBitrate)
-                    return;
-                const d = vrtcp.decrypt(data);
-                const rtcp = RtcpPacketConverter.deSerialize(d);
-                const rr = rtcp.find(packet => packet.type === 201);
-                if (!rr)
-                    return;
-                tryRtcpReconfigureBitrate(rr as RtcpRrPacket);
             });
-            if (dynamicBitrate) {
-                // reset the video bitrate to max after a dynanic bitrate session ends.
-                session.videoReturn.on('close', async () => {
-                    const reconfigured: MediaStreamOptions = Object.assign({
-                        id: selectedStream?.id,
-                        video: {
-                        },
-                    }, selectedStream || {});
-                    reconfigured.video.bitrate = maxBitrate;
-                    console.log('reconfigure bitrate (reset)', maxBitrate);
-                    await device.setVideoStreamOptions(reconfigured);
-                })
-            }
             resetIdleTimeout();
 
-            console.log('isHomeKitHub:', session.isHomeKitHub,
-                'selected stream:', selectedStream?.name || 'Default/undefined',
-                'audio.packet_time:', session.startRequest.audio.packet_time);
+            console.log('isLowBandwidth:', session.isLowBandwidth,
+                'selected stream:', selectedStream?.name || 'Default/undefined');
 
             try {
                 if (CAMERA_STREAM_PERFECT_CODECS) {

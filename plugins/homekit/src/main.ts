@@ -106,16 +106,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 value: this.getAdvertiser(),
             },
             {
-                group: 'Performance',
-                title: 'HomeKit Hubs',
-                description: 'Optional: The addresses of your HomeKit Hubs. When HomeKit streams to outside of your local network, it is routed through a HomeKit hub. Scrypted can use a lower bitrate stream to keep your remote viewing session responsive.',
-                key: 'homekitHubs',
-                choices: [...this.homekitConnections],
-                value: this.getHomeKitHubs(),
-                multiple: true,
-                combobox: true,
-            },
-            {
                 key: 'forceOpus',
                 group: 'Performance',
                 title: 'Force Opus Audio Codec',
@@ -127,12 +117,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
-        if (key === 'homekitHubs') {
-            this.storage.setItem(key, JSON.stringify(value));
-        }
-        else {
-            this.storage.setItem(key, value.toString());
-        }
+        this.storage.setItem(key, value.toString());
 
         if (key === 'portOverride' || key === 'advertiserOverride') {
             this.log.a('Reload the HomeKit plugin to apply this change.');
@@ -346,44 +331,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             this.storage.setItem('portOverride', port.toString());
         }
         return port;
-    }
-
-    getHomeKitHubs(): string[] {
-        try {
-            return JSON.parse(this.storage.getItem('homekitHubs'));
-        }
-        catch (e) {
-        }
-    }
-
-    getAutoHomeKitHubs(): string[] {
-        try {
-            return JSON.parse(this.storage.getItem('autoHomekitHubs'));
-        }
-        catch (e) {
-            return [];
-        }
-    }
-
-    isHomeKitHub(address: string) {
-        return !!this.getHomeKitHubs()?.find(check => check.endsWith(address));
-    }
-
-    detectedHomeKitHub(ip: string) {
-        try {
-            const homekitHubs = this.getHomeKitHubs();
-            if (homekitHubs?.includes(ip))
-                return;
-            const autoHomekitHubs = this.getAutoHomeKitHubs();
-            if (autoHomekitHubs.includes(ip))
-                return;
-            autoHomekitHubs.push(ip);
-            homekitHubs.push(ip);
-            this.storage.setItem('autoHomekitHubs', JSON.stringify(autoHomekitHubs));
-            this.storage.setItem('homekitHubs', JSON.stringify(homekitHubs));
-        }
-        catch (e) {
-        }
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]) {

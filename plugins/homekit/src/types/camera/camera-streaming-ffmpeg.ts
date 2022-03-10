@@ -13,7 +13,6 @@ const { mediaManager } = sdk;
 
 export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: MediaStreamOptions, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
 
-    const { isHomeKitHub } = session;
     const request = session.startRequest;
 
     const videomtu = session.startRequest.video.mtu;
@@ -36,7 +35,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         '-hide_banner',
     ];
 
-    const transcodeStreaming = isHomeKitHub
+    const transcodeStreaming = session.isLowBandwidth
         ? storage.getItem('transcodeStreamingHub') === 'true'
         : storage.getItem('transcodeStreaming') === 'true';
 

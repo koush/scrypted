@@ -1,6 +1,6 @@
 import { ChildProcess } from 'child_process';
 import dgram from 'dgram';
-import { PrepareStreamRequest, StartStreamRequest, CameraController } from '../../hap';
+import { PrepareStreamRequest, StartStreamRequest } from '../../hap';
 import { HomeKitRtpSink } from '../../rtp/rtp-ffmpeg-input';
 
 export interface CameraStreamingSession {
@@ -13,7 +13,8 @@ export interface CameraStreamingSession {
     videoReturn: dgram.Socket;
     audioReturn: dgram.Socket;
     rtpSink?: HomeKitRtpSink;
-    isHomeKitHub: boolean;
+    isLowBandwidth: boolean;
+    tryReconfigureBitrate?: (reason: string, bitrate: number) => void;
 }
 
 export type KillCameraStreamingSession = () => void;

@@ -33,10 +33,10 @@ export class CameraMixin extends HomekitMixin<any> {
             });
 
             settings.push({
-                title: 'Live Stream (remote streaming)',
+                title: 'Live Stream (remote streaming and Apple Watch)',
                 key: 'streamingChannelHub',
                 value: this.storage.getItem('streamingChannelHub') || msos[0].name,
-                description: 'The media stream to use when streaming from outside your home network.',
+                description: 'The media stream to use when streaming from outside your home network or to limited capability devices like Apple Watch.',
                 choices: msos.map(mso => mso.name),
             });
         }
@@ -128,7 +128,7 @@ export class CameraMixin extends HomekitMixin<any> {
             }
 
             settings.push({
-                title: 'Transcode Remote Streaming',
+                title: 'Transcode Remote Streaming and Apple Watch',
                 group: 'HomeKit Transcoding',
                 key: 'hubStreamingMode',
                 value: value || 'Disabled',
@@ -137,17 +137,17 @@ export class CameraMixin extends HomekitMixin<any> {
                     'Transcode',
                     'Dynamic Bitrate',
                 ],
-                description: 'Remote Streaming via HomeKit Hub: Transcode will use FFmpeg to stream a format supported by HomeKit. Dynamic Bitrate adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Dynamic Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
+                description: 'The transcode options to use when remote streaming or streaming to limited capabilitity devices like Apple Watch. "Transcode" will use FFmpeg to stream a format supported by HomeKit. "Dynamic Bitrate" adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Dynamic Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
             });
         }
         else {
             settings.push({
-                title: 'Transcode Remote Streaming',
+                title: 'Transcode Remote Streaming and Apple Watch',
                 group: 'HomeKit Transcoding',
                 type: 'boolean',
                 key: 'transcodeStreamingHub',
                 value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
-                description: 'Remote Streaming via HomeKit Hub: Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+                description: 'Transcode when remote streaming and streaming to limited capabilitity devices like Apple Watch.',
             });
         }
 
