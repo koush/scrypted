@@ -83,7 +83,7 @@ class PrebufferSession {
   rebroadcastModeKey: string;
   rtspParserKey: string;
 
-  constructor(public mixin: PrebufferMixin, public streamName: string, public streamId: string, public stopInactive: boolean) {
+  constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: MediaStreamOptions, public stopInactive: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
@@ -92,6 +92,14 @@ class PrebufferSession {
     this.rebroadcastModeKey = 'rebroadcastMode-' + this.streamId;
     this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
     this.rtspParserKey = 'rtspParser-' + this.streamId;
+  }
+
+  get streamId() {
+    return this.advertisedMediaStreamOptions.id;
+  }
+
+  get streamName() {
+    return this.advertisedMediaStreamOptions.name;
   }
 
   clearPrebuffers() {
@@ -233,36 +241,38 @@ class PrebufferSession {
       )
     };
 
-    if (session) {
-      if (this.canUseRtspParser(muxingMp4)
-        && rtspMode
-        && session.mediaStreamOptions?.container === 'rtsp') {
 
-        const value = this.getParser(rtspMode, muxingMp4, session.mediaStreamOptions);
+    if (this.canUseRtspParser(muxingMp4)
+      && rtspMode
+      && this.advertisedMediaStreamOptions?.container === 'rtsp') {
 
-        settings.push(
-          {
-            key: this.rtspParserKey,
-            group,
-            title: 'RTSP Parser',
-            description: `Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser is lower latency. The Scrypted Parser is only available when the Audo Codec is not Transcoding and the Rebroadcast Container is RTSP. The default is "${value}" for this camera.`,
-            value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
-            choices: [
-              STRING_DEFAULT,
-              FFMPEG_PARSER,
-              SCRYPTED_PARSER,
-            ],
-          }
-        );
+      const value = this.getParser(rtspMode, muxingMp4, this.advertisedMediaStreamOptions);
 
-        if (value !== SCRYPTED_PARSER) {
-          // ffmpeg parser is being used, so add ffmpeg input arguments option.
-          addFFmpegInputArgumentsSettings();
+      settings.push(
+        {
+          key: this.rtspParserKey,
+          group,
+          title: 'RTSP Parser',
+          description: `Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser is lower latency. The Scrypted Parser is only available when the Audo Codec is not Transcoding and the Rebroadcast Container is RTSP. The default is "${value}" for this camera.`,
+          value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
+          choices: [
+            STRING_DEFAULT,
+            FFMPEG_PARSER,
+            SCRYPTED_PARSER,
+          ],
         }
-      }
-      else {
+      );
+
+      if (value !== SCRYPTED_PARSER) {
+        // ffmpeg parser is being used, so add ffmpeg input arguments option.
         addFFmpegInputArgumentsSettings();
       }
+    }
+    else {
+      addFFmpegInputArgumentsSettings();
+    }
+
+    if (session) {
 
       settings.push(
         {
@@ -292,10 +302,6 @@ class PrebufferSession {
       );
     }
     else {
-      // adding this option even when using the scrypted parser is a failsafe
-      // in case the parsing won't start.
-      addFFmpegInputArgumentsSettings();
-
       settings.push(
         {
           title: 'Status',
@@ -985,7 +991,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         const name = mso?.name;
         const notEnabled = !enabledIds.includes(id)
         const stopInactive = isBatteryPowered || notEnabled;
-        session = new PrebufferSession(this, name, id, stopInactive);
+        session = new PrebufferSession(this, mso, stopInactive);
         this.sessions.set(id, session);
         if (id === msos?.[0]?.id)
           this.sessions.set(undefined, session);
