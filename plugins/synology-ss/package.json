@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/synology-ss",
-   "version": "0.0.10",
+   "version": "0.0.11",
    "description": "A Synology Surveillance Station plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -28,6 +28,9 @@
       "interfaces": [
          "DeviceProvider",
          "Settings"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin"
       ]
    },
    "dependencies": {

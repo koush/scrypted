@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/hikvision",
-   "version": "0.0.92",
+   "version": "0.0.93",
    "description": "HikVision Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -27,6 +27,9 @@
       "interfaces": [
          "DeviceProvider",
          "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin"
       ]
    },
    "dependencies": {

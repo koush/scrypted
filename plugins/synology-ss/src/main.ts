@@ -1,9 +1,8 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
-import { recommendRebroadcast } from "../../rtsp/src/recommend";
 import {SynologyApiClient, SynologyCameraStream, SynologyCamera} from "./api/synology-api-client";
 
-const { log, deviceManager, mediaManager } = sdk;
+const { deviceManager, mediaManager } = sdk;
 
 class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpRequestHandler, MotionSensor, Settings, VideoCamera {
     private static readonly DefaultSensorTimeoutSecs: number = 30;
@@ -18,17 +17,6 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
 
         this.motionDetected = false;
         this.streams = SynologyCameraDevice.identifyStreams(camera);
-    }
-
-    private getDefaultOrderedVideoStreamOptions(vsos: MediaStreamOptions[]) {
-        if (!vsos || !vsos.length)
-            return vsos;
-        const defaultStream = this.getDefaultStream(vsos);
-        if (!defaultStream)
-            return vsos;
-        vsos = vsos.filter(vso => vso.id !== defaultStream?.id);
-        vsos.unshift(defaultStream);
-        return vsos;
     }
 
     private getDefaultStream(vsos: MediaStreamOptions[]) {
@@ -126,6 +114,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
         const ret: MediaStreamOptions = {
             id: stream.id,
             name: stream.id,
+            container: 'rtsp',
             video: {
                 codec: 'h264',
                 width: parseInt(stream.resolution.substring(0, stream.resolution.indexOf('x'))),
@@ -141,9 +130,8 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
     }
 
     public async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-        const video = this.streams.map(channel => this.createMediaStreamOptions(channel));
-
-        return this.getDefaultOrderedVideoStreamOptions(video);
+        const vsos = this.streams.map(channel => this.createMediaStreamOptions(channel));
+        return vsos;
     }
 
     public async getPictureOptions(): Promise<PictureOptions[]> {
@@ -196,7 +184,6 @@ class SynologySurveillanceStation extends ScryptedDeviceBase implements Settings
         super(nativeId);
 
         this.startup = this.discoverDevices(0);
-        recommendRebroadcast();
     }
 
     public async discoverDevices(duration: number): Promise<void> {
