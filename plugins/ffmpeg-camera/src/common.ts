@@ -53,20 +53,9 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
         return;
     }
 
-    getDefaultOrderedVideoStreamOptions(vsos: T[]) {
-        if (!vsos || !vsos.length)
-            return vsos;
-        const defaultStream = this.getDefaultStream(vsos);
-        if (!defaultStream)
-            return vsos;
-        vsos = vsos.filter(vso => vso.id !== defaultStream?.id);
-        vsos.unshift(defaultStream);
-        return vsos;
-    }
-
     async getVideoStreamOptions(): Promise<T[]> {
-        let vsos = this.getRawVideoStreamOptions();
-        return this.getDefaultOrderedVideoStreamOptions(vsos);
+        const vsos = this.getRawVideoStreamOptions();
+        return vsos;
     }
 
     abstract getRawVideoStreamOptions(): T[];
@@ -101,36 +90,11 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
     }
 
     getDefaultStream(vsos: T[]) {
-        let defaultStreamIndex = vsos?.findIndex(vso => vso.id === this.storage.getItem('defaultStream'));
-        if (defaultStreamIndex === -1)
-            defaultStreamIndex = 0;
-
-        defaultStreamIndex = defaultStreamIndex || 0;
-        return vsos?.[defaultStreamIndex];
+        return vsos?.[0];
     }
 
     async getStreamSettings(): Promise<Setting[]> {
-        try {
-            const vsos = await this.getVideoStreamOptions();
-            if (!vsos?.length || vsos?.length === 1)
-                return [];
-
-
-            const defaultStream = this.getDefaultStream(vsos);
-            return [
-                {
-                    title: 'Default Stream',
-                    group: 'Advanced',
-                    key: 'defaultStream',
-                    value: defaultStream?.name,
-                    choices: vsos.map(vso => vso.name),
-                    description: 'The default stream to use when not specified',
-                }
-            ];
-        }
-        catch (e) {
-            return [];
-        }
+        return [];
     }
 
     getUsernameDescription(): string {
