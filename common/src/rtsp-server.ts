@@ -105,21 +105,29 @@ export function parseSemicolonDelimited(value: string) {
 export class RtspBase {
     client: net.Socket;
 
-    write(line: string, headers: Headers, body?: Buffer) {
-        let response = `${line}\r\n`;
+    constructor(public console?: Console) {
+    }
+
+    write(messageLine: string, headers: Headers, body?: Buffer) {
+        let message = `${messageLine}\r\n`;
         if (body)
             headers['Content-Length'] = body.length.toString();
         for (const [key, value] of Object.entries(headers)) {
-            response += `${key}: ${value}\r\n`;
+            message += `${key}: ${value}\r\n`;
         }
-        response += '\r\n';
-        this.client.write(response);
+        message += '\r\n';
+        this.client.write(message);
+        this.console?.log('rtsp outgpoing message\n', message);
+        this.console?.log();
         if (body)
             this.client.write(body);
     }
 
     async readMessage(): Promise<string[]> {
-        return readMessage(this.client);
+        const message = await readMessage(this.client);
+        this.console?.log('rtsp incoming message\n', message.join('\n'));
+        this.console?.log();
+        return message;
     }
 }
 
@@ -131,8 +139,8 @@ export class RtspClient extends RtspBase {
     session: string;
     authorization: string;
 
-    constructor(public url: string) {
-        super();
+    constructor(public url: string, console?: Console) {
+        super(console);
         const u = new URL(url);
         const port = parseInt(u.port) || 554;
         if (url.startsWith('rtsps')) {
