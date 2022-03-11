@@ -79,8 +79,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             return;
         bitrate = Math.round(bitrate / 1000);
         // what is Encode[0]? Is that the camera number?
+        const channel = parseInt(this.getRtspChannel()) || 1;
+        const format = options.id === 'channel0' ? 'MainFormat' : 'ExtraFormat';
         const response = await this.getClient().digestAuth.request({
-            url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&Encode[0].MainFormat[${this.getChannelFromMediaStreamOptionsId(options.id)}].Video.BitRate=${bitrate}`
+            url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&Encode[${channel - 1}].${format}[0].Video.BitRate=${bitrate}`
         });
         this.console.log('reconfigure result', response.data);
     }
