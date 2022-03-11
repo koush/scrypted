@@ -1277,8 +1277,10 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
           for (const session of mixin.sessions.values()) {
             if (u.pathname.endsWith(session.rtspServerPath)) {
               server.console = session.console;
-              server.sdp = await session.sdp;
               prebufferSession = session;
+              prebufferSession.ensurePrebufferSession();
+              await prebufferSession.parserSessionPromise;
+              server.sdp = await prebufferSession.sdp;
               return true;
             }
           }
@@ -1292,15 +1294,16 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
 
       try {
         await server.handlePlayback();
-        prebufferSession.ensurePrebufferSession();
         const session = await prebufferSession.parserSessionPromise;
+
+        const requestedPrebuffer = Math.max(4000, (prebufferSession.detectedIdrInterval || 4000)) * 1.5;
 
         prebufferSession.handleRebroadcasterClient({
           isActiveClient: true,
           container: 'rtsp',
           session,
           socketPromise: Promise.resolve(client),
-          requestedPrebuffer: 0,
+          requestedPrebuffer,
         });
 
         await server.handleTeardown();
