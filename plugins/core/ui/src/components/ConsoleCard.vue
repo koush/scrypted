@@ -10,6 +10,23 @@
         </template>
         <span>Copy</span>
       </v-tooltip>
+      <v-tooltip bottom>
+        <template v-slot:activator="{ on }">
+          <v-btn v-on="on" text @click="expanded = !expanded">
+            <v-icon x-small>fa-angle-double-down</v-icon>
+          </v-btn>
+        </template>
+        <span>Toggle Expand</span>
+      </v-tooltip>
+
+      <v-tooltip bottom>
+        <template v-slot:activator="{ on }">
+          <v-btn @click="clear" v-on="on" text
+            ><v-icon small> fas fa-trash</v-icon>
+          </v-btn>
+        </template>
+        <span>Clear</span>
+      </v-tooltip>
     </v-toolbar>
     <div ref="terminal"></div>
   </v-card>
@@ -24,7 +41,27 @@ export default {
   props: ["deviceId"],
   socket: null,
   buffer: [],
+  term: null,
+  watch: {
+    expanded(oldValue, newValue) {
+      if (this.expanded) this.term.resize(this.term.cols, this.term.rows * 2.5);
+      else this.term.resize(this.term.cols, this.term.rows / 2.5);
+    },
+  },
+  data() {
+    return {
+      expanded: false,
+    };
+  },
   methods: {
+    async clear() {
+      this.term.clear();
+      this.buffer = [];
+      const plugins = await this.$scrypted.systemManager.getComponent(
+        "plugins"
+      );
+      plugins.clearConsole(this.deviceId);
+    },
     reconnect(term) {
       this.buffer = [];
       const endpointPath = `/endpoint/@scrypted/core`;
@@ -58,6 +95,7 @@ export default {
     term.loadAddon(fitAddon);
     term.open(this.$refs.terminal);
     fitAddon.fit();
+    this.term = term;
 
     this.reconnect(term);
   },
