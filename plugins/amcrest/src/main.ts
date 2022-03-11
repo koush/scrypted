@@ -4,22 +4,34 @@ import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { EventEmitter } from "stream";
 import child_process, { ChildProcess } from 'child_process';
-import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
+import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import net from 'net';
-import { listenZero } from "../../../common/src/listen-cluster";
-import { readLength } from "../../../common/src/read-stream";
+import { listenZero } from "@scrypted/common/src/listen-cluster";
+import { readLength } from "@scrypted/common/src/read-stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
+import { parse } from "path";
 
 const { mediaManager } = sdk;
 
 const AMCREST_DOORBELL_TYPE = 'Amcrest Doorbell';
 const DAHUA_DOORBELL_TYPE = 'Dahua Doorbell';
 
+function findValue(blob: string, prefix: string, key: string) {
+    const lines = blob.split('\n');
+    const value = lines.find(line => line.startsWith(`${prefix}.${key}`));
+    if (!value)
+        return;
+
+    const parts = value.split('=');
+    return parts[1];
+}
+
 class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
-    maxExtraStreams: number;
+    maxExtraStreams: Promise<number>;
+    videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     onvifIntercom = new OnvifIntercom(this);
 
     constructor(nativeId: string, provider: RtspProvider) {
@@ -189,7 +201,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 description: 'Amcrest cameras may support both Amcrest and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
                 choices,
             },
-        )
+        );
 
         return ret;
     }
@@ -223,27 +235,88 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         return ret;
     }
 
-
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
-        let mas = this.maxExtraStreams;
+        const client = this.getClient();
+
         if (!this.maxExtraStreams) {
-            const client = this.getClient();
-            try {
-                const response = await client.digestAuth.request({
-                    url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`,
-                    responseType: 'text',
-                    httpsAgent: amcrestHttpsAgent,
-                })
-                this.maxExtraStreams = parseInt(response.data.split('=')[1].trim());
-                mas = this.maxExtraStreams;
-            }
-            catch (e) {
-                this.console.error('error retrieving max extra streams', e);
-            }
+            this.maxExtraStreams = (async () => {
+                let mas: string;
+                try {
+                    const response = await client.digestAuth.request({
+                        url: `http://${this.getHttpAddress()}/cgi-bin/magicBox.cgi?action=getProductDefinition&name=MaxExtraStream`,
+                        responseType: 'text',
+                        httpsAgent: amcrestHttpsAgent,
+                    })
+                    mas = response.data.split('=')[1].trim();
+                    this.storage.setItem('maxExtraStreams', mas.toString());
+                }
+                catch (e) {
+                    this.console.error('error retrieving max extra streams', e);
+                    mas = this.storage.getItem('maxExtraStreams');
+                    this.maxExtraStreams = undefined;
+                }
+                return parseInt(mas) || 1;
+            })();
         }
-        mas = mas || 1;
-        const channel = this.getRtspChannel() || '1';
-        return [...Array(mas + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
+
+        if (!this.videoStreamOptions) {
+            this.videoStreamOptions = (async () => {
+                const mas = await this.maxExtraStreams;
+                const channel = parseInt(this.getRtspChannel()) || 1;
+                const vsos = [...Array(mas + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
+
+                try {
+                    const capResponse = await client.digestAuth.request({
+                        url: `http://${this.getHttpAddress()}/cgi-bin/encode.cgi?action=getConfigCaps&channel=0`,
+                        responseType: 'text',
+                        httpsAgent: amcrestHttpsAgent,
+                    });
+                    this.console.log(capResponse.data);
+                    const encodeResponse = await client.digestAuth.request({
+                        url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=getConfig&name=Encode`,
+                        responseType: 'text',
+                        httpsAgent: amcrestHttpsAgent,
+                    });
+                    this.console.log(encodeResponse.data);
+
+                    for (let i = 0; i < vsos.length; i++) {
+                        const vso = vsos[i];
+                        let capName: string;
+                        let encName: string;
+                        if (i === 0) {
+                            capName = `caps[${channel - 1}].MainFormat[0]`;
+                            encName = `table.Encode[${channel - 1}].MainFormat[0]`;
+                        }
+                        else {
+                            capName = `caps[${channel - 1}].ExtraFormat[${i - 1}]`;
+                            encName = `table.Encode[${channel - 1}].ExtraFormat[${i - 1}]`;
+                        }
+
+                        const bitrateOptions = findValue(capResponse.data, capName, 'Video.BitRateOptions');
+                        if (!bitrateOptions)
+                            continue;
+
+                        const encodeOptions = findValue(encodeResponse.data, encName, 'Video.BitRate');
+                        if (!encodeOptions)
+                            continue;
+
+                        const [min, max] = bitrateOptions.split(',');
+                        if (!min || !max)
+                            continue;
+                        vso.video.bitrate = parseInt(encodeOptions) * 1000;
+                        vso.video.maxBitrate = parseInt(max) * 1000;
+                        vso.video.minBitrate = parseInt(min) * 1000;
+                    }
+                }
+                catch (e) {
+                    this.console.error('error retrieving stream configurations', e);
+                }
+
+                return vsos;
+            })();
+        }
+
+        return this.videoStreamOptions;
     }
 
     async putSetting(key: string, value: string) {

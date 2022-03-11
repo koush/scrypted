@@ -18,7 +18,6 @@ The optimal/reliable codec settings can be found in the documentation for the [H
 * Specify `Type` is `Doorbell` (at top under device Name)
 * `Username` admin
 * `Password` (see below)
-* `Default Stream` set to properly configured video codec stream (Main Stream = `Stream 1`; Sub Stream 1 = `Stream 2`; Sub Stream 2 = `Stream 3`; and so on)
 * `Doorbell Type` is `Amcrest Doorbell` 
  
 The `admin` user account credentials is required to (1) add doorbell to Scrypted or (2) change codec settings with `IP Config Software` or `Amcrest Surveillance Pro` applications. 
@@ -36,8 +35,6 @@ Each 'Channel' or (camera) Device attached to the NVR must be configured as sepa
 * `IP Address` NVR's IP Address
 * `Snapshot URL Override` camera's IP address (preferred) or specific port number of NVR for that camera (may work). That is: `http://<camera IP address>/cgi-bin/snapshot.cgi` or `http://<NVR IP address>:<NVR port # for camera>/cgi-bin/snapshot.cgi`
 * `Channel Number Override` camera's channel number as known to DVR
-* `Default Stream` Properly configured video codec stream (Main Stream = `Stream 1`; Sub Stream 1 = `Stream 2`; Sub Stream 2 = `Stream 3`; and so on)
-
 
 
 # Troubleshooting
@@ -45,7 +42,6 @@ Each 'Channel' or (camera) Device attached to the NVR must be configured as sepa
 * Is the URL attempting to use HTTPS?  Try disabling HTTPS on the device to see if that resolves issue (do not use self-signed certs).
 * Does your account (`Username`) have proper permissions ("Authority" in Amcrest speak)?  Try granting all Authority for testing.  See below `User Account Authority (Camera or NVR)`.
 * Amcrest Doorbell: `Username` is **admin** and `Password` is the device/camera password -- not Amcrest Smart Home (Cloud) account password.
-* Check that you have specified the correct `Default Stream` number in device (in Scrypted).
 * Check that you have configured the correct Stream number's codec settings (in Amcrest admin page (Main Stream or Sub Stream(s)).
 
 ## User Account Authority (Camera or NVR)

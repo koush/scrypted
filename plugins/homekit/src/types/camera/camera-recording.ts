@@ -102,6 +102,10 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
                     ['-acodec', aacLowEncoder, '-profile:a', 'aac_low'] :
                     ['-acodec', 'libfdk_aac', '-profile:a', 'aac_eld']),
                 '-ar', `${AudioRecordingSamplerateValues[configuration.audioCodec.samplerate]}k`,
+                // technically, this should be used for VBR (which this plugin offers).
+                // will see about changing it later.
+                // '-q:a', '3',
+                // this is used for CBR.
                 '-b:a', `${configuration.audioCodec.bitrate}k`,
                 '-ac', `${configuration.audioCodec.audioChannels}`
             ];

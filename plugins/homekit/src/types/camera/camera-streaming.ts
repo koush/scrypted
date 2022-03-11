@@ -192,7 +192,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             if (dynamicBitrate) {
                 const initialBitrate = request.video.max_bit_rate * 1000;
-                const dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate);
+                const dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate, console);
 
                 session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
                     dynamicBitrateSession.onBitrateReconfigured(bitrate);

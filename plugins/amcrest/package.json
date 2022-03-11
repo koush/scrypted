@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/amcrest",
-   "version": "0.0.86",
+   "version": "0.0.89",
    "description": "Amcrest Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -35,6 +35,7 @@
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
       "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/common": "file:../../common",
       "@types/multiparty": "^0.0.33",
       "multiparty": "^4.2.2"
    },

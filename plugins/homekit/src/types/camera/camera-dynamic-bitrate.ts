@@ -1,19 +1,4 @@
-import sdk, { Camera, Intercom, MediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
-import dgram, { SocketType } from 'dgram';
-import { once } from 'events';
-import os from 'os';
 import { RtcpRrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/rr';
-import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
-import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
-import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { HomeKitSession } from '../../common';
-import { CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
-import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
-import { createSnapshotHandler } from '../camera/camera-snapshot';
-import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
-import { CameraStreamingSession } from './camera-streaming-session';
-import { startCameraStreamSrtp } from './camera-streaming-srtp';
 
 export class DynamicBitrateSession {
     currentBitrate: number;
@@ -21,7 +6,7 @@ export class DynamicBitrateSession {
     lastPerfectBitrate: number;
     lastTotalPacketsLost = 0;
 
-    constructor(initialBitrate: number, public minBitrate: number, public maxBitrate: number) {
+    constructor(initialBitrate: number, public minBitrate: number, public maxBitrate: number, public console?: Console) {
         this.currentBitrate = initialBitrate;
         this.lastPerfectBitrate = initialBitrate;
     }
@@ -72,7 +57,7 @@ export class DynamicBitrateSession {
         this.currentBitrate = Math.max(this.minBitrate, this.currentBitrate);
         this.currentBitrate = Math.min(this.maxBitrate, this.currentBitrate);
 
-        console.log('Packets lost:', packetsLost);
+        this.console?.log('Packets lost:', packetsLost);
         return true;
     };
 }
