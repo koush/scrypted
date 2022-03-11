@@ -7,15 +7,17 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityT
 import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, MP4Atom, parseMp4StreamChunks } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
-import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { parsePayloadTypes, parseTrackIds } from '@scrypted/common/src/sdp-utils';
 import { createRtspParser, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
 import { Duplex } from 'stream';
 import net from 'net';
 import { readLength } from '@scrypted/common/src/read-stream';
+import { StorageSettings } from '@scrypted/common/src/settings';
 import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { sleep } from '@scrypted/common/src/sleep';
+import crypto from 'crypto';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -83,6 +85,7 @@ class PrebufferSession {
   lastDetectedAudioCodecKey: string;
   rebroadcastModeKey: string;
   rtspParserKey: string;
+  rtspServerPath: string;
 
   constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: MediaStreamOptions, public stopInactive: boolean) {
     this.storage = mixin.storage;
@@ -93,6 +96,13 @@ class PrebufferSession {
     this.rebroadcastModeKey = 'rebroadcastMode-' + this.streamId;
     this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
     this.rtspParserKey = 'rtspParser-' + this.streamId;
+    const rtspServerPathKey = 'rtspServerPathKey-' + this.streamId;
+
+    this.rtspServerPath = this.storage.getItem(rtspServerPathKey);
+    if (!this.rtspServerPath) {
+      this.rtspServerPath = crypto.randomBytes(8).toString('hex');
+      this.storage.setItem(rtspServerPathKey, this.rtspServerPath);
+    }
   }
 
   get streamId() {
@@ -316,6 +326,17 @@ class PrebufferSession {
           readonly: true,
         },
       )
+    }
+
+    if (rtspMode) {
+      settings.push({
+        group,
+        key: 'rtspRebroadcastUrl',
+        title: 'RTSP Rebroadcast Url',
+        description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
+        readonly: true,
+        value: `rtsp://localhost:${this.mixin.plugin.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
+      });
     }
 
     return settings;
@@ -755,6 +776,77 @@ class PrebufferSession {
     }, 30000);
   }
 
+  async handleRebroadcasterClient(options: {
+    isActiveClient: boolean,
+    container: PrebufferParsers,
+    session: ParserSession<PrebufferParsers>,
+    socketPromise: Promise<Duplex>,
+    requestedPrebuffer: number,
+  }) {
+    const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
+
+    handleRebroadcasterClient(socketPromise, {
+      // console: this.console,
+      connect: (writeData, destroy) => {
+        if (isActiveClient) {
+          this.activeClients++;
+          this.printActiveClients();
+        }
+        else {
+          // this.console.log('passive client request started');
+        }
+
+        const now = Date.now();
+
+        const safeWriteData = (chunk: StreamChunk) => {
+          const buffered = writeData(chunk);
+          if (buffered > 100000000) {
+            this.console.log('more than 100MB has been buffered, did downstream die? killing connection.', this.streamName);
+            cleanup();
+          }
+        }
+
+        const cleanup = () => {
+          destroy();
+          session.removeListener(container, safeWriteData);
+          session.removeListener('killed', cleanup);
+        }
+
+        session.on(container, safeWriteData);
+        session.once('killed', cleanup);
+
+        const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+        if (true) {
+          for (const prebuffer of prebufferContainer) {
+            if (prebuffer.time < now - requestedPrebuffer)
+              continue;
+
+            safeWriteData(prebuffer.chunk);
+          }
+        }
+        else {
+          // for some reason this doesn't work as well as simply guessing and dumping.
+          const parser = this.parsers[container];
+          const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
+          for (const prebuffer of availablePrebuffers) {
+            safeWriteData(prebuffer);
+          }
+        }
+
+        return () => {
+          if (isActiveClient) {
+            this.activeClients--;
+            this.inactivityCheck(session);
+          }
+          else {
+            // this.console.log('passive client request ended');
+          }
+          cleanup();
+        };
+      }
+    })
+  }
+
   async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
     this.ensurePrebufferSession();
 
@@ -784,7 +876,6 @@ class PrebufferSession {
     }
 
     const createContainerServer = async (container: PrebufferParsers) => {
-      const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
       let socketPromise: Promise<Duplex>;
       let containerUrl: string;
@@ -809,65 +900,13 @@ class PrebufferSession {
 
       const isActiveClient = options?.refresh !== false;
 
-      handleRebroadcasterClient(socketPromise, {
-        // console: this.console,
-        connect: (writeData, destroy) => {
-          if (isActiveClient) {
-            this.activeClients++;
-            this.printActiveClients();
-          }
-          else {
-            // this.console.log('passive client request started');
-          }
-
-          const now = Date.now();
-
-          const safeWriteData = (chunk: StreamChunk) => {
-            const buffered = writeData(chunk);
-            if (buffered > 100000000) {
-              this.console.log('more than 100MB has been buffered, did downstream die? killing connection.', this.streamName);
-              cleanup();
-            }
-          }
-
-          const cleanup = () => {
-            destroy();
-            session.removeListener(container, safeWriteData);
-            session.removeListener('killed', cleanup);
-          }
-
-          session.on(container, safeWriteData);
-          session.once('killed', cleanup);
-
-          if (true) {
-            for (const prebuffer of prebufferContainer) {
-              if (prebuffer.time < now - requestedPrebuffer)
-                continue;
-
-              safeWriteData(prebuffer.chunk);
-            }
-          }
-          else {
-            // for some reason this doesn't work as well as simply guessing and dumping.
-            const parser = this.parsers[container];
-            const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
-            for (const prebuffer of availablePrebuffers) {
-              safeWriteData(prebuffer);
-            }
-          }
-
-          return () => {
-            if (isActiveClient) {
-              this.activeClients--;
-              this.inactivityCheck(session);
-            }
-            else {
-              // this.console.log('passive client request ended');
-            }
-            cleanup();
-          };
-        }
-      })
+      this.handleRebroadcasterClient({
+        isActiveClient,
+        container,
+        requestedPrebuffer,
+        socketPromise,
+        session,
+      });
 
       return containerUrl;
     }
@@ -948,7 +987,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   released = false;
   sessions = new Map<string, PrebufferSession>();
 
-  constructor(options: SettingsMixinDeviceOptions<VideoCamera>) {
+
+  constructor(public plugin: PrebufferProvider, options: SettingsMixinDeviceOptions<VideoCamera>) {
     super(options);
 
     this.delayStart();
@@ -1026,7 +1066,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
               const ps = await session.parserSessionPromise;
               active++;
               wasActive = true;
-              this.online = active == total;
+              this.online = !!active;
               await once(ps, 'killed');
               this.console.error('prebuffer session ended');
             }
@@ -1037,7 +1077,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
               if (wasActive)
                 active--;
               wasActive = false;
-              this.online = active == total;
+              this.online = !!active;
             }
             this.console.log('restarting prebuffer session in 5 seconds');
             await new Promise(resolve => setTimeout(resolve, 5000));
@@ -1178,6 +1218,16 @@ function millisUntilMidnight() {
 }
 
 class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider, BufferConverter {
+  storageSettings = new StorageSettings(this, {
+    rebroadcastPort: {
+      title: 'Rebroadcast Port',
+      description: 'The port of the RTSP server that will rebroadcast your streams.',
+      type: 'number',
+    }
+  });
+  rtspServer: net.Server;
+  currentMixins = new Map<string, PrebufferMixin>();
+
   constructor(nativeId?: string) {
     super(nativeId);
 
@@ -1205,6 +1255,64 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
     const twoAM = midnight + 2 * 60 * 60 * 1000;
     this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
     setTimeout(() => deviceManager.requestRestart(), twoAM);
+
+    this.startRtspServer();
+  }
+
+  startRtspServer() {
+    closeQuiet(this.rtspServer);
+
+    this.rtspServer = new net.Server(async (client) => {
+      let prebufferSession: PrebufferSession;
+
+      const server = new RtspServer(client, undefined, undefined, async (method, url, headers, rawMessage) => {
+        server.checkRequest = undefined;
+
+        const u = new URL(url);
+
+        for (const id of this.currentMixins.keys()) {
+          const mixin = this.currentMixins.get(id);
+          for (const session of mixin.sessions.values()) {
+            if (u.pathname.endsWith(session.rtspServerPath)) {
+              server.console = session.console;
+              server.sdp = await session.sdp;
+              prebufferSession = session;
+              return true;
+            }
+          }
+        }
+
+        return false;
+      });
+
+      this.console.log('RTSP Rebroadcast connection started.')
+      server.console = this.console;
+
+      try {
+        await server.handlePlayback();
+        prebufferSession.ensurePrebufferSession();
+        const session = await prebufferSession.parserSessionPromise;
+
+        prebufferSession.handleRebroadcasterClient({
+          isActiveClient: true,
+          container: 'rtsp',
+          session,
+          socketPromise: Promise.resolve(client),
+          requestedPrebuffer: 0,
+        });
+
+        await server.handleTeardown();
+      }
+      catch (e) {
+        client.destroy();
+      }
+      this.console.log('RTSP Rebroadcast connection finished.')
+    });
+
+    if (!this.storageSettings.values.rebroadcastPort)
+      this.storageSettings.values.rebroadcastPort = Math.round(Math.random() * 10000 + 30000);
+
+    this.rtspServer.listen(this.storageSettings.values.rebroadcastPort);
   }
 
   async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer> {
@@ -1268,7 +1376,7 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
     this.setHasEnabledMixin(mixinDeviceState.id);
-    return new PrebufferMixin({
+    const ret = new PrebufferMixin(this, {
       mixinDevice,
       mixinDeviceState,
       mixinProviderNativeId: this.nativeId,
@@ -1276,10 +1384,14 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
       group: "Prebuffer Settings",
       groupKey: "prebuffer",
     });
+    this.currentMixins.set(mixinDeviceState.id, ret);
+    return ret;
   }
+
   async releaseMixin(id: string, mixinDevice: any) {
     mixinDevice.online = true;
-    mixinDevice.release();
+    await mixinDevice.release();
+    this.currentMixins.delete(id);
   }
 }
 
