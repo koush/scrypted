@@ -294,7 +294,7 @@ export class RtspServer {
         audio: 0,
     };
 
-    constructor(public client: Duplex, public sdp?: string, public udp?: dgram.Socket) {
+    constructor(public client: Duplex, public sdp?: string, public udp?: dgram.Socket, public checkRequest?: (method: string, url: string, headers: Headers, rawMessage: string[]) => Promise<boolean>) {
         this.session = randomBytes(4).toString('hex');
         if (sdp)
             sdp = sdp.trim();
@@ -402,11 +402,15 @@ export class RtspServer {
     setup(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
         const transport = requestHeaders['transport'];
-        headers['Transport'] = requestHeaders['transport'];
+        headers['Transport'] = transport;
         headers['Session'] = this.session;
         let audioTrack = findTrack(this.sdp, 'audio');
         let videoTrack = findTrack(this.sdp, 'video');
         if (transport.includes('UDP')) {
+            if (!this.udp) {
+                this.respond(461, 'Unsupported Transport', requestHeaders, {});
+                return;
+            }
             const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/);
             const [_, rtp, rtcp] = match;
             if (audioTrack && url.includes(audioTrack.trackId))
@@ -478,6 +482,21 @@ export class RtspServer {
         let [method, url] = headers[0].split(' ', 2);
         method = method.toLowerCase();
         const requestHeaders = parseHeaders(headers);
+        if (this.checkRequest) {
+            let allow: boolean;
+            try {
+                allow = await this.checkRequest(method, url, requestHeaders, headers)
+            }
+            catch (e) {
+                this.console?.error('error checking request', e);
+            }
+            if (!allow) {
+                this.respond(400, 'Bad Request', requestHeaders, {});
+                this.client.destroy();
+                throw new Error('check request failed');
+            }
+        }
+
         const thisAny = this as any;
         if (!thisAny[method]) {
             this.respond(400, 'Bad Request', requestHeaders, {});

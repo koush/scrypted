@@ -8,11 +8,11 @@ export async function listenZero(server: net.Server) {
     return (server.address() as net.AddressInfo).port;
 }
 
-export function closeQuiet(socket: dgram.Socket) {
+export async function closeQuiet(socket: dgram.Socket | net.Server) {
     if (!socket)
         return;
     try {
-        socket.close()
+        await new Promise(resolve => socket.close(resolve));
     }
     catch (e) {
     }
