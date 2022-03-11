@@ -189,25 +189,9 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
 
-    getDefaultStream(vsos: MediaStreamOptions[]) {
-        let defaultStreamIndex = vsos.findIndex(vso => vso.id === this.storage.getItem('defaultStream'));
-        if (defaultStreamIndex === -1)
-            defaultStreamIndex = 0;
-
-        return vsos[defaultStreamIndex];
-    }
-
     async getSettings(): Promise<Setting[]> {
         const vsos = await this.getVideoStreamOptions();
-        const defaultStream = this.getDefaultStream(vsos);
         return [
-            {
-                title: 'Default Stream',
-                key: 'defaultStream',
-                value: defaultStream?.name,
-                choices: vsos.map(vso => vso.name),
-                description: 'The default stream to use when not specified',
-            },
             {
                 title: 'Sensor Timeout',
                 key: 'sensorTimeout',
@@ -218,14 +202,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async putSetting(key: string, value: string | number | boolean) {
-        if (key === 'defaultStream') {
-            const vsos = await this.getVideoStreamOptions();
-            const stream = vsos.find(vso => vso.name === value);
-            this.storage.setItem('defaultStream', stream?.id);
-        }
-        else {
-            this.storage.setItem(key, value?.toString());
-        }
+        this.storage.setItem(key, value?.toString());
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
@@ -293,7 +270,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const camera = this.findCamera();
         const vsos = await this.getVideoStreamOptions();
-        const vso = vsos.find(check => check.id === options?.id) || this.getDefaultStream(vsos);
+        const vso = vsos.find(check => check.id === options?.id) || vsos[0];
 
         const rtspChannel = camera.channels.find(check => check.id.toString() === vso.id);
 
