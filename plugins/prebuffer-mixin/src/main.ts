@@ -527,7 +527,9 @@ class PrebufferSession {
       const parser = createRtspParser({
         vcodec,
         // the rtsp parser should always stream copy unless audio is soft muted.
-        acodec,
+        acodec: isUsingDefaultAudioConfig
+          ? ['-acodec', 'copy']
+          : acodec,
       });
       this.sdp = parser.sdp;
       rbo.parsers.rtsp = parser;
