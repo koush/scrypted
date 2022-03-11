@@ -1,196 +1,140 @@
 <template>
   <v-layout>
     <v-flex xs12 md6 lg4>
-      <!-- <GmapMap
-        :center="position"
-        :zoom="16"
-        ref="mapRef"
-        style="height: 400px"
-        :options="{
-          mapTypeControl: false,
-          fullscreenControl: false,
-        }"
-      >
-        <GmapMarker :position="position" />
-      </GmapMap>
+      <v-card v-if="updateAvailable">
+        <v-toolbar>
+          <v-toolbar-title>Update Available </v-toolbar-title>
+        </v-toolbar>
+        <v-card-subtitle>
+          Installed:
+          <v-chip x-small color="info">{{ currentVersion }}</v-chip> &nbsp;
+          Update: <v-chip color="green" x-small>{{ updateAvailable }}</v-chip>
+        </v-card-subtitle>
+        <v-card-text v-if="!canUpdate">
+          There is an update available for Scrypted. Pull the new docker image
+          to upgrade. If you are using Watchtower, an update check and
+          installation happens automatically once a day.
+        </v-card-text>
+        <v-card-text v-else>
+          There is an update available for Scrypted.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            v-if="!canUpdate"
+            small
+            text
+            href="https://github.com/koush/scrypted#installation"
+            >More Information</v-btn
+          >
+          <v-dialog v-else v-model="updateAndRestart" width="500">
+            <template v-slot:activator="{ on }">
+              <v-btn small text color="red" v-on="on"
+                >Update and Restart Scrypted</v-btn
+              >
+            </template>
 
-      <v-flex>
-        <v-text-field
-          ref="locationAutocomplete"
-          autocomplete="off"
-          outlined
-          label="Set Location (Maps, Timezone)"
-          placeholder="Set Location"
-          v-model="location"
-        ></v-text-field>
-      </v-flex>
+            <v-card color="red" dark>
+              <v-card-title primary-title>Restart Scrypted</v-card-title>
 
-      <v-flex>
-        <v-btn color="primary" @click="goLegacy" outlined dark block
-          >Legacy Management Console</v-btn
+              <v-card-text
+                >Are you sure you want to restart the Scrypted
+                service?</v-card-text
+              >
+
+              <v-card-text>{{ restartStatus }}</v-card-text>
+              <v-divider></v-divider>
+
+              <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn text @click="updateAndRestart = false">Cancel</v-btn>
+                <v-btn text @click="doUpdateAndRestart">Restart</v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
+        </v-card-actions>
+      </v-card>
+
+      <v-card v-else-if="currentVersion">
+        <v-toolbar>
+          <v-toolbar-title>Server Version</v-toolbar-title>
+        </v-toolbar>
+        <v-card-subtitle>
+          Current Version: {{ currentVersion }}
+        </v-card-subtitle>
+        <v-card-text> You're up to date! </v-card-text>
+      </v-card>
+
+      <v-card class="mt-2" v-if="showRestart">
+        <v-toolbar
+          ><v-toolbar-title>Server Management</v-toolbar-title></v-toolbar
         >
-      </v-flex>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-dialog v-model="restart" width="500">
+            <template v-slot:activator="{ on }">
+              <v-btn small text color="red" v-on="on">Restart Scrypted</v-btn>
+            </template>
 
-      <v-flex>
-        <form method="POST" action="/web/component/settings/backup">
-          <v-btn color="green" type="submit" outlined dark block
-            >Download Backup</v-btn
-          >
-        </form>
-      </v-flex>
+            <v-card color="red" dark>
+              <v-card-title primary-title>Restart Scrypted</v-card-title>
 
-      <v-flex>
-        <input
-          type="file"
-          name="file"
-          hidden
-          ref="restoreInput"
-          @change="doRestore"
-        />
-        <v-btn color="blue" outlined dark block @click="restore"
-          >Restore Backup</v-btn
-        >
-      </v-flex> -->
+              <v-card-text
+                >Are you sure you want to restart the Scrypted
+                service?</v-card-text
+              >
 
-      <v-dialog v-if="showRestart" v-model="restart" width="500">
-        <template v-slot:activator="{ on }">
-          <v-flex>
-            <v-btn class="mb-2" block color="red" dark v-on="on"
-              >Restart Scrypted</v-btn
-            >
-          </v-flex>
-        </template>
+              <v-card-text>{{ restartStatus }}</v-card-text>
+              <v-divider></v-divider>
 
-        <v-card color="red" dark>
-          <v-card-title primary-title>Restart Scrypted</v-card-title>
-
-          <v-card-text
-            >Are you sure you want to restart the Scrypted service?</v-card-text
-          >
-
-          <v-card-text>{{ restartStatus }}</v-card-text>
-          <v-divider></v-divider>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn text @click="restart = false">Cancel</v-btn>
-            <v-btn text @click="doRestart">Restart</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
-
-      <v-dialog v-if="showUpdate" v-model="updateAndRestart" width="500">
-        <template v-slot:activator="{ on }">
-          <v-flex>
-            <v-btn block color="red" dark v-on="on"
-              >Update and Restart Scrypted</v-btn
-            >
-          </v-flex>
-        </template>
-
-        <v-card color="red" dark>
-          <v-card-title primary-title>Restart Scrypted</v-card-title>
-
-          <v-card-text
-            >Are you sure you want to restart the Scrypted service?</v-card-text
-          >
-
-          <v-card-text>{{ restartStatus }}</v-card-text>
-          <v-divider></v-divider>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn text @click="updateAndRestart = false">Cancel</v-btn>
-            <v-btn text @click="doUpdateAndRestart">Restart</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+              <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn text @click="restart = false">Cancel</v-btn>
+                <v-btn text @click="doRestart">Restart</v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
+        </v-card-actions>
+      </v-card>
     </v-flex>
   </v-layout>
 </template>
 <script>
-import { getComponentWebPath } from "../helpers";
-import axios from "axios";
-import throttle from "lodash/throttle";
-import qs from "query-string";
+import { checkUpdate } from "../plugin/plugin";
 
 export default {
   data() {
     return {
+      currentVersion: null,
+      updateAvailable: null,
+      canUpdate: false,
       updateAndRestart: false,
       restart: false,
       restartStatus: undefined,
       showRestart: false,
-      showUpdate: false,
     };
   },
-  // data() {
-  //   return {
-  //     restart: false,
-  //     restartStatus: undefined,
-  //     location: "",
-  //     position: {
-  //       lat: 0,
-  //       lng: 0,
-  //     },
-  //   };
-  // },
-  // computed: {
-  //   componentWebPath() {
-  //     return getComponentWebPath("settings");
-  //   },
-  // },
   mounted() {
     this.loadEnv();
-    // this.$refs.mapRef.$mapPromise.then(() => {
-    //   let element = this.$refs.locationAutocomplete.$el;
-    //   element = element.querySelector("input");
-    //   var autocomplete = new google.maps.places.Autocomplete(element, {
-    //     types: ["geocode"],
-    //   });
-    //   autocomplete.addListener("place_changed", () => {
-    //     var place = autocomplete.getPlace();
-    //     this.location = place.formatted_address;
-    //     this.position.lat = place.geometry.location.lat();
-    //     this.position.lng = place.geometry.location.lng();
-    //     this.debounceUpdate(
-    //       place.geometry.location.lat().toString(),
-    //       place.geometry.location.lng().toString()
-    //     );
-    //   });
-    // });
-    // axios
-    //   .get(`${this.getComponentWebPath("automation")}/settings`)
-    //   .then((response) => {
-    //     this.location = response.data.location;
-    //     this.position.lat = parseFloat(response.data.latitude);
-    //     this.position.lng = parseFloat(response.data.longitude);
-    //   });
+    this.checkUpdateAvailable();
   },
   methods: {
+    async checkUpdateAvailable() {
+      const info = await this.$scrypted.systemManager.getComponent("info");
+      const version = await info.getVersion();
+      this.currentVersion = version;
+      const { updateAvailable } = await checkUpdate(
+        "@scrypted/server",
+        version
+      );
+      this.updateAvailable = updateAvailable;
+    },
     async loadEnv() {
       const info = await this.$scrypted.systemManager.getComponent("info");
       const env = await info.getScryptedEnv();
       this.showRestart = !!env.SCRYPTED_CAN_RESTART;
-      this.showUpdate = !!(env.SCRYPTED_NPM_SERVE || env.SCRYPTED_GIT_SERVE);
+      this.canUpdate = !!env.SCRYPTED_NPM_SERVE;
     },
-    // getComponentWebPath,
-    // debounceUpdate: throttle(function (latitude, longitude) {
-    //   axios.post(
-    //     `${this.getComponentWebPath("automation")}/`,
-    //     qs.stringify({
-    //       location: this.location,
-    //       latitude,
-    //       longitude,
-    //     }),
-    //     {
-    //       "Content-Type": "application/x-www-form-urlencoded",
-    //     }
-    //   );
-    // }, 500),
-    // goLegacy() {
-    //   window.open("/web/dashboard");
-    // },
     async doRestart() {
       this.restartStatus = "Restarting...";
       const serviceControl = await this.$scrypted.systemManager.getComponent(
@@ -205,21 +149,6 @@ export default {
       );
       await serviceControl.update();
     },
-    // restore() {
-    //   this.$refs.restoreInput.click();
-    // },
-    // doRestore() {
-    //   let formData = new FormData();
-    //   formData.append("file", this.$refs.restoreInput.files[0]);
-    //   axios
-    //     .post("/web/component/settings/restore", formData, {
-    //       headers: {
-    //         "Content-Type": "multipart/form-data",
-    //       },
-    //     })
-    //     .then(function () {})
-    //     .catch(function () {});
-    // },
   },
 };
 </script>

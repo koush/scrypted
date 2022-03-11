@@ -2,6 +2,22 @@
   <v-navigation-drawer fixed app v-model="value.drawer" clipped>
     <v-list dense nav>
       <v-subheader></v-subheader>
+
+      <v-list-item
+        link
+        href="#/component/settings"
+        v-if="updateAvailable"
+        active-class="deep-purple accent-4 white--text"
+      >
+        <v-list-item-icon>
+          <v-icon color="red" small>fa-download</v-icon>
+        </v-list-item-icon>
+
+        <v-list-item-content>
+          <v-list-item-title>Update {{ updateAvailable }}</v-list-item-title>
+        </v-list-item-content>
+      </v-list-item>
+
       <v-list-item
         v-for="item in builtinComponents"
         :key="item.id"
@@ -84,6 +100,7 @@
 
 <script>
 import { getComponentViewPath } from "./helpers";
+import { checkUpdate } from "./plugin/plugin";
 
 export default {
   props: {
@@ -133,6 +150,9 @@ export default {
       },
     },
   },
+  mounted() {
+    this.checkUpdateAvailable();
+  },
   computed: {
     scryptedVersion() {
       return this.$store.state.version;
@@ -140,6 +160,24 @@ export default {
   },
   methods: {
     getComponentViewPath,
+    async checkUpdateAvailable() {
+      await this.$connectingScrypted;
+      const info = await this.$scrypted.systemManager.getComponent("info");
+      const version = await info.getVersion();
+      this.currentVersion = version;
+      const { updateAvailable } = await checkUpdate(
+        "@scrypted/server",
+        version
+      );
+      this.updateAvailable = updateAvailable;
+      if (updateAvailable) {
+        const logger = this.$scrypted.deviceManager.getDeviceLogger();
+        const u = new URL(window.location)
+        u.hash = "#/component/settings";
+        logger.clearAlerts();
+        logger.a(`Scrypted Server update available: ${updateAvailable}. ${u}`);
+      }
+    },
     filterComponents: function (category) {
       return this.components.filter(
         (component) => component.category == category
@@ -148,6 +186,7 @@ export default {
   },
   data: function () {
     return {
+      updateAvailable: null,
       actives: {},
       // components: [],
       builtinComponents: [

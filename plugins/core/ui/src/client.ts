@@ -110,5 +110,5 @@ Vue.use(Vue => {
             });
     };
 
-    Vue.prototype.$connectScrypted();
+    Vue.prototype.$connectingScrypted = Vue.prototype.$connectScrypted();
 });
