@@ -311,13 +311,13 @@ export abstract class RtspSmartCamera extends RtspCamera {
 
     async getVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         if (this.showRtspUrlOverride()) {
-            const vso = await super.getVideoStreamOptions();
-            if (vso)
-                return vso;
+            const vsos = await super.getVideoStreamOptions();
+            if (vsos)
+                return vsos;
         }
 
         const vsos = await this.getConstructedVideoStreamOptions();
-        return this.getDefaultOrderedVideoStreamOptions(vsos);
+        return vsos;
     }
 }
 
