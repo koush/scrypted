@@ -11,6 +11,7 @@ export interface ConsoleServer {
     readPort: number,
     writePort: number,
     destroy(): void;
+    clear(nativeId: ScryptedNativeId): void;
 }
 
 export interface StdPassThroughs {
@@ -127,6 +128,11 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
     const writePort = await listenZero(writeServer);
 
     return {
+        clear(nativeId: ScryptedNativeId) {
+            const pt = outputs.get(nativeId);
+            if (pt)
+                pt.buffers = [];
+        },
         destroy() {
             for (const socket of sockets) {
                 socket.destroy();
