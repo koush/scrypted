@@ -15,6 +15,7 @@ import net from 'net';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
+import { sleep } from '@scrypted/common/src/sleep';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -137,8 +138,10 @@ class PrebufferSession {
     }
   }
 
-  canUseRtspParser(muxingMp4: boolean) {
+  canUseRtspParser(muxingMp4: boolean, mediaStreamOptions: MediaStreamOptions) {
     if (muxingMp4)
+      return false;
+    if (mediaStreamOptions?.container !== 'rtsp')
       return false;
     // The RTSP demuxer can only be used when not transcoding audio.
     const { isUsingDefaultAudioConfig, compatibleAudio, aacAudio } = this.getAudioConfig();
@@ -147,10 +150,11 @@ class PrebufferSession {
   }
 
   getParser(rtspMode: boolean, muxingMp4: boolean, mediaStreamOptions: MediaStreamOptions) {
-    if (!this.canUseRtspParser(muxingMp4))
+    if (!this.canUseRtspParser(muxingMp4, mediaStreamOptions))
       return FFMPEG_PARSER;
 
-    const defaultValue = rtspMode && mediaStreamOptions?.tool === 'scrypted' ?
+    const defaultValue = rtspMode
+      && mediaStreamOptions?.tool === 'scrypted' ?
       SCRYPTED_PARSER : FFMPEG_PARSER;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
     if (!rtspParser || rtspParser === STRING_DEFAULT)
@@ -242,7 +246,7 @@ class PrebufferSession {
     };
 
 
-    if (this.canUseRtspParser(muxingMp4)
+    if (this.canUseRtspParser(muxingMp4, this.advertisedMediaStreamOptions)
       && rtspMode
       && this.advertisedMediaStreamOptions?.container === 'rtsp') {
 
@@ -544,10 +548,11 @@ class PrebufferSession {
       if (parser === SCRYPTED_PARSER) {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser')
-        const rtspClient = new RtspClient(ffmpegInput.url);
+        const rtspClient = new RtspClient(ffmpegInput.url, this.console);
         await rtspClient.options();
         const sdpResponse = await rtspClient.describe();
         const sdp = sdpResponse.body.toString().trim();
+        this.console.log('sdp', sdp);
         this.sdp = Promise.resolve(sdp);
         const { audio, video } = parseTrackIds(sdp);
         let channel = 0;
@@ -558,6 +563,13 @@ class PrebufferSession {
         await rtspClient.setup(channel, video);
         const socket = await rtspClient.play();
         session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
+        const sessionKill = session.kill.bind(session);
+        session.kill = async () => {
+          // issue a teardown to upstream to close gracefully but don't rely on it responding.
+          rtspClient.teardown().finally(sessionKill);
+          await sleep(500);
+          sessionKill();
+        }
       }
       else {
         // create missing pts from dts so mpegts and mp4 muxing does not fail
