@@ -9,7 +9,8 @@ export interface CameraStreamingSession {
     startRequest: StartStreamRequest;
     videossrc: number;
     audiossrc: number;
-    cp: ChildProcess;
+    videoProcess: ChildProcess;
+    audioProcess: ChildProcess;
     videoReturn: dgram.Socket;
     audioReturn: dgram.Socket;
     rtpSink?: HomeKitRtpSink;

@@ -50,7 +50,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
         clearTimeout(idleTimeout);
         sessions.delete(sessionID);
         session.killed = true;
-        session.cp?.kill('SIGKILL');
+        session.videoProcess?.kill('SIGKILL');
+        session.audioProcess?.kill('SIGKILL');
         session.videoReturn?.close();
         session.audioReturn?.close();
         session.rtpSink?.destroy();
@@ -76,7 +77,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 startRequest: null,
                 videossrc,
                 audiossrc,
-                cp: null,
+                videoProcess: null,
+                audioProcess: null,
                 videoReturn,
                 audioReturn,
                 isLowBandwidth: undefined,
@@ -178,9 +180,12 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             selectedStream = selectedStream || {
                 id: undefined,
+                // if rebroadcast is being used, this will cause it to send
+                // a prebuffer which hopefully contains a key frame.
+                // it is safe to pipe this directly into ffmpeg because
+                // ffmpeg starts streaming after it finds the key frame.
+                prebuffer: undefined,
             };
-            if (isLowBandwidthDevice)
-                selectedStream.prebuffer = 0;
 
             const minBitrate = selectedStream?.video?.minBitrate;
             const maxBitrate = selectedStream?.video?.maxBitrate;

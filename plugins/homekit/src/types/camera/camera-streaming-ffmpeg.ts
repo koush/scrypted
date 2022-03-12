@@ -23,15 +23,22 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     let audiomtu = 400;
 
     console.log('fetching video stream');
-    const media = await device.getVideoStream(selectedStream);
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const videoInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    // test code path that allows using two ffmpeg processes. did not see
+    // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame
+    // to immediately finish. ffmpeg will only start sending on a key frame.
+    // const audioInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const audioInput = videoInput;
 
     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
-    const mso = ffmpegInput.mediaStreamOptions;
+    const mso = videoInput.mediaStreamOptions;
     const noAudio = mso?.audio === null;
-    const args: string[] = [
+    const videoArgs: string[] = [
+        '-hide_banner',
+    ];
+    const audioArgs: string[] = [
         '-hide_banner',
     ];
 
@@ -43,23 +50,25 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         // decoder arguments
         const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
         if (videoDecoderArguments) {
-            args.push(...evalRequest(videoDecoderArguments, request));
+            videoArgs.push(...evalRequest(videoDecoderArguments, request));
         }
     }
 
     // ffmpeg input for decoder
-    args.push(...ffmpegInput.inputArguments);
+    videoArgs.push(...videoInput.inputArguments);
+    if (audioInput !== videoInput)
+        audioArgs.push(...audioInput.inputArguments);
 
     if (!noAudio) {
         // create a dummy audio track if none actually exists.
         // this track will only be used if no audio track is available.
         // this prevents homekit erroring out if the audio track is actually missing.
         // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+        audioArgs.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
     }
 
     // video encoding
-    args.push(
+    videoArgs.push(
         "-an", '-sn', '-dn',
     );
 
@@ -81,12 +90,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 "-filter:v", "fps=" + request.video.fps.toString(),
             ];
 
-        args.push(
+        videoArgs.push(
             ...videoCodec,
         )
     }
     else {
-        args.push(
+        videoArgs.push(
             "-vcodec", "copy",
         );
 
@@ -98,10 +107,39 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         // This flag was enabled by default, but I believe this is causing issues with some users.
         // Make it a setting.
         if (storage.getItem('needsExtraData') === 'true')
-            args.push("-bsf:v", "dump_extra");
+            videoArgs.push("-bsf:v", "dump_extra");
     }
 
-    args.push(
+    let videoOutput = `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`;
+
+    if (false) {
+        // this test code helped me determine ffmpeg behavior when streaming
+        // beginning with a non key frame.
+        // ffmpeg will only start sending rtp data once an sps/pps/keyframe has been received.
+        // when using ffmpeg, it is safe to pipe a prebuffer, even when using cellular
+        // or apple watch.
+        const videoForwarder = await createBindZero();
+        videoForwarder.server.once('message', () => console.log('first opus packet received.'));
+        session.videoReturn.on('close', () => videoForwarder.server.close());
+        let needSpsPps = true;
+        videoForwarder.server.on('message', data => {
+            // const packet = RtpPacket.deSerialize(data);
+            // rtp header is ~12
+            // sps/pps is ~32-40.
+            if (needSpsPps) {
+                if (data.length > 64) {
+                    console.log('not sps/pps');
+                    return;
+                }
+                needSpsPps = false;
+                console.log('found sps/pps');
+            }
+            videoForwarder.server.send(data, session.prepareRequest.video.port, session.prepareRequest.targetAddress);
+        });
+        videoOutput = `srtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
+    }
+
+    videoArgs.push(
         "-payload_type", (request as StartStreamRequest).video.pt.toString(),
         "-ssrc", session.videossrc.toString(),
         // '-fflags', '+flush_packets', '-flush_packets', '1',
@@ -109,13 +147,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
         "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
         "-srtp_out_params", videoKey.toString('base64'),
-        `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`
+        videoOutput,
     );
 
     if (!noAudio) {
         // audio encoding
         const audioCodec = (request as StartStreamRequest).audio.codec;
-        args.push(
+        audioArgs.push(
             "-vn", '-sn', '-dn',
         );
 
@@ -136,12 +174,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         if (!transcodeStreaming
             && (perfectAac || perfectOpus)
             && mso?.tool === 'scrypted') {
-            args.push(
+            audioArgs.push(
                 "-acodec", "copy",
             );
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
-            args.push(
+            audioArgs.push(
                 '-acodec', ...(requestedOpus ?
                     [
                         'libopus',
@@ -161,14 +199,9 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             console.warn(device.name, 'unknown audio codec, audio will not be streamed.', request);
         }
         if (hasAudio) {
-            args.push(
+            audioArgs.push(
                 "-payload_type", (request as StartStreamRequest).audio.pt.toString(),
                 "-ssrc", session.audiossrc.toString(),
-                "-srtp_out_suite", session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
-                "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
-                "-srtp_out_params", audioKey.toString('base64'),
-                // not sure this has any effect? testing.
-                // '-fflags', '+flush_packets', '-flush_packets', '1',
                 "-f", "rtp",
             );
 
@@ -199,12 +232,19 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                     const packet = RtpPacket.deSerialize(data);
                     audioSender(packet);
                 });
-                args.push(
+                audioArgs.push(
                     `rtp://127.0.0.1:${audioForwarder.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
                 )
             }
             else {
-                args.push(
+                audioArgs.push(
+                    "-srtp_out_suite",
+                    session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80
+                        ? "AES_CM_128_HMAC_SHA1_80"
+                        : "AES_CM_256_HMAC_SHA1_80",
+                    "-srtp_out_params", audioKey.toString('base64'),
+                    // not sure this has any effect? testing.
+                    // '-fflags', '+flush_packets', '-flush_packets', '1',
                     `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
                 )
             }
@@ -218,12 +258,29 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         return;
     }
 
-    safePrintFFmpegArguments(console, args);
-
     console.log('ffmpeg', ffmpegPath);
-    const cp = child_process.spawn(ffmpegPath, args);
-    ffmpegLogInitialOutput(console, cp);
 
-    session.cp = cp;
-    cp.on('exit', killSession);
+    if (audioInput !== videoInput) {
+        safePrintFFmpegArguments(console, videoArgs);
+        safePrintFFmpegArguments(console, audioArgs);
+
+        const vp = child_process.spawn(ffmpegPath, videoArgs);
+        session.videoProcess = vp;
+        ffmpegLogInitialOutput(console, vp);
+        vp.on('exit', killSession);
+
+        const ap = child_process.spawn(ffmpegPath, audioArgs);
+        session.audioProcess = ap;
+        ffmpegLogInitialOutput(console, ap);
+        ap.on('exit', killSession);
+    }
+    else {
+        const args = [...videoArgs, ...audioArgs];
+        safePrintFFmpegArguments(console, args);
+
+        const cp = child_process.spawn(ffmpegPath, args);
+        session.videoProcess = cp;
+        ffmpegLogInitialOutput(console, cp);
+        cp.on('exit', killSession);
+    }
 }
