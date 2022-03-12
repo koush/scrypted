@@ -1,6 +1,6 @@
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { readLength, readLine } from "@scrypted/common/src/read-stream";
-import sdk, { MediaObject, MediaStreamOptions } from "@scrypted/sdk";
+import { readLength } from "@scrypted/common/src/read-stream";
+import sdk, { MediaStreamOptions } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import net from 'net';
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
