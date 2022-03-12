@@ -180,12 +180,13 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             selectedStream = selectedStream || {
                 id: undefined,
-                // if rebroadcast is being used, this will cause it to send
-                // a prebuffer which hopefully contains a key frame.
-                // it is safe to pipe this directly into ffmpeg because
-                // ffmpeg starts streaming after it finds the key frame.
-                prebuffer: undefined,
             };
+            // if rebroadcast is being used, this will cause it to send
+            // a prebuffer which hopefully contains a key frame.
+            // it is safe to pipe this directly into ffmpeg because
+            // ffmpeg starts streaming after it finds the key frame.
+            selectedStream.prebuffer = undefined;
+
 
             const minBitrate = selectedStream?.video?.minBitrate;
             const maxBitrate = selectedStream?.video?.maxBitrate;
