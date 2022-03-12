@@ -104,6 +104,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     args.push(
         "-payload_type", (request as StartStreamRequest).video.pt.toString(),
         "-ssrc", session.videossrc.toString(),
+        // '-fflags', '+flush_packets', '-flush_packets', '1',
         "-f", "rtp",
         "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
         "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
@@ -184,6 +185,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 };
 
                 const audioForwarder = await createBindZero();
+                audioForwarder.server.once('message', () => console.log('first opus packet received.'));
                 session.audioReturn.on('close', () => audioForwarder.server.close());
 
                 const audioSender = createCameraStreamSender(aconfig, session.audioReturn,
