@@ -35,6 +35,27 @@ typeMap.set('binary_sensor', {
     type: ScryptedDeviceType.Sensor,
 });
 
+// https://www.home-assistant.io/integrations/light.mqtt/#json-schema
+// {
+//   "brightness": 255,
+//   "color_mode": "rgb",
+//   "color_temp": 155,
+//   "color": {
+//     "r": 255,
+//     "g": 180,
+//     "b": 200,
+//     "c": 100,
+//     "w": 50,
+//     "x": 0.406,
+//     "y": 0.301,
+//     "h": 344.0,
+//     "s": 29.412
+//   },
+//   "effect": "colorloop",
+//   "state": "ON",
+//   "transition": 2,
+// }
+
 export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceProvider {
     client: MqttClient;
     pathname: string;
@@ -126,9 +147,14 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
                 for (const iface of deviceInterfaces) {
                     configs[iface] = config;
                 }
-                device.storage.setItem('configs', JSON.stringify(configs));
-                device.storage.setItem('component', component);
-                device.bind();
+                try {
+                    device.storage.setItem('configs', JSON.stringify(configs));
+                    device.storage.setItem('component', component);
+                    device.bind();
+                }
+                catch (e) {
+                    device.console.error('bind error', e);
+                }
             });
         }
         catch (e) {
@@ -161,13 +187,32 @@ export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceP
     }
 }
 
+function scaleBrightness(scryptedBrightness: number, brightnessScale: number) {
+    brightnessScale = brightnessScale || 255;
+    return Math.round(scryptedBrightness * brightnessScale / 100);
+}
+
+function unscaleBrightness(mqttBrightness: number, brightnessScale: number) {
+    brightnessScale = brightnessScale || 255;
+    return Math.round(mqttBrightness * 100 / brightnessScale);
+}
+
 export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff, Brightness, Lock {
     messageListeners: ((topic: string, payload: Buffer) => void)[] = [];
 
     constructor(nativeId: string, public provider: MqttAutoDiscoveryProvider, noBind?: boolean) {
         super(nativeId);
-        if (!noBind && this.storage.getItem('configs'))
-            this.bind();
+        const configs = this.storage.getItem('configs');
+        if (!configs) {
+            this.console.warn('no config');
+            return;
+        }
+        this.console.log('configs', configs);
+        if (noBind) {
+            this.console.warn('delayed bind')
+            return;
+        }
+        this.bind();
     }
 
     eval(template: string, payload: Buffer): any {
@@ -178,9 +223,11 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
     }
 
     bindMessage(topic: string, cb: (payload: Buffer) => void) {
+        this.console.log('subscribing', topic);
         const listener = (messageTopic: string, payload: Buffer) => {
             if (topic !== messageTopic)
                 return;
+            this.console.log('message', topic, payload?.toString());
             try {
                 cb(payload);
             }
@@ -193,18 +240,22 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
     }
 
     bind() {
+        this.console.log('binding...');
         const { client } = this.provider;
         if (this.providedInterfaces.includes(ScryptedInterface.Brightness)) {
             const config = this.loadComponentConfig(ScryptedInterface.Brightness);
-            client.subscribe(config.brightness_state_topic);
-            this.bindMessage(config.brightness_state_topic,
-                payload => this.brightness = this.eval(config.brightness_value_template, payload));
+            const brightnessStateTopic = config.brightness_state_topic || config.state_topic;
+            client.subscribe(brightnessStateTopic);
+            this.bindMessage(brightnessStateTopic,
+                payload => this.brightness =
+                 unscaleBrightness(this.eval(config.brightness_value_template || '{{ value_json.brightness }}', payload), config.brightness_scale));
         }
         if (this.providedInterfaces.includes(ScryptedInterface.OnOff)) {
             const config = this.loadComponentConfig(ScryptedInterface.OnOff);
             client.subscribe(config.state_topic);
             this.bindMessage(config.state_topic,
-                payload => this.on = (config.payload_on || 'ON') === this.eval(config.state_value_template, payload));
+                payload => this.on = 
+                    (config.payload_on || 'ON') === this.eval(config.state_value_template || '{{ value_json.state }}', payload));
         }
         if (this.providedInterfaces.includes(ScryptedInterface.Lock)) {
             const config = this.loadComponentConfig(ScryptedInterface.Lock);
@@ -269,7 +320,7 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
     }
     async setBrightness(brightness: number): Promise<void> {
         const config = this.loadComponentConfig(ScryptedInterface.Brightness);
-        const scaledBrightness = Math.round(brightness / 100 * (config.brightness_scale || 100));
+        const scaledBrightness = scaleBrightness(brightness, config.brightness_scale);
         this.publishValue(config.brightness_command_topic,
             config.brightness_value_template,
             scaledBrightness, scaledBrightness);
