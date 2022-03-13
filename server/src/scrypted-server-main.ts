@@ -364,7 +364,6 @@ async function start() {
         const maxAge = 86400000;
 
         if (hasLogin) {
-
             const user = await db.tryGet(ScryptedUser, username);
             if (!user) {
                 res.send({
@@ -406,6 +405,14 @@ async function start() {
                 expiration: maxAge,
             });
 
+            return;
+        }
+
+        if (!username || !password) {
+            res.send({
+                error: 'Username and password must not be empty.',
+                hasLogin,
+            });
             return;
         }
 
