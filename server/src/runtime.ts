@@ -667,8 +667,9 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         mixinInterfaces.push(...providedInterfaces.slice());
         mixinInterfaces = PluginDeviceProxyHandler.sortInterfaces(mixinInterfaces);
 
-        this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);
-        const interfacesChanged = this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces);
+        let interfacesChanged = this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, providedInterfaces);
+        interfacesChanged = this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, mixinInterfaces)
+            || interfacesChanged;
         if (device.info !== undefined)
             this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.info, device.info);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providerId, provider?._id);
