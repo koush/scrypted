@@ -570,6 +570,13 @@ export interface VideoCamera {
 export interface VideoCameraConfiguration {
     setVideoStreamOptions(options: MediaStreamOptions): Promise<void>;
 }
+export interface RequestRecordingStreamOptions extends MediaStreamOptions {
+    startTime: number;
+}
+export interface VideoRecorder {
+    getRecordingStream(options: RequestRecordingStreamOptions): Promise<MediaObject>;
+    getRecordingStreamOptions(): Promise<MediaStreamOptions>[];
+}
 /**
  * Intercom devices can play back
  */
@@ -1289,6 +1296,7 @@ export declare enum ScryptedInterface {
     HumiditySensor = "HumiditySensor",
     Camera = "Camera",
     VideoCamera = "VideoCamera",
+    VideoRecorder = "VideoRecorder",
     VideoCameraConfiguration = "VideoCameraConfiguration",
     Intercom = "Intercom",
     Lock = "Lock",

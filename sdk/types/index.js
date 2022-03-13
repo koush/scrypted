@@ -222,6 +222,14 @@ exports.ScryptedInterfaceDescriptors = {
         ],
         properties: []
     },
+    VideoRecorder: {
+        name: 'VideoRecorder',
+        methods: [
+            'getRecordingStream',
+            'getRecordingStreamOptions'
+        ],
+        properties: []
+    },
     VideoCameraConfiguration: {
         name: 'VideoCameraConfiguration',
         methods: [
@@ -649,6 +657,7 @@ var ScryptedInterface;
     ScryptedInterface["HumiditySensor"] = "HumiditySensor";
     ScryptedInterface["Camera"] = "Camera";
     ScryptedInterface["VideoCamera"] = "VideoCamera";
+    ScryptedInterface["VideoRecorder"] = "VideoRecorder";
     ScryptedInterface["VideoCameraConfiguration"] = "VideoCameraConfiguration";
     ScryptedInterface["Intercom"] = "Intercom";
     ScryptedInterface["Lock"] = "Lock";

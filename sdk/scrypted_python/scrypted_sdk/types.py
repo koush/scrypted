@@ -118,6 +118,7 @@ class ScryptedInterface(Enum):
     UltravioletSensor = "UltravioletSensor"
     VideoCamera = "VideoCamera"
     VideoCameraConfiguration = "VideoCameraConfiguration"
+    VideoRecorder = "VideoRecorder"
 
 class ScryptedMimeTypes(Enum):
     AcceptUrlParameter = "accept-url"
@@ -410,6 +411,20 @@ class RequestPictureOptions(TypedDict):
     periodicRequest: bool
     picture: PictureDimensions
     reason: Any | Any
+    pass
+
+class RequestRecordingStreamOptions(TypedDict):
+    audio: AudioStreamOptions
+    container: str
+    id: str
+    metadata: Any
+    name: str
+    prebuffer: float
+    source: MediaStreamSource
+    startTime: float
+    tool: str
+    userConfigurable: bool
+    video: VideoStreamOptions
     pass
 
 class ScriptSource(TypedDict):
@@ -832,6 +847,13 @@ class VideoCamera:
 
 class VideoCameraConfiguration:
     async def setVideoStreamOptions(self, options: MediaStreamOptions) -> None:
+        pass
+    pass
+
+class VideoRecorder:
+    async def getRecordingStream(self, options: RequestRecordingStreamOptions) -> MediaObject:
+        pass
+    def getRecordingStreamOptions(self) -> list[MediaStreamOptions]:
         pass
     pass
 
