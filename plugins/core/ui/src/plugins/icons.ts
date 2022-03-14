@@ -76,6 +76,8 @@ import {
   faSortDown,
   faCodeBranch,
   faHdd,
+  faTimes,
+  faHistory,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -84,6 +86,7 @@ import {
 } from '@fortawesome/free-brands-svg-icons'
 
 const icons =[
+  faHistory,
   faQuestion,
   faServer,
   faPuzzlePiece,
@@ -158,6 +161,7 @@ const icons =[
   faSortDown,
   faCodeBranch,
   faHdd,
+  faTimes,
 ];
 
 for (var icon in icons) {

@@ -6,6 +6,7 @@ import './plugins/clipboard';
 import './plugins/maps';
 import './plugins/async-computed';
 import './plugins/apexcharts';
+import './plugins/is-mobile';
 import App from './App.vue'
 import './registerServiceWorker'
 

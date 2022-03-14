@@ -1,4 +1,4 @@
-import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, DeviceProvider, ScryptedInterface, ScryptedDeviceType, RTCSignalingChannel, VideoCamera } from '@scrypted/sdk';
+import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, DeviceProvider, ScryptedInterface, ScryptedDeviceType, RTCSignalingChannel, VideoCamera, VideoRecorder } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import Router from 'router';
 import { UserStorage } from './userStorage';
@@ -12,7 +12,7 @@ import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
-import { startBrowserRTCSignaling } from "@scrypted/common/src/ffmpeg-to-wrtc";
+import { createBrowserSignalingSession, isPeerConnectionAlive, startBrowserRTCSignaling, startRTCPeerConnectionForBrowser } from "@scrypted/common/src/ffmpeg-to-wrtc";
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
 
 const { pluginHostAPI, systemManager, deviceManager, mediaManager, endpointManager } = sdk;
@@ -184,14 +184,52 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return;
         }
 
+        const attachPeerConnection = (pc: RTCPeerConnection) => {
+            if (!pc)
+                return;
+            const checkConn = () => {
+                if (!isPeerConnectionAlive(pc))
+                    ws.close();
+            }
+            ws.addEventListener('close', () => pc.close());
+            pc.addEventListener('connectionstatechange', checkConn);
+            pc.addEventListener('iceconnectionstatechange', checkConn);
+        }
+
         if (this.checkEngineIoEndpoint(request, 'videocamera')) {
             const url = new URL(`http://localhost${request.url}`);
             const deviceId = url.searchParams.get('deviceId');
             const camera = systemManager.getDeviceById<VideoCamera & RTCSignalingChannel>(deviceId);
-            if (!camera)
+            if (!camera) {
                 ws.close();
-            else
-                startBrowserRTCSignaling(camera, ws, this.console);
+            }
+            else {
+                const pc = await startBrowserRTCSignaling(camera, ws, this.console);
+                // todo, pc is null if it's an rtc signaling channel. do we care?
+                attachPeerConnection(pc);
+            }
+            return;
+        }
+
+        if (this.checkEngineIoEndpoint(request, 'videorecorder')) {
+            const url = new URL(`http://localhost${request.url}`);
+            const deviceId = url.searchParams.get('deviceId');
+            const startTime = parseInt(url.searchParams.get('startTime'));
+            const camera = systemManager.getDeviceById<VideoRecorder>(deviceId);
+            if (!camera) {
+                ws.close();
+            }
+            else {
+                const session = await createBrowserSignalingSession(ws);
+                const options = await session.getOptions();
+
+                const pc = await startRTCPeerConnectionForBrowser(this.console, await camera.getRecordingStream({
+                    id: undefined,
+                    startTime,
+                }), session, options);
+
+                attachPeerConnection(pc);
+            }
             return;
         }
 

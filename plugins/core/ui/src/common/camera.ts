@@ -1,10 +1,9 @@
-import { ScryptedDevice, MediaManager, VideoCamera, MediaObject, RTCSignalingChannel } from '@scrypted/types';
+import { ScryptedDevice, MediaManager, MediaObject } from '@scrypted/types';
 import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
 import eio from "engine.io-client";
 import { RpcPeer } from '../../../../../server/src/rpc';
 
-export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & VideoCamera & RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
-
+export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice, getVideo: () => HTMLVideoElement) {
   const pluginId = '@scrypted/core';
   const endpointPath = `/endpoint/${pluginId}`
   const options: any = {
@@ -17,6 +16,27 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   const rootLocation = `${window.location.protocol}//${window.location.host}`;
   const socket = eio(rootLocation, options);
 
+  return streamMedia(socket, getVideo);
+}
+
+export async function streamRecorder(mediaManager: MediaManager, device: ScryptedDevice, startTime: number, getVideo: () => HTMLVideoElement) {
+  const pluginId = '@scrypted/core';
+  const endpointPath = `/endpoint/${pluginId}`
+  const options: any = {
+    path: `${endpointPath}/engine.io/videorecorder/`,
+    query: {
+      deviceId: device.id,
+      startTime,
+    },
+    rejectUnauthorized: false,
+  };
+  const rootLocation = `${window.location.protocol}//${window.location.host}`;
+  const socket = eio(rootLocation, options);
+
+  return streamMedia(socket, getVideo);
+}
+
+export async function streamMedia(socket: eio.Socket, getVideo: () => HTMLVideoElement) {
   const rpcPeer = new RpcPeer('cast-receiver', 'scrypted-server', (message, reject) => {
     try {
       socket.send(JSON.stringify(message));
@@ -45,6 +65,16 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
     remoteAudio.play();
     console.log('received track', ev.track);
   };
+
+  pc.addEventListener('connectionstatechange', () => {
+    if (pc.connectionState === 'closed' || pc.connectionState === 'disconnected' || pc.connectionState === 'failed')
+      socket.close();
+  });
+
+  pc.addEventListener('iceconnectionstatechange', () => {
+    if (pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')
+      socket.close();
+  });
 
   return pc;
 }
