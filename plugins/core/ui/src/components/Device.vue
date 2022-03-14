@@ -3,6 +3,7 @@
     <v-flex xs12>
       <div v-if="deviceAlerts.length" class="pb-5">
         <v-alert
+        dark
           dismissible
           @input="removeAlert(alert)"
           v-for="alert in deviceAlerts"
@@ -10,8 +11,6 @@
           xs12
           md6
           lg6
-          outlined
-          text
           color="primary"
           icon="mdi-vuetify"
           border="left"
@@ -25,7 +24,6 @@
           <div
             v-linkified:options="{ className: 'alert-link' }"
             v-html="alert.message.replace('origin:', origin)"
-            style="color: white"
           ></div>
         </v-alert>
       </div>
@@ -46,7 +44,7 @@
       <v-layout row wrap>
         <v-flex xs12>
           <v-card raised>
-            <v-card-title class="orange-gradient subtitle-1 font-weight-light">
+            <v-card-title >
               {{ name || "No Device Name" }}
               <v-layout
                 mr-1
@@ -234,7 +232,7 @@
                 <v-card>
                   <v-card-title
                     style="margin-bottom: 8px"
-                    class="red font-weight-light white--text"
+                    class="red white--text"
                     primary-title
                     >Delete Device</v-card-title
                   >
@@ -274,7 +272,6 @@
         <v-flex xs12 v-if="availableMixins.length">
           <v-card raised>
             <v-card-title
-              class="green-gradient subtitle-1 text--white font-weight-light"
             >
               <font-awesome-icon size="sm" icon="puzzle-piece" />
               &nbsp;&nbsp;Integrations and Extensions
@@ -319,7 +316,6 @@
         <v-flex xs12 v-if="showStorage">
           <v-card raised>
             <v-card-title
-              class="green-gradient subtitle-1 text--white font-weight-light"
               >Storage</v-card-title
             >
             <v-container>
@@ -338,7 +334,7 @@
 
         <v-flex xs12 v-for="iface in cardUnderInterfaces" :key="iface">
           <v-card raised>
-            <v-card-title class="orange-gradient subtitle-1 font-weight-light">
+            <v-card-title>
               {{ getInterfaceFriendlyName(iface) }}
             </v-card-title>
             <component
@@ -356,7 +352,6 @@
         <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
           <v-card>
             <v-card-title
-              class="red-gradient white--text subtitle-1 font-weight-light"
               >{{ getInterfaceFriendlyName(iface) }}</v-card-title
             >
             <component

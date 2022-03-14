@@ -6,10 +6,9 @@
       style="margin-bottom: 30px"
     >
       <v-card-title
-        class="green-gradient subtitle-1 text--white font-weight-light"
       >
         <v-icon x-small>fa-bolt</v-icon>
-        <span class="title font-weight-light"
+        <span 
           >&nbsp;&nbsp;Automation Triggers</span
         >
       </v-card-title>
@@ -38,7 +37,6 @@
 
     <v-card raised style="margin-bottom: 30px">
       <v-card-title
-        class="green-gradient subtitle-1 text--white font-weight-light"
       >
         <v-icon x-small>fa-play</v-icon>
         <span v-if="device.automationType !== 'Scene'"
@@ -73,7 +71,6 @@
 
     <v-card raised v-if="device.automationType === 'Scene'">
       <v-card-title
-        class="green-gradient subtitle-1 text--white font-weight-light"
       >
         <v-icon x-small>fa-play</v-icon>
         <h5 class="card-title">&nbsp;&nbsp;Scene Deactivation Actions</h5>

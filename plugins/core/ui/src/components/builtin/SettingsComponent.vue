@@ -5,11 +5,11 @@
         <v-toolbar>
           <v-toolbar-title>Update Available </v-toolbar-title>
         </v-toolbar>
-        <v-card-subtitle>
+        <v-card-text>
           Installed:
           <v-chip x-small color="info">{{ currentVersion }}</v-chip> &nbsp;
           Update: <v-chip color="green" x-small>{{ updateAvailable }}</v-chip>
-        </v-card-subtitle>
+        </v-card-text>
         <v-card-text v-if="!canUpdate">
           There is an update available for Scrypted. Pull the new docker image
           to upgrade. If you are using Watchtower, an update check and
@@ -59,9 +59,9 @@
         <v-toolbar>
           <v-toolbar-title>Server Version</v-toolbar-title>
         </v-toolbar>
-        <v-card-subtitle>
+        <v-card-text>
           Current Version: {{ currentVersion }}
-        </v-card-subtitle>
+        </v-card-text>
         <v-card-text> You're up to date! </v-card-text>
       </v-card>
 

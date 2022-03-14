@@ -2,10 +2,9 @@
   <v-flex xs12 md8 lg6>
     <v-card raised style="margin-bottom: 30px">
       <v-card-title
-        class="orange-gradient subtitle-1 text--white font-weight-light"
       >
         <font-awesome-icon size="sm" icon="bolt" />
-        <span class="title font-weight-light"
+        <span 
           >&nbsp;&nbsp;Scrypted Plugins</span
         >
       </v-card-title>

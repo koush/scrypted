@@ -1,10 +1,9 @@
 <template>
   <v-card raised style="margin-bottom: 30px">
     <v-card-title
-      class="green-gradient subtitle-1 text--white font-weight-light"
     >
       <font-awesome-icon size="sm" icon="folder-plus" />
-      <span class="title font-weight-light">&nbsp;&nbsp;Grouped Devices</span>
+      <span >&nbsp;&nbsp;Grouped Devices</span>
     </v-card-title>
     <v-flex xs12>
       <InterfaceMultiselect

@@ -7,9 +7,9 @@
 
       <v-toolbar-title class="headline text-uppercase">
         <span>{{ title }}</span>
-        <!-- <span class="font-weight-light">Management Console</span> -->
       </v-toolbar-title>
       <v-spacer></v-spacer>
+      <v-btn icon small @click="toggleDarkMode"><v-icon small>fa fa-sun</v-icon></v-btn>
       <v-menu left bottom>
         <template v-slot:activator="{ on }">
           <v-btn v-on="on" text>{{ $store.state.username }}</v-btn>
@@ -252,7 +252,8 @@ export default {
     Drawer,
   },
   mounted() {
-    this.$vuetify.theme.dark = true;
+    if (this.darkMode)
+      this.$vuetify.theme.dark = true;
     this._timer = setInterval(
       function () {
         this.$data.now = Date.now();
@@ -264,6 +265,11 @@ export default {
     clearInterval(this._timer);
   },
   methods: {
+    toggleDarkMode() {
+      this.darkMode = !this.darkMode;
+      this.$vuetify.theme.dark = this.darkMode;
+      localStorage.setItem('darkMode', this.darkMode.toString());
+    },
     reconnect() {
       this.$connectScrypted().catch((e) => (this.loginResult = e.toString()));
     },
@@ -367,6 +373,7 @@ export default {
   data() {
     const self = this;
     return {
+      darkMode: localStorage.getItem('darkMode') !== 'false',
       now: 0,
       title: "Scrypted",
       drawer: this.$vuetify.breakpoint.lgAndUp,

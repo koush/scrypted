@@ -14,7 +14,7 @@
             color="white"
             style="margin-right: 20px"
           />
-          <span v-if="!!cardComponentSettings" class="title font-weight-light"
+          <span v-if="!!cardComponentSettings" 
             >{{ cardComponentSettings.cardComponent.component }} Settings</span
           >
         </v-card-title>
@@ -79,7 +79,6 @@
         <v-flex>
           <v-card raised>
             <v-card-title
-              class="red-gradient subtitle-1 text--white font-weight-light"
               >No Devices Found</v-card-title
             >
             <v-card-text

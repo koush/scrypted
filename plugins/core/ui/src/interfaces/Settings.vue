@@ -1,6 +1,6 @@
 <template>
   <v-card>
-    <v-card-title v-if="!noTitle" class="subtitle-1 font-weight-light"
+    <v-card-title v-if="!noTitle" 
       >Settings</v-card-title
     >
     <v-flex xs12 v-if="showChips" class="pt-0">

@@ -144,7 +144,7 @@ export default {
 
       const editor = monaco.editor.create(this.$refs.container, {
         automaticLayout: true,
-        theme: "vs-dark",
+        theme: this.$vuetify.theme.dark ? "vs-dark" : "vs",
         minimap: {
           enabled: false,
         },

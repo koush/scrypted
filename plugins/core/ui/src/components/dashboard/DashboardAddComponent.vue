@@ -3,7 +3,7 @@
     <v-card color="purple" raised>
       <v-card-title>
         <font-awesome-icon size="sm" icon="sliders-h" color="white" style="margin-right: 20px" />
-        <span class="title font-weight-light">Add Card Item</span>
+        <span >Add Card Item</span>
       </v-card-title>
 
       <v-list flat color="purple">

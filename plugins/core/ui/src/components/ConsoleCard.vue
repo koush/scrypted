@@ -87,6 +87,11 @@ export default {
   },
   mounted() {
     const term = new Terminal({
+      theme: this.$vuetify.theme.isDark ? undefined : {
+        foreground: 'black',
+        background: 'white',
+        cursor: 'black',
+      },
       convertEol: true,
       disableStdin: true,
       scrollback: 10000,

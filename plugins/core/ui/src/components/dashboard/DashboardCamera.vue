@@ -1,11 +1,8 @@
 <template>
-  <v-dialog
-    width="1024"
-    v-model="dialog"
-    :fullscreen="$isMobile()"
-  >
+  <v-dialog width="1024" v-model="dialog" :fullscreen="$isMobile()">
     <template v-slot:activator="{ on }">
       <v-img
+        style="cursor: pointer"
         v-on="on"
         contain
         :src="src"

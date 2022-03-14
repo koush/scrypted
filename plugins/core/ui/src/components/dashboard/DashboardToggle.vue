@@ -22,7 +22,7 @@
             <v-icon x-small color="white" style="margin-right: 20px">
               {{ typeToIcon(type) }}
             </v-icon>
-            <span class="title font-weight-light">{{ name }}</span>
+            <span >{{ name }}</span>
           </v-card-title>
 
           <v-flex xs12>
