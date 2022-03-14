@@ -200,7 +200,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     // try to make a webrtc a/v session to handle it.
 
     const engineio = await endpointManager.getPublicLocalEndpoint(this.nativeId) + 'engine.io/';
-    const mo = mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
+    const mo = await mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
     const cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
 
     const castMedia: any = {

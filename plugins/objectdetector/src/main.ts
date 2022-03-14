@@ -49,9 +49,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   hasMotionType: boolean;
   settings: Setting[];
 
-  constructor(mixinDevice: VideoCamera & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, public internal: boolean) {
-    super(mixinDevice, mixinDeviceState, {
-      providerNativeId,
+  constructor(mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, public internal: boolean) {
+    super({
+      mixinDevice, mixinDeviceState,
+      mixinProviderNativeId: providerNativeId,
       mixinDeviceInterfaces,
       group,
       groupKey: "objectdetectionplugin:" + objectDetection.id,
@@ -227,7 +228,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         stream = await this.cameraDevice.getVideoStream(selectedStream);
       }
       else {
-        stream = mediaManager.createMediaObject(Buffer.alloc(0), 'x-scrypted/x-internal-media-object');
+        stream = await mediaManager.createMediaObject(Buffer.alloc(0), 'x-scrypted/x-internal-media-object');
       }
 
       const session = await this.objectDetection?.detectObjects(stream, {
@@ -593,7 +594,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
-  release() {
+  async release() {
     super.release();
     this.released = true;
     this.clearDetectionTimeout();
@@ -609,7 +610,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
 class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements MixinProvider {
   constructor(mixinDevice: ObjectDetection, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState, mixinProviderNativeId: ScryptedNativeId, public modelName: string, public internal?: boolean) {
-    super(mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId);
+    super({ mixinDevice, mixinDeviceInterfaces, mixinDeviceState, mixinProviderNativeId });
 
     // trigger mixin creation. todo: fix this to not be stupid hack.
     for (const id of Object.keys(systemManager.getSystemState())) {

@@ -7,7 +7,7 @@ const { mediaManager, log } = sdk;
 
 async function audioFetch(body: string): Promise<string> {
   const buf = Buffer.from(body);
-  const mo = mediaManager.createMediaObject(buf, 'text/plain');
+  const mo = await mediaManager.createMediaObject(buf, 'text/plain');
   return mediaManager.convertMediaObjectToInsecureLocalUrl(mo, 'audio/*');
 }
 

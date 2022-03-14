@@ -494,7 +494,7 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: str | bytearray, fromMimeType: str, toMimeType: str) -> MediaObject | bytearray:
+    async def convert(self, data: Any, fromMimeType: str, toMimeType: str) -> Any:
         pass
     pass
 
@@ -928,6 +928,8 @@ class SystemManager:
 
 class MediaManager:
     builtinConverters: list[BufferConverter]
+    async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> T:
+        pass
     async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:
         pass
     async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
@@ -938,9 +940,9 @@ class MediaManager:
         pass
     async def convertMediaObjectToUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
-    def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput) -> MediaObject:
+    async def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput) -> MediaObject:
         pass
-    def createMediaObject(self, data: Any, mimeType: str) -> MediaObject:
+    async def createMediaObject(self, data: Any, mimeType: str) -> MediaObject:
         pass
     async def createMediaObjectFromUrl(self, data: str, mimeType: str = None) -> MediaObject:
         pass

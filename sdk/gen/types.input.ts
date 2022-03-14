@@ -641,7 +641,7 @@ export interface SoftwareUpdate {
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-  convert(data: string|Buffer, fromMimeType: string, toMimeType: string): Promise<MediaObject|Buffer>;
+  convert(data: string|Buffer|any, fromMimeType: string, toMimeType: string): Promise<MediaObject|Buffer|any>;
 
   fromMimeType?: string;
   toMimeType?: string;
@@ -845,6 +845,11 @@ export interface MediaManager {
    * Additional plugin provided convertors to consider for use when converting MediaObjects.
    */
   builtinConverters: BufferConverter[];
+  
+  /**
+   * Convert a media object to a Buffer, primtive type, or RPC Object.
+   */
+  convertMediaObject<T>(mediaObject: MediaObject, toMimeType: string): Promise<T>;
 
   /**
    * Convert a media object to a Buffer of the given mime type, and them parse it as JSON.
@@ -874,13 +879,14 @@ export interface MediaManager {
   /**
    * Create a MediaObject. The media will be created from the provided FFmpeg input arguments.
    */
-  createFFmpegMediaObject(ffmpegInput: FFMpegInput): MediaObject;
+  createFFmpegMediaObject(ffmpegInput: FFMpegInput): Promise<MediaObject>;
 
   /**
    * Create a MediaObject.
-   * The data must be a Buffer, or a JSON object that will be serialized to a Buffer.
+   * If the data is a buffer, JSON object, or primitive type, it will be serialized.
+   * All other objects will be objects will become RPC objects.
    */
-  createMediaObject(data: any | Buffer, mimeType: string): MediaObject;
+  createMediaObject(data: any | Buffer, mimeType: string): Promise<MediaObject>;
 
   /**
    * Create a MediaObject from an URL. The mime type should be provided, but it may be inferred from the URL path.
