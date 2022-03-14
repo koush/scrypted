@@ -3,3 +3,4 @@ node_modules
 .gcloud/
 dist/
 scrypted.db
+src/test.ts

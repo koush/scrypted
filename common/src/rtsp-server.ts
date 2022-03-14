@@ -6,7 +6,7 @@ import { findTrack } from './sdp-utils';
 import dgram from 'dgram';
 import net from 'net';
 import tls from 'tls';
-import { DIGEST } from 'http-auth-utils/src/index';
+import { DIGEST } from 'http-auth-utils/dist/index';
 import crypto from 'crypto';
 
 export const RTSP_FRAME_MAGIC = 36;
@@ -244,9 +244,11 @@ export class RtspClient extends RtspBase {
         });
     }
 
-    async setup(channel: number, path?: string) {
+    async setup(channelOrPort: number, path?: string, udp?: boolean) {
+        const protocol = udp ? 'UDP' : 'TCP';
+        const client = udp ? 'client_port' : 'interleaved';
         const headers: any = {
-            Transport: `RTP/AVP/TCP;unicast;interleaved=${channel}-${channel + 1}`,
+            Transport: `RTP/AVP/${protocol};unicast;${client}=${channelOrPort}-${channelOrPort + 1}`,
         };
         const response = await this.request('SETUP', headers, path)
         if (response.headers.session) {
@@ -266,11 +268,16 @@ export class RtspClient extends RtspBase {
         return response;
     }
 
-    async play() {
+    async play(start: string = '0.000') {
         const headers: any = {
-            Range: 'npt=0.000-',
+            Range: `npt=${start}-`,
         };
         await this.request('PLAY', headers);
+        return this.client;
+    }
+
+    async pause() {
+        await this.request('PAUSE');
         return this.client;
     }
 

@@ -50,18 +50,15 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         return ret;
     }
 
-    async createVideoStream(vso: UrlMediaStreamOptions): Promise<MediaObject> {
-        if (!vso)
-            throw new Error('video streams not set up or no longer exists.');
-
+    addRtspCredentials(rtspUrl: string) {
         // ignore this deprecation warning. the WHATWG URL class will trim the password
         // off if it is empty, resulting in urls like rtsp://admin@foo.com/.
         // this causes ffmpeg to fail on sending a blank password.
         // we need to send it as follows: rtsp://admin:@foo.com/.
         // Note the trailing colon.
         // issue: https://github.com/koush/scrypted/issues/134
-        const parsedUrl = url.parse(vso.url);
-        this.console.log('rtsp stream url', vso.url);
+        const parsedUrl = url.parse(rtspUrl);
+        this.console.log('rtsp stream url', rtspUrl);
         const username = this.storage.getItem("username");
         const password = this.storage.getItem("password");
         if (username) {
@@ -71,7 +68,10 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         }
 
         const stringUrl = url.format(parsedUrl);
+        return stringUrl;
+    }
 
+    createFfmpegMediaObject(stringUrl: string, vso: MediaStreamOptions) {
         const ret: FFMpegInput = {
             url: stringUrl,
             inputArguments: [
@@ -82,6 +82,14 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         };
 
         return mediaManager.createFFmpegMediaObject(ret);
+    }
+
+    async createVideoStream(vso: UrlMediaStreamOptions): Promise<MediaObject> {
+        if (!vso)
+            throw new Error('video streams not set up or no longer exists.');
+
+        const stringUrl = this.addRtspCredentials(vso.url);
+        return this.createFfmpegMediaObject(stringUrl, vso);
     }
 
     // hide the description from CameraBase that indicates it is only used for snapshots

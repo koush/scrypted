@@ -120,7 +120,7 @@ export function createMonacoEvalDefaults(extraLibs: { [lib: string]: string }) {
 
     const libs = Object.assign(getTypeDefs(), extraLibs);
 
-    function monacoEvalDefaultsFunction(monaco, safeLibs, libs) {
+    function monacoEvalDefaultsFunction(monaco: any, safeLibs: any, libs: any) {
         monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(
             Object.assign(
                 {},
@@ -223,7 +223,7 @@ export function createScriptDevice(baseInterfaces: string[]): ScriptDeviceImpl {
                 const iface = methodInterfaces.get(method);
                 if (iface) {
                     allInterfaces.push(iface);
-                    device[method] = handler[method].bind(handler);
+                    (device as any)[method] = handler[method].bind(handler);
                 }
             }
             return allInterfaces;

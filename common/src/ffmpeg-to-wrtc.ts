@@ -17,6 +17,18 @@ const configuration: RTCConfiguration = {
   ],
 };
 
+export function isPeerConnectionAlive(pc :RTCPeerConnection) {
+    if (pc.iceConnectionState === 'disconnected'
+      || pc.iceConnectionState === 'failed'
+      || pc.iceConnectionState === 'closed')
+      return false;
+    if (pc.connectionState === 'closed'
+      || pc.connectionState === 'disconnected'
+      || pc.connectionState === 'failed') 
+    return false;
+  return true;
+}
+
 let wrtc: any;
 function initalizeWebRtc() {
   if (wrtc)
@@ -214,20 +226,12 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   }
 
   const checkConn = () => {
-    if (pc.iceConnectionState === 'disconnected'
-      || pc.iceConnectionState === 'failed'
-      || pc.iceConnectionState === 'closed') {
+    if (!isPeerConnectionAlive(pc))
       cleanup();
-    }
-    if (pc.connectionState === 'closed'
-      || pc.connectionState === 'disconnected'
-      || pc.connectionState === 'failed') {
-      cleanup();
-    }
   }
 
-  pc.onconnectionstatechange = checkConn;
-  pc.oniceconnectionstatechange = checkConn;
+  pc.addEventListener('connectionstatechange', checkConn);
+  pc.addEventListener('iceconnectionstatechange', checkConn);
 
   setTimeout(() => {
     if (pc.connectionState !== 'connected') {
@@ -273,6 +277,7 @@ export async function startRTCPeerConnection(console: Console, mediaObject: Medi
     });
 
     await pc.setRemoteDescription(answer);
+    return pc;
   }
   catch (e) {
     pc.close();
@@ -314,7 +319,7 @@ export async function startBrowserRTCSignaling(camera: ScryptedDevice & RTCSigna
       camera.startRTCSignalingSession(session, options);
     }
     else {
-      startRTCPeerConnectionForBrowser(console, await camera.getVideoStream(), session, options);
+      return startRTCPeerConnectionForBrowser(console, await camera.getVideoStream(), session, options);
     }
   }
   catch (e) {
