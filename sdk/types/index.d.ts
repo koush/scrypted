@@ -575,7 +575,7 @@ export interface RequestRecordingStreamOptions extends MediaStreamOptions {
 }
 export interface VideoRecorder {
     getRecordingStream(options: RequestRecordingStreamOptions): Promise<MediaObject>;
-    getRecordingStreamOptions(): Promise<MediaStreamOptions>[];
+    getRecordingStreamOptions(): Promise<MediaStreamOptions[]>;
 }
 /**
  * Intercom devices can play back

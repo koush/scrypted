@@ -853,7 +853,7 @@ class VideoCameraConfiguration:
 class VideoRecorder:
     async def getRecordingStream(self, options: RequestRecordingStreamOptions) -> MediaObject:
         pass
-    def getRecordingStreamOptions(self) -> list[MediaStreamOptions]:
+    async def getRecordingStreamOptions(self) -> list[MediaStreamOptions]:
         pass
     pass
 

@@ -1,4 +1,4 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions, VideoCameraConfiguration, MediaStreamOptions } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions, VideoCameraConfiguration, MediaStreamOptions, VideoRecorder, RequestRecordingStreamOptions } from "@scrypted/sdk";
 import { Stream, PassThrough } from "stream";
 import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -26,7 +26,7 @@ function findValue(blob: string, prefix: string, key: string) {
     return parts[1];
 }
 
-class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom {
+class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration, Camera, Intercom, VideoRecorder {
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
@@ -42,6 +42,25 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
 
         this.updateDeviceInfo();
+    }
+
+    async getRecordingStream(options: RequestRecordingStreamOptions): Promise<MediaObject> {
+        // ffplay 'rtsp://user:password@192.168.2.87/cam/playback?channel=1&starttime=2022_03_12_21_00_00'
+        const startTime = new Date(options.startTime);
+        const month = (startTime.getMonth() + 1).toString().padStart(2, '0');
+        const date = startTime.getDate().toString().padStart(2, '0');
+        const year = startTime.getFullYear();
+        const hours = startTime.getHours().toString().padStart(2, '0');
+        const minutes = startTime.getMinutes().toString().padStart(2, '0');
+        const seconds = startTime.getSeconds().toString().padStart(2, '0');;
+
+        const url = `rtsp://${this.getRtspAddress()}/cam/playback?channel=1&starttime=${year}_${month}_${date}_${hours}_${minutes}_${seconds}`;
+        const authedUrl = this.addRtspCredentials(url);
+        return this.createFfmpegMediaObject(authedUrl, undefined);
+    }
+
+    getRecordingStreamOptions(): Promise<MediaStreamOptions[]> {
+        return this.getVideoStreamOptions();
     }
 
     async updateDeviceInfo(): Promise<void> {
@@ -203,6 +222,13 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 description: 'Amcrest cameras may support both Amcrest and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
                 choices,
             },
+            {
+                title: 'Continuous Recording',
+                key: 'continuousRecording',
+                description: 'Continuously record onto the Camera SD Card.',
+                type: 'boolean',
+                value: (this.storage.getItem('continuousRecording') === 'true').toString(),
+            },
         );
 
         return ret;
@@ -322,6 +348,22 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async putSetting(key: string, value: string) {
+        if (key === 'continuousRecording') {
+            if (value === 'true') {
+                try {
+                    await this.getClient().enableContinousRecording(parseInt(this.getRtspChannel()) || 1);
+                    this.storage.setItem('continuousRecording', 'true');
+                }
+                catch (e) {
+                    this.log.a('There was an error enabling continuous recording.');
+                    this.console.error('There was an error enabling continuous recording.', e);
+                }
+            }
+            else {
+                this.storage.removeItem('continuousRecording');
+            }
+        }
+
         this.client = undefined;
         this.maxExtraStreams = undefined;
 
@@ -342,6 +384,9 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         if (isDoorbell || twoWayAudio) {
             interfaces.push(ScryptedInterface.Intercom);
         }
+        const continuousRecording = this.storage.getItem('continuousRecording') === 'true';
+        if (continuousRecording)
+            interfaces.push(ScryptedInterface.VideoRecorder);
         provider.updateDevice(this.nativeId, this.name, interfaces, type);
     }
 

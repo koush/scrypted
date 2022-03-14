@@ -81,4 +81,16 @@ export class AmcrestCameraClient {
 
         return stream;
     }
+
+    async enableContinousRecording(channel: number) {
+        for (let i = 0; i < 7; i++) {
+            const url = `http://${this.ip}/cgi-bin/configManager.cgi?action=setConfig&Record[${channel - 1}].TimeSection[${i}][0]=1 00:00:00-23:59:59`;
+            const response = await this.digestAuth.request({
+                httpsAgent: amcrestHttpsAgent,
+                method: "POST",
+                url,
+            });
+            this.console.log(response.data);
+        }
+    }
 }
