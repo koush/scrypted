@@ -9,24 +9,25 @@
         <span>{{ title }}</span>
       </v-toolbar-title>
       <v-spacer></v-spacer>
-      <v-btn icon small @click="toggleDarkMode"><v-icon small>fa fa-sun</v-icon></v-btn>
       <v-menu left bottom>
         <template v-slot:activator="{ on }">
           <v-btn v-on="on" text>{{ $store.state.username }}</v-btn>
         </template>
         <v-list>
-          <v-list-item class="font-weight-light" @click="reload">
+          <v-list-item  @click="reload">
             <v-list-item-content>
               <v-list-item-title>Reload</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
-          <v-list-item class="font-weight-light" @click="logout">
+          <v-list-item  @click="logout">
             <v-list-item-content>
               <v-list-item-title>Logout</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
         </v-list>
       </v-menu>
+
+      <v-btn icon small @click="toggleDarkMode"><v-icon small>fa fa-sun</v-icon></v-btn>
 
       <v-menu left bottom>
         <template v-slot:activator="{ on }">
@@ -46,7 +47,7 @@
 
         <v-list>
           <v-list-item
-            class="font-weight-light"
+            
             v-for="alert in $store.state.scrypted.alerts"
             :key="alert.id"
             @click="doAlert(alert)"
@@ -71,7 +72,7 @@
           <v-divider v-if="$store.state.scrypted.alerts.length"></v-divider>
           <v-list-item
             v-if="!$store.state.scrypted.alerts.length"
-            class="font-weight-light"
+            
           >
             <v-list-item-content>
               <v-list-item-title class="caption"
@@ -79,7 +80,7 @@
               >
             </v-list-item-content>
           </v-list-item>
-          <v-list-item v-else class="font-weight-light" @click="clearAlerts">
+          <v-list-item v-else  @click="clearAlerts">
             <v-list-item-icon>
               <v-icon x-small style="color: #a9afbb">fa-trash</v-icon>
             </v-list-item-icon>
@@ -101,7 +102,7 @@
 
         <v-list>
           <v-list-item
-            class="font-weight-light"
+            
             v-for="(menuItem, index) in $store.state.menu"
             :key="index"
             @click="menuItem.click"

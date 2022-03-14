@@ -8,17 +8,6 @@ import DashboardStartStop from "./DashboardStartStop.vue";
 import DashboardMediaPlayer from "./DashboardMediaPlayer.vue";
 import { Multimap, EnsureMap } from "./multimap";
 
-function randomGradient() {
-    const gradients = [
-        "purple-gradient",
-        "orange-gradient",
-        "red-gradient",
-        "green-gradient",
-        'blue-gradient',
-    ];
-    return gradients[Math.round(Math.random() * 10000) % gradients.length];
-}
-
 export interface Card {
     name: string;
     components: CardComponent[];
@@ -317,7 +306,7 @@ export function getDefaultDashboard(deviceIds: string[], systemManager: SystemMa
             name: room,
             components,
             height,
-            color: randomGradient(),
+            color: 'light-blue darken-2',
         }
         ret.push(card);
     }
@@ -338,7 +327,7 @@ export function getDefaultDashboard(deviceIds: string[], systemManager: SystemMa
             name: pluralize(type),
             components,
             height,
-            color: randomGradient(),
+            color: 'light-blue darken-2',
         }
         ret.push(card);
     }

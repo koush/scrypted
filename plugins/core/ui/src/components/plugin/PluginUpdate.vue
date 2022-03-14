@@ -5,7 +5,7 @@
     </div>
     <div
       v-else-if="!updateAvailable"
-      class="body-2 font-weight-light"
+      
     >{{ device.npmPackageVersion }}</div>
     <v-btn
       @click="doInstall"

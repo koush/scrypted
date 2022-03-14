@@ -10,7 +10,7 @@
       >
     </v-list-item-icon>
     <v-list-item-content>
-      <v-list-item-title class="font-weight-light">{{
+      <v-list-item-title >{{
         name || device.name
       }}</v-list-item-title>
     </v-list-item-content>

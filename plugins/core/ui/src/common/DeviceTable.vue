@@ -15,24 +15,24 @@
         <td>
           <v-icon x-small color="#a9afbb">{{ typeToIcon(device.type) }}</v-icon>
         </td>
-        <td class="body-2 font-weight-light">
+        <td >
           <a link :href="'#' + getDeviceViewPath(device.id)">{{ device.name }}</a>
         </td>
         <td v-if="extraColumn0"><slot name="extra-column-0" v-bind:device="device"></slot></td>
-        <td v-if="$vuetify.breakpoint.mdAndUp && deviceGroup.ownerColumn && getOwnerLink(device)" class="body-2 font-weight-light">
+        <td v-if="$vuetify.breakpoint.mdAndUp && deviceGroup.ownerColumn && getOwnerLink(device)" >
           <a :href="getOwnerLink(device)">{{ getOwnerColumn(device) }}</a>
         </td>
         <td
           v-else-if="$vuetify.breakpoint.mdAndUp && deviceGroup.ownerColumn"
-          class="body-2 font-weight-light"
+          
         >{{ getOwnerColumn(device) }}</td>
         <td v-if="$vuetify.breakpoint.mdAndUp && extraColumn1"><slot name="extra-column-1" v-bind:device="device"></slot></td>
-        <td v-if="$vuetify.breakpoint.mdAndUp && !hideType" class="body-2 font-weight-light">{{ device.type }}</td>
+        <td v-if="$vuetify.breakpoint.mdAndUp && !hideType" >{{ device.type }}</td>
       </tr>
     </tbody>
     <tbody v-else>
       <td></td>
-      <td class="body-2 font-weight-light">None found.</td>
+      <td >None found.</td>
     </tbody>
   </v-simple-table>
 </template>

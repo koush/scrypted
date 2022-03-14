@@ -14,7 +14,7 @@
             color="white"
             style="margin-right: 20px"
           />
-          <span v-if="!!cardComponentSettings" 
+          <span v-if="!!cardComponentSettings"
             >{{ cardComponentSettings.cardComponent.component }} Settings</span
           >
         </v-card-title>
@@ -78,9 +78,7 @@
       <v-flex v-else-if="isEmpty" xs12 md6 lg4>
         <v-flex>
           <v-card raised>
-            <v-card-title
-              >No Devices Found</v-card-title
-            >
+            <v-card-title>No Devices Found</v-card-title>
             <v-card-text
               >No devices found, install a plugin to add support for your
               things</v-card-text
@@ -109,10 +107,7 @@
           class="pb-4"
         >
           <v-card raised v-if="!card.state.hidden || editCardMode">
-            <v-card-title
-              :class="card.color"
-              class="subtitle-1 font-weight-light"
-            >
+            <card-toolbar :color="card.color" class="subtitle-1">
               <v-text-field
                 hide-details
                 dark
@@ -121,65 +116,48 @@
                 v-model="card.name"
               ></v-text-field>
               <div v-else>{{ card.name }}</div>
-            </v-card-title>
+            </card-toolbar>
 
             <div v-if="editCardMode">
               <v-card-actions>
-                <v-layout align-center justify-center>
-                  <v-btn
-                    small
-                    dark
-                    fab
-                    color="green"
-                    @click="card.color = 'green-gradient'"
-                  ></v-btn>
-                  <v-btn
-                    small
-                    dark
-                    fab
-                    color="purple"
-                    @click="card.color = 'purple-gradient'"
-                  ></v-btn>
-                  <v-btn
-                    small
-                    dark
-                    fab
-                    color="red"
-                    @click="card.color = 'red-gradient'"
-                  ></v-btn>
-                  <v-btn
-                    small
-                    dark
-                    fab
-                    color="orange"
-                    @click="card.color = 'orange-gradient'"
-                  ></v-btn>
-                  <v-btn
-                    small
-                    dark
-                    fab
-                    color="blue"
-                    @click="card.color = 'blue-gradient'"
-                  ></v-btn>
-                  <v-btn
-                    small
-                    icon
-                    @click="card.state.hidden = !card.state.hidden"
-                  >
-                    <font-awesome-icon
-                      :icon="card.state.hidden ? 'eye-slash' : 'eye'"
-                      style="color: #a9afbb"
-                    />
-                  </v-btn>
-                  <v-btn
-                    small
-                    icon
-                    @click="cardColumn.splice(cardIndex, 1)"
-                    color="#a9afbb"
-                  >
-                    <v-icon>delete</v-icon>
-                  </v-btn>
-                </v-layout>
+                <v-dialog width="400px" height="400px">
+                  <template v-slot:activator="{ on }">
+                    <v-btn v-on="on" x-small text :color="card.color"
+                      ><v-icon x-small :color="card.color"
+                        >fa fa-fill-drip</v-icon
+                      ></v-btn
+                    >
+                  </template>
+                  <v-card>
+                    <v-color-picker
+                      swatches-max-height="100%"
+                      v-model="card.color"
+                      hide-canvas
+                      hide-inputs
+                      hide-sliders
+                      show-swatches
+                    ></v-color-picker>
+                  </v-card>
+                </v-dialog>
+
+                <v-btn
+                  x-small
+                  text
+                  color="#a9afbb"
+                  @click="card.state.hidden = !card.state.hidden"
+                >
+                  <v-icon x-small>
+                    fa {{ card.state.hidden ? "fa-eye-slash" : "fa-eye" }}
+                  </v-icon>
+                </v-btn>
+                <v-btn
+                  x-small
+                  text
+                  @click="cardColumn.splice(cardIndex, 1)"
+                  color="#a9afbb"
+                >
+                  <v-icon x-small>delete</v-icon>
+                </v-btn>
               </v-card-actions>
               <v-card-actions>
                 <v-btn small icon @click="moveCard(index, cardIndex, -1, 0)">
@@ -339,7 +317,12 @@ import {
   Card,
 } from "./layout";
 import { Menu } from "../../store";
-import { Settings as SettingsInterface, Setting, SettingValue } from "@scrypted/types";
+import {
+  Settings as SettingsInterface,
+  Setting,
+  SettingValue,
+} from "@scrypted/types";
+import CardToolbar from "../CardToolbar.vue";
 
 class CardComponentSettings implements SettingsInterface {
   cardComponent: CardComponent;
@@ -377,6 +360,8 @@ class CardComponentSettings implements SettingsInterface {
 export default {
   mixins: [DashboardBase],
   components: {
+    CardToolbar,
+
     DashboardMap,
     DashboardToggle,
     DashboardCamera,

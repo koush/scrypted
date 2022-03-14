@@ -7,7 +7,7 @@
       >{{ typeToIcon(device.type) }}</v-icon>
     </v-list-item-icon>
     <v-list-item-content>
-      <v-list-item-title class="font-weight-light">{{ name || device.name }}</v-list-item-title>
+      <v-list-item-title >{{ name || device.name }}</v-list-item-title>
     </v-list-item-content>
     <v-list-item-action class="mx-0 mt-0 mb-0">
       <span>

@@ -1,7 +1,6 @@
 <template>
   <v-card>
     <v-card-title
-      class="small-header red-gradient white--text font-weight-light subtitle-2"
       >Trigger</v-card-title
     >
 

@@ -2,7 +2,7 @@
   <v-layout>
     <v-flex xs12 md8 lg6>
       <v-card raised>
-        <v-toolbar dark color="blue">
+        <v-toolbar dark :color="$vuetify.theme.dark ? undefined : 'light-blue darken-2'">
           All Devices
           <v-spacer></v-spacer>
           <v-text-field

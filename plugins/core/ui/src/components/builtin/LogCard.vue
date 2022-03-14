@@ -19,14 +19,8 @@
       <template v-slot:[`item.pri`]="{ item }">
         <v-chip x-small :color="priToColor(item.level)">{{ item.level }}</v-chip>
       </template>
-      <!-- <template v-slot:[`item.tag`]="{ item }">
-        <router-link :to="`/component/log${item.path}`">{{ item.title }}</router-link>
-      </template> -->
       <template v-slot:[`item.log`]="{ item }">
         <pre class="caption">{{ item.message }}</pre>
-        <!-- <div class="caption font-weight-light">
-          <router-link :to="item.path">{{ item.title }}</router-link>
-        </div> -->
       </template>
     </v-data-table>
     <v-card-text light v-else>

@@ -1,7 +1,6 @@
 <template>
   <v-card style="margin-bottom: 16px">
     <v-card-title
-      class="small-header red-gradient white--text font-weight-light subtitle-2"
       >Action</v-card-title
     >
 

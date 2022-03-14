@@ -44,7 +44,7 @@
       <v-layout row wrap>
         <v-flex xs12>
           <v-card raised>
-            <v-card-title >
+            <card-toolbar >
               {{ name || "No Device Name" }}
               <v-layout
                 mr-1
@@ -61,7 +61,7 @@
                   :key="iface"
                 ></component>
               </v-layout>
-            </v-card-title>
+            </card-toolbar>
 
             <v-card-subtitle v-if="ownerDevice && pluginData">
               <a @click="openDevice(ownerDevice.id)">{{ ownerDevice.name }}</a>
@@ -230,11 +230,11 @@
                 </template>
 
                 <v-card>
-                  <v-card-title
+                  <card-toolbar
                     style="margin-bottom: 8px"
                     class="red white--text"
                     primary-title
-                    >Delete Device</v-card-title
+                    >Delete Device</card-toolbar
                   >
 
                   <v-card-text
@@ -271,11 +271,11 @@
 
         <v-flex xs12 v-if="availableMixins.length">
           <v-card raised>
-            <v-card-title
+            <card-toolbar
             >
               <font-awesome-icon size="sm" icon="puzzle-piece" />
               &nbsp;&nbsp;Integrations and Extensions
-            </v-card-title>
+            </card-toolbar>
 
             <v-list-item-group>
               <v-list-item
@@ -315,8 +315,8 @@
 
         <v-flex xs12 v-if="showStorage">
           <v-card raised>
-            <v-card-title
-              >Storage</v-card-title
+            <card-toolbar
+              >Storage</card-toolbar
             >
             <v-container>
               <v-layout>
@@ -334,9 +334,9 @@
 
         <v-flex xs12 v-for="iface in cardUnderInterfaces" :key="iface">
           <v-card raised>
-            <v-card-title>
+            <card-toolbar>
               {{ getInterfaceFriendlyName(iface) }}
-            </v-card-title>
+            </card-toolbar>
             <component
               :value="deviceState"
               :device="device"
@@ -351,8 +351,8 @@
       <v-layout row wrap>
         <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
           <v-card>
-            <v-card-title
-              >{{ getInterfaceFriendlyName(iface) }}</v-card-title
+            <card-toolbar
+              >{{ getInterfaceFriendlyName(iface) }}</card-toolbar
             >
             <component
               :value="deviceState"
@@ -439,6 +439,7 @@ import {
   setMixin,
   getDeviceMixins,
 } from "../common/mixin";
+import CardToolbar from '../components/CardToolbar.vue';
 
 const cardHeaderInterfaces = [
   ScryptedInterface.OccupancySensor,
@@ -512,6 +513,8 @@ function filterInterfaces(interfaces) {
 
 export default {
   components: {
+    CardToolbar,
+    
     DeviceProvider,
     MixinProvider,
 
