@@ -31,3 +31,7 @@ export function isRtpMessagePayloadType(payloadType: number) {
 export function getPayloadType(message: Buffer) {
     return message.readUInt8(1) & 0x7f
 }
+
+export function getSequenceNumber(message: Buffer) {
+    return message.readUInt16BE(2)
+}

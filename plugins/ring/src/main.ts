@@ -4,11 +4,15 @@ import { StorageSettings } from '@scrypted/common/src/settings';
 import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
 import { RefreshPromise } from "@scrypted/common/src/promise-utils"
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { replacePorts } from '@scrypted/common/src/sdp-utils';
+import { addTrackControls, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { RtspServer } from '@scrypted/common/src/rtsp-server'
 import dgram from 'dgram';
-import { createCryptoLine, encodeSrtpOptions, getPayloadType, isRtpMessagePayloadType } from './srtp-utils';
+import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 import child_process, { ChildProcess } from 'child_process';
+import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
+import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
+import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
+import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 
 enum CaptureModes {
     Default = 'Default',
@@ -54,7 +58,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
             title: 'SIP Gateway',
             description: 'The gateway used to import the stream.',
             choices: Object.values(CaptureModes),
-            value: CaptureModes.Default,
+            defaultValue: CaptureModes.Default,
         }
     });
     buttonTimeout: NodeJS.Timeout;
@@ -192,29 +196,17 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                 const videoPort = useRtsp ? 0 : sip.videoSplitter.address().port;
                 const audioPort = useRtsp ? 0 : sip.audioSplitter.address().port;
 
-                const inputSdpLines = [
-                    'v=0',
-                    'o=105202070 3747 461 IN IP4 0.0.0.0',
-                    's=Talk',
-                    'c=IN IP4 0.0.0.0',
-                    'b=AS:380',
-                    't=0 0',
-                    'a=rtcp-xr:rcvr-rtt=all:10000 stat-summary=loss,dup,jitt,TTL voip-metrics',
-                    `m=audio ${audioPort} RTP/SAVP 0 101`,
-                    'a=control:trackID=audio',
-                    'a=rtpmap:0 PCMU/8000',
-                    createCryptoLine(this.rtpDescription.audio),
-                    'a=rtcp-mux',
-                    `m=video ${videoPort} RTP/SAVP 99`,
-                    'a=control:trackID=video',
-                    'a=rtpmap:99 H264/90000',
-                    createCryptoLine(this.rtpDescription.video),
-                    'a=rtcp-mux'
-                ];
-
-                const proposedSdp = inputSdpLines.filter((x) => Boolean(x)).join('\n');
-                const sdp = replacePorts(this.rtpDescription.sdp, audioPort, videoPort);
+                let sdp = replacePorts(this.rtpDescription.sdp, audioPort, videoPort);
+                sdp = addTrackControls(sdp);
+                sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
                 this.console.log('proposed sdp', sdp);
+
+                let vseq = 0;
+                let vseen = 0;
+                let vlost = 0;
+                let aseq = 0;
+                let aseen = 0;
+                let alost = 0;
 
                 if (useRtsp) {
                     const rtsp = new RtspServer(client, sdp, udp);
@@ -226,20 +218,77 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                     sip.videoSplitter.on('message', message => {
                         if (!isStunMessage(message)) {
                             const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-                            if (!isRtpMessage) {
-                                this.console.log('rtcp');
-                            }
+                            if (!isRtpMessage)
+                                return;
+                                vseen++;
                             rtsp.sendVideo(message, !isRtpMessage);
+                            const seq = getSequenceNumber(message);
+                            if (seq !== (vseq + 1) % 0x0FFFF)
+                            vlost ++;
+                            vseq = seq;
                         }
                     });
+
+                    sip.videoRtcpSplitter.on('message', message => {
+                        rtsp.sendVideo(message, true);
+                    });
+
+                    sip.videoSplitter.once('message', message => {
+                        const srtcp = new SrtcpSession({
+                            profile: ProtectionProfileAes128CmHmacSha1_80,
+                            keys: {
+                                localMasterKey: this.rtpDescription.video.srtpKey,
+                                localMasterSalt: this.rtpDescription.video.srtpSalt,
+                                remoteMasterKey: this.rtpDescription.video.srtpKey,
+                                remoteMasterSalt: this.rtpDescription.video.srtpSalt,
+                            },
+                        });
+                        const first = srtcp.decrypt(message);
+                        const rtp = RtpPacket.deSerialize(first);
+
+                        const report = new RtcpReceiverInfo({
+                            ssrc: rtp.header.ssrc,
+                            fractionLost: 0,
+                            packetsLost: 0,
+                            highestSequence: rtp.header.sequenceNumber,
+                            jitter: 0,
+                            lsr: 0,
+                            dlsr: 0,
+                        })
+
+                        const rr = new RtcpRrPacket({
+                            ssrc: rtp.header.ssrc,
+                            reports: [
+                                report,
+                            ],
+                        });
+
+                        const interval = setInterval(() => {
+                            report.highestSequence = vseq;
+                            report.packetsLost = vlost;
+                            report.fractionLost = Math.round(vlost * 100 / vseen);
+                            const packet = srtcp.encrypt(rr.serialize());
+                            sip.videoSplitter.send(packet, this.rtpDescription.video.rtcpPort, this.rtpDescription.address)
+                        }, 500);
+                        sip.videoSplitter.on('close', () => clearInterval(interval))
+                    });
+
                     sip.audioSplitter.on('message', message => {
                         if (!isStunMessage(message)) {
                             const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-                            if (!isRtpMessage) {
-                                this.console.log('rtcp');
-                            }
+                            if (!isRtpMessage)
+                                return;
+                            aseen++;
                             rtsp.sendAudio(message, !isRtpMessage);
+                            const seq = getSequenceNumber(message);
+                            if (seq !== (aseq + 1) % 0x0FFFF)
+                                alost++;
+                            aseq = seq;
                         }
+                    });
+
+                    sip.audioRtcpSplitter.on('message', message => {
+                        rtsp.sendAudio(message, true);
                     });
 
                     sip.requestKeyFrame();
@@ -257,42 +306,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                     }
                 }
                 else {
-                    const rtsp = new RtspServer(client, sdp, udp);
-                    rtsp.udpPorts = {
-                        video: videoPort,
-                        audio: audioPort,
-                    };
-                    rtsp.console = this.console;
-                    rtsp.audioChannel = 0;
-                    rtsp.videoChannel = 2;
+                    this.session = sip;
 
                     const packetWaiter = new Promise(resolve => sip.videoSplitter.once('message', resolve));
-
-                    sip.videoSplitter.on('message', message => {
-                        if (!isStunMessage(message)) {
-                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-                            if (!isRtpMessage)
-                                this.console.log('rtcp')
-                            rtsp.sendVideo(message, !isRtpMessage);
-                        }
-                        else {
-                            this.console.log('stun')
-                        }
-                    });
-                    sip.audioSplitter.on('message', message => {
-                        if (!isStunMessage(message)) {
-                            const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-                            if (!isRtpMessage)
-                                this.console.log('rtcp')
-                            rtsp.sendAudio(message, !isRtpMessage);
-                        }
-                        else {
-                            this.console.log('stun')
-                        }
-                    });
-
-                    sip.requestKeyFrame();
-                    this.session = sip;
 
                     await packetWaiter;
 
@@ -303,6 +319,8 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
 
                     client.write(sdp + '\r\n');
                     client.end();
+
+                    sip.requestKeyFrame();
                 }
             }
             catch (e) {
