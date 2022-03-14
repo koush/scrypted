@@ -570,28 +570,35 @@ class PrebufferSession {
       const parser = this.getParser(rtspMode, muxingMp4, ffmpegInput.mediaStreamOptions);
       if (parser === SCRYPTED_PARSER) {
         usingScryptedParser = true;
-        this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser')
+        this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser');
         const rtspClient = new RtspClient(ffmpegInput.url, this.console);
-        await rtspClient.options();
-        const sdpResponse = await rtspClient.describe();
-        const sdp = sdpResponse.body.toString().trim();
-        this.console.log('sdp', sdp);
-        this.sdp = Promise.resolve(sdp);
-        const { audio, video } = parseTrackIds(sdp);
-        let channel = 0;
-        if (!audioSoftMuted) {
-          await rtspClient.setup(channel, audio);
-          channel += 2;
+        try {
+          rtspClient.requestTimeout = 10000;
+          await rtspClient.options();
+          const sdpResponse = await rtspClient.describe();
+          const sdp = sdpResponse.body.toString().trim();
+          this.console.log('sdp', sdp);
+          this.sdp = Promise.resolve(sdp);
+          const { audio, video } = parseTrackIds(sdp);
+          let channel = 0;
+          if (!audioSoftMuted) {
+            await rtspClient.setup(channel, audio);
+            channel += 2;
+          }
+          await rtspClient.setup(channel, video);
+          const socket = await rtspClient.play();
+          session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
+          const sessionKill = session.kill.bind(session);
+          session.kill = async () => {
+            // issue a teardown to upstream to close gracefully but don't rely on it responding.
+            rtspClient.teardown().finally(sessionKill);
+            await sleep(500);
+            sessionKill();
+          }
         }
-        await rtspClient.setup(channel, video);
-        const socket = await rtspClient.play();
-        session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
-        const sessionKill = session.kill.bind(session);
-        session.kill = async () => {
-          // issue a teardown to upstream to close gracefully but don't rely on it responding.
-          rtspClient.teardown().finally(sessionKill);
-          await sleep(500);
-          sessionKill();
+        catch (e) {
+          rtspClient.client.destroy();
+          throw e;
         }
       }
       else {

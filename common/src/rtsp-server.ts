@@ -8,6 +8,7 @@ import net from 'net';
 import tls from 'tls';
 import { DIGEST } from 'http-auth-utils/dist/index';
 import crypto from 'crypto';
+import { timeoutPromise } from './promise-utils';
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -138,6 +139,7 @@ export class RtspClient extends RtspBase {
     cseq = 0;
     session: string;
     authorization: string;
+    requestTimeout: number;
 
     constructor(public url: string, console?: Console) {
         super(console);
@@ -190,7 +192,7 @@ export class RtspClient extends RtspBase {
     }> {
         this.writeRequest(method, headers, path, body);
 
-        const message = await this.readMessage();
+        const message = this.requestTimeout ? await timeoutPromise(this.requestTimeout, this.readMessage()) : await this.readMessage();
         const status = message[0];
         const response = parseHeaders(message);
         if (!status.includes('200') && !response['www-authenticate'])
