@@ -1,5 +1,8 @@
 <template>
-  <div style="position: relative; overflow: hidden; width: 100%; height: 100%">
+  <div
+    style="position: relative; overflow: hidden; width: 100%; height: 100%"
+    @wheel="doTimeScroll"
+  >
     <video
       ref="video"
       style="
@@ -50,15 +53,48 @@
       <v-icon small>fa fa-times</v-icon></v-btn
     >
 
-    <div v-if="showNvr" 
+    <div
+      v-if="showNvr"
       style="position: absolute; bottom: 10px; right: 10px; z-index: 3"
     >
-    
-      <v-btn small color="info" :outlined="isLive" @click="streamRecorder(Date.now() - 2 * 60 * 1000)">
-        <v-icon small>fa fa-video</v-icon></v-btn
+      <v-dialog width="unset" v-model="dateDialog">
+        <template v-slot:activator="{ on }">
+          <v-btn
+            v-on="on"
+            small
+            :color="isLive ? 'white' : 'blue'"
+            :outlined="isLive"
+          >
+            <v-icon small color="white" :outlined="isLive"
+              >fa fa-calendar-alt</v-icon
+            >&nbsp;{{ monthDay }}</v-btn
+          >
+        </template>
+        <v-date-picker  @input="datePicked"></v-date-picker>
+      </v-dialog>
+
+      <v-btn
+        small
+        :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
+        :outlined="isLive"
+        @click="streamRecorder(Date.now() - 2 * 60 * 1000)"
+      >
+        <v-btn
+          v-if="!isLive && adjustingTime"
+          small
+          :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
+          :outlined="isLive"
+        >
+          {{ time }}</v-btn
+        >
+        <v-icon v-else small color="white" :outlined="isLive"
+          >fa fa-video</v-icon
+        ></v-btn
       >
 
-      <v-btn small color="red" :outlined="!isLive" @click="streamCamera">Live</v-btn>
+      <v-btn small color="red" :outlined="!isLive" @click="streamCamera"
+        >Live</v-btn
+      >
     </div>
   </div>
 </template>
@@ -76,7 +112,9 @@ export default {
   props: ["clipPathValue", "device"],
   data() {
     return {
-      isLive: true,
+      dateDialog: false,
+      adjustingTime: null,
+      startTime: null,
       lastDetection: {},
       objectListener: this.device.listen(
         ScryptedInterface.ObjectDetector,
@@ -89,6 +127,23 @@ export default {
     };
   },
   computed: {
+    isLive() {
+      return !this.startTime;
+    },
+    time() {
+      const d = this.startTime ? new Date(this.startTime) : new Date();
+      const h = d.getHours().toString().padStart(2, "0");
+      const m = d.getMinutes().toString().padStart(2, "0");
+      const s = d.getSeconds().toString().padStart(2, "0");
+      return `${h}:${m}:${s}`;
+    },
+    monthDay() {
+      const d = this.startTime ? new Date(this.startTime) : new Date();
+      return d.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+    },
     showNvr() {
       return this.device.interfaces.includes(ScryptedInterface.VideoRecorder);
     },
@@ -132,6 +187,26 @@ export default {
     this.objectListener.removeListener();
   },
   methods: {
+    datePicked(value) {
+      this.dateDialog = false;
+      console.log(value);
+      const d = new Date(value);
+      const dt = d.getTime() + new Date().getTimezoneOffset() * 60 * 1000;
+      this.streamRecorder(dt);
+    },
+    doTimeScroll(e) {
+      if (!this.startTime) {
+        this.startTime = Date.now() - 2 * 60 * 1000;
+        return;
+      }
+      const adjust = Math.round(e.deltaY / 7);
+      this.startTime -= adjust * 60000;
+      clearTimeout(this.adjustingTime);
+      this.adjustingTime = setTimeout(() => {
+        this.adjustingTime = null;
+        this.streamRecorder(this.startTime);
+      }, 2500);
+    },
     cleanupConnection() {
       if (this.pc) {
         console.log("peer connection cleaned up");
@@ -141,7 +216,7 @@ export default {
     },
     async streamCamera() {
       this.cleanupConnection();
-      this.isLive = true;
+      this.startTime = null;
       this.pc = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
@@ -150,7 +225,7 @@ export default {
     },
     async streamRecorder(startTime) {
       this.cleanupConnection();
-      this.isLive = false;
+      this.startTime = startTime;
       this.pc = await streamRecorder(
         this.$scrypted.mediaManager,
         this.device,
