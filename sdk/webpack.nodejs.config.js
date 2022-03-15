@@ -46,6 +46,7 @@ if (process.env.WEBPACK_ANALYZER) {
 
 const alias = {};
 const polyfills = [
+    'source-map-support/register',
     'adm-zip',
     "memfs",
     "realfs",
