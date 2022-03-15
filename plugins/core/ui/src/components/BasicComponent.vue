@@ -8,7 +8,7 @@
         :md6="cards.length > 1"
       >
         <v-card v-if="!card.hide" raised >
-          <card-toolbar>{{ card.title }}</card-toolbar>
+          <CardTitle>{{ card.title }}</CardTitle>
 
           <v-card-text>{{ card.description }}</v-card-text>
           <component
@@ -37,7 +37,7 @@
         :key="deviceGroup.name"
       >
         <v-card raised >
-          <card-toolbar>{{ deviceGroup.name }}</card-toolbar>
+          <CardTitle>{{ deviceGroup.name }}</CardTitle>
 
           <DeviceTable
             :hideType="deviceGroup.hideType"
@@ -81,7 +81,7 @@ import {
 import DeviceTable from "../common/DeviceTable.vue";
 import axios from "axios";
 import qs from "query-string";
-import CardToolbar from './CardToolbar.vue';
+import CardTitle from './CardTitle.vue';
 
 export default {
   data() {
@@ -93,7 +93,7 @@ export default {
   },
   components: {
     DeviceTable,
-    CardToolbar,
+    CardTitle,
   },
   methods: {
     typeToIcon,

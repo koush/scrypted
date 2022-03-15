@@ -60,6 +60,7 @@
       <v-dialog width="unset" v-model="dateDialog">
         <template v-slot:activator="{ on }">
           <v-btn
+            :dark="!live"
             v-on="on"
             small
             :color="isLive ? 'white' : 'blue'"
@@ -70,10 +71,11 @@
             >&nbsp;{{ monthDay }}</v-btn
           >
         </template>
-        <v-date-picker  @input="datePicked"></v-date-picker>
+        <v-date-picker @input="datePicked"></v-date-picker>
       </v-dialog>
 
       <v-btn
+        :dark="!live"
         small
         :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
         :outlined="isLive"
@@ -92,7 +94,12 @@
         ></v-btn
       >
 
-      <v-btn small color="red" :outlined="!isLive" @click="streamCamera"
+      <v-btn
+        :dark="!live"
+        small
+        color="red"
+        :outlined="!isLive"
+        @click="streamCamera"
         >Live</v-btn
       >
     </div>

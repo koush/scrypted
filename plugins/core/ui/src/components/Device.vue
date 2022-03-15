@@ -3,7 +3,7 @@
     <v-flex xs12>
       <div v-if="deviceAlerts.length" class="pb-5">
         <v-alert
-        dark
+          dark
           dismissible
           @input="removeAlert(alert)"
           v-for="alert in deviceAlerts"
@@ -44,7 +44,7 @@
       <v-layout row wrap>
         <v-flex xs12>
           <v-card raised>
-            <card-toolbar >
+            <v-toolbar dark :color="colors.indigo.darken2" dense>
               {{ name || "No Device Name" }}
               <v-layout
                 mr-1
@@ -61,7 +61,7 @@
                   :key="iface"
                 ></component>
               </v-layout>
-            </card-toolbar>
+            </v-toolbar>
 
             <v-card-subtitle v-if="ownerDevice && pluginData">
               <a @click="openDevice(ownerDevice.id)">{{ ownerDevice.name }}</a>
@@ -177,9 +177,7 @@
               ></component>
               <v-spacer></v-spacer>
 
-              <v-btn color="info" text @click="openConsole"
-                >Console</v-btn
-              >
+              <v-btn color="info" text @click="openConsole">Console</v-btn>
 
               <v-tooltip bottom>
                 <template v-slot:activator="{ on }">
@@ -230,11 +228,11 @@
                 </template>
 
                 <v-card>
-                  <card-toolbar
+                  <CardTitle
                     style="margin-bottom: 8px"
                     class="red white--text"
                     primary-title
-                    >Delete Device</card-toolbar
+                    >Delete Device</CardTitle
                   >
 
                   <v-card-text
@@ -271,11 +269,9 @@
 
         <v-flex xs12 v-if="availableMixins.length">
           <v-card raised>
-            <card-toolbar
-            >
-              <font-awesome-icon size="sm" icon="puzzle-piece" />
-              &nbsp;&nbsp;Integrations and Extensions
-            </card-toolbar>
+            <CardTitle icon='fa-puzzle-piece'>
+              Integrations and Extensions
+            </CardTitle>
 
             <v-list-item-group>
               <v-list-item
@@ -315,9 +311,7 @@
 
         <v-flex xs12 v-if="showStorage">
           <v-card raised>
-            <card-toolbar
-              >Storage</card-toolbar
-            >
+            <CardTitle>Storage</CardTitle>
             <v-container>
               <v-layout>
                 <v-flex xs12>
@@ -334,9 +328,9 @@
 
         <v-flex xs12 v-for="iface in cardUnderInterfaces" :key="iface">
           <v-card raised>
-            <card-toolbar>
+            <CardTitle>
               {{ getInterfaceFriendlyName(iface) }}
-            </card-toolbar>
+            </CardTitle>
             <component
               :value="deviceState"
               :device="device"
@@ -351,9 +345,7 @@
       <v-layout row wrap>
         <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
           <v-card>
-            <card-toolbar
-              >{{ getInterfaceFriendlyName(iface) }}</card-toolbar
-            >
+            <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
             <component
               :value="deviceState"
               :device="device"
@@ -439,7 +431,8 @@ import {
   setMixin,
   getDeviceMixins,
 } from "../common/mixin";
-import CardToolbar from '../components/CardToolbar.vue';
+import CardTitle from "../components/CardTitle.vue";
+import colors from "vuetify/es5/util/colors";
 
 const cardHeaderInterfaces = [
   ScryptedInterface.OccupancySensor,
@@ -513,8 +506,8 @@ function filterInterfaces(interfaces) {
 
 export default {
   components: {
-    CardToolbar,
-    
+    CardTitle,
+
     DeviceProvider,
     MixinProvider,
 
@@ -600,6 +593,7 @@ export default {
     getAlertIcon,
     initialState() {
       return {
+        colors,
         showLogs: false,
         showConsole: false,
         showRepl: false,
@@ -760,7 +754,9 @@ export default {
         ).filter((device) => !mixins.includes(device.id));
 
         const allMixins = [
-          ...mixins.map((id) => this.$scrypted.systemManager.getDeviceById(id)).filter(device => !!device),
+          ...mixins
+            .map((id) => this.$scrypted.systemManager.getDeviceById(id))
+            .filter((device) => !!device),
           ...availableMixins,
         ];
 

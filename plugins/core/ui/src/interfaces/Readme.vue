@@ -1,6 +1,6 @@
 <template>
   <v-card>
-    <card-toolbar >Readme</card-toolbar>
+    <CardTitle >Readme</CardTitle>
     <v-flex v-if="readme">
       <VueMarkdown>{{ readme }}</VueMarkdown>
     </v-flex>
@@ -8,7 +8,7 @@
   </v-card>
 </template>
 <script>
-import CardToolbar from './../components/CardToolbar.vue';
+import CardTitle from './../components/CardTitle.vue';
 import VueMarkdown from "vue-markdown";
 import RPCInterface from "./RPCInterface.vue";
 
@@ -16,7 +16,7 @@ export default {
   mixins: [RPCInterface],
   components: {
     VueMarkdown,
-    CardToolbar,
+    CardTitle,
   },
   data() {
     return {

@@ -107,7 +107,7 @@
           class="pb-4"
         >
           <v-card raised v-if="!card.state.hidden || editCardMode">
-            <card-toolbar :color="card.color" class="subtitle-1">
+            <CardTitle :color="card.color" class="subtitle-1">
               <v-text-field
                 hide-details
                 dark
@@ -116,7 +116,7 @@
                 v-model="card.name"
               ></v-text-field>
               <div v-else>{{ card.name }}</div>
-            </card-toolbar>
+            </CardTitle>
 
             <div v-if="editCardMode">
               <v-card-actions>
@@ -322,7 +322,7 @@ import {
   Setting,
   SettingValue,
 } from "@scrypted/types";
-import CardToolbar from "../CardToolbar.vue";
+import CardTitle from "../CardTitle.vue";
 
 class CardComponentSettings implements SettingsInterface {
   cardComponent: CardComponent;
@@ -360,7 +360,7 @@ class CardComponentSettings implements SettingsInterface {
 export default {
   mixins: [DashboardBase],
   components: {
-    CardToolbar,
+    CardTitle,
 
     DashboardMap,
     DashboardToggle,

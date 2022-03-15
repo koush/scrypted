@@ -1,12 +1,12 @@
 <template>
-  <v-toolbar
-    dense
+  <v-system-bar
     dark
     :color="color || ($vuetify.theme.dark ? undefined : colors.indigo.darken2)"
-    ><v-icon small v-if="icon">{{ icon }}</v-icon
-    >&nbsp;&nbsp;
-    <slot></slot>
-  </v-toolbar>
+    ><v-icon x-small v-if="icon">{{ icon }}</v-icon
+    ><span class="caption" style="text-transform: uppercase; font-weight: bold">
+      <slot></slot>
+    </span>
+  </v-system-bar>
 </template>
 <script>
 import colors from "vuetify/es5/util/colors";

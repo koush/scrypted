@@ -1,13 +1,7 @@
 <template>
   <v-flex xs12 md8 lg6>
     <v-card raised style="margin-bottom: 30px">
-      <v-card-title
-      >
-        <font-awesome-icon size="sm" icon="bolt" />
-        <span 
-          >&nbsp;&nbsp;Scrypted Plugins</span
-        >
-      </v-card-title>
+      <CardToolbar icon="fa-bolt"> Scrypted Plugins </CardToolbar>
 
       <v-card-text
         >Integrate your existing smart home devices and services.</v-card-text
@@ -52,12 +46,13 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn
+          small
             color="info"
             outlined
             @click="openLink(result.package.links.npm)"
             >View on npm</v-btn
           >
-          <v-btn color="success" @click="install(result.package.name)"
+          <v-btn color="success" @click="install(result.package.name)" small
             >Install</v-btn
           >
         </v-card-actions>
@@ -73,11 +68,15 @@ import md5 from "md5";
 import axios from "axios";
 import { getDeviceViewPath } from "../helpers";
 import { installNpm } from "./plugin";
+import CardToolbar from '../CardToolbar';
 
 export default {
+  components: {
+    CardToolbar,
+  },
   data: function () {
     return {
-      search: this.$route.params.pathMatch || '',
+      search: this.$route.params.pathMatch || "",
       results: [],
     };
   },
@@ -99,9 +98,7 @@ export default {
     doSearch: debounce(function () {
       axios
         .get(
-          `https://registry.npmjs.org/-/v1/search?text=keywords:scrypted+${
-            this.search
-          }`
+          `https://registry.npmjs.org/-/v1/search?text=keywords:scrypted+${this.search}`
         )
         .then((response) => {
           this.results = response.data.objects;
@@ -110,9 +107,3 @@ export default {
   },
 };
 </script>
-
-<style>
-.package-title {
-  color: inherit;
-}
-</style>

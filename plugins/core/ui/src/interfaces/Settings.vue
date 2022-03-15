@@ -1,7 +1,7 @@
 <template>
   <v-card>
-    <card-toolbar v-if="!noTitle" 
-      >Settings</card-toolbar
+    <CardTitle v-if="!noTitle" 
+      >Settings</CardTitle
     >
     <v-flex xs12 v-if="showChips" class="pt-0">
       <v-chip-group
@@ -46,11 +46,11 @@
 import RPCInterface from "./RPCInterface.vue";
 import Setting from "./Setting.vue";
 import SettingMultiple from "./SettingMultiple.vue";
-import CardToolbar from "../components/CardToolbar.vue";
+import CardTitle from "../components/CardTitle.vue";
 
 export default {
   components: {
-    CardToolbar,
+    CardTitle,
     Setting,
     SettingMultiple,
   },

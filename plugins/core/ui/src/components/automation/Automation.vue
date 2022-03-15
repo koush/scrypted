@@ -5,13 +5,7 @@
       v-if="device.automationType !== 'Scene'"
       style="margin-bottom: 30px"
     >
-      <v-card-title
-      >
-        <v-icon x-small>fa-bolt</v-icon>
-        <span 
-          >&nbsp;&nbsp;Automation Triggers</span
-        >
-      </v-card-title>
+      <card-title icon="fa-bolt"> Automation Triggers </card-title>
 
       <v-card-subtitle
         >Specify the events (and optional conditions) that will trigger the
@@ -36,14 +30,9 @@
     </v-card>
 
     <v-card raised style="margin-bottom: 30px">
-      <v-card-title
-      >
-        <v-icon x-small>fa-play</v-icon>
-        <span v-if="device.automationType !== 'Scene'"
-          >&nbsp;&nbsp;Automation Actions</span
-        >
-        <span v-else>&nbsp;&nbsp;Scene Activation Actions</span>
-      </v-card-title>
+      <CardTitle v-if="device.automationType" icon="fa-play"
+        >{{ device.automationType ? 'Automation Actions ' : 'Scene Activation Actions' }}
+      </CardTitle>
 
       <v-card-subtitle v-if="device.automationType !== 'Scene'"
         >Specify action(s) to take when the automation is
@@ -70,8 +59,7 @@
     </v-card>
 
     <v-card raised v-if="device.automationType === 'Scene'">
-      <v-card-title
-      >
+      <v-card-title>
         <v-icon x-small>fa-play</v-icon>
         <h5 class="card-title">&nbsp;&nbsp;Scene Deactivation Actions</h5>
       </v-card-title>
@@ -101,6 +89,7 @@ import InterfacesPicker from "./InterfacesPicker.vue";
 import EventsPicker from "./EventsPicker.vue";
 import { ScryptedInterface } from "@scrypted/types";
 import { actionableEvents, actionableInterfaces } from "./interfaces";
+import CardTitle from "../CardTitle.vue";
 
 const includeContextual = [
   ScryptedInterface.OnOff,
@@ -133,6 +122,7 @@ export default {
   },
   props: ["value", "id"],
   components: {
+    CardTitle,
     InterfacesPicker,
     EventsPicker,
   },
@@ -180,10 +170,10 @@ export default {
           component: "Timer",
         },
         {
-          id: 'update-plugins',
-          text: 'Update Plugins',
-          component: 'UpdatePlugins',
-        }
+          id: "update-plugins",
+          text: "Update Plugins",
+          component: "UpdatePlugins",
+        },
       ];
 
       for (const id of Object.keys(
