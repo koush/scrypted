@@ -88,14 +88,14 @@ class EndpointManagerImpl implements EndpointManager {
     }
     async getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         const local = await this.getPublicLocalEndpoint(nativeId);
-        const mo = this.mediaManager.createMediaObject(Buffer.from(local), ScryptedMimeTypes.LocalUrl);
+        const mo = await this.mediaManager.createMediaObject(Buffer.from(local), ScryptedMimeTypes.LocalUrl);
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
     }
     async getPublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         return `https://${await this.getUrlSafeIp()}:${await this.api.getComponent('SCRYPTED_SECURE_PORT')}/endpoint/${this.getEndpoint(nativeId)}/public/`;
     }
     async getPublicPushEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
-        const mo = this.mediaManager.createMediaObject(Buffer.from(this.getEndpoint(nativeId)), ScryptedMimeTypes.PushEndpoint);
+        const mo = await this.mediaManager.createMediaObject(Buffer.from(this.getEndpoint(nativeId)), ScryptedMimeTypes.PushEndpoint);
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.PushEndpoint);
     }
     async deliverPush(endpoint: string, request: HttpRequest) {
