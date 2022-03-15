@@ -302,7 +302,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     }
                 });
 
-                const mo = mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput);
+                const mo = await mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput);
                 device.startIntercom(mo);
             }
         },
