@@ -320,9 +320,13 @@ export abstract class MediaManagerBase implements MediaManager {
                     }
                 }
 
+                // edge matches
                 if (mimeMatches(mediaMime, inputMime)) {
-                    mediaNode[targetId] = 1;
+                    // catch all converters should be heavily weighted so as not to use them.
+                    mediaNode[targetId] = inputMime.essence === '*/*' ? 1000 : 1;
                 }
+
+                // target output matches
                 if (mimeMatches(outputMime, convertedMime) || converter.toMimeType === ScryptedMimeTypes.MediaObject) {
                     node['output'] = 1;
                 }
