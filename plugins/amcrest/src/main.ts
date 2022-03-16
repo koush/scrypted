@@ -44,6 +44,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         this.updateDeviceInfo();
     }
 
+    getRecordingStreamThumbnail(time: number): Promise<MediaObject> {
+        throw new Error("Method not implemented.");
+    }
+
     async getRecordingStream(options: RequestRecordingStreamOptions): Promise<MediaObject> {
         // ffplay 'rtsp://user:password@192.168.2.87/cam/playback?channel=1&starttime=2022_03_12_21_00_00'
         const startTime = new Date(options.startTime);
