@@ -15,7 +15,7 @@ import { randomPinCode } from './pincode';
 import './types';
 import { VideoClipsMixinProvider } from './video-clips-provider';
 
-const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
+const { systemManager, deviceManager } = sdk;
 
 initializeHapStorage();
 const includeToken = 4;
@@ -56,8 +56,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                         interfaces: [
                             ScryptedInterface.MixinProvider,
                             ScryptedInterface.Settings,
-                            ScryptedInterface.BufferConverter,
-                            ScryptedInterface.HttpRequestHandler,
                             ScryptedInterface.Readme,
                         ],
                     }

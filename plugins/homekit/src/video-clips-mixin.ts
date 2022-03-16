@@ -1,6 +1,6 @@
 import sdk, { FFMpegInput, MediaObject, MixinDeviceBase, MixinDeviceOptions, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
 import fs from 'fs';
-import { getCameraRecordingFiles, getVideoClips, HKSV_MIME_TYPE, parseHksvId, removeVideoClip } from "./types/camera/camera-recording-files";
+import { getCameraRecordingFiles, getVideoClips, parseHksvId, removeVideoClip } from "./types/camera/camera-recording-files";
 
 const { mediaManager } = sdk;
 
@@ -37,9 +37,11 @@ export class ClipsMixin extends MixinDeviceBase<VideoCamera> implements VideoCli
         return ret;
     }
 
-    getVideoClip(videoClipId: string): Promise<MediaObject> {
-        parseHksvId(videoClipId);
-        return mediaManager.createMediaObject(Buffer.from(videoClipId), HKSV_MIME_TYPE);
+    async getVideoClip(videoClipId: string): Promise<MediaObject> {
+        const { id, startTime } = parseHksvId(videoClipId);
+        const { mp4Path } = await getCameraRecordingFiles(id, startTime);
+        const url = `file:${mp4Path}`;
+        return mediaManager.createMediaObjectFromUrl(url);
     }
 
     async getVideoClipThumbnail(videoClipId: string): Promise<MediaObject> {
@@ -61,7 +63,8 @@ export class ClipsMixin extends MixinDeviceBase<VideoCamera> implements VideoCli
             jpeg = await mediaManager.convertMediaObjectToBuffer(input, 'image/jpeg');
             fs.writeFileSync(thumbnailPath, jpeg);
         }
-        return mediaManager.createMediaObject(jpeg, 'image/jpeg');
+        const url = `file:${thumbnailPath}`;
+        return mediaManager.createMediaObjectFromUrl(url);
     }
 
     async removeVideoClips(...ids: string[]): Promise<void> {

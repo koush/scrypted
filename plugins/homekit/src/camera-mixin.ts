@@ -3,7 +3,7 @@ import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmp
 import { SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
 import { HomekitMixin } from "./homekit-mixin";
 
-const { log, systemManager, deviceManager, mediaManager } = sdk;
+const { systemManager, deviceManager } = sdk;
 
 export const defaultObjectDetectionContactSensorTimeout = 60;
 

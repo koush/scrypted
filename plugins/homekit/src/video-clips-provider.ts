@@ -1,18 +1,15 @@
-import sdk, { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import { MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { canCameraMixin } from "./camera-mixin";
 import { HOMEKIT_MIXIN } from "./homekit-mixin";
 import { StorageSettings } from "@scrypted/common/src/settings";
-import { getCameraRecordingFiles, getSavePath, HKSV_MIME_TYPE, nukeClips, parseHksvId, pruneClips } from "./types/camera/camera-recording-files";
-import fs from 'fs';
+import { getSavePath, nukeClips, pruneClips } from "./types/camera/camera-recording-files";
 import { ClipsMixin } from "./video-clips-mixin";
 import checkDiskSpace from 'check-disk-space';
-
-const { mediaManager, endpointManager } = sdk;
 
 const DAYS_TO_KEEP = 10;
 const PRUNE_AGE = DAYS_TO_KEEP * 24 * 60 * 60 * 1000;
 
-export class VideoClipsMixinProvider extends ScryptedDeviceBase implements MixinProvider, Settings, HttpRequestHandler, BufferConverter, Readme {
+export class VideoClipsMixinProvider extends ScryptedDeviceBase implements MixinProvider, Settings, Readme {
     storageSettings = new StorageSettings(this, {
         reset: {
             title: 'Remove All Clips',
@@ -85,47 +82,5 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
     }
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {
-    }
-
-    async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
-        if (request.isPublicEndpoint) {
-            response.send('not authorized', {
-                code: 401,
-            });
-            return;
-        }
-
-        response.sendFile(request.url.substring(request.rootPath.length));
-    }
-
-    async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<MediaObject> {
-        if (fromMimeType !== HKSV_MIME_TYPE)
-            throw new Error('unknown mime type ' + fromMimeType);
-
-        const { id, startTime } = parseHksvId(data.toString());
-
-        const {
-            mp4Name,
-            mp4Path,
-        } = await getCameraRecordingFiles(id, startTime);
-
-        if (toMimeType.startsWith('video/')) {
-            const buffer = fs.readFileSync(mp4Path);
-            const mo = await mediaManager.createMediaObject(buffer, 'video/mp4');
-            return mo;
-        }
-
-        if (toMimeType === ScryptedMimeTypes.LocalUrl) {
-            const pub = toMimeType === ScryptedMimeTypes.LocalUrl
-                ? await endpointManager.getPublicLocalEndpoint(this.nativeId)
-                : await endpointManager.getInsecurePublicLocalEndpoint(this.nativeId);
-            const endpoint = pub.replace('/public/', '/');
-            const url = new URL(`hksv/${mp4Name}`, endpoint);
-            const buffer = Buffer.from(url.pathname);
-            const mo = await mediaManager.createMediaObject(buffer, toMimeType);
-            return mo;
-        }
-
-        throw new Error('unknown homekit conversion' + toMimeType);
     }
 }

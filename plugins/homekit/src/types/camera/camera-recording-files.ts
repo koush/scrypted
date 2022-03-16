@@ -3,9 +3,7 @@ import sdk, { VideoClip } from '@scrypted/sdk';
 import path from 'path';
 import fs from 'fs';
 
-const { mediaManager, systemManager } = sdk;
-
-export const HKSV_MIME_TYPE = 'x-scrypted-homekit/x-hksv';
+const { mediaManager } = sdk;
 
 export interface HksvVideoClip extends VideoClip {
     fragments: number;
@@ -118,23 +116,25 @@ export function parseHksvId(hksvId: string) {
     };
 }
 
+async function unlinkSafe(...files: string[]) {
+    for (const f of files) {
+        try {
+            await fs.promises.unlink(f);
+        }
+        catch (e) {
+        }
+    }
+}
+
 export async function removeVideoClip(hksvId: string) {
     try {
         const { id, startTime } = parseHksvId(hksvId);
         const {
             mp4Path,
+            thumbnailPath,
             metadataPath
         } = await getCameraRecordingFiles(id, startTime);
-        try {
-            fs.unlinkSync(mp4Path);
-        }
-        catch (e) {
-        }
-        try {
-            fs.unlinkSync(metadataPath);
-        }
-        catch (e) {
-        }
+        unlinkSafe(mp4Path, thumbnailPath, metadataPath);
     }
     catch (e) {
     }
