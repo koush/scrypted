@@ -716,7 +716,6 @@ var ScryptedInterface;
 })(ScryptedInterface = exports.ScryptedInterface || (exports.ScryptedInterface = {}));
 var ScryptedMimeTypes;
 (function (ScryptedMimeTypes) {
-    ScryptedMimeTypes["AcceptUrlParameter"] = "accept-url";
     ScryptedMimeTypes["Url"] = "text/x-uri";
     ScryptedMimeTypes["InsecureLocalUrl"] = "text/x-insecure-local-uri";
     ScryptedMimeTypes["LocalUrl"] = "text/x-local-uri";

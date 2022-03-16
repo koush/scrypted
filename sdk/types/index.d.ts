@@ -1426,7 +1426,6 @@ export interface RTCAVMessage {
     configuration: RTCConfiguration;
 }
 export declare enum ScryptedMimeTypes {
-    AcceptUrlParameter = "accept-url",
     Url = "text/x-uri",
     InsecureLocalUrl = "text/x-insecure-local-uri",
     LocalUrl = "text/x-local-uri",

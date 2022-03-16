@@ -122,7 +122,6 @@ class ScryptedInterface(Enum):
     VideoRecorder = "VideoRecorder"
 
 class ScryptedMimeTypes(Enum):
-    AcceptUrlParameter = "accept-url"
     FFmpegInput = "x-scrypted/x-ffmpeg-input"
     InsecureLocalUrl = "text/x-insecure-local-uri"
     LocalUrl = "text/x-local-uri"
