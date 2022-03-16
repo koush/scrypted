@@ -71,7 +71,8 @@
     "prebuild": "rimraf dist",
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "postpublish": "gh workflow run docker.yml"
   },
   "author": "",
   "license": "ISC"
