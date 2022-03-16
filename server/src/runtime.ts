@@ -31,6 +31,7 @@ import rimraf from 'rimraf';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { PluginHttp } from './plugin/plugin-http';
 import AdmZip from 'adm-zip';
+import path from 'path';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -353,7 +354,9 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 console.log(ws);
             });
         }
-        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedPath));
+
+        const filesPath = path.join(getPluginVolume(pluginHost.pluginId), 'files');
+        handler.onRequest(endpointRequest, createResponseInterface(res, pluginHost.unzippedPath, filesPath));
     }
 
     killPlugin(pluginId: string) {

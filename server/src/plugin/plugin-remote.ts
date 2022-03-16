@@ -140,6 +140,8 @@ interface DeviceManagerDevice {
 class DeviceManagerImpl implements DeviceManager {
     api: PluginAPI;
     nativeIds = new Map<string, DeviceManagerDevice>();
+    deviceStorage = new Map<string, StorageImpl>();
+    mixinStorage = new Map<string, Map<string, StorageImpl>>();
 
     constructor(public systemManager: SystemManagerImpl,
         public getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console,
@@ -161,10 +163,25 @@ class DeviceManagerImpl implements DeviceManager {
     }
 
     getDeviceStorage(nativeId?: any): StorageImpl {
-        return new StorageImpl(this, nativeId);
+        let ret = this.deviceStorage.get(nativeId);
+        if (!ret) {
+            ret = new StorageImpl(this, nativeId);
+            this.deviceStorage.set(nativeId, ret);
+        }
+        return ret;
     }
     getMixinStorage(id: string, nativeId?: ScryptedNativeId) {
-        return new StorageImpl(this, nativeId, `mixin:${id}:`);
+        let ms = this.mixinStorage.get(nativeId);
+        if (!ms) {
+            ms = new Map();
+            this.mixinStorage.set(nativeId, ms);
+        }
+        let ret = ms.get(id);
+        if (!ret) {
+            ret = new StorageImpl(this, nativeId, `mixin:${id}:`);
+            ms.set(id, ret);
+        }
+        return ret;
     }
     async onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any) {
         return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);

@@ -4,9 +4,9 @@ import { RpcPeer } from "./rpc";
 import { join as pathJoin } from 'path';
 import fs from 'fs';
 
-const  mime = require('mime/lite');
+const mime = require('mime/lite');
 
-export function createResponseInterface(res: Response, unzippedDir: string): HttpResponse {
+export function createResponseInterface(res: Response, unzippedDir: string, filesPath: string): HttpResponse {
     class HttpResponseImpl implements HttpResponse {
         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
             'send',
@@ -47,11 +47,14 @@ export function createResponseInterface(res: Response, unzippedDir: string): Htt
                 }
             }
 
-            const filePath = pathJoin(unzippedDir, 'fs', path);
+            let filePath = pathJoin(unzippedDir, 'fs', path);
             if (!fs.existsSync(filePath)) {
-                res.status(404);
-                res.end();
-                return;
+                filePath = pathJoin(filesPath, path);
+                if (!fs.existsSync(filePath)) {
+                    res.status(404);
+                    res.end();
+                    return;
+                }
             }
             res.sendFile(filePath);
         }

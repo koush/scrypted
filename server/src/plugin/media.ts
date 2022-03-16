@@ -1,4 +1,4 @@
-import { ScryptedInterfaceProperty, SystemDeviceState, MediaStreamUrl, VideoCamera, Camera, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, SystemManager } from "@scrypted/types";
+import { ScryptedInterfaceProperty, SystemDeviceState, MediaStreamUrl, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedInterface, ScryptedMimeTypes, SystemManager } from "@scrypted/types";
 import { MediaObjectRemote } from "./plugin-api";
 import mimeType from 'mime'
 import child_process from 'child_process';
@@ -7,12 +7,13 @@ import fs from 'fs';
 import tmp from 'tmp';
 import os from 'os';
 import { getInstalledFfmpeg } from '@scrypted/ffmpeg'
-import { ffmpegLogInitialOutput } from "../media-helpers";
 import Graph from 'node-dijkstra';
 import MimeType from 'whatwg-mimetype';
 import axios from 'axios';
 import https from 'https';
 import rimraf from "rimraf";
+import mkdirp from "mkdirp";
+import path from 'path';
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -171,6 +172,15 @@ export abstract class MediaManagerBase implements MediaManager {
         return getInstalledFfmpeg() || defaultPath;
     }
 
+    async getFilesPath(): Promise<string> {
+        const filesPath = process.env.SCRYPTED_PLUGIN_VOLUME;
+        if (!filesPath)
+            throw new Error('SCRYPTED_PLUGIN_VOLUME env variable not set?');
+        const ret = path.join(filesPath, 'files');
+        mkdirp.sync(ret);
+        return ret;
+    }
+
     getConverters(): BufferConverter[] {
         const converters = Object.entries(this.getSystemState())
             .filter(([id, state]) => state[ScryptedInterfaceProperty.interfaces]?.value?.includes(ScryptedInterface.BufferConverter))
@@ -188,8 +198,8 @@ export abstract class MediaManagerBase implements MediaManager {
     }
 
     async convertMediaObject<T>(mediaObject: MediaObject, toMimeType: string): Promise<T> {
-         const converted: any = await this.convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
-         return converted;
+        const converted = await this.convert(this.getConverters(), this.ensureMediaObjectRemote(mediaObject), toMimeType);
+        return converted.data;
     }
 
     async convertMediaObjectToInsecureLocalUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string> {
@@ -361,6 +371,16 @@ export abstract class MediaManagerBase implements MediaManager {
                 }
                 throw new Error(`no ${ScryptedInterface.BufferConverter} exists for scheme: ${scheme}`);
             }
+
+            if (converter.toMimeType === ScryptedMimeTypes.MediaObject) {
+                const mo = await converter.convert(value, valueMime.essence, toMimeType) as MediaObject;
+                const found = await this.convertMediaObjectToBuffer(mo, toMimeType);
+                return {
+                    data: found,
+                    mimeType: mo.mimeType,
+                };
+            }
+
             value = await converter.convert(value, valueMime.essence, targetMimeType) as string | Buffer;
             valueMime = new MimeType(targetMimeType);
         }
