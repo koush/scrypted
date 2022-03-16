@@ -3,15 +3,15 @@ import { FFMpegFragmentedMP4Session, startFFMPegFragmentedMP4Session } from '@sc
 import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
 import sdk, { AudioSensor, FFMpegInput, MediaStreamOptions, MotionSensor, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import net from 'net';
-import { Duplex } from 'stream';
+import { Duplex, Writable } from 'stream';
 import { HomeKitSession } from '../../common';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { evalRequest } from './camera-transcode';
-
-// const fs = require('realfs');
+import fs from 'fs';
+import mkdirp from 'mkdirp';
+import { getCameraRecordingFiles, HksvVideoClip } from './camera-recording-files';
 
 const { log, mediaManager, deviceManager } = sdk;
-
 
 export const iframeIntervalSeconds = 4;
 
@@ -21,6 +21,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     console.log(device.name, 'recording session starting', configuration);
 
     const storage = deviceManager.getMixinStorage(device.id, undefined);
+    const saveRecordings = storage.getItem('saveRecordings') === 'true';
 
     let selectedStream: MediaStreamOptions;
     let recordingChannel = storage.getItem('recordingChannel');
@@ -151,6 +152,37 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         session = await startFFMPegFragmentedMP4Session(inputArguments, audioArgs, videoArgs, console);
     }
 
+    const start = Date.now();
+    let recordingFile: Writable;
+    const saveFragment = async (i: number, fragment: Buffer) => {
+        if (!saveRecordings)
+            return;
+
+        try {
+            const duration = Date.now() - start;
+            const {
+                clipId,
+                savePath,
+                metadataPath,
+                mp4Path
+            } = await getCameraRecordingFiles(device.id, start);
+            mkdirp.sync(savePath);
+            if (!recordingFile)
+                recordingFile = fs.createWriteStream(mp4Path);
+            recordingFile.write(fragment);
+            const metadata: HksvVideoClip = {
+                id: clipId,
+                startTime: start,
+                duration,
+                fragments: i + 1,
+            };
+            fs.writeFileSync(metadataPath, Buffer.from(JSON.stringify(metadata)));
+        }
+        catch (e) {
+            console.error('error saving hksv fragment', e);
+        }
+    };
+
     console.log(`motion recording started`);
     const { socket, cp, generator } = session;
     let pending: Buffer[] = [];
@@ -177,6 +209,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
                     continue;
                 }
                 const fragment = Buffer.concat(pending);
+                saveFragment(i, fragment);
                 pending = [];
                 console.log(`motion fragment #${++i} sent. size:`, fragment.length);
                 // fs.writeFileSync(`/tmp/${device.id}-${i.toString().padStart(2, '0')}.mp4`, fragment);
@@ -192,5 +225,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         console.timeEnd('mp4 recording');
         socket?.destroy();
         cp?.kill('SIGKILL');
+        recordingFile?.end();
+        recordingFile?.destroy();
     }
 }

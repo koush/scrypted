@@ -1,20 +1,22 @@
 import qrcode from '@koush/qrcode-terminal';
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
+import sdk, { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
 import { randomBytes } from 'crypto';
 import os from 'os';
 import packageJson from "../package.json";
 import { maybeAddBatteryService } from './battery';
-import { CameraMixin } from './camera-mixin';
+import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import { getHAPUUID, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin } from './homekit-mixin';
 import { randomPinCode } from './pincode';
 import './types';
+import fs from 'fs';
+import { getCameraRecordingFiles, HKSV_MIME_TYPE, parseHksvId } from './types/camera/camera-recording-files';
 
-const { systemManager, deviceManager } = sdk;
+const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
 initializeHapStorage();
 const includeToken = 4;
@@ -25,7 +27,7 @@ function getAddresses() {
     return addresses;
 }
 
-class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, HomeKitSession {
+class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, HomeKitSession, HttpRequestHandler, BufferConverter {
     bridge = new Bridge('Scrypted', getHAPUUID(this.storage));
     snapshotThrottles = new Map<string, SnapshotThrottle>();
     pincode = randomPinCode();
@@ -40,6 +42,51 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             this.storage.removeItem('blankSnapshots');
             this.log.a(`The "Never Wait for Snapshots" setting has been moved to the Snapshot Plugin. Install the plugin and enable it on your preferred cameras. origin:/#/component/plugin/install/@scrypted/snapshot`);
         }
+
+        this.fromMimeType = 'x-scrypted-homekit/x-hksv';
+        this.toMimeType = ScryptedMimeTypes.MediaObject;
+    }
+
+    async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        if (request.isPublicEndpoint) {
+            response.send('not authorized', {
+                code: 401,
+            });
+            return;
+        }
+
+        response.sendFile(request.url.substring(request.rootPath.length));
+    }
+
+    async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<MediaObject> {
+        if (fromMimeType !== HKSV_MIME_TYPE)
+            throw new Error('unknown mime type ' + fromMimeType);
+
+        const { id, startTime } = parseHksvId(data.toString());
+
+        const {
+            mp4Name,
+            mp4Path,
+        } = await getCameraRecordingFiles(id, startTime);
+
+        if (toMimeType.startsWith('video/')) {
+            const buffer = fs.readFileSync(mp4Path);
+            const mo = await mediaManager.createMediaObject(buffer, 'video/mp4');
+            return mo;
+        }
+
+        if (toMimeType === ScryptedMimeTypes.LocalUrl) {
+            const pub = toMimeType === ScryptedMimeTypes.LocalUrl
+                ? await endpointManager.getPublicLocalEndpoint(this.nativeId)
+                : await endpointManager.getInsecurePublicLocalEndpoint(this.nativeId);
+            const endpoint = pub.replace('/public/', '/');
+            const url = new URL(`hksv/${mp4Name}`, endpoint);
+            const buffer = Buffer.from(url.pathname);
+            const mo = await mediaManager.createMediaObject(buffer, toMimeType);
+            return mo;
+        }
+
+        throw new Error('unknown homekit conversion' + toMimeType);
     }
 
     getUsername(storage: Storage) {
@@ -342,7 +389,11 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             return null;
         }
 
-        return [ScryptedInterface.Settings];
+        const ret = [ScryptedInterface.Settings];
+        if (canCameraMixin(type, interfaces))
+            ret.push(ScryptedInterface.VideoClips);
+
+        return ret;
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
@@ -355,8 +406,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         };
         let ret: CameraMixin | HomekitMixin<any>;
 
-        if ((mixinDeviceState.type === ScryptedDeviceType.Camera || mixinDeviceState.type === ScryptedDeviceType.Doorbell)
-            && mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera)) {
+        if (canCameraMixin(mixinDeviceState.type, mixinDeviceInterfaces)) {
             ret = new CameraMixin(options);
         }
         else {
