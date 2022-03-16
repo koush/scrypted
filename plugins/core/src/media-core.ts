@@ -41,21 +41,7 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         const url = new URL(data.toString());
         const id = url.hostname;
         const path = url.pathname.split('/')[1];
-        if (path === ScryptedInterface.VideoCamera) {
-            const camera = systemManager.getDeviceById<VideoCamera>(id);
-            if (toMimeType === ScryptedMimeTypes.RTCAVSignalingOfferSetup) {
-                const msos = await camera.getVideoStreamOptions();
-                const found = msos.find(mso => mso.container?.startsWith(ScryptedMimeTypes.RTCAVSignalingPrefix)) as RequestMediaStreamOptions;
-                if (found) {
-                    found.directMediaStream = true;
-                    const mo = await camera.getVideoStream(found);
-                    const buffer = await mediaManager.convertMediaObjectToBuffer(mo, mo.mimeType);
-                    return mediaManager.createMediaObject(buffer, ScryptedMimeTypes.RTCAVSignalingOfferSetup);
-                }
-            }
-            return camera.getVideoStream();
-        }
-        else if (path === ScryptedInterface.Camera) {
+        if (path === ScryptedInterface.Camera) {
             return await systemManager.getDeviceById<Camera>(id).takePicture() as any;
         }
         else {

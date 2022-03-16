@@ -18,18 +18,13 @@ export default {
     VueMarkdown,
     CardTitle,
   },
-  data() {
-    return {
-      readme: null,
-    };
-  },
-  mounted() {
-    this.refresh();
-  },
-  methods: {
-    async refresh() {
-      this.readme = await this.rpc().getReadmeMarkdown();
-    },
+  asyncComputed: {
+    readme: {
+      async get() {
+        return await this.rpc().getReadmeMarkdown();;
+      },
+      default: undefined,
+    }
   },
 };
 </script>

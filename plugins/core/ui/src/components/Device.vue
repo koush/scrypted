@@ -397,6 +397,7 @@ import ColorSettingRgb from "../interfaces/ColorSettingRgb.vue";
 import OauthClient from "../interfaces/OauthClient.vue";
 import Camera from "../interfaces/Camera.vue";
 import VideoCamera from "../interfaces/VideoCamera.vue";
+import VideoClips from "../interfaces/VideoClips.vue";
 import Thermometer from "../interfaces/sensors/Thermometer.vue";
 import HumiditySensor from "../interfaces/sensors/HumiditySensor.vue";
 import EntrySensor from "../interfaces/sensors/EntrySensor.vue";
@@ -464,6 +465,7 @@ const cardInterfaces = [
   ScryptedInterface.ColorSettingRgb,
   ScryptedInterface.Camera,
   ScryptedInterface.VideoCamera,
+  ScryptedInterface.VideoClips,
   ScryptedInterface.TemperatureSetting,
   ScryptedInterface.PasswordStore,
   ScryptedInterface.PositionSensor,
@@ -524,6 +526,7 @@ export default {
     Notifier,
     Camera,
     VideoCamera,
+    VideoClips,
     PasswordStore,
     Settings,
     ColorSettingTemperature,

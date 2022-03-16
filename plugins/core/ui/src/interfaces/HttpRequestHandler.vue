@@ -31,10 +31,10 @@ export default {
   },
   methods: {
     async viewPublic() {
-        window.open(`/endpoint/${this.id}/public/`, 'endpoint');
+        window.open(`/endpoint/${this.device.id}/public/`, 'endpoint');
     },
     async viewPrivate() {
-        window.open(`/endpoint/${this.id}/`, 'endpoint');
+        window.open(`/endpoint/${this.device.id}/`, 'endpoint');
     }
   }
 };

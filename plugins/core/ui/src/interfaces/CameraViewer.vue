@@ -60,7 +60,7 @@
       <v-dialog width="unset" v-model="dateDialog">
         <template v-slot:activator="{ on }">
           <v-btn
-            :dark="!live"
+            :dark="!isLive"
             v-on="on"
             small
             :color="isLive ? 'white' : 'blue'"
@@ -75,7 +75,7 @@
       </v-dialog>
 
       <v-btn
-        :dark="!live"
+        :dark="!isLive"
         small
         :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
         :outlined="isLive"
@@ -95,7 +95,7 @@
       >
 
       <v-btn
-        :dark="!live"
+        :dark="!isLive"
         small
         color="red"
         :outlined="!isLive"
@@ -111,6 +111,7 @@ import { streamCamera, streamRecorder } from "../common/camera";
 import { ScryptedInterface } from "@scrypted/types";
 import ClipPathEditor from "../components/clippath/ClipPathEditor.vue";
 import cloneDeep from "lodash/cloneDeep";
+import { datePickerLocalTimeToUTC } from "../common/date";
 
 export default {
   components: {
@@ -196,9 +197,7 @@ export default {
   methods: {
     datePicked(value) {
       this.dateDialog = false;
-      console.log(value);
-      const d = new Date(value);
-      const dt = d.getTime() + new Date().getTimezoneOffset() * 60 * 1000;
+      const dt = datePickerLocalTimeToUTC(value);
       this.streamRecorder(dt);
     },
     doTimeScroll(e) {
