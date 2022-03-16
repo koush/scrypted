@@ -1,8 +1,10 @@
 import { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import mime from "mime/lite";
+import path from 'path';
+import crypto from 'crypto';
 
-const {endpointManager} = sdk;
+const { endpointManager } = sdk;
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -11,12 +13,11 @@ function uuidv4() {
     });
 }
 
-export class UrlConverter extends ScryptedDeviceBase implements HttpRequestHandler, BufferConverter {
-    hosted = new Map<string, {buffer: Buffer, fromMimeType: string }>()
-    secure: boolean;
+export class BufferHost extends ScryptedDeviceBase implements HttpRequestHandler, BufferConverter {
+    hosted = new Map<string, { data: Buffer | string, fromMimeType: string, toMimeType: string }>()
 
-    constructor(secure: boolean) {
-        super(secure ? 'https': 'http');
+    constructor(public secure: boolean) {
+        super(secure ? 'https' : 'http');
         this.fromMimeType = '*/*';
         this.secure = secure;
         this.toMimeType = secure ? ScryptedMimeTypes.LocalUrl : ScryptedMimeTypes.InsecureLocalUrl;
@@ -27,6 +28,7 @@ export class UrlConverter extends ScryptedDeviceBase implements HttpRequestHandl
         normalizedRequest.url = normalizedRequest.url.replace(normalizedRequest.rootPath, '');
         const pathOnly = normalizedRequest.url.split('?')[0];
         const file = this.hosted.get(pathOnly);
+
         if (!file) {
             response.send('Not Found', {
                 code: 404,
@@ -34,18 +36,14 @@ export class UrlConverter extends ScryptedDeviceBase implements HttpRequestHandl
             return;
         }
 
-        response.send(file.buffer, {
+        response.send(file.data as Buffer, {
             headers: {
                 'Content-Type': file.fromMimeType,
             }
         });
     }
 
-    getEndpoint(): string {
-        throw new Error("Method not implemented.");
-    }
-
-    async convert(buffer: Buffer, fromMimeType: string): Promise<Buffer> {
+    async convert(buffer: string, fromMimeType: string, toMimeType: string): Promise<Buffer> {
         const uuid = uuidv4();
 
         const endpoint = await (this.secure ? endpointManager.getPublicLocalEndpoint(this.nativeId) : endpointManager.getInsecurePublicLocalEndpoint(this.nativeId));
@@ -53,7 +51,42 @@ export class UrlConverter extends ScryptedDeviceBase implements HttpRequestHandl
 
         const filename = uuid + (extension ? `.${extension}` : '');
 
-        this.hosted.set(`/${filename}`, { buffer, fromMimeType });
+        this.hosted.set(`/${filename}`, { data: buffer, fromMimeType, toMimeType });
+
+        return Buffer.from(`${endpoint}${filename}`);
+    }
+}
+
+export class FileHost extends ScryptedDeviceBase implements HttpRequestHandler, BufferConverter {
+    hosted = new Map<string, { data: Buffer | string }>()
+
+    constructor(public secure: boolean) {
+        super(secure ? 'files' : 'file');
+        this.fromMimeType = ScryptedMimeTypes.SchemePrefix + 'file';
+        this.secure = secure;
+        this.toMimeType = secure ? ScryptedMimeTypes.LocalUrl : ScryptedMimeTypes.InsecureLocalUrl;
+    }
+
+    async onRequest(request: HttpRequest, response: HttpResponse) {
+        const normalizedRequest = Object.assign({}, request);
+        normalizedRequest.url = normalizedRequest.url.replace(normalizedRequest.rootPath, '');
+        const pathOnly = normalizedRequest.url.split('?')[0];
+        const file = this.hosted.get(pathOnly);
+
+        response.sendFile(file.data as string);
+    }
+
+    async convert(buffer: string, fromMimeType: string, toMimeType: string): Promise<Buffer> {
+        const { pathname } = new URL(buffer);
+        // one way hash that is browser cache friendly
+        const uuid = crypto.createHash('sha256').update(pathname).digest('hex');
+
+        const endpoint = await (this.secure ? endpointManager.getPublicLocalEndpoint(this.nativeId) : endpointManager.getInsecurePublicLocalEndpoint(this.nativeId));
+        const extension = path.extname(pathname).substring(1);
+
+        const filename = uuid + (extension ? `.${extension}` : '');
+
+        this.hosted.set(`/${filename}`, { data: pathname });
 
         return Buffer.from(`${endpoint}${filename}`);
     }
