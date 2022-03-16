@@ -51,7 +51,19 @@ export abstract class MediaManagerBase implements MediaManager {
         }
 
         this.builtinConverters.push({
-            fromMimeType: `${ScryptedMimeTypes.Url};${ScryptedMimeTypes.AcceptUrlParameter}=true`,
+            fromMimeType: ScryptedMimeTypes.SchemePrefix + 'file',
+            toMimeType: ScryptedMimeTypes.MediaObject,
+            convert: async (data, fromMimeType, toMimeType) => {
+                const filename = data.toString();
+                const ab = await fs.promises.readFile(filename);
+                const mt =  mimeType.lookup(data.toString());
+                const mo = this.createMediaObject(ab, mt);
+                return mo;
+            }
+        });
+
+        this.builtinConverters.push({
+            fromMimeType: ScryptedMimeTypes.Url,
             toMimeType: ScryptedMimeTypes.FFmpegInput,
             async convert(data, fromMimeType): Promise<Buffer> {
                 const url = data.toString();
@@ -328,7 +340,8 @@ export abstract class MediaManagerBase implements MediaManager {
 
                 // target output matches
                 if (mimeMatches(outputMime, convertedMime) || converter.toMimeType === ScryptedMimeTypes.MediaObject) {
-                    node['output'] = 1;
+                    // catch all converters should be heavily weighted so as not to use them.
+                    node['output'] = converter.toMimeType === ScryptedMimeTypes.MediaObject ? 1000 : 1;
                 }
             }
             catch (e) {
@@ -357,24 +370,6 @@ export abstract class MediaManagerBase implements MediaManager {
             const type = converterToMimeType.type === '*' ? valueMime.type : converterToMimeType.type;
             const subtype = converterToMimeType.subtype === '*' ? valueMime.subtype : converterToMimeType.subtype;
             const targetMimeType = `${type}/${subtype}`;
-
-            if (typeof value === 'string' && !converterFromMimeType.parameters.has(ScryptedMimeTypes.AcceptUrlParameter)) {
-                const url = new URL(value);
-                const scheme = url.protocol.slice(0, -1);
-                const fromMimeType = ScryptedMimeTypes.SchemePrefix + scheme;
-                for (const converter of this.getConverters()) {
-                    if (converter.fromMimeType !== fromMimeType || converter.toMimeType !== ScryptedMimeTypes.MediaObject)
-                        continue;
-
-                    const mo = await converter.convert(value, fromMimeType, toMimeType) as MediaObject;
-                    const found = await this.convertMediaObjectToBuffer(mo, toMimeType);
-                    return {
-                        data: found,
-                        mimeType: mo.mimeType,
-                    };
-                }
-                throw new Error(`no ${ScryptedInterface.BufferConverter} exists for scheme: ${scheme}`);
-            }
 
             if (converter.toMimeType === ScryptedMimeTypes.MediaObject) {
                 const mo = await converter.convert(value, valueMime.essence, toMimeType) as MediaObject;

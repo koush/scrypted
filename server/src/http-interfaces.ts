@@ -51,9 +51,12 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
             if (!fs.existsSync(filePath)) {
                 filePath = pathJoin(filesPath, path);
                 if (!fs.existsSync(filePath)) {
-                    res.status(404);
-                    res.end();
-                    return;
+                    filePath = path;
+                    if (!fs.existsSync(filePath)) {
+                        res.status(404);
+                        res.end();
+                        return;
+                    }
                 }
             }
             res.sendFile(filePath);
