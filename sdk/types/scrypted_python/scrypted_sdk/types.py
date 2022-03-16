@@ -118,6 +118,7 @@ class ScryptedInterface(Enum):
     UltravioletSensor = "UltravioletSensor"
     VideoCamera = "VideoCamera"
     VideoCameraConfiguration = "VideoCameraConfiguration"
+    VideoClips = "VideoClips"
     VideoRecorder = "VideoRecorder"
 
 class ScryptedMimeTypes(Enum):
@@ -462,6 +463,21 @@ class Setting(TypedDict):
     title: str
     type: Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
+    pass
+
+class VideoClip(TypedDict):
+    duration: float
+    event: str
+    id: str
+    startTime: float
+    pass
+
+class VideoClipOptions(TypedDict):
+    count: float
+    endTime: float
+    reverseOrder: bool
+    startId: str
+    startTime: float
     pass
 
 class AmbientLightSensor:
@@ -850,10 +866,23 @@ class VideoCameraConfiguration:
         pass
     pass
 
+class VideoClips:
+    async def getVideoClip(self, videoClipId: str) -> MediaObject:
+        pass
+    async def getVideoClipThumbnail(self, videoClipId: str) -> MediaObject:
+        pass
+    async def getVideoClips(self, options: VideoClipOptions = None) -> list[VideoClip]:
+        pass
+    async def removeVideoClips(self, videoClipIds: list[str]) -> None:
+        pass
+    pass
+
 class VideoRecorder:
     async def getRecordingStream(self, options: RequestRecordingStreamOptions) -> MediaObject:
         pass
     async def getRecordingStreamOptions(self) -> list[MediaStreamOptions]:
+        pass
+    async def getRecordingStreamThumbnail(self, time: float) -> MediaObject:
         pass
     pass
 
@@ -947,6 +976,8 @@ class MediaManager:
     async def createMediaObjectFromUrl(self, data: str, mimeType: str = None) -> MediaObject:
         pass
     async def getFFmpegPath(self) -> str:
+        pass
+    async def getFilesPath(self) -> str:
         pass
     pass
 

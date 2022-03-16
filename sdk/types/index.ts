@@ -329,7 +329,18 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     name: 'VideoRecorder',
     methods: [
       'getRecordingStream',
-      'getRecordingStreamOptions'
+      'getRecordingStreamOptions',
+      'getRecordingStreamThumbnail'
+    ],
+    properties: []
+  },
+  VideoClips: {
+    name: 'VideoClips',
+    methods: [
+      'getVideoClip',
+      'getVideoClipThumbnail',
+      'getVideoClips',
+      'removeVideoClips'
     ],
     properties: []
   },
@@ -1130,6 +1141,29 @@ export interface RequestRecordingStreamOptions extends MediaStreamOptions {
 export interface VideoRecorder {
   getRecordingStream(options: RequestRecordingStreamOptions): Promise<MediaObject>;
   getRecordingStreamOptions(): Promise<MediaStreamOptions[]>;
+  getRecordingStreamThumbnail(time: number): Promise<MediaObject>;
+}
+
+export interface VideoClip {
+  id: string;
+  startTime: number;
+  duration?: number;
+  event?: string;
+}
+
+export interface VideoClipOptions {
+  startTime?: number;
+  endTime?: number;
+  startId?: string;
+  count?: number;
+  reverseOrder?: boolean;
+}
+
+export interface VideoClips {
+  getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]>;
+  getVideoClip(videoClipId: string): Promise<MediaObject>;
+  getVideoClipThumbnail(videoClipId: string): Promise<MediaObject>;
+  removeVideoClips(...videoClipIds: string[]): Promise<void>;
 }
 
 /**
@@ -1569,6 +1603,10 @@ export interface MediaManager {
    */
   getFFmpegPath(): Promise<string>;
 
+  /**
+   * Get the directory where the plugin should store files.
+   */
+  getFilesPath(): Promise<string>;
 }
 export interface MediaStreamUrl {
   url: string;
@@ -1933,6 +1971,7 @@ export enum ScryptedInterface {
   Camera = "Camera",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
+  VideoClips = "VideoClips",
   VideoCameraConfiguration = "VideoCameraConfiguration",
   Intercom = "Intercom",
   Lock = "Lock",
