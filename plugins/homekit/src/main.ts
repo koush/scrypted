@@ -50,7 +50,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
             await deviceManager.onDevicesChanged({
                 devices: [
                     {
-                        name: 'Save Video Clips',
+                        name: 'Save HomeKit Video Clips',
                         nativeId: VIDEO_CLIPS_NATIVE_ID,
                         type: ScryptedDeviceType.DataSource,
                         interfaces: [
@@ -58,6 +58,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                             ScryptedInterface.Settings,
                             ScryptedInterface.BufferConverter,
                             ScryptedInterface.HttpRequestHandler,
+                            ScryptedInterface.Readme,
                         ],
                     }
                 ]

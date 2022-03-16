@@ -2,7 +2,6 @@
 import sdk, { VideoClip } from '@scrypted/sdk';
 import path from 'path';
 import fs from 'fs';
-import checkDiskSpace from 'check-disk-space';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -12,34 +11,55 @@ export interface HksvVideoClip extends VideoClip {
     fragments: number;
 }
 
-const PRUNE_AGE = 24 * 60 * 60 * 1000;
+export async function nukeClips() {
+    const savePath = await getSavePath();
+    await fs.promises.rm(savePath, { recursive: true, force: true });
+}
 
-export async function pruneClips() {
+export async function pruneClips(pruneAge: number, console: Console) {
     const savePath = await getSavePath();
     const allFiles = await fs.promises.readdir(savePath);
     const jsonFiles = allFiles.filter(file => file.endsWith('.json'));
 
     const now = Date.now();
-    const pruneBefore = now - PRUNE_AGE;
+    const pruneBefore = now - pruneAge;
     // watch for weird clock changes too.
-    const pruneAfter = now + PRUNE_AGE;
+    const pruneAfter = now + (24 * 60 * 60 * 1000);
 
+    let retained = 0;
+    let removedSize = 0;
+    let retainedSize = 0;
     for (const jsonFile of jsonFiles) {
-        const hksvId = jsonFile.slice(0, '.json'.length);
+        const hksvId = jsonFile.slice(0, -'.json'.length);
+        let size = 0;
         try {
-            const { startTime } = parseHksvId(hksvId);
+            const { id, startTime } = parseHksvId(hksvId);
+            try {
+                const { mp4Path } = await getCameraRecordingFiles(id, startTime);
+                const stat = await fs.promises.stat(mp4Path);
+                size += stat.size;
+            }
+            catch (e) {
+            }
+
             if (startTime < pruneBefore)
                 throw new Error("Pruning old clip");
             if (!startTime)
                 throw new Error("Pruning invalid start time");
             if (startTime > pruneAfter)
                 throw new Error("Pruning weird future clip");
+            retained++;
+            retainedSize += size;
         }
         catch (e) {
-            console.error('removing video clip', hksvId);
-            // removeVideoClip(hksvId);
+            removedSize += size;
+            console.log('removing video clip', hksvId);
+            removeVideoClip(hksvId);
         }
     }
+
+    console.log(`Removed Recordings: ${jsonFiles.length - retained}: ${removedSize} bytes.`);
+    console.log(`Retained Recordings: ${retained}: ${retainedSize} bytes.`);
 }
 
 export async function getSavePath() {
