@@ -21,7 +21,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     console.log(device.name, 'recording session starting', configuration);
 
     const storage = deviceManager.getMixinStorage(device.id, undefined);
-    const saveRecordings = storage.getItem('saveRecordings') === 'true';
+    const saveRecordings =  device.interfaces.includes(homekitSession.videoClipsId);
 
     let selectedStream: MediaStreamOptions;
     let recordingChannel = storage.getItem('recordingChannel');

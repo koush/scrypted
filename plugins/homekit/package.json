@@ -24,13 +24,13 @@
       "interfaces": [
          "MixinProvider",
          "Settings",
-         "HttpRequestHandler",
-         "BufferConverter"
+         "DeviceProvider"
       ],
       "realfs": true
    },
    "dependencies": {
       "@koush/qrcode-terminal": "^0.12.0",
+      "check-disk-space": "^3.3.0",
       "hap-nodejs": "file:../../external/HAP-NodeJS",
       "lodash": "^4.17.21",
       "mkdirp": "^1.0.4"

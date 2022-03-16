@@ -9,6 +9,7 @@ import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
 
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
+import { pruneClips } from './camera/camera-recording-files';
 
 const { deviceManager, systemManager } = sdk;
 

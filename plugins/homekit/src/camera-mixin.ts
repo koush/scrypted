@@ -1,9 +1,7 @@
-import sdk, { FFMpegInput, MediaObject, MediaStreamOptions, ObjectDetector, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
+import sdk, { MediaStreamOptions, ObjectDetector, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmpeg-hardware-acceleration";
 import { SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
 import { HomekitMixin } from "./homekit-mixin";
-import fs from 'fs';
-import { getCameraRecordingFiles, getVideoClips, HKSV_MIME_TYPE, parseHksvId, removeVideoClip } from "./types/camera/camera-recording-files";
 
 const { log, systemManager, deviceManager, mediaManager } = sdk;
 
@@ -14,74 +12,9 @@ export function canCameraMixin(type: ScryptedDeviceType, interfaces: string[]) {
         && interfaces.includes(ScryptedInterface.VideoCamera);
 }
 
-export class CameraMixin extends HomekitMixin<any> implements VideoClips {
+export class CameraMixin extends HomekitMixin<any> {
     constructor(options: SettingsMixinDeviceOptions<VideoCamera>) {
         super(options);
-    }
-
-    async getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
-        let ret = await getVideoClips(this.id);
-        ret = ret.sort((a, b) => a.startTime - b.startTime);
-
-        if (options?.startTime) {
-            const startIndex = ret.findIndex(c => c.startTime > options.startTime);
-            ret = ret.slice(startIndex);
-        }
-
-        if (options?.endTime)
-            ret = ret.filter(clip => clip.startTime + clip.duration < options.endTime);
-
-        if (options?.reverseOrder)
-            ret = ret.reverse();
-
-        if (options?.startId) {
-            const startIndex = ret.findIndex(c => c.id === options.startId);
-            if (startIndex === -1)
-                throw new Error('startIndex not found');
-            ret = ret.slice(startIndex);
-        }
-
-        if (options?.count)
-            ret = ret.slice(0, options.count);
-
-        return ret;
-    }
-
-    getVideoClip(videoClipId: string): Promise<MediaObject> {
-        parseHksvId(videoClipId);
-        return mediaManager.createMediaObject(Buffer.from(videoClipId), HKSV_MIME_TYPE);
-    }
-
-    async getVideoClipThumbnail(videoClipId: string): Promise<MediaObject> {
-        const { id, startTime } = parseHksvId(videoClipId);
-        const { mp4Path, thumbnailPath } = await getCameraRecordingFiles(id, startTime);
-        let jpeg: Buffer;
-        if (fs.existsSync(thumbnailPath)) {
-            jpeg = fs.readFileSync(thumbnailPath);
-        }
-        else {
-            const ffmpegInput: FFMpegInput = {
-                url: undefined,
-                inputArguments: [
-                    '-ss', '00:00:04',
-                    '-i', mp4Path,
-                ],
-            };
-            const input = await mediaManager.createFFmpegMediaObject(ffmpegInput);
-            jpeg = await mediaManager.convertMediaObjectToBuffer(input, 'image/jpeg');
-            fs.writeFileSync(thumbnailPath, jpeg);
-        }
-        return mediaManager.createMediaObject(jpeg, 'image/jpeg');
-    }
-
-    async removeVideoClips(...ids: string[]): Promise<void> {
-        if (!ids.length) {
-            const allClips = await getVideoClips(this.id);
-            ids = allClips.map(clip => clip.id);
-        }
-        for (const id of ids) {
-            removeVideoClip(id);
-        }
     }
 
     async getMixinSettings(): Promise<Setting[]> {
@@ -258,14 +191,6 @@ export class CameraMixin extends HomekitMixin<any> implements VideoClips {
                 description: 'Trigger HomeKit Secure Video recording on audio activity.',
             });
         }
-
-        settings.push({
-            title: 'Save HomeKit Secure Video Clips',
-            description: 'Save HomeKit Secure Video clips locally on your Scrypted server in addition to iCloud.',
-            key: 'saveRecordings',
-            type: 'boolean',
-            value: (this.storage.getItem('saveRecordings') === 'true').toString(),
-        });
 
         if (this.interfaces.includes(ScryptedInterface.ObjectDetector)) {
             try {

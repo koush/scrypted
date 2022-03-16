@@ -4,6 +4,8 @@ import sdk, { ScryptedInterface, SettingValue } from "@scrypted/sdk";
 import crypto from 'crypto';
 const { log } = sdk;
 
+export const HOMEKIT_MIXIN = 'mixin:@scrypted/homekit';
+
 export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     storageSettings = new StorageSettings(this, {
         resetAccessory: {

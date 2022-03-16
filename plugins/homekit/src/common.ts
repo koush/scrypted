@@ -16,6 +16,7 @@ export interface HomeKitSession {
     storage: Storage;
     snapshotThrottles: Map<string, SnapshotThrottle>;
     log: Logger;
+    videoClipsId: string;
 }
 
 interface SupportedType {
