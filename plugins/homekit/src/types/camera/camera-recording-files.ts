@@ -89,7 +89,8 @@ export async function getVideoClips(options?: VideoClipOptions, id?: string): Pr
 
     if (options?.startTime) {
         const startIndex = ret.findIndex(c => c.startTime > options.startTime);
-        ret = ret.slice(startIndex);
+        if (startIndex === -1)
+            return [];
     }
 
     if (options?.endTime)

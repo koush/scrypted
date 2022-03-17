@@ -57,9 +57,9 @@
           <v-date-picker @input="onDate"> </v-date-picker>
         </v-card>
       </v-dialog>
-      <v-btn text small disabled>{{ pageRange }}</v-btn>
+      <v-btn text small disabled v-if="pages">{{ pageRange }}</v-btn>
       <v-spacer></v-spacer>
-      <v-dialog v-model="removeAllClipsDialog" v-if="clips.length">
+      <v-dialog v-model="removeAllClipsDialog" v-if="pages">
         <template v-slot:activator="{ on }">
           <v-btn v-on="on" small text color="red"
             ><v-icon x-small>fa fa-trash</v-icon></v-btn
@@ -141,7 +141,12 @@ export default {
     clips: {
       async get() {
         await this.refreshNonce;
-        const ret = await this.device.getVideoClips();
+        const date = new Date(`${this.year}-${this.month}-${this.date}`);
+        const dt = date.getTime();
+        const ret = await this.device.getVideoClips({
+          startTime: dt,
+          endTime: dt + 24 * 60 * 60 * 1000,
+        });
         return ret;
       },
       default: [],
@@ -203,6 +208,7 @@ export default {
       this.month = d.getMonth() + 1;
       this.date = d.getDate();
       this.year = d.getFullYear();
+      this.refresh();
     },
   },
 };
