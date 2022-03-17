@@ -141,7 +141,15 @@ export default {
     clips: {
       async get() {
         await this.refreshNonce;
-        const date = new Date(`${this.year}-${this.month}-${this.date}`);
+        const date = new Date();
+        date.setMilliseconds(0);
+        date.setSeconds(0);
+        date.setMinutes(0);
+        date.setHours(0);
+        date.setFullYear(this.year);
+        date.setMonth(this.month - 1);
+        date.setDate(this.date);
+        console.log(date);
         const dt = date.getTime();
         const ret = await this.device.getVideoClips({
           startTime: dt,
