@@ -60,8 +60,10 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
             videoClipIds = allClips.map(clip => clip.id);
         }
         for (const id of videoClipIds) {
-            removeVideoClip(id);
+            await removeVideoClip(id);
         }
+
+        this.onDeviceEvent(ScryptedInterface.VideoClips, undefined);
     }
 
     async prune() {

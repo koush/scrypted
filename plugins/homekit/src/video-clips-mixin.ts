@@ -1,6 +1,5 @@
-import sdk, { FFMpegInput, MediaObject, MixinDeviceBase, MixinDeviceOptions, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
-import fs from 'fs';
-import { getCameraRecordingFiles, getVideoClip, getVideoClips, getVideoClipThumbnail, parseHksvId, removeVideoClip } from "./types/camera/camera-recording-files";
+import sdk, { MediaObject, MixinDeviceBase, MixinDeviceOptions, ScryptedInterface, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
+import { getVideoClip, getVideoClips, getVideoClipThumbnail, removeVideoClip } from "./types/camera/camera-recording-files";
 
 const { mediaManager } = sdk;
 
@@ -29,7 +28,9 @@ export class ClipsMixin extends MixinDeviceBase<VideoCamera> implements VideoCli
             videoClipIds = allClips.map(clip => clip.id);
         }
         for (const id of videoClipIds) {
-            removeVideoClip(id);
+            await removeVideoClip(id);
         }
+
+        this.onDeviceEvent(ScryptedInterface.VideoClips, undefined);
     }
 }

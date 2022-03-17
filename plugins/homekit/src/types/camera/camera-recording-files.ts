@@ -160,7 +160,7 @@ export async function removeVideoClip(hksvId: string) {
             thumbnailPath,
             metadataPath
         } = await getCameraRecordingFiles(id, startTime);
-        unlinkSafe(mp4Path, thumbnailPath, metadataPath);
+        await unlinkSafe(mp4Path, thumbnailPath, metadataPath);
     }
     catch (e) {
     }
