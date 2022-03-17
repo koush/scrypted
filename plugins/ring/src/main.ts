@@ -56,7 +56,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
     storageSettings = new StorageSettings(this, {
         captureMode: {
             title: 'SIP Gateway',
-            description: 'The gateway used to import the stream.',
+            description: 'Experimental: The gateway used to import the stream.',
             choices: Object.values(CaptureModes),
             defaultValue: CaptureModes.Default,
         }
