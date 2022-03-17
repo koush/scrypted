@@ -59,7 +59,7 @@
       </v-dialog>
       <v-btn text small disabled v-if="pages">{{ pageRange }}</v-btn>
       <v-spacer></v-spacer>
-      <v-dialog v-model="removeAllClipsDialog" v-if="pages">
+      <v-dialog v-model="removeAllClipsDialog" v-if="pages" width="unset">
         <template v-slot:activator="{ on }">
           <v-btn v-on="on" small text color="red"
             ><v-icon x-small>fa fa-trash</v-icon></v-btn
