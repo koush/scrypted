@@ -22,6 +22,11 @@
       "interfaces": [
          "DeviceProvider",
          "Settings"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin",
+         "@scrypted/snapshot",
+         "@scrypted/webrtc-source"
       ]
    },
    "dependencies": {
@@ -37,5 +42,5 @@
       "@scrypted/sdk": "file:../../sdk",
       "typescript": "^4.6.2"
    },
-   "version": "0.0.67"
+   "version": "0.0.69"
 }
