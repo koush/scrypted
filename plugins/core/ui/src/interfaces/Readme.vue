@@ -2,7 +2,7 @@
   <v-card>
     <CardTitle >Readme</CardTitle>
     <v-flex v-if="readme">
-      <VueMarkdown>{{ readme }}</VueMarkdown>
+      <VueMarkdown :source="readme"></VueMarkdown>
     </v-flex>
     <v-card-text v-else> Loading... </v-card-text>
   </v-card>
@@ -21,7 +21,7 @@ export default {
   asyncComputed: {
     readme: {
       async get() {
-        return await this.rpc().getReadmeMarkdown();;
+        return this.device.getReadmeMarkdown();;
       },
       default: undefined,
     }

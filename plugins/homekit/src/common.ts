@@ -1,5 +1,6 @@
 
 import { EventDetails, EventListenerRegister, Logger, Refresh, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { CameraMixin } from './camera-mixin';
 import { Accessory, Service, SnapshotRequest, Characteristic, CharacteristicEventTypes, WithUUID } from './hap';
 
 export interface DummyDevice {
@@ -17,6 +18,7 @@ export interface HomeKitSession {
     snapshotThrottles: Map<string, SnapshotThrottle>;
     log: Logger;
     videoClipsId: string;
+    cameraMixins: Map<string, CameraMixin>;
 }
 
 interface SupportedType {

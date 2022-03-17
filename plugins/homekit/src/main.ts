@@ -13,6 +13,7 @@ import { getHAPUUID, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { randomPinCode } from './pincode';
 import './types';
+import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
 
 const { systemManager, deviceManager } = sdk;
@@ -26,8 +27,6 @@ function getAddresses() {
     return addresses;
 }
 
-const VIDEO_CLIPS_NATIVE_ID = 'save-video-clips';
-
 class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, HomeKitSession, DeviceProvider {
     bridge = new Bridge('Scrypted', getHAPUUID(this.storage));
     snapshotThrottles = new Map<string, SnapshotThrottle>();
@@ -35,7 +34,8 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     homekitConnections = new Set<string>();
     standalones = new Map<string, Accessory>();
     videoClips: VideoClipsMixinProvider;
-    videoClipsId;
+    videoClipsId: string;
+    cameraMixins = new Map<string, CameraMixin>();
 
     constructor() {
         super();
@@ -54,6 +54,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                         nativeId: VIDEO_CLIPS_NATIVE_ID,
                         type: ScryptedDeviceType.DataSource,
                         interfaces: [
+                            ScryptedInterface.VideoClips,
                             ScryptedInterface.MixinProvider,
                             ScryptedInterface.Settings,
                             ScryptedInterface.Readme,
@@ -392,6 +393,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
         if (canCameraMixin(mixinDeviceState.type, mixinDeviceInterfaces)) {
             ret = new CameraMixin(options);
+            this.cameraMixins.set(ret.id, ret);
         }
         else {
             ret = new HomekitMixin(options);

@@ -1,9 +1,10 @@
 
-import sdk, { VideoClip } from '@scrypted/sdk';
+import sdk, { FFMpegInput, MediaObject, VideoClip, VideoClipOptions } from '@scrypted/sdk';
 import path from 'path';
 import fs from 'fs';
 
 const { mediaManager } = sdk;
+export const VIDEO_CLIPS_NATIVE_ID = 'save-video-clips';
 
 export interface HksvVideoClip extends VideoClip {
     fragments: number;
@@ -65,12 +66,14 @@ export async function getSavePath() {
     return savePath;
 }
 
-export async function getVideoClips(id: string): Promise<HksvVideoClip[]> {
+export async function getVideoClips(options?: VideoClipOptions, id?: string): Promise<HksvVideoClip[]> {
     const savePath = await getSavePath();
     const allFiles = await fs.promises.readdir(savePath);
     const jsonFiles = allFiles.filter(file => file.endsWith('.json'));
-    const idJsonFiles = jsonFiles.filter(file => file.startsWith(`${id}-`));
-    const ret: HksvVideoClip[] = [];
+    let idJsonFiles = jsonFiles;
+    if (id)
+        idJsonFiles = jsonFiles.filter(file => file.startsWith(`${id}-`));
+    let ret: HksvVideoClip[] = [];
 
     for (const jsonFile of idJsonFiles) {
         try {
@@ -81,6 +84,29 @@ export async function getVideoClips(id: string): Promise<HksvVideoClip[]> {
         catch (e) {
         }
     }
+
+    ret = ret.sort((a, b) => a.startTime - b.startTime);
+
+    if (options?.startTime) {
+        const startIndex = ret.findIndex(c => c.startTime > options.startTime);
+        ret = ret.slice(startIndex);
+    }
+
+    if (options?.endTime)
+        ret = ret.filter(clip => clip.startTime + clip.duration < options.endTime);
+
+    if (options?.reverseOrder)
+        ret = ret.reverse();
+
+    if (options?.startId) {
+        const startIndex = ret.findIndex(c => c.id === options.startId);
+        if (startIndex === -1)
+            throw new Error('startIndex not found');
+        ret = ret.slice(startIndex);
+    }
+
+    if (options?.count)
+        ret = ret.slice(0, options.count);
 
     return ret;
 }
@@ -138,4 +164,34 @@ export async function removeVideoClip(hksvId: string) {
     }
     catch (e) {
     }
+}
+
+export async function getVideoClipThumbnail(videoClipId: string): Promise<MediaObject> {
+    const { id, startTime } = parseHksvId(videoClipId);
+    const { mp4Path, thumbnailPath } = await getCameraRecordingFiles(id, startTime);
+    let jpeg: Buffer;
+    if (fs.existsSync(thumbnailPath)) {
+        jpeg = fs.readFileSync(thumbnailPath);
+    }
+    else {
+        const ffmpegInput: FFMpegInput = {
+            url: undefined,
+            inputArguments: [
+                '-ss', '00:00:04',
+                '-i', mp4Path,
+            ],
+        };
+        const input = await mediaManager.createFFmpegMediaObject(ffmpegInput);
+        jpeg = await mediaManager.convertMediaObjectToBuffer(input, 'image/jpeg');
+        fs.writeFileSync(thumbnailPath, jpeg);
+    }
+    const url = `file:${thumbnailPath}`;
+    return mediaManager.createMediaObjectFromUrl(url);
+}
+
+export async function getVideoClip(videoClipId: string): Promise<MediaObject> {
+    const { id, startTime } = parseHksvId(videoClipId);
+    const { mp4Path } = await getCameraRecordingFiles(id, startTime);
+    const url = `file:${mp4Path}`;
+    return mediaManager.createMediaObjectFromUrl(url);
 }

@@ -1149,6 +1149,7 @@ export interface VideoClip {
   startTime: number;
   duration?: number;
   event?: string;
+  description?: string;
 }
 
 export interface VideoClipOptions {
@@ -2071,13 +2072,6 @@ export interface RTCAVSignalingSetup {
     dict?: RTCDataChannelInit;
   };
   type: 'offer' | 'answer';
-}
-
-export interface RTCAVMessage {
-  id: string;
-  description: RTCSessionDescriptionInit;
-  candidates: RTCIceCandidateInit[];
-  configuration: RTCConfiguration;
 }
 
 export enum ScryptedMimeTypes {

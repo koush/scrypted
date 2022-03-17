@@ -1,7 +1,7 @@
 
 import { FFMpegFragmentedMP4Session, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
-import sdk, { AudioSensor, FFMpegInput, MediaStreamOptions, MotionSensor, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { AudioSensor, FFMpegInput, MediaStreamOptions, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import net from 'net';
 import { Duplex, Writable } from 'stream';
 import { HomeKitSession } from '../../common';
@@ -9,7 +9,7 @@ import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordin
 import { evalRequest } from './camera-transcode';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
-import { getCameraRecordingFiles, HksvVideoClip } from './camera-recording-files';
+import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -227,5 +227,9 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         cp?.kill('SIGKILL');
         recordingFile?.end();
         recordingFile?.destroy();
+        if (saveRecordings) {
+            homekitSession.cameraMixins.get(device.id)?.onDeviceEvent(ScryptedInterface.VideoClips, undefined);
+            deviceManager.onDeviceEvent(VIDEO_CLIPS_NATIVE_ID, ScryptedInterface.VideoClips, undefined);
+        }
     }
 }

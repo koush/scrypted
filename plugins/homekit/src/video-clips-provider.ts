@@ -1,15 +1,16 @@
-import { MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import sdk, { MediaObject, MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
 import { canCameraMixin } from "./camera-mixin";
 import { HOMEKIT_MIXIN } from "./homekit-mixin";
 import { StorageSettings } from "@scrypted/common/src/settings";
-import { getSavePath, nukeClips, pruneClips } from "./types/camera/camera-recording-files";
+import { getSavePath, getVideoClip, getVideoClips, getVideoClipThumbnail, nukeClips, parseHksvId, pruneClips, removeVideoClip } from "./types/camera/camera-recording-files";
 import { ClipsMixin } from "./video-clips-mixin";
 import checkDiskSpace from 'check-disk-space';
 
 const DAYS_TO_KEEP = 10;
 const PRUNE_AGE = DAYS_TO_KEEP * 24 * 60 * 60 * 1000;
+const { systemManager } = sdk;
 
-export class VideoClipsMixinProvider extends ScryptedDeviceBase implements MixinProvider, Settings, Readme {
+export class VideoClipsMixinProvider extends ScryptedDeviceBase implements MixinProvider, Settings, Readme, VideoClips {
     storageSettings = new StorageSettings(this, {
         reset: {
             title: 'Remove All Clips',
@@ -34,6 +35,33 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
         this.toMimeType = ScryptedMimeTypes.MediaObject;
 
         this.prune();
+    }
+
+    async getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
+        const clips = await getVideoClips(options);
+        for (const clip of clips) {
+            const { id } = parseHksvId(clip.id);
+            clip.description = systemManager.getDeviceById(id)?.name;
+        }
+        return clips;
+    }
+
+    getVideoClip(videoClipId: string): Promise<MediaObject> {
+        return getVideoClip(videoClipId);
+    }
+
+    getVideoClipThumbnail(videoClipId: string): Promise<MediaObject> {
+        return getVideoClipThumbnail(videoClipId);
+    }
+
+    async removeVideoClips(...videoClipIds: string[]) {
+        if (!videoClipIds.length) {
+            const allClips = await getVideoClips(undefined, this.id);
+            videoClipIds = allClips.map(clip => clip.id);
+        }
+        for (const id of videoClipIds) {
+            removeVideoClip(id);
+        }
     }
 
     async prune() {

@@ -465,6 +465,7 @@ class Setting(TypedDict):
     pass
 
 class VideoClip(TypedDict):
+    description: str
     duration: float
     event: str
     id: str

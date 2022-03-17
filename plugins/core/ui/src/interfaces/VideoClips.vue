@@ -24,6 +24,9 @@
         <v-list-item-subtitle>
           {{ clip.duration / 1000 }}s
         </v-list-item-subtitle>
+        <v-list-item-subtitle v-if="clip.description">
+          {{ clip.description }}
+        </v-list-item-subtitle>
       </v-list-item-content>
     </v-list-item>
     <div class="text-center" v-if="pages">
