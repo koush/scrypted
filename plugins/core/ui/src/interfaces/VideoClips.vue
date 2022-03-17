@@ -17,7 +17,7 @@
         max-width="100px"
       >
       </v-img>
-      <v-list-item-content class="">
+      <v-list-item-content>
         <v-list-item-title>
           {{ localTime(clip.startTime) }}
         </v-list-item-title>
@@ -28,14 +28,23 @@
           {{ clip.description }}
         </v-list-item-subtitle>
       </v-list-item-content>
+
+      <v-list-item-action>
+        <v-btn text x-small @click.stop="downloadClip(clip)">
+          <v-icon x-small>fa fa-download</v-icon>
+        </v-btn>
+      </v-list-item-action>
+      <v-list-item-action>
+        <v-btn text x-small @click.stop="removeClip(clip)">
+          <v-icon x-small color="red" small>fa fa-trash</v-icon>
+        </v-btn>
+      </v-list-item-action>
     </v-list-item>
     <div class="text-center" v-if="pages">
       <v-pagination v-model="page" :length="pages"></v-pagination>
     </div>
     <v-card-text v-else>No clips found.</v-card-text>
     <v-card-actions>
-      <v-spacer></v-spacer>
-      <v-btn text small disabled>{{ pageRange }}</v-btn>
       <v-dialog width="unset" v-model="dialog">
         <template v-slot:activator="{ on }">
           <v-btn v-on="on" small>
@@ -46,6 +55,29 @@
         </template>
         <v-card>
           <v-date-picker @input="onDate"> </v-date-picker>
+        </v-card>
+      </v-dialog>
+      <v-btn text small disabled>{{ pageRange }}</v-btn>
+      <v-spacer></v-spacer>
+      <v-dialog v-model="removeAllClipsDialog" v-if="clips.length">
+        <template v-slot:activator="{ on }">
+          <v-btn v-on="on" small text color="red"
+            ><v-icon x-small>fa fa-trash</v-icon></v-btn
+          >
+        </template>
+        <v-card>
+          <v-card-title> Delete All Clips? </v-card-title>
+          <v-card-text
+            >Please confirm deletion of all video clips. This action can not be
+            undone.</v-card-text
+          >
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn small text @click="removeAllClipsDialog = false"
+              >Cancel</v-btn
+            >
+            <v-btn small text color="red" @click="removeAllClips">Delete</v-btn>
+          </v-card-actions>
         </v-card>
       </v-dialog>
     </v-card-actions>
@@ -61,13 +93,15 @@ export default {
   mixins: [RPCInterface],
 
   asyncComputed: {
-      pageRange: {
-          async get() {
-              const start = this.localTime(this.pageClips[0].startTime)
-              const end = this.localTime(this.pageClips[this.pageClips.length - 1].startTime);
-              return `${start} - ${end}`;
-          }
+    pageRange: {
+      async get() {
+        const start = this.localTime(this.pageClips[0].startTime);
+        const end = this.localTime(
+          this.pageClips[this.pageClips.length - 1].startTime
+        );
+        return `${start} - ${end}`;
       },
+    },
     pageClips: {
       async get() {
         const start = (this.page - 1) * 4;
@@ -94,7 +128,7 @@ export default {
             }
             const thumbnail = await fetchClipThumbnail(
               mediaManager,
-              this.rpc(),
+              this.device,
               clip
             );
             Vue.set(ret, i, thumbnail);
@@ -106,7 +140,8 @@ export default {
     },
     clips: {
       async get() {
-        const ret = await this.rpc().getVideoClips();
+        await this.refreshNonce;
+        const ret = await this.device.getVideoClips();
         return ret;
       },
       default: [],
@@ -120,6 +155,8 @@ export default {
   },
   data() {
     return {
+      refreshNonce: Math.random(),
+      removeAllClipsDialog: false,
       playDialog: false,
       playUrl: null,
       clipsPerPage: 4,
@@ -133,9 +170,24 @@ export default {
     };
   },
   methods: {
+    refresh() {
+      this.refreshNonce = Math.random();
+    },
+    async downloadClip(clip) {
+      const mediaManager = this.$scrypted.mediaManager;
+      const url = await fetchClipUrl(mediaManager, this.device, clip);
+      window.open(url + "?attachment");
+    },
+    async removeClip(clip) {
+      this.device.removeVideoClips(clip.id);
+    },
+    async removeAllClips() {
+      this.removeAllClipsDialog = false;
+      await this.device.removeVideoClips();
+    },
     async playClip(clip) {
       const mediaManager = this.$scrypted.mediaManager;
-      const url = await fetchClipUrl(mediaManager, this.rpc(), clip);
+      const url = await fetchClipUrl(mediaManager, this.device, clip);
       this.playUrl = url;
       this.playDialog = true;
     },

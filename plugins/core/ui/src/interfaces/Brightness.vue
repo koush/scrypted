@@ -1,8 +1,13 @@
 <template>
-  <v-slider class="mx-5" thumb-label="always" v-model="lazyValue.brightness" @change="onChange"
-  
-        append-icon="brightness_high"
-        prepend-icon="brightness_low"
+  <v-slider
+    thumb-size="20"
+    class="mx-5 mt-2"
+    thumb-label="always"
+    v-model="lazyValue.brightness"
+    @change="onChange"
+    dense
+    append-icon="brightness_high"
+    prepend-icon="brightness_low"
   ></v-slider>
 </template>
 
@@ -13,7 +18,7 @@ import throttle from "lodash/throttle";
 export default {
   mixins: [RPCInterface],
   methods: {
-    debounceSetBrightness: throttle(function() {
+    debounceSetBrightness: throttle(function () {
       this.rpc().setBrightness(this.lazyValue.brightness);
     }, 500),
     onChange() {
@@ -22,7 +27,7 @@ export default {
         return;
       }
       this.rpc().setBrightness(this.lazyValue.brightness);
-    }
-  }
+    },
+  },
 };
 </script>

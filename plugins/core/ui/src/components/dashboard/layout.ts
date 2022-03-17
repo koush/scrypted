@@ -8,6 +8,8 @@ import DashboardStartStop from "./DashboardStartStop.vue";
 import DashboardMediaPlayer from "./DashboardMediaPlayer.vue";
 import { Multimap, EnsureMap } from "./multimap";
 
+const defaultCardColor = 'teal darken-2';
+
 export interface Card {
     name: string;
     components: CardComponent[];
@@ -306,7 +308,7 @@ export function getDefaultDashboard(deviceIds: string[], systemManager: SystemMa
             name: room,
             components,
             height,
-            color: 'light-blue darken-2',
+            color: defaultCardColor,
         }
         ret.push(card);
     }
@@ -327,7 +329,7 @@ export function getDefaultDashboard(deviceIds: string[], systemManager: SystemMa
             name: pluralize(type),
             components,
             height,
-            color: 'light-blue darken-2',
+            color: defaultCardColor,
         }
         ret.push(card);
     }

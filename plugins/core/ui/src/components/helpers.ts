@@ -179,6 +179,10 @@ export function isSyncable(type: ScryptedDeviceType) {
 const interfaceFriendlyNames = new Map<ScryptedInterface, string>();
 interfaceFriendlyNames.set(ScryptedInterface.MixinProvider, "Compatible Things");
 interfaceFriendlyNames.set(ScryptedInterface.DeviceProvider, "Providing Things");
+interfaceFriendlyNames.set(ScryptedInterface.VideoClips, "Video Clips");
+interfaceFriendlyNames.set(ScryptedInterface.Notifier, "Send Notification");
+interfaceFriendlyNames.set(ScryptedInterface.PasswordStore, "Passwords");
+interfaceFriendlyNames.set(ScryptedInterface.Brightness, "Adjust Brightness");
 
 export function getInterfaceFriendlyName(iface: ScryptedInterface) {
     return interfaceFriendlyNames.get(iface) || iface.toString();

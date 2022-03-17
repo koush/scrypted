@@ -34,7 +34,8 @@ export default {
         );
       }
     },
-    refresh() {},
+    refresh() {
+    },
     rpc(options) {
       options = options || {};
 

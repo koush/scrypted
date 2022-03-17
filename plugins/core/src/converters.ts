@@ -1,4 +1,4 @@
-import { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
+import { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, HttpResponseOptions, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import mime from "mime/lite";
 import path from 'path';
@@ -36,11 +36,19 @@ export class BufferHost extends ScryptedDeviceBase implements HttpRequestHandler
             return;
         }
 
-        response.send(file.data as Buffer, {
+
+        let options: HttpResponseOptions = {
             headers: {
                 'Content-Type': file.fromMimeType,
             }
-        });
+        };
+
+        const q = new URLSearchParams(request.url.split('?')[1]);
+        if (q.has('attachment')) {
+            options.headers['Content-Disposition'] = 'attachment';
+        }
+
+        response.send(file.data as Buffer, );
     }
 
     async convert(buffer: string, fromMimeType: string, toMimeType: string): Promise<Buffer> {
@@ -73,7 +81,16 @@ export class FileHost extends ScryptedDeviceBase implements HttpRequestHandler, 
         const pathOnly = normalizedRequest.url.split('?')[0];
         const file = this.hosted.get(pathOnly);
 
-        response.sendFile(file.data as string);
+        let options: HttpResponseOptions;
+        const q = new URLSearchParams(request.url.split('?')[1]);
+        if (q.has('attachment')) {
+            options = {
+                headers: {
+                    'Content-Disposition': 'attachment',
+                },
+            };
+        }
+        response.sendFile(file.data as string, options);
     }
 
     async convert(buffer: string, fromMimeType: string, toMimeType: string): Promise<Buffer> {
