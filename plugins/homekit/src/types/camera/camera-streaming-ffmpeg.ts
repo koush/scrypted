@@ -35,10 +35,9 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
     const mso = videoInput.mediaStreamOptions;
     const noAudio = mso?.audio === null;
-    const videoArgs: string[] = [
-        '-hide_banner',
-    ];
-    const audioArgs: string[] = [
+    const videoArgs: string[] = [];
+    const audioArgs: string[] = [];
+    const hideBanner = [
         '-hide_banner',
     ];
 
@@ -54,17 +53,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         }
     }
 
-    // ffmpeg input for decoder
-    videoArgs.push(...videoInput.inputArguments);
-    if (audioInput !== videoInput)
-        audioArgs.push(...audioInput.inputArguments);
-
+    const nullAudioInput: string[] = [];
     if (!noAudio) {
         // create a dummy audio track if none actually exists.
         // this track will only be used if no audio track is available.
         // this prevents homekit erroring out if the audio track is actually missing.
         // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        audioArgs.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+        nullAudioInput.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
     }
 
     // video encoding
@@ -264,18 +259,33 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         safePrintFFmpegArguments(console, videoArgs);
         safePrintFFmpegArguments(console, audioArgs);
 
-        const vp = child_process.spawn(ffmpegPath, videoArgs);
+        const vp = child_process.spawn(ffmpegPath, [
+            ...hideBanner,
+            ...videoInput.inputArguments,
+            ...videoArgs,
+        ]);
         session.videoProcess = vp;
         ffmpegLogInitialOutput(console, vp);
         vp.on('exit', killSession);
 
-        const ap = child_process.spawn(ffmpegPath, audioArgs);
+        const ap = child_process.spawn(ffmpegPath, [
+            ...hideBanner,
+            ...audioInput.inputArguments,
+            ...nullAudioInput,
+            ...audioArgs,
+        ]);
         session.audioProcess = ap;
         ffmpegLogInitialOutput(console, ap);
         ap.on('exit', killSession);
     }
     else {
-        const args = [...videoArgs, ...audioArgs];
+        const args = [
+            ...hideBanner,
+            ...videoInput.inputArguments,
+            ...nullAudioInput,
+            ...videoArgs,
+            ...audioArgs,
+        ];
         safePrintFFmpegArguments(console, args);
 
         const cp = child_process.spawn(ffmpegPath, args);
