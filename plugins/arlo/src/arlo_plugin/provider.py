@@ -1,4 +1,5 @@
 from arlo import Arlo
+import asyncio
 import base64
 import binascii
 import json
@@ -6,15 +7,17 @@ import os
 import tempfile
 
 import scrypted_sdk
-from scrypted_sdk.types import Settings, DeviceProvider, DeviceCreator, ScryptedInterface, ScryptedDeviceType
+from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface, ScryptedDeviceType
 
+from .camera import ArloCamera
 from .logging import getLogger
 from .scrypted_env import getPyPluginSettingsFile, ensurePyPluginSettingsFile
 
 logger = getLogger(__name__)
 
-class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, DeviceCreator):
-    _devices = {}
+class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery):
+    _scrypted_devices = {}
+    _arlo_devices = {}
     _settings = None
     _arlo = None
 
@@ -26,12 +29,9 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         super().__init__(nativeId=nativeId)
 
         ensurePyPluginSettingsFile(self.pluginId)
+        self._load_arlo()
 
-        self.arlo
-
-        #for camId in scrypted_sdk.deviceManager.getNativeIds():
-        #    if camId is not None:
-        #        self.getDevice(camId)
+        asyncio.get_event_loop().create_task(self.discoverDevices(0))
 
     @property
     def pluginId(self):
@@ -62,11 +62,15 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     def arlo(self):
         if self._arlo is not None:
             return self._arlo
-
+        return self._load_arlo()
+    
+    def _load_arlo(self):
         if self.arlo_username == "" or \
             self.arlo_password == "" or \
             self.arlo_gmail_credentials_b64 == "":
             return None
+
+        self._arlo_devices = {}
 
         logger.info("Trying to initialize Arlo client...")
         try:
@@ -86,8 +90,12 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         return self._arlo
 
     @property
-    def devices(self):
-        return self._devices
+    def scrypted_devices(self):
+        return self._scrypted_devices
+
+    @property
+    def arlo_devices(self):
+        return self._arlo_devices
 
     def saveSettings(self):
         with open(getPyPluginSettingsFile(self.pluginId), 'w') as file:
@@ -95,7 +103,8 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
 
         # force arlo client to be invalidated and reloaded
         self._arlo = None
-        self.arlo
+        self._load_arlo()
+        asyncio.get_event_loop().create_task(self.discoverDevices(0))
 
     async def getSettings(self):
         return [
@@ -121,36 +130,53 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     async def putSetting(self, key, value):
         self.settings[key] = value
         self.saveSettings()
-        await self.onDeviceEvent(ScryptedInterface.Settings, None)
+        await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
+
+    async def discoverDevices(self, duration):
+        if not self.arlo:
+            raise Exception("Arlo client not connected, cannot discover devices")
+
+        logger.info("Discovering devices...")
+
+        cameras = self.arlo.GetDevices('camera')
+        devices = []
+        for camera in cameras:
+            device = {
+                "info": {
+                    "model": f"{camera['properties']['modelId']} ({camera['properties']['hwVersion']})",
+                    "manufacturer": "Arlo",
+                    "firmware": camera["firmwareVersion"],
+                    "serialNumber": camera["deviceId"],
+                },
+                "nativeId": camera["uniqueId"],
+                "name": camera["deviceName"],
+                "interfaces": [
+                    #ScryptedInterface.VideoCamera.value,
+                    ScryptedInterface.Camera.value
+                ],
+                "type": ScryptedDeviceType.Camera.value,
+                "providerNativeId": self.nativeId,
+            }
+            devices.append(device)
+
+            nativeId = camera["uniqueId"]
+            self.arlo_devices[nativeId] = camera
+            self.getDevice(nativeId)
+
+        await scrypted_sdk.deviceManager.onDevicesChanged({
+            "devices": devices,
+        })
+
+        logger.info(f"Discovered {len(cameras)} devices")
 
     def getDevice(self, nativeId):
-        ret = self.devices.get(nativeId, None)
+        print("GETTING DEVICE", nativeId)
+        ret = self.scrypted_devices.get(nativeId, None)
         if ret is None:
             ret = self.createCamera(nativeId)
             if ret is not None:
-                self.devices.set(nativeId, ret)
+                self.scrypted_devices[nativeId] = ret
         return ret
 
-    async def createDevice(self, settings):
-        raise Exception("foo")
-        nativeId = binascii.b2a_hex(os.urandom(4)).decode("utf-8")
-        name = settings["newCamera"]
-        logger.info(f"Creating Arlo device named {name} as {nativeId}")
-        await scrypted_sdk.deviceManager.onDeviceDiscovered({
-            "nativeId": nativeId, 
-            "name": name, 
-            "interfaces": [
-                ScryptedInterface.VideoCamera.value,
-            ],
-            "type": ScryptedDeviceType.Camera.value,
-        })
-        return nativeId
-
-    async def getCreateDeviceSettings(self):
-        return [
-            {
-                'key': 'newCamera',
-                'title': 'Add Camera',
-                'placeholder': 'Camera name, e.g.: Back Yard Camera, Baby Camera, etc',
-            },
-        ]
+    def createCamera(self, nativeId):
+        return ArloCamera(nativeId, self.arlo_devices[nativeId], self)
