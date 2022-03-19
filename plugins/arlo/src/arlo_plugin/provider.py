@@ -132,6 +132,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         return ret
 
     async def createDevice(self, settings):
+        raise Exception("foo")
         nativeId = binascii.b2a_hex(os.urandom(4)).decode("utf-8")
         name = settings["newCamera"]
         logger.info(f"Creating Arlo device named {name} as {nativeId}")
@@ -146,14 +147,9 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     async def getCreateDeviceSettings(self):
         return [
             {
-                "key": "newCamera",
-                "title": "Add Scrypted Camera",
-                "placeholder": "Scrypted camera name, can be the same as your Arlo camera name",
-            },
-            {
-                "key": "arloCamera",
-                "title": "Target Arlo Camera",
-                "placeholder": "Name of target camera in the connected Arlo account",
+                'key': 'newCamera',
+                'title': 'Add Camera',
+                'placeholder': 'Camera name, e.g.: Back Yard Camera, Baby Camera, etc',
             },
         ]
 
