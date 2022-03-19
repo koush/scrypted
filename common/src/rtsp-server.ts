@@ -6,7 +6,7 @@ import { findTrack } from './sdp-utils';
 import dgram from 'dgram';
 import net from 'net';
 import tls from 'tls';
-import { DIGEST } from 'http-auth-utils/dist/index';
+import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
 import crypto from 'crypto';
 import { timeoutPromise } from './promise-utils';
 
@@ -198,29 +198,40 @@ export class RtspClient extends RtspBase {
         if (!status.includes('200') && !response['www-authenticate'])
             throw new Error(status);
 
-        if (response['www-authenticate']) {
+        const wwwAuthenticate = response['www-authenticate']
+        if (wwwAuthenticate) {
             if (authenticating)
                 throw new Error('auth failed');
 
             const parsedUrl = new URL(this.url);
 
-            const wwwAuth = DIGEST.parseWWWAuthenticateRest(response['www-authenticate']);
+            if (wwwAuthenticate.includes('Basic')) {
+                const { username, password } = parsedUrl;
+                if (username && password) {
+                    const hash = BASIC.computeHash(parsedUrl);
+                    this.authorization = `Basic ${hash}`;
+                }
+            }
+            else {
+                const wwwAuth = DIGEST.parseWWWAuthenticateRest(wwwAuthenticate);
 
-            const ha1 = crypto.createHash('md5').update(`${parsedUrl.username}:${wwwAuth.realm}:${parsedUrl.password}`).digest('hex');
-            const ha2 = crypto.createHash('md5').update(`${method}:${parsedUrl.pathname}`).digest('hex');
-            const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
+                const ha1 = crypto.createHash('md5').update(`${parsedUrl.username}:${wwwAuth.realm}:${parsedUrl.password}`).digest('hex');
+                const ha2 = crypto.createHash('md5').update(`${method}:${parsedUrl.pathname}`).digest('hex');
+                const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
 
-            const params = {
-                username: parsedUrl.username,
-                realm: wwwAuth.realm,
-                nonce: wwwAuth.nonce,
-                uri: parsedUrl.pathname,
-                algorithm: 'MD5',
-                response: hash,
-            };
+                const params = {
+                    username: parsedUrl.username,
+                    realm: wwwAuth.realm,
+                    nonce: wwwAuth.nonce,
+                    uri: parsedUrl.pathname,
+                    algorithm: 'MD5',
+                    response: hash,
+                };
 
-            const paramsString = Object.entries(params).map(([key, value]) => `${key}=${value && quote(value)}`).join(', ');
-            this.authorization = `Digest ${paramsString}`;
+                const paramsString = Object.entries(params).map(([key, value]) => `${key}=${value && quote(value)}`).join(', ');
+                this.authorization = `Digest ${paramsString}`;
+            }
+
             return this.request(method, headers, path, body, true);
         }
         const cl = parseInt(response['content-length']);

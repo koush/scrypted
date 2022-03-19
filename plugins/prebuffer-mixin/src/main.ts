@@ -177,10 +177,19 @@ class PrebufferSession {
   }
 
   getRebroadcastMode() {
-    const mode = this.storage.getItem(this.rebroadcastModeKey);
+    let mode = this.storage.getItem(this.rebroadcastModeKey) || 'Default';
+    let defaultMode = 'MPEG-TS';
+    if (this.advertisedMediaStreamOptions?.tool === 'scrypted'
+      && this.advertisedMediaStreamOptions?.container?.startsWith('rtsp')) {
+      defaultMode = 'RTSP';
+    }
+    if (mode === 'Default') {
+      mode = defaultMode;
+    }
     const rtspMode = mode?.startsWith('RTSP');
 
     return {
+      defaultMode,
       rtspMode: mode?.startsWith('RTSP'),
       muxingMp4: !rtspMode || mode?.includes('MP4'),
     };
@@ -193,7 +202,7 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    const { muxingMp4, rtspMode } = this.getRebroadcastMode();
+    const { muxingMp4, rtspMode, defaultMode } = this.getRebroadcastMode();
     for (const prebuffer of (muxingMp4 ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunk.chunks) {
@@ -223,7 +232,7 @@ class PrebufferSession {
       {
         title: 'Rebroadcast Container',
         group,
-        description: 'Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP is lower latency. The default is "MPEG-TS" for this camera.',
+        description: `Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP is lower latency. The default mode for this camera is ${defaultMode}.`,
         placeholder: 'MPEG-TS',
         choices: [
           STRING_DEFAULT,
