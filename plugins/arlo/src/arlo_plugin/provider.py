@@ -151,7 +151,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
                 "nativeId": camera["uniqueId"],
                 "name": camera["deviceName"],
                 "interfaces": [
-                    #ScryptedInterface.VideoCamera.value,
+                    ScryptedInterface.VideoCamera.value,
                     ScryptedInterface.Camera.value
                 ],
                 "type": ScryptedDeviceType.Camera.value,
