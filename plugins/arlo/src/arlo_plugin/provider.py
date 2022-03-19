@@ -24,7 +24,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     def __init__(self, nativeId=None):
         if nativeId is None:
             managerNativeIds = scrypted_sdk.deviceManager.nativeIds
-            logger.info(f"No nativeId provided, selecting None key from: { {k: v.id for k, v in managerNativeIds.items()} }")
+            logger.info(f"No nativeId provided, selecting 'None' key from: { {k: v.id for k, v in managerNativeIds.items()} }")
             nativeId = managerNativeIds[None].id
         super().__init__(nativeId=nativeId)
 
@@ -170,7 +170,6 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         logger.info(f"Discovered {len(cameras)} devices")
 
     def getDevice(self, nativeId):
-        print("GETTING DEVICE", nativeId)
         ret = self.scrypted_devices.get(nativeId, None)
         if ret is None:
             ret = self.createCamera(nativeId)
