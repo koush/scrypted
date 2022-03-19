@@ -14,6 +14,7 @@ from .scrypted_env import getPyPluginSettingsFile, ensurePyPluginSettingsFile
 logger = getLogger(__name__)
 
 class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, DeviceCreator):
+    _devices = {}
     _settings = None
     _arlo = None
 
@@ -84,6 +85,10 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
 
         return self._arlo
 
+    @property
+    def devices(self):
+        return self._devices
+
     def saveSettings(self):
         with open(getPyPluginSettingsFile(self.pluginId), 'w') as file:
             file.write(json.dumps(self._settings))
@@ -130,7 +135,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         nativeId = binascii.b2a_hex(os.urandom(4)).decode("utf-8")
         name = settings["newCamera"]
         logger.info(f"Creating Arlo device named {name} as {nativeId}")
-        await scrypted_sdk.deviceManager.systemManager.api.onDeviceDiscovered({
+        await scrypted_sdk.deviceManager.onDeviceDiscovered({
             "nativeId": nativeId, 
             "name": name, 
             "interfaces": self.getDeviceInterfaces(),
