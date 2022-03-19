@@ -39,14 +39,23 @@ export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forev
 
 export function safePrintFFmpegArguments(console: Console, args: string[]) {
     const ret = [];
+    let redactNext = false;
     for (const arg of args) {
         try {
-            const url = new URL(arg);
-            ret.push(`${url.protocol}[REDACTED]`)
+            if (redactNext) {
+                const url = new URL(arg);
+                ret.push(`${url.protocol}[REDACTED]`)
+            }
+            else {
+                ret.push(arg);
+            }
         }
         catch (e) {
             ret.push(arg);
         }
+
+        // input arguments may contain passwords.
+        redactNext = arg === '-i';
     }
 
     console.log(ret.join(' '));
