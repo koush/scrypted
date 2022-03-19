@@ -32,6 +32,7 @@ if (!semver.gte(process.version, '16.0.0')) {
 
 process.on('unhandledRejection', error => {
     if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
+        console.error('pending crash', error);
         throw error;
     }
     console.warn('unhandled rejection of RPC Result', error);

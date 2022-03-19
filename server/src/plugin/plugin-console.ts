@@ -20,8 +20,12 @@ export interface StdPassThroughs {
     buffers: Buffer[];
 }
 
-export async function createConsoleServer(remoteStdout: Readable, remoteStderr: Readable) {
+export async function createConsoleServer(remoteStdout: Readable, remoteStderr: Readable, header: string) {
     const outputs = new Map<string, StdPassThroughs>();
+
+    const addHeader = (pts: StdPassThroughs) => {
+        pts.buffers.push(Buffer.from(header));
+    }
 
     const getPassthroughs = (nativeId?: ScryptedNativeId) => {
         if (!nativeId)
@@ -49,6 +53,8 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
 
             stdout.on('data', appendOutput);
             stderr.on('data', appendOutput);
+
+            addHeader(pts);
         }
 
         return pts;
@@ -132,6 +138,7 @@ export async function createConsoleServer(remoteStdout: Readable, remoteStderr: 
             const pt = outputs.get(nativeId);
             if (pt)
                 pt.buffers = [];
+            addHeader(pt);
         },
         destroy() {
             for (const socket of sockets) {

@@ -25,6 +25,8 @@ import { PythonRuntimeWorker } from './runtime/python-worker';
 import { NodeForkWorker } from './runtime/node-fork-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 
+const serverVersion = require('../../package.json').version;
+
 export class PluginHost {
     worker: RuntimeWorker;
     peer: RpcPeer;
@@ -283,12 +285,8 @@ export class PluginHost {
 
         this.worker.stdout.on('data', data => console.log(data.toString()));
         this.worker.stderr.on('data', data => console.error(data.toString()));
-        this.consoleServer = createConsoleServer(this.worker.stdout, this.worker.stderr);
-
-        this.consoleServer.then(cs => {
-            const { pluginConsole } = cs;
-            pluginConsole.log('starting plugin', this.pluginId, this.packageJson.version);
-        });
+        const consoleHeader = `server version: ${serverVersion}\nplugin version: ${this.pluginId} ${this.packageJson.version}\n`;
+        this.consoleServer = createConsoleServer(this.worker.stdout, this.worker.stderr, consoleHeader);
 
         const disconnect = () => {
             connected = false;
