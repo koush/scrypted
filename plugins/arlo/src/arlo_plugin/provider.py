@@ -8,7 +8,10 @@ import tempfile
 import scrypted_sdk
 from scrypted_sdk.types import Settings, DeviceProvider, DeviceCreator, ScryptedInterface, ScryptedDeviceType
 
+from .logging import getLogger
 from .scrypted_env import getPyPluginSettingsFile, ensurePyPluginSettingsFile
+
+logger = getLogger(__name__)
 
 class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, DeviceCreator):
     _settings = None
@@ -17,7 +20,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     def __init__(self, nativeId=None):
         if nativeId is None:
             managerNativeIds = scrypted_sdk.deviceManager.nativeIds
-            print(f"No nativeId provided, selecting None key from: { {k: v.id for k, v in managerNativeIds.items()} }")
+            logger.info(f"No nativeId provided, selecting None key from: { {k: v.id for k, v in managerNativeIds.items()} }")
             nativeId = managerNativeIds[None].id
         super().__init__(nativeId=nativeId)
 
@@ -64,7 +67,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
             self.arlo_gmail_credentials_b64 == "":
             return None
 
-        print("Trying to initialize Arlo client...")
+        logger.info("Trying to initialize Arlo client...")
         try:
             credFileContents = base64.b64decode(self.arlo_gmail_credentials_b64)
 
@@ -75,9 +78,9 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
 
                 self._arlo = Arlo(self.arlo_username, self.arlo_password, credFilePath)
         except Exception as e:
-            print(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
+            logger.error(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
             return None
-        print(f"Initialized Arlo client for {self.arlo_username}")
+        logger.info(f"Initialized Arlo client for {self.arlo_username}")
 
         return self._arlo
 
@@ -126,13 +129,13 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     async def createDevice(self, settings):
         nativeId = binascii.b2a_hex(os.urandom(4)).decode("utf-8")
         name = settings["newCamera"]
+        logger.info(f"Creating Arlo device named {name} as {nativeId}")
         await scrypted_sdk.deviceManager.systemManager.api.onDeviceDiscovered({
             "nativeId": nativeId, 
             "name": name, 
             "interfaces": self.getDeviceInterfaces(),
             "type": ScryptedDeviceType.Camera.value,
         })
-        print(f"Creating Arlo device named {name} as {nativeId}")
         return nativeId
 
     async def getCreateDeviceSettings(self):
