@@ -139,7 +139,9 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         await scrypted_sdk.deviceManager.onDeviceDiscovered({
             "nativeId": nativeId, 
             "name": name, 
-            "interfaces": self.getDeviceInterfaces(),
+            "interfaces": [
+                ScryptedInterface.VideoCamera.value,
+            ],
             "type": ScryptedDeviceType.Camera.value,
         })
         return nativeId
@@ -151,9 +153,4 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
                 'title': 'Add Camera',
                 'placeholder': 'Camera name, e.g.: Back Yard Camera, Baby Camera, etc',
             },
-        ]
-
-    def getDeviceInterfaces(self):
-        return [
-            ScryptedInterface.VideoCamera.value,
         ]
