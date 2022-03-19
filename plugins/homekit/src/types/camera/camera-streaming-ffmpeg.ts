@@ -11,7 +11,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: MediaStreamOptions, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: MediaStreamOptions, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
 
     const request = session.startRequest;
 
@@ -40,10 +40,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     const hideBanner = [
         '-hide_banner',
     ];
-
-    const transcodeStreaming = session.isLowBandwidth
-        ? storage.getItem('transcodeStreamingHub') === 'true'
-        : storage.getItem('transcodeStreaming') === 'true';
 
     if (transcodeStreaming) {
         // decoder arguments

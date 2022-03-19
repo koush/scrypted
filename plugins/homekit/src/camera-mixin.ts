@@ -38,10 +38,18 @@ export class CameraMixin extends HomekitMixin<any> {
             });
 
             settings.push({
-                title: 'Live Stream (remote streaming and Apple Watch)',
+                title: 'Remote Live Stream',
                 key: 'streamingChannelHub',
                 value: this.storage.getItem('streamingChannelHub') || msos[0].name,
-                description: 'The media stream to use when streaming from outside your home network or to limited capability devices like Apple Watch.',
+                description: 'The media stream to use when streaming from outside your home network. Selecting a low birate stream is recommended.',
+                choices: msos.map(mso => mso.name),
+            });
+
+            settings.push({
+                title: 'Apple Watch Live Stream',
+                key: 'streamingChannelWatch',
+                value: this.storage.getItem('streamingChannelWatch') || msos[0].name,
+                description: 'The media stream to use when streaming to Apple Watch. Selecting a low resolution (320x240) and low bitrate stream is recommended.',
                 choices: msos.map(mso => mso.name),
             });
         }
@@ -98,8 +106,7 @@ export class CameraMixin extends HomekitMixin<any> {
             type: 'boolean',
         });
 
-        let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true'
-            || this.storage.getItem('transcodeStreamingHub') === 'true';
+        let showTranscodeArgs = this.storage.getItem('transcodeStreaming') === 'true';
 
         if (hasMotionSensor) {
             settings.push({
@@ -123,36 +130,76 @@ export class CameraMixin extends HomekitMixin<any> {
             description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
         });
 
+        const transcodeEnabledValues = [
+            'Transcode',
+            'true',
+        ];
+
+        let hubStreamingMode = this.storage.getItem('hubStreamingMode');
+        // 3/19/2022 migrate setting.
+        if (this.storage.getItem('transcodeStreamingHub') === 'true') {
+            if (!hubStreamingMode)
+                hubStreamingMode = 'Transcode';
+            this.storage.removeItem('transcodeStreamingHub');
+        }
+
+        let watchStreamingMode = this.storage.getItem('watchStreamingMode');
+
+        showTranscodeArgs = showTranscodeArgs
+            || transcodeEnabledValues.includes(hubStreamingMode)
+            || transcodeEnabledValues.includes(watchStreamingMode);
+
         if (this.interfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
-            let value = this.storage.getItem('hubStreamingMode');
-            if (!value) {
-                if (this.storage.getItem('dynamicBitrate') === 'true')
-                    value = 'Dynamic Bitrate';
-                else if (this.storage.getItem('transcodeStreamingHub') === 'true')
-                    value = 'Transcode';
-            }
+            const choices = [
+                'Disabled',
+                'Transcode',
+                'Dynamic Bitrate',
+            ];
+
+            if (hubStreamingMode === 'true')
+                hubStreamingMode = 'Transcode';
 
             settings.push({
-                title: 'Transcode Remote Streaming and Apple Watch',
+                title: 'Transcode Remote Streaming',
                 group: 'HomeKit Transcoding',
                 key: 'hubStreamingMode',
-                value: value || 'Disabled',
-                choices: [
-                    'Disabled',
-                    'Transcode',
-                    'Dynamic Bitrate',
-                ],
+                value: hubStreamingMode || 'Disabled',
+                choices,
                 description: 'The transcode options to use when remote streaming or streaming to limited capabilitity devices like Apple Watch. "Transcode" will use FFmpeg to stream a format supported by HomeKit. "Dynamic Bitrate" adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Dynamic Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
+            });
+
+
+            if (watchStreamingMode === 'true')
+                watchStreamingMode = 'Transcode';
+
+            settings.push({
+                title: 'Transcode Apple Watch Streaming',
+                group: 'HomeKit Transcoding',
+                key: 'watchStreamingMode',
+                value: watchStreamingMode || 'Disabled',
+                choices,
+                description: 'The transcode options to use when streaming to Apple Watch. "Transcode" will use FFmpeg to stream a format supported by HomeKit. "Dynamic Bitrate" adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Dynamic Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
             });
         }
         else {
+
+
             settings.push({
-                title: 'Transcode Remote Streaming and Apple Watch',
+                title: 'Transcode Remote Streaming',
                 group: 'HomeKit Transcoding',
                 type: 'boolean',
-                key: 'transcodeStreamingHub',
-                value: (this.storage.getItem('transcodeStreamingHub') === 'true').toString(),
-                description: 'Transcode when remote streaming and streaming to limited capabilitity devices like Apple Watch.',
+                key: 'hubStreamingMode',
+                value: transcodeEnabledValues.includes(hubStreamingMode).toString(),
+                description: 'Transcode when remote streaming.',
+            });
+
+            settings.push({
+                title: 'Transcode Apple Watch Streaming',
+                group: 'HomeKit Transcoding',
+                type: 'boolean',
+                key: 'watchStreamingMode',
+                value: transcodeEnabledValues.includes(this.storage.getItem('watchStreamingMode')).toString(),
+                description: 'Transcode when streaming to Apple Watch.',
             });
         }
 
@@ -266,21 +313,6 @@ export class CameraMixin extends HomekitMixin<any> {
             }
             const substitute = args?.join(' ');
             value = substitute ? `\`${substitute}\`` : value;
-        }
-
-        if (key === 'hubStreamingMode') {
-            if (value === 'Dynamic Bitrate') {
-                this.storage.setItem('dynamicBitrate', 'true');
-                this.storage.removeItem('transcodeStreamingHub');
-            }
-            else if (value === 'transcodeStreamingHub') {
-                this.storage.setItem('transcodeStreamingHub', 'true');
-                this.storage.removeItem('dynamicBitrate');
-            }
-            else {
-                this.storage.removeItem('dynamicBitrate');
-                this.storage.removeItem('transcodeStreamingHub');
-            }
         }
 
         if (key === 'objectDetectionContactSensors') {
