@@ -20,6 +20,10 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // from my observation of talkback packets, the max packet size is ~370, so
     // I'm just guessing that HomeKit wants something similar for the audio it receives.
     // going higher causes choppiness. going lower may cause other issues.
+    // Update: since implementing Opus, I'm unsure this value actually has any affect
+    // unless ffmpeg is buffering packets. Opus supports a packet time argument,
+    // which in turn limits the packet size. I'm not sure if AAC-ELD has a similar
+    // option, but not sure it matters since AAC-ELD is no longer in use.
     let audiomtu = 400;
 
     console.log('fetching video stream');
@@ -35,19 +39,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
     const mso = videoInput.mediaStreamOptions;
     const noAudio = mso?.audio === null;
-    const videoArgs: string[] = [];
-    const audioArgs: string[] = [];
     const hideBanner = [
         '-hide_banner',
     ];
-
-    if (transcodeStreaming) {
-        // decoder arguments
-        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
-        if (videoDecoderArguments) {
-            videoArgs.push(...evalRequest(videoDecoderArguments, request));
-        }
-    }
+    const decoderArgs: string[] = [];
+    const videoArgs: string[] = [];
+    const audioArgs: string[] = [];
 
     const nullAudioInput: string[] = [];
     if (!noAudio) {
@@ -58,11 +55,20 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         nullAudioInput.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
     }
 
-    // video encoding
+    // decoder args
+    if (transcodeStreaming) {
+        // decoder arguments
+        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
+        if (videoDecoderArguments) {
+            decoderArgs.push(...evalRequest(videoDecoderArguments, request));
+        }
+    }
+
     videoArgs.push(
         "-an", '-sn', '-dn',
     );
 
+    // encoder args
     if (transcodeStreaming) {
         const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
         const videoCodec = h264EncoderArguments
@@ -257,6 +263,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         const vp = child_process.spawn(ffmpegPath, [
             ...hideBanner,
+            ...decoderArgs,
             ...videoInput.inputArguments,
             ...videoArgs,
         ]);
@@ -266,6 +273,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         const ap = child_process.spawn(ffmpegPath, [
             ...hideBanner,
+            ...decoderArgs,
             ...audioInput.inputArguments,
             ...nullAudioInput,
             ...audioArgs,
@@ -277,6 +285,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     else {
         const args = [
             ...hideBanner,
+            ...decoderArgs,
             ...videoInput.inputArguments,
             ...nullAudioInput,
             ...videoArgs,

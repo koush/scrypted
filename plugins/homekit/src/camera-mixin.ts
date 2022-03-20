@@ -153,7 +153,7 @@ export class CameraMixin extends HomekitMixin<any> {
             const choices = [
                 'Disabled',
                 'Transcode',
-                'Dynamic Bitrate',
+                'Adaptive Bitrate',
             ];
 
             if (hubStreamingMode === 'true')
@@ -165,7 +165,7 @@ export class CameraMixin extends HomekitMixin<any> {
                 key: 'hubStreamingMode',
                 value: hubStreamingMode || 'Disabled',
                 choices,
-                description: 'The transcode options to use when remote streaming or streaming to limited capabilitity devices like Apple Watch. "Transcode" will use FFmpeg to stream a format supported by HomeKit. "Dynamic Bitrate" adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Dynamic Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
+                description: 'The transcode options to use when remote streaming or streaming to limited capabilitity devices like Apple Watch. "Transcode" will use FFmpeg to stream a format supported by HomeKit. "Adaptive Bitrate" adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Adaptive Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
             });
 
 
@@ -178,7 +178,7 @@ export class CameraMixin extends HomekitMixin<any> {
                 key: 'watchStreamingMode',
                 value: watchStreamingMode || 'Disabled',
                 choices,
-                description: 'The transcode options to use when streaming to Apple Watch. "Transcode" will use FFmpeg to stream a format supported by HomeKit. "Dynamic Bitrate" adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Dynamic Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
+                description: 'The transcode options to use when streaming to Apple Watch. "Transcode" will use FFmpeg to stream a format supported by HomeKit. "Adaptive Bitrate" adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. Adaptive Bitrate should be used on secondary streams (sub streams), and not the main stream connected to an NVR, as it will reduce the recording quality.',
             });
         }
         else {

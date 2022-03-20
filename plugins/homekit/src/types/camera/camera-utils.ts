@@ -59,10 +59,11 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
             ? storage.getItem('streamingChannelHub')
             : storage.getItem('streamingChannel');
     let selectedStream: MediaStreamOptions;
-    if (streamingChannel) {
-        const msos = await device.getVideoStreamOptions();
-        selectedStream = msos.find(mso => mso.name === streamingChannel);
-    }
+    const msos = await device.getVideoStreamOptions();
+    if (streamingChannel)
+        selectedStream = msos?.find(mso => mso.name === streamingChannel);
+    if (!selectedStream)
+        selectedStream = msos?.[0];
 
     selectedStream = selectedStream || {
         id: undefined,
@@ -74,7 +75,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     if (isWatch) {
         const watchStreamingMode = storage.getItem('watchStreamingMode');
         return {
-            dynamicBitrate: canDynamicBitrate && watchStreamingMode === 'Dynamic Bitrate',
+            dynamicBitrate: canDynamicBitrate && watchStreamingMode === 'Adaptive Bitrate',
             transcodeStreaming: watchStreamingMode === 'Transcode',
             selectedStream,
             isWatch,
@@ -93,7 +94,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
         }
 
         return {
-            dynamicBitrate: canDynamicBitrate && hubStreamingMode === 'Dynamic Bitrate',
+            dynamicBitrate: canDynamicBitrate && hubStreamingMode === 'Adaptive Bitrate',
             transcodeStreaming: hubStreamingMode === 'Transcode',
             selectedStream,
             isWatch,
