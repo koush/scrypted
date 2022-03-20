@@ -168,11 +168,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                         || event === AmcrestEvent.AlarmIPCStop || event === AmcrestEvent.DahuaTalkHangup) {
                         this.binaryState = false;
                     }
-                    else if (event === AmcrestEvent.TalkPulse && doorbellType === AMCREST_DOORBELL_TYPE) {
-                        clearTimeout(pulseTimeout);
-                        pulseTimeout = setTimeout(() => this.binaryState = false, 30000);
-                        this.binaryState = true;
-                    }
                     else if (event === AmcrestEvent.DahuaTalkPulse && doorbellType === DAHUA_DOORBELL_TYPE) {
                         clearTimeout(pulseTimeout);
                         pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
