@@ -16,8 +16,8 @@ from .scrypted_env import getPyPluginSettingsFile, ensurePyPluginSettingsFile
 logger = getLogger(__name__)
 
 class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery):
-    _scrypted_devices = {}
-    _arlo_devices = {}
+    arlo_devices = None 
+    scrypted_devices = None
     _settings = None
     _arlo = None
 
@@ -27,6 +27,9 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
             logger.info(f"No nativeId provided, selecting 'None' key from: { {k: v.id for k, v in managerNativeIds.items()} }")
             nativeId = managerNativeIds[None].id
         super().__init__(nativeId=nativeId)
+
+        self.arlo_devices = {}
+        self.scrypted_devices = {}
 
         ensurePyPluginSettingsFile(self.pluginId)
         self._load_arlo()
@@ -60,9 +63,9 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
 
     @property
     def arlo(self):
-        if self._arlo is not None:
-            return self._arlo
-        return self._load_arlo()
+        if self._arlo is None:
+            self._arlo = self._load_arlo()
+        return self._arlo
     
     def _load_arlo(self):
         if self.arlo_username == "" or \
@@ -70,40 +73,31 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
             self.arlo_gmail_credentials_b64 == "":
             return None
 
-        self._arlo_devices = {}
-
+        arlo = None
         logger.info("Trying to initialize Arlo client...")
         try:
-            credFileContents = base64.b64decode(self.arlo_gmail_credentials_b64)
+            cred_file_contents = base64.b64decode(self.arlo_gmail_credentials_b64)
 
-            with tempfile.TemporaryDirectory() as credDir:
-                credFilePath = os.path.join(credDir, "credentials")
-                with open(credFilePath, 'wb') as credFile:
-                    credFile.write(credFileContents)
+            with tempfile.TemporaryDirectory() as cred_dir:
+                cred_file_path = os.path.join(cred_dir, "credentials")
+                with open(cred_file_path, 'wb') as cred_file:
+                    cred_file.write(cred_file_contents)
 
-                self._arlo = Arlo(self.arlo_username, self.arlo_password, credFilePath)
+                arlo = Arlo(self.arlo_username, self.arlo_password, cred_file_path)
         except Exception as e:
             logger.error(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
-            return None
+            raise
         logger.info(f"Initialized Arlo client for {self.arlo_username}")
 
-        return self._arlo
-
-    @property
-    def scrypted_devices(self):
-        return self._scrypted_devices
-
-    @property
-    def arlo_devices(self):
-        return self._arlo_devices
+        return arlo
 
     def saveSettings(self):
         with open(getPyPluginSettingsFile(self.pluginId), 'w') as file:
             file.write(json.dumps(self._settings))
 
         # force arlo client to be invalidated and reloaded
-        self._arlo = None
-        self._load_arlo()
+        self._arlo.Unsubscribe()
+        self._arlo = self._load_arlo()
         asyncio.get_event_loop().create_task(self.discoverDevices(0))
 
     async def getSettings(self):
@@ -137,6 +131,8 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
             raise Exception("Arlo client not connected, cannot discover devices")
 
         logger.info("Discovering devices...")
+        self.arlo_devices = {}
+        self.scrypted_devices = {}
 
         cameras = self.arlo.GetDevices('camera')
         devices = []
@@ -178,4 +174,4 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         return ret
 
     def createCamera(self, nativeId):
-        return ArloCamera(nativeId, self.arlo_devices[nativeId], self)
+        return ArloCamera(nativeId, self.arlo_devices[nativeId], self._load_arlo())
