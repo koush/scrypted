@@ -88,8 +88,6 @@ export class OnvifIntercom implements Intercom {
         if (!audioBackchannel)
             throw new Error('ONVIF audio backchannel not found');
 
-        this.camera.console.log('audio back channel track:', audioBackchannel);
-
         const rtp = Math.round(10000 + Math.random() * 30000);
         const rtcp = rtp + 1;
 
@@ -125,6 +123,7 @@ export class OnvifIntercom implements Intercom {
             throw new Error('no supported codec was found for back channel');
 
         const args = [
+            '-hide_banner',
             ...ffmpegInput.inputArguments,
             '-vn',
             '-acodec', codec.ffmpegCodec,
