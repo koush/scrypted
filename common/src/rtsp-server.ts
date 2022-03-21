@@ -215,14 +215,15 @@ export class RtspClient extends RtspBase {
             else {
                 const wwwAuth = DIGEST.parseWWWAuthenticateRest(wwwAuthenticate);
 
+                const username = decodeURIComponent(parsedUrl.username);
                 const password = decodeURIComponent(parsedUrl.password);
 
-                const ha1 = crypto.createHash('md5').update(`${parsedUrl.username}:${wwwAuth.realm}:${password}`).digest('hex');
+                const ha1 = crypto.createHash('md5').update(`${username}:${wwwAuth.realm}:${password}`).digest('hex');
                 const ha2 = crypto.createHash('md5').update(`${method}:${parsedUrl.pathname}`).digest('hex');
                 const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
 
                 const params = {
-                    username: decodeURIComponent(parsedUrl.username),
+                    username,
                     realm: wwwAuth.realm,
                     nonce: wwwAuth.nonce,
                     uri: parsedUrl.pathname,
