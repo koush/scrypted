@@ -34,6 +34,7 @@ function parseValue(value: string, type: SettingValue, defaultValue: any) {
 export interface StorageSetting extends Setting {
     defaultValue?: any;
     onPut?: (oldValue: any, newValue: any) => void;
+    onGet?: () => Promise<StorageSetting>;
     mapPut?: (oldValue: any, newValue: any) => any;
     hide?: boolean;
     noStore?: boolean;
@@ -70,13 +71,16 @@ export class StorageSettings<T extends string> implements Settings {
     async getSettings(): Promise<Setting[]> {
         const ret = [];
         for (const [key, setting] of Object.entries(this.settings)) {
-            const s: StorageSetting = Object.assign({}, setting);
+            let s: StorageSetting = Object.assign({}, setting);
+            if (s.onGet)
+                s = Object.assign(s, await s.onGet());
             if (s.hide)
                 continue;
             s.key = key;
             s.value = this.getItem(key as T);
             ret.push(s);
             delete s.onPut;
+            delete s.onGet;
             delete s.mapPut;
         }
         return ret;

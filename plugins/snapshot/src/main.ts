@@ -31,8 +31,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             defaultValue: 'Camera Default',
             hide: !this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera),
             onGet: async () => {
-                if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera))
-                    return {};
+                if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
+                    return {
+                        hide: true,
+                    };
+                }
 
                 let psos: PictureOptions[];
                 try {
@@ -41,8 +44,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 catch (e) {
                 }
 
-                if (!psos?.length)
-                    return {};
+                if (!psos?.length) {
+                    return {
+                        hide: true,
+                    };
+                }
 
                 return {
                     hide: false,
