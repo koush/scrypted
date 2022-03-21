@@ -23,6 +23,31 @@ class NeverWaitError extends Error {
 
 class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     storageSettings = new StorageSettings(this, {
+        defaultSnapshotChannel: {
+            title: 'Default Snapshot Channel',
+            description: 'The default channel to use for snapshots.',
+            defaultValue: 'Camera Default',
+            hide: true,
+            onGet: async () => {
+                let psos: PictureOptions[];
+                try {
+                    psos = await this.mixinDevice.getPictureOptions();
+                }
+                catch (e) {
+                }
+
+                if (!psos?.length)
+                    return {};
+
+                return {
+                    hide: false,
+                    choices: [
+                        'Camera Default',
+                        ...psos.map(pso => pso.name),
+                    ],
+                };
+            }
+        },
         snapshotUrl: {
             title: this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)
                 ? 'Override Snapshot URL'
@@ -77,7 +102,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
-        let takePicture: () => Promise<Buffer>;
+        let takePicture: (options?: PictureOptions) => Promise<Buffer>;
         if (this.storageSettings.values.snapshotsFromPrebuffer) {
             try {
                 const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
@@ -102,11 +127,23 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         if (!takePicture) {
             if (!this.storageSettings.values.snapshotUrl) {
                 if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
-                    takePicture = async () => {
+                    takePicture = async (options?: PictureOptions) => {
                         // if operating in full resolution mode, nuke any picture options containing
                         // the requested dimensions that are sent.
                         if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
                             options.picture = undefined;
+
+                        if (!options?.id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
+                            try {
+                                const psos = await this.mixinDevice.getPictureOptions();
+                                const pso = psos.find(pso => pso.name === this.storageSettings.values.defaultSnapshotChannel);
+                                if (!options)
+                                    options = {};
+                                options.id = pso.id;
+                            }
+                            catch (e) {
+                            }
+                        }
                         return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
                     };
                 }
@@ -264,7 +301,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async getPictureOptions() {
-        return undefined;
+        return this.mixinDevice.getPictureOptions();
     }
 
     getMixinSettings(): Promise<Setting[]> {
