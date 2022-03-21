@@ -1,4 +1,7 @@
 import json
+import os
+from subprocess import call
+import tempfile
 import urllib.request
 
 import scrypted_sdk
@@ -22,18 +25,37 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         self.arlo_device = arlo_device
         self.provider = provider
 
+    @property
+    def is_streaming(self):
+        return self.rtsp_proxy is not None
+
     async def getPictureOptions(self):
         return []
 
     async def takePicture(self, options=None):
         logger.debug(f"ArloCamera.takePicture nativeId={self.nativeId} options={options}")
 
-        with self.provider.arlo as arlo:
-            picUrl = arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device) 
+        if self.is_streaming:
+            logger.info(f"Capturing snapshot for {self.nativeId} from ongoing stream")
+            with tempfile.TemporaryDirectory() as temp_dir:
+                out = os.path.join(temp_dir, "image.jpeg")
+                call([
+                    await scrypted_sdk.mediaManager.getFFmpegPath(),
+                    "-y",
+                    "-rtsp_transport", "tcp",
+                    "-i", self.rtsp_proxy.proxy_url,
+                    "-frames:v", "1",
+                    out 
+                ])
+                picBytes = open(out, 'rb').read()
+            logger.info(f"Done capturing stream snapshot for {self.nativeId}")
+        else:
+            with self.provider.arlo as arlo:
+                picUrl = arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device) 
 
-        logger.info(f"Downloading Arlo snapshot for {self.nativeId} from {picUrl}")
-        picBytes = urllib.request.urlopen(picUrl).read()
-        logger.info(f"Done downloading snapshot for {self.nativeId}")
+            logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")
+            picBytes = urllib.request.urlopen(picUrl).read()
+            logger.info(f"Done downloading snapshot for {self.nativeId}")
 
         return await scrypted_sdk.mediaManager.createMediaObject(picBytes, "image/jpeg")
 
@@ -47,7 +69,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
             with self.provider.arlo as arlo:
                 rtspUrl = arlo.StartStream(self.arlo_device, self.arlo_device)
 
-            logger.info(f"Got Arlo stream for {self.nativeId} at {rtspUrl}")
+            logger.info(f"Got stream for {self.nativeId} at {rtspUrl}")
 
             def on_proxy_exit():
                 self.rtsp_proxy = None
