@@ -811,7 +811,7 @@ class PrebufferSession {
     if (this.activeClients)
       return;
 
-    if (this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
+    if (this.needBitrateReset && this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
         this.resetBitrate();
     }
 
