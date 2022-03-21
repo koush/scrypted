@@ -2,6 +2,7 @@ import json
 import os
 from subprocess import call
 import tempfile
+import time
 import urllib.request
 
 import scrypted_sdk
@@ -17,6 +18,8 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     arlo_device = None
     provider = None
     rtsp_proxy = None
+    cached_image = None
+    cached_time = None
 
     def __init__(self, nativeId, arlo_device, provider):
         super().__init__(nativeId=nativeId)
@@ -34,6 +37,10 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
 
     async def takePicture(self, options=None):
         logger.debug(f"ArloCamera.takePicture nativeId={self.nativeId} options={options}")
+
+        if self.cached_image is not None and time.time() - self.cached_time < 30:
+            logger.info(f"Using cached image for {self.nativeId}")
+            return await scrypted_sdk.mediaManager.createMediaObject(self.cached_image, "image/jpeg")
 
         if self.is_streaming:
             logger.info(f"Capturing snapshot for {self.nativeId} from ongoing stream")
@@ -57,6 +64,8 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
             picBytes = urllib.request.urlopen(picUrl).read()
             logger.info(f"Done downloading snapshot for {self.nativeId}")
 
+        self.cached_image = picBytes
+        self.cached_time = time.time()
         return await scrypted_sdk.mediaManager.createMediaObject(picBytes, "image/jpeg")
 
     async def getVideoStreamOptions(self):
