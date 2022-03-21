@@ -206,11 +206,8 @@ export class RtspClient extends RtspBase {
             const parsedUrl = new URL(this.url);
 
             if (wwwAuthenticate.includes('Basic')) {
-                const { username, password } = parsedUrl;
-                if (username && password) {
-                    const hash = BASIC.computeHash(parsedUrl);
-                    this.authorization = `Basic ${hash}`;
-                }
+                const hash = BASIC.computeHash(parsedUrl);
+                this.authorization = `Basic ${hash}`;
             }
             else {
                 const wwwAuth = DIGEST.parseWWWAuthenticateRest(wwwAuthenticate);
