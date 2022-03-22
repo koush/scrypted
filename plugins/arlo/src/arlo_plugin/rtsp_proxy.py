@@ -1,4 +1,5 @@
 from urllib.parse import urlparse
+import socket
 import threading
 import traceback
 
@@ -10,7 +11,8 @@ logger = getLogger(__name__)
 class RtspArloProxy(TheServer):
     def __init__(self, rtspUrl, provider, arlo_device):
         parsed = urlparse(rtspUrl)
-        super().__init__("localhost", 0, parsed.hostname, parsed.port)
+        self.hostip = socket.gethostbyname(socket.gethostname())
+        super().__init__(self.hostip, 0, parsed.hostname, parsed.port)
 
         self.provider = provider
         self.arlo_device = arlo_device
@@ -23,7 +25,7 @@ class RtspArloProxy(TheServer):
     @property
     def proxy_url(self):
         parsed = urlparse(self.rtspUrl)
-        modified = parsed._replace(netloc=f"localhost:{self.listen_port}")
+        modified = parsed._replace(netloc=f"{self.hostip}:{self.listen_port}")
         return modified.geturl()
 
     def on_accept(self):
