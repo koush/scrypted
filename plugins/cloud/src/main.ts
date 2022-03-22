@@ -93,7 +93,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
         this.initialize();
 
-        this.fromMimeType = `${ScryptedMimeTypes.LocalUrl};${ScryptedMimeTypes.AcceptUrlParameter}=true`;
+        this.fromMimeType = ScryptedMimeTypes.LocalUrl;
         this.toMimeType = ScryptedMimeTypes.Url;
 
         (async () => {
@@ -189,6 +189,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         wssTarget.protocol = 'wss';
         const googleHomeTarget = new URL(httpsTarget);
         googleHomeTarget.pathname = '/endpoint/@scrypted/google-home/public/';
+        const alexaTarget = new URL(httpsTarget);
+        alexaTarget.pathname = '/endpoint/@scrypted/alexa/public/';
 
         this.server = createServer(async (req, res) => {
             const url = Url.parse(req.url);
@@ -212,6 +214,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             else if (url.path === '/web/component/home/endpoint') {
                 this.proxy.web(req, res, {
                     target: googleHomeTarget.toString(),
+                    ignorePath: true,
+                    secure: false,
+                });
+                return;
+            }
+            else if (url.path === '/web/component/alexa/endpoint') {
+                this.proxy.web(req, res, {
+                    target: alexaTarget.toString(),
                     ignorePath: true,
                     secure: false,
                 });
