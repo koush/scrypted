@@ -47,20 +47,24 @@ class TheServer:
         try:
             self.input_list.append(self.server)
             while not self.stop:
-                time.sleep(delay)
-                ss = select.select
-                inputready, outputready, exceptready = ss(self.input_list, [], [])
-                for self.s in inputready:
-                    if self.s == self.server:
-                        self.on_accept()
-                        break
+                try:
+                    time.sleep(delay)
+                    ss = select.select
+                    inputready, outputready, exceptready = ss(self.input_list, [], [])
+                    for self.s in inputready:
+                        if self.s == self.server:
+                            self.on_accept()
+                            break
 
-                    self.data = self.s.recv(buffer_size)
-                    if len(self.data) == 0:
-                        self.on_close()
-                        break
-                    else:
-                        self.on_recv()
+                        self.data = self.s.recv(buffer_size)
+                        if len(self.data) == 0:
+                            self.on_close()
+                            break
+                        else:
+                            self.on_recv()
+                except ConnectionResetError as e:
+                    logger.warn(f"{type(e)}: {str(e)}")
+                    self.on_close()
         finally:
             for _, s in self.channel.items():
                 s.close()
@@ -95,7 +99,7 @@ class TheServer:
             del self.channel[out]
             del self.channel[self.s]
         except OSError as e:
-            logger.error(f"Error when closing peer connection: {str(e)}")
+            logger.error(f"Error when closing peer connection: {type(e)} {str(e)}")
 
     def on_recv(self):
         data = self.data

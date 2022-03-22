@@ -1,7 +1,9 @@
 import json
 import os
-from subprocess import call
+import subprocess
+from subprocess import call, Popen
 import tempfile
+import threading
 import time
 import urllib.request
 
@@ -9,9 +11,17 @@ import scrypted_sdk
 from scrypted_sdk.types import Camera, VideoCamera, ScryptedMimeTypes
 
 from .logging import getLogger
-from .rtsp_proxy import RtspArloProxy
+from .rtsp_monitor import RtspArloMonitor
+from .scrypted_env import getPluginInstallDirectory
 
 logger = getLogger(__name__)
+
+nextPort = 15000
+def getNextProxyPort():
+    global nextPort
+    port = nextPort
+    nextPort += 1
+    return port
 
 class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     nativeId = None
@@ -49,6 +59,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
                     out = os.path.join(temp_dir, "image.jpeg")
                     call([
                         await scrypted_sdk.mediaManager.getFFmpegPath(),
+                        "-hide_banner",
                         "-y",
                         "-rtsp_transport", "tcp",
                         "-i", self.rtsp_proxy.proxy_url,
@@ -84,12 +95,57 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
 
             logger.info(f"Got stream for {self.nativeId} at {rtspUrl}")
 
-            def on_proxy_exit():
+            def startMultiplexer():
+                return Popen([
+                    os.path.join(getPluginInstallDirectory(), "live555ProxyServer"),
+                    "-t",
+                    "-p", f"{getNextProxyPort()}",
+                    rtspUrl
+                ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+            multiplexer = startMultiplexer()
+            def onMonitorExit():
+                multiplexer.kill()
                 self.rtsp_proxy = None
 
-            self.rtsp_proxy = RtspArloProxy(rtspUrl, self.provider, self.arlo_device)
-            self.rtsp_proxy.run_threaded(on_proxy_exit)
+            isReady = False
+            liveUrl = None
+
+            def readStdout():
+                nonlocal multiplexer
+                nonlocal isReady
+                nonlocal liveUrl
+                while True:
+                    exitLoop = True
+                    for line in multiplexer.stdout:
+                        line = line.decode("utf-8").rstrip()
+                        print(line)
+                        if not isReady:
+                            if line.find("Play this stream using the URL") != -1:
+                                liveUrl = line.split()[-1]
+                                isReady = True
+                            elif line.find("Address already in use") != -1:
+                                multiplexer.kill()
+                                multiplexer = startMultiplexer()
+                                exitLoop = False
+                                break
+                    if exitLoop:
+                        break
+
+            stdoutReader = threading.Thread(target=readStdout)
+            stdoutReader.setDaemon(True)
+            stdoutReader.start()
+
+            while not isReady:
+                time.sleep(1)
+
+            # additional waiting for the proxy to actually acquire the stream
+            # this could probably be replaced by a dynamic readiness probe
+            time.sleep(5)
+
+            self.rtsp_proxy = RtspArloMonitor(liveUrl, self.provider, self.arlo_device)
+            self.rtsp_proxy.run_threaded(onMonitorExit)
         else:
-            logger.debug(f"Reusing existing RTSP proxy at {self.rtsp_proxy.proxy_url}")
+            logger.debug(f"Reusing existing RTSP monitor at {self.rtsp_proxy.proxy_url}")
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(self.rtsp_proxy.proxy_url), ScryptedMimeTypes.Url.value)

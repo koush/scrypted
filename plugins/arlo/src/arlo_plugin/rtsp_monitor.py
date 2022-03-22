@@ -8,7 +8,7 @@ from .tcp_proxy import TheServer
 
 logger = getLogger(__name__)
 
-class RtspArloProxy(TheServer):
+class RtspArloMonitor(TheServer):
     def __init__(self, rtspUrl, provider, arlo_device):
         parsed = urlparse(rtspUrl)
         self.hostip = socket.gethostbyname(socket.gethostname())
@@ -45,13 +45,13 @@ class RtspArloProxy(TheServer):
     def run_threaded(self, on_proxy_exit):
         def thread_main(self):
             try:
-                logger.info(f"Starting RTSP proxy at {self.proxy_url}")
+                logger.debug(f"Starting RTSP monitor: {self.rtspUrl} proxied at {self.proxy_url}")
                 self.main_loop()
             finally:
-                logger.info(f"RTSP proxy exiting")
+                logger.info(f"RTSP monitor exiting")
                 on_proxy_exit()
 
-        thread = threading.Thread(name="RTSPArloProxy", target=thread_main, args=(self,))
+        thread = threading.Thread(name="RTSPArloMonitor", target=thread_main, args=(self,))
         thread.setDaemon(True)
         thread.start()
 

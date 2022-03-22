@@ -24,4 +24,7 @@ def ensurePyPluginSettingsFile(pluginId):
         with open(file, 'w') as settingsFile:
             settingsFile.write('{}')
 
+def getPluginInstallDirectory():
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))), "unzipped")
+
 ensurePyPluginSettingsVolume()
