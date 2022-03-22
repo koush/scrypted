@@ -14,6 +14,8 @@ import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from '.
 const { log, mediaManager, deviceManager } = sdk;
 
 export const iframeIntervalSeconds = 4;
+// have seen strange issues where homekit never terminates the video.
+const maxVideoDuration = 3 * 60 * 1000;
 
 export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration, console: Console, homekitSession: HomeKitSession): AsyncGenerator<Buffer, void, unknown> {
@@ -185,6 +187,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
 
     console.log(`motion recording started`);
     const { socket, cp, generator } = session;
+    const videoTimeout = setTimeout(() => generator.throw(new Error('homekit secure video max duration reached')), maxVideoDuration);
     let pending: Buffer[] = [];
     try {
         let i = 0;
@@ -222,6 +225,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         console.log(`motion recording complete ${e}`);
     }
     finally {
+        clearTimeout(videoTimeout);
         console.timeEnd('mp4 recording');
         socket?.destroy();
         cp?.kill('SIGKILL');
