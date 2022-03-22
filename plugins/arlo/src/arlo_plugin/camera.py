@@ -164,15 +164,20 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
                     raise Exception("Max retries exceeded while waiting for RTSP proxy")
                 time.sleep(1)
 
-            try:
-                picBytes = self.takePictureCV(liveUrl)
-                self.cached_image = picBytes
-                self.cached_time = time.time()
-            except Exception as e:
-                logger.warn(f"Got exception capturing snapshot from stream: {str(e)}")
-
             self.rtsp_proxy = RtspArloMonitor(liveUrl, self.provider, self.arlo_device)
             self.rtsp_proxy.run_threaded(onMonitorExit)
+
+            def cachePicInThread():
+                try:
+                    picBytes = self.takePictureCV(self.rtsp_proxy.proxy_url)
+                    self.cached_image = picBytes
+                    self.cached_time = time.time()
+                except Exception as e:
+                    logger.warn(f"Got exception capturing snapshot from stream: {str(e)}")
+
+            picCacherThread = threading.Thread(target=cachePicInThread)
+            picCacherThread.setDaemon(True)
+            picCacherThread.start()
         else:
             logger.debug(f"Reusing existing RTSP monitor at {self.rtsp_proxy.proxy_url}")
 
