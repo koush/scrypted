@@ -1,5 +1,7 @@
+import cv2
 import json
 import os
+import shutil
 import subprocess
 from subprocess import call, Popen
 import tempfile
@@ -12,7 +14,6 @@ from scrypted_sdk.types import Camera, VideoCamera, ScryptedMimeTypes
 
 from .logging import getLogger
 from .rtsp_monitor import RtspArloMonitor
-from .scrypted_env import getPluginInstallDirectory
 
 logger = getLogger(__name__)
 
@@ -38,9 +39,31 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         self.arlo_device = arlo_device
         self.provider = provider
 
+        picUrl = arlo_device["presignedFullFrameSnapshotUrl"]
+        logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")
+        picBytes = urllib.request.urlopen(picUrl).read()
+        logger.info(f"Done downloading snapshot for {self.nativeId}")
+
+        self.cached_image = picBytes
+        self.cached_time = time.time()
+
     @property
     def is_streaming(self):
         return self.rtsp_proxy is not None
+
+    def takePictureCV(self, rtspUrl):
+        logger.info(f"Capturing snapshot for {self.nativeId} from ongoing stream")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = os.path.join(temp_dir, "image.jpeg")
+
+            cap = cv2.VideoCapture(rtspUrl)
+            _, frame = cap.read()
+            cap.release()
+            cv2.imwrite(out, frame)
+
+            picBytes = open(out, 'rb').read()
+        logger.info(f"Done capturing stream snapshot for {self.nativeId}")
+        return picBytes
 
     async def getPictureOptions(self):
         return []
@@ -48,39 +71,18 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     async def takePicture(self, options=None):
         logger.debug(f"ArloCamera.takePicture nativeId={self.nativeId} options={options}")
 
-        if self.cached_image is not None and time.time() - self.cached_time < 30:
-            logger.info(f"Using cached image for {self.nativeId}")
-            return await scrypted_sdk.mediaManager.createMediaObject(self.cached_image, "image/jpeg")
-
-        if self.is_streaming:
+        if self.is_streaming and time.time() - self.cached_time >= 5:
             try:
-                logger.info(f"Capturing snapshot for {self.nativeId} from ongoing stream")
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    out = os.path.join(temp_dir, "image.jpeg")
-                    call([
-                        await scrypted_sdk.mediaManager.getFFmpegPath(),
-                        "-hide_banner",
-                        "-y",
-                        "-rtsp_transport", "tcp",
-                        "-i", self.rtsp_proxy.proxy_url,
-                        "-frames:v", "1",
-                        out 
-                    ])
-                    picBytes = open(out, 'rb').read()
-                logger.info(f"Done capturing stream snapshot for {self.nativeId}")
+                picBytes = self.takePictureCV(self.rtsp_proxy.proxy_url)
+                self.cached_time = time.time()
             except Exception as e:
                 logger.warn(f"Got exception capturing snapshot from stream: {str(e)}, using cached")
-                return await scrypted_sdk.mediaManager.createMediaObject(self.cached_image, "image/jpeg")
+                picBytes = self.cached_image
         else:
-            with self.provider.arlo as arlo:
-                picUrl = arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device) 
-
-            logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")
-            picBytes = urllib.request.urlopen(picUrl).read()
-            logger.info(f"Done downloading snapshot for {self.nativeId}")
+            logger.info(f"Using cached image for {self.nativeId}")
+            picBytes = self.cached_image
 
         self.cached_image = picBytes
-        self.cached_time = time.time()
         return await scrypted_sdk.mediaManager.createMediaObject(picBytes, "image/jpeg")
 
     async def getVideoStreamOptions(self):
@@ -97,7 +99,8 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
 
             def startMultiplexer():
                 return Popen([
-                    os.path.join(getPluginInstallDirectory(), "live555ProxyServer"),
+                    shutil.which("live555ProxyServer"),
+                    #"-V",
                     "-t",
                     "-p", f"{getNextProxyPort()}",
                     rtspUrl
@@ -105,6 +108,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
 
             multiplexer = startMultiplexer()
             def onMonitorExit():
+                nonlocal multiplexer
                 multiplexer.kill()
                 self.rtsp_proxy = None
 
@@ -136,12 +140,36 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
             stdoutReader.setDaemon(True)
             stdoutReader.start()
 
+            # waiting for the proxy process to start up
             while not isReady:
                 time.sleep(1)
 
-            # additional waiting for the proxy to actually acquire the stream
-            # this could probably be replaced by a dynamic readiness probe
-            time.sleep(5)
+            # it takes additional time for proxy to warm up, so check here
+            maxRetries = 10
+            retries = 0
+            while True:
+                cap = cv2.VideoCapture(liveUrl)
+                retries += 1
+
+                try:   
+                    # Check if camera opened successfully
+                    if (cap.isOpened() == True):
+                        cap.release()
+                        break
+                except:
+                    pass
+
+                if retries >= maxRetries:
+                    multiplexer.kill()
+                    raise Exception("Max retries exceeded while waiting for RTSP proxy")
+                time.sleep(1)
+
+            try:
+                picBytes = self.takePictureCV(liveUrl)
+                self.cached_image = picBytes
+                self.cached_time = time.time()
+            except Exception as e:
+                logger.warn(f"Got exception capturing snapshot from stream: {str(e)}")
 
             self.rtsp_proxy = RtspArloMonitor(liveUrl, self.provider, self.arlo_device)
             self.rtsp_proxy.run_threaded(onMonitorExit)

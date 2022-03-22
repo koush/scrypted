@@ -63,8 +63,11 @@ class TheServer:
                         else:
                             self.on_recv()
                 except ConnectionResetError as e:
-                    logger.warn(f"{type(e)}: {str(e)}")
+                    logger.warn(f"{type(e)} on {self.s}: {str(e)}")
                     self.on_close()
+        except Exception as e:
+            logger.error(f"Exception broke out of proxy loop: {type(e)} {str(e)}")
+            raise
         finally:
             for _, s in self.channel.items():
                 s.close()
@@ -86,8 +89,7 @@ class TheServer:
 
     def on_close(self):
         try:
-            logger.debug(f"{self.s.getpeername()} has disconnected")
-            #remove objects from input_list
+            # remove objects from input_list
             self.input_list.remove(self.s)
             self.input_list.remove(self.channel[self.s])
             out = self.channel[self.s]
@@ -98,8 +100,9 @@ class TheServer:
             # delete both objects from channel dict
             del self.channel[out]
             del self.channel[self.s]
+            logger.debug(f"{self.s.getpeername()} has disconnected")
         except OSError as e:
-            logger.error(f"Error when closing peer connection: {type(e)} {str(e)}")
+            logger.warn(f"Error when closing peer connection {self.s}: {type(e)} {str(e)}")
 
     def on_recv(self):
         data = self.data
