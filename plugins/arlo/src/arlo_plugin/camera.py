@@ -43,19 +43,23 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
             return await scrypted_sdk.mediaManager.createMediaObject(self.cached_image, "image/jpeg")
 
         if self.is_streaming:
-            logger.info(f"Capturing snapshot for {self.nativeId} from ongoing stream")
-            with tempfile.TemporaryDirectory() as temp_dir:
-                out = os.path.join(temp_dir, "image.jpeg")
-                call([
-                    await scrypted_sdk.mediaManager.getFFmpegPath(),
-                    "-y",
-                    "-rtsp_transport", "tcp",
-                    "-i", self.rtsp_proxy.proxy_url,
-                    "-frames:v", "1",
-                    out 
-                ])
-                picBytes = open(out, 'rb').read()
-            logger.info(f"Done capturing stream snapshot for {self.nativeId}")
+            try:
+                logger.info(f"Capturing snapshot for {self.nativeId} from ongoing stream")
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    out = os.path.join(temp_dir, "image.jpeg")
+                    call([
+                        await scrypted_sdk.mediaManager.getFFmpegPath(),
+                        "-y",
+                        "-rtsp_transport", "tcp",
+                        "-i", self.rtsp_proxy.proxy_url,
+                        "-frames:v", "1",
+                        out 
+                    ])
+                    picBytes = open(out, 'rb').read()
+                logger.info(f"Done capturing stream snapshot for {self.nativeId}")
+            except Exception as e:
+                logger.warn(f"Got exception capturing snapshot from stream: {str(e)}, using cached")
+                return await scrypted_sdk.mediaManager.createMediaObject(self.cached_image, "image/jpeg")
         else:
             with self.provider.arlo as arlo:
                 picUrl = arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device) 
