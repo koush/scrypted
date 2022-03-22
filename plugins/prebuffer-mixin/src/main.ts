@@ -378,7 +378,7 @@ class PrebufferSession {
         title: 'Max Bitrate',
         description: 'This camera supports Adaptive Bitrate. Set the maximum bitrate to be allowed while using adaptive bitrate streaming. This will also serve as the default bitrate.',
         type: 'number',
-        value: this.maxBitrate.toString(),
+        value: this.maxBitrate?.toString(),
       });
     }
 
