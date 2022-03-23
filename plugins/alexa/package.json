@@ -18,10 +18,13 @@
       ]
    },
    "dependencies": {
+      "@koush/wrtc": "^0.5.2",
       "@types/node": "^16.6.1",
+      "alexa-smarthome-ts": "^0.0.1",
       "axios": "^0.24.0"
    },
    "devDependencies": {
+      "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk"
    }
 }

@@ -2,7 +2,10 @@ import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedInterface, Setting, S
 
 const { systemManager } = sdk;
 
-function parseValue(value: string, type: SettingValue, defaultValue: any) {
+function parseValue(value: string, setting: StorageSetting) {
+    const { defaultValue } = setting;
+    const type = setting.multiple ? 'array' : setting.type;
+
     if (type === 'boolean') {
         if (value === 'true')
             return true;
@@ -28,6 +31,16 @@ function parseValue(value: string, type: SettingValue, defaultValue: any) {
         return systemManager.getDeviceById(value);
     }
 
+    // string type, so check if it is json.
+    if (value && setting.json) {
+        try {
+            return JSON.parse(value)
+        }
+        catch (e) {
+            return defaultValue;
+        }
+    }
+
     return value || defaultValue;
 }
 
@@ -36,6 +49,7 @@ export interface StorageSetting extends Setting {
     onPut?: (oldValue: any, newValue: any) => void;
     onGet?: () => Promise<StorageSetting>;
     mapPut?: (oldValue: any, newValue: any) => any;
+    json?: boolean;
     hide?: boolean;
     noStore?: boolean;
 }
@@ -107,7 +121,6 @@ export class StorageSettings<T extends string> implements Settings {
         const setting = this.settings[key];
         if (!setting)
             return this.device.storage.getItem(key);
-        const type = setting.multiple ? 'array' : setting.type;
-        return parseValue(this.device.storage.getItem(key), type, setting.defaultValue);
+        return parseValue(this.device.storage.getItem(key), setting);
     }
 }

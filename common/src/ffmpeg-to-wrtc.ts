@@ -1,6 +1,6 @@
 import child_process from 'child_process';
 import net from 'net';
-import { listenZero } from "./listen-cluster";
+import { listenZero, listenZeroSingleClient } from "./listen-cluster";
 import { ffmpegLogInitialOutput } from "./media-helpers";
 import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingClientOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingClientSession } from "@scrypted/sdk";
 import { RpcPeer } from "../../server/src/rpc";
@@ -17,14 +17,14 @@ const configuration: RTCConfiguration = {
   ],
 };
 
-export function isPeerConnectionAlive(pc :RTCPeerConnection) {
-    if (pc.iceConnectionState === 'disconnected'
-      || pc.iceConnectionState === 'failed'
-      || pc.iceConnectionState === 'closed')
-      return false;
-    if (pc.connectionState === 'closed'
-      || pc.connectionState === 'disconnected'
-      || pc.connectionState === 'failed') 
+export function isPeerConnectionAlive(pc: RTCPeerConnection) {
+  if (pc.iceConnectionState === 'disconnected'
+    || pc.iceConnectionState === 'failed'
+    || pc.iceConnectionState === 'closed')
+    return false;
+  if (pc.connectionState === 'closed'
+    || pc.connectionState === 'disconnected'
+    || pc.connectionState === 'failed')
     return false;
   return true;
 }
@@ -44,12 +44,6 @@ function initalizeWebRtc() {
   Object.assign(global, wrtc);
 }
 
-interface RTCSession {
-  pc: RTCPeerConnection;
-  pendingCandidates: RTCIceCandidate[];
-  resolve?: (value: any) => void;
-}
-
 export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, options?: {
   maxWidth: number,
 }): Promise<RTCPeerConnection> {
@@ -62,19 +56,17 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   const videoSource = new RTCVideoSource();
   pc.addTrack(videoSource.createTrack());
 
-
-  let audioPort: number;
-
   // wrtc causes browser to hang if there's no audio track? so always make sure one exists.
   const noAudio = ffInput.mediaStreamOptions && ffInput.mediaStreamOptions.audio === null;
 
-  let audioServer: net.Server;
+  let audioPort: number;
+
   if (!noAudio) {
     const audioSource = new RTCAudioSource();
     pc.addTrack(audioSource.createTrack());
 
-    audioServer = net.createServer(async (socket) => {
-      audioServer.close()
+    const audioServer = await listenZeroSingleClient();
+    audioServer.clientPromise.then(async (socket) => {
       const { sample_rate, channels } = await sampleInfo;
       const bitsPerSample = 16;
       const channelCount = channels[1] === 'mono' ? 1 : 2;
@@ -106,11 +98,11 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
         }
       });
     });
-    audioPort = await listenZero(audioServer);
+    audioPort = audioServer.port;
   }
 
-  const videoServer = net.createServer(async (socket) => {
-    videoServer.close()
+  const videoServer = await listenZeroSingleClient();
+  videoServer.clientPromise.then(async (socket) => {
     const res = await resolution;
     const width = parseInt(res[2]);
     const height = parseInt(res[3]);
@@ -131,8 +123,7 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
         }
       }
     });
-  });
-  const videoPort = await listenZero(videoServer);
+  })
 
   const args = [
     '-hide_banner',
@@ -165,7 +156,7 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
     args.push('-vf', 'scale=w=iw/2:h=ih/2');
   }
   args.push('-f', 'rawvideo');
-  args.push(`tcp://127.0.0.1:${videoPort}`);
+  args.push(`tcp://127.0.0.1:${videoServer.port}`);
 
   console.log(ffInput);
   console.log(args);
@@ -176,11 +167,12 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   ffmpegLogInitialOutput(console, cp);
   cp.on('error', e => console.error('ffmpeg error', e));
 
-  cp.on('exit', () => {
-    videoServer.close();
-    audioServer?.close();
-    pc.close();
-  });
+  const closePeerConnection = () => {
+    // causes wrtc crash???
+    // pc.close();
+  };
+
+  cp.on('exit', closePeerConnection);
 
   let outputSeen = false;
   const resolution = new Promise<Array<string>>(resolve => {
@@ -221,13 +213,15 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   });
 
   const cleanup = () => {
+    closePeerConnection();
     cp?.kill();
     setTimeout(() => cp?.kill('SIGKILL'), 1000);
   }
 
   const checkConn = () => {
-    if (!isPeerConnectionAlive(pc))
+    if (!isPeerConnectionAlive(pc)) {
       cleanup();
+    }
   }
 
   pc.addEventListener('connectionstatechange', checkConn);

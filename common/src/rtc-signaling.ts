@@ -133,19 +133,22 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
         await this.createPeerConnection(setup);
 
-        const gatheringPromise = new Promise(resolve => this.pc.onicegatheringstatechange = () => {
-            if (this.pc.iceGatheringState === 'complete')
-                resolve(undefined);
-        });
-
-        if (sendIceCandidate) {
+        const gatheringPromise = new Promise(resolve => {
             this.pc.onicecandidate = ev => {
                 if (ev.candidate) {
                     console.log("local candidate", ev.candidate);
-                    sendIceCandidate(JSON.parse(JSON.stringify(ev.candidate)));
+                    sendIceCandidate?.(JSON.parse(JSON.stringify(ev.candidate)));
+                }
+                else {
+                    resolve(undefined);
                 }
             }
-        }
+
+            this.pc.onicegatheringstatechange = () => {
+                if (this.pc.iceGatheringState === 'complete')
+                    resolve(undefined);
+            }
+        });
 
         const toDescription = (init: RTCSessionDescriptionInit) => {
             return {
