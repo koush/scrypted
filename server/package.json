@@ -38,7 +38,7 @@
     "ws": "^8.2.3"
   },
   "optionalDependencies": {
-    "@koush/wrtc": "^0.5.2",
+    "@koush/wrtc": "^0.5.3",
     "mdns": "^2.7.2"
   },
   "devDependencies": {
