@@ -82,6 +82,21 @@ export class SynologyApiClient {
         return response.cameras;
     }
 
+    public async getCameraInfo(cameraId: number | string): Promise<SynologyCameraInfo> {
+        const params = {
+            api: 'SYNO.SurveillanceStation.Camera',
+            version: 8,
+            method: 'GetInfo',
+            privCamType: 1,
+            streamInfo: true,
+            cameraIds: cameraId
+        };
+
+        const response = await this.sendRequest<SynologyCameraInfoResponse>(params);
+
+        return response.cameras[0];
+    }
+
     public async login(account: string, password: string, otpCode?: number, enableDeviceToken: boolean = false, deviceName?: string,
         deviceId?: string): Promise<string | undefined> {
         const params = {
@@ -224,4 +239,22 @@ export interface SynologyCameraStream {
     bitrateCtrl?: number;
     quality?: string;
     constantBitrate?: string;
+}
+
+export interface SynologyCameraInfoResponse {
+    cameras: SynologyCameraInfo[];
+}
+
+export interface SynologyCameraInfo {
+    id: string;
+    stm_info: SynologyCameraInfoStream[];
+}
+
+export interface SynologyCameraInfoStream {
+    camPath?: string;
+    fps?: number;
+    quality?: string;
+    resolution?: string;
+    stmNo?: number;
+    type?: number;
 }

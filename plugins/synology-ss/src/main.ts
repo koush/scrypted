@@ -1,6 +1,6 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
-import {SynologyApiClient, SynologyCameraStream, SynologyCamera} from "./api/synology-api-client";
+import { SynologyApiClient, SynologyCameraStream, SynologyCamera } from "./api/synology-api-client";
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -96,15 +96,28 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
 
         const rtspChannel = this.streams.find(check => check.id === vso.id);
 
-        const liveViewPaths = await this.provider.api.getCameraLiveViewPath([this.nativeId]);
-        if (!liveViewPaths?.length)
-            throw new Error(`Unable to locate RTSP stream for camera ${this.nativeId}`);
+        let rtspPath = null;
+
+        if (vso.id !== '1') {
+            const cameraInfo = await this.provider.api.getCameraInfo(this.nativeId);
+            const camStream = cameraInfo?.stm_info?.find(el => el.stmNo.toString() == vso.id);
+            if (camStream)
+                rtspPath = Buffer.from(camStream.camPath, 'base64').toString('binary')
+        }
+
+        if (!rtspPath) {
+            const liveViewPaths = await this.provider.api.getCameraLiveViewPath([this.nativeId]);
+            if (!liveViewPaths?.length)
+                throw new Error(`Unable to locate RTSP stream for camera ${this.nativeId}`);
+
+            rtspPath = liveViewPaths[0].rtspPath;
+        }
 
         return mediaManager.createFFmpegMediaObject({
-            url: liveViewPaths[0].rtspPath,
+            url: rtspPath,
             inputArguments: [
                 "-rtsp_transport", "tcp",
-                "-i", liveViewPaths[0].rtspPath,
+                "-i", rtspPath,
             ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
         });
