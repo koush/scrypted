@@ -14,7 +14,8 @@
       "name": "Alexa Plugin",
       "type": "API",
       "interfaces": [
-         "HttpRequestHandler"
+         "HttpRequestHandler",
+         "MixinProvider"
       ]
    },
    "dependencies": {

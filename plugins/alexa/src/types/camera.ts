@@ -3,6 +3,7 @@ import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers } from "./
 import { startRTCPeerConnectionFFmpegInput } from '@scrypted/common/src/ffmpeg-to-wrtc';
 import { BrowserSignalingSession, startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
 import crypto from 'crypto';
+import { createMessageId } from "../message";
 
 const { mediaManager } = sdk;
 
@@ -57,7 +58,7 @@ rtcHandlers.set('InitiateSessionWithOffer', async (request, response, directive:
                 "header": {
                     "namespace": "Alexa.RTCSessionController",
                     "name": "AnswerGeneratedForSession",
-                    "messageId": crypto.randomBytes(8).toString('hex'),
+                    "messageId": createMessageId(),
                     "payloadVersion": "3"
                 },
                 "payload": {
@@ -85,7 +86,7 @@ capabilityHandlers.set('Alexa.RTCSessionController', async (request, response, d
             "header": {
                 "namespace": "Alexa.RTCSessionController",
                 name,
-                "messageId": crypto.randomBytes(8).toString('hex'),
+                "messageId": createMessageId(),
                 "payloadVersion": "3"
             },
             "payload": {
