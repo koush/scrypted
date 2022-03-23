@@ -99,7 +99,7 @@ class AlexaPlugin extends ScryptedDeviceBase implements HttpRequestHandler {
 
             discovery = Object.assign({
                 endpointId: device.id,
-                manufacturerName: device.info?.manufacturer || 'Unknown Manufacturer',
+                manufacturerName: device.info?.manufacturer || 'Scrypted Camera',
                 description: device.type,
                 friendlyName: device.name,
             }, discovery);

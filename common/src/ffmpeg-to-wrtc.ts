@@ -1,6 +1,5 @@
 import child_process from 'child_process';
-import net from 'net';
-import { listenZero, listenZeroSingleClient } from "./listen-cluster";
+import { listenZeroSingleClient } from "./listen-cluster";
 import { ffmpegLogInitialOutput } from "./media-helpers";
 import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingClientOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingClientSession } from "@scrypted/sdk";
 import { RpcPeer } from "../../server/src/rpc";
@@ -56,50 +55,45 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   const videoSource = new RTCVideoSource();
   pc.addTrack(videoSource.createTrack());
 
-  // wrtc causes browser to hang if there's no audio track? so always make sure one exists.
-  const noAudio = ffInput.mediaStreamOptions && ffInput.mediaStreamOptions.audio === null;
-
   let audioPort: number;
 
-  if (!noAudio) {
-    const audioSource = new RTCAudioSource();
-    pc.addTrack(audioSource.createTrack());
+  const audioSource = new RTCAudioSource();
+  pc.addTrack(audioSource.createTrack());
 
-    const audioServer = await listenZeroSingleClient();
-    audioServer.clientPromise.then(async (socket) => {
-      const { sample_rate, channels } = await sampleInfo;
-      const bitsPerSample = 16;
-      const channelCount = channels[1] === 'mono' ? 1 : 2;
-      const sampleRate = parseInt(sample_rate[1]);
+  const audioServer = await listenZeroSingleClient();
+  audioServer.clientPromise.then(async (socket) => {
+    const { sample_rate, channels } = await sampleInfo;
+    const bitsPerSample = 16;
+    const channelCount = channels[1] === 'stereo' ? 2 : 1;
+    const sampleRate = parseInt(sample_rate[1]);
 
-      const toRead = sampleRate / 100 * channelCount * 2;
-      socket.on('readable', () => {
-        while (true) {
-          const buffer: Buffer = socket.read(toRead);
-          if (!buffer)
-            return;
+    const toRead = sampleRate / 100 * channelCount * 2;
+    socket.on('readable', () => {
+      while (true) {
+        const buffer: Buffer = socket.read(toRead);
+        if (!buffer)
+          return;
 
-          const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + toRead)
-          const samples = new Int16Array(ab);  // 10 ms of 16-bit mono audio
+        const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + toRead)
+        const samples = new Int16Array(ab);  // 10 ms of 16-bit mono audio
 
-          const data = {
-            samples,
-            sampleRate,
-            bitsPerSample,
-            channelCount,
-          };
-          try {
-            audioSource.onData(data);
-          }
-          catch (e) {
-            cp.kill();
-            console.error(e);
-          }
+        const data = {
+          samples,
+          sampleRate,
+          bitsPerSample,
+          channelCount,
+        };
+        try {
+          audioSource.onData(data);
         }
-      });
+        catch (e) {
+          cp.kill();
+          console.error(e);
+        }
+      }
     });
-    audioPort = audioServer.port;
-  }
+  });
+  audioPort = audioServer.port;
 
   const videoServer = await listenZeroSingleClient();
   videoServer.clientPromise.then(async (socket) => {
@@ -133,17 +127,15 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
 
   args.push(...ffInput.inputArguments);
 
-  if (!noAudio) {
-    // create a dummy audio track if none actually exists.
-    // this track will only be used if no audio track is available.
-    // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-    args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+  // create a dummy audio track if none actually exists.
+  // this track will only be used if no audio track is available.
+  // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+  args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
 
-    args.push('-vn');
-    args.push('-acodec', 'pcm_s16le');
-    args.push('-f', 's16le');
-    args.push(`tcp://127.0.0.1:${audioPort}`);
-  }
+  args.push('-vn');
+  args.push('-acodec', 'pcm_s16le');
+  args.push('-f', 's16le');
+  args.push(`tcp://127.0.0.1:${audioPort}`);
 
   args.push('-an');
   // chromecast seems to crap out on higher than 15fps??? is there
@@ -201,7 +193,7 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
     const parser = (data: Buffer) => {
       const stdout = data.toString();
       const sample_rate = /([0-9]+) Hz/i.exec(stdout)
-      const channels = /Audio:.* (stereo|mono)/.exec(stdout)
+      const channels = /Audio:.* (stereo|mono|1 channels)/.exec(stdout)
       if (sample_rate && channels) {
         resolve({
           sample_rate, channels,
