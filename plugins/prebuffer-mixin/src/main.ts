@@ -18,6 +18,7 @@ import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { sleep } from '@scrypted/common/src/sleep';
 import crypto from 'crypto';
+import { title } from 'process';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -812,7 +813,7 @@ class PrebufferSession {
       return;
 
     if (this.needBitrateReset && this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
-        this.resetBitrate();
+      this.resetBitrate();
     }
 
     if (!this.stopInactive) {
@@ -1085,6 +1086,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
 
+    const defaultStreamName = this.storage.getItem('defaultStream');
+    let defaultSession: PrebufferSession;
+
     let active = 0;
     for (const id of ids) {
       let session = this.sessions.get(id);
@@ -1094,19 +1098,20 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
           log.a(`Prebuffer is already available on ${this.name}. If this is a grouped device, disable the Rebroadcast extension.`)
         }
         const name = mso?.name;
-        const notEnabled = !enabledIds.includes(id)
-        const stopInactive = isBatteryPowered || notEnabled;
+        const enabled = enabledIds.includes(id);
+        const stopInactive = isBatteryPowered || !enabled;
         session = new PrebufferSession(this, mso, stopInactive);
         this.sessions.set(id, session);
-        if (id === msos?.[0]?.id)
-          this.sessions.set(undefined, session);
+
+        if (mso?.name === defaultStreamName)
+          defaultSession = session;
 
         if (isBatteryPowered) {
           this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
           continue;
         }
 
-        if (notEnabled) {
+        if (!enabled) {
           this.console.log('stream', name, 'will be rebroadcast on demand.');
           continue;
         }
@@ -1139,6 +1144,22 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         })();
       }
     }
+
+    if (!defaultSession) {
+      if (enabledIds?.length)
+        defaultSession = this.sessions.get(msos?.find(mso => mso.id === enabledIds[0])?.id);
+      else
+        defaultSession = this.sessions.get(msos?.find(mso => mso.id === ids?.[0])?.id);
+    }
+
+    if (defaultSession) {
+      this.sessions.set(undefined, defaultSession);
+      this.console.log('Default Stream:', defaultSession.advertisedMediaStreamOptions.id, defaultSession.advertisedMediaStreamOptions.name);
+    }
+    else {
+      this.console.warn('Unable to find Default Stream?');
+    }
+
     deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
   }
 
@@ -1150,6 +1171,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       const enabledStreams = this.getEnabledMediaStreamOptions(msos);
       if (msos?.length > 0) {
         settings.push(
+          {
+            title: 'Default Stream',
+            description: 'The default stream to use when not specified.',
+            key: 'defaultStream',
+            value: this.storage.getItem('defaultStream') || enabledStreams?.[0].name || msos[0].name,
+            choices: msos.map(mso => mso.name),
+          },
           {
             title: 'Prebuffered Streams',
             description: 'The streams to prebuffer. Enable only as necessary to reduce traffic.',
