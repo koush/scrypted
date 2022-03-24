@@ -30,16 +30,7 @@ export function isPeerConnectionAlive(pc: RTCPeerConnection) {
 
 let wrtc: any;
 function initalizeWebRtc() {
-  if (wrtc)
-    return;
-  try {
-    wrtc = require('wrtc');
-  }
-  catch (e) {
-    console.warn('loading wrtc failed. trying @koush/wrtc fallback.');
-    wrtc = require('@koush/wrtc');
-  }
-
+  wrtc = require('@koush/wrtc');
   Object.assign(global, wrtc);
 }
 
