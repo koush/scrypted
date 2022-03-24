@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/alexa",
-   "version": "0.0.1",
+   "version": "0.0.3",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -10,16 +10,24 @@
       "scrypted-deploy": "scrypted-deploy",
       "scrypted-webpack": "scrypted-webpack"
    },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "alexa",
+      "amazon"
+   ],
    "scrypted": {
       "name": "Alexa Plugin",
       "type": "API",
       "interfaces": [
          "HttpRequestHandler",
          "MixinProvider"
+      ],
+      "pluginDependencies": [
+         "@scrypted/cloud"
       ]
    },
    "dependencies": {
-      "@koush/wrtc": "^0.5.2",
       "@types/node": "^16.6.1",
       "alexa-smarthome-ts": "^0.0.1",
       "axios": "^0.24.0"
