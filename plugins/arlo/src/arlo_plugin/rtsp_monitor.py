@@ -9,13 +9,11 @@ from .tcp_proxy import TheServer
 logger = getLogger(__name__)
 
 class RtspArloMonitor(TheServer):
-    def __init__(self, rtspUrl, provider, arlo_device):
+    def __init__(self, rtspUrl):
         parsed = urlparse(rtspUrl)
         self.hostip = socket.gethostbyname(socket.gethostname())
         super().__init__(self.hostip, 0, parsed.hostname, parsed.port)
 
-        self.provider = provider
-        self.arlo_device = arlo_device
         self.rtspUrl = rtspUrl
         self.listen_port = self.server.getsockname()[1]
 
@@ -39,8 +37,6 @@ class RtspArloMonitor(TheServer):
             self.num_clients -= 1
             if self.num_clients == 0:
                 self.stop = True
-                with self.provider.arlo as arlo:
-                    arlo.StopStream(self.arlo_device, self.arlo_device)
 
     def run_threaded(self, on_proxy_exit):
         def thread_main(self):

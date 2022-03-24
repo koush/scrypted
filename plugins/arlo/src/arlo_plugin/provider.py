@@ -1,8 +1,7 @@
 from arlo import Arlo
 import asyncio
 import base64
-import binascii
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 import json
 import os
 import tempfile
@@ -35,10 +34,13 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         self.scrypted_devices = {}
 
         ensurePyPluginSettingsFile(self.pluginId)
-        self._arlo_lock = threading.Lock()
-        _ = self.arlo
+        self._arlo_lock = asyncio.Lock()
 
-        asyncio.get_event_loop().create_task(self.discoverDevices(0))
+        async def initialLoad(self):
+            async with self.arlo as _:
+                pass
+            await self.discoverDevices()
+        asyncio.get_event_loop().create_task(initialLoad(self))
 
     @property
     def pluginId(self):
@@ -66,9 +68,9 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         return self.settings.get("arlo_gmail_credentials_b64", "")
 
     @property
-    @contextmanager
-    def arlo(self):
-        with self._arlo_lock:
+    @asynccontextmanager
+    async def arlo(self):
+        async with self._arlo_lock:
             if self._arlo is None:
                 self._arlo = self._load_arlo()
 
@@ -105,9 +107,12 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
             file.write(json.dumps(self._settings))
 
         # force arlo client to be invalidated and reloaded
-        self._arlo.Unsubscribe()
-        self._arlo = self._load_arlo()
-        asyncio.get_event_loop().create_task(self.discoverDevices(0))
+        async def reloadArlo(self):
+            async with self.arlo:
+                self._arlo.Unsubscribe()
+                self._arlo = self._load_arlo()
+            await self.discoverDevices()
+        asyncio.get_event_loop().create_task(reloadArlo(self))
 
     async def getSettings(self):
         return [
@@ -135,8 +140,8 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         self.saveSettings()
         await self.onDeviceEvent(ScryptedInterface.Settings.value, None)
 
-    async def discoverDevices(self, duration):
-        with self.arlo as arlo:
+    async def discoverDevices(self, duration=0):
+        async with self.arlo as arlo:
             if not arlo:
                 raise Exception("Arlo client not connected, cannot discover devices")
 

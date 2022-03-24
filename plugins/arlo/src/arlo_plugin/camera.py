@@ -1,3 +1,5 @@
+import aiohttp
+import asyncio
 import cv2
 import json
 import os
@@ -31,6 +33,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     rtsp_proxy = None
     cached_image = None
     cached_time = None
+    snapshot_interval = 60 * 15 # every 15 min
 
     def __init__(self, nativeId, arlo_device, provider):
         super().__init__(nativeId=nativeId)
@@ -39,17 +42,36 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         self.arlo_device = arlo_device
         self.provider = provider
 
-        picUrl = arlo_device["presignedFullFrameSnapshotUrl"]
-        logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")
-        picBytes = urllib.request.urlopen(picUrl).read()
-        logger.info(f"Done downloading snapshot for {self.nativeId}")
+        async def cacheImage(self):
+            picUrl = arlo_device["presignedFullFrameSnapshotUrl"]
 
-        self.cached_image = picBytes
-        self.cached_time = time.time()
+            logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(picUrl) as resp:
+                    picBytes = await resp.read()
+            logger.info(f"Done downloading snapshot for {self.nativeId}")
+
+            self.cached_image = picBytes
+            self.cached_time = time.time()
+        asyncio.get_event_loop().create_task(cacheImage(self))
+
+        asyncio.get_event_loop().create_task(self.takePicturePeriodic(sleepFirst=False))
 
     @property
     def is_streaming(self):
         return self.rtsp_proxy is not None
+
+    async def takePicturePeriodic(self, sleepFirst=True):
+        async def doTask(self, doSleep):
+            if doSleep:
+                await asyncio.sleep(self.snapshot_interval)
+            try:
+                logger.info(f"Taking periodic snapshot for {self.nativeId}")
+                await self.takePicture(remote=True)
+            except Exception as e:
+                logger.warn(f"Could not take periodic snapshot for {self.nativeId}: {type(e)} {str(e)}") 
+            asyncio.get_event_loop().create_task(doTask(self, True))
+        asyncio.get_event_loop().create_task(doTask(self, sleepFirst))
 
     def takePictureCV(self, rtspUrl):
         logger.info(f"Capturing snapshot for {self.nativeId} from ongoing stream")
@@ -68,7 +90,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     async def getPictureOptions(self):
         return []
 
-    async def takePicture(self, options=None):
+    async def takePicture(self, options=None, remote=False):
         logger.debug(f"ArloCamera.takePicture nativeId={self.nativeId} options={options}")
 
         if self.is_streaming and time.time() - self.cached_time >= 5:
@@ -78,6 +100,17 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
             except Exception as e:
                 logger.warn(f"Got exception capturing snapshot from stream: {str(e)}, using cached")
                 picBytes = self.cached_image
+        elif not self.is_streaming and remote:
+            logger.info(f"Taking remote snapshot for {self.nativeId}")
+            async with self.provider.arlo as arlo:
+                picUrl = arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device)
+            await asyncio.sleep(0)
+
+            logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(picUrl) as resp:
+                    picBytes = await resp.read()
+            logger.info(f"Done downloading snapshot for {self.nativeId}") 
         else:
             logger.info(f"Using cached image for {self.nativeId}")
             picBytes = self.cached_image
@@ -92,7 +125,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         logger.debug(f"ArloCamera.getVideoStream nativeId={self.nativeId} options={options}")
 
         if self.rtsp_proxy is None:
-            with self.provider.arlo as arlo:
+            async with self.provider.arlo as arlo:
                 rtspUrl = arlo.StartStream(self.arlo_device, self.arlo_device)
 
             logger.info(f"Got stream for {self.nativeId} at {rtspUrl}")
@@ -107,10 +140,16 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
                 ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
             multiplexer = startMultiplexer()
+            current_loop = asyncio.get_event_loop()
+            async def stopStream(self):
+                logger.info(f"Stopping stream for {self.nativeId}")
+                async with self.provider.arlo as arlo:
+                    arlo.StopStream(self.arlo_device, self.arlo_device)
             def onMonitorExit():
                 nonlocal multiplexer
                 multiplexer.kill()
                 self.rtsp_proxy = None
+                current_loop.call_soon_threadsafe(stopStream, self)
 
             isReady = False
             liveUrl = None
@@ -133,6 +172,11 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
                                 multiplexer = startMultiplexer()
                                 exitLoop = False
                                 break
+                        elif line.find("RTCPInstance error") != -1:
+                            multiplexer.kill()
+                            multiplexer = startMultiplexer()
+                            exitLoop = False
+                            break
                     if exitLoop:
                         break
 
@@ -142,10 +186,10 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
 
             # waiting for the proxy process to start up
             while not isReady:
-                time.sleep(1)
+                await asyncio.sleep(1)
 
             # it takes additional time for proxy to warm up, so check here
-            maxRetries = 10
+            maxRetries = 20
             retries = 0
             while True:
                 cap = cv2.VideoCapture(liveUrl)
@@ -162,9 +206,9 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
                 if retries >= maxRetries:
                     multiplexer.kill()
                     raise Exception("Max retries exceeded while waiting for RTSP proxy")
-                time.sleep(1)
+                await asyncio.sleep(1)
 
-            def cachePicInThread():
+            async def cachePic(self):
                 try:
                     picBytes = self.takePictureCV(liveUrl)
                     self.cached_image = picBytes
@@ -172,11 +216,9 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
                 except Exception as e:
                     logger.warn(f"Got exception capturing snapshot from stream: {str(e)}")
 
-            picCacherThread = threading.Thread(target=cachePicInThread)
-            picCacherThread.setDaemon(True)
-            picCacherThread.start()
+            asyncio.get_event_loop().create_task(cachePic(self))
 
-            self.rtsp_proxy = RtspArloMonitor(liveUrl, self.provider, self.arlo_device)
+            self.rtsp_proxy = RtspArloMonitor(liveUrl)
             self.rtsp_proxy.run_threaded(onMonitorExit)
         else:
             logger.debug(f"Reusing existing RTSP monitor at {self.rtsp_proxy.proxy_url}")
