@@ -1,13 +1,13 @@
-import sdk, { ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
-import { addSupportedType } from "./common";
+import sdk, { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { addSupportedType, EventReport } from "./common";
 
 addSupportedType(ScryptedDeviceType.Doorbell, {
     probe(device) {
-        if (!device.interfaces.includes(ScryptedInterface.VideoCamera))
+        if (!device.interfaces.includes(ScryptedInterface.VideoCamera) || !device.interfaces.includes(ScryptedInterface.BinarySensor))
             return;
 
         return {
-            displayCategories: ['DOORBELL'],
+            displayCategories: ['CAMERA'],
             capabilities: [
                 {
                     "type": "AlexaInterface",
@@ -17,7 +17,28 @@ addSupportedType(ScryptedDeviceType.Doorbell, {
                         "isFullDuplexAudioSupported": false,
                     }
                 },
+                {
+                    "type": "AlexaInterface",
+                    "interface": "Alexa.DoorbellEventSource",
+                    "version": "3",
+                    "proactivelyReported": true
+                }
             ],
         }
+    },
+    async reportState(eventSource: ScryptedDevice & BinarySensor, eventDetails, eventData): Promise<EventReport> {
+        if (!eventSource.binaryState)
+            return undefined;
+        return {
+            type: 'event',
+            namespace: 'Alexa.DoorbellEventSource',
+            name: 'DoorbellPress',
+            payload: {
+                "cause": {
+                    "type": "PHYSICAL_INTERACTION"
+                },
+                "timestamp": new Date().toISOString(),
+            }
+        };
     }
 });

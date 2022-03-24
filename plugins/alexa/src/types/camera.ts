@@ -25,6 +25,9 @@ addSupportedType(ScryptedDeviceType.Camera, {
                 },
             ],
         }
+    },
+    async reportState() {
+        return undefined;
     }
 });
 
