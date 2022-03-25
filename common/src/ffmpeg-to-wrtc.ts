@@ -212,7 +212,7 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
 
   setTimeout(() => {
     if (pc.connectionState !== 'connected') {
-      pc.close();
+      closePeerConnection();
       cp.kill();
     }
   }, 60000);

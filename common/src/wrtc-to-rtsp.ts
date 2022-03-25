@@ -106,6 +106,9 @@ export async function createRTCPeerConnectionSource(options: {
 
         socket.on('close', cleanup);
         socket.on('error', cleanup);
+        pc.iceGatheringStateChange.subscribe(() => {
+            console.log('iceGatheringStateChange', pc.iceGatheringState);
+        });
         pc.iceConnectionStateChange.subscribe(() => {
             console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
             if (pc.iceConnectionState === 'disconnected'
