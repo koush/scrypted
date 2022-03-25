@@ -195,13 +195,23 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     return this.loadRTCSession(token, options?.title || 'Scrypted');
   }
 
+  engineIoEndpoint: Promise<string>;
+
   async loadRTCSession(token: string, title: string) {
     // this media object is something weird that can't be handled by a straightforward url.
     // try to make a webrtc a/v session to handle it.
 
-    const engineio = await endpointManager.getPublicLocalEndpoint(this.nativeId) + 'engine.io/';
-    const mo = await mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
-    const cameraStreamAuthToken = await mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
+    if (!this.engineIoEndpoint) {
+      this.engineIoEndpoint = (async() => {
+        const engineio = await endpointManager.getPublicLocalEndpoint(this.nativeId) + 'engine.io/';
+        const mo = await mediaManager.createMediaObject(Buffer.from(engineio), ScryptedMimeTypes.LocalUrl);
+        return mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
+      })();
+
+      this.engineIoEndpoint.catch(() => this.engineIoEndpoint = undefined);
+    }
+
+    const cameraStreamAuthToken = await this.engineIoEndpoint;
 
     const castMedia: any = {
       contentId: cameraStreamAuthToken,
