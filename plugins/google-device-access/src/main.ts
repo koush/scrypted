@@ -5,8 +5,8 @@ import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { startRTCSignalingSession } from '../../../common/src/rtc-signaling';
-import { sleep } from '../../../common/src/sleep';
+import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
+import { sleep } from '@scrypted/common/src/sleep';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
 
