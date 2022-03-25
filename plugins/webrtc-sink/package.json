@@ -1,0 +1,35 @@
+{
+   "name": "@scrypted/webrtc-sink",
+   "version": "0.0.2",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "webrtc",
+      "ring",
+      "google",
+      "nest"
+   ],
+   "scrypted": {
+      "name": "WebRTC Sink",
+      "type": "API",
+      "interfaces": [
+         "MixinProvider"
+      ]
+   },
+   "dependencies": {
+      "@types/node": "^16.6.1"
+   },
+   "devDependencies": {
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk"
+   }
+}
