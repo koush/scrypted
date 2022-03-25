@@ -196,7 +196,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
 
-        if (!this.pendingPicture) {
+        const hadPendingPicture = !!this.pendingPicture;
+        if (!hadPendingPicture) {
             const pendingPicture = (async () => {
                 let picture: Buffer;
                 try {
@@ -219,9 +220,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
             this.pendingPicture = pendingPicture;
 
-            // this triggers an event to refresh the web ui.
-            this.pendingPicture.then(() => this.onDeviceEvent(ScryptedInterface.Camera, undefined));
-
             // prevent infinite loop from onDeviceEvent triggering picture updates.
             // retain this promise for a bit while everything settles.
             pendingPicture.finally(() => {
@@ -240,6 +238,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             try {
                 if (this.storageSettings.values.snapshotMode === 'Never Wait') {
                     if (!this.currentPicture) {
+                        // this triggers an event to refresh the web ui.
+                        // but only trigger a refresh if this call fetched the picture.
+                        if (!hadPendingPicture)
+                            this.pendingPicture.then(() => this.onDeviceEvent(ScryptedInterface.Camera, undefined));
+
                         data = await this.createErrorImage(new NeverWaitError());
                     }
                     else {
