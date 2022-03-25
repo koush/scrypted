@@ -1,6 +1,6 @@
 import child_process from 'child_process';
 import { listenZeroSingleClient } from "./listen-cluster";
-import { ffmpegLogInitialOutput } from "./media-helpers";
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "./media-helpers";
 import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingClientOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingClientSession } from "@scrypted/sdk";
 import { RpcPeer } from "../../server/src/rpc";
 
@@ -34,7 +34,7 @@ function initalizeWebRtc() {
   Object.assign(global, wrtc);
 }
 
-export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, options?: {
+export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, console: Console, options?: {
   maxWidth: number,
 }): Promise<RTCPeerConnection> {
   initalizeWebRtc();
@@ -53,10 +53,9 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
 
   const audioServer = await listenZeroSingleClient();
   audioServer.clientPromise.then(async (socket) => {
-    const { sample_rate, channels } = await sampleInfo;
+    const sampleRate = 48000;
+    const channelCount = 2;
     const bitsPerSample = 16;
-    const channelCount = channels[1] === 'stereo' ? 2 : 1;
-    const sampleRate = parseInt(sample_rate[1]);
 
     const toRead = sampleRate / 100 * channelCount * 2;
     socket.on('readable', () => {
@@ -112,8 +111,6 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
 
   const args = [
     '-hide_banner',
-    // don't think this is actually necessary but whatever.
-    '-y',
   ];
 
   args.push(...ffInput.inputArguments);
@@ -124,6 +121,8 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
 
   args.push('-vn');
+  args.push('-ar', '48000');
+  args.push('-ac', '2');
   args.push('-acodec', 'pcm_s16le');
   args.push('-f', 's16le');
   args.push(`tcp://127.0.0.1:${audioPort}`);
@@ -141,8 +140,7 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   args.push('-f', 'rawvideo');
   args.push(`tcp://127.0.0.1:${videoServer.port}`);
 
-  console.log(ffInput);
-  console.log(args);
+  safePrintFFmpegArguments(console, args);
 
   const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
     // DO NOT IGNORE STDIO, NEED THE DATA FOR RESOLUTION PARSING, ETC.
@@ -180,21 +178,6 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
     channels: string[];
   }
 
-  const sampleInfo = new Promise<SampleInfo>(resolve => {
-    const parser = (data: Buffer) => {
-      const stdout = data.toString();
-      const sample_rate = /([0-9]+) Hz/i.exec(stdout)
-      const channels = /Audio:.* (stereo|mono|1 channels)/.exec(stdout)
-      if (sample_rate && channels) {
-        resolve({
-          sample_rate, channels,
-        });
-      }
-    };
-    cp.stdout.on('data', parser);
-    cp.stderr.on('data', parser);
-  });
-
   const cleanup = () => {
     closePeerConnection();
     cp?.kill();
@@ -225,7 +208,7 @@ export async function startRTCPeerConnection(console: Console, mediaObject: Medi
   const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput);
   const ffInput = JSON.parse(buffer.toString());
 
-  const pc = await startRTCPeerConnectionFFmpegInput(ffInput, options);
+  const pc = await startRTCPeerConnectionFFmpegInput(ffInput, console, options);
 
   try {
     pc.onicecandidate = ev => {
