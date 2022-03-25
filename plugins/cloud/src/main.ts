@@ -174,7 +174,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async getOauthUrl(): Promise<string> {
         const args = qs.stringify({
-            registration_id: this.manager.registrationId,
+            registration_id: await this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
         })
         return `https://${SCRYPTED_SERVER}/_punch/login?${args}`;
