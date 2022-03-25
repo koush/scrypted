@@ -44,5 +44,5 @@
       "@types/debug": "^4.1.5",
       "@types/http-proxy": "^1.17.5"
    },
-   "version": "0.0.28"
+   "version": "0.0.29"
 }

@@ -46,12 +46,17 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     server: Server;
     proxy: HttpProxy;
     push: ScryptedPush;
+    whitelisted = new Map<string, string>();
 
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
         const local = Url.parse(localUrl);
 
         if (this.storage.getItem('hostname')) {
             return Buffer.from(`${baseUrl}${local.path}`);
+        }
+
+        if (this.whitelisted.has(local.path)) {
+            return Buffer.from(this.whitelisted.get(local.path));
         }
 
         const token_info = this.storage.getItem('token_info');
@@ -72,6 +77,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         const url = `${baseUrl}${local.path}?${tokens}`;
+        this.whitelisted.set(local.path, url);
         return Buffer.from(url);
     }
 
