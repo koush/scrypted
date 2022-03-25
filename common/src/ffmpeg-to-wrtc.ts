@@ -156,17 +156,31 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, co
   cp.on('exit', closePeerConnection);
 
   let outputSeen = false;
+  const checkOutputSeen = (data: any) => {
+    let stdout: string = data.toString();
+    if (outputSeen)
+      return stdout;
+    const index = stdout.indexOf('Output #0');
+    if (index === -1)
+      return stdout;
+
+    outputSeen = true;
+    stdout = stdout.substring(index);
+    return stdout;
+  }
   const resolution = new Promise<Array<string>>(resolve => {
     cp.stdout.on('data', data => {
-      const stdout = data.toString();
-      outputSeen = outputSeen || stdout.includes('Output #0');
+      const stdout = checkOutputSeen(data);
+      if (!outputSeen)
+        return;
       const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
       if (res && outputSeen)
         resolve(res);
     });
     cp.stderr.on('data', data => {
-      const stdout = data.toString();
-      outputSeen = outputSeen || stdout.includes('Output #0');
+      const stdout = checkOutputSeen(data);
+      if (!outputSeen)
+        return;
       const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
       if (res && outputSeen)
         resolve(res);

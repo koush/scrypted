@@ -1,10 +1,10 @@
-import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup } from '@scrypted/sdk';
+import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { startRTCPeerConnectionFFmpegInput } from '@scrypted/common/src/ffmpeg-to-wrtc';
-import { BrowserSignalingSession, connectRTCSignalingClients, startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
+import { BrowserSignalingSession, connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 
 
 const { mediaManager, systemManager } = sdk;
@@ -15,24 +15,30 @@ const supportedTypes = [
 ];
 
 
-function createSetup(type: 'offer' | 'answer'): RTCAVSignalingSetup {
+function createSetup(type: 'offer' | 'answer', audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): RTCAVSignalingSetup {
     return {
         type,
         audio: {
-            direction: 'recvonly',
+            direction: audioDirection,
         },
         video: {
-            direction: 'recvonly',
+            direction: videoDirection,
         },
     }
 };
 
-class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel> implements RTCSignalingChannel {
+class ScryptedSignalingSession extends BrowserSignalingSession {
+    async createPeerConnection(setup: RTCAVSignalingSetup): Promise<void> {
+        return super.createPeerConnection(setup);
+    }
+}
+
+class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel {
     storageSettings = new StorageSettings(this, {
 
     });
 
-    constructor(options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera>) {
+    constructor(options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
         super(options)
     }
 
@@ -45,11 +51,23 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         const device = systemManager.getDeviceById<VideoCamera>(this.id);
         const mo = await device.getVideoStream();
         const ffInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
-        const pc = await startRTCPeerConnectionFFmpegInput(ffInput, {
+        const pc = await startRTCPeerConnectionFFmpegInput(ffInput, this.console, {
             maxWidth: 960,
         });
 
-        const answerSession = new BrowserSignalingSession(pc);
+        const hasIntercom = this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom);
+
+        if (hasIntercom) {
+            const transceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'audio');
+            const wrtc = require('@koush/wrtc');
+            const { RTCAudioSink } = wrtc.nonstandard;
+            const sink = new RTCAudioSink(transceiver.receiver.track);
+            sink.addEventListener('data', data => {
+                // this.console.log(data);
+            });
+        }
+
+        const answerSession = new ScryptedSignalingSession(pc);
         answerSession.options = undefined;
         answerSession.hasSetup = true;
 
@@ -57,10 +75,18 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             pc.onicecandidate({
                 candidate: undefined,
             } as any)
-        }, 2000)
+        }, 2000);
 
-        connectRTCSignalingClients(session, createSetup('offer'),
-            answerSession, createSetup('answer'), !!options?.offer);
+        const offerAudioDirection = hasIntercom
+            ? 'sendrecv'
+            : 'recvonly';
+
+        const answerAudioDirection = hasIntercom
+            ? 'sendrecv'
+            : 'sendonly';
+
+        connectRTCSignalingClients(session, createSetup('offer', offerAudioDirection, 'recvonly'),
+            answerSession, createSetup('answer', answerAudioDirection, 'sendonly'), !!options?.offer);
 
         return undefined;
     }
@@ -85,9 +111,6 @@ class WebRTCSinkPlugin extends AutoenableMixinProvider {
 
         if (!interfaces.includes(ScryptedInterface.VideoCamera))
             return;
-
-        // if (interfaces.includes(ScryptedInterface.RTCSignalingChannel))
-        //     return;
 
         return [
             '@scrypted/webrtc-sink',
