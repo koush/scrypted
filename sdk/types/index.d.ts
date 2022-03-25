@@ -316,11 +316,7 @@ export interface ColorHsv {
  * Notifier can be any endpoint that can receive messages, such as speakers, phone numbers, messaging clients, etc. The messages may optionally contain media.
  */
 export interface Notifier {
-    /**
-     * If a the media parameter is supplied, the mime type denotes how to send the media within notification. For example, specify 'image/*' to send a video MediaObject as an image.
-  Passing null uses the native type of the MediaObject. If that is not supported by the notifier, the media will be converted to a compatible type.
-     */
-    sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void>;
+    sendNotification(title: string, body: string, media?: string | MediaObject): Promise<void>;
 }
 /**
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.
@@ -1382,6 +1378,17 @@ export interface RTCSignalingSession {
     addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
 }
 export interface RTCSignalingClientOptions {
+    /**
+     * Indicates that this client requires an answer, and is providing an offer.
+     * If an offer is provided, this has a couple implications:
+     * The client can only create offers and requires and answer.
+     * The client does not support trickle ICE.
+     */
+    offer?: RTCSessionDescriptionInit;
+    /**
+     * Hint to proxy the feed, as the client may be inflexible.
+     */
+    proxy?: boolean;
     capabilities?: {
         video?: RTCRtpCapabilities;
         audio?: RTCRtpCapabilities;

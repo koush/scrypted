@@ -380,6 +380,8 @@ class RTCSessionControl(TypedDict):
 
 class RTCSignalingClientOptions(TypedDict):
     capabilities: Any
+    offer: RTCSessionDescriptionInit
+    proxy: bool
     pass
 
 class RTCSignalingClientSession(TypedDict):
@@ -657,7 +659,7 @@ class MotionSensor:
     pass
 
 class Notifier:
-    async def sendNotification(self, title: str, body: str, media: str | MediaObject, mimeType: str = None) -> None:
+    async def sendNotification(self, title: str, body: str, media: str | MediaObject = None) -> None:
         pass
     pass
 
