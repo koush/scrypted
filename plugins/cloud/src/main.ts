@@ -60,6 +60,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
 
         const token_info = this.storage.getItem('token_info');
+        if (!token_info)
+            throw new Error('@scrypted/cloud is not logged in.');
         const q = qs.stringify({
             scope: local.path,
             ttl,
