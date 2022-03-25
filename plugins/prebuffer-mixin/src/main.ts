@@ -1175,7 +1175,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
             title: 'Default Stream',
             description: 'The default stream to use when not specified.',
             key: 'defaultStream',
-            value: this.storage.getItem('defaultStream') || enabledStreams?.[0].name || msos[0].name,
+            value: this.storage.getItem('defaultStream') || enabledStreams?.[0]?.name || msos[0].name,
             choices: msos.map(mso => mso.name),
           },
           {
