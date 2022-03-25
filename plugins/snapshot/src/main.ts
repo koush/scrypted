@@ -295,13 +295,13 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return this.timeoutPicture.promise;
         }
         else if (e instanceof NeverWaitError) {
-            this.progressPicture = singletonPromise(this.timeoutPicture,
+            this.progressPicture = singletonPromise(this.progressPicture,
                 () => this.createTextErrorImage('Snapshot In Progress'),
                 FOREVER);
             return this.progressPicture.promise;
         }
         else {
-            this.errorPicture = singletonPromise(this.timeoutPicture,
+            this.errorPicture = singletonPromise(this.errorPicture,
                 () => this.createTextErrorImage('Snapshot Failed'),
                 FOREVER);
             return this.errorPicture.promise;
