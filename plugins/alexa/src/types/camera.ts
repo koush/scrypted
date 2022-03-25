@@ -1,4 +1,4 @@
-import sdk, { FFMpegInput, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import sdk, { FFMpegInput, HttpResponse, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers } from "./common";
 import { startRTCPeerConnectionFFmpegInput } from '@scrypted/common/src/ffmpeg-to-wrtc';
 import { BrowserSignalingSession, startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
@@ -33,30 +33,24 @@ addSupportedType(ScryptedDeviceType.Camera, {
 
 export const rtcHandlers = new Map<string, AlexaCapabilityHandler<any>>();
 
-rtcHandlers.set('InitiateSessionWithOffer', async (request, response, directive: any, device: ScryptedDevice & VideoCamera) => {
-    const mo = await device.getVideoStream();
-    const ffInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
-    const pc = await startRTCPeerConnectionFFmpegInput(ffInput, {
-        maxWidth: 960,
-    });
+export class AlexaSignalingSession implements RTCSignalingSession {
+    constructor(public response: HttpResponse, public directive: any) {
 
-    const session = new BrowserSignalingSession(pc);
-    session.options = undefined;
-    session.hasSetup = true;
+    }
 
-    const sdp: string = directive.payload.offer.value.replaceAll('sendrecv', 'recvonly');
+    async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
+        return {
+            type: 'offer',
+            sdp: this.directive.payload.offer.value,
+        }
+    }
 
-    setTimeout(() => {
-        pc.onicecandidate({
-            candidate: undefined,
-        } as any)
-    },2000)
+    async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
+        throw new Error("trickle ICE is not supported by Alexa");
+    }
 
-    startRTCSignalingSession(session, {
-        sdp,
-        type: 'offer',
-    }, console, async () => undefined, async (remoteDescription: RTCSessionDescriptionInit) => {
-        response.send(JSON.stringify({
+    async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> {
+        this.response.send(JSON.stringify({
             "event": {
                 "header": {
                     "namespace": "Alexa.RTCSessionController",
@@ -67,13 +61,23 @@ rtcHandlers.set('InitiateSessionWithOffer', async (request, response, directive:
                 "payload": {
                     "answer": {
                         "format": "SDP",
-                        "value": remoteDescription.sdp,
+                        "value": description.sdp,
                     }
                 }
             }
         }));
+    }
+}
 
-        return undefined;
+rtcHandlers.set('InitiateSessionWithOffer', async (request, response, directive: any,
+    device: ScryptedDevice & RTCSignalingChannel) => {
+    const session = new AlexaSignalingSession(response, directive);
+    device.startRTCSignalingSession(session, {
+        proxy: true,
+        offer: {
+            type: 'offer',
+            sdp: directive.payload.offer.value,
+        }
     });
 });
 
