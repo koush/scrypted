@@ -1331,7 +1331,7 @@ export enum ScryptedInterface {
   RTCSignalingClient = "RTCSignalingClient",
 }
 
-export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidate) => Promise<void>;
+export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
 
 export interface RTCSignalingClientSession extends RTCSignalingSession {
   getOptions(): Promise<RTCSignalingClientOptions>;

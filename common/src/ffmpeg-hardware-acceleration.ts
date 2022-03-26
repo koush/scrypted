@@ -107,6 +107,7 @@ export function getH264EncoderArgs() {
     }
     else if (os.platform() === 'linux') {
         // h264_v4l2m2m h264_vaapi nvenc_h264
+        encoders['V4L2'] = 'h264_v4l2m2m';
         encoders['VAAPI'] = 'h264_vaapi';
         encoders['Nvidia'] = 'nvenc_h264';
     }

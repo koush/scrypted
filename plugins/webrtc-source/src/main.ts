@@ -38,7 +38,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingChannel & VideoCam
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
-            useUdp: this.storageSettings.values.useUdp,
+            useUdp: true,
+            // useUdp: this.storageSettings.values.useUdp,
         });
 
         return mediaManager.createFFmpegMediaObject(ffmpegInput);

@@ -1,4 +1,5 @@
 import type { RTCSignalingSendIceCandidate, RTCSignalingClientSession, RTCAVSignalingSetup, RTCSignalingClientOptions, RTCSignalingSession } from "@scrypted/sdk/types";
+// import type { RTCPeerConnection as WeriftRTCPeerConnection } from "@koush/werift";
 
 export async function startRTCSignalingSession(session: RTCSignalingSession, offer: RTCSessionDescriptionInit,
     console: Console,

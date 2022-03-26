@@ -7,6 +7,19 @@ const filtered = [
     'non-existing PPS',
 ];
 
+export function safeKillFFmpeg(cp: ChildProcess) {
+    if (!cp)
+        return;
+    // this will allow ffmpeg to send rtsp TEARDOWN etc
+    cp.stdin.write('q\n');
+    setTimeout(() => {
+        cp.kill();
+        setTimeout(() => {
+            cp.kill('SIGKILL');
+        }, 2000);
+    }, 2000);
+}
+
 export function ffmpegLogInitialOutput(console: Console, cp: ChildProcess, forever?: boolean, storage?: Storage) {
     const SCRYPTED_FFMPEG_NOISY = !!process.env.SCRYPTED_FFMPEG_NOISY || !!storage?.getItem('SCRYPTED_FFMPEG_NOISY');
 

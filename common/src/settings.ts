@@ -44,6 +44,8 @@ function parseValue(value: string, setting: StorageSetting) {
     return value || defaultValue;
 }
 
+export type HideFunction = (device: any) => boolean;
+
 export interface StorageSetting extends Setting {
     defaultValue?: any;
     onPut?: (oldValue: any, newValue: any) => void;
@@ -56,6 +58,11 @@ export interface StorageSetting extends Setting {
 
 export class StorageSettings<T extends string> implements Settings {
     public values: { [key in T]: any } = {} as any;
+    public options?: {
+        hide?: {
+            [key in T]?: () => Promise<boolean>;
+        }
+    };
 
     constructor(public device: ScryptedDeviceBase | MixinDeviceBase<any>, public settings: { [key in T]: StorageSetting }) {
         for (const key of Object.keys(settings)) {
@@ -88,7 +95,7 @@ export class StorageSettings<T extends string> implements Settings {
             let s: StorageSetting = Object.assign({}, setting);
             if (s.onGet)
                 s = Object.assign(s, await s.onGet());
-            if (s.hide)
+            if (s.hide || await this.options?.hide?.[key as T]?.())
                 continue;
             s.key = key;
             s.value = this.getItem(key as T);

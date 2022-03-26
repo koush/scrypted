@@ -7,7 +7,7 @@ import { Socket } from "net";
 import { RTCSessionControl, RTCSignalingSession } from "@scrypted/sdk";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
 import { RpcPeer } from "../../server/src/rpc";
-import {addTrackControls} from './sdp-utils'
+import { createSdpInput } from './sdp-utils'
 
 export async function createRTCPeerConnectionSource(options: {
     console: Console,
@@ -406,34 +406,6 @@ export class JitterBuffer extends Pipeline {
             this.children?.pushRtpPackets?.(packets);
         }
     };
-}
-
-// this is an sdp corresponding to what is requested from webrtc.
-// h264 baseline and opus are required codecs that all webrtc implementations must provide.
-function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
-    // replace all IPs
-    let outputSdp = sdp
-        .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
-        .replace(/m=audio \d+/, `m=audio ${audioPort}`)
-        .replace(/m=video \d+/, `m=video ${videoPort}`);
-
-        // filter all ice and rtcp mux info
-    let lines = outputSdp.split('\n').map(line => line.trim());
-    lines = lines
-        .filter(line => !line.includes('a=rtcp-mux'))
-        .filter(line => !line.includes('a=candidate'))
-        .filter(line => !line.includes('a=ice'));
-
-    outputSdp = lines.join('\r\n');
-
-    outputSdp = addTrackControls(outputSdp);
-
-    // only include the m sections.
-    outputSdp = outputSdp.split('m=')
-        .slice(1)
-        .map(line => 'm=' + line)
-        .join('');
-    return outputSdp;
 }
 
 export function getRTCMediaStreamOptions(id: string, name: string, useUdp: boolean): MediaStreamOptions {

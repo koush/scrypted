@@ -1368,7 +1368,7 @@ export declare enum ScryptedInterface {
     RTCSignalingChannel = "RTCSignalingChannel",
     RTCSignalingClient = "RTCSignalingClient"
 }
-export declare type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidate) => Promise<void>;
+export declare type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
 export interface RTCSignalingClientSession extends RTCSignalingSession {
     getOptions(): Promise<RTCSignalingClientOptions>;
 }
@@ -1386,7 +1386,7 @@ export interface RTCSignalingClientOptions {
      */
     offer?: RTCSessionDescriptionInit;
     /**
-     * Hint to proxy the feed, as the client may be inflexible.
+     * Hint to proxy the feed, as the target client may be inflexible.
      */
     proxy?: boolean;
     capabilities?: {

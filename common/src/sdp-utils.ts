@@ -18,6 +18,34 @@ export function addTrackControls(sdp: string) {
     return lines.join('\r\n')
 }
 
+// this is an sdp corresponding to what is requested from webrtc.
+// h264 baseline and opus are required codecs that all webrtc implementations must provide.
+export function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
+    // replace all IPs
+    let outputSdp = sdp
+        .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
+        .replace(/m=audio \d+/, `m=audio ${audioPort}`)
+        .replace(/m=video \d+/, `m=video ${videoPort}`);
+
+    // filter all ice and rtcp mux info
+    let lines = outputSdp.split('\n').map(line => line.trim());
+    lines = lines
+        .filter(line => !line.includes('a=rtcp-mux'))
+        .filter(line => !line.includes('a=candidate'))
+        .filter(line => !line.includes('a=ice'));
+
+    outputSdp = lines.join('\r\n');
+
+    outputSdp = addTrackControls(outputSdp);
+
+    // only include the m sections.
+    outputSdp = outputSdp.split('m=')
+        .slice(1)
+        .map(line => 'm=' + line)
+        .join('');
+    return outputSdp;
+}
+
 export function parsePayloadTypes(sdp: string) {
     const audioPayloadTypes = new Set<number>();
     const videoPayloadTypes = new Set<number>();
