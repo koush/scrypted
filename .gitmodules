@@ -34,6 +34,3 @@
 [submodule "plugins/roborock/homebridge-xiaomi-roborock-vacuum"]
 	path = plugins/roborock/homebridge-xiaomi-roborock-vacuum
 	url = https://github.com/homebridge-xiaomi-roborock-vacuum/homebridge-xiaomi-roborock-vacuum.git
-[submodule "plugins/arlo/src/arlo"]
-	path = plugins/arlo/src/arlo
-	url = https://github.com/bjia56/arlo.git
