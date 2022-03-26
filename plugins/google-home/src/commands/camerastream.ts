@@ -1,4 +1,4 @@
-import { Brightness, OnOff, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import { RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import { executeResponse } from "../common";
 import { commandHandlers } from "../handlers";
 

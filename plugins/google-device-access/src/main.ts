@@ -494,7 +494,7 @@ class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient,
         this.clientSecret = this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg';
         this.projectId = this.storage.getItem('projectId');// || '778da527-9690-4368-9c96-6872bb29e7a0';
         if (!this.projectId) {
-            this.log.a('Enter a valid project ID. Setup instructions for Nest: https://www.home-assistant.io/integrations/nest/');
+            this.log.a('Enter a valid project ID. See README for more information.');
         }
 
         const authorizationHostname = this.storage.getItem('authorizationHostname') || 'nestservices.google.com';
