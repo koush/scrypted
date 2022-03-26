@@ -427,13 +427,6 @@ class PrebufferSession {
       probingAudioCodec = true;
     }
 
-    // complain to the user about the codec if necessary. upstream may send a audio
-    // stream but report none exists (to request muting).
-    if (!audioSoftMuted && advertisedAudioCodec && detectedAudioCodec !== undefined
-      && detectedAudioCodec !== advertisedAudioCodec) {
-      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
-    }
-
     // the assumed audio codec is the detected codec first and the reported codec otherwise.
     const assumedAudioCodec = detectedAudioCodec === undefined
       ? advertisedAudioCodec?.toLowerCase()
@@ -687,6 +680,19 @@ class PrebufferSession {
           }
         })
         .catch(() => { });
+    }
+
+    // complain to the user about the codec if necessary. upstream may send a audio
+    // stream but report none exists (to request muting).
+    if (!audioSoftMuted && advertisedAudioCodec && session.inputAudioCodec !== undefined
+      && session.inputAudioCodec !== advertisedAudioCodec) {
+      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
+    }
+
+    const advertisedVideoCodec = mso?.video?.codec;
+    if (advertisedVideoCodec && session.inputVideoCodec !== undefined
+      && session.inputVideoCodec !== advertisedVideoCodec) {
+      this.console.warn('Video codec plugin reported vs detected mismatch', advertisedVideoCodec, session.inputVideoCodec);
     }
 
     if (!session.inputAudioCodec) {
@@ -1001,11 +1007,16 @@ class PrebufferSession {
       }
     }
 
-    if (mediaStreamOptions.video && session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
+    if (!mediaStreamOptions.video)
+      mediaStreamOptions.video = {};
+
+    mediaStreamOptions.video.codec = session.inputVideoCodec;
+
+    if (session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
       Object.assign(mediaStreamOptions.video, {
         width: parseInt(session.inputVideoResolution[2]),
         height: parseInt(session.inputVideoResolution[3]),
-      })
+      });
     }
 
     const now = Date.now();
