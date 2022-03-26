@@ -2,6 +2,8 @@
 
 const app = new smarthome.App("1.0.0");
 
+const SCRYPTED_INSECURE_PORT = 30080;
+
 app
   .onIdentify(async (request) => {
     console.debug("IDENTIFY request:", request);
@@ -57,7 +59,7 @@ app
       command.requestId = request.requestId;
       command.deviceId = request.inputs[0].payload.devices[0].id;
       command.method = smarthome.Constants.HttpOperation.POST;
-      command.port = 10080;
+      command.port = SCRYPTED_INSECURE_PORT;
       command.path = '/endpoint/@scrypted/google-home/public';
       command.dataType = 'application/json';
 
@@ -95,7 +97,7 @@ app
       command.requestId = request.requestId;
       command.deviceId = request.inputs[0].payload.commands[0].devices[0].id;
       command.method = smarthome.Constants.HttpOperation.POST;
-      command.port = 10080;
+      command.port = SCRYPTED_INSECURE_PORT;
       command.path = '/endpoint/@scrypted/google-home/public';
       command.dataType = 'application/json';
 
