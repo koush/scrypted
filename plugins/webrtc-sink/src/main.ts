@@ -346,8 +346,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         });
 
         const cleanup = async () => {
-            if (hasIntercom)
-                this.mixinDevice.stopIntercom();
+            // no need to explicitly stop intercom as the server closing will terminate it.
+            // do this to prevent shared intercom clobbering.
             closeQuiet(videoInput.server);
             closeQuiet(audioInput.server);
             closeQuiet(audioOutput.server);
