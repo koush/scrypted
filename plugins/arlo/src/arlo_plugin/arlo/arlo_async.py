@@ -127,19 +127,23 @@ class Arlo(object):
         self.user_id = auth_body['data']['userId']
         self.request.session.headers.update({'Authorization': base64.b64encode(auth_body['data']['token'].encode('utf-8'))})
 
-        # Retrieve email factor id
+        # Retrieve MFA factor id
         factors_body = self.request.get(
             f'https://{self.AUTH_URL}/api/getFactors',
             params={'data': auth_body['data']['issued']},
             headers=headers,
             raw=True
         )
-        email_factor_id = next(i for i in factors_body['data']['items'] if i['factorType'] == 'EMAIL' and i['factorRole'] == "PRIMARY")['factorId']
+        factor_id = next(
+            i for i in factors_body['data']['items']
+            if (i['factorType'] == 'EMAIL' or i['factorType'] == 'SMS')
+            and i['factorRole'] == "PRIMARY"
+        )['factorId']
 
         # Start factor auth
         start_auth_body = self.request.post(
             f'https://{self.AUTH_URL}/api/startAuth',
-            {'factorId': email_factor_id},
+            {'factorId': factor_id},
             headers=headers,
             raw=True
         )
