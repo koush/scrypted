@@ -132,14 +132,21 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         });
         const port = await listenZero(server)
 
-        const args = ffmpegInput.inputArguments.slice();
+        const args = [
+            '-hide_banner',
+
+            '-fflags', 'nobuffer',
+            '-flags', 'low_delay',
+
+            ...ffmpegInput.inputArguments,
+        ];
 
         args.push(
-            "-acodec", "libfdk_aac",
+            "-acodec", "aac",
             "-profile:a", "aac_low",
             "-threads", "0",
             "-avioflags", "direct",
-            "-flush_packets", "1",
+            '-fflags', '+flush_packets', '-flush_packets', '1',
             "-flags", "+global_header",
             "-ar", camera.talkbackSettings.samplingRate.toString(),
             "-ac", camera.talkbackSettings.channels.toString(),
