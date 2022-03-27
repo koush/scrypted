@@ -27,6 +27,10 @@
          "Settings",
          "DeviceProvider",
          "DeviceDiscovery"
+      ],
+      "pluginDependencies": [
+         "@scrypted/snapshot",
+         "@scrypted/prebuffer-mixin"
       ]
    },
    "devDependencies": {
