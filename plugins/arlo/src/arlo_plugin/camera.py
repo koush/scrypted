@@ -37,7 +37,22 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(pic_url), ScryptedMimeTypes.Url.value)
 
     async def getVideoStreamOptions(self):
-        return []
+        return [
+            {
+                "id": 'default',
+                "name": 'Cloud RTSP',
+                "container": 'rtsp',
+                "video": {
+                    "codec": 'h264',
+                },
+                "audio": {
+                    "codec": 'aac',
+                },
+                "source": 'cloud',
+                "tool": 'scrypted',
+                "userConfigurable": False,
+            }
+        ]
 
     async def getVideoStream(self, options=None):
         logger.debug(f"ArloCamera.getVideoStream nativeId={self.nativeId} options={options}")
