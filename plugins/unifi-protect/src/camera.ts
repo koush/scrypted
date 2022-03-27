@@ -1,14 +1,15 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl } from "@scrypted/sdk";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
-import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
-import { fitHeightToWidth } from "../../../common/src/resolution-utils";
-import { listenZero } from "../../../common/src/listen-cluster";
+import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
+import { listenZero } from "@scrypted/common/src/listen-cluster";
 import net from 'net';
 import WS from 'ws';
 import { once } from "events";
 import { FeatureFlagsShim } from "./shim";
 import { UnifiProtect } from "./main";
+import { Readable } from "stream";
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -90,6 +91,8 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async startIntercom(media: MediaObject) {
+        this.stopIntercom();
+
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
         const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
 
@@ -106,9 +109,44 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const websocket = new WS(talkbackUrl, { rejectUnauthorized: false });
         await once(websocket, 'open');
 
-        const server = new net.Server(async (socket) => {
-            server.close();
+        const args = [
+            '-hide_banner',
 
+            '-fflags', 'nobuffer',
+            '-flags', 'low_delay',
+
+            ...ffmpegInput.inputArguments,
+        ];
+
+        args.push(
+            "-acodec", "aac",
+            "-profile:a", "aac_low",
+            "-threads", "0",
+            "-avioflags", "direct",
+            '-fflags', '+flush_packets', '-flush_packets', '1',
+            "-flags", "+global_header",
+            "-ar", camera.talkbackSettings.samplingRate.toString(),
+            "-ac", camera.talkbackSettings.channels.toString(),
+            "-b:a", "16k",
+            "-f", "adts",
+            `pipe:3`,
+        );
+
+        this.console.log('starting 2 way audio', args);
+
+        const ffmpeg = await mediaManager.getFFmpegPath();
+        const cp = this.intercomProcess = child_process.spawn(ffmpeg, args, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+        this.intercomProcess.on('exit', () => {
+            this.intercomProcess = undefined;
+            websocket.close();
+        });
+
+        websocket.on('close', () => safeKillFFmpeg(cp));
+
+        (async () => {
+            const socket = cp.stdio[3] as Readable;
             this.console.log('sending audio data to', talkbackUrl);
 
             try {
@@ -119,43 +157,20 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
                         if (!data)
                             break;
                         websocket.send(data, e => {
-                            if (e)
-                                socket.destroy();
+                            if (e) {
+                                safeKillFFmpeg(cp);
+                            }
                         });
                     }
                 }
             }
             finally {
                 this.console.log('talkback ended')
-                this.intercomProcess.kill();
+                safeKillFFmpeg(cp);
             }
-        });
-        const port = await listenZero(server)
+        })();
 
-        const args = ffmpegInput.inputArguments.slice();
 
-        args.push(
-            "-acodec", "libfdk_aac",
-            "-profile:a", "aac_low",
-            "-threads", "0",
-            "-avioflags", "direct",
-            "-flush_packets", "1",
-            "-flags", "+global_header",
-            "-ar", camera.talkbackSettings.samplingRate.toString(),
-            "-ac", camera.talkbackSettings.channels.toString(),
-            "-b:a", "16k",
-            "-f", "adts",
-            `tcp://127.0.0.1:${port}`,
-        );
-
-        this.console.log('starting 2 way audio', args);
-
-        const ffmpeg = await mediaManager.getFFmpegPath();
-        this.intercomProcess = child_process.spawn(ffmpeg, args);
-        this.intercomProcess.on('exit', () => {
-            websocket.close();
-            this.intercomProcess = undefined;
-        });
         ffmpegLogInitialOutput(this.console, this.intercomProcess);
     }
 

@@ -30,7 +30,7 @@
       ]
    },
    "dependencies": {
-      "@koush/wrtc": "^0.5.2",
+      "@koush/wrtc": "^0.5.3",
       "@scrypted/common": "../../common",
       "@scrypted/sdk": "file:../../sdk",
       "mime": "^3.0.0",

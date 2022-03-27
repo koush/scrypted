@@ -9,7 +9,6 @@ import net from 'net';
 import { listenZero } from "@scrypted/common/src/listen-cluster";
 import { readLength } from "@scrypted/common/src/read-stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
-import { parse } from "path";
 
 const { mediaManager } = sdk;
 
@@ -30,7 +29,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
-    maxExtraStreams: Promise<number>;
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     onvifIntercom = new OnvifIntercom(this);
 
@@ -168,11 +166,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                         || event === AmcrestEvent.AlarmIPCStop || event === AmcrestEvent.DahuaTalkHangup) {
                         this.binaryState = false;
                     }
-                    else if (event === AmcrestEvent.TalkPulse && doorbellType === AMCREST_DOORBELL_TYPE) {
-                        clearTimeout(pulseTimeout);
-                        pulseTimeout = setTimeout(() => this.binaryState = false, 30000);
-                        this.binaryState = true;
-                    }
                     else if (event === AmcrestEvent.DahuaTalkPulse && doorbellType === DAHUA_DOORBELL_TYPE) {
                         clearTimeout(pulseTimeout);
                         pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
@@ -270,8 +263,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         const client = this.getClient();
 
-        if (!this.maxExtraStreams) {
-            this.maxExtraStreams = (async () => {
+        if (!this.videoStreamOptions) {
+            this.videoStreamOptions = (async () => {
                 let mas: string;
                 try {
                     const response = await client.digestAuth.request({
@@ -285,17 +278,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 catch (e) {
                     this.console.error('error retrieving max extra streams', e);
                     mas = this.storage.getItem('maxExtraStreams');
-                    this.maxExtraStreams = undefined;
                 }
-                return parseInt(mas) || 1;
-            })();
-        }
 
-        if (!this.videoStreamOptions) {
-            this.videoStreamOptions = (async () => {
-                const mas = await this.maxExtraStreams;
+                const maxExtraStreams = parseInt(mas) || 1;
                 const channel = parseInt(this.getRtspChannel()) || 1;
-                const vsos = [...Array(mas + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
+                const vsos = [...Array(maxExtraStreams + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
 
                 try {
                     const capResponse = await client.digestAuth.request({
@@ -369,7 +356,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
 
         this.client = undefined;
-        this.maxExtraStreams = undefined;
+        this.videoStreamOptions = undefined;
 
         super.putSetting(key, value);
         const doorbellType = this.storage.getItem('doorbellType');

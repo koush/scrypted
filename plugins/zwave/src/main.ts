@@ -238,7 +238,8 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 return requested;
             },
             validateDSKAndEnterPIN: async (dsk: string) => {
-                this.console.log('dsk received', sdk);
+                this.console.log('dsk received', dsk);
+                this.log.a('Please enter the pairing DSK to confirm device enrollment.');
                 return new Promise((resolve, reject) => {
                     if (this.dskDeferred) {
                         this.dskDeferred.reject(new Error('new dsk received'));
@@ -251,7 +252,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 });
             },
             abort: function (): void {
-                this.console.log('abort');
+                this.console.log('inclusion aborted');
             }
         }
         await this.stopOperations();

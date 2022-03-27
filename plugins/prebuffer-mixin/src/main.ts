@@ -1,5 +1,5 @@
 
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter, ResponseMediaStreamOptions } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter, ResponseMediaStreamOptions, VideoCameraConfiguration } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { once } from 'events';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -18,6 +18,7 @@ import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { sleep } from '@scrypted/common/src/sleep';
 import crypto from 'crypto';
+import { title } from 'process';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -74,7 +75,7 @@ class PrebufferSession {
   prevIdr = 0;
   audioDisabled = false;
 
-  mixinDevice: VideoCamera;
+  mixinDevice: VideoCamera & VideoCameraConfiguration;
   console: Console;
   storage: Storage;
 
@@ -85,7 +86,9 @@ class PrebufferSession {
   lastDetectedAudioCodecKey: string;
   rebroadcastModeKey: string;
   rtspParserKey: string;
+  maxBitrateKey: string;
   rtspServerPath: string;
+  needBitrateReset = false;
 
   constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: MediaStreamOptions, public stopInactive: boolean) {
     this.storage = mixin.storage;
@@ -97,12 +100,33 @@ class PrebufferSession {
     this.lastDetectedAudioCodecKey = 'lastDetectedAudioCodec-' + this.streamId;
     this.rtspParserKey = 'rtspParser-' + this.streamId;
     const rtspServerPathKey = 'rtspServerPathKey-' + this.streamId;
+    this.maxBitrateKey = 'maxBitrate-' + this.streamId;
 
     this.rtspServerPath = this.storage.getItem(rtspServerPathKey);
     if (!this.rtspServerPath) {
       this.rtspServerPath = crypto.randomBytes(8).toString('hex');
       this.storage.setItem(rtspServerPathKey, this.rtspServerPath);
     }
+  }
+
+  get maxBitrate() {
+    let ret = parseInt(this.storage.getItem(this.maxBitrateKey));
+    if (!ret) {
+      ret = this.advertisedMediaStreamOptions?.video?.maxBitrate;
+      this.storage.setItem(this.maxBitrateKey, ret?.toString());
+    }
+    return ret || undefined;
+  }
+
+  async resetBitrate() {
+    this.console.log('Resetting bitrate after adaptive streaming session', this.maxBitrate);
+    this.needBitrateReset = false;
+    this.mixinDevice.setVideoStreamOptions({
+      id: this.streamId,
+      video: {
+        bitrate: this.maxBitrate,
+      }
+    });
   }
 
   get streamId() {
@@ -177,10 +201,19 @@ class PrebufferSession {
   }
 
   getRebroadcastMode() {
-    const mode = this.storage.getItem(this.rebroadcastModeKey);
+    let mode = this.storage.getItem(this.rebroadcastModeKey) || 'Default';
+    let defaultMode = 'MPEG-TS';
+    if (this.advertisedMediaStreamOptions?.tool === 'scrypted'
+      && this.advertisedMediaStreamOptions?.container?.startsWith('rtsp')) {
+      defaultMode = 'RTSP';
+    }
+    if (mode === 'Default') {
+      mode = defaultMode;
+    }
     const rtspMode = mode?.startsWith('RTSP');
 
     return {
+      defaultMode,
       rtspMode: mode?.startsWith('RTSP'),
       muxingMp4: !rtspMode || mode?.includes('MP4'),
     };
@@ -193,7 +226,7 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    const { muxingMp4, rtspMode } = this.getRebroadcastMode();
+    const { muxingMp4, rtspMode, defaultMode } = this.getRebroadcastMode();
     for (const prebuffer of (muxingMp4 ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunk.chunks) {
@@ -223,7 +256,7 @@ class PrebufferSession {
       {
         title: 'Rebroadcast Container',
         group,
-        description: 'Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP is lower latency. The default is "MPEG-TS" for this camera.',
+        description: `Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP is lower latency. The default mode for this camera is ${defaultMode}.`,
         placeholder: 'MPEG-TS',
         choices: [
           STRING_DEFAULT,
@@ -339,6 +372,17 @@ class PrebufferSession {
       });
     }
 
+    if (this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
+      settings.push({
+        group,
+        key: this.maxBitrateKey,
+        title: 'Max Bitrate',
+        description: 'This camera supports Adaptive Bitrate. Set the maximum bitrate to be allowed while using adaptive bitrate streaming. This will also serve as the default bitrate.',
+        type: 'number',
+        value: this.maxBitrate?.toString(),
+      });
+    }
+
     return settings;
   }
 
@@ -381,13 +425,6 @@ class PrebufferSession {
       && detectedAudioCodec === undefined) {
       this.console.warn('Camera did not report an audio codec, muting the audio stream and probing the codec.');
       probingAudioCodec = true;
-    }
-
-    // complain to the user about the codec if necessary. upstream may send a audio
-    // stream but report none exists (to request muting).
-    if (!audioSoftMuted && advertisedAudioCodec && detectedAudioCodec !== undefined
-      && detectedAudioCodec !== advertisedAudioCodec) {
-      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
     }
 
     // the assumed audio codec is the detected codec first and the reported codec otherwise.
@@ -645,6 +682,19 @@ class PrebufferSession {
         .catch(() => { });
     }
 
+    // complain to the user about the codec if necessary. upstream may send a audio
+    // stream but report none exists (to request muting).
+    if (!audioSoftMuted && advertisedAudioCodec && session.inputAudioCodec !== undefined
+      && session.inputAudioCodec !== advertisedAudioCodec) {
+      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
+    }
+
+    const advertisedVideoCodec = mso?.video?.codec;
+    if (advertisedVideoCodec && session.inputVideoCodec !== undefined
+      && session.inputVideoCodec !== advertisedVideoCodec) {
+      this.console.warn('Video codec plugin reported vs detected mismatch', advertisedVideoCodec, session.inputVideoCodec);
+    }
+
     if (!session.inputAudioCodec) {
       this.console.log('No audio stream detected.');
     }
@@ -767,9 +817,12 @@ class PrebufferSession {
     this.printActiveClients();
     if (this.activeClients)
       return;
+
+    if (this.needBitrateReset && this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
+      this.resetBitrate();
+    }
+
     if (!this.stopInactive) {
-      if (this.activeClients === 0)
-        this.console.log('stopInactive false');
       return;
     }
 
@@ -954,11 +1007,16 @@ class PrebufferSession {
       }
     }
 
-    if (mediaStreamOptions.video && session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
+    if (!mediaStreamOptions.video)
+      mediaStreamOptions.video = {};
+
+    mediaStreamOptions.video.codec = session.inputVideoCodec;
+
+    if (session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
       Object.assign(mediaStreamOptions.video, {
         width: parseInt(session.inputVideoResolution[2]),
         height: parseInt(session.inputVideoResolution[3]),
-      })
+      });
     }
 
     const now = Date.now();
@@ -992,12 +1050,11 @@ class PrebufferSession {
   }
 }
 
-class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
+class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraConfiguration> implements VideoCamera, Settings, VideoCameraConfiguration {
   released = false;
   sessions = new Map<string, PrebufferSession>();
 
-
-  constructor(public plugin: PrebufferProvider, options: SettingsMixinDeviceOptions<VideoCamera>) {
+  constructor(public plugin: PrebufferProvider, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
 
     this.delayStart();
@@ -1040,8 +1097,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
 
     const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
 
+    const defaultStreamName = this.storage.getItem('defaultStream');
+    let defaultSession: PrebufferSession;
+
     let active = 0;
-    const total = enabledIds.length;
     for (const id of ids) {
       let session = this.sessions.get(id);
       if (!session) {
@@ -1050,19 +1109,20 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
           log.a(`Prebuffer is already available on ${this.name}. If this is a grouped device, disable the Rebroadcast extension.`)
         }
         const name = mso?.name;
-        const notEnabled = !enabledIds.includes(id)
-        const stopInactive = isBatteryPowered || notEnabled;
+        const enabled = enabledIds.includes(id);
+        const stopInactive = isBatteryPowered || !enabled;
         session = new PrebufferSession(this, mso, stopInactive);
         this.sessions.set(id, session);
-        if (id === msos?.[0]?.id)
-          this.sessions.set(undefined, session);
+
+        if (mso?.name === defaultStreamName)
+          defaultSession = session;
 
         if (isBatteryPowered) {
           this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
           continue;
         }
 
-        if (notEnabled) {
+        if (!enabled) {
           this.console.log('stream', name, 'will be rebroadcast on demand.');
           continue;
         }
@@ -1095,6 +1155,22 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
         })();
       }
     }
+
+    if (!defaultSession) {
+      if (enabledIds?.length)
+        defaultSession = this.sessions.get(msos?.find(mso => mso.id === enabledIds[0])?.id);
+      else
+        defaultSession = this.sessions.get(msos?.find(mso => mso.id === ids?.[0])?.id);
+    }
+
+    if (defaultSession) {
+      this.sessions.set(undefined, defaultSession);
+      this.console.log('Default Stream:', defaultSession.advertisedMediaStreamOptions.id, defaultSession.advertisedMediaStreamOptions.name);
+    }
+    else {
+      this.console.warn('Unable to find Default Stream?');
+    }
+
     deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
   }
 
@@ -1106,6 +1182,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
       const enabledStreams = this.getEnabledMediaStreamOptions(msos);
       if (msos?.length > 0) {
         settings.push(
+          {
+            title: 'Default Stream',
+            description: 'The default stream to use when not specified.',
+            key: 'defaultStream',
+            value: this.storage.getItem('defaultStream') || enabledStreams?.[0]?.name || msos[0].name,
+            choices: msos.map(mso => mso.name),
+          },
           {
             title: 'Prebuffered Streams',
             description: 'The streams to prebuffer. Enable only as necessary to reduce traffic.',
@@ -1199,6 +1282,19 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
     }
 
     return ret;
+  }
+
+  setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
+    const session = this.sessions.get(options.id);
+    if (session && options?.video?.bitrate) {
+      session.needBitrateReset = true;
+      const maxBitrate = session.maxBitrate;
+      if (maxBitrate && options?.video?.bitrate > maxBitrate) {
+        this.console.log('clamping max bitrate request', options.video.bitrate, maxBitrate);
+        options.video.bitrate = maxBitrate;
+      }
+    }
+    return this.mixinDevice.setVideoStreamOptions(options);
   }
 
   async release() {
@@ -1383,7 +1479,10 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
-    return [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online];
+    const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online];
+    if (interfaces.includes(ScryptedInterface.VideoCameraConfiguration))
+      ret.push(ScryptedInterface.VideoCameraConfiguration);
+    return ret;
   }
 
   async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {

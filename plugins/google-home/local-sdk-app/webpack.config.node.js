@@ -5,7 +5,7 @@ module.exports = {
   target: 'node',
   entry: './index.ts',
   output: {
-    path: path.resolve(__dirname, '../docs/local-sdk-app/node/'),
+    path: path.resolve(__dirname, '../../../docs/plugins/google-home/local-sdk-app/node/'),
     filename: 'bundle.js'
   },
   module: {

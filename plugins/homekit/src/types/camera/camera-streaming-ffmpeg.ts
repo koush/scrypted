@@ -11,7 +11,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: MediaStreamOptions, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: MediaStreamOptions, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
 
     const request = session.startRequest;
 
@@ -20,6 +20,10 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // from my observation of talkback packets, the max packet size is ~370, so
     // I'm just guessing that HomeKit wants something similar for the audio it receives.
     // going higher causes choppiness. going lower may cause other issues.
+    // Update: since implementing Opus, I'm unsure this value actually has any affect
+    // unless ffmpeg is buffering packets. Opus supports a packet time argument,
+    // which in turn limits the packet size. I'm not sure if AAC-ELD has a similar
+    // option, but not sure it matters since AAC-ELD is no longer in use.
     let audiomtu = 400;
 
     console.log('fetching video stream');
@@ -35,43 +39,36 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
     const mso = videoInput.mediaStreamOptions;
     const noAudio = mso?.audio === null;
-    const videoArgs: string[] = [
+    const hideBanner = [
         '-hide_banner',
     ];
-    const audioArgs: string[] = [
-        '-hide_banner',
-    ];
+    const decoderArgs: string[] = [];
+    const videoArgs: string[] = [];
+    const audioArgs: string[] = [];
 
-    const transcodeStreaming = session.isLowBandwidth
-        ? storage.getItem('transcodeStreamingHub') === 'true'
-        : storage.getItem('transcodeStreaming') === 'true';
-
-    if (transcodeStreaming) {
-        // decoder arguments
-        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
-        if (videoDecoderArguments) {
-            videoArgs.push(...evalRequest(videoDecoderArguments, request));
-        }
-    }
-
-    // ffmpeg input for decoder
-    videoArgs.push(...videoInput.inputArguments);
-    if (audioInput !== videoInput)
-        audioArgs.push(...audioInput.inputArguments);
-
+    const nullAudioInput: string[] = [];
     if (!noAudio) {
         // create a dummy audio track if none actually exists.
         // this track will only be used if no audio track is available.
         // this prevents homekit erroring out if the audio track is actually missing.
         // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        audioArgs.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+        nullAudioInput.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
     }
 
-    // video encoding
+    // decoder args
+    if (transcodeStreaming) {
+        // decoder arguments
+        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
+        if (videoDecoderArguments) {
+            decoderArgs.push(...evalRequest(videoDecoderArguments, request));
+        }
+    }
+
     videoArgs.push(
         "-an", '-sn', '-dn',
     );
 
+    // encoder args
     if (transcodeStreaming) {
         const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
         const videoCodec = h264EncoderArguments
@@ -264,18 +261,36 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         safePrintFFmpegArguments(console, videoArgs);
         safePrintFFmpegArguments(console, audioArgs);
 
-        const vp = child_process.spawn(ffmpegPath, videoArgs);
+        const vp = child_process.spawn(ffmpegPath, [
+            ...hideBanner,
+            ...decoderArgs,
+            ...videoInput.inputArguments,
+            ...videoArgs,
+        ]);
         session.videoProcess = vp;
         ffmpegLogInitialOutput(console, vp);
         vp.on('exit', killSession);
 
-        const ap = child_process.spawn(ffmpegPath, audioArgs);
+        const ap = child_process.spawn(ffmpegPath, [
+            ...hideBanner,
+            ...decoderArgs,
+            ...audioInput.inputArguments,
+            ...nullAudioInput,
+            ...audioArgs,
+        ]);
         session.audioProcess = ap;
         ffmpegLogInitialOutput(console, ap);
         ap.on('exit', killSession);
     }
     else {
-        const args = [...videoArgs, ...audioArgs];
+        const args = [
+            ...hideBanner,
+            ...decoderArgs,
+            ...videoInput.inputArguments,
+            ...nullAudioInput,
+            ...videoArgs,
+            ...audioArgs,
+        ];
         safePrintFFmpegArguments(console, args);
 
         const cp = child_process.spawn(ffmpegPath, args);

@@ -3,7 +3,7 @@ export interface RefreshPromise<T> {
     cacheDuration: number;
 }
 
-export function singletonPromise<T>(rp: RefreshPromise<T>, method: () => Promise<T>) {
+export function singletonPromise<T>(rp: RefreshPromise<T>, method: () => Promise<T>, cacheDuration = 0) {
     if (rp?.promise)
         return rp;
 
@@ -11,7 +11,7 @@ export function singletonPromise<T>(rp: RefreshPromise<T>, method: () => Promise
     if (!rp) {
         rp = {
             promise,
-            cacheDuration: 0,
+            cacheDuration,
         }
     }
     else {

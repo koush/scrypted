@@ -14,7 +14,6 @@ export interface CameraStreamingSession {
     videoReturn: dgram.Socket;
     audioReturn: dgram.Socket;
     rtpSink?: HomeKitRtpSink;
-    isLowBandwidth: boolean;
     tryReconfigureBitrate?: (reason: string, bitrate: number) => void;
 }
 

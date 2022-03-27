@@ -4,13 +4,15 @@ import { StorageSettings } from "@scrypted/common/src/settings"
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
 import axios, { Axios } from "axios";
-import { TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import jimp from 'jimp';
 
-const { systemManager } = sdk;
+const { mediaManager, systemManager } = sdk;
 
-const { mediaManager } = sdk;
+// lol
+const FOREVER = 24 * 60 * 60 * 1000;
+
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
@@ -23,6 +25,40 @@ class NeverWaitError extends Error {
 
 class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     storageSettings = new StorageSettings(this, {
+        defaultSnapshotChannel: {
+            title: 'Default Snapshot Channel',
+            description: 'The default channel to use for snapshots.',
+            defaultValue: 'Camera Default',
+            hide: !this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera),
+            onGet: async () => {
+                if (!this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
+                    return {
+                        hide: true,
+                    };
+                }
+
+                let psos: PictureOptions[];
+                try {
+                    psos = await this.mixinDevice.getPictureOptions();
+                }
+                catch (e) {
+                }
+
+                if (!psos?.length) {
+                    return {
+                        hide: true,
+                    };
+                }
+
+                return {
+                    hide: false,
+                    choices: [
+                        'Camera Default',
+                        ...psos.map(pso => pso.name),
+                    ],
+                };
+            }
+        },
         snapshotUrl: {
             title: this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)
                 ? 'Override Snapshot URL'
@@ -67,17 +103,18 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     });
     axiosClient: Axios | AxiosDigestAuth;
     pendingPicture: Promise<Buffer>;
-    // this will contain the last picture retrieved,
-    // or an outdated picture blurred with an error overlay.
-    lastPicture: Buffer;
-    rawLastPicture: Buffer;
+    errorPicture: RefreshPromise<Buffer>;
+    timeoutPicture: RefreshPromise<Buffer>;
+    progressPicture: RefreshPromise<Buffer>;
+    currentPicture: Buffer;
+    lastAvailablePicture: Buffer;
 
     constructor(options: SettingsMixinDeviceOptions<Camera>) {
         super(options);
     }
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
-        let takePicture: () => Promise<Buffer>;
+        let takePicture: (options?: PictureOptions) => Promise<Buffer>;
         if (this.storageSettings.values.snapshotsFromPrebuffer) {
             try {
                 const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
@@ -102,11 +139,23 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         if (!takePicture) {
             if (!this.storageSettings.values.snapshotUrl) {
                 if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
-                    takePicture = async () => {
+                    takePicture = async (options?: PictureOptions) => {
                         // if operating in full resolution mode, nuke any picture options containing
                         // the requested dimensions that are sent.
                         if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
                             options.picture = undefined;
+
+                        if (!options?.id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
+                            try {
+                                const psos = await this.mixinDevice.getPictureOptions();
+                                const pso = psos.find(pso => pso.name === this.storageSettings.values.defaultSnapshotChannel);
+                                if (!options)
+                                    options = {};
+                                options.id = pso.id;
+                            }
+                            catch (e) {
+                            }
+                        }
                         return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
                     };
                 }
@@ -147,27 +196,30 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
 
-        if (!this.pendingPicture) {
+        const hadPendingPicture = !!this.pendingPicture;
+        if (!hadPendingPicture) {
             const pendingPicture = (async () => {
                 let picture: Buffer;
                 try {
                     picture = await takePicture();
                     picture = await this.cropAndScale(picture);
-                    this.rawLastPicture = picture;
+                    this.clearCachedPictures();
+                    this.currentPicture = picture;
+                    this.lastAvailablePicture = picture;
+                    setTimeout(() => {
+                        if (this.currentPicture === picture) {
+                            this.clearCachedPictures();
+                        }
+                    }, 30000);
                 }
                 catch (e) {
                     picture = await this.createErrorImage(e);
                 }
-                this.lastPicture = picture;
-                setTimeout(() => {
-                    if (this.lastPicture === picture) {
-                        this.lastPicture = undefined;
-                    }
-                }, 30000);
                 return picture;
             })();
 
             this.pendingPicture = pendingPicture;
+
             // prevent infinite loop from onDeviceEvent triggering picture updates.
             // retain this promise for a bit while everything settles.
             pendingPicture.finally(() => {
@@ -185,13 +237,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         else {
             try {
                 if (this.storageSettings.values.snapshotMode === 'Never Wait') {
-                    if (!this.lastPicture) {
+                    if (!this.currentPicture) {
                         // this triggers an event to refresh the web ui.
-                        this.pendingPicture.then(() => this.onDeviceEvent(ScryptedInterface.Camera, undefined));
+                        // but only trigger a refresh if this call fetched the picture.
+                        if (!hadPendingPicture)
+                            this.pendingPicture.then(() => this.onDeviceEvent(ScryptedInterface.Camera, undefined));
+
                         data = await this.createErrorImage(new NeverWaitError());
                     }
                     else {
-                        data = this.lastPicture;
+                        data = this.currentPicture;
                     }
                 }
                 else {
@@ -229,16 +284,37 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         return cropped;
     }
 
+    clearCachedPictures() {
+        this.currentPicture = undefined;
+        this.errorPicture = undefined;
+        this.pendingPicture = undefined;
+        this.timeoutPicture = undefined;
+    }
+
     async createErrorImage(e: any) {
         this.console.log('creating error snapshot', e);
-        let text: string;
-        if (e instanceof TimeoutError)
-            text = 'Snapshot Timed Out';
-        else if (e instanceof NeverWaitError)
-            text = 'Snapshot in Progress';
-        else
-            text = 'Snapshot Failed';
-        if (!this.rawLastPicture) {
+        if (e instanceof TimeoutError) {
+            this.timeoutPicture = singletonPromise(this.timeoutPicture,
+                () => this.createTextErrorImage('Snapshot Timed Out'),
+                FOREVER);
+            return this.timeoutPicture.promise;
+        }
+        else if (e instanceof NeverWaitError) {
+            this.progressPicture = singletonPromise(this.progressPicture,
+                () => this.createTextErrorImage('Snapshot In Progress'),
+                FOREVER);
+            return this.progressPicture.promise;
+        }
+        else {
+            this.errorPicture = singletonPromise(this.errorPicture,
+                () => this.createTextErrorImage('Snapshot Failed'),
+                FOREVER);
+            return this.errorPicture.promise;
+        }
+    }
+
+    async createTextErrorImage(text: string) {
+        if (!this.currentPicture) {
             const img = await jimp.create(1920 / 2, 1080 / 2);
             const font = await fontPromise;
             img.print(font, 0, 0, {
@@ -249,7 +325,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return img.getBufferAsync('image/jpeg');
         }
         else {
-            const img = await jimp.read(this.rawLastPicture);
+            const img = await jimp.read(this.currentPicture);
             img.resize(1920 / 2, jimp.AUTO);
             img.blur(15);
             img.brightness(-.2);
@@ -264,7 +340,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async getPictureOptions() {
-        return undefined;
+        return this.mixinDevice.getPictureOptions();
     }
 
     getMixinSettings(): Promise<Setting[]> {

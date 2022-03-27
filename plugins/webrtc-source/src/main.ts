@@ -1,9 +1,9 @@
 import { Settings, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import {createRTCPeerConnectionSource, getRTCMediaStreamOptions} from '@scrypted/common/src/wrtc-to-rtsp';
-import {AutoenableMixinProvider} from '@scrypted/common/src/autoenable-mixin-provider';
-import {SettingsMixinDeviceBase, SettingsMixinDeviceOptions} from '@scrypted/common/src/settings-mixin';
-import {StorageSettings} from '@scrypted/common/src/settings';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '@scrypted/common/src/wrtc-to-rtsp';
+import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
+import { StorageSettings } from '@scrypted/common/src/settings';
 const { mediaManager } = sdk;
 
 const supportedTypes = [
@@ -38,7 +38,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<RTCSignalingChannel & VideoCam
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
-            useUdp: this.storageSettings.values.useUdp,
+            useUdp: true,
+            // useUdp: this.storageSettings.values.useUdp,
         });
 
         return mediaManager.createFFmpegMediaObject(ffmpegInput);
@@ -69,6 +70,9 @@ class WebRTCSourcePlugin extends AutoenableMixinProvider {
     }
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         if (!supportedTypes.includes(type))
+            return;
+
+        if (interfaces.includes('@scrypted/webrtc-sink'))
             return;
 
         if (!interfaces.includes(ScryptedInterface.RTCSignalingChannel))

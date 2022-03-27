@@ -1,6 +1,7 @@
-import type { RTCSignalingSendIceCandidate, RTCSignalingClientSession, RTCAVSignalingSetup, RTCSignalingClientOptions } from "@scrypted/sdk/types";
+import type { RTCSignalingSendIceCandidate, RTCSignalingClientSession, RTCAVSignalingSetup, RTCSignalingClientOptions, RTCSignalingSession } from "@scrypted/sdk/types";
+// import type { RTCPeerConnection as WeriftRTCPeerConnection } from "@koush/werift";
 
-export async function startRTCSignalingSession(session: RTCSignalingClientSession, offer: RTCSessionDescriptionInit,
+export async function startRTCSignalingSession(session: RTCSignalingSession, offer: RTCSessionDescriptionInit,
     console: Console,
     createSetup: () => Promise<RTCAVSignalingSetup>,
     setRemoteDescription: (remoteDescription: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit>,
@@ -34,15 +35,16 @@ export async function startRTCSignalingSession(session: RTCSignalingClientSessio
 }
 
 export async function connectRTCSignalingClients(
-    client1: RTCSignalingClientSession,
-    setup1: RTCAVSignalingSetup,
-    client2: RTCSignalingClientSession,
-    setup2: RTCAVSignalingSetup,
+    offerClient: RTCSignalingSession,
+    offerSetup: RTCAVSignalingSetup,
+    answerClient: RTCSignalingSession,
+    answerSetup: RTCAVSignalingSetup,
+    disableAnswerTrickle?: boolean,
 ) {
-    const offer = await client1.createLocalDescription('offer', setup1, candidate => client2.addIceCandidate(candidate));
-    await client2.setRemoteDescription(offer, setup2);
-    const answer = await client2.createLocalDescription('answer', setup2, candidate => client2.addIceCandidate(candidate));
-    await client1.setRemoteDescription(answer, setup1);
+    const offer = await offerClient.createLocalDescription('offer', offerSetup, candidate => answerClient.addIceCandidate(candidate));
+    await answerClient.setRemoteDescription(offer, answerSetup);
+    const answer = await answerClient.createLocalDescription('answer', answerSetup, disableAnswerTrickle ? undefined : candidate => offerClient.addIceCandidate(candidate));
+    await offerClient.setRemoteDescription(answer, offerSetup);
 }
 
 export class BrowserSignalingSession implements RTCSignalingClientSession {
@@ -62,7 +64,7 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
 
     constructor(public pc: RTCPeerConnection, cleanup?: () => void) {
         const checkConn = () => {
-            console.log('iceConnectionState state', pc.iceConnectionState);
+            console.log('iceConnectionState', pc.iceConnectionState);
             console.log('connectionState', pc.connectionState);
             if (pc.iceConnectionState === 'disconnected'
                 || pc.iceConnectionState === 'failed'
@@ -78,6 +80,10 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
 
         pc.addEventListener('connectionstatechange', checkConn);
         pc.addEventListener('iceconnectionstatechange', checkConn);
+
+        pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState))
+        pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState))
+        pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
     }
 
     async getOptions(): Promise<RTCSignalingClientOptions> {
@@ -133,19 +139,22 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
         await this.createPeerConnection(setup);
 
-        const gatheringPromise = new Promise(resolve => this.pc.onicegatheringstatechange = () => {
-            if (this.pc.iceGatheringState === 'complete')
-                resolve(undefined);
-        });
-
-        if (sendIceCandidate) {
+        const gatheringPromise = new Promise(resolve => {
             this.pc.onicecandidate = ev => {
                 if (ev.candidate) {
                     console.log("local candidate", ev.candidate);
-                    sendIceCandidate(JSON.parse(JSON.stringify(ev.candidate)));
+                    sendIceCandidate?.(JSON.parse(JSON.stringify(ev.candidate)));
+                }
+                else {
+                    resolve(undefined);
                 }
             }
-        }
+
+            this.pc.onicegatheringstatechange = () => {
+                if (this.pc.iceGatheringState === 'complete')
+                    resolve(undefined);
+            }
+        });
 
         const toDescription = (init: RTCSessionDescriptionInit) => {
             return {

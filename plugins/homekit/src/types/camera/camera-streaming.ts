@@ -15,6 +15,7 @@ import { DynamicBitrateSession } from './camera-dynamic-bitrate';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
+import { getStreamingConfiguration } from './camera-utils';
 
 const { mediaManager } = sdk;
 const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
@@ -81,7 +82,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 audioProcess: null,
                 videoReturn,
                 audioReturn,
-                isLowBandwidth: undefined,
             }
 
             sessions.set(request.sessionID, session);
@@ -165,35 +165,31 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
-            let selectedStream: MediaStreamOptions;
+            const {
+                selectedStream,
+                dynamicBitrate,
+                transcodeStreaming,
+                isLowBandwidth,
+                isWatch,
+            } = await getStreamingConfiguration(device, storage, request)
 
-            const isLowBandwidthDevice = request.audio.packet_time !== 20;
-            session.isLowBandwidth = isLowBandwidthDevice;
+            console.log({
+                dynamicBitrate,
+                isLowBandwidth,
+                isWatch,
+                transcodeStreaming,
+                stream: selectedStream?.name || 'Default/undefined',
+            });
 
-            const streamingChannel = isLowBandwidthDevice
-                ? storage.getItem('streamingChannelHub')
-                : storage.getItem('streamingChannel');
-            if (streamingChannel) {
-                const msos = await device.getVideoStreamOptions();
-                selectedStream = msos.find(mso => mso.name === streamingChannel);
-            }
-
-            selectedStream = selectedStream || {
-                id: undefined,
-            };
             // if rebroadcast is being used, this will cause it to send
             // a prebuffer which hopefully contains a key frame.
             // it is safe to pipe this directly into ffmpeg because
             // ffmpeg starts streaming after it finds the key frame.
             selectedStream.prebuffer = undefined;
 
-
             const minBitrate = selectedStream?.video?.minBitrate;
             const maxBitrate = selectedStream?.video?.maxBitrate;
 
-            const dynamicBitrate = storage.getItem('dynamicBitrate') === 'true'
-                && isLowBandwidthDevice
-                && device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration);
             session.startRequest = request as StartStreamRequest;
 
             if (dynamicBitrate) {
@@ -258,9 +254,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
             resetIdleTimeout();
 
-            console.log('isLowBandwidth:', session.isLowBandwidth,
-                'selected stream:', selectedStream?.name || 'Default/undefined');
-
             try {
                 if (CAMERA_STREAM_PERFECT_CODECS) {
                     await startCameraStreamSrtp(device, console, selectedStream, session, () => killSession(request.sessionID));
@@ -270,6 +263,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                         console,
                         storage,
                         selectedStream,
+                        transcodeStreaming,
                         session,
                         () => killSession(request.sessionID));
                 }

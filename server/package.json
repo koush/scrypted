@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.158",
+  "version": "0.0.161",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.8",
@@ -38,7 +38,7 @@
     "ws": "^8.2.3"
   },
   "optionalDependencies": {
-    "@koush/wrtc": "^0.5.2",
+    "@koush/wrtc": "^0.5.3",
     "mdns": "^2.7.2"
   },
   "devDependencies": {

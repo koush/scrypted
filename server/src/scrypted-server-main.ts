@@ -32,6 +32,7 @@ if (!semver.gte(process.version, '16.0.0')) {
 
 process.on('unhandledRejection', error => {
     if (error?.constructor !== RPCResultError && error?.constructor !== PluginError) {
+        console.error('pending crash', error);
         throw error;
     }
     console.warn('unhandled rejection of RPC Result', error);
@@ -217,6 +218,11 @@ async function start() {
 
     listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
     listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
+    const legacyInsecure = http.createServer(app);
+    legacyInsecure.listen(10080);
+    legacyInsecure.on('error', () => {
+        // can ignore.
+    });
 
     console.log('#######################################################');
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);

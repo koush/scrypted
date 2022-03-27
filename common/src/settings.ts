@@ -2,7 +2,10 @@ import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedInterface, Setting, S
 
 const { systemManager } = sdk;
 
-function parseValue(value: string, type: SettingValue, defaultValue: any) {
+function parseValue(value: string, setting: StorageSetting) {
+    const { defaultValue } = setting;
+    const type = setting.multiple ? 'array' : setting.type;
+
     if (type === 'boolean') {
         if (value === 'true')
             return true;
@@ -28,19 +31,38 @@ function parseValue(value: string, type: SettingValue, defaultValue: any) {
         return systemManager.getDeviceById(value);
     }
 
+    // string type, so check if it is json.
+    if (value && setting.json) {
+        try {
+            return JSON.parse(value)
+        }
+        catch (e) {
+            return defaultValue;
+        }
+    }
+
     return value || defaultValue;
 }
+
+export type HideFunction = (device: any) => boolean;
 
 export interface StorageSetting extends Setting {
     defaultValue?: any;
     onPut?: (oldValue: any, newValue: any) => void;
+    onGet?: () => Promise<StorageSetting>;
     mapPut?: (oldValue: any, newValue: any) => any;
+    json?: boolean;
     hide?: boolean;
     noStore?: boolean;
 }
 
 export class StorageSettings<T extends string> implements Settings {
     public values: { [key in T]: any } = {} as any;
+    public options?: {
+        hide?: {
+            [key in T]?: () => Promise<boolean>;
+        }
+    };
 
     constructor(public device: ScryptedDeviceBase | MixinDeviceBase<any>, public settings: { [key in T]: StorageSetting }) {
         for (const key of Object.keys(settings)) {
@@ -70,13 +92,16 @@ export class StorageSettings<T extends string> implements Settings {
     async getSettings(): Promise<Setting[]> {
         const ret = [];
         for (const [key, setting] of Object.entries(this.settings)) {
-            const s: StorageSetting = Object.assign({}, setting);
-            if (s.hide)
+            let s: StorageSetting = Object.assign({}, setting);
+            if (s.onGet)
+                s = Object.assign(s, await s.onGet());
+            if (s.hide || await this.options?.hide?.[key as T]?.())
                 continue;
             s.key = key;
             s.value = this.getItem(key as T);
             ret.push(s);
             delete s.onPut;
+            delete s.onGet;
             delete s.mapPut;
         }
         return ret;
@@ -103,7 +128,6 @@ export class StorageSettings<T extends string> implements Settings {
         const setting = this.settings[key];
         if (!setting)
             return this.device.storage.getItem(key);
-        const type = setting.multiple ? 'array' : setting.type;
-        return parseValue(this.device.storage.getItem(key), type, setting.defaultValue);
+        return parseValue(this.device.storage.getItem(key), setting);
     }
 }
