@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, TypedDict
+from typing import Any, Set, TypedDict
 from typing import Callable
 
 SettingValue = str
@@ -9,10 +9,24 @@ class Console:
     pass
 
 class Storage:
-    pass
+    def getItem(key: str) -> str:
+        pass
+
+    def setItem(key: str, value: str):
+        pass
+
+    def removeItem(key: str):
+        pass
+
+    def getKeys() -> Set[str]:
+        pass
+
+    def clear():
+        pass
 
 class MediaObject:
     mimeType: str
+
 
 class RTCSessionDescriptionInit(TypedDict):
     pass
