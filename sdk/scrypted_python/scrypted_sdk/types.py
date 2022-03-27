@@ -959,13 +959,13 @@ class SystemManager:
 
 class MediaManager:
     builtinConverters: list[BufferConverter]
-    async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> T:
+    async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
     async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:
         pass
     async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
-    async def convertMediaObjectToJSON(self, mediaObject: MediaObject, toMimeType: str) -> T:
+    async def convertMediaObjectToJSON(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
     async def convertMediaObjectToLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass

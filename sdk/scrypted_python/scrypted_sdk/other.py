@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, TypedDict
 from typing import Callable
 
 SettingValue = str
@@ -13,3 +13,6 @@ class Storage:
 
 class MediaObject:
     mimeType: str
+
+class RTCSessionDescriptionInit(TypedDict):
+    pass

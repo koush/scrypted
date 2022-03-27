@@ -82,6 +82,9 @@ function toPythonType(type: any): string {
             return 'Any';
         case 'Buffer':
             return 'bytearray';
+            // generic return type... how to handle this?
+        case 'T':
+            return 'Any';
     }
 
     if (typeof type !== 'string')
