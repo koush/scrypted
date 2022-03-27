@@ -381,7 +381,7 @@ class Arlo(object):
 #
 #        self.HandleEvents(basestation, callbackwrapper, timeout)
 
-    async def HandleEvents(self, basestation, resource, action, callback, timeout=10):
+    async def HandleEvents(self, basestation, resource, actions, callback, timeout=10):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -393,7 +393,7 @@ class Arlo(object):
         if self.event_stream and self.event_stream.connected and self.event_stream.registered:
             while self.event_stream.connected:
                 try:
-                    event = await self.event_stream.get(resource, action, timeout=timeout)
+                    event, action = await self.event_stream.get(resource, actions, timeout=timeout)
                 except asyncio.TimeoutError:
                     return TIMEOUT
 
@@ -407,7 +407,7 @@ class Arlo(object):
                     continue
                 return response
 
-    async def TriggerAndHandleEvent(self, basestation, resource, action, trigger, callback, timeout=10):
+    async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback, timeout=10):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -422,7 +422,7 @@ class Arlo(object):
         trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.
-        return await self.HandleEvents(basestation, resource, action, callback, timeout=timeout)
+        return await self.HandleEvents(basestation, resource, actions, callback, timeout=timeout)
 
 #    def GetBaseStationState(self, basestation):
 #        return self.NotifyAndGetResponse(basestation, {"action":"get","resource":"basestation","publishResponse":False})
@@ -1669,14 +1669,13 @@ class Arlo(object):
             self.request.post("https://my.arlo.com/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
 
         def callback(self, event):
-            if event.get("action") == "fullFrameSnapshotAvailable" and\
-                event.get("from") == basestation.get("deviceId") and\
-                event.get("resource") == resource:
-                return event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
+            url = event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
+            if url:
+                return url
 
             return REQUEUE 
 
-        return await self.TriggerAndHandleEvent(basestation, resource, "fullFrameSnapshotAvailable", trigger, callback)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback)
 
 #    def StartRecording(self, basestation, camera):
 #        """

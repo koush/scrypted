@@ -42,22 +42,30 @@ class EventStream:
     def __del__(self):
         self.disconnect()
 
-    async def get(self, resource, action, timeout=None):
-        async def get_impl(resource, action):
+    async def get(self, resource, actions, timeout=None):
+        async def get_impl(resource, actions):
             while True:
-                key = f"{resource}/{action}"
-                if key not in self.queues:
-                    await asyncio.sleep(0.1)
-                    continue
-                q = self.queues[key]
-                event = await q.get()
-                q.task_done()
-                if time.time() - event.timestamp > self.expire:
-                    print(f"Expiring event: {event.item}")
-                    # dropping expired events
-                    continue
-                return event
-        return await asyncio.wait_for(get_impl(resource, action), timeout)
+                for action in actions:
+                    key = f"{resource}/{action}"
+                    if key not in self.queues:
+                        await asyncio.sleep(0)
+                        continue
+
+                    q = self.queues[key]
+                    if q.empty():
+                        await asyncio.sleep(0)
+                        continue
+
+                    event = q.get_nowait()
+                    q.task_done()
+                    if time.time() - event.timestamp > self.expire:
+                        # dropping expired events
+                        print(f"Expiring event: {event.item}")
+                        await asyncio.sleep(0)
+                        break
+
+                    return event, action
+        return await asyncio.wait_for(get_impl(resource, actions), timeout)
 
     async def start(self):
         if self.event_stream is not None:
