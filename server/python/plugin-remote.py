@@ -1,34 +1,39 @@
 from __future__ import annotations
-from typing import Optional
-from io import StringIO
-from typing import Any
-import subprocess
-import zipfile
-import time
-import base64
-from typing_extensions import TypedDict
-from typing import Tuple
-import aiofiles
-import json
-from asyncio.events import AbstractEventLoop
+
 import asyncio
-import rpc
-from collections.abc import Mapping
-from scrypted_python.scrypted_sdk.types import DeviceManifest, MediaManager, ScryptedInterfaceProperty
-import scrypted_python.scrypted_sdk.types
+import base64
+import gc
+import json
+import os
+import platform
+import resource
+import shutil
+import subprocess
+import threading
+import time
+import zipfile
+from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
 from asyncio.streams import StreamReader, StreamWriter
-import os
+from collections.abc import Mapping
+from io import StringIO
 from os import sys
-import platform
-import shutil
-import gc
-import threading
+from typing import Any, Optional, Set, Tuple
+
+import aiofiles
 import gi
-import resource
+import scrypted_python.scrypted_sdk.types
+from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
+                                                MediaManager,
+                                                ScryptedInterfaceProperty,
+                                                Storage)
+from typing_extensions import TypedDict
+
+import rpc
+
 gi.require_version('Gst', '1.0')
 
-from gi.repository import Gst, GLib
+from gi.repository import GLib, Gst
 
 Gst.init(None)
 
@@ -82,11 +87,33 @@ class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):
         self.systemManager.api.setState(self.nativeId, property, value)
 
 
-class DeviceStorage:
+class DeviceStorage(Storage):
     id: str
     nativeId: str
-    storage: Mapping[str, str] = {}
+    storage: Mapping[str, str]
+    remote: PluginRemote
+    loop: AbstractEventLoop
 
+    def update_storage(self):
+        self.remote.api.setStorage(self.nativeId, self.storage)
+
+    def getItem(self, key: str) -> str:
+        return self.storage.get(key, None)
+
+    def setItem(self, key: str, value: str):
+        self.storage[key] = value
+        self.update_storage()
+
+    def removeItem(self, key: str):
+        self.storage.pop(key, None)
+        self.update_storage()
+
+    def getKeys(self) -> Set[str]:
+        return self.storage.keys()
+
+    def clear(self):
+        self.storage = {}
+        self.update_storage()
 
 class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
     def __init__(self, nativeIds: Mapping[str, DeviceStorage], systemManager: SystemManager) -> None:
@@ -104,6 +131,20 @@ class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
     async def onDevicesChanged(self, devices: DeviceManifest) -> None:
         return await self.systemManager.api.onDevicesChanged(devices)
 
+    async def onDeviceDiscovered(self, devices: Device) -> str:
+        return await self.systemManager.api.onDeviceDiscovered(devices)
+
+    async def onDeviceRemoved(self, nativeId: str) -> None:
+        return await self.systemManager.api.onDeviceRemoved(nativeId)
+
+    async def onMixinEvent(self, id: str, mixinDevice: Any, eventInterface: str, eventData: Any) -> None:
+        return await self.systemManager.api.onMixinEvent(id, mixinDevice, eventInterface, eventData)
+
+    async def requestRestart(self) -> None:
+        return await self.systemManager.api.onMixinEvent(id)
+
+    def getDeviceStorage(self, nativeId: str = None) -> Storage:
+        return self.nativeIds.get(nativeId, None)
 
 class BufferSerializer(rpc.RpcSerializer):
     def serialize(self, value):
@@ -253,7 +294,10 @@ class PluginRemote:
         if id:
             ds = DeviceStorage()
             ds.id = id
+            ds.nativeId = nativeId
             ds.storage = storage
+            ds.remote = self
+            ds.loop = self.loop
             self.nativeIds[nativeId] = ds
         else:
             self.nativeIds.pop(nativeId, None)

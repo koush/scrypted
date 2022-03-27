@@ -44,6 +44,10 @@ class ScryptedDeviceBase(DeviceState):
     async def onDeviceEvent(self, interface: ScryptedInterface, eventData: Any):
         await deviceManager.onDeviceEvent(self.nativeId, interface, eventData)
 
+    @property
+    def storage(self):
+        return deviceManager.getDeviceStorage(self.nativeId)
+
     def print(self, *values: object, sep: Optional[str] = ' ',
             end: Optional[str] = '\n',
             flush: bool = True):
