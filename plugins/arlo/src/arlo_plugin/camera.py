@@ -1,7 +1,7 @@
 import scrypted_sdk
 from scrypted_sdk.types import Camera, VideoCamera, ScryptedMimeTypes
 
-from .arlo.arlo_async import TIMEOUT
+from .arlo import TIMEOUT
 from .logging import getLogger
 
 logger = getLogger(__name__)
