@@ -1,6 +1,6 @@
 import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, Device, ScryptedInterface, ObjectsDetected, ObjectDetectionResult } from "@scrypted/sdk";
 import { ProtectApi, ProtectApiUpdates, ProtectNvrUpdatePayloadCameraUpdate, ProtectNvrUpdatePayloadEventAdd } from "./unifi-protect";
-import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
+import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '@scrypted/common/src/provider-plugin';
 import fetch, { RequestInfo, RequestInit, Response } from "node-fetch";
 import { defaultSensorTimeout, UnifiCamera } from "./camera";
 import { FeatureFlagsShim, LastSeenShim } from "./shim";
