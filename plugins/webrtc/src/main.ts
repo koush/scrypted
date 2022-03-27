@@ -1,5 +1,5 @@
 import { MediaStreamTrack, RTCIceCandidate, RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
-import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RTCSignalingSendIceCandidate } from '@scrypted/sdk';
+import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RTCSignalingSendIceCandidate, RequestMediaStreamOptions, MediaObject, MediaStreamOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
@@ -11,6 +11,7 @@ import { getH264DecoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffm
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { createSdpInput } from '@scrypted/common/src/sdp-utils';
 import child_process, { ChildProcess } from 'child_process';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '@scrypted/common/src/wrtc-to-rtsp';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -91,6 +92,13 @@ class ScryptedSignalingSession implements RTCSignalingSession {
 
 class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel {
     storageSettings = new StorageSettings(this, {
+        useUdp: {
+            title: 'Use SDP/UDP instead of RTSP/TCP',
+            description: 'Experimental',
+            type: 'boolean',
+            defaultValue: true,
+            hide: true,
+        },
         addExtraData: {
             title: 'Add H264 Extra Data',
             description: 'Some cameras do not include H264 extra data in the stream and this causes live streaming to always fail (but recordings may be working). This is a inexpensive video filter and does not perform a transcode. Enable this setting only as necessary.',
@@ -130,7 +138,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             description: 'The bitrate to send when transcoding video.',
             type: 'number',
             defaultValue: 500000,
-        }
+        },
     });
 
     constructor(options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
@@ -404,9 +412,39 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
     putMixinSetting(key: string, value: SettingValue): Promise<void> {
         return this.storageSettings.putSetting(key, value);
     }
+
+
+    createVideoStreamOptions() {
+        return getRTCMediaStreamOptions('webrtc', 'WebRTC', this.storageSettings.values.useUdp);
+    }
+
+    async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera) && options?.id !== 'webrtc') {
+            return this.mixinDevice.getVideoStream(options);
+        }
+
+        const ffmpegInput = await createRTCPeerConnectionSource({
+            console: this.console,
+            mediaStreamOptions: this.createVideoStreamOptions(),
+            channel: this.mixinDevice,
+            useUdp: this.storageSettings.values.useUdp,
+        });
+
+        return mediaManager.createFFmpegMediaObject(ffmpegInput);
+    }
+
+    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+        let ret: MediaStreamOptions[] = [];
+        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera)) {
+            ret = await this.mixinDevice.getVideoStreamOptions();
+        }
+        ret.push(this.createVideoStreamOptions());
+        return ret;
+    }
+
 }
 
-class WebRTCSinkPlugin extends AutoenableMixinProvider {
+class WebRTCPlugin extends AutoenableMixinProvider {
     constructor() {
         super();
         this.on = this.on || false;
@@ -415,14 +453,22 @@ class WebRTCSinkPlugin extends AutoenableMixinProvider {
         if (!supportedTypes.includes(type))
             return;
 
-        if (!interfaces.includes(ScryptedInterface.VideoCamera))
-            return;
+            // if this is a webrtc camera, also proxy the signaling channel too,
+            // for inflexible clients.
+            if (interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
+                return [
+                    ScryptedInterface.RTCSignalingChannel,
+                    ScryptedInterface.VideoCamera,
+                    ScryptedInterface.Settings,
+                ];
+            }
 
-        return [
-            '@scrypted/webrtc-sink',
-            ScryptedInterface.RTCSignalingChannel,
-            ScryptedInterface.Settings,
-        ];
+        if (interfaces.includes(ScryptedInterface.VideoCamera)) {
+            return [
+                ScryptedInterface.RTCSignalingChannel,
+                ScryptedInterface.Settings,
+            ];
+        }
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
@@ -431,7 +477,7 @@ class WebRTCSinkPlugin extends AutoenableMixinProvider {
             mixinDeviceInterfaces,
             mixinDeviceState,
             group: 'WebRTC',
-            groupKey: 'webrtc-sink',
+            groupKey: 'webrtc',
             mixinProviderNativeId: this.nativeId,
         })
     }
@@ -441,4 +487,4 @@ class WebRTCSinkPlugin extends AutoenableMixinProvider {
     }
 }
 
-export default new WebRTCSinkPlugin();
+export default new WebRTCPlugin();

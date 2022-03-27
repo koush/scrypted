@@ -1,5 +1,5 @@
 {
-   "name": "@scrypted/webrtc-sink",
+   "name": "@scrypted/webrtc",
    "version": "0.0.1",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
@@ -16,7 +16,7 @@
       "webrtc"
    ],
    "scrypted": {
-      "name": "WebRTC Sink",
+      "name": "WebRTC Plugin",
       "type": "API",
       "interfaces": [
          "MixinProvider"
