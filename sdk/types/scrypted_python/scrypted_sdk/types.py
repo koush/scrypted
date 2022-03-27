@@ -916,7 +916,7 @@ class DeviceManager:
         pass
     def getDeviceState(self, nativeId: str = None) -> DeviceState:
         pass
-    def getDeviceStorage(self) -> Storage:
+    def getDeviceStorage(self, nativeId: str = None) -> Storage:
         pass
     def getMixinConsole(self, mixinId: str, nativeId: str = None) -> Console:
         pass

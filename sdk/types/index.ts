@@ -1637,11 +1637,6 @@ export interface DeviceManager {
   getDeviceState(nativeId?: ScryptedNativeId): DeviceState;
 
   /**
-   * Get the per script Storage object.
-   */
-  getDeviceStorage(): Storage;
-
-  /**
    * Get the storage for a mixin.
    * @param id The id of the device being mixined.
    * @param nativeId The nativeId of the MixinProvider.
@@ -1654,7 +1649,7 @@ export interface DeviceManager {
   onMixinEvent(id: string, mixinDevice: any, eventInterface: string, eventData: any): Promise<void>;
 
   /**
-  * Get the per device Storage object.
+  * Get the device Storage object.
   */
   getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
 
