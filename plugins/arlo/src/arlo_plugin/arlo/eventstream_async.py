@@ -42,6 +42,30 @@ class EventStream:
     def __del__(self):
         self.disconnect()
 
+    async def _clean_queues(self):
+        while not self.event_stream_stop_event.is_set():
+            print("Running periodic queue cleanup")
+
+            for key, q in self.queues.items():
+                items = []
+                num_dropped = 0
+                while not q.empty():
+                    item = q.get_nowait()
+                    q.task_done()
+
+                    if time.time() - item.timestamp > self.expire:
+                        num_dropped += 1
+                        continue
+
+                    items.append(item)
+
+                for item in items:
+                    q.put_nowait(item)
+
+                print(f"Cleaned {num_dropped} events from queue {key}")
+
+            await asyncio.sleep(self.expire * 2)
+
     async def get(self, resource, actions, timeout=None):
         async def get_impl(resource, actions):
             while True:
@@ -103,6 +127,8 @@ class EventStream:
 
         while not self.connected and not self.event_stream_stop_event.is_set():
             await asyncio.sleep(0.5)
+
+        asyncio.get_event_loop().create_task(self._clean_queues())
 
     async def _queue_response(self, response):
         resource = response.get('resource')
