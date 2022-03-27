@@ -44,6 +44,7 @@ from googleapiclient.discovery import build
 #logging.basicConfig(level=logging.DEBUG,format='[%(levelname)s] (%(threadName)-10s) %(message)s',)
 
 REQUEUE = object()
+TIMEOUT = object()
 
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
@@ -380,7 +381,7 @@ class Arlo(object):
 #
 #        self.HandleEvents(basestation, callbackwrapper, timeout)
 
-    async def HandleEvents(self, basestation, callback, timeout=120):
+    async def HandleEvents(self, basestation, resource, action, callback, timeout=10):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -391,22 +392,22 @@ class Arlo(object):
         await self.Subscribe(basestation)
         if self.event_stream and self.event_stream.connected and self.event_stream.registered:
             while self.event_stream.connected:
-                event = await self.event_stream.get()
+                try:
+                    event = await self.event_stream.get(resource, action, timeout=timeout)
+                except asyncio.TimeoutError:
+                    return TIMEOUT
+
                 if event is None or self.event_stream.event_stream_stop_event.is_set():
                     return None
 
-                # If this event has is of resource type "subscriptions", then it's a ping reply event.
-                if event.item.get('resource', '').startswith('subscriptions'):
+                response = callback(self, event.item)
+                # requeue if the callback says to do so
+                if response is REQUEUE:
+                    await self.event_stream.requeue(event, resource, action)
                     continue
-                else:
-                    response = callback(self, event.item)
-                    # requeue if the callback says to do so
-                    if response is REQUEUE:
-                        await self.event_stream.put(event)
-                        continue
-                    return response
+                return response
 
-    async def TriggerAndHandleEvent(self, basestation, trigger, callback):
+    async def TriggerAndHandleEvent(self, basestation, resource, action, trigger, callback, timeout=10):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -421,7 +422,7 @@ class Arlo(object):
         trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.
-        return await self.HandleEvents(basestation, callback)
+        return await self.HandleEvents(basestation, resource, action, callback, timeout=timeout)
 
 #    def GetBaseStationState(self, basestation):
 #        return self.NotifyAndGetResponse(basestation, {"action":"get","resource":"basestation","publishResponse":False})
@@ -1656,32 +1657,26 @@ class Arlo(object):
 #
 #        return self.TriggerAndHandleEvent(basestation, trigger, callback)
 
-    async def TriggerFullFrameSnapshot(self, basestation, camera, retryAfter=30):
+    async def TriggerFullFrameSnapshot(self, basestation, camera):
         """
         This function causes the camera to record a fullframe snapshot.
         The presignedFullFrameSnapshotUrl url is returned.
         Use DownloadSnapshot() to download the actual image file.
         """
-        lastTry = None
+        resource = f"cameras/{camera.get('deviceId')}"
 
         def trigger(self):
-            nonlocal lastTry
-            lastTry = time.time()
             self.request.post("https://my.arlo.com/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
 
         def callback(self, event):
-            nonlocal lastTry
             if event.get("action") == "fullFrameSnapshotAvailable" and\
                 event.get("from") == basestation.get("deviceId") and\
-                event.get("resource") == "cameras/"+camera.get("deviceId"):
+                event.get("resource") == resource:
                 return event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
-
-            if time.time() - lastTry > retryAfter:
-                trigger(self)
 
             return REQUEUE 
 
-        return await self.TriggerAndHandleEvent(basestation, trigger, callback)
+        return await self.TriggerAndHandleEvent(basestation, resource, "fullFrameSnapshotAvailable", trigger, callback)
 
 #    def StartRecording(self, basestation, camera):
 #        """

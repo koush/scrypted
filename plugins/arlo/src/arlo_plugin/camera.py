@@ -1,9 +1,8 @@
-import aiohttp
-import asyncio
 
 import scrypted_sdk
 from scrypted_sdk.types import Camera, VideoCamera, ScryptedMimeTypes
 
+from .arlo.arlo_async import TIMEOUT
 from .logging import getLogger
 
 logger = getLogger(__name__)
@@ -30,16 +29,13 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         picUrl = await self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device)
 
         if picUrl is None:
-            logger.warn(f"Cannot take snapshot for {self.nativeId}")
+            logger.warn(f"Error taking snapshot for {self.nativeId}")
             raise Exception(f"Error taking snapshot for {self.nativeId}")
-        else:
-            logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(picUrl) as resp:
-                    picBytes = await resp.read()
-            logger.info(f"Done downloading snapshot for {self.nativeId}") 
+        elif picUrl is TIMEOUT:
+            logger.warn(f"Timeout taking snapshot for {self.nativeId}")
+            raise Exception(f"Timeout taking snapshot for {self.nativeId}")
 
-        return await scrypted_sdk.mediaManager.createMediaObject(picBytes, "image/jpeg")
+        return await scrypted_sdk.mediaManager.createMediaObject(str.encode(picUrl), ScryptedMimeTypes.Url.value)
 
     async def getVideoStreamOptions(self):
         return []
