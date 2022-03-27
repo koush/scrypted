@@ -1,4 +1,3 @@
-
 import scrypted_sdk
 from scrypted_sdk.types import Camera, VideoCamera, ScryptedMimeTypes
 

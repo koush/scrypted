@@ -1,8 +1,5 @@
 import asyncio
-import base64
 import json
-import os
-import tempfile
 
 import scrypted_sdk
 from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface, ScryptedDeviceType
@@ -10,6 +7,7 @@ from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, Scrypt
 from .arlo import Arlo
 from .camera import ArloCamera
 from .logging import getLogger
+from .monkey_patch import *
 from .scrypted_env import get_pyplugin_settings_file, ensure_pyplugin_settings_file
 
 logger = getLogger(__name__)
