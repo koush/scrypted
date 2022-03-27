@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Set, TypedDict
+from typing import AbstractSet, Any, TypedDict
 from typing import Callable
 
 SettingValue = str
@@ -20,7 +20,7 @@ class Storage:
     def removeItem(self, key: str):
         pass
 
-    def getKeys(self) -> Set[str]:
+    def getKeys(self) -> AbstractSet[str]:
         pass
 
     def clear(self):
