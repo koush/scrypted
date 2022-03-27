@@ -396,7 +396,7 @@ class Arlo(object):
                     return None
 
                 # If this event has is of resource type "subscriptions", then it's a ping reply event.
-                if event.get('resource', '').startswith('subscriptions'):
+                if event.item.get('resource', '').startswith('subscriptions'):
                     continue
                 else:
                     response = callback(self, event.item)
@@ -1656,26 +1656,30 @@ class Arlo(object):
 #
 #        return self.TriggerAndHandleEvent(basestation, trigger, callback)
 
-    async def TriggerFullFrameSnapshot(self, basestation, camera):
+    async def TriggerFullFrameSnapshot(self, basestation, camera, retryAfter=30):
         """
         This function causes the camera to record a fullframe snapshot.
         The presignedFullFrameSnapshotUrl url is returned.
         Use DownloadSnapshot() to download the actual image file.
         """
+        lastTry = None
+
         def trigger(self):
+            nonlocal lastTry
+            lastTry = time.time()
             self.request.post("https://my.arlo.com/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
 
-        numRequeued = 0
         def callback(self, event):
-            nonlocal numRequeued
-            if event.get("action") == "fullFrameSnapshotAvailable":
-                if event.get("from") == basestation.get("deviceId") and event.get("resource") == "cameras/"+camera.get("deviceId"):
-                    return event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
-                numRequeued += 1
-                if numRequeued > 10:
-                    trigger(self)
-                return REQUEUE 
-            return None
+            nonlocal lastTry
+            if event.get("action") == "fullFrameSnapshotAvailable" and\
+                event.get("from") == basestation.get("deviceId") and\
+                event.get("resource") == "cameras/"+camera.get("deviceId"):
+                return event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
+
+            if time.time() - lastTry > retryAfter:
+                trigger(self)
+
+            return REQUEUE 
 
         return await self.TriggerAndHandleEvent(basestation, trigger, callback)
 

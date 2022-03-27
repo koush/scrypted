@@ -30,7 +30,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         picUrl = await self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device)
 
         if picUrl is None:
-            logger.warn(f"Cannot take snapshot for {self.nativeId}, stream disconnected, using cached")
+            logger.warn(f"Cannot take snapshot for {self.nativeId}")
             raise Exception(f"Error taking snapshot for {self.nativeId}")
         else:
             logger.info(f"Downloading snapshot for {self.nativeId} from {picUrl}")

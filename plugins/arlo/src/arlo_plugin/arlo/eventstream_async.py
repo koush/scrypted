@@ -28,11 +28,12 @@ import time
 
 class EventStream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=10):
+    def __init__(self, arlo, expire=30):
         self.event_stream = None
         self.connected = False
         self.registered = False
         self.queue = asyncio.Queue()
+        self.expire = expire
         self.event_stream_stop_event = threading.Event()
         self.arlo = arlo
         self.event_loop = asyncio.get_event_loop()
@@ -45,6 +46,7 @@ class EventStream:
             event = await self.queue.get()
             self.queue.task_done()
             if time.time() - event.timestamp > self.expire:
+                print(f"Expiring event: {event.item}")
                 # dropping expired events
                 continue
             return event
@@ -74,9 +76,13 @@ class EventStream:
                         self.disconnect()
                         return None
                     else:
-                        self.event_loop.call_soon_threadsafe(self.put, Event(response, time.time()))
+                        self.event_loop.call_soon_threadsafe(
+                            lambda: asyncio.create_task(
+                                self.put(StreamEvent(response, time.time()))
+                            )
+                        )
                 elif response.get('status') == 'connected':
-                    self.connect = True
+                    self.connected = True
 
         self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization').decode(), session=self.arlo.request.session)
         self.event_stream_thread = threading.Thread(name="EventStream", target=thread_main, args=(self, ))
@@ -100,7 +106,7 @@ class EventStream:
         if self.event_stream_thread != threading.current_thread():
             self.event_stream_thread.join()
 
-class Event:
+class StreamEvent:
     item = None
     timestamp = None
 
