@@ -65,7 +65,7 @@ export function getH264DecoderArgs(): CodecArgs {
         'Nvidia CUDA': [
             '-vsync', '0', '–hwaccel', 'cuda', '-hwaccel_output_format', 'cuda',
         ],
-        'Nvidia CUVID:': [
+        'Nvidia CUVID': [
             '-vsync', '0', '–hwaccel', 'cuvid', '-c:v', 'h264_cuvid',
         ],
     };

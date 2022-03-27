@@ -1,5 +1,5 @@
 import { MediaStreamTrack, RTCIceCandidate, RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
-import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RTCSignalingSendIceCandidate, MediaObject } from '@scrypted/sdk';
+import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RTCSignalingSendIceCandidate } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
@@ -9,7 +9,7 @@ import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { getH264DecoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
-import { addTrackControls, createSdpInput } from '@scrypted/common/src/sdp-utils';
+import { createSdpInput } from '@scrypted/common/src/sdp-utils';
 import child_process, { ChildProcess } from 'child_process';
 
 const { mediaManager, systemManager } = sdk;
@@ -277,8 +277,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                     ?.find(codec => codec.sdpFmtpLine.includes('profile-level-id=64'))
 
                 const videoArgs: string[] = [];
-
-                if (!sessionSupportsH264High || mediaStreamOptions?.video?.codec !== 'h264' || this.storageSettings.values.transcode === 'Enabled') {
+                const transcode = !sessionSupportsH264High || mediaStreamOptions?.video?.codec !== 'h264' || this.storageSettings.values.transcode === 'Enabled';
+                if (transcode) {
                     const encoderArguments: string = this.storageSettings.values.encoderArguments;
                     if (!encoderArguments) {
                         videoArgs.push(
@@ -292,6 +292,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                     }
 
                     videoArgs.push(
+                        "-bf", "0",
                         '-r', '15',
                         '-vf', 'scale=w=iw/2:h=ih/2',
                         '-profile:v', 'baseline',
@@ -307,11 +308,15 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                 if (this.storageSettings.values.addExtraData)
                     videoArgs.push("-bsf:v", "dump_extra");
 
+                const decoderArguments: string[] = this.storageSettings.values.decoderArguments?.split(' ') || [];
+
                 const args = [
                     '-hide_banner',
 
                     '-fflags', 'nobuffer',
                     '-flags', 'low_delay',
+
+                    ...(transcode ? decoderArguments : []),
 
                     ...ffInput.inputArguments,
 
