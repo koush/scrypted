@@ -5,24 +5,27 @@ from typing import Callable
 SettingValue = str
 EventListener = Callable[[Any, Any, Any], None]
 
+
 class Console:
     pass
 
+
 class Storage:
-    def getItem(key: str) -> str:
+    def getItem(self, key: str) -> str:
         pass
 
-    def setItem(key: str, value: str):
+    def setItem(self, key: str, value: str):
         pass
 
-    def removeItem(key: str):
+    def removeItem(self, key: str):
         pass
 
-    def getKeys() -> Set[str]:
+    def getKeys(self) -> Set[str]:
         pass
 
-    def clear():
+    def clear(self):
         pass
+
 
 class MediaObject:
     mimeType: str
