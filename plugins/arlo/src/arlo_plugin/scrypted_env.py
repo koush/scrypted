@@ -1,30 +1,28 @@
 import os
 
-def getScryptedVolume():
+def get_scrypted_volume():
     return os.environ.get('SCRYPTED_VOLUME', os.path.join(os.getcwd(), 'volume'))
 
-def getPyPluginSettingsVolume():
-    return os.path.join(getScryptedVolume(), 'pypluginsettings')
+def get_pyplugin_settings_volume():
+    return os.path.join(get_scrypted_volume(), 'pypluginsettings')
 
-def ensurePyPluginSettingsVolume():
-    pypluginDir = getPyPluginSettingsVolume()
-    if not os.path.exists(pypluginDir):
-        os.makedirs(pypluginDir)
+def ensure_pyplugin_settings_volume():
+    pyplugin_dir = get_pyplugin_settings_volume()
+    if not os.path.exists(pyplugin_dir):
+        os.makedirs(pyplugin_dir)
 
-def getPyPluginSettingsFile(pluginId):
-    return os.path.join(getPyPluginSettingsVolume(), f'{pluginId}.json')
+def get_pyplugin_settings_file(pluginId):
+    return os.path.join(get_pyplugin_settings_volume(), f'{pluginId}.json')
 
-def ensurePyPluginSettingsFile(pluginId):
-    file = getPyPluginSettingsFile(pluginId)
+def ensure_pyplugin_settings_file(pluginId):
+    file = get_pyplugin_settings_file(pluginId)
     if not os.path.exists(file):
         parent = os.path.dirname(file)
         if not os.path.exists(parent):
             os.makedirs(parent)
 
-        with open(file, 'w') as settingsFile:
-            settingsFile.write('{}')
+        with open(file, 'w') as settings_file:
+            settings_file.write('{}')
 
-def getPluginInstallDirectory():
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))), "unzipped")
 
-ensurePyPluginSettingsVolume()
+ensure_pyplugin_settings_volume()

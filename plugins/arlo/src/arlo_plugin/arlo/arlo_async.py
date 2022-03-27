@@ -50,15 +50,10 @@ class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
     TRANSID_PREFIX = 'web'
-    def __init__(self, username, password, google_credential_file=None):
 
+    def __init__(self):
         self.event_stream = None
         self.request = None
-
-        if google_credential_file:
-            self.LoginMFA(username, password, google_credential_file)
-        else:
-            self.Login(username, password)
 
     def to_timestamp(self, dt):
         if sys.version[0] == '2':
@@ -103,73 +98,10 @@ class Arlo(object):
         now = datetime.today()
         return trans_type+"!" + float2hex(random.random() * math.pow(2, 32)).lower() + "!" + str(int((time.mktime(now.timetuple())*1e3 + now.microsecond/1e3)))
 
-    def Login(self, username, password):
-        """
-        This call returns the following:
-        {
-            "userId":"XXX-XXXXXXX",
-            "email":"user@example.com",
-            "token":"2_5HicFJMXXXXX-S_7IuK2EqOUHXXXXXXXXXXX1CXKWTThgU18Va_XXXXXX5S00hUafv3PV_if_Bl_rhiFsDHYwhxI3CxlVnR5f3q2XXXXXX-Wnt9F7D82uN1f4cXXXXX-FMUsWF_6tMBqwn6DpzOaIB7ciJrnr2QJyKewbQouGM6",
-            "paymentId":"XXXXXXXX",
-            "authenticated":1472961381,
-            "accountStatus":"registered",
-            "serialNumber":"XXXXXXXXXXXXX",
-            "countryCode":"US",
-            "tocUpdate":false,
-            "policyUpdate":false,
-            "validEmail":true
-        }
-        """
+    def LoginMFA(self, username, password):
         self.username = username
         self.password = password
         self.request = Request()
-
-        headers = {
-            'Access-Control-Request-Headers': 'content-type,source,x-user-device-id,x-user-device-name,x-user-device-type',
-            'Access-Control-Request-Method': 'POST',
-            'Origin': f'https://{self.BASE_URL}',
-            'Referer': f'https://{self.BASE_URL}/',
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
-        }
-        self.request.options(f'https://{self.AUTH_URL}/api/auth', headers=headers)
-        
-        headers = {
-            'DNT': '1',
-            'schemaVersion': '1',
-            'Auth-Version': '2',
-            'Content-Type': 'application/json; charset=UTF-8',
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
-            'Origin': f'https://{self.BASE_URL}',
-            'Referer': f'https://{self.BASE_URL}/',
-            'Source': 'arloCamWeb',
-        }
-
-        #body = self.request.post(f'https://{self.BASE_URL}/hmsweb/login/v2', {'email': self.username, 'password': self.password}, headers=headers)
-        body = self.request.post(
-            f'https://{self.AUTH_URL}/api/auth',
-            params={
-                'email': self.username,
-                'password': str(base64.b64encode(self.password.encode('utf-8')), 'utf-8'),
-                'language': 'en',
-                'EnvSource': 'prod'
-            },
-            headers=headers
-        )
-        headers['Authorization'] = body['token']
-
-        self.request.session.headers.update(headers)
-
-        self.user_id = body['userId']
-        return body
-
-    def LoginMFA(self, username, password, google_credential_file):
-        self.username = username
-        self.password = password
-        self.google_credentials = pickle.load(open(google_credential_file, 'rb'))
-        self.request = Request()
-
-        # request MFA token
-        request_start_time = int(time.time())
 
         headers = {
             'DNT': '1',
@@ -216,56 +148,29 @@ class Arlo(object):
         )
         factor_auth_code = start_auth_body['data']['factorAuthCode']
 
-        # search for MFA token in latest emails
-        pattern = '\d{6}'
-        code = None
-        service = build('gmail', 'v1', credentials = self.google_credentials)
+        def complete_auth(code):
+            nonlocal self, factor_auth_code, headers
 
-        for i in range(0, 10):
-            time.sleep(5)
-            messages = service.users().messages().list(
-                userId='me',
-                q=f'from:do_not_reply@arlo.com after:{request_start_time}'
-            ).execute()
+            finish_auth_body = self.request.post(
+                f'https://{self.AUTH_URL}/api/finishAuth',
+                {
+                    'factorAuthCode': factor_auth_code,
+                    'otp': code
+                },
+                headers=headers,
+                raw=True
+            )
 
-            if messages['resultSizeEstimate'] == 0:
-                print('no matching emails found')
-                continue
+            # Update Authorization code with new code
+            headers = {
+                'Auth-Version': '2',
+                'Authorization': finish_auth_body['data']['token'].encode('utf-8'),
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+            }
+            self.request.session.headers.update(headers)
+            self.BASE_URL = 'myapi.arlo.com'
 
-            # only check the latest message
-            message = service.users().messages().get(userId='me', id=messages['messages'][0]['id']).execute()
-            search = re.search(pattern, message['snippet'])
-            if not search:
-                print('no matching code in email found')
-                continue
-
-            code = search.group(0)
-            break
-
-        """
-        code = input("Enter MFA code:\n")
-        print("CODE", factor_auth_code)
-        """
-
-        # Complete auth
-        finish_auth_body = self.request.post(
-            f'https://{self.AUTH_URL}/api/finishAuth',
-            {
-                'factorAuthCode': factor_auth_code,
-                'otp': code
-            },
-            headers=headers,
-            raw=True
-        )
-
-        # Update Authorization code with new code
-        headers = {
-            'Auth-Version': '2',
-            'Authorization': finish_auth_body['data']['token'].encode('utf-8'),
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
-        }
-        self.request.session.headers.update(headers)
-        self.BASE_URL = 'myapi.arlo.com'
+        return complete_auth
 
     def Logout(self):
         self.Unsubscribe()
@@ -381,7 +286,7 @@ class Arlo(object):
 #
 #        self.HandleEvents(basestation, callbackwrapper, timeout)
 
-    async def HandleEvents(self, basestation, resource, actions, callback, timeout=10):
+    async def HandleEvents(self, basestation, resource, actions, callback, timeout):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -407,7 +312,7 @@ class Arlo(object):
                     continue
                 return response
 
-    async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback, timeout=10):
+    async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback, timeout):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -422,7 +327,7 @@ class Arlo(object):
         trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.
-        return await self.HandleEvents(basestation, resource, actions, callback, timeout=timeout)
+        return await self.HandleEvents(basestation, resource, actions, callback, timeout)
 
 #    def GetBaseStationState(self, basestation):
 #        return self.NotifyAndGetResponse(basestation, {"action":"get","resource":"basestation","publishResponse":False})
@@ -1657,7 +1562,7 @@ class Arlo(object):
 #
 #        return self.TriggerAndHandleEvent(basestation, trigger, callback)
 
-    async def TriggerFullFrameSnapshot(self, basestation, camera):
+    async def TriggerFullFrameSnapshot(self, basestation, camera, timeout=10):
         """
         This function causes the camera to record a fullframe snapshot.
         The presignedFullFrameSnapshotUrl url is returned.
@@ -1675,7 +1580,7 @@ class Arlo(object):
 
             return REQUEUE 
 
-        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback, timeout)
 
 #    def StartRecording(self, basestation, camera):
 #        """

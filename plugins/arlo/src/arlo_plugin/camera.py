@@ -10,13 +10,15 @@ logger = getLogger(__name__)
 class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     nativeId = None
     arlo_device = None
+    arlo_basestation = None
     provider = None
 
-    def __init__(self, nativeId, arlo_device, provider):
+    def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
 
         self.nativeId = nativeId
         self.arlo_device = arlo_device
+        self.arlo_basestation = arlo_basestation
         self.provider = provider
 
     async def getPictureOptions(self):
@@ -25,17 +27,15 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     async def takePicture(self, options=None):
         logger.debug(f"ArloCamera.takePicture nativeId={self.nativeId} options={options}")
 
-        logger.info(f"Taking remote snapshot for {self.nativeId}")
-        picUrl = await self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_device, self.arlo_device)
+        logger.debug(f"Taking remote snapshot for {self.nativeId}")
+        pic_url = await self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device)
 
-        if picUrl is None:
-            logger.warn(f"Error taking snapshot for {self.nativeId}")
+        if pic_url is None:
             raise Exception(f"Error taking snapshot for {self.nativeId}")
-        elif picUrl is TIMEOUT:
-            logger.warn(f"Timeout taking snapshot for {self.nativeId}")
+        elif pic_url is TIMEOUT:
             raise Exception(f"Timeout taking snapshot for {self.nativeId}")
 
-        return await scrypted_sdk.mediaManager.createMediaObject(str.encode(picUrl), ScryptedMimeTypes.Url.value)
+        return await scrypted_sdk.mediaManager.createMediaObject(str.encode(pic_url), ScryptedMimeTypes.Url.value)
 
     async def getVideoStreamOptions(self):
         return []
@@ -43,7 +43,7 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     async def getVideoStream(self, options=None):
         logger.debug(f"ArloCamera.getVideoStream nativeId={self.nativeId} options={options}")
 
-        rtspUrl = self.provider.arlo.StartStream(self.arlo_device, self.arlo_device)
-        logger.info(f"Got stream for {self.nativeId} at {rtspUrl}")
+        rtsp_url = self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device)
+        logger.debug(f"Got stream for {self.nativeId} at {rtsp_url}")
 
-        return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtspUrl), ScryptedMimeTypes.Url.value)
+        return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)

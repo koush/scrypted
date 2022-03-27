@@ -60,7 +60,6 @@ class EventStream:
                     q.task_done()
                     if time.time() - event.timestamp > self.expire:
                         # dropping expired events
-                        print(f"Expiring event: {event.item}")
                         await asyncio.sleep(0)
                         break
 
@@ -73,18 +72,15 @@ class EventStream:
 
         def thread_main(self):
             for event in self.event_stream:
-                print("Received event", event)
                 if event is None or self.event_stream_stop_event.is_set():
                     return None
 
                 if event.data.strip() == "":
-                    print("Empty event, ignoring")
                     continue
 
                 try:
                     response = json.loads(event.data)
                 except json.JSONDecodeError:
-                    print("Invalid json, ignoring")
                     continue
 
                 if self.connected:

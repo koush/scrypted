@@ -1,5 +1,2 @@
-aiohttp==3.8.1
 sseclient==0.0.22
-google-api-python-client
 requests
-pickle-mixin
