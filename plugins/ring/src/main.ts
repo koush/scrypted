@@ -393,7 +393,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         // if any video capabilities are offered, use the browser endpoint for safety.
         // this should be improved further in the future by inspecting the capabilities
         // since this currently defaults to using the baseline profile on Chrome when high is supported.
-        if (options?.capabilities.video) {
+        if (options?.capabilities?.video) {
             // the browser path will automatically activate the speaker on the ring.
             await startRTCSignalingSession(session, undefined, this.console,
                 async () => {
