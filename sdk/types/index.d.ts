@@ -1369,9 +1369,9 @@ export interface RTCSignalingClientSession extends RTCSignalingSession {
     getOptions(): Promise<RTCSignalingClientOptions>;
 }
 export interface RTCSignalingSession {
-    createLocalDescription: (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate) => Promise<RTCSessionDescriptionInit>;
-    setRemoteDescription: (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => Promise<void>;
-    addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
+    createLocalDescription(type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit>;
+    setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void>;
+    addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
 }
 export interface RTCSignalingClientOptions {
     /**
