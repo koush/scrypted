@@ -11,7 +11,7 @@ import { getH264DecoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffm
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { createSdpInput } from '@scrypted/common/src/sdp-utils';
 import child_process, { ChildProcess } from 'child_process';
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '@scrypted/common/src/wrtc-to-rtsp';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -209,7 +209,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         });
 
         const audioOutput = await createBindZero();
-        const rtspTcpServer = await listenZeroSingleClient();
+        const rtspTcpServer = hasIntercom ? await listenZeroSingleClient() : undefined;
+
         if (hasIntercom) {
             const sdpReturnAudio = [
                 "v=0",
@@ -247,9 +248,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                     rtspServer.sendAudio(rtpPacket.serialize(), false);
                 })
             })
-        }
-        else {
-            rtspTcpServer.clientPromise = Promise.reject(new Error('no intercom'));
         }
 
         const videoInput = await createBindZero();
@@ -328,6 +326,11 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 
                     ...ffInput.inputArguments,
 
+                    // create a dummy audio track if none actually exists.
+                    // this track will only be used if no audio track is available.
+                    // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+                    '-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest',
+
                     '-an',
 
                     ...videoArgs,
@@ -364,9 +367,9 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             closeQuiet(videoInput.server);
             closeQuiet(audioInput.server);
             closeQuiet(audioOutput.server);
-            closeQuiet(rtspTcpServer.server);
+            closeQuiet(rtspTcpServer?.server);
             await Promise.allSettled([
-                rtspTcpServer.clientPromise.then(client => client.destroy()),
+                rtspTcpServer?.clientPromise.then(client => client.destroy()),
                 pc.close(),
                 (async () => {
                     safeKillFFmpeg(await cpPromise);
@@ -453,15 +456,15 @@ class WebRTCPlugin extends AutoenableMixinProvider {
         if (!supportedTypes.includes(type))
             return;
 
-            // if this is a webrtc camera, also proxy the signaling channel too,
-            // for inflexible clients.
-            if (interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
-                return [
-                    ScryptedInterface.RTCSignalingChannel,
-                    ScryptedInterface.VideoCamera,
-                    ScryptedInterface.Settings,
-                ];
-            }
+        // if this is a webrtc camera, also proxy the signaling channel too,
+        // for inflexible clients.
+        if (interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
+            return [
+                ScryptedInterface.RTCSignalingChannel,
+                ScryptedInterface.VideoCamera,
+                ScryptedInterface.Settings,
+            ];
+        }
 
         if (interfaces.includes(ScryptedInterface.VideoCamera)) {
             return [
