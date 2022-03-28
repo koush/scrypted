@@ -18,7 +18,6 @@ import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { sleep } from '@scrypted/common/src/sleep';
 import crypto from 'crypto';
-import { title } from 'process';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -765,7 +764,7 @@ class PrebufferSession {
 
         const updateIdr = () => {
           if (this.prevIdr) {
-            const sendEvent = !this.detectedIdrInterval;
+            const sendEvent = typeof this.detectedIdrInterval !== 'number';
             this.detectedIdrInterval = now - this.prevIdr;
             // only on the first idr update should we send a settings refresh.
             if (sendEvent)
