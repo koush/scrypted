@@ -1,6 +1,6 @@
 import { Settings, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '@scrypted/common/src/wrtc-to-rtsp';
+import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from '../../webrtc/src/wrtc-to-rtsp';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { StorageSettings } from '@scrypted/common/src/settings';

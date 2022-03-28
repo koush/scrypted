@@ -1,5 +1,5 @@
-import { MediaStreamTrack, RTCIceCandidate, RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
-import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RTCSignalingSendIceCandidate, RequestMediaStreamOptions, MediaObject, MediaStreamOptions } from '@scrypted/sdk';
+import { MediaStreamTrack, RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
+import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RequestMediaStreamOptions, MediaObject, MediaStreamOptions, DeviceCreator, DeviceProvider, DeviceCreatorSettings } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
@@ -12,8 +12,12 @@ import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { createSdpInput } from '@scrypted/common/src/sdp-utils';
 import child_process, { ChildProcess } from 'child_process';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
+import { WebRTCOutputSignalingSession } from "./output-signaling-session";
+import { ScryptedSessionControl } from "./session-control";
+import crypto from 'crypto';
+import { WebRTCCamera } from "./webrtc-camera";
 
-const { mediaManager, systemManager } = sdk;
+const { mediaManager, systemManager, deviceManager } = sdk;
 
 const supportedTypes = [
     ScryptedDeviceType.Camera,
@@ -33,64 +37,8 @@ function createSetup(type: 'offer' | 'answer', audioDirection: RTCRtpTransceiver
     }
 };
 
-class ScryptedSessionControl implements RTCSessionControl {
-    constructor(public cleanup: () => Promise<void>) {
-    }
 
-    async getRefreshAt() {
-    }
-    async extendSession() {
-    }
-    async endSession() {
-        await this.cleanup();
-    }
-}
-
-class ScryptedSignalingSession implements RTCSignalingSession {
-    constructor(public pc: RTCPeerConnection) {
-    }
-
-    async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
-        this.pc.onIceCandidate.subscribe(candidate => {
-            console.log('local candidate', candidate);
-            sendIceCandidate({
-                candidate: candidate.candidate,
-                sdpMid: candidate.sdpMid,
-                sdpMLineIndex: candidate.sdpMLineIndex,
-            });
-        })
-
-
-        let ret: RTCSessionDescriptionInit;
-        if (type === 'offer') {
-            const offer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(offer);
-            ret = {
-                type: offer.type,
-                sdp: offer.sdp,
-            };
-        }
-        else {
-            const answer = await this.pc.createAnswer();
-            this.pc.setLocalDescription(answer);
-            ret = {
-                type: answer.type,
-                sdp: answer.sdp,
-            };
-        }
-        return ret;
-    }
-
-    async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) {
-        await this.pc.setRemoteDescription(description as any)
-    }
-
-    async addIceCandidate(candidate: RTCIceCandidateInit) {
-        await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
-    }
-}
-
-class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel {
+class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = new StorageSettings(this, {
         useUdp: {
             title: 'Use SDP/UDP instead of RTSP/TCP',
@@ -153,6 +101,13 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                 }
             }
         };
+    }
+
+    startIntercom(media: MediaObject): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+    stopIntercom(): Promise<void> {
+        throw new Error("Method not implemented.");
     }
 
     async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl> {
@@ -400,7 +355,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                 cleanup();
         });
 
-        const answerSession = new ScryptedSignalingSession(pc);
+        const answerSession = new WebRTCOutputSignalingSession(pc);
 
         connectRTCSignalingClients(session, createSetup('offer', offerAudioDirection, 'recvonly'),
             answerSession, createSetup('answer', answerAudioDirection, 'sendonly'), !!options?.offer);
@@ -447,11 +402,12 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 
 }
 
-class WebRTCPlugin extends AutoenableMixinProvider {
+class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider {
     constructor() {
         super();
         this.on = this.on || false;
     }
+
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         if (!supportedTypes.includes(type))
             return;
@@ -462,7 +418,7 @@ class WebRTCPlugin extends AutoenableMixinProvider {
             return [
                 ScryptedInterface.RTCSignalingChannel,
                 ScryptedInterface.VideoCamera,
-                ScryptedInterface.Settings,
+                // ScryptedInterface.Settings,
             ];
         }
 
@@ -487,6 +443,35 @@ class WebRTCPlugin extends AutoenableMixinProvider {
 
     async releaseMixin(id: string, mixinDevice: any): Promise<void> {
         await mixinDevice.release();
+    }
+
+    async getCreateDeviceSettings(): Promise<Setting[]> {
+        return [
+            {
+                key: 'name',
+                title: 'Name',
+                description: 'The name of the browser connected camera.',
+            }
+        ];
+    }
+
+    async createDevice(settings: DeviceCreatorSettings): Promise<string> {
+        const nativeId = crypto.randomBytes(8).toString('hex');
+        await deviceManager.onDeviceDiscovered({
+            name: settings.name?.toString(),
+            type: ScryptedDeviceType.Camera,
+            nativeId,
+            interfaces: [
+                ScryptedInterface.VideoCamera,
+                // ScryptedInterface.RTCSignalingChannel,
+                ScryptedInterface.RTCSignalingClient,
+            ],
+        });
+        return nativeId;
+    }
+
+    getDevice(nativeId: string) {
+        return new WebRTCCamera(nativeId);
     }
 }
 

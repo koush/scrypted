@@ -19,7 +19,9 @@
       "name": "WebRTC Plugin",
       "type": "API",
       "interfaces": [
-         "MixinProvider"
+         "MixinProvider",
+         "DeviceProvider",
+         "DeviceCreator"
       ]
    },
    "dependencies": {

@@ -1,13 +1,12 @@
-import { RTCAVSignalingSetup, RTCSignalingChannel, FFMpegInput, MediaStreamOptions } from "@scrypted/sdk/types";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
-import { Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpCodecParameters, RtpPacket, uint16Add } from "@koush/werift";
+import { Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpCodecParameters, RTCSessionDescription, RtpPacket, uint16Add } from "@koush/werift";
 import dgram from 'dgram';
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { Socket } from "net";
-import { RTCSessionControl, RTCSignalingSession } from "@scrypted/sdk";
+import { RTCSignalingChannel, FFMpegInput, MediaStreamOptions, RTCSessionControl, RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup } from "@scrypted/sdk";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
-import { RpcPeer } from "../../../server/src/rpc";
 import { createSdpInput } from '@scrypted/common/src/sdp-utils'
+import { createRawResponse } from "./werift-util";
 
 export async function createRTCPeerConnectionSource(options: {
     console: Console,
@@ -203,15 +202,11 @@ export async function createRTCPeerConnectionSource(options: {
                     jitter.pipe(new RtspOutput())
                 }
 
-                // what is this for? it was in the example code, but as far as i can tell, it doesn't
-                // actually do anything?
-                // track.onReceiveRtp.once(() => {
-                //     pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
-                // });
-
                 track.onReceiveRtp.once(() => {
                     let firSequenceNumber = 0;
                     pictureLossInterval = setInterval(() => {
+                        // i think this is necessary for older clients like ring
+                        // which is really a sip gateway?
                         const fir = new FullIntraRequest({
                             senderSsrc: videoTransceiver.receiver.rtcpSsrc,
                             mediaSsrc: track.ssrc,
@@ -226,14 +221,39 @@ export async function createRTCPeerConnectionSource(options: {
                             feedback: fir,
                         });
                         videoTransceiver.receiver.dtlsTransport.sendRtcp([packet]);
+
+                        // from my testing with browser clients, the pli is what
+                        // triggers a i-frame to be sent, and not the prior FIR request.
+                        videoTransceiver.receiver.sendRtcpPLI(track.ssrc!);
                     }, 4000);
                 });
             });
         }
 
-        sessionControl = await channel.startRTCSignalingSession({
-            [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
-            createLocalDescription: async (type, setup, sendIceCandidate) => {
+        const handleRtspSetup = async (description: RTCSessionDescriptionInit) => {
+            if (description.type !== 'answer')
+                return;
+
+            rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
+            console.log('sdp sent', rtspServer.sdp);
+
+            if (useUdp) {
+                rtspServer.udpPorts = {
+                    video: videoPort,
+                    audio: audioPort,
+                };
+                rtspServer.client.write(rtspServer.sdp + '\r\n');
+                rtspServer.client.end();
+                rtspServer.client.on('data', () => { });
+                // rtspServer.client.destroy();
+            }
+            else {
+                await rtspServer.handleSetup();
+            }
+        }
+
+        class SignalingSession implements RTCSignalingSession {
+            async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
                 if (type === 'offer')
                     doSetup(setup);
                 if (setup.datachannel)
@@ -247,63 +267,54 @@ export async function createRTCPeerConnectionSource(options: {
                     sendIceCandidate?.(ev.candidate as any);
                 };
 
+                const handleRawResponse = async (response: RTCSessionDescription): Promise<RTCSessionDescriptionInit> => {
+                    const ret = createRawResponse(response);
+                    await handleRtspSetup(ret);
+                    return ret;
+                }
+
                 if (type === 'answer') {
                     let answer = await pc.createAnswer();
-                    console.log(answer.sdp);
+                    console.log('sdp received', answer.sdp);
                     const set = pc.setLocalDescription(answer);
                     if (sendIceCandidate)
-                        return answer as any;
+                        return handleRawResponse(answer);
                     await set;
                     await gatheringPromise;
                     answer = pc.localDescription || answer;
-                    return {
-                        sdp: answer.sdp,
-                        type: answer.type,
-                    };
+                    return handleRawResponse(answer);
                 }
                 else {
                     let offer = await pc.createOffer();
                     // console.log(offer.sdp);
                     const set = pc.setLocalDescription(offer);
                     if (sendIceCandidate)
-                        return offer as any;
+                        return handleRawResponse(offer);
                     await set;
                     await gatheringPromise;
                     offer = await pc.createOffer();
-                    return {
-                        sdp: offer.sdp,
-                        type: offer.type,
-                    };
+                    return handleRawResponse(offer);
                 }
-            },
-            setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
+            }
+            async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> {
                 if (description.type === 'offer')
                     doSetup(setup);
-                rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
-                console.log('rtsp sdp', rtspServer.sdp);
 
-                if (useUdp) {
-                    rtspServer.udpPorts = {
-                        video: videoPort,
-                        audio: audioPort,
-                    };
-                    rtspServer.client.write(rtspServer.sdp + '\r\n');
-                    rtspServer.client.end();
-                    rtspServer.client.on('data', () => { });
-                    // rtspServer.client.destroy();
-                    console.log('sdp sent');
-                }
-                else {
-                    await rtspServer.handleSetup();
-                }
+                await handleRtspSetup(description);
                 await pc.setRemoteDescription(description as any);
-            },
-            addIceCandidate: async (candidate: RTCIceCandidateInit) => {
+            }
+            async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
-            },
-        } as RTCSignalingSession);
+            }
+
+        }
+
+        sessionControl = await channel.startRTCSignalingSession(new SignalingSession());
     })
-        .catch(e => cleanup);
+        .catch(e => {
+            console.error('failed to create webrtc signaling session', e);
+            cleanup();
+        });
 
 
     if (useUdp) {
