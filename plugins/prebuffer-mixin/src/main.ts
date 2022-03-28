@@ -1096,9 +1096,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
 
-    const defaultStreamName = this.storage.getItem('defaultStream');
-    let defaultSession: PrebufferSession;
-
     let active = 0;
     for (const id of ids) {
       let session = this.sessions.get(id);
@@ -1112,9 +1109,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         const stopInactive = isBatteryPowered || !enabled;
         session = new PrebufferSession(this, mso, stopInactive);
         this.sessions.set(id, session);
-
-        if (mso?.name === defaultStreamName)
-          defaultSession = session;
 
         if (isBatteryPowered) {
           this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
@@ -1155,19 +1149,21 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       }
     }
 
-    if (!defaultSession) {
-      if (enabledIds?.length)
+    if (!this.sessions.has(undefined)) {
+      const defaultStreamName = this.storage.getItem('defaultStream');
+      let defaultSession = this.sessions.get(msos?.find(mso => mso.name === defaultStreamName)?.id);
+      if (!defaultSession)
         defaultSession = this.sessions.get(msos?.find(mso => mso.id === enabledIds[0])?.id);
-      else
+      if (!defaultSession)
         defaultSession = this.sessions.get(msos?.find(mso => mso.id === ids?.[0])?.id);
-    }
 
-    if (defaultSession) {
-      this.sessions.set(undefined, defaultSession);
-      this.console.log('Default Stream:', defaultSession.advertisedMediaStreamOptions.id, defaultSession.advertisedMediaStreamOptions.name);
-    }
-    else {
-      this.console.warn('Unable to find Default Stream?');
+      if (defaultSession) {
+        this.sessions.set(undefined, defaultSession);
+        this.console.log('Default Stream:', defaultSession.advertisedMediaStreamOptions.id, defaultSession.advertisedMediaStreamOptions.name);
+      }
+      else {
+        this.console.warn('Unable to find Default Stream?');
+      }
     }
 
     deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
