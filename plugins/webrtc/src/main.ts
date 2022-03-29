@@ -16,6 +16,7 @@ import { WebRTCOutputSignalingSession } from "./output-signaling-session";
 import { ScryptedSessionControl } from "./session-control";
 import crypto from 'crypto';
 import { WebRTCCamera } from "./webrtc-camera";
+import ip from 'ip';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -57,9 +58,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             defaultValue: 'Default',
             choices: [
                 'Default',
-                'Disabled',
-                'Enabled',
-                // 'Remote Only',
+                'Always',
             ],
         },
         decoderArguments: {
@@ -91,16 +90,16 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 
     constructor(options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
         super(options);
-        this.storageSettings.options = {
-            hide: {
-                decoderArguments: async () => {
-                    return this.storageSettings.values.transcode === 'Disabled';
-                },
-                encoderArguments: async () => {
-                    return this.storageSettings.values.transcode === 'Disabled';
-                }
-            }
-        };
+        // this.storageSettings.options = {
+        //     hide: {
+        //         decoderArguments: async () => {
+        //             return this.storageSettings.values.transcode === 'Disabled';
+        //         },
+        //         encoderArguments: async () => {
+        //             return this.storageSettings.values.transcode === 'Disabled';
+        //         }
+        //     }
+        // };
     }
 
     startIntercom(media: MediaObject): Promise<void> {
@@ -231,6 +230,14 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 
                 connected = true;
 
+                let isPrivate = true;
+                for (const ice of pc.validIceTransports()) {
+                    const [address, port] = ice.connection.remoteAddr;
+                    isPrivate = isPrivate && ip.isPrivate(address);
+                }
+
+                this.console.log('Connection is local network:', isPrivate);
+
                 // we assume that the camera doesn't output h264 baseline, because
                 // that is awful quality. so check to see if the session has an
                 // explicit list of supported codecs with h264 high on it.
@@ -242,7 +249,9 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                     ?.find(codec => codec.sdpFmtpLine.includes('profile-level-id=64'))
 
                 const videoArgs: string[] = [];
-                const transcode = !sessionSupportsH264High || mediaStreamOptions?.video?.codec !== 'h264' || this.storageSettings.values.transcode === 'Enabled';
+                const transcode = !sessionSupportsH264High
+                    || mediaStreamOptions?.video?.codec !== 'h264'
+                    || this.storageSettings.values.transcode === 'Always';
                 if (transcode) {
                     const encoderArguments: string = this.storageSettings.values.encoderArguments;
                     if (!encoderArguments) {

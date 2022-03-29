@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/webrtc",
-   "version": "0.0.1",
+   "version": "0.0.2",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -25,11 +25,13 @@
       ]
    },
    "dependencies": {
+      "@koush/werift": "file:../../external/werift/packages/webrtc",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@koush/werift": "file:../../external/werift/packages/webrtc"
+      "ip": "^1.1.5"
    },
    "devDependencies": {
+      "@types/ip": "^1.1.0",
       "@types/node": "^16.6.1"
    }
 }
