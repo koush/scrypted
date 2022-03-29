@@ -625,9 +625,13 @@ class PrebufferSession {
           const socket = await rtspClient.play();
           session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
           const sessionKill = session.kill.bind(session);
+          let issuedTeardown = false;
           session.kill = async () => {
             // issue a teardown to upstream to close gracefully but don't rely on it responding.
-            rtspClient.teardown().finally(sessionKill);
+            if (!issuedTeardown) {
+              issuedTeardown = true;
+              rtspClient.teardown().finally(sessionKill);
+            }
             await sleep(500);
             sessionKill();
           }

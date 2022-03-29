@@ -118,7 +118,7 @@ export class RtspBase {
         }
         message += '\r\n';
         this.client.write(message);
-        this.console?.log('rtsp outgpoing message\n', message);
+        this.console?.log('rtsp outgoing message\n', message);
         this.console?.log();
         if (body)
             this.client.write(body);
