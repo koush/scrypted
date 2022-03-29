@@ -3,7 +3,7 @@ import { Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFee
 import dgram from 'dgram';
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { Socket } from "net";
-import { RTCSignalingChannel, FFMpegInput, MediaStreamOptions, RTCSessionControl, RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup } from "@scrypted/sdk";
+import { RTCSignalingChannel, FFMpegInput, MediaStreamOptions, RTCSessionControl, RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions } from "@scrypted/sdk";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
 import { createSdpInput } from '@scrypted/common/src/sdp-utils'
 import { createRawResponse } from "./werift-util";
@@ -43,7 +43,7 @@ export async function createRTCPeerConnectionSource(options: {
     clientPromise.then(async (client) => {
         socket = client;
         const rtspServer = new RtspServer(socket, undefined, udp);
-        rtspServer.console = console;
+        // rtspServer.console = console;
         rtspServer.audioChannel = 0;
         rtspServer.videoChannel = 2;
 
@@ -253,6 +253,10 @@ export async function createRTCPeerConnectionSource(options: {
         }
 
         class SignalingSession implements RTCSignalingSession {
+            getOptions(): Promise<RTCSignalingOptions> {
+                return;
+            }
+
             async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
                 if (type === 'offer')
                     doSetup(setup);
@@ -310,6 +314,7 @@ export async function createRTCPeerConnectionSource(options: {
         }
 
         sessionControl = await channel.startRTCSignalingSession(new SignalingSession());
+        console.log('session setup complete');
     })
         .catch(e => {
             console.error('failed to create webrtc signaling session', e);

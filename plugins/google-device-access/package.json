@@ -29,7 +29,7 @@
       ],
       "pluginDependencies": [
          "@scrypted/snapshot",
-         "@scrypted/webrtc-source",
+         "@scrypted/webrtc",
          "@scrypted/cloud",
          "@scrypted/prebuffer-mixin"
       ]

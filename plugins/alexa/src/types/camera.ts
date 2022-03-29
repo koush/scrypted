@@ -1,4 +1,4 @@
-import sdk, { FFMpegInput, HttpResponse, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import sdk, { FFMpegInput, HttpResponse, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers } from "./common";
 import { startRTCPeerConnectionFFmpegInput } from '@scrypted/common/src/ffmpeg-to-wrtc';
 import { BrowserSignalingSession, startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
@@ -35,7 +35,16 @@ export const rtcHandlers = new Map<string, AlexaCapabilityHandler<any>>();
 
 export class AlexaSignalingSession implements RTCSignalingSession {
     constructor(public response: HttpResponse, public directive: any) {
+    }
 
+    async getOptions(): Promise<RTCSignalingOptions> {
+        return {
+            proxy: true,
+            offer: {
+                type: 'offer',
+                sdp: this.directive.payload.offer.value,
+            }
+        }
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
@@ -72,13 +81,7 @@ export class AlexaSignalingSession implements RTCSignalingSession {
 rtcHandlers.set('InitiateSessionWithOffer', async (request, response, directive: any,
     device: ScryptedDevice & RTCSignalingChannel) => {
     const session = new AlexaSignalingSession(response, directive);
-    device.startRTCSignalingSession(session, {
-        proxy: true,
-        offer: {
-            type: 'offer',
-            sdp: directive.payload.offer.value,
-        }
-    });
+    device.startRTCSignalingSession(session);
 });
 
 capabilityHandlers.set('Alexa.RTCSessionController', async (request, response, directive: any, device: ScryptedDevice & VideoCamera) => {

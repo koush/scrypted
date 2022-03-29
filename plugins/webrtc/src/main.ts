@@ -1,5 +1,5 @@
 import { MediaStreamTrack, RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
-import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingClientOptions, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RequestMediaStreamOptions, MediaObject, MediaStreamOptions, DeviceCreator, DeviceProvider, DeviceCreatorSettings } from '@scrypted/sdk';
+import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RequestMediaStreamOptions, MediaObject, MediaStreamOptions, DeviceCreator, DeviceProvider, DeviceCreatorSettings, RTCSignalingOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
@@ -110,11 +110,15 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         throw new Error("Method not implemented.");
     }
 
-    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl> {
+    async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
         // if the camera natively has RTCSignalingChannel and the client is not a weird non-browser
         // thing like Alexa, etc, pass through. Otherwise proxy/transcode.
+
+        // but, maybe we should always proxy?
+
+        const options = await session.getOptions();
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.RTCSignalingChannel) && !options?.proxy)
-            return this.mixinDevice.startRTCSignalingSession(session, options);
+            return this.mixinDevice.startRTCSignalingSession(session);
 
         const hasIntercom = this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom);
 
@@ -196,7 +200,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                 const client = await rtspTcpServer.clientPromise;
 
                 const rtspServer = new RtspServer(client, sdp, audioOutput.server);
-                rtspServer.console = this.console;
+                // rtspServer.console = this.console;
                 await rtspServer.handlePlayback();
                 track.onReceiveRtp.subscribe(rtpPacket => {
                     rtpPacket.header.payloadType = 110;
@@ -405,7 +409,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider {
     constructor() {
         super();
-        this.on = this.on || false;
+        this.unshiftMixin = true;
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
@@ -463,6 +467,9 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
             nativeId,
             interfaces: [
                 ScryptedInterface.VideoCamera,
+                // RTCSignalingChannel is actually implemented as a loopback from the browser, but
+                // since the feed needs to be tee'd to multiple clients, use VideoCamera instead
+                // to do that.
                 // ScryptedInterface.RTCSignalingChannel,
                 ScryptedInterface.RTCSignalingClient,
             ],

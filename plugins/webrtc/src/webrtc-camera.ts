@@ -1,9 +1,8 @@
-import sdk, { RTCSessionControl, RTCSignalingClient, RTCSignalingClientOptions, RTCSignalingSession, RTCSignalingClientSession, ScryptedDeviceBase, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, VideoCamera, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel } from "@scrypted/sdk";
-import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
+import sdk, { RTCSessionControl, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, VideoCamera, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel, RTCSignalingOptions } from "@scrypted/sdk";import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
 const { mediaManager, systemManager, deviceManager } = sdk;
 
 export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTCSignalingClient, RTCSignalingChannel {
-    pendingClient: (session: RTCSignalingClientSession) => void;
+    pendingClient: (session: RTCSignalingSession) => void;
 
     constructor(nativeId: string) {
         super(nativeId);
@@ -29,13 +28,13 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
         ];
     }
 
-    async startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl> {
+    async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
         if (!this.pendingClient)
             throw new Error('Browser client is not connected. Click "Stream Web Camera".');
 
-        class CompletedSession implements RTCSignalingClientSession {
-            async getOptions(): Promise<RTCSignalingClientOptions> {
-                return options;
+        class CompletedSession implements RTCSignalingSession {
+            async getOptions(): Promise<RTCSignalingOptions> {
+                return;
             }
             createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
                 return session.createLocalDescription(type, setup, sendIceCandidate);
@@ -54,7 +53,7 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
         return;
     }
 
-    createRTCSignalingSession(): Promise<RTCSignalingClientSession> {
+    createRTCSignalingSession(): Promise<RTCSignalingSession> {
         return new Promise(resolve => {
             this.pendingClient = resolve;
         });

@@ -1,4 +1,4 @@
-import type { RTCSignalingSendIceCandidate, RTCSignalingClientSession, RTCAVSignalingSetup, RTCSignalingClientOptions, RTCSignalingSession } from "@scrypted/sdk/types";
+import type { RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions } from "@scrypted/sdk/types";
 // import type { RTCPeerConnection as WeriftRTCPeerConnection } from "@koush/werift";
 
 export async function startRTCSignalingSession(session: RTCSignalingSession, offer: RTCSessionDescriptionInit,
@@ -12,18 +12,18 @@ export async function startRTCSignalingSession(session: RTCSignalingSession, off
         if (!offer) {
             console.log('session.createLocalDescription');
             const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-            console.log('rtc offer created');
+            console.log('rtc offer created', offer.sdp);
             const answer = await setRemoteDescription(offer);
-            console.log('rtc answer received');
+            console.log('rtc answer received', answer.sdp);
             await session.setRemoteDescription(answer, setup);
             console.log('session.setRemoteDescription done');
         }
         else {
-            console.log('session.setRemoteDescription');
+            console.log('session.setRemoteDescription', offer.sdp);
             await session.setRemoteDescription(offer, setup);
             console.log('session.createLocalDescription');
             const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-            console.log('rtc answer created');
+            console.log('rtc answer created', answer.sdp);
             await setRemoteDescription(answer);
             console.log('session.setRemoteDescription done');
         }
@@ -47,9 +47,9 @@ export async function connectRTCSignalingClients(
     await offerClient.setRemoteDescription(answer, offerSetup);
 }
 
-export class BrowserSignalingSession implements RTCSignalingClientSession {
+export class BrowserSignalingSession implements RTCSignalingSession {
     hasSetup = false;
-    options: RTCSignalingClientOptions = {
+    options: RTCSignalingOptions = {
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
                 codecs: undefined,
@@ -86,7 +86,7 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
         pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
     }
 
-    async getOptions(): Promise<RTCSignalingClientOptions> {
+    async getOptions(): Promise<RTCSignalingOptions> {
         return this.options;
     }
 

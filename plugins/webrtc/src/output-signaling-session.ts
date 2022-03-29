@@ -1,9 +1,13 @@
 import { RTCIceCandidate, RTCPeerConnection } from "@koush/werift";
-import { RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingSendIceCandidate } from '@scrypted/sdk';
+import { RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, RTCSignalingOptions } from '@scrypted/sdk';
 import { createRawResponse } from "./werift-util";
 
 export class WebRTCOutputSignalingSession implements RTCSignalingSession {
     constructor(public pc: RTCPeerConnection) {
+    }
+
+    async getOptions(): Promise<RTCSignalingOptions> {
+        return;
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {

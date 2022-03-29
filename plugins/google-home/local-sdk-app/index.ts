@@ -2,7 +2,7 @@
 
 const app = new smarthome.App("1.0.0");
 
-const SCRYPTED_INSECURE_PORT = 30080;
+const SCRYPTED_INSECURE_PORT = 11080;
 
 app
   .onIdentify(async (request) => {

@@ -1,4 +1,4 @@
-import sdk, { RTCSignalingClientSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingClientOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera, MediaStreamOptions, FFMpegInput, ScryptedMimeTypes, Intercom } from '@scrypted/sdk';
+import sdk, { RTCSignalingSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera, MediaStreamOptions, FFMpegInput, ScryptedMimeTypes, Intercom } from '@scrypted/sdk';
 import { SipSession, isStunMessage, LiveCallNegotiation, clientApi, generateUuid, RingApi, RingCamera, RingRestClient, RtpDescription } from './ring-client-api';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
@@ -382,7 +382,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         return this.storageSettings.putSetting(key, value);
     }
 
-    async startRTCSignalingSession(session: RTCSignalingClientSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl> {
+    async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
+        const options = await session.getOptions();
+
         const camera = this.findCamera();
 
         let sessionControl: RTCSessionControl;
@@ -440,7 +442,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                         ));
                     }
                     else if (message.method === 'ice') {
-                        this.console.log(message.ice);
+                        // this.console.log(message.ice);
                         session.addIceCandidate({
                             candidate: message.ice,
                             sdpMLineIndex: message.mlineindex,
