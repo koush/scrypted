@@ -2010,17 +2010,14 @@ export enum ScryptedInterface {
 
 export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
 
-export interface RTCSignalingClientSession extends RTCSignalingSession {
-  getOptions(): Promise<RTCSignalingClientOptions>;
-}
-
 export interface RTCSignalingSession {
   createLocalDescription(type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined|RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit>;
   setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void>;
   addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
+  getOptions(): Promise<RTCSignalingOptions>;
 }
 
-export interface RTCSignalingClientOptions {
+export interface RTCSignalingOptions {
   /**
    * Indicates that this client requires an answer, and is providing an offer.
    * If an offer is provided, this has a couple implications:
@@ -2049,7 +2046,7 @@ export interface RTCSessionControl {
  * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
  */
 export interface RTCSignalingClient {
-  createRTCSignalingSession(): Promise<RTCSignalingClientSession>;
+  createRTCSignalingSession(): Promise<RTCSignalingSession>;
 }
 
 /**
@@ -2058,7 +2055,7 @@ export interface RTCSignalingClient {
  * strict requirements and expectations on client setup.
  */
 export interface RTCSignalingChannel {
-  startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl|undefined>;
+  startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl|undefined>;
 }
 
 export interface RTCAVSignalingSetup {

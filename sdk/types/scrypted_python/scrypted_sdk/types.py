@@ -378,15 +378,6 @@ class Position(TypedDict):
 class RTCSessionControl(TypedDict):
     pass
 
-class RTCSignalingClientOptions(TypedDict):
-    capabilities: Any
-    offer: RTCSessionDescriptionInit
-    proxy: bool
-    pass
-
-class RTCSignalingClientSession(TypedDict):
-    pass
-
 class RTCSignalingSession(TypedDict):
     pass
 
@@ -736,12 +727,12 @@ class PushHandler:
     pass
 
 class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingClientOptions = None) -> RTCSessionControl:
+    async def startRTCSignalingSession(self, session: RTCSignalingSession) -> RTCSessionControl:
         pass
     pass
 
 class RTCSignalingClient:
-    async def createRTCSignalingSession(self) -> RTCSignalingClientSession:
+    async def createRTCSignalingSession(self) -> RTCSignalingSession:
         pass
     pass
 
