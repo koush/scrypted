@@ -324,6 +324,14 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     ],
     properties: []
   },
+  Display: {
+    name: 'Display',
+    methods: [
+      'startDisplay',
+      'stopDisplay'
+    ],
+    properties: []
+  },
   VideoCamera: {
     name: 'VideoCamera',
     methods: [
@@ -1188,11 +1196,19 @@ export interface VideoClips {
 }
 
 /**
- * Intercom devices can play back 
+ * Intercom devices can playback audio. 
  */
 export interface Intercom {
   startIntercom(media: MediaObject): Promise<void>;
   stopIntercom(): Promise<void>;
+}
+
+/**
+ * Display devices can play back audio and video.
+ */
+export interface Display {
+  startDisplay(media: MediaObject): Promise<void>;
+  stopDisplay(media: MediaObject): Promise<void>;
 }
 
 /**
@@ -1986,6 +2002,7 @@ export enum ScryptedInterface {
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",
   Microphone = "Microphone",
+  Display = "Display",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
   VideoClips = "VideoClips",

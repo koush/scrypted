@@ -612,11 +612,18 @@ export interface VideoClips {
     removeVideoClips(...videoClipIds: string[]): Promise<void>;
 }
 /**
- * Intercom devices can play back
+ * Intercom devices can playback audio.
  */
 export interface Intercom {
     startIntercom(media: MediaObject): Promise<void>;
     stopIntercom(): Promise<void>;
+}
+/**
+ * Display devices can play back audio and video.
+ */
+export interface Display {
+    startDisplay(media: MediaObject): Promise<void>;
+    stopDisplay(media: MediaObject): Promise<void>;
 }
 /**
  * Lock controls devices that can lock or unlock entries. Often works in tandem with PasswordControl.
@@ -1335,6 +1342,7 @@ export declare enum ScryptedInterface {
     HumiditySensor = "HumiditySensor",
     Camera = "Camera",
     Microphone = "Microphone",
+    Display = "Display",
     VideoCamera = "VideoCamera",
     VideoRecorder = "VideoRecorder",
     VideoClips = "VideoClips",

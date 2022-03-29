@@ -75,6 +75,7 @@ class ScryptedInterface(Enum):
     DeviceCreator = "DeviceCreator"
     DeviceDiscovery = "DeviceDiscovery"
     DeviceProvider = "DeviceProvider"
+    Display = "Display"
     Dock = "Dock"
     EngineIOHandler = "EngineIOHandler"
     Entry = "Entry"
@@ -553,6 +554,13 @@ class DeviceDiscovery:
 
 class DeviceProvider:
     def getDevice(self, nativeId: str) -> Any:
+        pass
+    pass
+
+class Display:
+    async def startDisplay(self, media: MediaObject) -> None:
+        pass
+    async def stopDisplay(self, media: MediaObject) -> None:
         pass
     pass
 

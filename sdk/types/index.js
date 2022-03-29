@@ -221,6 +221,14 @@ exports.ScryptedInterfaceDescriptors = {
         ],
         properties: []
     },
+    Display: {
+        name: 'Display',
+        methods: [
+            'startDisplay',
+            'stopDisplay'
+        ],
+        properties: []
+    },
     VideoCamera: {
         name: 'VideoCamera',
         methods: [
@@ -686,6 +694,7 @@ var ScryptedInterface;
     ScryptedInterface["HumiditySensor"] = "HumiditySensor";
     ScryptedInterface["Camera"] = "Camera";
     ScryptedInterface["Microphone"] = "Microphone";
+    ScryptedInterface["Display"] = "Display";
     ScryptedInterface["VideoCamera"] = "VideoCamera";
     ScryptedInterface["VideoRecorder"] = "VideoRecorder";
     ScryptedInterface["VideoClips"] = "VideoClips";
