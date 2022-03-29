@@ -422,20 +422,34 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
-        if (!supportedTypes.includes(type))
-            return;
-
-        // if this is a webrtc camera, also proxy the signaling channel too,
+        // if this is a webrtc camera, also proxy the signaling channel too
         // for inflexible clients.
         if (interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
-            return [
+            const ret = [
                 ScryptedInterface.RTCSignalingChannel,
-                ScryptedInterface.VideoCamera,
-                // ScryptedInterface.Settings,
             ];
-        }
+            if (type === ScryptedDeviceType.Speaker) {
+                ret.push(ScryptedInterface.Intercom);
+            }
+            else if (type === ScryptedDeviceType.SmartSpeaker) {
+                ret.push(ScryptedInterface.Intercom, ScryptedInterface.Microphone);
+            }
+            else if (type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) {
+                ret.push(ScryptedInterface.VideoCamera, ScryptedInterface.Intercom);
+            }
+            else if (type === ScryptedDeviceType.Display) {
+                ret.push(ScryptedInterface.Display);
+            }
+            else if (type === ScryptedDeviceType.SmartDisplay) {
+                ret.push(ScryptedInterface.Display, ScryptedInterface.VideoCamera);
+            }
+            else {
+                return;
+            }
 
-        if (interfaces.includes(ScryptedInterface.VideoCamera)) {
+            return ret;
+        }
+        else if (supportedTypes.includes(type)) {
             return [
                 ScryptedInterface.RTCSignalingChannel,
                 ScryptedInterface.Settings,
