@@ -86,8 +86,19 @@ export enum ScryptedDeviceType {
   Thermostat = "Thermostat",
   Lock = "Lock",
   PasswordControl = "PasswordControl",
+  /**
+   * Displays have audio and video output.
+   */
   Display = "Display",
+  /**
+   * Smart Displays have two way audio and video.
+   */
+  SmartDisplay = "SmartDisplay",
   Speaker = "Speaker",
+  /**
+   * Smart Speakers have two way audio.
+   */
+  SmartSpeaker = "SmartSpeaker",
   Event = "Event",
   Entry = "Entry",
   Garage = "Garage",
@@ -422,6 +433,13 @@ export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
    * @default true
    */
   refresh?: boolean;
+}
+
+/**
+ * Microphone devices can capture audio streams.
+ */
+export interface Microphone {
+  getAudioStream(): Promise<MediaObject>;
 }
 
 /**
@@ -1278,6 +1296,7 @@ export enum ScryptedInterface {
   Thermometer = "Thermometer",
   HumiditySensor = "HumiditySensor",
   Camera = "Camera",
+  Microphone = "Microphone",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
   VideoClips = "VideoClips",

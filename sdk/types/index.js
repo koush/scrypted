@@ -214,6 +214,13 @@ exports.ScryptedInterfaceDescriptors = {
         ],
         properties: []
     },
+    Microphone: {
+        name: 'Microphone',
+        methods: [
+            'getAudioStream'
+        ],
+        properties: []
+    },
     VideoCamera: {
         name: 'VideoCamera',
         methods: [
@@ -593,8 +600,19 @@ var ScryptedDeviceType;
     ScryptedDeviceType["Thermostat"] = "Thermostat";
     ScryptedDeviceType["Lock"] = "Lock";
     ScryptedDeviceType["PasswordControl"] = "PasswordControl";
+    /**
+     * Displays have audio and video output.
+     */
     ScryptedDeviceType["Display"] = "Display";
+    /**
+     * Smart Displays have two way audio and video.
+     */
+    ScryptedDeviceType["SmartDisplay"] = "SmartDisplay";
     ScryptedDeviceType["Speaker"] = "Speaker";
+    /**
+     * Smart Speakers have two way audio.
+     */
+    ScryptedDeviceType["SmartSpeaker"] = "SmartSpeaker";
     ScryptedDeviceType["Event"] = "Event";
     ScryptedDeviceType["Entry"] = "Entry";
     ScryptedDeviceType["Garage"] = "Garage";
@@ -667,6 +685,7 @@ var ScryptedInterface;
     ScryptedInterface["Thermometer"] = "Thermometer";
     ScryptedInterface["HumiditySensor"] = "HumiditySensor";
     ScryptedInterface["Camera"] = "Camera";
+    ScryptedInterface["Microphone"] = "Microphone";
     ScryptedInterface["VideoCamera"] = "VideoCamera";
     ScryptedInterface["VideoRecorder"] = "VideoRecorder";
     ScryptedInterface["VideoClips"] = "VideoClips";

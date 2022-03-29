@@ -51,6 +51,8 @@ class ScryptedDeviceType(Enum):
     Program = "Program"
     Scene = "Scene"
     Sensor = "Sensor"
+    SmartDisplay = "SmartDisplay"
+    SmartSpeaker = "SmartSpeaker"
     Speaker = "Speaker"
     Switch = "Switch"
     Thermostat = "Thermostat"
@@ -87,6 +89,7 @@ class ScryptedInterface(Enum):
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
     MediaPlayer = "MediaPlayer"
+    Microphone = "Microphone"
     MixinProvider = "MixinProvider"
     MotionSensor = "MotionSensor"
     Notifier = "Notifier"
@@ -633,6 +636,11 @@ class MediaPlayer:
     async def skipNext(self) -> None:
         pass
     async def skipPrevious(self) -> None:
+        pass
+    pass
+
+class Microphone:
+    async def getAudioStream(self) -> MediaObject:
         pass
     pass
 
