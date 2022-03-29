@@ -309,7 +309,7 @@ class RpcPeer:
                     result['result'] = self.serialize(value, False)
                 except Exception as e:
                     tb = traceback.format_exc()
-                    print('failure', method, e, tb)
+                    # print('failure', method, e, tb)
                     self.createErrorResult(
                         result, type(e).__name__, str(e), tb)
 
