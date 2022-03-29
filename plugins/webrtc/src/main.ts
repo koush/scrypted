@@ -249,7 +249,9 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                         videoArgs.push(
                             '-vcodec', 'libx264',
                             '-preset', 'ultrafast',
-                            '-tune', 'zerolatency',
+                            // this causes chromecast to chop and show frames only every 10 seconds.
+                            // but it seems to work fine everywhere else?
+                            // '-tune', 'zerolatency',
                         );
                     }
                     else {
@@ -264,6 +266,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                         // this seems to cause issues with presets i think.
                         // '-level:v', '4.0',
                         '-b:v', this.storageSettings.values.bitrate.toString(),
+                        '-maxrate', this.storageSettings.values.bitrate.toString(),
+                        '-bufsize', (this.storageSettings.values.bitrate / 2).toString(),
                     )
                 }
                 else {
