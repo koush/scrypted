@@ -1,0 +1,39 @@
+{
+   "name": "@scrypted/arlo",
+   "version": "0.0.1",
+   "description": "Arlo Plugin for Scrypted",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "arlo",
+      "camera"
+   ],
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "scrypted": {
+      "name": "Arlo Camera Plugin",
+      "runtime": "python",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "Settings",
+         "DeviceProvider",
+         "DeviceDiscovery"
+      ],
+      "pluginDependencies": [
+         "@scrypted/snapshot",
+         "@scrypted/prebuffer-mixin"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk"
+   }
+}
