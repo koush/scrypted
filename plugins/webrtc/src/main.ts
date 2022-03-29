@@ -17,6 +17,8 @@ import { ScryptedSessionControl } from "./session-control";
 import crypto from 'crypto';
 import { WebRTCCamera } from "./webrtc-camera";
 import ip from 'ip';
+import { createTrackForwarders, getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
+import { isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -208,17 +210,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             })
         }
 
-        const videoInput = await createBindZero();
-        const audioInput = await createBindZero();
-
-        videoInput.server.on('message', data => {
-            vtrack.writeRtp(data);
-        });
-
-        audioInput.server.on('message', data => {
-            atrack.writeRtp(data);
-        });
-
         const cpPromise: Promise<ChildProcess> = new Promise(resolve => {
             let connected = false;
             pc.connectionStateChange.subscribe(async () => {
@@ -284,46 +275,28 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 
                 const decoderArguments: string[] = this.storageSettings.values.decoderArguments?.split(' ') || [];
 
-                const args = [
-                    '-hide_banner',
-
-                    '-fflags', 'nobuffer',
-                    '-flags', 'low_delay',
-
+                const { cp } = await startRtpForwarderProcess(this.console, [
                     ...(transcode ? decoderArguments : []),
 
                     ...ffInput.inputArguments,
+                ], {
+                    video: {
+                        transceiver: videoTransceiver,
+                        outputArguments: [
+                            '-an',
+                            ...videoArgs,
+                            '-pkt_size', '1300',
+                            '-fflags', '+flush_packets', '-flush_packets', '1',
+                        ]
+                    },
+                    audio: {
+                        transceiver: audioTransceiver,
+                        outputArguments: [
+                            ...getFFmpegRtpAudioOutputArguments(),
+                        ]
+                    }
+                })
 
-                    // create a dummy audio track if none actually exists.
-                    // this track will only be used if no audio track is available.
-                    // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-                    '-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest',
-
-                    '-an',
-
-                    ...videoArgs,
-
-                    '-pkt_size', '1300',
-                    '-fflags', '+flush_packets', '-flush_packets', '1',
-                    '-f', 'rtp', `rtp://127.0.0.1:${videoInput.port}`,
-
-                    '-vn',
-                    '-acodec', 'libopus',
-                    '-ar', '48k',
-                    // choose a better birate? this is on the high end recommendation for voice.
-                    '-b:a', '40k',
-                    '-ac', '1',
-                    '-application', 'lowdelay',
-                    '-frame_duration', '60',
-                    // '-pkt_size', '1300',
-                    '-fflags', '+flush_packets', '-flush_packets', '1',
-                    '-f', 'rtp', `rtp://127.0.0.1:${audioInput.port}`,
-                ];
-
-                safePrintFFmpegArguments(this.console, args);
-
-                const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
-                ffmpegLogInitialOutput(this.console, cp);
                 cp.on('exit', cleanup);
                 resolve(cp);
             });
@@ -332,8 +305,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         const cleanup = async () => {
             // no need to explicitly stop intercom as the server closing will terminate it.
             // do this to prevent shared intercom clobbering.
-            closeQuiet(videoInput.server);
-            closeQuiet(audioInput.server);
             closeQuiet(audioOutput.server);
             closeQuiet(rtspTcpServer?.server);
             await Promise.allSettled([
@@ -345,26 +316,14 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             ])
         };
 
-        const isPeerConnectionAlive = () => {
-            if (pc.iceConnectionState === 'disconnected'
-                || pc.iceConnectionState === 'failed'
-                || pc.iceConnectionState === 'closed')
-                return false;
-            if (pc.connectionState === 'closed'
-                || pc.connectionState === 'disconnected'
-                || pc.connectionState === 'failed')
-                return false;
-            return true;
-        }
-
         pc.connectionStateChange.subscribe(() => {
             this.console.log('connectionStateChange', pc.connectionState);
-            if (!isPeerConnectionAlive())
+            if (!isPeerConnectionAlive(pc))
                 cleanup();
         });
         pc.iceConnectionStateChange.subscribe(() => {
             this.console.log('iceConnectionStateChange', pc.iceConnectionState);
-            if (!isPeerConnectionAlive())
+            if (!isPeerConnectionAlive(pc))
                 cleanup();
         });
 
@@ -394,7 +353,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             return this.mixinDevice.getVideoStream(options);
         }
 
-        const ffmpegInput = await createRTCPeerConnectionSource({
+        const { ffmpegInput } = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
@@ -438,9 +397,11 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
                 ret.push(ScryptedInterface.VideoCamera, ScryptedInterface.Intercom);
             }
             else if (type === ScryptedDeviceType.Display) {
+                // intercom too?
                 ret.push(ScryptedInterface.Display);
             }
             else if (type === ScryptedDeviceType.SmartDisplay) {
+                // intercom too?
                 ret.push(ScryptedInterface.Display, ScryptedInterface.VideoCamera);
             }
             else {
@@ -489,7 +450,11 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
             type: ScryptedDeviceType.Camera,
             nativeId,
             interfaces: [
-                ScryptedInterface.VideoCamera,
+                ScryptedInterface.Display,
+                ScryptedInterface.Intercom,
+                // two way video?
+                // ScryptedInterface.VideoCamera,
+
                 // RTCSignalingChannel is actually implemented as a loopback from the browser, but
                 // since the feed needs to be tee'd to multiple clients, use VideoCamera instead
                 // to do that.

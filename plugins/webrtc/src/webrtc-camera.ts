@@ -1,22 +1,40 @@
-import sdk, { RTCSessionControl, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, VideoCamera, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel, RTCSignalingOptions } from "@scrypted/sdk";import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
+import sdk, { RTCSessionControl, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, VideoCamera, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel, RTCSignalingOptions, Intercom } from "@scrypted/sdk"; import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
 const { mediaManager, systemManager, deviceManager } = sdk;
 
-export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTCSignalingClient, RTCSignalingChannel {
+export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTCSignalingClient, RTCSignalingChannel, Intercom {
     pendingClient: (session: RTCSignalingSession) => void;
+    intercom: Promise<Intercom>;
 
     constructor(nativeId: string) {
         super(nativeId);
     }
 
+    async startIntercom(media: MediaObject): Promise<void> {
+        const intercom = await this.intercom;
+        if (!intercom)
+            throw new Error('no webrtc session')
+        return intercom.startIntercom(media);
+    }
+
+    async stopIntercom(): Promise<void> {
+        const intercom = await this.intercom;
+        if (!intercom)
+            throw new Error('no webrtc session')
+        return intercom.stopIntercom();
+    }
+
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', true);
 
-        const ffmpegInput = await createRTCPeerConnectionSource({
+        const { ffmpegInput, intercom } = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions,
             channel: this,
             useUdp: true,
         });
+
+        this.intercom?.then(intercom => intercom.stopIntercom());
+        this.intercom = intercom;
 
         return mediaManager.createFFmpegMediaObject(ffmpegInput);
     }
