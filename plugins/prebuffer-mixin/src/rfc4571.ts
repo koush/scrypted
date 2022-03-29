@@ -61,6 +61,10 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
                     continue;
                 }
 
+                // RTSP magic byte
+                if (header[0] !== 36)
+                    throw new Error('Unexpected byte found instead of RTSP header magic: ' + header[0]);
+
                 length = header.readUInt16BE(2);
             }
             else {
