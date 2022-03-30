@@ -16,12 +16,12 @@
             "preLaunchTask": "scrypted: deploy+debug",
             "pathMappings": [
                 {
-                    "localRoot": "/Volumes/Dev/scrypted/server/python/",
-                    "remoteRoot": "/Volumes/Dev/scrypted/server/python/",
+                    "localRoot": "${workspaceFolder}/../../server/python/",
+                    "remoteRoot": "${config:scrypted.serverRoot}/python",
                 },
                 {
                     "localRoot": "${workspaceFolder}/src",
-                    "remoteRoot": "${config:scrypted.pythonRemoteRoot}"
+                    "remoteRoot": "${config:scrypted.volumeRoot}/plugin.zip"
                 },
 
             ]
