@@ -119,17 +119,19 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             try {
                 const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
                 const msos = await realDevice.getVideoStreamOptions();
-                for (const mso of msos) {
-                    if (mso.prebuffer) {
-                        const request = mso as RequestMediaStreamOptions;
-                        request.refresh = false;
-                        takePicture = async () => mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
-                        // a prebuffer snapshot should wipe out any pending pictures
-                        // that may not have come from the prebuffer to allow a safe-ish/fast refresh.
-                        this.pendingPicture = undefined;
-                        this.console.log('snapshotting active prebuffer');
-                        break;
-                    }
+                let prebufferChannel = msos?.find(mso => mso.prebuffer);
+                if (prebufferChannel || !this.lastAvailablePicture) {
+                    prebufferChannel = prebufferChannel || {
+                        id: undefined,
+                    };
+
+                    const request = prebufferChannel as RequestMediaStreamOptions;
+                    request.refresh = false;
+                    takePicture = async () => mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
+                    // a prebuffer snapshot should wipe out any pending pictures
+                    // that may not have come from the prebuffer to allow a safe-ish/fast refresh.
+                    this.pendingPicture = undefined;
+                    this.console.log('snapshotting active prebuffer');
                 }
             }
             catch (e) {
@@ -292,8 +294,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async createErrorImage(e: any) {
-        this.console.log('creating error snapshot', e);
         if (e instanceof TimeoutError) {
+            if (!this.timeoutPicture)
+                this.console.log('creating timeout snapshot');
             this.timeoutPicture = singletonPromise(this.timeoutPicture,
                 () => this.createTextErrorImage('Snapshot Timed Out'),
                 FOREVER);
@@ -306,6 +309,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return this.progressPicture.promise;
         }
         else {
+            if (!this.errorPicture)
+                this.console.log('creating error snapshot', e);
             this.errorPicture = singletonPromise(this.errorPicture,
                 () => this.createTextErrorImage('Snapshot Failed'),
                 FOREVER);
