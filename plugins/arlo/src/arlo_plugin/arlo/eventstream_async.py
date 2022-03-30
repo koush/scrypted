@@ -29,7 +29,7 @@ import uuid
 
 class EventStream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=30):
+    def __init__(self, arlo, expire=5):
         self.event_stream = None
         self.connected = False
         self.registered = False
@@ -43,12 +43,16 @@ class EventStream:
         self.disconnect()
 
     async def _clean_queues(self):
+        interval = self.expire * 2
+
+        await asyncio.sleep(interval)
         while not self.event_stream_stop_event.is_set():
-            print("Running periodic queue cleanup")
+            empty_queues = []
 
             for key, q in self.queues.items():
                 items = []
                 num_dropped = 0
+
                 while not q.empty():
                     item = q.get_nowait()
                     q.task_done()
@@ -62,9 +66,17 @@ class EventStream:
                 for item in items:
                     q.put_nowait(item)
 
-                print(f"Cleaned {num_dropped} events from queue {key}")
+                if num_dropped > 0:
+                    print(f"Cleaned {num_dropped} events from queue {key}")
 
-            await asyncio.sleep(self.expire * 2)
+                if q.empty():
+                    empty_queues.append(key)
+
+            for key in empty_queues:
+                del self.queues[key]
+                print(f"Removed empty queue {key}")
+
+            await asyncio.sleep(interval)
 
     async def get(self, resource, actions, timeout=None):
         async def get_impl(resource, actions):
@@ -72,22 +84,20 @@ class EventStream:
                 for action in actions:
                     key = f"{resource}/{action}"
                     if key not in self.queues:
-                        await asyncio.sleep(0)
                         continue
 
                     q = self.queues[key]
                     if q.empty():
-                        await asyncio.sleep(0)
                         continue
 
-                    event = q.get_nowait()
-                    q.task_done()
-                    if time.time() - event.timestamp > self.expire:
-                        # dropping expired events
-                        await asyncio.sleep(0)
-                        break
-
-                    return event, action
+                    while not q.empty():
+                        event = q.get_nowait()
+                        q.task_done()
+                        if time.time() - event.timestamp > self.expire:
+                            continue
+                        else:
+                            return event, action
+                await asyncio.sleep(0.1)
         return await asyncio.wait_for(get_impl(resource, actions), timeout)
 
     async def start(self):
@@ -112,11 +122,7 @@ class EventStream:
                         self.disconnect()
                         return None
                     else:
-                        self.event_loop.call_soon_threadsafe(
-                            lambda: asyncio.create_task(
-                                self._queue_response(response)
-                            )
-                        )
+                        self.event_loop.call_soon_threadsafe(self._queue_response, response)
                 elif response.get('status') == 'connected':
                     self.connected = True
 
@@ -130,25 +136,27 @@ class EventStream:
 
         asyncio.get_event_loop().create_task(self._clean_queues())
 
-    async def _queue_response(self, response):
+    def _queue_response(self, response):
         resource = response.get('resource')
         action = response.get('action')
-        q = self.queues.setdefault(f"{resource}/{action}", asyncio.Queue())
-        await q.put(StreamEvent(response, time.time()))
-
-    async def requeue(self, event, resource, action):
         key = f"{resource}/{action}"
-        await self.queues[key].put(event)
+        if key not in self.queues:
+            q = self.queues[key] = asyncio.Queue()
+        else:
+            q = self.queues[key]
+        q.put_nowait(StreamEvent(response, time.time()))
+
+    def requeue(self, event, resource, action):
+        key = f"{resource}/{action}"
+        self.queues[key].put_nowait(event)
 
     def disconnect(self):
         self.connected = False
 
-        for _, q in self.queues:
-            self.event_loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(
-                    q.put(None)
-                )
-            )
+        def exit_queues(self):
+            for _, q in self.queues:
+                q.put_nowait(None)
+        self.event_loop.call_soon_threadsafe(exit_queues, self)
 
         self.event_stream_stop_event.set()
 

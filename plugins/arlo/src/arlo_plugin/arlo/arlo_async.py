@@ -40,7 +40,6 @@ import time
 
 #logging.basicConfig(level=logging.DEBUG,format='[%(levelname)s] (%(threadName)-10s) %(message)s',)
 
-REQUEUE = object()
 TIMEOUT = object()
 
 class Arlo(object):
@@ -183,15 +182,9 @@ class Arlo(object):
         Unfortunately, this appears to be the only way Arlo communicates these messages.
 
         This function makes the initial GET request to /subscribe, which returns the EventStream socket.
-        Once we have that socket, the API requires a POST request to /notify with the "subscriptionsresource.
-        This call "registersthe device (which should be the basestation) so that events will be sent to the EventStream
+        Once we have that socket, the API requires a POST request to /notify with the subscriptions resource.
+        This call registers the device (which should be the basestation) so that events will be sent to the EventStream
         when subsequent calls to /notify are made.
-
-        Since this interface is asynchronous, and this is a quick and dirty hack to get this working, I'm using a thread
-        to listen to the EventStream. This thread puts events into a queue. Some polling is required (see NotifyAndGetResponse()) because
-        the event messages aren't guaranteed to be delivered in any specific order, but I wanted to maintain a synchronous style API.
-
-        You generally shouldn't need to call Subscribe() directly, although I'm leaving it "publicfor now.
         """
         basestation_id = basestation.get('deviceId')
 
@@ -307,11 +300,12 @@ class Arlo(object):
                     return None
 
                 response = callback(self, event.item)
-                # requeue if the callback says to do so
-                if response is REQUEUE:
-                    await self.event_stream.requeue(event, resource, action)
-                    continue
-                return response
+
+                # always requeue so other listeners can see the event too
+                self.event_stream.requeue(event, resource, action)
+
+                if response is not None:
+                    return response
 
     async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback, timeout):
         """
@@ -1578,8 +1572,7 @@ class Arlo(object):
             url = event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
             if url:
                 return url
-
-            return REQUEUE 
+            return None
 
         return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback, timeout)
 
