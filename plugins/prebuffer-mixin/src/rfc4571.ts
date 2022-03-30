@@ -124,7 +124,7 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
         inputAudioCodec,
         inputVideoCodec,
         inputVideoResolution: undefined,
-        isActive() { return isActive },
+        get isActive() { return isActive },
         kill,
         mediaStreamOptions,
         emit(container: 'rtsp', chunk: StreamChunk) {

@@ -636,7 +636,7 @@ class PrebufferSession {
             rtspClient.client.destroy();
             sessionKill();
           }
-          if (!session.isActive())
+          if (!session.isActive)
             throw new Error('parser was killed before rtsp client started');
         }
         catch (e) {
@@ -819,11 +819,11 @@ class PrebufferSession {
     this.console.log(this.streamName, 'active rebroadcast clients:', this.activeClients);
   }
 
-  inactivityCheck(session: ParserSession<PrebufferParsers>) {
-    this.printActiveClients();
+  inactivityCheck(session: ParserSession<PrebufferParsers>, resetTimeout: boolean) {
     if (this.activeClients)
       return;
 
+    // should bitrate be reset immediately once the stream goes inactive?
     if (this.needBitrateReset && this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
       this.resetBitrate();
     }
@@ -831,6 +831,10 @@ class PrebufferSession {
     if (!this.stopInactive) {
       return;
     }
+
+    // passive clients should not reset timeouts.
+    if (this.inactivityTimeout && !resetTimeout)
+      return;
 
     clearTimeout(this.inactivityTimeout)
     this.inactivityTimeout = setTimeout(() => {
@@ -904,11 +908,9 @@ class PrebufferSession {
         return () => {
           if (isActiveClient) {
             this.activeClients--;
-            this.inactivityCheck(session);
+            this.printActiveClients();
           }
-          else {
-            // this.console.log('passive client request ended');
-          }
+          this.inactivityCheck(session, isActiveClient);
           cleanup();
         };
       }
@@ -916,6 +918,9 @@ class PrebufferSession {
   }
 
   async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+    if (options?.refresh === false && !this.parserSessionPromise)
+      throw new Error('Stream is currently unavailable and will not be started for this request. RequestMediaStreamOptions.refresh === false');
+
     this.ensurePrebufferSession();
 
     const session = await this.parserSessionPromise;
@@ -1073,15 +1078,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
   }
 
   async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+    if (options?.directMediaStream)
+      return this.mixinDevice.getVideoStream(options);
+
     await this.ensurePrebufferSessions();
 
     const id = options?.id;
-    let session = this.sessions.get(id);
-    if (!session || options?.directMediaStream)
-      return this.mixinDevice.getVideoStream(options);
-    session.ensurePrebufferSession();
-    await session.parserSessionPromise;
-    session = this.sessions.get(id);
+    const session = this.sessions.get(id);
     if (!session)
       return this.mixinDevice.getVideoStream(options);
     return session.getVideoStream(options);
