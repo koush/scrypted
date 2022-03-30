@@ -7,7 +7,6 @@ from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, Scrypt
 from .arlo import Arlo
 from .camera import ArloCamera
 from .logging import getLogger
-from .monkey_patch import *
 from .scrypted_env import get_pyplugin_settings_file, ensure_pyplugin_settings_file
 
 logger = getLogger(__name__)
@@ -192,6 +191,10 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         return ret
 
     def createCamera(self, nativeId):
+        if nativeId not in self.arlo_cameras:
+            return None
+        if arlo_camera["parentId"] not in self.arlo_basestations:
+            return None
         arlo_camera = self.arlo_cameras[nativeId]
         arlo_basestation = self.arlo_basestations[arlo_camera["parentId"]]
         return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
