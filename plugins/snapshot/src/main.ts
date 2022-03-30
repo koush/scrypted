@@ -23,6 +23,10 @@ class NeverWaitError extends Error {
 
 }
 
+class PrebufferUnavailableError extends Error {
+
+}
+
 class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     storageSettings = new StorageSettings(this, {
         defaultSnapshotChannel: {
@@ -79,11 +83,15 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             title: 'Snapshot Mode',
             description: 'Set the snapshot mode to accomodate cameras with slow snapshots that may hang HomeKit.\nSetting the mode to "Never Wait" will only use recently available snapshots.\nSetting the mode to "Timeout" will cancel slow snapshots.',
             choices: [
-                'Normal',
+                'Default',
                 'Never Wait',
                 'Timeout',
             ],
-            defaultValue: 'Normal',
+            mapGet(value) {
+                // renamed the setting value.
+                return value === 'Normal' ? 'Default' : value;
+            },
+            defaultValue: 'Default',
         },
         snapshotResolution: {
             title: 'Snapshot Resolution',
@@ -106,6 +114,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     errorPicture: RefreshPromise<Buffer>;
     timeoutPicture: RefreshPromise<Buffer>;
     progressPicture: RefreshPromise<Buffer>;
+    prebufferUnavailablePicture: RefreshPromise<Buffer>;
     currentPicture: Buffer;
     lastAvailablePicture: Buffer;
 
@@ -126,7 +135,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     };
 
                     const request = prebufferChannel as RequestMediaStreamOptions;
-                    request.refresh = false;
+                    if (this.lastAvailablePicture)
+                        request.refresh = false;
                     takePicture = async () => mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
                     // a prebuffer snapshot should wipe out any pending pictures
                     // that may not have come from the prebuffer to allow a safe-ish/fast refresh.
@@ -161,9 +171,14 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
                     };
                 }
+                else if (this.storageSettings.values.snapshotsFromPrebuffer) {
+                    takePicture = () => {
+                        throw new PrebufferUnavailableError();
+                    }
+                }
                 else {
                     takePicture = () => {
-                        throw new Error('Snapshot Unavailable (snapshotUrl empty, and prebuffer not available or enabled)');
+                        throw new Error('Snapshot Unavailable (snapshotUrl empty)');
                     }
                 }
             }
@@ -210,7 +225,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     this.lastAvailablePicture = picture;
                     setTimeout(() => {
                         if (this.currentPicture === picture) {
-                            this.clearCachedPictures();
+                            // only clear the current picture after it times out,
+                            // the plugin shouldn't invalidate error, timeout, progress
+                            // images unless the current picture is updated.
+                            this.currentPicture = undefined;
                         }
                     }, 30000);
                 }
@@ -233,7 +251,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
 
         let data: Buffer;
-        if (this.storageSettings.values.snapshotMode === 'Normal') {
+        if (this.storageSettings.values.snapshotMode === 'Default') {
             data = await this.pendingPicture;
         }
         else {
@@ -291,6 +309,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         this.errorPicture = undefined;
         this.pendingPicture = undefined;
         this.timeoutPicture = undefined;
+        this.progressPicture = undefined;
+        this.prebufferUnavailablePicture = undefined;
     }
 
     async createErrorImage(e: any) {
@@ -301,6 +321,12 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 () => this.createTextErrorImage('Snapshot Timed Out'),
                 FOREVER);
             return this.timeoutPicture.promise;
+        }
+        else if (e instanceof PrebufferUnavailableError) {
+            this.prebufferUnavailablePicture = singletonPromise(this.prebufferUnavailablePicture,
+                () => this.createTextErrorImage('Snapshot Unavailable'),
+                FOREVER);
+            return this.prebufferUnavailablePicture.promise;
         }
         else if (e instanceof NeverWaitError) {
             this.progressPicture = singletonPromise(this.progressPicture,
@@ -319,7 +345,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async createTextErrorImage(text: string) {
-        if (!this.currentPicture) {
+        const errorBackground = this.currentPicture || this.lastAvailablePicture;
+
+        if (!errorBackground) {
             const img = await jimp.create(1920 / 2, 1080 / 2);
             const font = await fontPromise;
             img.print(font, 0, 0, {
@@ -330,9 +358,9 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return img.getBufferAsync('image/jpeg');
         }
         else {
-            const img = await jimp.read(this.currentPicture);
+            const img = await jimp.read(errorBackground);
             img.resize(1920 / 2, jimp.AUTO);
-            img.blur(15);
+            img.blur(8);
             img.brightness(-.2);
             const font = await fontPromise;
             img.print(font, 0, 0, {
