@@ -349,7 +349,9 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 
 
     createVideoStreamOptions() {
-        return getRTCMediaStreamOptions('webrtc', 'WebRTC', this.storageSettings.values.useUdp);
+        const ret = getRTCMediaStreamOptions('webrtc', 'WebRTC', this.storageSettings.values.useUdp);
+        ret.source = 'cloud';
+        return ret;
     }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
