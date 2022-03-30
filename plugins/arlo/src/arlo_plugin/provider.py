@@ -1,15 +1,10 @@
 import asyncio
-import json
 
 import scrypted_sdk
 from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface, ScryptedDeviceType
 
 from .arlo import Arlo
 from .camera import ArloCamera
-from .logging import getLogger
-from .scrypted_env import get_pyplugin_settings_file, ensure_pyplugin_settings_file
-
-logger = getLogger(__name__)
 
 class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery):
     arlo_cameras = None
@@ -22,38 +17,19 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     _arlo_mfa_complete_auth = None
 
     def __init__(self, nativeId=None):
-        if nativeId is None:
-            mgr_native_ids = scrypted_sdk.deviceManager.nativeIds
-            logger.info(f"No nativeId provided, selecting 'None' key from: { {k: v.id for k, v in mgr_native_ids.items()} }")
-            nativeId = mgr_native_ids[None].id
         super().__init__(nativeId=nativeId)
 
         self.arlo_cameras = {}
         self.arlo_basestations = {}
         self.scrypted_devices = {}
 
-        ensure_pyplugin_settings_file(self.pluginId)
-
-    @property
-    def pluginId(self):
-        return scrypted_sdk.remote.pluginId
-
-    @property
-    def settings(self):
-        if self._settings is not None:
-            return self._settings
-
-        file_path = get_pyplugin_settings_file(self.pluginId)
-        self._settings = json.loads(open(file_path).read())
-        return self._settings
-
     @property
     def arlo_username(self):
-        return self.settings.get("arlo_username", "")
+        return self.storage.getItem("arlo_username")
 
     @property
     def arlo_password(self):
-        return self.settings.get("arlo_password", "")
+        return self.storage.getItem("arlo_password")
 
     @property
     def arlo(self):
@@ -62,34 +38,30 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
                 if self._arlo_mfa_code == "":
                     return None
 
-                logger.info("Completing Arlo MFA...")
+                self.print("Completing Arlo MFA...")
                 self._arlo_mfa_complete_auth(self._arlo_mfa_code)
                 self._arlo_mfa_complete_auth = None 
                 self._arlo_mfa_code = None
-                logger.info("Arlo MFA done")
+                self.print("Arlo MFA done")
                 asyncio.get_event_loop().create_task(self.discoverDevices())
 
             return self._arlo
 
-        if self.arlo_username == "" or self.arlo_password == "":
+        if self.arlo_username is None or self.arlo_password is None:
             return None
             
-        logger.info("Trying to initialize Arlo client...")
+        self.print("Trying to initialize Arlo client...")
         try:
             self._arlo = Arlo()
             self._arlo_mfa_complete_auth = self._arlo.LoginMFA(self.arlo_username, self.arlo_password)
         except Exception as e:
-            logger.error(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
+            self.print(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
             self._arlo = None
             self._arlo_mfa_code = None
             return None
-        logger.info(f"Initialized Arlo client for {self.arlo_username}, waiting for MFA code")
+        self.print(f"Initialized Arlo client for {self.arlo_username}, waiting for MFA code")
 
         return None
-
-    def save_settings(self):
-        with open(get_pyplugin_settings_file(self.pluginId), 'w') as file:
-            file.write(json.dumps(self._settings))
 
     async def getSettings(self):
         _ = self.arlo
@@ -116,8 +88,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         if key == "arlo_mfa_code":
             self._arlo_mfa_code = value
         else:
-            self.settings[key] = value
-            self.save_settings()
+            self.storage.setItem(key, value)
 
             # force arlo client to be invalidated and reloaded
             if self.arlo is not None:
@@ -134,7 +105,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         if not self.arlo:
             raise Exception("Arlo client not connected, cannot discover devices")
 
-        logger.debug("Discovering devices...")
+        self.print("Discovering devices...")
         self.arlo_cameras = {}
         self.arlo_basestations = {}
         self.scrypted_devices = {}
@@ -142,13 +113,13 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         basestations = self.arlo.GetDevices('basestation')
         for basestation in basestations:
             self.arlo_basestations[basestation["deviceId"]] = basestation
-        logger.info(f"Discovered {len(basestations)} basestations")
+        self.print(f"Discovered {len(basestations)} basestations")
 
         devices = []
         cameras = self.arlo.GetDevices('camera')
         for camera in cameras:
             if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
-                logger.warn(f"Skipping camera {camera['deviceId']} because its basestation was not found")
+                self.print(f"Skipping camera {camera['deviceId']} because its basestation was not found")
                 continue
 
             device = {
@@ -180,7 +151,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
             "devices": devices,
         })
 
-        logger.debug(f"Discovered {len(cameras)} cameras, but only {len(devices)} are usable")
+        self.print(f"Discovered {len(cameras)} cameras, but only {len(devices)} are usable")
 
     def getDevice(self, nativeId):
         ret = self.scrypted_devices.get(nativeId, None)
@@ -193,8 +164,10 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     def createCamera(self, nativeId):
         if nativeId not in self.arlo_cameras:
             return None
+        arlo_camera = self.arlo_cameras[nativeId]
+
         if arlo_camera["parentId"] not in self.arlo_basestations:
             return None
-        arlo_camera = self.arlo_cameras[nativeId]
         arlo_basestation = self.arlo_basestations[arlo_camera["parentId"]]
+
         return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
