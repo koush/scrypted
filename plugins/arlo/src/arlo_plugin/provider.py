@@ -11,9 +11,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     arlo_basestations = None
     _arlo_mfa_code = None
     scrypted_devices = None
-    _settings = None
     _arlo = None
-    _arlo_lock = None
     _arlo_mfa_complete_auth = None
 
     def __init__(self, nativeId=None):
