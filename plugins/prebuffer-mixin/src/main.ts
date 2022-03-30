@@ -633,8 +633,11 @@ class PrebufferSession {
               rtspClient.teardown().finally(sessionKill);
             }
             await sleep(500);
+            rtspClient.client.destroy();
             sessionKill();
           }
+          if (!session.isActive())
+            throw new Error('parser was killed before rtsp client started');
         }
         catch (e) {
           rtspClient.client.destroy();

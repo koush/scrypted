@@ -157,6 +157,14 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
 
     let needSdp = false;
 
+    const ensureActive = (killed: () => void) => {
+        if (!isActive) {
+            killed();
+            throw new Error('parser session was killed killed before ffmpeg connected');
+        }
+        events.on('killed', killed);
+    }
+
     // first see how many pipes are needed, and prep them for the child process
     const stdio: StdioOptions = ['pipe', 'pipe', 'pipe']
     let pipeCount = 3;
@@ -169,10 +177,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
             const udp = await bindZero(socket);
             const rtcp = dgram.createSocket('udp4');
             await bind(rtcp, udp.port + 1);
-            events.once('killed', () => {
+            ensureActive(() => {
                 socket.close();
                 rtcp.close();
-            })
+            });
             args.push(
                 ...parser.outputArguments,
                 // using rtp instead of udp gives us the rtcp messages too.
@@ -211,6 +219,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
             (async () => {
                 const socket = await tcp.clientPromise;
                 try {
+                    ensureActive(() => socket.destroy());
+
                     for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
                         ffmpegStartedResolve?.(undefined);
                         events.emit(container, chunk);

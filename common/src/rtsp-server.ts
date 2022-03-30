@@ -285,7 +285,7 @@ export class RtspClient extends RtspBase {
         const headers: any = {
             Range: `npt=${start}-`,
         };
-        await this.request('PLAY', headers);
+        this.writeRequest('PLAY', headers);
         return this.client;
     }
 
