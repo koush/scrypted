@@ -143,15 +143,20 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         basestations = self.arlo.GetDevices('basestation')
         for basestation in basestations:
             self.arlo_basestations[basestation["deviceId"]] = basestation
+        logger.info(f"Discovered {len(basestations)} basestations")
 
         devices = []
         cameras = self.arlo.GetDevices('camera')
         for camera in cameras:
+            if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
+                logger.warn(f"Skipping camera {camera['deviceId']} because its basestation was not found")
+                continue
+
             device = {
                 "info": {
                     "model": f"{camera['properties']['modelId']} ({camera['properties']['hwVersion']})",
                     "manufacturer": "Arlo",
-                    "firmware": camera["firmwareVersion"],
+                    "firmware": camera.get("firmwareVersion"),
                     "serialNumber": camera["deviceId"],
                 },
                 "nativeId": camera["deviceId"],
@@ -176,7 +181,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
             "devices": devices,
         })
 
-        logger.debug(f"Discovered {len(cameras)} devices")
+        logger.debug(f"Discovered {len(cameras)} cameras, but only {len(devices)} are usable")
 
     def getDevice(self, nativeId):
         ret = self.scrypted_devices.get(nativeId, None)
