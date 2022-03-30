@@ -26,7 +26,7 @@ export interface ParserSession<T extends string> {
     inputVideoCodec?: string;
     inputVideoResolution?: string[];
     kill(): void;
-    isActive(): boolean;
+    isActive: boolean;
 
     emit(container: T, chunk: StreamChunk): this;
     on(container: T, callback: (chunk: StreamChunk) => void): this;
@@ -90,7 +90,7 @@ export async function parseAudioCodec(cp: ChildProcess) {
     return parseToken(cp, 'Audio');
 }
 
-export function setupActivityTimer (container: string, kill: () => void, events: {
+export function setupActivityTimer(container: string, kill: () => void, events: {
     once(event: 'killed', callback: () => void): void,
 }, timeout: number) {
     let dataTimeout: NodeJS.Timeout;
@@ -309,7 +309,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         inputAudioCodec,
         inputVideoCodec,
         inputVideoResolution,
-        isActive() { return isActive },
+        get isActive() { return isActive },
         kill,
         mediaStreamOptions: ffmpegInput.mediaStreamOptions || {
             id: undefined,

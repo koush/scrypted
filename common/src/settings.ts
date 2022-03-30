@@ -51,6 +51,7 @@ export interface StorageSetting extends Setting {
     onPut?: (oldValue: any, newValue: any) => void;
     onGet?: () => Promise<StorageSetting>;
     mapPut?: (oldValue: any, newValue: any) => any;
+    mapGet?: (value: any) => any;
     json?: boolean;
     hide?: boolean;
     noStore?: boolean;
@@ -103,6 +104,7 @@ export class StorageSettings<T extends string> implements Settings {
             delete s.onPut;
             delete s.onGet;
             delete s.mapPut;
+            delete s.mapGet;
         }
         return ret;
     }
@@ -128,6 +130,7 @@ export class StorageSettings<T extends string> implements Settings {
         const setting = this.settings[key];
         if (!setting)
             return this.device.storage.getItem(key);
-        return parseValue(this.device.storage.getItem(key), setting);
+        const ret = parseValue(this.device.storage.getItem(key), setting);
+        return setting.mapGet ? setting.mapGet(ret) : ret;
     }
 }
