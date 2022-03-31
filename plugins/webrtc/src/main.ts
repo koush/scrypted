@@ -456,16 +456,14 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
             type: ScryptedDeviceType.Camera,
             nativeId,
             interfaces: [
+                ScryptedInterface.RTCSignalingClient,
                 ScryptedInterface.Display,
                 ScryptedInterface.Intercom,
-                // two way video?
-                // ScryptedInterface.VideoCamera,
 
                 // RTCSignalingChannel is actually implemented as a loopback from the browser, but
                 // since the feed needs to be tee'd to multiple clients, use VideoCamera instead
                 // to do that.
-                // ScryptedInterface.RTCSignalingChannel,
-                ScryptedInterface.RTCSignalingClient,
+                ScryptedInterface.VideoCamera,
             ],
         });
         return nativeId;
