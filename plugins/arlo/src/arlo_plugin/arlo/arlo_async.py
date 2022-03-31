@@ -36,7 +36,6 @@ import math
 import random
 import time
 
-
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
     AUTH_URL = 'ocapi-app.arlo.com'
@@ -189,7 +188,7 @@ class Arlo(object):
                 self.Ping(basestation)
                 await asyncio.sleep(interval)
 
-        if not self.event_stream or not self.event_stream.connected:
+        if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
             self.event_stream = EventStream(self)
             await self.event_stream.start()
 
@@ -259,21 +258,30 @@ class Arlo(object):
         basestation_id = basestation.get('deviceId')
         return self.Notify(basestation, {"action":"set","resource":"subscriptions/"+self.user_id+"_web","publishResponse":False,"properties":{"devices":[basestation_id]}})
 
-#    def SubscribeToMotionEvents(self, basestation, callback, timeout=120):
-#        """
-#        Use this method to subscribe to motion events. You must provide a callback function which will get called once per motion event.
-#
-#        The callback function should have the following signature:
-#        def callback(self, event)
-#
-#        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
-#        that has a big switch statement in it to handle all the various events Arlo produces.
-#        """
-#        def callbackwrapper(self, event):
-#            if event.get('properties', {}).get('motionDetected'):
-#                callback(self, event)
-#
-#        self.HandleEvents(basestation, callbackwrapper, timeout)
+    def SubscribeToMotionEvents(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to motion events. You must provide a callback function which will get called once per motion event.
+
+        The callback function should have the following signature:
+        def callback(self, event)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+        """
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        async def callbackwrapper(self, event):
+            properties = event.get('properties', {})
+            stop = None
+            if 'motionDetected' in properties:
+                stop = callback(properties['motionDetected'])
+                await asyncio.sleep(5)
+            elif properties.get('activityState') == 'idle':
+                stop = callback(False)
+                await asyncio.sleep(5)
+            return stop
+
+        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
     async def HandleEvents(self, basestation, resource, actions, callback):
         """
@@ -283,6 +291,9 @@ class Arlo(object):
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
+        if not asyncio.iscoroutinefunction(callback):
+            callback = asyncio.coroutine(callback)
+
         await self.Subscribe(basestation)
         if self.event_stream and self.event_stream.connected and self.event_stream.registered:
             while self.event_stream.connected:
@@ -291,7 +302,7 @@ class Arlo(object):
                 if event is None or self.event_stream.event_stream_stop_event.is_set():
                     return None
 
-                response = callback(self, event.item)
+                response = await callback(self, event.item)
 
                 # always requeue so other listeners can see the event too
                 self.event_stream.requeue(event, resource, action)

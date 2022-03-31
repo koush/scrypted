@@ -31,6 +31,7 @@ class EventStream:
     """This class provides a queue-based EventStream object."""
     def __init__(self, arlo, expire=5):
         self.event_stream = None
+        self.initializing = True
         self.connected = False
         self.registered = False
         self.queues = {}
@@ -104,6 +105,7 @@ class EventStream:
 
         def thread_main(self):
             for event in self.event_stream:
+                print("Event:", event)
                 if event is None or self.event_stream_stop_event.is_set():
                     return None
 
@@ -122,6 +124,7 @@ class EventStream:
                     else:
                         self.event_loop.call_soon_threadsafe(self._queue_response, response)
                 elif response.get('status') == 'connected':
+                    self.initializing = False
                     self.connected = True
 
         self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization').decode(), session=self.arlo.request.session)

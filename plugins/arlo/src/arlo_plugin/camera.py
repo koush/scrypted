@@ -1,9 +1,9 @@
 import asyncio
 
 import scrypted_sdk
-from scrypted_sdk.types import Camera, VideoCamera, ScryptedMimeTypes
+from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, ScryptedMimeTypes
 
-class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
+class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSensor):
     nativeId = None
     arlo_device = None
     arlo_basestation = None
@@ -16,6 +16,19 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         self.arlo_device = arlo_device
         self.arlo_basestation = arlo_basestation
         self.provider = provider
+
+        self.stop_motion_subscription = None
+        self.start_motion_subscription()
+
+    def __del__(self):
+        self.stop_motion_subscription = True
+
+    def start_motion_subscription(self):
+        def callback(motionDetected):
+            self.motionDetected = motionDetected
+            return self.stop_motion_subscription
+
+        self.provider.arlo.SubscribeToMotionEvents(self.arlo_basestation, self.arlo_device, callback)
 
     async def getPictureOptions(self):
         return []
