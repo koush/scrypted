@@ -450,13 +450,22 @@ export declare enum ThermostatMode {
     On = "On"
 }
 export interface PictureDimensions {
-    width: number;
-    height: number;
+    width?: number;
+    height?: number;
 }
 export interface PictureOptions {
     id?: string;
-    name?: string;
+    /**
+     * The native dimensions of the camera.
+     */
     picture?: PictureDimensions;
+}
+export interface ResponsePictureOptions extends PictureOptions {
+    name?: string;
+    /**
+     * Flag that indicates that the request supports resizing to custom dimensions.
+     */
+    canResize?: boolean;
 }
 export interface RequestPictureOptions extends PictureOptions {
     reason?: 'user' | 'event';
@@ -474,7 +483,7 @@ export interface RequestPictureOptions extends PictureOptions {
  */
 export interface Camera {
     takePicture(options?: RequestPictureOptions): Promise<MediaObject>;
-    getPictureOptions(): Promise<PictureOptions[]>;
+    getPictureOptions(): Promise<ResponsePictureOptions[]>;
 }
 export interface VideoStreamOptions {
     codec?: string;
@@ -509,7 +518,7 @@ export declare type MediaStreamSource = "local" | "cloud";
  * is requested when calling getVideoStream.
  */
 export interface MediaStreamOptions {
-    id: string;
+    id?: string;
     name?: string;
     /**
      * Prebuffer time in milliseconds.
@@ -520,25 +529,26 @@ export interface MediaStreamOptions {
      */
     container?: string;
     /**
+    * Stream specific metadata.
+    */
+    metadata?: any;
+    /**
      * The tool used to generate the container. Ie, scrypted,
      * the ffmpeg tools, gstreamer.
      */
     tool?: string;
     video?: VideoStreamOptions;
     audio?: AudioStreamOptions;
-    /**
-    * Stream specific metadata.
-    */
-    metadata?: any;
-    source?: MediaStreamSource;
-    userConfigurable?: boolean;
 }
 export interface ResponseMediaStreamOptions extends MediaStreamOptions {
+    id: string;
     /**
      * The time in milliseconds that this stream must be refreshed again
      * via a call to getVideoStream.
      */
     refreshAt?: number;
+    source?: MediaStreamSource;
+    userConfigurable?: boolean;
 }
 export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
     /**

@@ -335,9 +335,7 @@ class MediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
-    source: MediaStreamSource
     tool: str
-    userConfigurable: bool
     video: VideoStreamOptions
     pass
 
@@ -365,12 +363,6 @@ class ObjectsDetected(TypedDict):
     inputDimensions: tuple[float, float]
     running: bool
     timestamp: float
-    pass
-
-class PictureOptions(TypedDict):
-    id: str
-    name: str
-    picture: PictureDimensions
     pass
 
 class Position(TypedDict):
@@ -404,7 +396,6 @@ class RequestMediaStreamOptions(TypedDict):
 class RequestPictureOptions(TypedDict):
     bulkRequest: bool
     id: str
-    name: str
     periodicRequest: bool
     picture: PictureDimensions
     reason: Any | Any
@@ -417,11 +408,16 @@ class RequestRecordingStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
-    source: MediaStreamSource
     startTime: float
     tool: str
-    userConfigurable: bool
     video: VideoStreamOptions
+    pass
+
+class ResponsePictureOptions(TypedDict):
+    canResize: bool
+    id: str
+    name: str
+    picture: PictureDimensions
     pass
 
 class ScriptSource(TypedDict):
@@ -512,7 +508,7 @@ class BufferConverter:
     pass
 
 class Camera:
-    async def getPictureOptions(self) -> list[PictureOptions]:
+    async def getPictureOptions(self) -> list[ResponsePictureOptions]:
         pass
     async def takePicture(self, options: RequestPictureOptions = None) -> MediaObject:
         pass
