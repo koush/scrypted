@@ -1,4 +1,4 @@
-import { MediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
+import { MediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import { StartStreamRequest, H264Level, H264Profile } from '../../hap';
 
 export function profileToFfmpeg(profile: H264Profile): string {
@@ -58,7 +58,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
         : isLowBandwidth
             ? storage.getItem('streamingChannelHub')
             : storage.getItem('streamingChannel');
-    let selectedStream: MediaStreamOptions;
+    let selectedStream: ResponseMediaStreamOptions;
     const msos = await device.getVideoStreamOptions();
     if (streamingChannel)
         selectedStream = msos?.find(mso => mso.name === streamingChannel);

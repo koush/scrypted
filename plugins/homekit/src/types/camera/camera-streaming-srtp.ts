@@ -2,6 +2,7 @@ import { readLength } from '@scrypted/common/src/read-stream';
 import { parsePayloadTypes } from '@scrypted/common/src/sdp-utils';
 import sdk, { MediaStreamOptions, RequestMediaStreamOptions, VideoCamera } from '@scrypted/sdk';
 import net from 'net';
+import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
 import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
@@ -44,7 +45,7 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
     } as RequestMediaStreamOptions, selectedStream));
     const rfc = await mediaManager.convertMediaObjectToJSON<any>(mo, mo.mimeType);
     let { url, sdp } = rfc;
-    let socket: net.Socket;
+    let socket: Readable;
     const isRtsp = url.startsWith('rtsp');
     if (isRtsp) {
         const rtspClient = new RtspClient(url);
@@ -53,7 +54,8 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
         sdp = sdpResponse.body.toString().trim();
         await rtspClient.setup(0, '/audio');
         await rtspClient.setup(2, '/video');
-        socket = await rtspClient.play();
+        await rtspClient.play();
+        socket = rtspClient.rfc4571;
     }
     else {
         const u = new URL(url);

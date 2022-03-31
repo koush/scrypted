@@ -1,6 +1,6 @@
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import sdk, { FFMpegInput, MediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFMpegInput, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
@@ -11,7 +11,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: MediaStreamOptions, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: RequestMediaStreamOptions, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
 
     const request = session.startRequest;
 
