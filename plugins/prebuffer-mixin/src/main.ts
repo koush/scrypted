@@ -622,8 +622,8 @@ class PrebufferSession {
             channel += 2;
           }
           await rtspClient.setup(channel, video);
-          const socket = await rtspClient.play();
-          session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
+          await rtspClient.play();
+          session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
           session.kill = async () => {
@@ -638,6 +638,8 @@ class PrebufferSession {
           }
           if (!session.isActive)
             throw new Error('parser was killed before rtsp client started');
+
+          rtspClient.readLoop().finally(() => session.kill());
         }
         catch (e) {
           rtspClient.client.destroy();
@@ -676,7 +678,7 @@ class PrebufferSession {
             return;
           }
 
-          session.once('killed', kill);
+          session.killed.finally(kill);
 
           const { resetActivityTimer } = setupActivityTimer('mp4', kill, session, rbo.timeout);
 
@@ -752,10 +754,10 @@ class PrebufferSession {
       }
 
       scheduleRefresh(mso);
-      session.once('killed', () => clearTimeout(refreshTimeout));
+      session.killed.finally(() => clearTimeout(refreshTimeout));
     }
 
-    session.once('killed', () => {
+    session.killed.finally(() => {
       clearTimeout(this.inactivityTimeout)
       this.parserSessionPromise = undefined;
       if (this.parserSession === session)
@@ -879,9 +881,9 @@ class PrebufferSession {
         }
 
         const cleanup = () => {
-          destroy();
           session.removeListener(container, safeWriteData);
           session.removeListener('killed', cleanup);
+          destroy();
         }
 
         session.on(container, safeWriteData);
@@ -1139,7 +1141,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
               active++;
               wasActive = true;
               this.online = !!active;
-              await once(ps, 'killed');
+              await ps.killed;
               this.console.error('prebuffer session ended');
             }
             catch (e) {
