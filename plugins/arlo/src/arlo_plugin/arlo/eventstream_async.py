@@ -78,27 +78,25 @@ class EventStream:
 
             await asyncio.sleep(interval)
 
-    async def get(self, resource, actions, timeout=None):
-        async def get_impl(resource, actions):
-            while True:
-                for action in actions:
-                    key = f"{resource}/{action}"
-                    if key not in self.queues:
-                        continue
+    async def get(self, resource, actions):
+        while True:
+            for action in actions:
+                key = f"{resource}/{action}"
+                if key not in self.queues:
+                    continue
 
-                    q = self.queues[key]
-                    if q.empty():
-                        continue
+                q = self.queues[key]
+                if q.empty():
+                    continue
 
-                    while not q.empty():
-                        event = q.get_nowait()
-                        q.task_done()
-                        if time.time() - event.timestamp > self.expire:
-                            continue
-                        else:
-                            return event, action
-                await asyncio.sleep(0.1)
-        return await asyncio.wait_for(get_impl(resource, actions), timeout)
+                while not q.empty():
+                    event = q.get_nowait()
+                    q.task_done()
+                    if time.time() - event.timestamp > self.expire:
+                        continue
+                    else:
+                        return event, action
+            await asyncio.sleep(0.1)
 
     async def start(self):
         if self.event_stream is not None:

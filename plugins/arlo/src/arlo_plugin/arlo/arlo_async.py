@@ -32,15 +32,10 @@ from datetime import datetime
 import asyncio
 import sys
 import base64
-#import logging
 import math
 import random
 import time
 
-
-#logging.basicConfig(level=logging.DEBUG,format='[%(levelname)s] (%(threadName)-10s) %(message)s',)
-
-TIMEOUT = object()
 
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
@@ -280,7 +275,7 @@ class Arlo(object):
 #
 #        self.HandleEvents(basestation, callbackwrapper, timeout)
 
-    async def HandleEvents(self, basestation, resource, actions, callback, timeout):
+    async def HandleEvents(self, basestation, resource, actions, callback):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -291,10 +286,7 @@ class Arlo(object):
         await self.Subscribe(basestation)
         if self.event_stream and self.event_stream.connected and self.event_stream.registered:
             while self.event_stream.connected:
-                try:
-                    event, action = await self.event_stream.get(resource, actions, timeout=timeout)
-                except asyncio.TimeoutError:
-                    return TIMEOUT
+                event, action = await self.event_stream.get(resource, actions)
 
                 if event is None or self.event_stream.event_stream_stop_event.is_set():
                     return None
@@ -307,7 +299,7 @@ class Arlo(object):
                 if response is not None:
                     return response
 
-    async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback, timeout):
+    async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -322,7 +314,7 @@ class Arlo(object):
         trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.
-        return await self.HandleEvents(basestation, resource, actions, callback, timeout)
+        return await self.HandleEvents(basestation, resource, actions, callback)
 
 #    def GetBaseStationState(self, basestation):
 #        return self.NotifyAndGetResponse(basestation, {"action":"get","resource":"basestation","publishResponse":False})
@@ -1557,7 +1549,7 @@ class Arlo(object):
 #
 #        return self.TriggerAndHandleEvent(basestation, trigger, callback)
 
-    async def TriggerFullFrameSnapshot(self, basestation, camera, timeout=10):
+    async def TriggerFullFrameSnapshot(self, basestation, camera):
         """
         This function causes the camera to record a fullframe snapshot.
         The presignedFullFrameSnapshotUrl url is returned.
@@ -1574,7 +1566,7 @@ class Arlo(object):
                 return url
             return None
 
-        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback, timeout)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback)
 
 #    def StartRecording(self, basestation, camera):
 #        """

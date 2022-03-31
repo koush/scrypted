@@ -1,7 +1,7 @@
+import asyncio
+
 import scrypted_sdk
 from scrypted_sdk.types import Camera, VideoCamera, ScryptedMimeTypes
-
-from .arlo import TIMEOUT
 
 class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
     nativeId = None
@@ -24,12 +24,10 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera):
         self.print(f"ArloCamera.takePicture nativeId={self.nativeId} options={options}")
 
         self.print(f"Taking remote snapshot for {self.nativeId}")
-        pic_url = await self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device)
+        pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=10)
 
         if pic_url is None:
             raise Exception(f"Error taking snapshot for {self.nativeId}")
-        elif pic_url is TIMEOUT:
-            raise Exception(f"Timeout taking snapshot for {self.nativeId}")
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(pic_url), ScryptedMimeTypes.Url.value)
 
