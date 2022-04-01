@@ -19,7 +19,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     _arlo_mfa_complete_auth = None
 
     plugin_verbosity_choices = {
-        "Silent": logging.WARNING,
+        "Few": logging.WARNING,
         "Normal": logging.INFO,
         "Verbose": logging.DEBUG
     }
@@ -115,7 +115,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             {
                 "key": "plugin_verbosity",
                 "title": "Plugin Verbosity",
-                "description": "Select the verbosity of this plugin",
+                "description": "Select the verbosity of this plugin. 'Few' will only show warnings and errors. 'Verbose' will show debugging messages, including events received from connected Arlo cameras.",
                 "value": self.plugin_verbosity,
                 "choices": sorted(self.plugin_verbosity_choices.keys()),
             },
