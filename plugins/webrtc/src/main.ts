@@ -1,5 +1,5 @@
 import { MediaStreamTrack, RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
-import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RequestMediaStreamOptions, MediaObject, MediaStreamOptions, DeviceCreator, DeviceProvider, DeviceCreatorSettings, RTCSignalingOptions } from '@scrypted/sdk';
+import { Settings, RTCSignalingChannel, ScryptedDeviceType, ScryptedInterface, VideoCamera, Setting, SettingValue, RTCSessionControl, RTCSignalingSession, FFMpegInput, ScryptedMimeTypes, RTCAVSignalingSetup, Intercom, RequestMediaStreamOptions, MediaObject, MediaStreamOptions, DeviceCreator, DeviceProvider, DeviceCreatorSettings, RTCSignalingOptions, ResponseMediaStreamOptions } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
@@ -267,7 +267,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                         // '-level:v', '4.0',
                         '-b:v', this.storageSettings.values.bitrate.toString(),
                         '-maxrate', this.storageSettings.values.bitrate.toString(),
-                        '-bufsize', (this.storageSettings.values.bitrate / 2).toString(),
+                        '-bufsize', this.storageSettings.values.bitrate.toString(),
                     )
                 }
                 else {
@@ -369,8 +369,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         return mediaManager.createFFmpegMediaObject(ffmpegInput);
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-        let ret: MediaStreamOptions[] = [];
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
+        let ret: ResponseMediaStreamOptions[] = [];
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCamera)) {
             ret = await this.mixinDevice.getVideoStreamOptions();
         }
@@ -456,16 +456,14 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
             type: ScryptedDeviceType.Camera,
             nativeId,
             interfaces: [
+                ScryptedInterface.RTCSignalingClient,
                 ScryptedInterface.Display,
                 ScryptedInterface.Intercom,
-                // two way video?
-                // ScryptedInterface.VideoCamera,
 
                 // RTCSignalingChannel is actually implemented as a loopback from the browser, but
                 // since the feed needs to be tee'd to multiple clients, use VideoCamera instead
                 // to do that.
-                // ScryptedInterface.RTCSignalingChannel,
-                ScryptedInterface.RTCSignalingClient,
+                ScryptedInterface.VideoCamera,
             ],
         });
         return nativeId;

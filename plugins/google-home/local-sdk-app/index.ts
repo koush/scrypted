@@ -1,11 +1,13 @@
 /// <reference types="@google/local-home-sdk" />
 
+import { IntentFlow } from "@google/local-home-sdk";
+
 const app = new smarthome.App("1.0.0");
 
-const SCRYPTED_INSECURE_PORT = 11080;
+let SCRYPTED_INSECURE_PORT = 11080;
 
 app
-  .onIdentify(async (request) => {
+  .onIdentify(async (request: IntentFlow.IdentifyRequest) => {
     console.debug("IDENTIFY request:", request);
 
     const device = request.inputs[0].payload.device;
@@ -14,11 +16,13 @@ app
       throw Error("mdns type not 'scrypted-gh'");
     }
 
+    SCRYPTED_INSECURE_PORT = parseInt(request.inputs[0].payload.device.mdnsScanData!.txt.port);
+
     // Decode scan data to obtain metadata about local device
     const proxyDeviceId = "local-hub-id";
 
     // Return a response
-    const response = {
+    const response: IntentFlow.IdentifyResponse = {
       intent: smarthome.Intents.IDENTIFY,
       requestId: request.requestId,
       payload: {
@@ -41,7 +45,7 @@ app
       .filter(device => device.verificationId !== 'local-hub-id');
 
     // Return a response
-    const response = {
+    const response: IntentFlow.ReachableDevicesResponse = {
       intent: smarthome.Intents.REACHABLE_DEVICES,
       requestId: request.requestId,
       payload: {

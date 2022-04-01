@@ -1,3 +1,4 @@
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import sdk, { Camera, Intercom, MediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
@@ -51,8 +52,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
         clearTimeout(idleTimeout);
         sessions.delete(sessionID);
         session.killed = true;
-        session.videoProcess?.kill('SIGKILL');
-        session.audioProcess?.kill('SIGKILL');
+        safeKillFFmpeg(session.videoProcess);
+        safeKillFFmpeg(session.audioProcess);
         session.videoReturn?.close();
         session.audioReturn?.close();
         session.rtpSink?.destroy();

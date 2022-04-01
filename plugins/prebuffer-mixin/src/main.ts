@@ -18,6 +18,7 @@ import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { sleep } from '@scrypted/common/src/sleep';
 import crypto from 'crypto';
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -391,7 +392,7 @@ class PrebufferSession {
     this.prebuffers.rtsp = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
-    let mso: MediaStreamOptions;
+    let mso: ResponseMediaStreamOptions;
     try {
       mso = (await this.mixinDevice.getVideoStreamOptions()).find(o => o.id === this.streamId);
     }
@@ -622,8 +623,8 @@ class PrebufferSession {
             channel += 2;
           }
           await rtspClient.setup(channel, video);
-          const socket = await rtspClient.play();
-          session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
+          await rtspClient.play();
+          session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
           session.kill = async () => {
@@ -638,6 +639,8 @@ class PrebufferSession {
           }
           if (!session.isActive)
             throw new Error('parser was killed before rtsp client started');
+
+          rtspClient.readLoop().finally(() => session.kill());
         }
         catch (e) {
           rtspClient.client.destroy();
@@ -666,7 +669,7 @@ class PrebufferSession {
           const mp4Session = await startFFMPegFragmentedMP4Session(ffmpegInput.inputArguments, acodec, vcodec, this.console);
 
           const kill = () => {
-            mp4Session.cp.kill('SIGKILL');
+            safeKillFFmpeg(mp4Session.cp);
             session.kill();
             mp4Session.generator.throw(new Error('killed'));
           };
@@ -676,7 +679,7 @@ class PrebufferSession {
             return;
           }
 
-          session.once('killed', kill);
+          session.killed.finally(kill);
 
           const { resetActivityTimer } = setupActivityTimer('mp4', kill, session, rbo.timeout);
 
@@ -752,10 +755,10 @@ class PrebufferSession {
       }
 
       scheduleRefresh(mso);
-      session.once('killed', () => clearTimeout(refreshTimeout));
+      session.killed.finally(() => clearTimeout(refreshTimeout));
     }
 
-    session.once('killed', () => {
+    session.killed.finally(() => {
       clearTimeout(this.inactivityTimeout)
       this.parserSessionPromise = undefined;
       if (this.parserSession === session)
@@ -879,9 +882,9 @@ class PrebufferSession {
         }
 
         const cleanup = () => {
-          destroy();
           session.removeListener(container, safeWriteData);
           session.removeListener('killed', cleanup);
+          destroy();
         }
 
         session.on(container, safeWriteData);
@@ -984,7 +987,7 @@ class PrebufferSession {
       return containerUrl;
     }
 
-    const mediaStreamOptions: MediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
+    const mediaStreamOptions: ResponseMediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
@@ -1139,7 +1142,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
               active++;
               wasActive = true;
               this.online = !!active;
-              await once(ps, 'killed');
+              await ps.killed;
               this.console.error('prebuffer session ended');
             }
             catch (e) {
@@ -1259,7 +1262,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     this.ensurePrebufferSessions();
   }
 
-  getEnabledMediaStreamOptions(msos?: MediaStreamOptions[]) {
+  getEnabledMediaStreamOptions(msos?: ResponseMediaStreamOptions[]) {
     if (!msos)
       return;
 
@@ -1275,8 +1278,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     return firstNonCloudStream ? [firstNonCloudStream] : [];
   }
 
-  async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-    const ret: MediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
+  async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
+    const ret: ResponseMediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
     let enabledStreams = this.getEnabledMediaStreamOptions(ret);
 
     const prebuffer = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;

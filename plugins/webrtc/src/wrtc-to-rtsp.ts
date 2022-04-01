@@ -3,7 +3,7 @@ import { Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFee
 import dgram from 'dgram';
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { Socket } from "net";
-import sdk, { RTCSignalingChannel, FFMpegInput, MediaStreamOptions, RTCSessionControl, RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions, MediaObject, Intercom, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { RTCSignalingChannel, FFMpegInput, MediaStreamOptions, RTCSessionControl, RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions, MediaObject, Intercom, ScryptedMimeTypes, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
 import { createSdpInput } from '@scrypted/common/src/sdp-utils'
 import { createRawResponse, isPeerConnectionAlive } from "./werift-util";
@@ -20,7 +20,7 @@ export interface RTCPeerConnectionPipe {
 
 export async function createRTCPeerConnectionSource(options: {
     console: Console,
-    mediaStreamOptions: MediaStreamOptions,
+    mediaStreamOptions: ResponseMediaStreamOptions,
     channel: RTCSignalingChannel,
     useUdp: boolean,
 }): Promise<RTCPeerConnectionPipe> {
@@ -483,7 +483,7 @@ export class JitterBuffer extends Pipeline {
     };
 }
 
-export function getRTCMediaStreamOptions(id: string, name: string, useUdp: boolean): MediaStreamOptions {
+export function getRTCMediaStreamOptions(id: string, name: string, useUdp: boolean): ResponseMediaStreamOptions {
     return {
         // set by consumer
         id,

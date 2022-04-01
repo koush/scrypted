@@ -318,13 +318,22 @@ export enum ThermostatMode {
   On = "On",
 }
 export interface PictureDimensions {
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 }
 export interface PictureOptions {
   id?: string;
-  name?: string;
+  /**
+   * The native dimensions of the camera.
+   */
   picture?: PictureDimensions;
+}
+export interface ResponsePictureOptions extends PictureOptions {
+  name?: string;
+  /**
+   * Flag that indicates that the request supports resizing to custom dimensions.
+   */
+  canResize?: boolean;
 }
 export interface RequestPictureOptions extends PictureOptions {
   reason?: 'user' | 'event';
@@ -342,8 +351,7 @@ export interface RequestPictureOptions extends PictureOptions {
  */
 export interface Camera {
   takePicture(options?: RequestPictureOptions): Promise<MediaObject>;
-  getPictureOptions(): Promise<PictureOptions[]>;
-
+  getPictureOptions(): Promise<ResponsePictureOptions[]>;
 }
 
 export interface VideoStreamOptions {
@@ -381,7 +389,7 @@ export type MediaStreamSource = "local" | "cloud";
  * is requested when calling getVideoStream.
  */
 export interface MediaStreamOptions {
-  id: string;
+  id?: string;
   name?: string;
   /**
    * Prebuffer time in milliseconds.
@@ -391,30 +399,33 @@ export interface MediaStreamOptions {
    * The container type of this stream, ie: mp4, mpegts, rtsp.
    */
   container?: string;
-  /**
-   * The tool used to generate the container. Ie, scrypted,
-   * the ffmpeg tools, gstreamer.
-   */
-  tool?: string;
-
-  video?: VideoStreamOptions;
-  audio?: AudioStreamOptions;
 
   /**
   * Stream specific metadata.
   */
   metadata?: any;
 
-  source?: MediaStreamSource;
-  userConfigurable?: boolean;
+  /**
+   * The tool used to generate the container. Ie, scrypted,
+   * the ffmpeg tools, gstreamer.
+   */
+  // should this be in the request too as a hint for the preferred tool to use?
+  tool?: string;
+
+  video?: VideoStreamOptions;
+  audio?: AudioStreamOptions;
 }
 
 export interface ResponseMediaStreamOptions extends MediaStreamOptions {
+  id: string;
   /**
    * The time in milliseconds that this stream must be refreshed again
    * via a call to getVideoStream.
    */
-   refreshAt?: number;
+  refreshAt?: number;
+
+  source?: MediaStreamSource;
+  userConfigurable?: boolean;
 }
 
 export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
@@ -458,7 +469,7 @@ export interface VideoCamera {
   /**
    * Get the available video streaming options.
    */
-  getVideoStreamOptions(): Promise<MediaStreamOptions[]>;
+  getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
 }
 
 export interface VideoCameraConfiguration {
@@ -686,7 +697,7 @@ export interface SoftwareUpdate {
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-  convert(data: string|Buffer|any, fromMimeType: string, toMimeType: string): Promise<MediaObject|Buffer|any>;
+  convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string): Promise<MediaObject | Buffer | any>;
 
   fromMimeType?: string;
   toMimeType?: string;
@@ -890,7 +901,7 @@ export interface MediaManager {
    * Additional plugin provided convertors to consider for use when converting MediaObjects.
    */
   builtinConverters: BufferConverter[];
-  
+
   /**
    * Convert a media object to a Buffer, primtive type, or RPC Object.
    */
@@ -1357,7 +1368,7 @@ export enum ScryptedInterface {
 export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
 
 export interface RTCSignalingSession {
-  createLocalDescription(type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined|RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit>;
+  createLocalDescription(type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit>;
   setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void>;
   addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
   getOptions(): Promise<RTCSignalingOptions>;
@@ -1382,7 +1393,7 @@ export interface RTCSignalingOptions {
 }
 
 export interface RTCSessionControl {
-  getRefreshAt(): Promise<number|void>;
+  getRefreshAt(): Promise<number | void>;
   extendSession(): Promise<void>;
   endSession(): Promise<void>;
 }
@@ -1401,7 +1412,7 @@ export interface RTCSignalingClient {
  * strict requirements and expectations on client setup.
  */
 export interface RTCSignalingChannel {
-  startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl|undefined>;
+  startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl | undefined>;
 }
 
 export interface RTCAVSignalingSetup {

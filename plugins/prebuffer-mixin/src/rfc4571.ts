@@ -1,7 +1,7 @@
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { MediaStreamOptions } from "@scrypted/sdk";
-import { EventEmitter } from "stream";
+import sdk, { MediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
+import { EventEmitter, Readable } from "stream";
 import net from 'net';
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { parseHeaders, readMessage, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
@@ -20,7 +20,7 @@ export function connectRFC4571Parser(url: string) {
 }
 
 
-export async function startRFC4571Parser(console: Console, socket: net.Socket, sdp: string, mediaStreamOptions: MediaStreamOptions, hasRstpPrefix?: boolean, options?: ParserOptions<"rtsp">): Promise<ParserSession<"rtsp">> {
+export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, hasRstpPrefix?: boolean, options?: ParserOptions<"rtsp">): Promise<ParserSession<"rtsp">> {
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
@@ -29,12 +29,18 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
     const audioPt = parseInt((sdp as string).match(/m=audio.* ([0-9]+)/)?.[1]);
     const videoPt = parseInt((sdp as string).match(/m=video.* ([0-9]+)/)?.[1]);
 
+    let sessionKilled: any;
+    const killed = new Promise<void>(resolve => {
+        sessionKilled = resolve;
+    });
+
     const kill = () => {
         if (isActive) {
             events.emit('killed');
             events.emit('error', new Error('killed'));
         }
         isActive = false;
+        sessionKilled();
         socket.destroy();
     };
 
@@ -49,22 +55,6 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
             let length: number;
             if (hasRstpPrefix) {
                 header = await readLength(socket, 4);
-                // rtsp over tcp will actually interleave RTSP request/responses
-                // within the RTSP data stream. The only way to tell if it's a request/response
-                // is to see if the header + data starts with RTSP/1.0 message line.
-                // Or RTSP, if looking at only the header bytes. Then grab the response out.
-                if (header.toString() === 'RTSP') {
-                    const response = parseHeaders(await readMessage(socket));
-                    const cl = parseInt(response['content-length']);
-                    if (cl)
-                        await readLength(socket, cl);
-                    continue;
-                }
-
-                // RTSP magic byte
-                if (header[0] !== 36)
-                    throw new Error('Unexpected byte found instead of RTSP header magic: ' + header[0]);
-
                 length = header.readUInt16BE(2);
             }
             else {
@@ -126,6 +116,7 @@ export async function startRFC4571Parser(console: Console, socket: net.Socket, s
         inputVideoResolution: undefined,
         get isActive() { return isActive },
         kill,
+        killed,
         mediaStreamOptions,
         emit(container: 'rtsp', chunk: StreamChunk) {
             events.emit(container, chunk);

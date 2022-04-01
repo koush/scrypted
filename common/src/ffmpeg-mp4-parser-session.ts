@@ -17,7 +17,7 @@ export async function startFFMPegFragmentedMP4Session(inputArguments: string[], 
     args.push(
         ...videoOutputArgs,
         ...audioOutputArgs,
-        '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+        '-movflags', 'frag_keyframe+empty_moov+default_base_moof+skip_sidx+skip_trailer',
         '-f', 'mp4',
         'pipe:3',
     );

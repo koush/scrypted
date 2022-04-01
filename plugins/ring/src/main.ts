@@ -1,18 +1,18 @@
-import sdk, { RTCSignalingSession, BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, RTCSessionControl, RTCSignalingChannel, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera, MediaStreamOptions, FFMpegInput, ScryptedMimeTypes, Intercom } from '@scrypted/sdk';
-import { SipSession, isStunMessage, LiveCallNegotiation, clientApi, generateUuid, RingApi, RingCamera, RingRestClient, RtpDescription } from './ring-client-api';
-import { StorageSettings } from '@scrypted/common/src/settings';
-import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
-import { RefreshPromise } from "@scrypted/common/src/promise-utils"
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { RefreshPromise } from "@scrypted/common/src/promise-utils";
+import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
+import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, replacePorts } from '@scrypted/common/src/sdp-utils';
-import { RtspServer } from '@scrypted/common/src/rtsp-server'
-import dgram from 'dgram';
-import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
+import { StorageSettings } from '@scrypted/common/src/settings';
+import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
+import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
-import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
+import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
+import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
+import { CameraData, clientApi, generateUuid, isStunMessage, LiveCallNegotiation, RingApi, RingCamera, RingRestClient, RtpDescription, SipSession } from './ring-client-api';
+import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 
 enum CaptureModes {
     Default = 'Default',
@@ -220,11 +220,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                             const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
                             if (!isRtpMessage)
                                 return;
-                                vseen++;
+                            vseen++;
                             rtsp.sendVideo(message, !isRtpMessage);
                             const seq = getSequenceNumber(message);
                             if (seq !== (vseq + 1) % 0x0FFFF)
-                            vlost ++;
+                                vlost++;
                             vseq = seq;
                         }
                     });
@@ -347,7 +347,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
     }
 
-    getSipMediaStreamOptions(): MediaStreamOptions {
+    getSipMediaStreamOptions(): ResponseMediaStreamOptions {
         const useRtsp = this.storageSettings.values.captureMode !== CaptureModes.FFmpeg;
 
         return {
@@ -369,7 +369,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         };
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         return [
             this.getSipMediaStreamOptions(),
         ]
@@ -526,6 +526,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
 
     findCamera() {
         return this.plugin.cameras?.find(camera => camera.id.toString() === this.nativeId);
+    }
+
+    updateState(data: CameraData) {
+        if (data.led_status)
+            this.on = data.led_status === 'on';
     }
 }
 
@@ -716,6 +721,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 const scryptedDevice = this.devices.get(nativeId);
                 if (scryptedDevice)
                     scryptedDevice.batteryLevel = camera.batteryLevel;
+            });
+            camera.onData.subscribe(data => {
+                const scryptedDevice = this.devices.get(nativeId);
+                if (scryptedDevice)
+                    scryptedDevice.updateState(data)
             });
         }
 

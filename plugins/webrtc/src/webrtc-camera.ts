@@ -1,4 +1,4 @@
-import sdk, { RTCSessionControl, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, VideoCamera, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel, RTCSignalingOptions, Intercom } from "@scrypted/sdk"; import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
+import sdk, { RTCSessionControl, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, VideoCamera, MediaObject, MediaStreamOptions, RequestMediaStreamOptions, RTCSignalingChannel, RTCSignalingOptions, Intercom, ResponseMediaStreamOptions } from "@scrypted/sdk"; import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
 const { mediaManager, systemManager, deviceManager } = sdk;
 
 export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTCSignalingClient, RTCSignalingChannel, Intercom {
@@ -39,7 +39,7 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
         return mediaManager.createFFmpegMediaObject(ffmpegInput);
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', true);
         return [
             mediaStreamOptions,

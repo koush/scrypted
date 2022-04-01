@@ -133,8 +133,8 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 type: 'scrypted-gh',
                 protocol: Protocol.TCP,
                 port: parseInt(url.port),
-                txt: { // optional
-                    key: "value",
+                txt: {
+                    port: url.port,
                 }
             });
             service.advertise();
