@@ -26,6 +26,8 @@ import threading
 import time
 import uuid
 
+from .logging import logger
+
 # TODO: There's a lot more refactoring that could/should be done to abstract out the arlo-specific implementation details.
 
 class EventStream:
@@ -69,14 +71,14 @@ class EventStream:
                     q.put_nowait(item)
 
                 if num_dropped > 0:
-                    print(f"Cleaned {num_dropped} events from queue {key}")
+                    logger.debug(f"Cleaned {num_dropped} events from queue {key}")
 
                 if q.empty():
                     empty_queues.append(key)
 
             for key in empty_queues:
                 del self.queues[key]
-                print(f"Removed empty queue {key}")
+                logger.debug(f"Removed empty queue {key}")
 
             await asyncio.sleep(interval)
 
@@ -106,7 +108,7 @@ class EventStream:
 
         def thread_main(self):
             for event in self.event_stream:
-                #print("Event:", event)
+                logger.debug(f"Received event: {event}")
                 if event is None or self.event_stream_stop_event.is_set():
                     return None
 

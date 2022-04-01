@@ -1,9 +1,14 @@
 import asyncio
+from re import X
+from venv import create
 
 import scrypted_sdk
+from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, Online, Battery, ScryptedMimeTypes
 
-class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery):
+from .logging import ScryptedDeviceLoggerMixin
+
+class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery, ScryptedDeviceLoggerMixin):
     nativeId = None
     arlo_device = None
     arlo_basestation = None
@@ -11,11 +16,13 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSen
 
     def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
+        self.logger_name = "ArloCamera"
 
         self.nativeId = nativeId
         self.arlo_device = arlo_device
         self.arlo_basestation = arlo_basestation
         self.provider = provider
+        self.logger.setLevel(self.provider.get_current_log_level())
 
         self.motionDetected = arlo_device["properties"].get("motionDetected", False)
         #self.online = arlo_device["properties"].get("connectionState") == "available" # TODO
@@ -38,10 +45,10 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSen
         return []
 
     async def takePicture(self, options=None):
-        self.print(f"ArloCamera.takePicture nativeId={self.nativeId} options={options}")
+        self.logger.info(f"Taking picture for {self.nativeId}")
 
-        self.print(f"Taking remote snapshot for {self.nativeId}")
         pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=10)
+        self.logger.debug(f"Got snapshot URL for {self.nativeId} at {pic_url}")
 
         if pic_url is None:
             raise Exception(f"Error taking snapshot for {self.nativeId}")
@@ -67,9 +74,9 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSen
         ]
 
     async def getVideoStream(self, options=None):
-        self.print(f"ArloCamera.getVideoStream nativeId={self.nativeId} options={options}")
+        self.logger.info(f"Requesting stream for {self.nativeId}")
 
         rtsp_url = self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device)
-        self.print(f"Got stream for {self.nativeId} at {rtsp_url}")
+        self.logger.debug(f"Got stream URL for {self.nativeId} at {rtsp_url}")
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
