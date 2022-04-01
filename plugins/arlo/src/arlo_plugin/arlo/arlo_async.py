@@ -270,15 +270,13 @@ class Arlo(object):
         """
         resource = f"cameras/{camera.get('deviceId')}"
 
-        async def callbackwrapper(self, event):
+        def callbackwrapper(self, event):
             properties = event.get('properties', {})
             stop = None
             if 'motionDetected' in properties:
                 stop = callback(properties['motionDetected'])
-                await asyncio.sleep(5)
-            elif properties.get('activityState') == 'idle':
-                stop = callback(False)
-                await asyncio.sleep(5)
+            if not stop:
+                return None
             return stop
 
         asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
@@ -291,24 +289,31 @@ class Arlo(object):
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
-        if not asyncio.iscoroutinefunction(callback):
-            callback = asyncio.coroutine(callback)
-
         await self.Subscribe(basestation)
         if self.event_stream and self.event_stream.connected and self.event_stream.registered:
+            seen_events = {}
             while self.event_stream.connected:
                 event, action = await self.event_stream.get(resource, actions)
 
                 if event is None or self.event_stream.event_stream_stop_event.is_set():
                     return None
 
-                response = await callback(self, event.item)
+                if event.uuid in seen_events:
+                    continue
+
+                seen_events[event.uuid] = event
+                response = callback(self, event.item)
 
                 # always requeue so other listeners can see the event too
                 self.event_stream.requeue(event, resource, action)
 
                 if response is not None:
                     return response
+
+                # remove events that have expired
+                for uuid in list(seen_events):
+                    if seen_events[uuid].expired:
+                        del seen_events[uuid]
 
     async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback):
         """
@@ -899,7 +904,7 @@ class Arlo(object):
         If you pass in a valid device type, as a string or a list, this method will return an array of just those devices that match that type. An example would be ['basestation', 'camera']
         To filter provisioned or unprovisioned devices pass in a True/False value for filter_provisioned. By default both types are returned.
         """
-        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices')
+        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
         if device_type:
             devices = [ device for device in devices if device.get('deviceType') in device_type]
 

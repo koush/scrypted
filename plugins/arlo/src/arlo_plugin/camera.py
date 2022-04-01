@@ -1,9 +1,9 @@
 import asyncio
 
 import scrypted_sdk
-from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, ScryptedMimeTypes
+from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, Online, Battery, ScryptedMimeTypes
 
-class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSensor):
+class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery):
     nativeId = None
     arlo_device = None
     arlo_basestation = None
@@ -17,7 +17,11 @@ class ArloCamera(scrypted_sdk.ScryptedDeviceBase, Camera, VideoCamera, MotionSen
         self.arlo_basestation = arlo_basestation
         self.provider = provider
 
-        self.stop_motion_subscription = None
+        self.motionDetected = arlo_device["properties"].get("motionDetected", False)
+        #self.online = arlo_device["properties"].get("connectionState") == "available" # TODO
+        self.batteryLevel = arlo_device["properties"].get("batteryLevel") # TODO update this
+
+        self.stop_motion_subscription = False
         self.start_motion_subscription()
 
     def __del__(self):

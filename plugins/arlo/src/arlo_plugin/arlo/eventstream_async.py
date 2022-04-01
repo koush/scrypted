@@ -20,6 +20,7 @@
 
 import asyncio
 import json
+import random
 import sseclient
 import threading
 import time
@@ -58,7 +59,7 @@ class EventStream:
                     item = q.get_nowait()
                     q.task_done()
 
-                    if time.time() - item.timestamp > self.expire:
+                    if item.expired:
                         num_dropped += 1
                         continue
 
@@ -93,11 +94,11 @@ class EventStream:
                 while not q.empty():
                     event = q.get_nowait()
                     q.task_done()
-                    if time.time() - event.timestamp > self.expire:
+                    if event.expired:
                         continue
                     else:
                         return event, action
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(random.uniform(0, 0.1))
 
     async def start(self):
         if self.event_stream is not None:
@@ -145,7 +146,8 @@ class EventStream:
             q = self.queues[key] = asyncio.Queue()
         else:
             q = self.queues[key]
-        q.put_nowait(StreamEvent(response, time.time()))
+        now = time.time()
+        q.put_nowait(StreamEvent(response, now, now + self.expire))
 
     def requeue(self, event, resource, action):
         key = f"{resource}/{action}"
@@ -167,9 +169,15 @@ class EventStream:
 class StreamEvent:
     item = None
     timestamp = None
+    expiration = None
     uuid = None
 
-    def __init__(self, item, timestamp):
+    def __init__(self, item, timestamp, expiration):
         self.item = item
         self.timestamp = timestamp
+        self.expiration = expiration
         self.uuid = str(uuid.uuid4())
+
+    @property
+    def expired(self):
+        return time.time() > self.expiration

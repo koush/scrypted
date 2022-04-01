@@ -131,11 +131,16 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
                 "name": camera["deviceName"],
                 "interfaces": [
                     ScryptedInterface.VideoCamera.value,
-                    ScryptedInterface.Camera.value
+                    ScryptedInterface.Camera.value,
+                    ScryptedInterface.MotionSensor.value,
                 ],
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,
             }
+
+            if "batteryLevel" in camera["properties"]:
+                device["interfaces"].append(ScryptedInterface.Battery.value)
+
             devices.append(device)
 
             if camera["deviceId"] == camera["parentId"]:
@@ -143,11 +148,13 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
 
             nativeId = camera["deviceId"]
             self.arlo_cameras[nativeId] = camera
-            self.getDevice(nativeId)
 
         await scrypted_sdk.deviceManager.onDevicesChanged({
             "devices": devices,
         })
+
+        for nativeId in self.arlo_cameras.keys():
+            self.getDevice(nativeId)
 
         self.print(f"Discovered {len(cameras)} cameras, but only {len(devices)} are usable")
 
