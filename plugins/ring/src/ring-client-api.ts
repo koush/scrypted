@@ -6,3 +6,4 @@ export { LiveCallNegotiation } from '@koush/ring-client-api/lib-esnext/api/live-
 export { SipSession } from '@koush/ring-client-api/lib-esnext/api/sip-session';
 export { RingCamera } from '@koush/ring-client-api/lib-esnext/api/ring-camera';
 export { RingApi } from '@koush/ring-client-api/lib-esnext/api';
+export { CameraData } from '@koush/ring-client-api/lib-esnext/api/ring-types';
