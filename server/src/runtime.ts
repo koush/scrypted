@@ -745,6 +745,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 setState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, PluginDeviceProxyHandler.sortInterfaces(interfaces));
             }
 
+            if (!pluginDevice.pluginId) {
+                dirty = true;
+                setState(pluginDevice, ScryptedInterfaceProperty.pluginId, pluginDevice.pluginId);
+            }
+
             if (dirty) {
                 this.datastore.upsert(pluginDevice);
             }

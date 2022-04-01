@@ -169,9 +169,10 @@ export class ScryptedStateManager extends EventRegistry {
 
                 await sleep(timeout);
                 try {
-                    if (!ret.tailRefresh)
+                    const rt = this.refreshThrottles[id];
+                    if (!rt.tailRefresh)
                         return;
-                    await device[RefreshSymbol](ret.refreshInterface, ret.userInitiated);
+                    await device[RefreshSymbol](rt.refreshInterface, rt.userInitiated);
                 }
                 catch (e) {
                     logger.log('e', 'Refresh failed');
