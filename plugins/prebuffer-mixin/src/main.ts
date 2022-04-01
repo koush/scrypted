@@ -18,6 +18,7 @@ import { addTrackControls } from '@scrypted/common/src/sdp-utils';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { sleep } from '@scrypted/common/src/sleep';
 import crypto from 'crypto';
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -391,7 +392,7 @@ class PrebufferSession {
     this.prebuffers.rtsp = [];
     const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
-    let mso: MediaStreamOptions;
+    let mso: ResponseMediaStreamOptions;
     try {
       mso = (await this.mixinDevice.getVideoStreamOptions()).find(o => o.id === this.streamId);
     }
@@ -668,7 +669,7 @@ class PrebufferSession {
           const mp4Session = await startFFMPegFragmentedMP4Session(ffmpegInput.inputArguments, acodec, vcodec, this.console);
 
           const kill = () => {
-            mp4Session.cp.kill('SIGKILL');
+            safeKillFFmpeg(mp4Session.cp);
             session.kill();
             mp4Session.generator.throw(new Error('killed'));
           };
@@ -986,7 +987,7 @@ class PrebufferSession {
       return containerUrl;
     }
 
-    const mediaStreamOptions: MediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
+    const mediaStreamOptions: ResponseMediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
@@ -1261,7 +1262,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     this.ensurePrebufferSessions();
   }
 
-  getEnabledMediaStreamOptions(msos?: MediaStreamOptions[]) {
+  getEnabledMediaStreamOptions(msos?: ResponseMediaStreamOptions[]) {
     if (!msos)
       return;
 
@@ -1277,8 +1278,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     return firstNonCloudStream ? [firstNonCloudStream] : [];
   }
 
-  async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-    const ret: MediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
+  async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
+    const ret: ResponseMediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
     let enabledStreams = this.getEnabledMediaStreamOptions(ret);
 
     const prebuffer = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;

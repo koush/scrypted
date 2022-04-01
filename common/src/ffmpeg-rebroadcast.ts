@@ -4,7 +4,7 @@ import { ChildProcess } from 'child_process';
 import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
 import { bind, bindZero, listenZero, listenZeroSingleClient } from './listen-cluster';
 import { EventEmitter } from 'events';
-import sdk from "@scrypted/sdk";
+import sdk, { ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from './media-helpers';
 import { StreamChunk, StreamParser } from './stream-parser';
 import dgram from 'dgram';
@@ -21,7 +21,7 @@ export interface MP4Atom {
 
 export interface ParserSession<T extends string> {
     sdp: Promise<Buffer[]>;
-    mediaStreamOptions: MediaStreamOptions;
+    mediaStreamOptions: ResponseMediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;
     inputVideoResolution?: string[];

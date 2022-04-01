@@ -1,6 +1,6 @@
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { MediaStreamOptions } from "@scrypted/sdk";
+import sdk, { MediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { EventEmitter, Readable } from "stream";
 import net from 'net';
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
@@ -20,7 +20,7 @@ export function connectRFC4571Parser(url: string) {
 }
 
 
-export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: MediaStreamOptions, hasRstpPrefix?: boolean, options?: ParserOptions<"rtsp">): Promise<ParserSession<"rtsp">> {
+export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, hasRstpPrefix?: boolean, options?: ParserOptions<"rtsp">): Promise<ParserSession<"rtsp">> {
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup

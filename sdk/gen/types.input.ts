@@ -469,7 +469,7 @@ export interface VideoCamera {
   /**
    * Get the available video streaming options.
    */
-  getVideoStreamOptions(): Promise<MediaStreamOptions[]>;
+  getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
 }
 
 export interface VideoCameraConfiguration {

@@ -174,20 +174,6 @@ class PictureDimensions(TypedDict):
     width: float
     pass
 
-class ResponseMediaStreamOptions(TypedDict):
-    audio: AudioStreamOptions
-    container: str
-    id: str
-    metadata: Any
-    name: str
-    prebuffer: float
-    refreshAt: float
-    source: MediaStreamSource
-    tool: str
-    userConfigurable: bool
-    video: VideoStreamOptions
-    pass
-
 class VideoStreamOptions(TypedDict):
     bitrate: float
     codec: str
@@ -410,6 +396,20 @@ class RequestRecordingStreamOptions(TypedDict):
     prebuffer: float
     startTime: float
     tool: str
+    video: VideoStreamOptions
+    pass
+
+class ResponseMediaStreamOptions(TypedDict):
+    audio: AudioStreamOptions
+    container: str
+    id: str
+    metadata: Any
+    name: str
+    prebuffer: float
+    refreshAt: float
+    source: MediaStreamSource
+    tool: str
+    userConfigurable: bool
     video: VideoStreamOptions
     pass
 
@@ -862,7 +862,7 @@ class UltravioletSensor:
 class VideoCamera:
     async def getVideoStream(self, options: RequestMediaStreamOptions = None) -> MediaObject:
         pass
-    async def getVideoStreamOptions(self) -> list[MediaStreamOptions]:
+    async def getVideoStreamOptions(self) -> list[ResponseMediaStreamOptions]:
         pass
     pass
 

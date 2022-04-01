@@ -10,6 +10,7 @@ import { evalRequest } from './camera-transcode';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -228,7 +229,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         clearTimeout(videoTimeout);
         console.timeEnd('mp4 recording');
         socket?.destroy();
-        cp?.kill('SIGKILL');
+        safeKillFFmpeg(cp);
         recordingFile?.end();
         recordingFile?.destroy();
         if (saveRecordings) {
