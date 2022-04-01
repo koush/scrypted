@@ -1,4 +1,4 @@
-import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { Camera, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin"
 import { StorageSettings } from "@scrypted/common/src/settings"
 import AxiosDigestAuth from '@koush/axios-digest-auth';
@@ -41,7 +41,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     };
                 }
 
-                let psos: PictureOptions[];
+                let psos: ResponsePictureOptions[];
                 try {
                     psos = await this.mixinDevice.getPictureOptions();
                 }
@@ -123,7 +123,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
-        let takePicture: (options?: PictureOptions) => Promise<Buffer>;
+        let takePicture: (options?: RequestPictureOptions) => Promise<Buffer>;
         if (this.storageSettings.values.snapshotsFromPrebuffer) {
             try {
                 const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
@@ -151,7 +151,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         if (!takePicture) {
             if (!this.storageSettings.values.snapshotUrl) {
                 if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
-                    takePicture = async (options?: PictureOptions) => {
+                    takePicture = async (options?: RequestPictureOptions) => {
                         // if operating in full resolution mode, nuke any picture options containing
                         // the requested dimensions that are sent.
                         if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)

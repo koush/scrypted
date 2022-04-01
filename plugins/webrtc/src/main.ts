@@ -267,7 +267,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                         // '-level:v', '4.0',
                         '-b:v', this.storageSettings.values.bitrate.toString(),
                         '-maxrate', this.storageSettings.values.bitrate.toString(),
-                        '-bufsize', (this.storageSettings.values.bitrate / 2).toString(),
+                        '-bufsize', this.storageSettings.values.bitrate.toString(),
                     )
                 }
                 else {
