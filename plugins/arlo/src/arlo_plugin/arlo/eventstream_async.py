@@ -106,7 +106,7 @@ class EventStream:
 
         def thread_main(self):
             for event in self.event_stream:
-                print("Event:", event)
+                #print("Event:", event)
                 if event is None or self.event_stream_stop_event.is_set():
                     return None
 
