@@ -11,6 +11,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["interfaces"] = "interfaces";
     ScryptedInterfaceProperty["mixins"] = "mixins";
     ScryptedInterfaceProperty["name"] = "name";
+    ScryptedInterfaceProperty["pluginId"] = "pluginId";
     ScryptedInterfaceProperty["providedInterfaces"] = "providedInterfaces";
     ScryptedInterfaceProperty["providedName"] = "providedName";
     ScryptedInterfaceProperty["providedRoom"] = "providedRoom";
@@ -72,6 +73,7 @@ exports.ScryptedInterfaceDescriptors = {
             'interfaces',
             'mixins',
             'name',
+            'pluginId',
             'providedInterfaces',
             'providedName',
             'providedRoom',

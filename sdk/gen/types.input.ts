@@ -21,6 +21,7 @@ export interface ScryptedDevice {
   probe(): Promise<boolean>;
 
   id?: string;
+  pluginId?: string;
   interfaces?: string[];
   mixins?: string[];
   name?: string;

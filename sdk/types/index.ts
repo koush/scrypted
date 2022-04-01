@@ -6,6 +6,7 @@ export interface DeviceState {
   interfaces?: string[]
   mixins?: string[]
   name?: string
+  pluginId?: string
   providedInterfaces?: string[]
   providedName?: ScryptedDeviceType
   providedRoom?: string
@@ -58,6 +59,7 @@ export class DeviceBase implements DeviceState {
   interfaces?: string[]
   mixins?: string[]
   name?: string
+  pluginId?: string
   providedInterfaces?: string[]
   providedName?: ScryptedDeviceType
   providedRoom?: string
@@ -111,6 +113,7 @@ export enum ScryptedInterfaceProperty {
   interfaces = "interfaces",
   mixins = "mixins",
   name = "name",
+  pluginId = "pluginId",
   providedInterfaces = "providedInterfaces",
   providedName = "providedName",
   providedRoom = "providedRoom",
@@ -175,6 +178,7 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       'interfaces',
       'mixins',
       'name',
+      'pluginId',
       'providedInterfaces',
       'providedName',
       'providedRoom',
@@ -718,6 +722,7 @@ export interface ScryptedDevice {
   probe(): Promise<boolean>;
 
   id?: string;
+  pluginId?: string;
   interfaces?: string[];
   mixins?: string[];
   name?: string;
