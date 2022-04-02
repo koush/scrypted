@@ -1,9 +1,11 @@
-import sdk, { FFMpegInput, HttpResponse, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
-import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers } from "./common";
+import sdk, { FFMpegInput, HttpResponse, MotionSensor, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers, EventReport } from "./common";
 import { startRTCPeerConnectionFFmpegInput } from '@scrypted/common/src/ffmpeg-to-wrtc';
 import { BrowserSignalingSession, startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
 import crypto from 'crypto';
 import { createMessageId } from "../message";
+import { Capability } from "alexa-smarthome-ts/lib/skill/Capability";
+import { DiscoveryEndpoint } from "alexa-smarthome-ts";
 
 const { mediaManager } = sdk;
 
@@ -12,22 +14,66 @@ addSupportedType(ScryptedDeviceType.Camera, {
         if (!device.interfaces.includes(ScryptedInterface.VideoCamera))
             return;
 
-        return {
-            displayCategories: ['CAMERA'],
-            capabilities: [
+
+        const capabilities: Capability<any>[] = [
+            {
+                "type": "AlexaInterface",
+                "interface": "Alexa.RTCSessionController",
+                "version": "3",
+                "configuration": {
+                    "isFullDuplexAudioSupported": false,
+                }
+            } as any,
+        ];
+
+        if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
+            capabilities.push(
                 {
                     "type": "AlexaInterface",
-                    "interface": "Alexa.RTCSessionController",
+                    "interface": "Alexa.MotionSensor",
                     "version": "3",
-                    "configuration": {
-                        "isFullDuplexAudioSupported": false,
+                    "properties": {
+                        "supported": [
+                            {
+                                "name": "detectionState"
+                            }
+                        ],
+                        "proactivelyReported": true,
+                        "retrievable": true
                     }
                 },
-            ],
+            )
+        }
+
+        return {
+            displayCategories: ['CAMERA'],
+            capabilities,
         }
     },
-    async reportState() {
-        return undefined;
+    async reportState(eventSource: ScryptedDevice & MotionSensor, eventDetails, eventData): Promise<EventReport> {
+        if (eventDetails.eventInterface !== ScryptedInterface.MotionSensor)
+            return undefined;
+        return {
+            type: 'event',
+            namespace: 'Alexa',
+            name: 'ChangeReport',
+            payload: {
+                change: {
+                    cause: {
+                        type: "PHYSICAL_INTERACTION"
+                    },
+                    properties: [
+                        {
+                            "namespace": "Alexa.MotionSensor",
+                            "name": "detectionState",
+                            "value": eventData ? "DETECTED" : "NOT_DETECTED",
+                            "timeOfSample": new Date().toISOString(),
+                            "uncertaintyInMilliseconds": 0
+                        }
+                    ]
+                }
+            },
+        };
     }
 });
 
