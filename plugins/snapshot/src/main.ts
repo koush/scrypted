@@ -138,9 +138,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     if (this.lastAvailablePicture)
                         request.refresh = false;
                     takePicture = async () => mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
-                    // a prebuffer snapshot should wipe out any pending pictures
-                    // that may not have come from the prebuffer to allow a safe-ish/fast refresh.
-                    this.pendingPicture = undefined;
                     this.console.log('snapshotting active prebuffer');
                 }
             }
@@ -241,10 +238,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
             this.pendingPicture = pendingPicture;
 
+            // don't allow a snapshot to take longer than 1 minute.
+            const failureTimeout = setTimeout(() => {
+                if (this.pendingPicture === pendingPicture)
+                    this.pendingPicture = undefined;
+            }, 60000);
             // prevent infinite loop from onDeviceEvent triggering picture updates.
             // retain this promise for a bit while everything settles.
             // this also has a side effect of only allowing snapshots every 5 seconds.
             pendingPicture.finally(() => {
+                clearTimeout(failureTimeout);
                 setTimeout(() => {
                     if (this.pendingPicture === pendingPicture)
                         this.pendingPicture = undefined;
