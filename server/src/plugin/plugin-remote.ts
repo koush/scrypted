@@ -8,6 +8,8 @@ import { RpcPeer, RPCResultError } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
 import fs from 'fs';
+import { checkProperty } from './plugin-state-check';
+import _ from 'lodash';
 const { link } = require('linkfs');
 
 class DeviceLogger implements Logger {
@@ -115,12 +117,7 @@ class DeviceStateProxyHandler implements ProxyHandler<any> {
     }
 
     set?(target: any, p: PropertyKey, value: any, receiver: any) {
-        if (p === ScryptedInterfaceProperty.id)
-            throw new Error("id is read only");
-        if (p === ScryptedInterfaceProperty.mixins)
-            throw new Error("mixins is read only");
-        if (p === ScryptedInterfaceProperty.interfaces)
-            throw new Error("interfaces is a read only post-mixin computed property, use providedInterfaces");
+        checkProperty(p.toString(), value);
         const now = Date.now();
         this.deviceManager.systemManager.state[this.id][p as string] = {
             lastEventTime: now,
