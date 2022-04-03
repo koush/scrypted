@@ -1,6 +1,4 @@
 import asyncio
-from re import X
-from venv import create
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
