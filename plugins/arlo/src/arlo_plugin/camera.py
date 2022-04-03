@@ -76,7 +76,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
     async def getVideoStream(self, options=None):
         self.logger.info(f"Requesting stream for {self.nativeId}")
 
-        rtsp_url = self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device)
+        rtsp_url = await asyncio.wait_for(self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device), timeout=10)
         self.logger.debug(f"Got stream URL for {self.nativeId} at {rtsp_url}")
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)

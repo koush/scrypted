@@ -1498,15 +1498,14 @@ class Arlo(object):
 #                fd.write(chunk)
 #        fd.close()
 
-    def StartStream(self, basestation, camera):
+    async def StartStream(self, basestation, camera):
         """
         This function returns the url of the rtsp video stream.
         This stream needs to be called within 30 seconds or else it becomes invalid.
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
         """
-        stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
-        return stream_url_dict['url'].replace("rtsp://", "rtsps://")
+        resource = f"cameras/{camera.get('deviceId')}"
 
         # nonlocal variable hack for Python 2.x.
         class nl:
@@ -1516,12 +1515,11 @@ class Arlo(object):
             nl.stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
 
         def callback(self, event):
-            if event.get("from") == basestation.get("deviceId") and event.get("resource") == "cameras/"+camera.get("deviceId") and event.get("properties", {}).get("activityState") == "userStreamActive":
+            if event.get("properties", {}).get("activityState") == "userStreamActive":
                 return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
-
             return None
 
-        return self.TriggerAndHandleEvent(basestation, trigger, callback)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["is"], trigger, callback)
 
     def StopStream(self, basestation, camera):
         return self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/stopStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.         get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"stopUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId": camera.get('xCloudId')})
