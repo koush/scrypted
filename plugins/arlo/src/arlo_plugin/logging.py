@@ -12,6 +12,9 @@ class ScryptedDeviceLoggingWrapper(logging.Handler):
 
 def createScryptedLogger(scrypted_device, name):
     logger = logging.getLogger(name)
+    if logger.hasHandlers():
+        return logger
+
     logger.setLevel(logging.INFO)
 
     # configure logger to output to scrypted's log stream 
