@@ -20,17 +20,21 @@
 
 import asyncio
 import json
+import random
 import sseclient
 import threading
 import time
 import uuid
 
+from .logging import logger
+
 # TODO: There's a lot more refactoring that could/should be done to abstract out the arlo-specific implementation details.
 
 class EventStream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=30):
+    def __init__(self, arlo, expire=5):
         self.event_stream = None
+        self.initializing = True
         self.connected = False
         self.registered = False
         self.queues = {}
@@ -43,17 +47,21 @@ class EventStream:
         self.disconnect()
 
     async def _clean_queues(self):
+        interval = self.expire * 2
+
+        await asyncio.sleep(interval)
         while not self.event_stream_stop_event.is_set():
-            print("Running periodic queue cleanup")
+            empty_queues = []
 
             for key, q in self.queues.items():
                 items = []
                 num_dropped = 0
+
                 while not q.empty():
                     item = q.get_nowait()
                     q.task_done()
 
-                    if time.time() - item.timestamp > self.expire:
+                    if item.expired:
                         num_dropped += 1
                         continue
 
@@ -62,33 +70,37 @@ class EventStream:
                 for item in items:
                     q.put_nowait(item)
 
-                print(f"Cleaned {num_dropped} events from queue {key}")
+                if num_dropped > 0:
+                    logger.debug(f"Cleaned {num_dropped} events from queue {key}")
 
-            await asyncio.sleep(self.expire * 2)
+                if q.empty():
+                    empty_queues.append(key)
 
-    async def get(self, resource, actions, timeout=None):
-        async def get_impl(resource, actions):
-            while True:
-                for action in actions:
-                    key = f"{resource}/{action}"
-                    if key not in self.queues:
-                        await asyncio.sleep(0)
-                        continue
+            for key in empty_queues:
+                del self.queues[key]
+                logger.debug(f"Removed empty queue {key}")
 
-                    q = self.queues[key]
-                    if q.empty():
-                        await asyncio.sleep(0)
-                        continue
+            await asyncio.sleep(interval)
 
+    async def get(self, resource, actions):
+        while True:
+            for action in actions:
+                key = f"{resource}/{action}"
+                if key not in self.queues:
+                    continue
+
+                q = self.queues[key]
+                if q.empty():
+                    continue
+
+                while not q.empty():
                     event = q.get_nowait()
                     q.task_done()
-                    if time.time() - event.timestamp > self.expire:
-                        # dropping expired events
-                        await asyncio.sleep(0)
-                        break
-
-                    return event, action
-        return await asyncio.wait_for(get_impl(resource, actions), timeout)
+                    if event.expired:
+                        continue
+                    else:
+                        return event, action
+            await asyncio.sleep(random.uniform(0, 0.1))
 
     async def start(self):
         if self.event_stream is not None:
@@ -96,6 +108,7 @@ class EventStream:
 
         def thread_main(self):
             for event in self.event_stream:
+                logger.debug(f"Received event: {event}")
                 if event is None or self.event_stream_stop_event.is_set():
                     return None
 
@@ -112,12 +125,9 @@ class EventStream:
                         self.disconnect()
                         return None
                     else:
-                        self.event_loop.call_soon_threadsafe(
-                            lambda: asyncio.create_task(
-                                self._queue_response(response)
-                            )
-                        )
+                        self.event_loop.call_soon_threadsafe(self._queue_response, response)
                 elif response.get('status') == 'connected':
+                    self.initializing = False
                     self.connected = True
 
         self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization').decode(), session=self.arlo.request.session)
@@ -130,25 +140,28 @@ class EventStream:
 
         asyncio.get_event_loop().create_task(self._clean_queues())
 
-    async def _queue_response(self, response):
+    def _queue_response(self, response):
         resource = response.get('resource')
         action = response.get('action')
-        q = self.queues.setdefault(f"{resource}/{action}", asyncio.Queue())
-        await q.put(StreamEvent(response, time.time()))
-
-    async def requeue(self, event, resource, action):
         key = f"{resource}/{action}"
-        await self.queues[key].put(event)
+        if key not in self.queues:
+            q = self.queues[key] = asyncio.Queue()
+        else:
+            q = self.queues[key]
+        now = time.time()
+        q.put_nowait(StreamEvent(response, now, now + self.expire))
+
+    def requeue(self, event, resource, action):
+        key = f"{resource}/{action}"
+        self.queues[key].put_nowait(event)
 
     def disconnect(self):
         self.connected = False
 
-        for _, q in self.queues:
-            self.event_loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(
-                    q.put(None)
-                )
-            )
+        def exit_queues(self):
+            for _, q in self.queues:
+                q.put_nowait(None)
+        self.event_loop.call_soon_threadsafe(exit_queues, self)
 
         self.event_stream_stop_event.set()
 
@@ -158,9 +171,15 @@ class EventStream:
 class StreamEvent:
     item = None
     timestamp = None
+    expiration = None
     uuid = None
 
-    def __init__(self, item, timestamp):
+    def __init__(self, item, timestamp, expiration):
         self.item = item
         self.timestamp = timestamp
+        self.expiration = expiration
         self.uuid = str(uuid.uuid4())
+
+    @property
+    def expired(self):
+        return time.time() > self.expiration

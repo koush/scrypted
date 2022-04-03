@@ -1,1 +1,1 @@
-from .arlo_async import Arlo, TIMEOUT
+from .arlo_async import Arlo

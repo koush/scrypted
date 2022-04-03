@@ -1,12 +1,16 @@
 import asyncio
+import logging
 
 import scrypted_sdk
+from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface, ScryptedDeviceType
 
 from .arlo import Arlo
+from .arlo.logging import logger as arlo_lib_logger
 from .camera import ArloCamera
+from .logging import ScryptedDeviceLoggerMixin 
 
-class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery):
+class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin):
     arlo_cameras = None
     arlo_basestations = None
     _arlo_mfa_code = None
@@ -14,12 +18,21 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
     _arlo = None
     _arlo_mfa_complete_auth = None
 
+    plugin_verbosity_choices = {
+        "Few": logging.WARNING,
+        "Normal": logging.INFO,
+        "Verbose": logging.DEBUG
+    }
+
     def __init__(self, nativeId=None):
         super().__init__(nativeId=nativeId)
+        self.logger_name = "ArloProvider"
 
         self.arlo_cameras = {}
         self.arlo_basestations = {}
         self.scrypted_devices = {}
+
+        self.propagate_verbosity()
 
     @property
     def arlo_username(self):
@@ -30,17 +43,25 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         return self.storage.getItem("arlo_password")
 
     @property
+    def plugin_verbosity(self):
+        verbosity = self.storage.getItem("plugin_verbosity")
+        if verbosity is None:
+            self.storage.setItem("plugin_verbosity", "Normal")
+            return "Normal"
+        return verbosity
+
+    @property
     def arlo(self):
         if self._arlo is not None:
             if self._arlo_mfa_complete_auth is not None:
                 if self._arlo_mfa_code == "":
                     return None
 
-                self.print("Completing Arlo MFA...")
+                self.logger.info("Completing Arlo MFA...")
                 self._arlo_mfa_complete_auth(self._arlo_mfa_code)
                 self._arlo_mfa_complete_auth = None 
                 self._arlo_mfa_code = None
-                self.print("Arlo MFA done")
+                self.logger.info("Arlo MFA done")
                 asyncio.get_event_loop().create_task(self.discoverDevices())
 
             return self._arlo
@@ -48,18 +69,29 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         if self.arlo_username is None or self.arlo_password is None:
             return None
             
-        self.print("Trying to initialize Arlo client...")
+        self.logger.info("Trying to initialize Arlo client...")
         try:
             self._arlo = Arlo()
             self._arlo_mfa_complete_auth = self._arlo.LoginMFA(self.arlo_username, self.arlo_password)
         except Exception as e:
-            self.print(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
+            self.logger.error(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
             self._arlo = None
             self._arlo_mfa_code = None
             return None
-        self.print(f"Initialized Arlo client for {self.arlo_username}, waiting for MFA code")
+        self.logger.info(f"Initialized Arlo client for {self.arlo_username}, waiting for MFA code")
 
         return None
+
+    def get_current_log_level(self):
+        return ArloProvider.plugin_verbosity_choices[self.plugin_verbosity]
+
+    def propagate_verbosity(self):
+        self.print(f"Setting plugin verbosity to {self.plugin_verbosity}")
+        log_level = self.get_current_log_level()
+        self.logger.setLevel(log_level)
+        for _, device in self.scrypted_devices.items():
+            device.logger.setLevel(log_level)
+        arlo_lib_logger.setLevel(log_level)
 
     async def getSettings(self):
         _ = self.arlo
@@ -80,6 +112,13 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
                 "title": "Two Factor Code",
                 "description": "Enter the code sent by Arlo to your email or phone number.",
             },
+            {
+                "key": "plugin_verbosity",
+                "title": "Plugin Verbosity",
+                "description": "Select the verbosity of this plugin. 'Few' will only show warnings and errors. 'Verbose' will show debugging messages, including events received from connected Arlo cameras.",
+                "value": self.plugin_verbosity,
+                "choices": sorted(self.plugin_verbosity_choices.keys()),
+            },
         ]
 
     async def putSetting(self, key, value):
@@ -88,12 +127,15 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         else:
             self.storage.setItem(key, value)
 
-            # force arlo client to be invalidated and reloaded
-            if self.arlo is not None:
-                self._arlo.Unsubscribe()
-                self._arlo = None
-                self._arlo_mfa_code = None
-                self._arlo_mfa_complete_auth = None
+            if key == "plugin_verbosity":
+                self.propagate_verbosity()
+            else:
+                # force arlo client to be invalidated and reloaded
+                if self.arlo is not None:
+                    self._arlo.Unsubscribe()
+                    self._arlo = None
+                    self._arlo_mfa_code = None
+                    self._arlo_mfa_complete_auth = None
 
         # initialize Arlo client or continue MFA
         _ = self.arlo
@@ -103,7 +145,7 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         if not self.arlo:
             raise Exception("Arlo client not connected, cannot discover devices")
 
-        self.print("Discovering devices...")
+        self.logger.info("Discovering devices...")
         self.arlo_cameras = {}
         self.arlo_basestations = {}
         self.scrypted_devices = {}
@@ -111,13 +153,13 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
         basestations = self.arlo.GetDevices('basestation')
         for basestation in basestations:
             self.arlo_basestations[basestation["deviceId"]] = basestation
-        self.print(f"Discovered {len(basestations)} basestations")
+        self.logger.info(f"Discovered {len(basestations)} basestations")
 
         devices = []
         cameras = self.arlo.GetDevices('camera')
         for camera in cameras:
             if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
-                self.print(f"Skipping camera {camera['deviceId']} because its basestation was not found")
+                self.logger.debug(f"Skipping camera {camera['deviceId']} because its basestation was not found")
                 continue
 
             device = {
@@ -131,11 +173,18 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
                 "name": camera["deviceName"],
                 "interfaces": [
                     ScryptedInterface.VideoCamera.value,
-                    ScryptedInterface.Camera.value
+                    ScryptedInterface.Camera.value,
+                    ScryptedInterface.MotionSensor.value,
+                    ScryptedInterface.Online.value,
+                    ScryptedInterface.Refresh.value,
                 ],
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,
             }
+
+            if "batteryLevel" in camera["properties"]:
+                device["interfaces"].append(ScryptedInterface.Battery.value)
+
             devices.append(device)
 
             if camera["deviceId"] == camera["parentId"]:
@@ -143,13 +192,18 @@ class ArloProvider(scrypted_sdk.ScryptedDeviceBase, Settings, DeviceProvider, De
 
             nativeId = camera["deviceId"]
             self.arlo_cameras[nativeId] = camera
-            self.getDevice(nativeId)
 
         await scrypted_sdk.deviceManager.onDevicesChanged({
             "devices": devices,
         })
 
-        self.print(f"Discovered {len(cameras)} cameras, but only {len(devices)} are usable")
+        for nativeId in self.arlo_cameras.keys():
+            self.getDevice(nativeId)
+
+        if len(cameras) != len(devices):
+            self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(devices)} are usable")
+        else:
+            self.logger.info(f"Discovered {len(cameras)} cameras")
 
     def getDevice(self, nativeId):
         ret = self.scrypted_devices.get(nativeId, None)

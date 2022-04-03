@@ -32,16 +32,9 @@ from datetime import datetime
 import asyncio
 import sys
 import base64
-#import logging
 import math
 import random
 import time
-
-
-#logging.basicConfig(level=logging.DEBUG,format='[%(levelname)s] (%(threadName)-10s) %(message)s',)
-
-REQUEUE = object()
-TIMEOUT = object()
 
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
@@ -183,15 +176,9 @@ class Arlo(object):
         Unfortunately, this appears to be the only way Arlo communicates these messages.
 
         This function makes the initial GET request to /subscribe, which returns the EventStream socket.
-        Once we have that socket, the API requires a POST request to /notify with the "subscriptionsresource.
-        This call "registersthe device (which should be the basestation) so that events will be sent to the EventStream
+        Once we have that socket, the API requires a POST request to /notify with the subscriptions resource.
+        This call registers the device (which should be the basestation) so that events will be sent to the EventStream
         when subsequent calls to /notify are made.
-
-        Since this interface is asynchronous, and this is a quick and dirty hack to get this working, I'm using a thread
-        to listen to the EventStream. This thread puts events into a queue. Some polling is required (see NotifyAndGetResponse()) because
-        the event messages aren't guaranteed to be delivered in any specific order, but I wanted to maintain a synchronous style API.
-
-        You generally shouldn't need to call Subscribe() directly, although I'm leaving it "publicfor now.
         """
         basestation_id = basestation.get('deviceId')
 
@@ -201,7 +188,7 @@ class Arlo(object):
                 self.Ping(basestation)
                 await asyncio.sleep(interval)
 
-        if not self.event_stream or not self.event_stream.connected:
+        if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
             self.event_stream = EventStream(self)
             await self.event_stream.start()
 
@@ -271,23 +258,30 @@ class Arlo(object):
         basestation_id = basestation.get('deviceId')
         return self.Notify(basestation, {"action":"set","resource":"subscriptions/"+self.user_id+"_web","publishResponse":False,"properties":{"devices":[basestation_id]}})
 
-#    def SubscribeToMotionEvents(self, basestation, callback, timeout=120):
-#        """
-#        Use this method to subscribe to motion events. You must provide a callback function which will get called once per motion event.
-#
-#        The callback function should have the following signature:
-#        def callback(self, event)
-#
-#        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
-#        that has a big switch statement in it to handle all the various events Arlo produces.
-#        """
-#        def callbackwrapper(self, event):
-#            if event.get('properties', {}).get('motionDetected'):
-#                callback(self, event)
-#
-#        self.HandleEvents(basestation, callbackwrapper, timeout)
+    def SubscribeToMotionEvents(self, basestation, camera, callback):
+        """
+        Use this method to subscribe to motion events. You must provide a callback function which will get called once per motion event.
 
-    async def HandleEvents(self, basestation, resource, actions, callback, timeout):
+        The callback function should have the following signature:
+        def callback(self, event)
+
+        This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
+        that has a big switch statement in it to handle all the various events Arlo produces.
+        """
+        resource = f"cameras/{camera.get('deviceId')}"
+
+        def callbackwrapper(self, event):
+            properties = event.get('properties', {})
+            stop = None
+            if 'motionDetected' in properties:
+                stop = callback(properties['motionDetected'])
+            if not stop:
+                return None
+            return stop
+
+        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+
+    async def HandleEvents(self, basestation, resource, actions, callback):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -297,23 +291,31 @@ class Arlo(object):
 
         await self.Subscribe(basestation)
         if self.event_stream and self.event_stream.connected and self.event_stream.registered:
+            seen_events = {}
             while self.event_stream.connected:
-                try:
-                    event, action = await self.event_stream.get(resource, actions, timeout=timeout)
-                except asyncio.TimeoutError:
-                    return TIMEOUT
+                event, action = await self.event_stream.get(resource, actions)
 
                 if event is None or self.event_stream.event_stream_stop_event.is_set():
                     return None
 
-                response = callback(self, event.item)
-                # requeue if the callback says to do so
-                if response is REQUEUE:
-                    await self.event_stream.requeue(event, resource, action)
+                if event.uuid in seen_events:
                     continue
-                return response
 
-    async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback, timeout):
+                seen_events[event.uuid] = event
+                response = callback(self, event.item)
+
+                # always requeue so other listeners can see the event too
+                self.event_stream.requeue(event, resource, action)
+
+                if response is not None:
+                    return response
+
+                # remove events that have expired
+                for uuid in list(seen_events):
+                    if seen_events[uuid].expired:
+                        del seen_events[uuid]
+
+    async def TriggerAndHandleEvent(self, basestation, resource, actions, trigger, callback):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -328,7 +330,7 @@ class Arlo(object):
         trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.
-        return await self.HandleEvents(basestation, resource, actions, callback, timeout)
+        return await self.HandleEvents(basestation, resource, actions, callback)
 
 #    def GetBaseStationState(self, basestation):
 #        return self.NotifyAndGetResponse(basestation, {"action":"get","resource":"basestation","publishResponse":False})
@@ -902,7 +904,7 @@ class Arlo(object):
         If you pass in a valid device type, as a string or a list, this method will return an array of just those devices that match that type. An example would be ['basestation', 'camera']
         To filter provisioned or unprovisioned devices pass in a True/False value for filter_provisioned. By default both types are returned.
         """
-        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/users/devices')
+        devices = self.request.get(f'https://{self.BASE_URL}/hmsweb/v2/users/devices')
         if device_type:
             devices = [ device for device in devices if device.get('deviceType') in device_type]
 
@@ -1496,15 +1498,14 @@ class Arlo(object):
 #                fd.write(chunk)
 #        fd.close()
 
-    def StartStream(self, basestation, camera):
+    async def StartStream(self, basestation, camera):
         """
         This function returns the url of the rtsp video stream.
         This stream needs to be called within 30 seconds or else it becomes invalid.
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
         """
-        stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
-        return stream_url_dict['url'].replace("rtsp://", "rtsps://")
+        resource = f"cameras/{camera.get('deviceId')}"
 
         # nonlocal variable hack for Python 2.x.
         class nl:
@@ -1514,12 +1515,11 @@ class Arlo(object):
             nl.stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
 
         def callback(self, event):
-            if event.get("from") == basestation.get("deviceId") and event.get("resource") == "cameras/"+camera.get("deviceId") and event.get("properties", {}).get("activityState") == "userStreamActive":
+            if event.get("properties", {}).get("activityState") == "userStreamActive":
                 return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
-
             return None
 
-        return self.TriggerAndHandleEvent(basestation, trigger, callback)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["is"], trigger, callback)
 
     def StopStream(self, basestation, camera):
         return self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/stopStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.         get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"stopUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId": camera.get('xCloudId')})
@@ -1563,7 +1563,7 @@ class Arlo(object):
 #
 #        return self.TriggerAndHandleEvent(basestation, trigger, callback)
 
-    async def TriggerFullFrameSnapshot(self, basestation, camera, timeout=10):
+    async def TriggerFullFrameSnapshot(self, basestation, camera):
         """
         This function causes the camera to record a fullframe snapshot.
         The presignedFullFrameSnapshotUrl url is returned.
@@ -1578,10 +1578,9 @@ class Arlo(object):
             url = event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
             if url:
                 return url
+            return None
 
-            return REQUEUE 
-
-        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback, timeout)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback)
 
 #    def StartRecording(self, basestation, camera):
 #        """
