@@ -429,6 +429,9 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
   userConfigurable?: boolean;
 }
 
+export type MediaStreamDestination = "local" | "remote" | "watch" | "recorder";
+
+
 export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
   /**
    * When retrieving media, setting disableMediaProxies=true
@@ -445,6 +448,13 @@ export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
    * @default true
    */
   refresh?: boolean;
+
+  /**
+   * The intended destination for this media stream. May be used as
+   * a hint to determine which main/substream to send if no id
+   * is explicitly provided.
+   */
+  destination?: MediaStreamDestination;
 }
 
 /**

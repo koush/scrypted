@@ -186,6 +186,9 @@ class VideoStreamOptions(TypedDict):
     width: float
     pass
 
+class MediaStreamDestination(TypedDict):
+    pass
+
 class MediaStreamSource(TypedDict):
     pass
 
@@ -366,6 +369,7 @@ class RTCSignalingSession(TypedDict):
 class RequestMediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
+    destination: MediaStreamDestination
     directMediaStream: bool
     id: str
     metadata: Any
