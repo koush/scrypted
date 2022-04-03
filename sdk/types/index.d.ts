@@ -337,7 +337,8 @@ export interface Notifier {
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.
  */
 export interface MediaObject {
-    mimeType?: string;
+    mimeType: string;
+    console?: Console;
 }
 /**
  * StartStop represents a device that can be started, stopped, and possibly paused and resumed. Typically vacuum cleaners or washers.
@@ -991,6 +992,12 @@ export interface OauthClient {
      */
     onOauthCallback(callbackUrl: string): Promise<void>;
 }
+export interface MediaObjectOptions {
+    /**
+     * The default console to be used when logging usage of the MediaObject.
+     */
+    console?: Console;
+}
 export interface MediaManager {
     /**
      * Additional plugin provided convertors to consider for use when converting MediaObjects.
@@ -1021,19 +1028,19 @@ export interface MediaManager {
      */
     convertMediaObjectToUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string>;
     /**
-     * Create a MediaObject. The media will be created from the provided FFmpeg input arguments.
+     * Create a MediaObject from FFMpeg input arguments.
      */
-    createFFmpegMediaObject(ffmpegInput: FFMpegInput): Promise<MediaObject>;
+    createFFmpegMediaObject(ffmpegInput: FFMpegInput, options?: MediaObjectOptions): Promise<MediaObject>;
+    /**
+     * Create a MediaObject from an URL. The mime type will be determined dynamically while resolving the url.
+     */
+    createMediaObjectFromUrl(data: string, options?: MediaObjectOptions): Promise<MediaObject>;
     /**
      * Create a MediaObject.
      * If the data is a buffer, JSON object, or primitive type, it will be serialized.
      * All other objects will be objects will become RPC objects.
      */
-    createMediaObject(data: any | Buffer, mimeType: string): Promise<MediaObject>;
-    /**
-     * Create a MediaObject from an URL. The mime type should be provided, but it may be inferred from the URL path.
-     */
-    createMediaObjectFromUrl(data: string, mimeType?: string): Promise<MediaObject>;
+    createMediaObject(data: any | Buffer, mimeType: string, options?: MediaObjectOptions): Promise<MediaObject>;
     /**
      * Get the path to ffmpeg on the host system.
      */

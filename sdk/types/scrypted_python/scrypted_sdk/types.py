@@ -304,6 +304,10 @@ class HumiditySettingStatus(TypedDict):
 class Logger(TypedDict):
     pass
 
+class MediaObjectOptions(TypedDict):
+    console: Console
+    pass
+
 class MediaPlayerOptions(TypedDict):
     autoplay: bool
     mimeType: str
@@ -980,11 +984,11 @@ class MediaManager:
         pass
     async def convertMediaObjectToUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
-    async def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput) -> MediaObject:
+    async def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObject(self, data: Any, mimeType: str) -> MediaObject:
+    async def createMediaObject(self, data: Any, mimeType: str, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObjectFromUrl(self, data: str, mimeType: str = None) -> MediaObject:
+    async def createMediaObjectFromUrl(self, data: str, options: MediaObjectOptions = None) -> MediaObject:
         pass
     async def getFFmpegPath(self) -> str:
         pass
