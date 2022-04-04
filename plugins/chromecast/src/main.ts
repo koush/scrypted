@@ -1,9 +1,9 @@
 import util from 'util';
-import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCSignalingClient, RTCSignalingClientSession, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject, MediaPlayer, MediaPlayerOptions, MediaPlayerState, MediaStatus, Refresh, RTCSignalingChannel, RTCSignalingClient, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import { EventEmitter } from 'events';
 import mdns from 'multicast-dns';
 import mime from 'mime';
-import { createBrowserSignalingSession, startRTCPeerConnectionForBrowser } from "@scrypted/common/src/ffmpeg-to-wrtc";
+import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
 
 const { mediaManager, endpointManager, deviceManager } = sdk;
 
@@ -161,7 +161,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     if (typeof media === 'string') {
       // always fetch images up front.
       if (options?.mimeType?.startsWith('image/')) {
-        const mo = await mediaManager.createMediaObjectFromUrl(media, options?.mimeType);
+        const mo = await mediaManager.createMediaObjectFromUrl(media);
         url = await mediaManager.convertMediaObjectToInsecureLocalUrl(mo, options?.mimeType);
       }
       else if (media.startsWith('http')) {
@@ -169,7 +169,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
         url = media;
       }
       else {
-        media = await mediaManager.createMediaObjectFromUrl(media, options?.mimeType);
+        media = await mediaManager.createMediaObjectFromUrl(media);
       }
     }
     else if (options?.mimeType?.startsWith('image/')) {
@@ -188,7 +188,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
     // try to make a webrtc a/v session to handle it.
     const token = Math.random().toString();
     if (typeof media === 'string') {
-      media = await mediaManager.createMediaObjectFromUrl(media, options.mimeType);
+      media = await mediaManager.createMediaObjectFromUrl(media);
     }
     this.tokens.set(token, media);
 
@@ -253,7 +253,7 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
           return;
         }
 
-        const session = await createBrowserSignalingSession(ws);
+        const session = await createBrowserSignalingSession(ws, '@scrypted/chromecast', 'cast-receiver');
         this.sessionDeferred.resolve(session);
         this.sessionDeferred = undefined;
       }
@@ -264,14 +264,14 @@ class CastDevice extends ScryptedDeviceBase implements MediaPlayer, Refresh, Eng
           return;
         }
 
-        const session = await createBrowserSignalingSession(ws);
-        const options = await session.getOptions();
-        startRTCPeerConnectionForBrowser(this.console, mediaObject, session, options);
+        const channel = await mediaManager.convertMediaObject<RTCSignalingChannel>(mediaObject, ScryptedMimeTypes.RTCSignalingChannel);
+        const session = await createBrowserSignalingSession(ws, '@scrypted/chromecast', 'cast-receiver');
+        await channel.startRTCSignalingSession(session);
       }
     }
   }
 
-  createRTCSignalingSession(): Promise<RTCSignalingClientSession> {
+  createRTCSignalingSession(): Promise<RTCSignalingSession> {
     return new Promise((resolve, reject) => {
       const sessionDeferred = this.sessionDeferred = {
         resolve,
