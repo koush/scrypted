@@ -1,5 +1,5 @@
 import { RTCIceCandidate, RTCPeerConnection } from "@koush/werift";
-import { RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingSendIceCandidate, RTCSignalingOptions } from '@scrypted/sdk';
+import { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from '@scrypted/sdk';
 import { createRawResponse } from "./werift-util";
 
 export class WebRTCOutputSignalingSession implements RTCSignalingSession {

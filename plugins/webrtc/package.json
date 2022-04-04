@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/webrtc",
-   "version": "0.0.4",
+   "version": "0.0.5",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -19,6 +19,8 @@
       "name": "WebRTC Plugin",
       "type": "API",
       "interfaces": [
+         "Settings",
+         "BufferConverter",
          "MixinProvider",
          "DeviceProvider",
          "DeviceCreator"
