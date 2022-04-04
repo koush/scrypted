@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/core",
-   "version": "0.0.228",
+   "version": "0.0.229",
    "description": "Scrypted Core plugin. Provides the UI, websocket, and engine.io APIs.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -27,6 +27,9 @@
          "HttpRequestHandler",
          "EngineIOHandler",
          "DeviceProvider"
+      ],
+      "pluginDependencies": [
+         "@scrypted/webrtc"
       ]
    },
    "dependencies": {

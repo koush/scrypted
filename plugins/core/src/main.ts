@@ -196,7 +196,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             pc.addEventListener('iceconnectionstatechange', checkConn);
         }
 
-        // todo: can remove this.
+        // 3/3/2022 todo: can remove this. leaving this around because
+        // cached ui will hit this endpoint.
         if (this.checkEngineIoEndpoint(request, 'videocamera')) {
             const url = new URL(`http://localhost${request.url}`);
             const deviceId = url.searchParams.get('deviceId');
@@ -212,7 +213,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return;
         }
 
-        // todo: can remove this
+        // 3/3/2022 todo: can remove this. leaving this around because
+        // cached ui will hit this endpoint.
         if (this.checkEngineIoEndpoint(request, 'videorecorder')) {
             const url = new URL(`http://localhost${request.url}`);
             const deviceId = url.searchParams.get('deviceId');
