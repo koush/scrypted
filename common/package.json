@@ -12,6 +12,7 @@
   "dependencies": {
     "@koush/werift": "file:../external/werift/packages/webrtc",
     "@koush/wrtc": "^0.5.3",
+    "@scrypted/server": "file:../server",
     "@scrypted/sdk": "file:../sdk",
     "http-auth-utils": "^3.0.2",
     "node-fetch-commonjs": "^3.1.1",
