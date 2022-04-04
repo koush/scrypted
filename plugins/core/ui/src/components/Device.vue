@@ -396,7 +396,6 @@ import ColorSettingHsv from "../interfaces/ColorSettingHsv.vue";
 import ColorSettingRgb from "../interfaces/ColorSettingRgb.vue";
 import OauthClient from "../interfaces/OauthClient.vue";
 import Camera from "../interfaces/Camera.vue";
-import VideoCamera from "../interfaces/VideoCamera.vue";
 import VideoClips from "../interfaces/VideoClips.vue";
 import Thermometer from "../interfaces/sensors/Thermometer.vue";
 import HumiditySensor from "../interfaces/sensors/HumiditySensor.vue";
@@ -464,7 +463,6 @@ const cardInterfaces = [
   ScryptedInterface.ColorSettingHsv,
   ScryptedInterface.ColorSettingRgb,
   ScryptedInterface.Camera,
-  ScryptedInterface.VideoCamera,
   ScryptedInterface.VideoClips,
   ScryptedInterface.TemperatureSetting,
   ScryptedInterface.PasswordStore,
@@ -493,10 +491,6 @@ function filterInterfaces(interfaces) {
     let ret = interfaces.filter((iface) =>
       this.$store.state.systemState[this.id].interfaces.value.includes(iface)
     );
-
-    if (ret.includes(ScryptedInterface.Camera)) {
-      ret = ret.filter((iface) => iface !== ScryptedInterface.VideoCamera);
-    }
 
     if (this.pluginData?.nativeId?.startsWith("script:")) {
       ret = ret.filter((iface) => iface !== ScryptedInterface.Program);
