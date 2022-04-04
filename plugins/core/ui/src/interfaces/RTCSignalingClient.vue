@@ -43,6 +43,7 @@ export default {
       const localSession = new BrowserSignalingSession(this.pc);
       const remoteSession = await this.rpc().createRTCSignalingSession();
       connectRTCSignalingClients(
+        console,
         localSession,
         {
           audio: {
