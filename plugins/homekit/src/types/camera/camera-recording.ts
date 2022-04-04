@@ -1,6 +1,6 @@
 
 import { FFMpegFragmentedMP4Session, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
-import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
+import { parseFragmentedMP4 } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import sdk, { AudioSensor, FFMpegInput, MediaStreamOptions, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import net from 'net';
 import { Duplex, Writable } from 'stream';
