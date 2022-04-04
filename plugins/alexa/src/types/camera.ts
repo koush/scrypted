@@ -1,19 +1,12 @@
-import sdk, { FFMpegInput, HttpResponse, MotionSensor, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import { HttpResponse, MotionSensor, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers, EventReport } from "./common";
-import { startRTCPeerConnectionFFmpegInput } from '@scrypted/common/src/ffmpeg-to-wrtc';
-import { BrowserSignalingSession, startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
-import crypto from 'crypto';
 import { createMessageId } from "../message";
 import { Capability } from "alexa-smarthome-ts/lib/skill/Capability";
-import { DiscoveryEndpoint } from "alexa-smarthome-ts";
-
-const { mediaManager } = sdk;
 
 addSupportedType(ScryptedDeviceType.Camera, {
     probe(device) {
-        if (!device.interfaces.includes(ScryptedInterface.VideoCamera))
+        if (!device.interfaces.includes(ScryptedInterface.RTCSignalingChannel))
             return;
-
 
         const capabilities: Capability<any>[] = [
             {
@@ -21,7 +14,7 @@ addSupportedType(ScryptedDeviceType.Camera, {
                 "interface": "Alexa.RTCSessionController",
                 "version": "3",
                 "configuration": {
-                    "isFullDuplexAudioSupported": false,
+                    isFullDuplexAudioSupported: true,
                 }
             } as any,
         ];

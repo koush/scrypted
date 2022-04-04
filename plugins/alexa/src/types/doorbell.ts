@@ -1,10 +1,12 @@
-import sdk, { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
 import { addSupportedType, EventReport } from "./common";
 
 addSupportedType(ScryptedDeviceType.Doorbell, {
     probe(device) {
-        if (!device.interfaces.includes(ScryptedInterface.VideoCamera) || !device.interfaces.includes(ScryptedInterface.BinarySensor))
+        if (!device.interfaces.includes(ScryptedInterface.RTCSignalingChannel) || !device.interfaces.includes(ScryptedInterface.BinarySensor))
             return;
+
+        const isFullDuplexAudioSupported = device.providedInterfaces.includes(ScryptedInterface.Intercom) || device.providedInterfaces.includes(ScryptedInterface.RTCSignalingChannel);
 
         return {
             displayCategories: ['CAMERA'],
@@ -14,7 +16,7 @@ addSupportedType(ScryptedDeviceType.Doorbell, {
                     "interface": "Alexa.RTCSessionController",
                     "version": "3",
                     "configuration": {
-                        "isFullDuplexAudioSupported": false,
+                        isFullDuplexAudioSupported: true,
                     }
                 },
                 {
