@@ -36,6 +36,16 @@ class ScryptedDeviceBase extends index_1.DeviceBase {
         }
         return this._console;
     }
+    async createMediaObject(data, mimeType) {
+        return mediaManager.createMediaObject(data, mimeType, {
+            sourceId: this.id,
+        });
+    }
+    getMediaObjectConsole(mediaObject) {
+        if (typeof mediaObject.sourceId !== 'string')
+            return this.console;
+        return deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
+    }
     _lazyLoadDeviceState() {
         if (!this._deviceState) {
             if (this.nativeId) {
@@ -80,6 +90,16 @@ class MixinDeviceBase extends index_1.DeviceBase {
                 this._console = deviceManager.getDeviceConsole(this.mixinProviderNativeId);
         }
         return this._console;
+    }
+    async createMediaObject(data, mimeType) {
+        return mediaManager.createMediaObject(data, mimeType, {
+            sourceId: this.id,
+        });
+    }
+    getMediaObjectConsole(mediaObject) {
+        if (typeof mediaObject.sourceId !== 'string')
+            return this.console;
+        return deviceManager.getMixinConsole(mediaObject.sourceId, this.mixinProviderNativeId);
     }
     /**
      * Fire an event for this device.

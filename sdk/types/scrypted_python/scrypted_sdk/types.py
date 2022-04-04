@@ -132,7 +132,7 @@ class ScryptedMimeTypes(Enum):
     MediaObject = "x-scrypted/x-scrypted-media-object"
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
-    RTCAVSignalingPrefix = "x-scrypted-rtc-signaling-"
+    RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     Url = "text/x-uri"
 
@@ -195,6 +195,10 @@ class MediaStreamSource(TypedDict):
 class BufferConverter(TypedDict):
     fromMimeType: str
     toMimeType: str
+    pass
+
+class BufferConvertorOptions(TypedDict):
+    sourceId: str
     pass
 
 class ColorHsv(TypedDict):
@@ -305,7 +309,7 @@ class Logger(TypedDict):
     pass
 
 class MediaObjectOptions(TypedDict):
-    console: Console
+    sourceId: str
     pass
 
 class MediaPlayerOptions(TypedDict):
@@ -512,7 +516,7 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: Any, fromMimeType: str, toMimeType: str) -> Any:
+    async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: BufferConvertorOptions = None) -> Any:
         pass
     pass
 

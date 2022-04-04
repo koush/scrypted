@@ -752,13 +752,7 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["PushEndpoint"] = "text/x-push-endpoint";
     ScryptedMimeTypes["MediaStreamUrl"] = "text/x-media-url";
     ScryptedMimeTypes["FFmpegInput"] = "x-scrypted/x-ffmpeg-input";
-    /**
-     * An RTCSignalingChannel/VideoCamera will return x-scrypted-rtc-signaling-<unique-prefix>/x-<unique-suffix>.
-     * RTC clients can inspect the mime and convert the contents to a buffer containing the string device id.
-     * If the client does not support WebRTC, it may try to convert it to an FFmpeg media object,
-     * which should also be trapped and handled by the endpoint using its internal signaling.
-     */
-    ScryptedMimeTypes["RTCAVSignalingPrefix"] = "x-scrypted-rtc-signaling-";
+    ScryptedMimeTypes["RTCSignalingChannel"] = "x-scrypted/x-scrypted-rtc-signaling-channel";
     ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
     ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));

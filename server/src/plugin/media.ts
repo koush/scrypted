@@ -1,19 +1,19 @@
-import { ScryptedInterfaceProperty, SystemDeviceState, MediaStreamUrl, BufferConverter, FFMpegInput, MediaManager, MediaObject, ScryptedInterface, ScryptedMimeTypes, SystemManager } from "@scrypted/types";
-import { MediaObjectRemote } from "./plugin-api";
-import mimeType from 'mime'
+import { getInstalledFfmpeg } from '@scrypted/ffmpeg';
+import { BufferConverter, BufferConvertorOptions, DeviceManager, FFMpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
+import axios from 'axios';
 import child_process from 'child_process';
 import { once } from 'events';
 import fs from 'fs';
-import tmp from 'tmp';
-import os from 'os';
-import { getInstalledFfmpeg } from '@scrypted/ffmpeg'
-import Graph from 'node-dijkstra';
-import MimeType from 'whatwg-mimetype';
-import axios from 'axios';
 import https from 'https';
-import rimraf from "rimraf";
+import mimeType from 'mime';
 import mkdirp from "mkdirp";
+import Graph from 'node-dijkstra';
+import os from 'os';
 import path from 'path';
+import rimraf from "rimraf";
+import tmp from 'tmp';
+import MimeType from 'whatwg-mimetype';
+import { MediaObjectRemote } from "./plugin-api";
 
 function typeMatches(target: string, candidate: string): boolean {
     // candidate will accept anything
@@ -33,7 +33,7 @@ const httpsAgent = new https.Agent({
 export abstract class MediaManagerBase implements MediaManager {
     builtinConverters: BufferConverter[] = [];
 
-    constructor(public console: Console) {
+    constructor() {
         for (const h of ['http', 'https']) {
             this.builtinConverters.push({
                 fromMimeType: ScryptedMimeTypes.SchemePrefix + h,
@@ -56,7 +56,7 @@ export abstract class MediaManagerBase implements MediaManager {
             convert: async (data, fromMimeType, toMimeType) => {
                 const filename = data.toString();
                 const ab = await fs.promises.readFile(filename);
-                const mt =  mimeType.lookup(data.toString());
+                const mt = mimeType.lookup(data.toString());
                 const mo = this.createMediaObject(ab, mt);
                 return mo;
             }
@@ -121,7 +121,9 @@ export abstract class MediaManagerBase implements MediaManager {
         this.builtinConverters.push({
             fromMimeType: ScryptedMimeTypes.FFmpegInput,
             toMimeType: 'image/jpeg',
-            convert: async (data, fromMimeType: string): Promise<Buffer> => {
+            convert: async (data, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<Buffer> => {
+                const console = this.getMixinConsole(options.sourceId, undefined);
+
                 const ffInput: FFMpegInput = JSON.parse(data.toString());
 
                 const args = [
@@ -161,6 +163,8 @@ export abstract class MediaManagerBase implements MediaManager {
 
     abstract getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } };
     abstract getDeviceById<T>(id: string): T;
+    abstract getPluginDeviceId(): string;
+    abstract getMixinConsole(mixinId: string, nativeId: ScryptedNativeId): Console;
 
     async getFFmpegPath(): Promise<string> {
         // try to get the ffmpeg path as a value of another variable
@@ -238,11 +242,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return url.data.toString();
     }
 
-    async createFFmpegMediaObject(ffMpegInput: FFMpegInput): Promise<MediaObject> {
-        return this.createMediaObjectRemote(Buffer.from(JSON.stringify(ffMpegInput)), ScryptedMimeTypes.FFmpegInput);
-    }
-
-    createMediaObjectRemote(data: any | Buffer | Promise<string | Buffer>, mimeType: string): MediaObjectRemote {
+    createMediaObjectRemote(data: any | Buffer | Promise<string | Buffer>, mimeType: string, options?: MediaObjectOptions): MediaObjectRemote {
         if (typeof data === 'string')
             throw new Error('string is not a valid type. if you intended to send a url, use createMediaObjectFromUrl.');
         if (!mimeType)
@@ -253,12 +253,15 @@ export abstract class MediaManagerBase implements MediaManager {
         if (data.constructor.name !== Buffer.name)
             data = Buffer.from(JSON.stringify(data));
 
+        const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
         class MediaObjectImpl implements MediaObjectRemote {
             __proxy_props = {
                 mimeType,
+                sourceId,
             }
 
             mimeType = mimeType;
+            sourceId = sourceId;
             async getData(): Promise<Buffer | string> {
                 return Promise.resolve(data);
             }
@@ -266,26 +269,33 @@ export abstract class MediaManagerBase implements MediaManager {
         return new MediaObjectImpl();
     }
 
-    async createMediaObject(data: any, mimeType: string): Promise<MediaObject> {
-        return this.createMediaObjectRemote(data, mimeType);
+    async createFFmpegMediaObject(ffMpegInput: FFMpegInput, options?: MediaObjectOptions): Promise<MediaObject> {
+        return this.createMediaObjectRemote(Buffer.from(JSON.stringify(ffMpegInput)), ScryptedMimeTypes.FFmpegInput, options);
     }
 
-    async createMediaObjectFromUrl(data: string): Promise<MediaObject> {
+    async createMediaObjectFromUrl(data: string, options?: MediaObjectOptions): Promise<MediaObject> {
         const url = new URL(data);
         const scheme = url.protocol.slice(0, -1);
         const mimeType = ScryptedMimeTypes.SchemePrefix + scheme;
 
+        const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
         class MediaObjectImpl implements MediaObjectRemote {
             __proxy_props = {
                 mimeType,
+                sourceId,
             }
 
             mimeType = mimeType;
+            sourceId = sourceId;
             async getData(): Promise<Buffer | string> {
                 return Promise.resolve(data);
             }
         }
         return new MediaObjectImpl();
+    }
+
+    async createMediaObject(data: any, mimeType: string, options?: MediaObjectOptions): Promise<MediaObject> {
+        return this.createMediaObjectRemote(data, mimeType, options);
     }
 
     async convert(converters: BufferConverter[], mediaObject: MediaObjectRemote, toMimeType: string): Promise<{ data: Buffer | string | any, mimeType: string }> {
@@ -299,6 +309,11 @@ export abstract class MediaManagerBase implements MediaManager {
                 data: await mediaObject.getData(),
             }
         }
+
+        let sourceId = mediaObject?.sourceId;
+        if (typeof sourceId !== 'string')
+            sourceId = this.getPluginDeviceId();
+        const console = this.getMixinConsole(sourceId, undefined);
 
         const converterIds = new Map<BufferConverter, string>();
         const converterReverseids = new Map<string, BufferConverter>();
@@ -363,6 +378,7 @@ export abstract class MediaManagerBase implements MediaManager {
         route.splice(route.length - 1);
         let value = await mediaObject.getData();
         let valueMime = new MimeType(mediaObject.mimeType);
+
         for (const node of route) {
             const converter = converterReverseids.get(node);
             const converterToMimeType = new MimeType(converter.toMimeType);
@@ -372,7 +388,7 @@ export abstract class MediaManagerBase implements MediaManager {
             const targetMimeType = `${type}/${subtype}`;
 
             if (converter.toMimeType === ScryptedMimeTypes.MediaObject) {
-                const mo = await converter.convert(value, valueMime.essence, toMimeType) as MediaObject;
+                const mo = await converter.convert(value, valueMime.essence, toMimeType, { sourceId }) as MediaObject;
                 const found = await this.convertMediaObjectToBuffer(mo, toMimeType);
                 return {
                     data: found,
@@ -380,7 +396,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 };
             }
 
-            value = await converter.convert(value, valueMime.essence, targetMimeType) as string | Buffer;
+            value = await converter.convert(value, valueMime.essence, targetMimeType, { sourceId }) as string | Buffer;
             valueMime = new MimeType(targetMimeType);
         }
 
@@ -392,8 +408,8 @@ export abstract class MediaManagerBase implements MediaManager {
 }
 
 export class MediaManagerImpl extends MediaManagerBase {
-    constructor(public systemManager: SystemManager, console: Console) {
-        super(console);
+    constructor(public systemManager: SystemManager, public deviceManager: DeviceManager) {
+        super();
     }
 
     getSystemState(): { [id: string]: { [property: string]: SystemDeviceState; }; } {
@@ -403,16 +419,35 @@ export class MediaManagerImpl extends MediaManagerBase {
     getDeviceById<T>(id: string): T {
         return this.systemManager.getDeviceById<T>(id);
     }
+
+    getPluginDeviceId(): string {
+        return this.deviceManager.getDeviceState().id;
+    }
+
+    getMixinConsole(mixinId: string, nativeId: string): Console {
+        if (typeof mixinId !== 'string')
+            return this.deviceManager.getDeviceConsole(nativeId);
+        return this.deviceManager.getMixinConsole(mixinId, nativeId);
+    }
 }
 
 export class MediaManagerHostImpl extends MediaManagerBase {
-    constructor(public systemState: { [id: string]: { [property: string]: SystemDeviceState } },
-        public getDeviceById: (id: string) => any,
-        console: Console) {
-        super(console);
+    constructor(public pluginDeviceId: string,
+        public systemState: { [id: string]: { [property: string]: SystemDeviceState } },
+        public console: Console,
+        public getDeviceById: (id: string) => any) {
+        super();
     }
 
     getSystemState(): { [id: string]: { [property: string]: SystemDeviceState; }; } {
         return this.systemState;
+    }
+
+    getPluginDeviceId(): string {
+        return this.pluginDeviceId;
+    }
+
+    getMixinConsole(mixinId: string, nativeId: string): Console {
+        return this.console;
     }
 }

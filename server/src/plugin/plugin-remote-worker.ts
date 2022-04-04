@@ -1,13 +1,13 @@
-import { RpcMessage, RpcPeer } from '../rpc';
-import { SystemManager, DeviceManager, ScryptedNativeId, ScryptedStatic } from '@scrypted/types'
-import { attachPluginRemote, PluginReader } from './plugin-remote';
-import { PluginAPI } from './plugin-api';
-import { MediaManagerImpl } from './media';
-import { PassThrough } from 'stream';
-import { Console } from 'console'
+import { DeviceManager, ScryptedNativeId, ScryptedStatic, SystemManager } from '@scrypted/types';
+import { Console } from 'console';
+import net from 'net';
 import { install as installSourceMapSupport } from 'source-map-support';
-import net from 'net'
+import { PassThrough } from 'stream';
+import { RpcMessage, RpcPeer } from '../rpc';
+import { MediaManagerImpl } from './media';
+import { PluginAPI } from './plugin-api';
 import { installOptionalDependencies } from './plugin-npm-dependencies';
+import { attachPluginRemote, PluginReader } from './plugin-remote';
 import { createREPLServer } from './plugin-repl';
 
 export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void) => void) {
@@ -172,9 +172,10 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
     let postInstallSourceMapSupport: (scrypted: ScryptedStatic) => void;
 
     attachPluginRemote(peer, {
-        createMediaManager: async (sm) => {
+        createMediaManager: async (sm, dm) => {
             systemManager = sm;
-            return new MediaManagerImpl(systemManager, getPluginConsole());
+            deviceManager = dm
+            return new MediaManagerImpl(systemManager, dm);
         },
         onGetRemote: async (_api, _pluginId) => {
             api = _api;

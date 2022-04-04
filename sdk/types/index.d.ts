@@ -338,7 +338,7 @@ export interface Notifier {
  */
 export interface MediaObject {
     mimeType: string;
-    console?: Console;
+    sourceId?: string;
 }
 /**
  * StartStop represents a device that can be started, stopped, and possibly paused and resumed. Typically vacuum cleaners or washers.
@@ -798,12 +798,15 @@ export interface SoftwareUpdate {
     installUpdate(): Promise<void>;
     updateAvailable?: boolean;
 }
+export interface BufferConvertorOptions {
+    sourceId?: string;
+}
 /**
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type.
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-    convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string): Promise<MediaObject | Buffer | any>;
+    convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<MediaObject | Buffer | any>;
     fromMimeType?: string;
     toMimeType?: string;
 }
@@ -994,9 +997,9 @@ export interface OauthClient {
 }
 export interface MediaObjectOptions {
     /**
-     * The default console to be used when logging usage of the MediaObject.
+     * The device id of the source of the MediaObject.
      */
-    console?: Console;
+    sourceId?: string;
 }
 export interface MediaManager {
     /**
@@ -1482,13 +1485,7 @@ export declare enum ScryptedMimeTypes {
     PushEndpoint = "text/x-push-endpoint",
     MediaStreamUrl = "text/x-media-url",
     FFmpegInput = "x-scrypted/x-ffmpeg-input",
-    /**
-     * An RTCSignalingChannel/VideoCamera will return x-scrypted-rtc-signaling-<unique-prefix>/x-<unique-suffix>.
-     * RTC clients can inspect the mime and convert the contents to a buffer containing the string device id.
-     * If the client does not support WebRTC, it may try to convert it to an FFmpeg media object,
-     * which should also be trapped and handled by the endpoint using its internal signaling.
-     */
-    RTCAVSignalingPrefix = "x-scrypted-rtc-signaling-",
+    RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel",
     SchemePrefix = "x-scrypted/x-scrypted-scheme-",
     MediaObject = "x-scrypted/x-scrypted-media-object"
 }

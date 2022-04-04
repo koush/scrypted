@@ -327,7 +327,7 @@ export interface WebSocketCustomHandler {
 export type PluginReader = (name: string) => Buffer;
 
 export interface PluginRemoteAttachOptions {
-    createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
+    createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManager) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
@@ -351,7 +351,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const systemManager = new SystemManagerImpl();
         const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
-        const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager);
+        const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager, deviceManager);
         peer.params['mediaManager'] = mediaManager;
         const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
 

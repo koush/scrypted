@@ -1,29 +1,29 @@
-import { RpcPeer } from '../rpc';
+import { Device, EngineIOHandler } from '@scrypted/types';
 import AdmZip from 'adm-zip';
-import { Device, EngineIOHandler } from '@scrypted/types'
-import { ScryptedRuntime } from '../runtime';
-import { Plugin } from '../db-types';
-import io, { Socket } from 'engine.io';
-import { setupPluginRemote } from './plugin-remote';
-import { PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
-import { Logger } from '../logger';
-import { MediaManagerHostImpl } from './media';
-import WebSocket from 'ws';
-import { sleep } from '../sleep';
-import { PluginHostAPI } from './plugin-host-api';
-import path from 'path';
-import { PluginDebug } from './plugin-debug';
-import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
-import { ConsoleServer, createConsoleServer } from './plugin-console';
-import { LazyRemote } from './plugin-lazy-remote';
 import crypto from 'crypto';
+import io, { Socket } from 'engine.io';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
+import path from 'path';
 import rimraf from 'rimraf';
-import { RuntimeWorker } from './runtime/runtime-worker';
-import { PythonRuntimeWorker } from './runtime/python-worker';
+import WebSocket from 'ws';
+import { Plugin } from '../db-types';
+import { Logger } from '../logger';
+import { RpcPeer } from '../rpc';
+import { ScryptedRuntime } from '../runtime';
+import { sleep } from '../sleep';
+import { MediaManagerHostImpl } from './media';
+import { PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
+import { ConsoleServer, createConsoleServer } from './plugin-console';
+import { PluginDebug } from './plugin-debug';
+import { PluginHostAPI } from './plugin-host-api';
+import { LazyRemote } from './plugin-lazy-remote';
+import { setupPluginRemote } from './plugin-remote';
+import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { NodeForkWorker } from './runtime/node-fork-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
+import { PythonRuntimeWorker } from './runtime/python-worker';
+import { RuntimeWorker } from './runtime/runtime-worker';
 
 const serverVersion = require('../../package.json').version;
 
@@ -109,6 +109,7 @@ export class PluginHost {
         // allow garbage collection of the base 64 contents
         plugin = undefined;
 
+        const pluginDeviceId = scrypted.findPluginDevice(this.pluginId)._id;
         const logger = scrypted.getDeviceLogger(scrypted.findPluginDevice(this.pluginId));
 
         const volume = getScryptedVolume();
@@ -157,7 +158,7 @@ export class PluginHost {
 
         const { runtime } = this.packageJson.scrypted;
         const mediaManager = runtime === 'python'
-            ? new MediaManagerHostImpl(scrypted.stateManager.getSystemState(), id => scrypted.getDevice(id), console)
+            ? new MediaManagerHostImpl(pluginDeviceId, scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
             : undefined;
 
         this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager);

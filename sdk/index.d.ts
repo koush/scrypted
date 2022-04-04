@@ -1,5 +1,5 @@
 export * from './types/index';
-import { DeviceBase } from './types/index';
+import { DeviceBase, MediaObject } from './types/index';
 import type { ScryptedNativeId, EventListenerRegister } from './types/index';
 import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types/index';
 export declare class ScryptedDeviceBase extends DeviceBase {
@@ -12,6 +12,8 @@ export declare class ScryptedDeviceBase extends DeviceBase {
     get storage(): Storage;
     get log(): Logger;
     get console(): Console;
+    createMediaObject(data: any, mimeType: string): Promise<MediaObject>;
+    getMediaObjectConsole(mediaObject: MediaObject): Console;
     _lazyLoadDeviceState(): void;
     /**
      * Fire an event for this device.
@@ -38,6 +40,8 @@ export declare class MixinDeviceBase<T> extends DeviceBase implements DeviceStat
     constructor(options: MixinDeviceOptions<T>);
     get storage(): Storage;
     get console(): Console;
+    createMediaObject(data: any, mimeType: string): Promise<MediaObject>;
+    getMediaObjectConsole(mediaObject: MediaObject): Console;
     /**
      * Fire an event for this device.
      */
