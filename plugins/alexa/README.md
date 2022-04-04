@@ -2,10 +2,6 @@
 
 The Alexa Plugin lets you control your Scrypted devices from Amazon Alexa.
 
-## Beta
-
-The skill is currently in the approval process. Join discord to get access to the beta.
-
 ## Setup
 
 1. Install the Scrypted Cloud plugin (@scrypted/cloud).

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/alexa",
-   "version": "0.0.4",
+   "version": "0.0.10",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -24,7 +24,8 @@
          "MixinProvider"
       ],
       "pluginDependencies": [
-         "@scrypted/cloud"
+         "@scrypted/cloud",
+         "@scrypted/webrtc"
       ]
    },
    "dependencies": {
