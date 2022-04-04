@@ -42,5 +42,5 @@
       "@scrypted/sdk": "file:../../sdk",
       "typescript": "^4.6.2"
    },
-   "version": "0.0.71"
+   "version": "0.0.72"
 }

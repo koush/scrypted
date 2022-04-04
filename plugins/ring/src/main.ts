@@ -529,8 +529,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
     }
 
     updateState(data: CameraData) {
-        if (data.led_status)
-            this.on = data.led_status === 'on';
+        if (this.findCamera().hasLight && data.led_status) {
+            const light = this.getDevice(undefined);
+            light.on = data.led_status === 'on';
+        }
     }
 }
 
