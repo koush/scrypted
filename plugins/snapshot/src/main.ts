@@ -280,7 +280,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             else
                 data = await this.createErrorImage(e);
         }
-        return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
+        return this.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
 
     async cropAndScale(buffer: Buffer) {

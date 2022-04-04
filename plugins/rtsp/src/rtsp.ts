@@ -1,4 +1,4 @@
-import sdk, { Setting, MediaObject, ScryptedInterface, FFMpegInput, PictureOptions, SettingValue, MediaStreamOptions } from "@scrypted/sdk";
+import sdk, { Setting, MediaObject, ScryptedInterface, FFMpegInput, PictureOptions, SettingValue, MediaStreamOptions, ResponseMediaStreamOptions, ScryptedMimeTypes } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 import url from 'url';
@@ -71,7 +71,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         return stringUrl;
     }
 
-    createFfmpegMediaObject(stringUrl: string, vso: MediaStreamOptions) {
+    createFfmpegMediaObject(stringUrl: string, vso: ResponseMediaStreamOptions) {
         const ret: FFMpegInput = {
             url: stringUrl,
             inputArguments: [
@@ -81,7 +81,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
             mediaStreamOptions: vso,
         };
 
-        return mediaManager.createFFmpegMediaObject(ret);
+        return this.createMediaObject(ret, ScryptedMimeTypes.FFmpegInput);
     }
 
     async createVideoStream(vso: UrlMediaStreamOptions): Promise<MediaObject> {

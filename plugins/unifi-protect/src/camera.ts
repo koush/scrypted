@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
@@ -21,7 +21,7 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
     }
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
         const buffer = await this.camera.getSnapshot(options, 'package-snapshot?');
-        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+        return this.createMediaObject(buffer, 'image/jpeg');
     }
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
@@ -30,7 +30,7 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
         const o = (await this.getVideoStreamOptions())[0];
         return this.camera.getVideoStream(o);
     }
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         const options = await this.camera.getVideoStreamOptions();
         return [options[options.length - 1]];
     }
@@ -201,7 +201,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             throw new Error('Event snapshot unavailable.');
         }
         const data = await response.arrayBuffer();
-        return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
+        return this.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -277,7 +277,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
         const buffer = await this.getSnapshot(options);
-        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+        return this.createMediaObject(buffer, 'image/jpeg');
     }
     findCamera() {
         return this.protect.api.cameras.find(camera => camera.id === this.nativeId);
@@ -297,11 +297,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             container: 'rtsp',
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
         } as MediaStreamUrl));
-        return mediaManager.createMediaObject(data, ScryptedMimeTypes.MediaStreamUrl);
+        return this.createMediaObject(data, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     createMediaStreamOptions(channel: ProtectCameraChannelConfig) {
-        const ret: MediaStreamOptions = {
+        const ret: ResponseMediaStreamOptions = {
             id: channel.id.toString(),
             name: channel.name,
             video: {
@@ -326,7 +326,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return ret;
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         const camera = this.findCamera();
         const vsos = camera.channels
             .map(channel => this.createMediaStreamOptions(channel));
@@ -375,11 +375,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         })
 
         if (typeof media === 'string') {
-            media = await mediaManager.createMediaObjectFromUrl(media);
+            media = await mediaManager.createMediaObjectFromUrl(media, { sourceId: this.id });
         }
         if (media) {
             if (typeof media === 'string') {
-                media = await mediaManager.createMediaObjectFromUrl(media);
+                media = await mediaManager.createMediaObjectFromUrl(media, { sourceId: this.id });
             }
             this.startIntercom(media);
         }

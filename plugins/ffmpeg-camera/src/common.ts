@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';
 import { randomBytes } from "crypto";
@@ -9,11 +9,11 @@ const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
 
-export interface UrlMediaStreamOptions extends MediaStreamOptions {
+export interface UrlMediaStreamOptions extends ResponseMediaStreamOptions {
     url: string;
 }
 
-export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
+export abstract class CameraBase<T extends ResponseMediaStreamOptions> extends ScryptedDeviceBase implements Camera, VideoCamera, Settings {
     snapshotAuth: AxiosDigestAuth;
     pendingPicture: Promise<MediaObject>;
 
@@ -153,7 +153,7 @@ export abstract class CameraBase<T extends MediaStreamOptions> extends ScryptedD
     }
 }
 
-export abstract class CameraProviderBase<T extends MediaStreamOptions> extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
+export abstract class CameraProviderBase<T extends ResponseMediaStreamOptions> extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator {
     devices = new Map<string, any>();
 
     constructor(nativeId?: string) {

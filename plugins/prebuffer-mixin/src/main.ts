@@ -1,10 +1,9 @@
 
 import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter, ResponseMediaStreamOptions, VideoCameraConfiguration } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { once } from 'events';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityTimer, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, MP4Atom, parseMp4StreamChunks } from '@scrypted/common/src/stream-parser';
+import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, parseMp4StreamChunks } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
@@ -1059,8 +1058,7 @@ class PrebufferSession {
       mediaStreamOptions,
     }
 
-    const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
-    return mo;
+    return this.mixin.createMediaObject(ffmpegInput, ScryptedMimeTypes.FFmpegInput);
   }
 }
 

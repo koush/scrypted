@@ -232,7 +232,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
-        return mediaManager.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
+        return this.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
     }
 
     async getUrlSettings() {
