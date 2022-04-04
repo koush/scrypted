@@ -1,7 +1,7 @@
 import child_process from 'child_process';
 import { listenZeroSingleClient } from "./listen-cluster";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "./media-helpers";
-import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingClientOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingClientSession } from "@scrypted/sdk";
+import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingOptions } from "@scrypted/sdk";
 import { RpcPeer } from "../../server/src/rpc";
 
 const { mediaManager } = sdk;
@@ -216,7 +216,7 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, co
   return pc;
 }
 
-export async function startRTCPeerConnection(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingClientOptions & {
+export async function startRTCPeerConnection(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingOptions & {
   maxWidth: number,
 }) {
   const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput);
@@ -259,7 +259,7 @@ export async function startRTCPeerConnection(console: Console, mediaObject: Medi
   }
 }
 
-export function startRTCPeerConnectionForBrowser(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingClientOptions) {
+export function startRTCPeerConnectionForBrowser(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingOptions) {
   return startRTCPeerConnection(console, mediaObject, session, Object.assign({
     maxWidth: 960,
   }, options || {}));
@@ -280,20 +280,19 @@ export async function createBrowserSignalingSession(ws: WebSocket) {
     peer.handleMessage(json);
   };
 
-  const session: RTCSignalingClientSession = await peer.getParam('session');
+  const session: RTCSignalingSession = await peer.getParam('session');
   return session;
 }
 
 export async function startBrowserRTCSignaling(camera: ScryptedDevice & RTCSignalingChannel & VideoCamera, ws: WebSocket, console: Console) {
   try {
     const session = await createBrowserSignalingSession(ws);
-    const options = await session.getOptions();
 
     if (camera.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
-      camera.startRTCSignalingSession(session, options);
+      camera.startRTCSignalingSession(session);
     }
     else {
-      return startRTCPeerConnectionForBrowser(console, await camera.getVideoStream(), session, options);
+      return startRTCPeerConnectionForBrowser(console, await camera.getVideoStream(), session);
     }
   }
   catch (e) {

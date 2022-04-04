@@ -1,9 +1,8 @@
 import { once } from "events";
 import { Duplex } from "stream";
-import { Socket } from "net";
 import { Socket as DatagramSocket } from "dgram";
-import { Readable } from "stream";
 import { readLength } from "./read-stream";
+import { FFMPEG_FRAGMENTED_MP4_OUTPUT_ARGS, MP4Atom, parseFragmentedMP4 } from "./ffmpeg-mp4-parser-session";
 
 export interface StreamParser {
     container: string;
@@ -169,29 +168,6 @@ export function createMpegTsParser(options?: StreamParserOptions): StreamParser 
     }
 }
 
-export async function* parseFragmentedMP4(readable: Readable): AsyncGenerator<MP4Atom> {
-    while (true) {
-        const header = await readLength(readable, 8);
-        const length = header.readInt32BE(0) - 8;
-        const type = header.slice(4).toString();
-        const data = await readLength(readable, length);
-
-        yield {
-            header,
-            length,
-            type,
-            data,
-        };
-    }
-}
-
-export interface MP4Atom {
-    header: Buffer;
-    length: number;
-    type: string;
-    data: Buffer;
-}
-
 export async function* parseMp4StreamChunks(parser: AsyncGenerator<MP4Atom>) {
     let ftyp: MP4Atom;
     let moov: MP4Atom;
@@ -222,8 +198,7 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
         outputArguments: [
             ...(options?.vcodec || []),
             ...(options?.acodec || []),
-            '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-            '-f', 'mp4',
+            ...FFMPEG_FRAGMENTED_MP4_OUTPUT_ARGS,
         ],
         async *parse(socket: Duplex): AsyncGenerator<StreamChunk> {
             const parser = parseFragmentedMP4(socket);

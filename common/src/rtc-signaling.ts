@@ -35,6 +35,7 @@ export async function startRTCSignalingSession(session: RTCSignalingSession, off
 }
 
 export async function connectRTCSignalingClients(
+    console: Console,
     offerClient: RTCSignalingSession,
     offerSetup: RTCAVSignalingSetup,
     answerClient: RTCSignalingSession,
@@ -42,8 +43,10 @@ export async function connectRTCSignalingClients(
     disableAnswerTrickle?: boolean,
 ) {
     const offer = await offerClient.createLocalDescription('offer', offerSetup, candidate => answerClient.addIceCandidate(candidate));
+    console.log('offer sdp', offer.sdp);
     await answerClient.setRemoteDescription(offer, answerSetup);
     const answer = await answerClient.createLocalDescription('answer', answerSetup, disableAnswerTrickle ? undefined : candidate => offerClient.addIceCandidate(candidate));
+    console.log('answer sdp', answer.sdp);
     await offerClient.setRemoteDescription(answer, offerSetup);
 }
 

@@ -1,7 +1,7 @@
 import { createServer, Server } from 'net';
 import child_process, { StdioOptions } from 'child_process';
 import { ChildProcess } from 'child_process';
-import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
+import { FFMpegInput } from '@scrypted/sdk/types';
 import { bind, bindZero, listenZero, listenZeroSingleClient } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk, { ResponseMediaStreamOptions } from "@scrypted/sdk";
@@ -11,13 +11,6 @@ import dgram from 'dgram';
 import { Duplex } from 'stream';
 
 const { mediaManager } = sdk;
-
-export interface MP4Atom {
-    header: Buffer;
-    length: number;
-    type: string;
-    data: Buffer;
-}
 
 export interface ParserSession<T extends string> {
     sdp: Promise<Buffer[]>;
