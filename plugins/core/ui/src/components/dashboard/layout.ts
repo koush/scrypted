@@ -130,8 +130,8 @@ for (const type of [ScryptedDeviceType.Light, ScryptedDeviceType.Outlet, Scrypte
     cardComponentTypes.push(new CardComponentType(type, 30, true, 1, DashboardToggle, undefined, ScryptedInterface.OnOff));
 }
 cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Sensor, 0, true, 6, DashboardMap, { cardName: "Map" }, ScryptedInterface.PositionSensor));
-cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Camera, 0, false, 4, DashboardCamera, undefined, ScryptedInterface.Camera, ScryptedInterface.VideoCamera));
-cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Doorbell, 0, false, 4, DashboardCamera, undefined, ScryptedInterface.Camera, ScryptedInterface.VideoCamera));
+cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Camera, 0, false, 4, DashboardCamera, undefined, ScryptedInterface.Camera, ScryptedInterface.RTCSignalingChannel));
+cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Doorbell, 0, false, 4, DashboardCamera, undefined, ScryptedInterface.Camera, ScryptedInterface.RTCSignalingChannel));
 cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Lock, 15, false, 1, DashboardLock, undefined, ScryptedInterface.Lock));
 cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Thermostat, 20, false, 1, DashboardThermostat, undefined, ScryptedInterface.TemperatureSetting));
 cardComponentTypes.push(new CardComponentType(ScryptedDeviceType.Vacuum, 10, false, 1, DashboardStartStop, undefined, ScryptedInterface.StartStop));
@@ -177,7 +177,7 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
             title: "Camera Device",
             key: "deviceId",
             type: 'device',
-            deviceFilter: `(${JSON.stringify(ScryptedDeviceType.Camera)} === type || ${JSON.stringify(ScryptedDeviceType.Doorbell)} === type) && (interfaces.includes(${JSON.stringify(ScryptedInterface.Camera)}) || interfaces.includes(${JSON.stringify(ScryptedInterface.VideoCamera)}))`,
+            deviceFilter: `(${JSON.stringify(ScryptedDeviceType.Camera)} === type || ${JSON.stringify(ScryptedDeviceType.Doorbell)} === type) && interfaces.includes(${JSON.stringify(ScryptedInterface.Camera)})`,
             value: null,
         }
     ]);
@@ -238,7 +238,7 @@ const cardComponentSettings: Map<string, Setting[]> = new Map();
             title: "Media Player",
             key: "deviceId",
             type: 'device',
-            deviceFilter: `${JSON.stringify([ScryptedDeviceType.Speaker, ScryptedDeviceType.Display])}.includes(type) && (interfaces.includes(${JSON.stringify(ScryptedInterface.MediaPlayer)}) || interfaces.includes(${JSON.stringify(ScryptedInterface.VideoCamera)}))`,
+            deviceFilter: `${JSON.stringify([ScryptedDeviceType.Speaker, ScryptedDeviceType.Display])}.includes(type) && interfaces.includes(${JSON.stringify(ScryptedInterface.MediaPlayer)})`,
             value: null,
         }
     ]);
