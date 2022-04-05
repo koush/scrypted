@@ -551,7 +551,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     // Configure API request
     const config: AxiosRequestConfig = {
       method,
-      baseURL: `https://${this.storage.getItem("api_base")}/api/1/`,
+      baseURL: `https://${this.storage.getItem("api_base")}/1/`,
       url: endpoint,
       headers: {
         Authorization: `Bearer ${this.access_token}`,
