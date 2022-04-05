@@ -519,7 +519,6 @@ export default {
     RTCSignalingClient,
     Notifier,
     Camera,
-    VideoCamera,
     VideoClips,
     PasswordStore,
     Settings,
