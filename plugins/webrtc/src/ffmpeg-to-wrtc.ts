@@ -3,7 +3,7 @@ import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/co
 import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
-import { createSdpInput } from "@scrypted/common/src/sdp-utils";
+import { createSdpInput, findFmtp } from "@scrypted/common/src/sdp-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
 import sdk, { FFMpegInput, Intercom, RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSession } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
@@ -16,9 +16,34 @@ import { isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
-function createSetup(type: 'offer' | 'answer', audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): RTCAVSignalingSetup {
+const requiredVideoCodec = new RTCRtpCodecParameters({
+    mimeType: "video/H264",
+    clockRate: 90000,
+    rtcpFeedback: [
+        { type: "transport-cc" },
+        { type: "ccm", parameter: "fir" },
+        { type: "nack" },
+        { type: "nack", parameter: "pli" },
+        { type: "goog-remb" },
+    ],
+    parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f'
+});
+
+const requiredAudioCodec = new RTCRtpCodecParameters({
+    mimeType: "audio/opus",
+    clockRate: 48000,
+    channels: 2,
+});
+
+function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
     return {
-        type,
+        configuration: {
+            iceServers: [
+                {
+                    urls: 'stun:stun.l.google.com:19302',
+                },
+            ],
+        },
         audio: {
             direction: audioDirection,
         },
@@ -29,7 +54,7 @@ function createSetup(type: 'offer' | 'answer', audioDirection: RTCRtpTransceiver
 };
 
 export async function createRTCPeerConnectionSink(
-    session: RTCSignalingSession,
+    clientSignalingSession: RTCSignalingSession,
     storageSettings: StorageSettings<WebRTCStorageSettingsKeys>,
     ffInput: FFMpegInput,
     console: Console,
@@ -37,34 +62,57 @@ export async function createRTCPeerConnectionSink(
     options: RTCSignalingOptions) {
     const hasIntercom = !!intercom;
 
-    const answerAudioDirection = hasIntercom
+    const cameraAudioDirection = hasIntercom
         ? 'sendrecv'
         : 'sendonly';
 
     const { mediaStreamOptions } = ffInput;
 
-    const codec = new RTCRtpCodecParameters({
-        mimeType: "video/H264",
-        clockRate: 90000,
-    });
+    const video = [
+        requiredVideoCodec,
+    ];
+
+    if (mediaStreamOptions.sdp) {
+        // this path is here for illustrative purposes, and is unused
+        // because this code always supplies an answer.
+        // it could be useful in the offer case, potentially.
+        // however, it seems that browsers ignore profile-level-id
+        // that are not exactly what they are expecting for
+        // baseline or high.
+        // seems better to use the browser offer to determine the capability
+        // set to see if a codec copy is possible.
+        const fmtps = findFmtp(mediaStreamOptions.sdp, 'H264/90000');
+        if (fmtps?.length === 1) {
+            const fmtp = fmtps[0];
+
+            const nativeVideoCodec = new RTCRtpCodecParameters({
+                mimeType: "video/H264",
+                clockRate: 90000,
+                rtcpFeedback: [
+                    { type: "transport-cc" },
+                    { type: "ccm", parameter: "fir" },
+                    { type: "nack" },
+                    { type: "nack", parameter: "pli" },
+                    { type: "goog-remb" },
+                ],
+                parameters: fmtp.fmtp,
+            });
+
+            video.unshift(nativeVideoCodec);
+        }
+    }
 
     const pc = new RTCPeerConnection({
         codecs: {
-            video: [
-                codec,
-            ],
             audio: [
-                new RTCRtpCodecParameters({
-                    mimeType: "audio/opus",
-                    clockRate: 48000,
-                    channels: 1,
-                })
+                requiredAudioCodec,
             ],
+            video,
         }
     });
 
     const vtrack = new MediaStreamTrack({
-        kind: "video", codec,
+        kind: "video", codec: requiredVideoCodec,
     });
     const videoTransceiver = pc.addTransceiver(vtrack, {
         direction: 'sendonly',
@@ -72,7 +120,7 @@ export async function createRTCPeerConnectionSink(
 
     const atrack = new MediaStreamTrack({ kind: "audio" });
     const audioTransceiver = pc.addTransceiver(atrack, {
-        direction: answerAudioDirection,
+        direction: cameraAudioDirection,
     });
 
     const audioOutput = await createBindZero();
@@ -87,7 +135,7 @@ export async function createRTCPeerConnectionSink(
             "t=0 0",
             "m=audio 0 RTP/AVP 110",
             "b=AS:24",
-            "a=rtpmap:110 opus/48000/1",
+            "a=rtpmap:110 opus/48000/2",
             "a=fmtp:101 minptime=10;useinbandfec=1",
         ];
         let sdp = sdpReturnAudio.join('\r\n');
@@ -144,9 +192,12 @@ export async function createRTCPeerConnectionSink(
             const sessionSupportsH264High = options?.capabilities?.video?.codecs
                 ?.filter(codec => codec.mimeType.toLowerCase() === 'video/h264')
                 // 42 is baseline profile
-                // 64 is high profile
-                // not sure what main profile is, dunno if anything actually uses it.
-                ?.find(codec => codec.sdpFmtpLine.includes('profile-level-id=64'))
+                // 64001f (chrome) or 640c1f (safari) is high profile.
+                // firefox only advertises baseline.
+                ?.find(codec => {
+                    return codec.sdpFmtpLine.includes('profile-level-id=64001f')
+                        || codec.sdpFmtpLine.includes('profile-level-id=640c1f');
+                });
 
             const videoArgs: string[] = [];
             const transcode = !sessionSupportsH264High
@@ -238,14 +289,16 @@ export async function createRTCPeerConnectionSink(
             cleanup();
     });
 
-    const answerSession = new WebRTCOutputSignalingSession(pc);
+    const cameraSignalingSession = new WebRTCOutputSignalingSession(pc);
 
-    const offerAudioDirection = hasIntercom
+    const clientAudioDirection = hasIntercom
         ? 'sendrecv'
         : 'recvonly';
 
-    connectRTCSignalingClients(console, session, createSetup('offer', offerAudioDirection, 'recvonly'),
-        answerSession, createSetup('answer', answerAudioDirection, 'sendonly'), !!options?.offer);
+    connectRTCSignalingClients(console,
+        clientSignalingSession, createSetup(clientAudioDirection, 'recvonly'),
+        cameraSignalingSession, createSetup(cameraAudioDirection, 'sendonly'),
+        !!options?.offer);
 
     return new ScryptedSessionControl(cleanup);
 }

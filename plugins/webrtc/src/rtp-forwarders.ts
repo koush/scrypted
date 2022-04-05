@@ -14,7 +14,7 @@ export function getFFmpegRtpAudioOutputArguments() {
         '-ar', '48k',
         // choose a better birate? this is on the high end recommendation for voice.
         '-b:a', '40k',
-        '-ac', '1',
+        '-ac', '2',
         '-application', 'lowdelay',
         '-frame_duration', '60',
         // '-pkt_size', '1300',

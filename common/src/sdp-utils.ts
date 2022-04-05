@@ -46,6 +46,22 @@ export function createSdpInput(audioPort: number, videoPort: number, sdp: string
     return outputSdp;
 }
 
+export function findFmtp(sdp: string, codec: string) {
+    let lines = sdp.split('\n').map(line => line.trim());
+
+    const re = new RegExp(`a=rtpmap:(\\d+) ${codec}`);
+    const rtpmaps = lines.map(line => line.match(re)).filter(match => !!match);
+    return rtpmaps.map(match => {
+        const payloadType = parseInt(match[1]);
+        const fmtpPrefix = `a=fmtp:${payloadType} `;
+        const fmtp = lines.find(line => line.startsWith(fmtpPrefix))?.substring(fmtpPrefix.length);
+        return {
+            payloadType,
+            fmtp,
+        }
+    })
+}
+
 export function parsePayloadTypes(sdp: string) {
     const audioPayloadTypes = new Set<number>();
     const videoPayloadTypes = new Set<number>();

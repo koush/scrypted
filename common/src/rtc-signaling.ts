@@ -38,21 +38,24 @@ export async function startRTCSignalingSession(session: RTCSignalingSession, off
 export async function connectRTCSignalingClients(
     console: Console,
     offerClient: RTCSignalingSession,
-    offerSetup: RTCAVSignalingSetup,
+    offerSetup: Partial<RTCAVSignalingSetup>,
     answerClient: RTCSignalingSession,
-    answerSetup: RTCAVSignalingSetup,
+    answerSetup: Partial<RTCAVSignalingSetup>,
     disableAnswerTrickle?: boolean,
 ) {
-    const offer = await offerClient.createLocalDescription('offer', offerSetup, candidate => answerClient.addIceCandidate(candidate));
+    offerSetup.type = 'offer';
+    answerSetup.type = 'answer';
+
+    const offer = await offerClient.createLocalDescription('offer', offerSetup as RTCAVSignalingSetup, candidate => answerClient.addIceCandidate(candidate));
     console.log('offer sdp', offer.sdp);
-    await answerClient.setRemoteDescription(offer, answerSetup);
-    const answer = await answerClient.createLocalDescription('answer', answerSetup, disableAnswerTrickle ? undefined : candidate => offerClient.addIceCandidate(candidate));
+    await answerClient.setRemoteDescription(offer, answerSetup as RTCAVSignalingSetup);
+    const answer = await answerClient.createLocalDescription('answer', answerSetup as RTCAVSignalingSetup, disableAnswerTrickle ? undefined : candidate => offerClient.addIceCandidate(candidate));
     console.log('answer sdp', answer.sdp);
-    await offerClient.setRemoteDescription(answer, offerSetup);
+    await offerClient.setRemoteDescription(answer, offerSetup as RTCAVSignalingSetup);
 }
 
 export class BrowserSignalingSession implements RTCSignalingSession {
-    hasSetup = false;
+    pc: RTCPeerConnection;
     options: RTCSignalingOptions = {
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
@@ -66,28 +69,8 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
     };
 
-    constructor(public pc: RTCPeerConnection, cleanup?: () => void) {
-        const checkConn = () => {
-            console.log('iceConnectionState', pc.iceConnectionState);
-            console.log('connectionState', pc.connectionState);
-            if (pc.iceConnectionState === 'disconnected'
-                || pc.iceConnectionState === 'failed'
-                || pc.iceConnectionState === 'closed') {
-                cleanup?.();
-            }
-            if (pc.connectionState === 'closed'
-                || pc.connectionState === 'disconnected'
-                || pc.connectionState === 'failed') {
-                cleanup?.();
-            }
-        }
+    constructor(public peerConnectionCreated?: (pc: RTCPeerConnection) => Promise<void>, public cleanup?: () => void) {
 
-        pc.addEventListener('connectionstatechange', checkConn);
-        pc.addEventListener('iceconnectionstatechange', checkConn);
-
-        pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState))
-        pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState))
-        pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
     }
 
     async getOptions(): Promise<RTCSignalingOptions> {
@@ -95,9 +78,34 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     }
 
     async createPeerConnection(setup: RTCAVSignalingSetup) {
-        if (this.hasSetup)
+        if (this.pc)
             return;
-        this.hasSetup = true;
+
+        const checkConn = () => {
+            console.log('iceConnectionState', pc.iceConnectionState);
+            console.log('connectionState', pc.connectionState);
+            if (pc.iceConnectionState === 'disconnected'
+                || pc.iceConnectionState === 'failed'
+                || pc.iceConnectionState === 'closed') {
+                this.cleanup?.();
+            }
+            if (pc.connectionState === 'closed'
+                || pc.connectionState === 'disconnected'
+                || pc.connectionState === 'failed') {
+                this.cleanup?.();
+            }
+        }
+
+        const pc = this.pc = new RTCPeerConnection(setup.configuration);
+        await this.peerConnectionCreated?.(pc);
+
+        pc.addEventListener('connectionstatechange', checkConn);
+        pc.addEventListener('iceconnectionstatechange', checkConn);
+
+        pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState))
+        pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState))
+        pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
+
         if (setup.datachannel)
             this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
         if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
@@ -161,6 +169,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         });
 
         const toDescription = (init: RTCSessionDescriptionInit) => {
+            console.log('local description', init.sdp);
             return {
                 type: init.type,
                 sdp: init.sdp,
@@ -197,12 +206,12 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
     async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) {
         await this.pc.setRemoteDescription(description);
-
+        console.log('remote description', description.sdp);
     }
 
     async addIceCandidate(candidate: RTCIceCandidateInit) {
-        console.log("remote candidate", candidate);
         await this.pc.addIceCandidate(candidate);
+        console.log("remote candidate", candidate);
     }
 
     async endSession() {
