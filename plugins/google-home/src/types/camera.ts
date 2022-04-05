@@ -4,7 +4,7 @@ import { addSupportedType, queryResponse, syncResponse } from '../common';
 addSupportedType({
     type: ScryptedDeviceType.Camera,
     probe(device) {
-        return device.interfaces.includes(ScryptedInterface.VideoCamera);
+        return device.interfaces.includes(ScryptedInterface.RTCSignalingChannel);
     },
     async getSyncResponse(device) {
         const ret = syncResponse(device, 'action.devices.types.CAMERA');

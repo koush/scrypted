@@ -16,7 +16,7 @@ import { canAccess } from './commands/camerastream';
 import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
 import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
-import { startBrowserRTCSignaling } from "@scrypted/common/src/ffmpeg-to-wrtc";
+import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
 
 import ciao, { Protocol } from '@homebridge/ciao';
 
@@ -200,7 +200,15 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
                 return;
             }
 
-            await startBrowserRTCSignaling(camera, ws, this.console);
+            try {
+                const session = await createBrowserSignalingSession(ws, '@scrypted/google-home', 'cast-receiver');
+                await camera.startRTCSignalingSession(session);
+            }
+            catch (e) {
+                console.error("error negotiating browser RTCC signaling", e);
+                ws.close();
+                throw e;
+            }
         }
     }
 
