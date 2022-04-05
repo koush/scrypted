@@ -385,6 +385,7 @@ class RequestMediaStreamOptions(TypedDict):
     prebuffer: float
     refresh: bool
     refreshAt: float
+    sdp: str
     source: MediaStreamSource
     tool: str
     userConfigurable: bool
@@ -419,6 +420,7 @@ class ResponseMediaStreamOptions(TypedDict):
     name: str
     prebuffer: float
     refreshAt: float
+    sdp: str
     source: MediaStreamSource
     tool: str
     userConfigurable: bool

@@ -428,6 +428,7 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
 
   source?: MediaStreamSource;
   userConfigurable?: boolean;
+  sdp?: string;
 }
 
 export type MediaStreamDestination = "local" | "remote" | "watch" | "recorder";
