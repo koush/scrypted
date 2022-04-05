@@ -180,6 +180,7 @@ export async function createRTCPeerConnectionSink(
             for (const ice of pc.validIceTransports()) {
                 const [address, port] = ice.connection.remoteAddr;
                 isPrivate = isPrivate && ip.isPrivate(address);
+                console.log('ice transport ip', address);
             }
 
             console.log('Connection is local network:', isPrivate);
@@ -188,12 +189,19 @@ export async function createRTCPeerConnectionSink(
 
             // we assume that the camera doesn't output h264 baseline, because
             // that is awful quality. so check to see if the session has an
-            // explicit list of supported codecs with h264 high on it.
+            // explicit list of supported codecs with a passable h264 high on it.
             const sessionSupportsH264High = options?.capabilities?.video?.codecs
                 ?.filter(codec => codec.mimeType.toLowerCase() === 'video/h264')
                 // 42 is baseline profile
                 // 64001f (chrome) or 640c1f (safari) is high profile.
                 // firefox only advertises baseline.
+                // nest hub max offers high 640015. this means the level (hex 15) is 2.1,
+                // this corresponds to a resolution of 480p according to the spec?
+                // https://en.wikipedia.org/wiki/Advanced_Video_Coding#Levels
+                // however, the 640x1f indicates a max resolution of 720p, but
+                // desktop browsers can handle 1080p+ fine regardless, since it does
+                // not actually seem to confirm the level. the level is merely a hint
+                // to make a rough guess as to the decoding capability of the client.
                 ?.find(codec => {
                     return codec.sdpFmtpLine.includes('profile-level-id=64001f')
                         || codec.sdpFmtpLine.includes('profile-level-id=640c1f');
