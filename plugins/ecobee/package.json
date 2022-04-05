@@ -1,6 +1,6 @@
 {
     "name": "@scrypted/ecobee",
-    "version": "0.0.14",
+    "version": "0.0.15",
     "description": "Ecobee Plugin for Scrypted",
     "author": "Scrypted",
     "license": "Apache",
