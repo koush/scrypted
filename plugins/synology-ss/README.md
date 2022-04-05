@@ -2,4 +2,4 @@
 
 # Notes
 
-Once logged into the plugin, you will need to configure webhooks per camera in the Synology Surveiallance Station to report motion events to Scrypted.
+Once logged into the plugin, you will need to configure webhooks in Synology Surveillance Station, per camera, to report motion events to Scrypted.
