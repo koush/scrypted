@@ -987,6 +987,7 @@ class PrebufferSession {
     }
 
     const mediaStreamOptions: ResponseMediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
+    mediaStreamOptions.sdp = (await session.sdp)?.toString();
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
