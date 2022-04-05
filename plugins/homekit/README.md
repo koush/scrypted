@@ -22,7 +22,7 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 1) The motion wasn't triggered. You can view if there are motion events in the camera `Events` section (a small icon button next to the `Console` button`.
 
 2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. If you do not see this, there are two possible causes and solutions:
-  * The Home Hubs are bugged out and have stopped responding to motion. Reboot all Home Hubs when this happens. **iPads and HomePods, which are wireless, are not reliable Home Hubs.**
+  * The Home Hubs are bugged out and have stopped responding to motion. Reboot all Home Hubs when this happens. **iPads and HomePods, which are wireless, are not reliable Home Hubs.** If you have an iPad as a Home Hub, remove it from acting as a Home Hub. Unfortunately this is not possible to do with HomePods.
   * Your iCloud account is in a bad state. Log out of iCloud on your iPhone, and log back in. Then disable and reenable HomeKit Secure Video on your cameras again.
 
 3) If HomeKit requested the video, but nothing showed up in the timeline, HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
