@@ -11,29 +11,11 @@ import ip from 'ip';
 import { WebRTCOutputSignalingSession } from "./output-signaling-session";
 import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
+import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
 import { WebRTCStorageSettingsKeys } from "./webrtc-storage-settings";
 import { isPeerConnectionAlive } from "./werift-util";
 
-const { mediaManager, systemManager, deviceManager } = sdk;
-
-const requiredVideoCodec = new RTCRtpCodecParameters({
-    mimeType: "video/H264",
-    clockRate: 90000,
-    rtcpFeedback: [
-        { type: "transport-cc" },
-        { type: "ccm", parameter: "fir" },
-        { type: "nack" },
-        { type: "nack", parameter: "pli" },
-        { type: "goog-remb" },
-    ],
-    parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f'
-});
-
-const requiredAudioCodec = new RTCRtpCodecParameters({
-    mimeType: "audio/opus",
-    clockRate: 48000,
-    channels: 2,
-});
+const { mediaManager } = sdk;
 
 function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
     return {

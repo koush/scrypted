@@ -9,6 +9,7 @@ import { ChildProcess } from "child_process";
 import dgram from 'dgram';
 import { Socket } from "net";
 import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
+import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
 import { createRawResponse, isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager } = sdk;
@@ -60,11 +61,9 @@ export async function createRTCPeerConnectionSource(options: {
         const pc = new RTCPeerConnection({
             codecs: {
                 audio: [
-                    new RTCRtpCodecParameters({
-                        mimeType: "audio/opus",
-                        clockRate: 48000,
-                        channels: 2,
-                    }),
+                    requiredAudioCodec,
+                    // these are some other option templates that may be worth considering
+                    // for fast path.
                     // new RTCRtpCodecParameters({
                     //     mimeType: "audio/opus",
                     //     clockRate: 8000,
@@ -82,33 +81,7 @@ export async function createRTCPeerConnectionSource(options: {
                     // }),
                 ],
                 video: [
-                    // h264 high
-                    // new RTCRtpCodecParameters(
-                    //     {
-                    //         clockRate: 90000,
-                    //         mimeType: "video/H264",
-                    //         rtcpFeedback: [
-                    //             { type: "transport-cc" },
-                    //             { type: "ccm", parameter: "fir" },
-                    //             { type: "nack" },
-                    //             { type: "nack", parameter: "pli" },
-                    //             { type: "goog-remb" },
-                    //         ],
-                    //         parameters: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f"
-                    //     },
-                    // ),
-                    new RTCRtpCodecParameters({
-                        mimeType: "video/H264",
-                        clockRate: 90000,
-                        rtcpFeedback: [
-                            { type: "transport-cc" },
-                            { type: "ccm", parameter: "fir" },
-                            { type: "nack" },
-                            { type: "nack", parameter: "pli" },
-                            { type: "goog-remb" },
-                        ],
-                        parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f'
-                    })
+                    requiredVideoCodec,
                 ],
             }
         });
