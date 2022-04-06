@@ -1,10 +1,10 @@
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { RefreshPromise } from "@scrypted/common/src/promise-utils";
-import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
+import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-connect';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
-import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
@@ -25,7 +25,7 @@ const STREAM_TIMEOUT = 120000;
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-class RingRTCSessionControl implements RTCSessionControl {
+class RingWebSocketRTCSessionControl implements RTCSessionControl {
     constructor(public liveCallNegtation: LiveCallNegotiation) {
     }
 
@@ -40,9 +40,24 @@ class RingRTCSessionControl implements RTCSessionControl {
     }
 }
 
+class RingBrowserRTCSessionControl implements RTCSessionControl {
+    constructor(public ringCamera: RingCameraDevice, public sessionId: string) {
+    }
+
+    async getRefreshAt() {
+    }
+
+    async extendSession() {
+    }
+
+    async endSession() {
+        this.ringCamera.findCamera().endWebRtcSession(this.sessionId);
+    }
+}
+
 class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(public camera: RingCameraDevice) {
-        super(camera.id + '-light');
+        super(camera.nativeId + '-light');
     }
     async turnOff(): Promise<void> {
         await this.camera.findCamera().setLight(false);
@@ -390,71 +405,120 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         let sessionControl: RTCSessionControl;
 
         // ring has two webrtc endpoints. one is for the android/ios clients, wherein the ring server
-        // sends an offer, which only has h264 high in it, which causes some browsers 
+        // sends an offer, which only has h264 high in it, which causes some browsers
         // like Safari (and probably Chromecast) to fail on codec negotiation.
         // if any video capabilities are offered, use the browser endpoint for safety.
         // this should be improved further in the future by inspecting the capabilities
         // since this currently defaults to using the baseline profile on Chrome when high is supported.
         if (options?.capabilities?.video) {
             // the browser path will automatically activate the speaker on the ring.
-            await startRTCSignalingSession(session, undefined, this.console,
-                async () => {
-                    return {
-                        type: 'offer',
-                        audio: {
-                            direction: 'sendrecv',
-                        },
-                        video: {
-                            direction: 'recvonly',
-                        },
-                    };
-                }, async (description) => {
-                    const answer = await camera.startWebRtcSession(generateUuid(), description.sdp);
+            let answerSdp: string;
+            const sessionId = generateUuid();
+
+            await connectRTCSignalingClients(this.console, session, {
+                type: 'offer',
+                audio: {
+                    direction: 'sendrecv',
+                },
+                video: {
+                    direction: 'recvonly',
+                },
+            }, {
+                createLocalDescription: async (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) => {
+                    if (type !== 'answer')
+                        throw new Error('Ring Camera default endpoint only supports RTC answer');
+
                     return {
                         type: 'answer',
-                        sdp: answer,
+                        sdp: answerSdp,
                     };
-                })
+                },
+                setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
+                    if (description.type !== 'offer')
+                        throw new Error('Ring Camera default endpoint only supports RTC answer');
+                    const answer = await camera.startWebRtcSession(sessionId, description.sdp);
+                    answerSdp = answer;
+                },
+                addIceCandidate: async (candidate: RTCIceCandidateInit) => {
+                    throw new Error("Ring Camera default endpoint does not support trickle ICE");
+                },
+                getOptions: async () => {
+                    return {
+                        requiresOffer: true,
+                        disableTrickle: true,
+                    };
+                }
+            }, {});
+
+            sessionControl = new RingBrowserRTCSessionControl(this, sessionId);
         }
         else {
             const callSignaling = new LiveCallNegotiation(await camera.startLiveCallNegotiation(), camera);
-            sessionControl = new RingRTCSessionControl(callSignaling);
-            await new Promise((resolve, reject) => {
+            sessionControl = new RingWebSocketRTCSessionControl(callSignaling);
+            let iceCandidates: RTCIceCandidateInit[] = [];
+            let _sendIceCandidate: RTCSignalingSendIceCandidate
+
+            const offerSdp = new Promise<string>((resolve, reject) => {
                 callSignaling.onMessage.subscribe(async (message) => {
                     // this.console.log('call signaling', message);
                     if (message.method === 'sdp') {
-                        resolve(startRTCSignalingSession(session, message, this.console,
-                            async () => {
-                                return {
-                                    type: 'answer',
-                                    audio: {
-                                        direction: 'sendrecv',
-                                    },
-                                    video: {
-                                        direction: 'recvonly',
-                                    },
-                                };
-                            },
-                            async (description) => {
-                                callSignaling.sendAnswer(description);
-                                return undefined;
-                            }
-                        ));
-                    }
-                    else if (message.method === 'ice') {
-                        // this.console.log(message.ice);
-                        session.addIceCandidate({
-                            candidate: message.ice,
-                            sdpMLineIndex: message.mlineindex,
-                        })
+                        resolve(message.sdp);
                     }
                     else if (message.method === 'close') {
                         reject(new Error(message.reason.text));
                     }
                 });
-
-                callSignaling.activate().catch(reject);
             });
+
+            callSignaling.onMessage.subscribe(async (message) => {
+                if (message.method === 'ice') {
+                    const candidate = {
+                        candidate: message.ice,
+                        sdpMLineIndex: message.mlineindex,
+                    };
+                    if (_sendIceCandidate) {
+                        _sendIceCandidate(candidate)
+                    }
+                    else {
+                        iceCandidates.push(candidate);
+                    }
+                }
+            });
+
+            await connectRTCSignalingClients(this.console, {
+                createLocalDescription: async (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) => {
+                    const offer = await offerSdp;
+                    _sendIceCandidate = sendIceCandidate;
+                    for (const candidate of iceCandidates) {
+                        sendIceCandidate?.(candidate);
+                    }
+                    return {
+                        type: 'offer',
+                        sdp: offer,
+                    }
+                },
+                setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
+                    callSignaling.sendAnswer(description);
+                },
+                addIceCandidate: async (candidate: RTCIceCandidateInit) => {
+                    // seemingly answer trickle is not supported, because its server initiated anyways.
+                },
+                getOptions: async () => {
+                    return {
+                    };
+                }
+            }, {},
+                session, {
+                type: 'answer',
+                audio: {
+                    direction: 'sendrecv',
+                },
+                video: {
+                    direction: 'recvonly',
+                },
+            })
+
+            await callSignaling.activate();
         }
 
         return sessionControl;
