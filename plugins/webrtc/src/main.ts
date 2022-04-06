@@ -33,9 +33,14 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
     }
 
     startIntercom(media: MediaObject): Promise<void> {
+        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom))
+            return this.mixinDevice.startIntercom(media);
         throw new Error("Method not implemented.");
     }
+
     stopIntercom(): Promise<void> {
+        if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom))
+            return this.mixinDevice.stopIntercom();
         throw new Error("Method not implemented.");
     }
 
