@@ -1,14 +1,14 @@
 import { MediaStreamTrack, RTCPeerConnection, RTCRtpCodecParameters } from "@koush/werift";
 import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
-import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
+import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-connect";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, findFmtp } from "@scrypted/common/src/sdp-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
-import sdk, { FFMpegInput, Intercom, RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSession } from "@scrypted/sdk";
+import sdk, { FFMpegInput, Intercom, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
 import ip from 'ip';
-import { WebRTCOutputSignalingSession } from "./output-signaling-session";
+import { WeriftOutputSignalingSession } from "./output-signaling-session";
 import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
@@ -17,14 +17,19 @@ import { isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager } = sdk;
 
+const iceServer = {
+    urls: ["turn:turn.scrypted.app:3478"],
+    username: "foo",
+    credential: "bar",
+};
+const iceServers = [
+    iceServer,
+];
+
 function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
     return {
         configuration: {
-            iceServers: [
-                {
-                    urls: 'stun:stun.l.google.com:19302',
-                },
-            ],
+            iceServers,
         },
         audio: {
             direction: audioDirection,
@@ -40,17 +45,17 @@ export async function createRTCPeerConnectionSink(
     storageSettings: StorageSettings<WebRTCStorageSettingsKeys>,
     ffInput: FFMpegInput,
     console: Console,
-    intercom: Intercom,
-    options: RTCSignalingOptions) {
+    intercom: Intercom) {
+
+    const options = await clientSignalingSession.getOptions();
     const hasIntercom = !!intercom;
+    const { mediaStreamOptions } = ffInput;
 
     const cameraAudioDirection = hasIntercom
         ? 'sendrecv'
         : 'sendonly';
 
-    const { mediaStreamOptions } = ffInput;
-
-    const video = [
+    const videoCodecs = [
         requiredVideoCodec,
     ];
 
@@ -80,16 +85,19 @@ export async function createRTCPeerConnectionSink(
                 parameters: fmtp.fmtp,
             });
 
-            video.unshift(nativeVideoCodec);
+            videoCodecs.unshift(nativeVideoCodec);
         }
     }
 
     const pc = new RTCPeerConnection({
+        // werift supports ice servers, but it seems to fail for some reason.
+        // it does not matter, as we can send the ice servers to the browser instead.
+        // the cameras and alexa targets will also provide externally reachable addresses.
         codecs: {
             audio: [
                 requiredAudioCodec,
             ],
-            video,
+            video: videoCodecs,
         }
     });
 
@@ -172,11 +180,11 @@ export async function createRTCPeerConnectionSink(
             // we assume that the camera doesn't output h264 baseline, because
             // that is awful quality. so check to see if the session has an
             // explicit list of supported codecs with a passable h264 high on it.
-            const sessionSupportsH264High = options?.capabilities?.video?.codecs
+            let sessionSupportsH264High = !!options?.capabilities?.video?.codecs
                 ?.filter(codec => codec.mimeType.toLowerCase() === 'video/h264')
                 // 42 is baseline profile
                 // 64001f (chrome) or 640c1f (safari) is high profile.
-                // firefox only advertises baseline.
+                // firefox only advertises 42e01f.
                 // nest hub max offers high 640015. this means the level (hex 15) is 2.1,
                 // this corresponds to a resolution of 480p according to the spec?
                 // https://en.wikipedia.org/wiki/Advanced_Video_Coding#Levels
@@ -185,9 +193,14 @@ export async function createRTCPeerConnectionSink(
                 // not actually seem to confirm the level. the level is merely a hint
                 // to make a rough guess as to the decoding capability of the client.
                 ?.find(codec => {
-                    return codec.sdpFmtpLine.includes('profile-level-id=64001f')
-                        || codec.sdpFmtpLine.includes('profile-level-id=640c1f');
+                    let sdpFmtpLine = codec.sdpFmtpLine.toLowerCase();
+                    return sdpFmtpLine.includes('profile-level-id=64001f')
+                        || sdpFmtpLine.includes('profile-level-id=640c1f');
                 });
+
+            // firefox is misleading. special case that to disable transcoding.
+            if (options?.userAgent?.includes('Firefox/'))
+                sessionSupportsH264High = true;
 
             const videoArgs: string[] = [];
             const transcode = !sessionSupportsH264High
@@ -279,7 +292,7 @@ export async function createRTCPeerConnectionSink(
             cleanup();
     });
 
-    const cameraSignalingSession = new WebRTCOutputSignalingSession(pc);
+    const cameraSignalingSession = new WeriftOutputSignalingSession(pc);
 
     const clientAudioDirection = hasIntercom
         ? 'sendrecv'
@@ -287,8 +300,7 @@ export async function createRTCPeerConnectionSink(
 
     connectRTCSignalingClients(console,
         clientSignalingSession, createSetup(clientAudioDirection, 'recvonly'),
-        cameraSignalingSession, createSetup(cameraAudioDirection, 'sendonly'),
-        !!options?.offer);
+        cameraSignalingSession, createSetup(cameraAudioDirection, 'sendonly'));
 
     return new ScryptedSessionControl(cleanup);
 }

@@ -60,8 +60,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             this.storageSettings,
             ffInput,
             this.console,
-            hasIntercom ? this.mixinDevice : undefined,
-            options);
+            hasIntercom ? this.mixinDevice : undefined);
     }
 
     getMixinSettings(): Promise<Setting[]> {
@@ -131,7 +130,7 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
 
         class OnDemandSignalingChannel implements RTCSignalingChannel {
             async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
-                return createRTCPeerConnectionSink(session, storageSettings, ffmpegInput, console, undefined, undefined);
+                return createRTCPeerConnectionSink(session, storageSettings, ffmpegInput, console, undefined);
             }
         }
 

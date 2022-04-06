@@ -1432,11 +1432,10 @@ export interface RTCSignalingSession {
 export interface RTCSignalingOptions {
     /**
      * Indicates that this client requires an answer, and is providing an offer.
-     * If an offer is provided, this has a couple implications:
-     * The client can only create offers and requires and answer.
-     * The client does not support trickle ICE.
      */
     offer?: RTCSessionDescriptionInit;
+    requiresOffer?: boolean;
+    disableTrickle?: boolean;
     /**
      * Hint to proxy the feed, as the target client may be inflexible.
      */
@@ -1445,6 +1444,7 @@ export interface RTCSignalingOptions {
         video?: RTCRtpCapabilities;
         audio?: RTCRtpCapabilities;
     };
+    userAgent?: string;
 }
 export interface RTCSessionControl {
     getRefreshAt(): Promise<number | void>;

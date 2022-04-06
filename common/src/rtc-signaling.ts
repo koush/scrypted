@@ -1,62 +1,19 @@
 import { RpcPeer } from "@scrypted/server/src/rpc";
 import type { RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions } from "@scrypted/sdk/types";
-// import type { RTCPeerConnection as WeriftRTCPeerConnection } from "@koush/werift";
+export * from './rtc-connect';
 
-export async function startRTCSignalingSession(session: RTCSignalingSession, offer: RTCSessionDescriptionInit,
-    console: Console,
-    createSetup: () => Promise<RTCAVSignalingSetup>,
-    setRemoteDescription: (remoteDescription: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit>,
-    addIceCandidate?: (candidate: RTCIceCandidate) => Promise<void>) {
+function getUserAgent() {
     try {
-        const setup = await createSetup();
-        // console.log('offer', offer?.sdp, 'rtc setup', setup);
-        if (!offer) {
-            console.log('session.createLocalDescription');
-            const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-            console.log('rtc offer created', offer.sdp);
-            const answer = await setRemoteDescription(offer);
-            console.log('rtc answer received', answer.sdp);
-            await session.setRemoteDescription(answer, setup);
-            console.log('session.setRemoteDescription done');
-        }
-        else {
-            console.log('session.setRemoteDescription', offer.sdp);
-            await session.setRemoteDescription(offer, setup);
-            console.log('session.createLocalDescription');
-            const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-            console.log('rtc answer created', answer.sdp);
-            await setRemoteDescription(answer);
-            console.log('session.setRemoteDescription done');
-        }
+        return navigator.userAgent;
     }
     catch (e) {
-        console.error('RTC signaling failed', e);
-        throw e;
     }
-}
-
-export async function connectRTCSignalingClients(
-    console: Console,
-    offerClient: RTCSignalingSession,
-    offerSetup: Partial<RTCAVSignalingSetup>,
-    answerClient: RTCSignalingSession,
-    answerSetup: Partial<RTCAVSignalingSetup>,
-    disableAnswerTrickle?: boolean,
-) {
-    offerSetup.type = 'offer';
-    answerSetup.type = 'answer';
-
-    const offer = await offerClient.createLocalDescription('offer', offerSetup as RTCAVSignalingSetup, candidate => answerClient.addIceCandidate(candidate));
-    console.log('offer sdp', offer.sdp);
-    await answerClient.setRemoteDescription(offer, answerSetup as RTCAVSignalingSetup);
-    const answer = await answerClient.createLocalDescription('answer', answerSetup as RTCAVSignalingSetup, disableAnswerTrickle ? undefined : candidate => offerClient.addIceCandidate(candidate));
-    console.log('answer sdp', answer.sdp);
-    await offerClient.setRemoteDescription(answer, offerSetup as RTCAVSignalingSetup);
 }
 
 export class BrowserSignalingSession implements RTCSignalingSession {
     pc: RTCPeerConnection;
     options: RTCSignalingOptions = {
+        userAgent: getUserAgent(),
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
                 codecs: undefined,
