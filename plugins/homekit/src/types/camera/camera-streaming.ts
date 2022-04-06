@@ -160,7 +160,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             callback();
 
             if (request.type === StreamRequestTypes.RECONFIGURE) {
-                session?.tryReconfigureBitrate('reconfigure', request.video.max_bit_rate * 1000);
+                session.tryReconfigureBitrate?.('reconfigure', request.video.max_bit_rate * 1000);
                 return;
             }
 
