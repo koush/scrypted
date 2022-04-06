@@ -137,7 +137,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     if (this.storage.getItem('debug'))
                         this.console.log('event', data.toString());
                 });
-                events.on('event', (event: AmcrestEvent, index: string) => {
+                events.on('event', (event: AmcrestEvent, index: string, payload: string) => {
                     const channelNumber = this.getRtspChannel();
                     if (channelNumber) {
                         const idx = parseInt(index) + 1;
@@ -158,13 +158,23 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     }
                     else if (event === AmcrestEvent.TalkInvite
                         || event === AmcrestEvent.PhoneCallDetectStart
-                        || event === AmcrestEvent.AlarmIPCStart || event === AmcrestEvent.DahuaTalkInvite) {
+                        || event === AmcrestEvent.AlarmIPCStart
+                        || event === AmcrestEvent.DahuaTalkInvite) {
                         this.binaryState = true;
                     }
                     else if (event === AmcrestEvent.TalkHangup
                         || event === AmcrestEvent.PhoneCallDetectStop
-                        || event === AmcrestEvent.AlarmIPCStop || event === AmcrestEvent.DahuaTalkHangup) {
+                        || event === AmcrestEvent.AlarmIPCStop
+                        || event === AmcrestEvent.DahuaTalkHangup) {
                         this.binaryState = false;
+                    }
+                    else if (event === AmcrestEvent.TalkPulse && doorbellType === AMCREST_DOORBELL_TYPE) {
+                        if (payload.includes('Invite')) {
+                            this.binaryState = true;
+                        }
+                        else if (payload.includes('Hangup')) {
+                            this.binaryState = false;
+                        }
                     }
                     else if (event === AmcrestEvent.DahuaTalkPulse && doorbellType === DAHUA_DOORBELL_TYPE) {
                         clearTimeout(pulseTimeout);
