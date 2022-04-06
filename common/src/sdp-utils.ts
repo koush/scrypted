@@ -81,15 +81,16 @@ export function parsePayloadTypes(sdp: string) {
 }
 
 export function findTrack(sdp: string, type: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
-    const tracks = sdp.split('m=').filter(track => track.startsWith(type));
+    const tracks = sdp.split('\nm=').filter(track => track.startsWith(type));
 
     for (const track of tracks) {
         const returnTrack = () => {
             const lines = track.split('\n').map(line => line.trim());
-            const control = lines.find(line => line.startsWith('a=control:'));
+            const controlString = 'a=control:';
+            const control = lines.find(line => line.startsWith(controlString));
             return {
                 section: 'm=' + track,
-                trackId: control?.split('a=control:')?.[1],
+                trackId: control.substring(controlString.length),
             };
         }
 

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/prebuffer-mixin",
-   "version": "0.1.220",
+   "version": "0.1.221",
    "description": "Rebroadcast and Prebuffer for VideoCameras.",
    "author": "Scrypted",
    "license": "Apache-2.0",

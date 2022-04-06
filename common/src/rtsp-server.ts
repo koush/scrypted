@@ -164,10 +164,16 @@ export class RtspClient extends RtspBase {
 
         let fullUrl = this.url;
         if (path) {
-            // strangely, RTSP urls do not behave like expected from an HTTP-ish server.
-            // ffmpeg will happily suffix path segments after query strings:
-            // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
-            fullUrl += '/' + path;
+            // a=control may be a full or "relative" url.
+            if (path.includes('rtsp://') || path.includes('rtsps://')) {
+                fullUrl = path;
+            }
+            else {
+                // strangely, relative RTSP urls do not behave like expected from an HTTP-ish server.
+                // ffmpeg will happily suffix path segments after query strings:
+                // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
+                fullUrl += '/' + path;
+            }
         }
 
         const sanitized = new URL(fullUrl);
