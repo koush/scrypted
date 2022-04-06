@@ -1,11 +1,11 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingOptions, RTCSignalingSendIceCandidate } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { startRTCSignalingSession } from '@scrypted/common/src/rtc-signaling';
+import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-connect';
 import { sleep } from '@scrypted/common/src/sleep';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
@@ -17,7 +17,7 @@ const refreshFrequency = 60;
 const readmeV1 = fs.readFileSync('README-camera-v1.md').toString();
 const readmeV2 = fs.readFileSync('README-camera-v2.md').toString();
 
-function getSdmRtspMediaStreamOptions(): MediaStreamOptions {
+function getSdmRtspMediaStreamOptions(): ResponseMediaStreamOptions {
     return {
         id: 'default',
         name: 'Cloud RTSP',
@@ -142,10 +142,22 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
     async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
         let mediaSessionId: string;
         let streamExtensionToken: string;
+        let _answerSdp: string;
 
-        await startRTCSignalingSession(session, undefined, this.console,
-            async () => createNestOfferSetup(),
-            async (description) => {
+        const answerSession: RTCSignalingSession = {
+            createLocalDescription: async (type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> => {
+                if (type !== 'answer')
+                    throw new Error('Google Camera only supports RTC answer');
+                if (sendIceCandidate)
+                    throw new Error("Alexa does not support trickle ICE");
+
+                return {
+                    type: 'answer',
+                    sdp: _answerSdp,
+                };
+            },
+
+            setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
                 const offerSdp = description.sdp.replace('a=ice-options:trickle\r\n', '');
 
                 const result = await this.provider.authPost(`/devices/${this.nativeId}:executeCommand`, {
@@ -155,6 +167,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
                     },
                 });
                 const { answerSdp, mediaSessionId: msid, streamExtensionToken: set } = result.data.results;
+                _answerSdp = answerSdp;
                 mediaSessionId = msid;
                 streamExtensionToken = set;
 
@@ -162,7 +175,21 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
                     sdp: answerSdp,
                     type: 'answer',
                 } as any;
-            });
+            },
+
+            addIceCandidate: async (candidate: RTCIceCandidateInit) => {
+                throw new Error("Google Camera does not support trickle ICE");
+            },
+
+            getOptions: async () => {
+                return {
+                    requiresOffer: true,
+                    disableTrickle: true,
+                }
+            }
+        }
+
+        await connectRTCSignalingClients(this.console, session, createNestOfferSetup(), answerSession, {});
 
         return new NestRTCSessionControl(this, {
             mediaSessionId,
@@ -231,7 +258,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         return;
     }
 
-    addRefreshOptions(trackerId: string, mso: MediaStreamOptions): MediaStreamOptions {
+    addRefreshOptions(trackerId: string, mso: ResponseMediaStreamOptions): ResponseMediaStreamOptions {
         return Object.assign(mso, {
             refreshAt: Date.now() + 4 * 60 * 1000,
             metadata: {
@@ -289,7 +316,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
         return this.createFFmpegMediaObject(trackerId, result.data.results.streamUrls.rtspUrl);
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         return [
             getSdmRtspMediaStreamOptions(),
         ];
@@ -473,7 +500,7 @@ class NestThermostat extends ScryptedDeviceBase implements HumiditySensor, Therm
     }
 }
 
-class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient, DeviceProvider, Settings, HttpRequestHandler {
+export class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements OauthClient, DeviceProvider, Settings, HttpRequestHandler {
     token: ClientOAuth2.Token;
     nestDevices = new Map<string, any>();
     devices = new Map<string, NestCamera | NestThermostat>();
