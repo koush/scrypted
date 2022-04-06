@@ -82,11 +82,16 @@ export class AlexaSignalingSession implements RTCSignalingSession {
             offer: {
                 type: 'offer',
                 sdp: this.directive.payload.offer.value,
-            }
+            },
+            disableTrickle: true,
         }
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
+        if (type !== 'offer')
+            throw new Error('Alexa only supports RTC offer');
+        if (sendIceCandidate)
+            throw new Error("Alexa does not support trickle ICE");
         return {
             type: 'offer',
             sdp: this.directive.payload.offer.value,
@@ -94,7 +99,7 @@ export class AlexaSignalingSession implements RTCSignalingSession {
     }
 
     async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
-        throw new Error("trickle ICE is not supported by Alexa");
+        throw new Error("Alexa does not support trickle ICE");
     }
 
     async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> {

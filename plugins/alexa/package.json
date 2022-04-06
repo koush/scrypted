@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/alexa",
-   "version": "0.0.10",
+   "version": "0.0.12",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
