@@ -59,7 +59,7 @@ export async function createRTCPeerConnectionSink(
         requiredVideoCodec,
     ];
 
-    if (mediaStreamOptions.sdp) {
+    if (mediaStreamOptions?.sdp) {
         // this path is here for illustrative purposes, and is unused
         // because this code always supplies an answer.
         // it could be useful in the offer case, potentially.
