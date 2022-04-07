@@ -37,10 +37,14 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 If HomeKit is not discoverable, make sure LAN/WLAN multicast is enabled on your router.
 If HomeKit fails while pairing during a Docker install, ensure host networking is being used.
 
-### HomeKit Live Streaming Timeout (Recordings maybe working)
+### HomeKit Live Streaming Timeout (Recordings may be working)
 
-This is a networking issue with multiple interfaces. This is the problem 100% of the time. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to the IP Address of your ethernet manually.
-If your camera is on a separate VLAN, try disabling that to see if that is the issue.
+This is always a issue with the network setup. 
+  * Ensure you are not connected to a VPN.
+  * You may have multiple network interfaces, such as wired and wireless, and HomeKit is preferring the wireless interface. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to your wired IP address manually.
+  * If your camera/server/iOS are on a separate VLANs, try disabling VLANs to determine if that is the issue.
+
+This is probably a codec issue. Try enabling Transcoding on both Live and Remote streams.
 
 ### HomeKit Remote Streaming not Working
 
