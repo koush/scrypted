@@ -81,7 +81,7 @@ export function parsePayloadTypes(sdp: string) {
 }
 
 export function findTrack(sdp: string, type: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
-    const tracks = sdp.split('\nm=').filter(track => track.startsWith(type));
+    const tracks = ('\n' + sdp).split('\nm=').filter(track => track.startsWith(type));
 
     for (const track of tracks) {
         const returnTrack = () => {
