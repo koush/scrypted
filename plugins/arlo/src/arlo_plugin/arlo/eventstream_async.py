@@ -142,7 +142,7 @@ class EventStream:
                     self.initializing = False
                     self.connected = True
 
-        self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization').decode(), session=self.arlo.request.session)
+        self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization'), session=self.arlo.request.session)
         self.event_stream_thread = threading.Thread(name="EventStream", target=thread_main, args=(self, ))
         self.event_stream_thread.setDaemon(True)
         self.event_stream_thread.start()

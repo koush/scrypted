@@ -41,9 +41,11 @@ class Arlo(object):
     AUTH_URL = 'ocapi-app.arlo.com'
     TRANSID_PREFIX = 'web'
 
-    def __init__(self):
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
         self.event_stream = None
-        self.request = None
+        self.request = Request()
 
     def to_timestamp(self, dt):
         if sys.version[0] == '2':
@@ -88,9 +90,11 @@ class Arlo(object):
         now = datetime.today()
         return trans_type+"!" + float2hex(random.random() * math.pow(2, 32)).lower() + "!" + str(int((time.mktime(now.timetuple())*1e3 + now.microsecond/1e3)))
 
-    def LoginMFA(self, username, password):
-        self.username = username
-        self.password = password
+    def UseExistingAuth(self, user_id, headers):
+        self.user_id = user_id
+        self.request.session.headers.update(headers)
+
+    def LoginMFA(self):
         self.request = Request()
 
         headers = {
@@ -118,7 +122,7 @@ class Arlo(object):
             raw=True
         )
         self.user_id = auth_body['data']['userId']
-        self.request.session.headers.update({'Authorization': base64.b64encode(auth_body['data']['token'].encode('utf-8'))})
+        self.request.session.headers.update({'Authorization': base64.b64encode(auth_body['data']['token'].encode('utf-8')).decode()})
 
         # Retrieve MFA factor id
         factors_body = self.request.get(
@@ -158,7 +162,7 @@ class Arlo(object):
             # Update Authorization code with new code
             headers = {
                 'Auth-Version': '2',
-                'Authorization': finish_auth_body['data']['token'].encode('utf-8'),
+                'Authorization': finish_auth_body['data']['token'],
                 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
             }
             self.request.session.headers.update(headers)
