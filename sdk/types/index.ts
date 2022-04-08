@@ -1132,10 +1132,9 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
   sdp?: string;
 }
 
-export type MediaStreamDestination = "local" | "remote" | "watch" | "recorder";
+export type MediaStreamDestination = "local" | "remote" | "low-resolution" | "local-recorder" | "remote-recorder";
 
-
-export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
+export interface RequestMediaStreamOptions extends MediaStreamOptions {
   /**
    * When retrieving media, setting disableMediaProxies=true
    * will bypass any intermediaries (NVR, rebroadcast) and retrieve

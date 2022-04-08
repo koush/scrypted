@@ -2,7 +2,7 @@ import { readLength, readLine } from './read-stream';
 import { Duplex, PassThrough, Readable } from 'stream';
 import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
-import { findTrack } from './sdp-utils';
+import { findTrackByType } from './sdp-utils';
 import dgram from 'dgram';
 import net from 'net';
 import tls from 'tls';
@@ -195,6 +195,7 @@ export class RtspClient extends RtspBase {
     }
 
     async handleDataPayload(header: Buffer) {
+        // todo: fix this, because calling teardown outside of the read loop causes this.
         if (header[0] !== RTSP_FRAME_MAGIC)
             throw new Error('RTSP Client expected frame magic but received: ' + header.toString());
 
@@ -353,6 +354,7 @@ export class RtspClient extends RtspBase {
 
     async teardown() {
         try {
+            // todo: fix this, because calling teardown outside of the read loop causes this.
             return await this.request('TEARDOWN');
         }
         finally {
@@ -482,8 +484,8 @@ export class RtspServer {
         const transport = requestHeaders['transport'];
         headers['Transport'] = transport;
         headers['Session'] = this.session;
-        let audioTrack = findTrack(this.sdp, 'audio');
-        let videoTrack = findTrack(this.sdp, 'video');
+        let audioTrack = findTrackByType(this.sdp, 'audio');
+        let videoTrack = findTrackByType(this.sdp, 'video');
         if (transport.includes('UDP')) {
             if (!this.udp) {
                 this.respond(461, 'Unsupported Transport', requestHeaders, {});
@@ -517,8 +519,8 @@ export class RtspServer {
 
     play(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
-        let audioTrack = findTrack(this.sdp, 'audio');
-        let videoTrack = findTrack(this.sdp, 'video');
+        let audioTrack = findTrackByType(this.sdp, 'audio');
+        let videoTrack = findTrackByType(this.sdp, 'video');
         let rtpInfo = '';
         if (audioTrack)
             rtpInfo = `url=${url}/trackID=${audioTrack.trackId};seq=0;rtptime=0`
@@ -597,7 +599,9 @@ export class RtspServer {
         this.console?.log('response headers', response);
         response += '\r\n';
         this.client.write(response);
-        if (buffer)
+        if (buffer) {
             this.client.write(buffer);
+            this.console?.log('response body', buffer.toString());
+        }
     }
 }

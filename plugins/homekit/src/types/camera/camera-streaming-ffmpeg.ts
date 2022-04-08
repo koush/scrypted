@@ -1,6 +1,6 @@
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import sdk, { FFMpegInput, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFMpegInput, MediaStreamDestination, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
@@ -11,7 +11,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, selectedStream: RequestMediaStreamOptions, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, destination: MediaStreamDestination, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
 
     const request = session.startRequest;
 
@@ -26,8 +26,8 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // option, but not sure it matters since AAC-ELD is no longer in use.
     let audiomtu = 400;
 
-    console.log('fetching video stream');
-    const videoInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const videoInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(await device.getVideoStream({ destination }), ScryptedMimeTypes.FFmpegInput);
+    session.mediaStreamOptions = videoInput.mediaStreamOptions;
     // test code path that allows using two ffmpeg processes. did not see
     // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame
     // to immediately finish. ffmpeg will only start sending on a key frame.
@@ -254,8 +254,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         console.log('session ended before streaming could start. bailing.');
         return;
     }
-
-    console.log('ffmpeg', ffmpegPath);
 
     if (audioInput !== videoInput) {
         safePrintFFmpegArguments(console, videoArgs);

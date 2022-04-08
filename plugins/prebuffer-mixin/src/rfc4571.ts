@@ -1,11 +1,11 @@
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { MediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
-import { EventEmitter, Readable } from "stream";
-import net from 'net';
+import { RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { findTrackByType } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
-import { parseHeaders, readMessage, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
-import { findTrack } from "@scrypted/common/src/sdp-utils";
+import sdk, { ResponseMediaStreamOptions } from "@scrypted/sdk";
+import net from 'net';
+import { EventEmitter, Readable } from "stream";
 
 
 const { mediaManager } = sdk;
@@ -95,8 +95,8 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
     let inputAudioCodec: string;
     let inputVideoCodec: string;
     // todo: multiple codecs may be offered, default is the first one in the sdp.
-    const audio = findTrack(sdp, 'audio');
-    const video = findTrack(sdp, 'video');
+    const audio = findTrackByType(sdp, 'audio');
+    const video = findTrackByType(sdp, 'video');
     if (audio) {
         const lc = audio.section.toLowerCase();
         if (lc.includes('mpeg4'))

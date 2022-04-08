@@ -29,8 +29,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             pendingPicture = mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
         }
         else {
-            // todo: remove this in favor of snapshot plugin requirement?
-            pendingPicture = device.getVideoStream().then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
+            pendingPicture = Promise.reject(new Error('Camera does not provide native snapshots. Please install the snapshot plugin.'));
         }
 
         const wrapped = pendingPicture;

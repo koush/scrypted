@@ -55,7 +55,9 @@ addSupportedType({
 
                 try {
                     const input = systemManager.getDeviceById(id) as ScryptedDevice & VideoCamera;
-                    const media = await input.getVideoStream();
+                    const media = await input.getVideoStream({
+                        destination: 'local',
+                    });
                     device.load(media, null);
                     callback();
                 }

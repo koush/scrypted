@@ -80,30 +80,35 @@ export function parsePayloadTypes(sdp: string) {
     }
 }
 
-export function findTrack(sdp: string, type: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
-    const tracks = ('\n' + sdp).split('\nm=').filter(track => track.startsWith(type));
+function getSections(sdp: string) {
+    const sections = ('\n' + sdp).split('\nm=');
+    return sections;
+}
 
-    for (const track of tracks) {
+export function findTrackByType(sdp: string, type: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
+    const sections = getSections(sdp).filter(track => track.startsWith(type));
+
+    for (const section of sections) {
         const returnTrack = () => {
-            const lines = track.split('\n').map(line => line.trim());
+            const lines = section.split('\n').map(line => line.trim());
             const controlString = 'a=control:';
             const control = lines.find(line => line.startsWith(controlString));
             return {
-                section: 'm=' + track,
+                section: 'm=' + section,
                 trackId: control.substring(controlString.length),
             };
         }
 
         for (const dir of directions) {
-            if (track.includes(`a=${dir}`)) {
+            if (section.includes(`a=${dir}`)) {
                 return returnTrack();
             }
         }
 
         // some sdp do not advertise a media flow direction. i think recvonly is the default?
         if ((directions.includes('recvonly'))
-            && !track.includes('sendonly')
-            && !track.includes('inactive')) {
+            && !section.includes('sendonly')
+            && !section.includes('inactive')) {
             return returnTrack();
         }
     }
@@ -111,9 +116,75 @@ export function findTrack(sdp: string, type: string, directions: TrackDirection[
 
 type TrackDirection = 'sendonly' | 'sendrecv' | 'recvonly' | 'inactive';
 
-export function parseTrackIds(sdp: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
+export function findTracksByType(sdp: string, directions: TrackDirection[] = ['recvonly', 'sendrecv']) {
     return {
-        audio: findTrack(sdp, 'audio', directions)?.trackId,
-        video: findTrack(sdp, 'video', directions)?.trackId,
+        audio: findTrackByType(sdp, 'audio', directions)?.trackId,
+        video: findTrackByType(sdp, 'video', directions)?.trackId,
     };
+}
+
+export function parseMLinePayloadTypes(mline: string) {
+    const payloadTypes = new Set<number>();
+    const addPts = (pts: string[]) => {
+        for (const pt of pts || []) {
+            payloadTypes.add(parseInt(pt));
+        }
+    };
+    addPts(mline.split(' ').slice(3));
+    return payloadTypes;
+}
+
+export function parseMLine(mline: string) {
+    // 'm=audio 0 RTP/AVP 96'
+    const type = mline.split(' ')[0].substring(2);
+    return {
+        type,
+        payloadTypes: parseMLinePayloadTypes(mline),
+    }
+}
+
+const acontrol = 'a=control:';
+export function parseMSection(msection: string[]) {
+    const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
+
+    return {
+        ...parseMLine(msection[0]),
+        lines: msection,
+        contents: msection.join('\r\n'),
+        control,
+    }
+}
+
+export function parseSdp(sdp: string) {
+    const lines = sdp.split('\n').map(line => line.trim());
+    const header: string[] = [];
+    const msections: string[][] = [];
+    let msection: string[];
+
+    for (const line of lines) {
+        if (line.startsWith('m=')) {
+            if (msection) {
+                msections.push(msection);
+            }
+            msection = [];
+        }
+
+        if (msection) {
+            msection.push(line);
+        }
+        else {
+            header.push(line);
+        }
+    }
+
+    if (msection)
+        msections.push(msection);
+
+    return {
+        header: {
+            lines: header,
+            contents: header.join('\r\n'),
+        },
+        msections: msections.map(parseMSection),
+    }
 }

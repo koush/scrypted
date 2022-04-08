@@ -384,11 +384,7 @@ class RequestMediaStreamOptions(TypedDict):
     name: str
     prebuffer: float
     refresh: bool
-    refreshAt: float
-    sdp: str
-    source: MediaStreamSource
     tool: str
-    userConfigurable: bool
     video: VideoStreamOptions
     pass
 
