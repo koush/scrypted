@@ -6,8 +6,6 @@ addSupportedType(ScryptedDeviceType.Doorbell, {
         if (!device.interfaces.includes(ScryptedInterface.RTCSignalingChannel) || !device.interfaces.includes(ScryptedInterface.BinarySensor))
             return;
 
-        const isFullDuplexAudioSupported = device.providedInterfaces.includes(ScryptedInterface.Intercom) || device.providedInterfaces.includes(ScryptedInterface.RTCSignalingChannel);
-
         return {
             displayCategories: ['CAMERA'],
             capabilities: [
