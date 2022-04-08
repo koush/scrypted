@@ -182,7 +182,7 @@ class Arlo(object):
         """
         basestation_id = basestation.get('deviceId')
 
-        async def heartbeat(self, basestation, interval=30):
+        async def heartbeat(self, basestation, interval=60):
             await asyncio.sleep(interval)
             while self.event_stream and self.event_stream.connected:
                 self.Ping(basestation)
@@ -293,13 +293,10 @@ class Arlo(object):
         if self.event_stream and self.event_stream.connected and self.event_stream.registered:
             seen_events = {}
             while self.event_stream.connected:
-                event, action = await self.event_stream.get(resource, actions)
+                event, action = await self.event_stream.get(resource, actions, seen_events)
 
                 if event is None or self.event_stream.event_stream_stop_event.is_set():
                     return None
-
-                if event.uuid in seen_events:
-                    continue
 
                 seen_events[event.uuid] = event
                 response = callback(self, event.item)

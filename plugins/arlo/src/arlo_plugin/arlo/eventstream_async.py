@@ -32,7 +32,7 @@ from .logging import logger
 
 class EventStream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=5):
+    def __init__(self, arlo, expire=15):
         self.event_stream = None
         self.initializing = True
         self.connected = False
@@ -82,7 +82,7 @@ class EventStream:
 
             await asyncio.sleep(interval)
 
-    async def get(self, resource, actions):
+    async def get(self, resource, actions, skip_uuids={}):
         while True:
             for action in actions:
                 key = f"{resource}/{action}"
@@ -93,11 +93,23 @@ class EventStream:
                 if q.empty():
                     continue
 
+                first_requeued = None
                 while not q.empty():
                     event = q.get_nowait()
                     q.task_done()
+
+                    if first_requeued is not None and first_requeued is event:
+                        # if we reach here, we've cycled through the whole queue
+                        # and found nothing for us, so go to the next queue
+                        break
+
                     if event.expired:
                         continue
+                    elif event.uuid in skip_uuids:
+                        q.put_nowait(event)
+
+                        if first_requeued is None:
+                            first_requeued = event
                     else:
                         return event, action
             await asyncio.sleep(random.uniform(0, 0.1))
@@ -124,7 +136,7 @@ class EventStream:
                     if response.get('action') == 'logout':
                         self.disconnect()
                         return None
-                    else:
+                    elif response.get('resource') is not None:
                         self.event_loop.call_soon_threadsafe(self._queue_response, response)
                 elif response.get('status') == 'connected':
                     self.initializing = False
