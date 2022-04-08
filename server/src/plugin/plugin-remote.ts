@@ -180,6 +180,21 @@ class DeviceManagerImpl implements DeviceManager {
         }
         return ret;
     }
+    pruneMixinStorage() {
+        for (const nativeId of this.nativeIds.keys()) {
+            const storage = this.nativeIds.get(nativeId).storage;
+            for (const key of Object.keys(storage)) {
+                if (!key.startsWith('mixin:'))
+                    continue;
+                const [, id,] = key.split(':');
+                // there's no rush to persist this, it will happen automatically on the plugin
+                // persisting something at some point.
+                // the key itself is unreachable due to the device no longer existing.
+                if (id && !this.systemManager.state[id])
+                    delete storage[key];
+            }
+        }
+    }
     async onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any) {
         return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);
     }
@@ -451,6 +466,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
             async setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState } }) {
                 systemManager.state = state;
+                deviceManager.pruneMixinStorage();
                 done(ret);
             },
 

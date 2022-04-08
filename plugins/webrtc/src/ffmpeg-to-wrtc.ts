@@ -132,26 +132,31 @@ export async function createRTCPeerConnectionSink(
         sdp = createSdpInput(audioOutput.port, 0, sdp);
 
         audioTransceiver.onTrack.subscribe(async (track) => {
-            const url = rtspTcpServer.url.replace('tcp:', 'rtsp:');
-            const ffmpegInput: FFMpegInput = {
-                url,
-                inputArguments: [
-                    '-rtsp_transport', 'udp',
-                    '-i', url,
-                ],
-            };
-            const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
-            intercom.startIntercom(mo);
-
-            const client = await rtspTcpServer.clientPromise;
-
-            const rtspServer = new RtspServer(client, sdp, audioOutput.server);
-            // rtspServer.console = console;
-            await rtspServer.handlePlayback();
-            track.onReceiveRtp.subscribe(rtpPacket => {
-                rtpPacket.header.payloadType = 110;
-                rtspServer.sendAudio(rtpPacket.serialize(), false);
-            })
+            try {
+                const url = rtspTcpServer.url.replace('tcp:', 'rtsp:');
+                const ffmpegInput: FFMpegInput = {
+                    url,
+                    inputArguments: [
+                        '-rtsp_transport', 'udp',
+                        '-i', url,
+                    ],
+                };
+                const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
+                await intercom.startIntercom(mo);
+    
+                const client = await rtspTcpServer.clientPromise;
+    
+                const rtspServer = new RtspServer(client, sdp, audioOutput.server);
+                // rtspServer.console = console;
+                await rtspServer.handlePlayback();
+                track.onReceiveRtp.subscribe(rtpPacket => {
+                    rtpPacket.header.payloadType = 110;
+                    rtspServer.sendAudio(rtpPacket.serialize(), false);
+                })
+            }
+            catch (e) {
+                console.log('webrtc talkback failed', e);
+            }
         })
     }
 
