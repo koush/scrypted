@@ -24,6 +24,7 @@ export function createWebRTCStorageSettings(device: MixinDeviceBase<any> | Scryp
             choices: [
                 'Default',
                 'Always',
+                'Never',
             ],
         },
         decoderArguments: {

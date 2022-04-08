@@ -5,7 +5,7 @@ import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-connect";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, findFmtp } from "@scrypted/common/src/sdp-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
-import sdk, { FFMpegInput, Intercom, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
+import sdk, { FFMpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
 import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
@@ -43,13 +43,13 @@ function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection:
 export async function createRTCPeerConnectionSink(
     clientSignalingSession: RTCSignalingSession,
     storageSettings: StorageSettings<WebRTCStorageSettingsKeys>,
-    ffInput: FFMpegInput,
     console: Console,
-    intercom: Intercom) {
+    intercom: Intercom,
+    getFFMpegInput: (destination: MediaStreamDestination) => Promise<FFMpegInput>,
+    ) {
 
     const options = await clientSignalingSession.getOptions();
     const hasIntercom = !!intercom;
-    const { mediaStreamOptions } = ffInput;
 
     const cameraAudioDirection = hasIntercom
         ? 'sendrecv'
@@ -59,6 +59,7 @@ export async function createRTCPeerConnectionSink(
         requiredVideoCodec,
     ];
 
+    /*
     if (mediaStreamOptions?.sdp) {
         // this path is here for illustrative purposes, and is unused
         // because this code always supplies an answer.
@@ -88,6 +89,7 @@ export async function createRTCPeerConnectionSink(
             videoCodecs.unshift(nativeVideoCodec);
         }
     }
+    */
 
     const pc = new RTCPeerConnection({
         // werift supports ice servers, but it seems to fail for some reason.
@@ -143,9 +145,9 @@ export async function createRTCPeerConnectionSink(
                 };
                 const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
                 await intercom.startIntercom(mo);
-    
+
                 const client = await rtspTcpServer.clientPromise;
-    
+
                 const rtspServer = new RtspServer(client, sdp, audioOutput.server);
                 // rtspServer.console = console;
                 await rtspServer.handlePlayback();
@@ -206,6 +208,9 @@ export async function createRTCPeerConnectionSink(
             // firefox is misleading. special case that to disable transcoding.
             if (options?.userAgent?.includes('Firefox/'))
                 sessionSupportsH264High = true;
+
+            const ffInput = await getFFMpegInput(isPrivate ? 'local' : 'remote');
+            const { mediaStreamOptions } = ffInput;
 
             const videoArgs: string[] = [];
             const transcode = !sessionSupportsH264High
