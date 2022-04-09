@@ -1,6 +1,6 @@
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import sdk, { FFMpegInput, MediaStreamDestination, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFMpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
@@ -11,7 +11,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, destination: MediaStreamDestination, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, requestOptions: RequestMediaStreamOptions, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
 
     const request = session.startRequest;
 
@@ -26,7 +26,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // option, but not sure it matters since AAC-ELD is no longer in use.
     let audiomtu = 400;
 
-    const videoInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(await device.getVideoStream({ destination }), ScryptedMimeTypes.FFmpegInput);
+    const videoInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(await device.getVideoStream(requestOptions), ScryptedMimeTypes.FFmpegInput);
     session.mediaStreamOptions = videoInput.mediaStreamOptions;
     // test code path that allows using two ffmpeg processes. did not see
     // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame

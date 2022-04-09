@@ -1,5 +1,5 @@
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
-import sdk, { Camera, Intercom, MediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { Camera, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
@@ -9,7 +9,7 @@ import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/r
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
 import { HomeKitSession } from '../../common';
-import { CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
+import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { DynamicBitrateSession } from './camera-dynamic-bitrate';
@@ -264,15 +264,28 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
             resetIdleTimeout();
 
+            const mediaOptions: RequestMediaStreamOptions = {
+                destination,
+                video: {
+                    codec: 'h264',
+                },
+                audio: {
+                    // opus is the preferred/default codec, and can be repacketized to fit any request if in use.
+                    // otherwise audio streaming for aac-eld needs to be transcoded, since nothing outputs aac-eld natively.
+                    // pcm/g711 the second best option for aac-eld, since it's raw audio.
+                    codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
+                },
+            };
+
             try {
                 if (CAMERA_STREAM_PERFECT_CODECS) {
-                    await startCameraStreamSrtp(device, console, destination, session, () => killSession(request.sessionID));
+                    await startCameraStreamSrtp(device, console, mediaOptions, session, () => killSession(request.sessionID));
                 }
                 else {
                     await startCameraStreamFfmpeg(device,
                         console,
                         storage,
-                        destination,
+                        mediaOptions,
                         transcodeStreaming,
                         session,
                         () => killSession(request.sessionID));

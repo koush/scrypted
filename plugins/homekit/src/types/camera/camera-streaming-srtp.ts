@@ -1,6 +1,6 @@
 import { readLength } from '@scrypted/common/src/read-stream';
 import { parsePayloadTypes } from '@scrypted/common/src/sdp-utils';
-import sdk, { MediaStreamDestination, VideoCamera } from '@scrypted/sdk';
+import sdk, { RequestMediaStreamOptions, VideoCamera } from '@scrypted/sdk';
 import net from 'net';
 import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
@@ -13,7 +13,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamSrtp(device: & VideoCamera, console: Console, destination: MediaStreamDestination, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamSrtp(device: & VideoCamera, console: Console, requestOptions: RequestMediaStreamOptions, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const vconfig = {
         keys: {
             localMasterKey: session.prepareRequest.video.srtp_key,
@@ -40,7 +40,7 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
         console.log(rtcp);
     })
 
-    const mo = await device.getVideoStream({ destination });
+    const mo = await device.getVideoStream(requestOptions);
     const rfc = await mediaManager.convertMediaObjectToJSON<any>(mo, mo.mimeType);
     let { url, sdp } = rfc;
     session.mediaStreamOptions = rfc.mediaStreamOptions;

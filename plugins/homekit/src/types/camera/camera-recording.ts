@@ -27,6 +27,12 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
 
     const media = await device.getVideoStream({
         destination: 'remote-recorder',
+        video: {
+            codec: 'h264',
+        },
+        audio: {
+            codec: 'aac',
+        },
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
         container: 'mp4',
     });
