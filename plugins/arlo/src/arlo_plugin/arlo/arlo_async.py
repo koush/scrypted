@@ -1521,9 +1521,10 @@ class Arlo(object):
             nl.stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
 
         def callback(self, event):
-            if event.get("properties", {}).get("streamURL"):
-                nl.stream_url_dict['url'] = event["properties"]["streamURL"]
-            if event.get("properties", {}).get("activityState") == "userStreamActive":
+            properties = event.get("properties", {})
+            if properties.get("streamURL"):
+                nl.stream_url_dict['url'] = properties["streamURL"]
+            if properties.get("activityState") == "userStreamActive" or properties.get("activityState") == "startUserStream":
                 return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
             return None
 
