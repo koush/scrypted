@@ -288,7 +288,7 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper, register_heartbeat=True))
+        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
     async def HandleEvents(self, basestation, resource, actions, callback, register_heartbeat=False):
         """

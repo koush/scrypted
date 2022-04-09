@@ -110,6 +110,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         try:
             await self.discoverDevices()
 
+            for basestation in self.arlo_basestations.values():
+                await self.arlo.Subscribe(basestation, register_heartbeat=True)
+
             for nativeId in self.arlo_cameras.keys():
                 self.getDevice(nativeId)
         except Exception as e:
