@@ -34,6 +34,10 @@ Chat on Discord for support, tips, announcements, and bug reporting. There is an
 
 [Join Scrypted Discord](https://discord.gg/DcFzmBHYGq)
 
+## Wiki
+
+There are many topics covered in the [Scrypted Wiki](https://github.com/koush/scrypted/wiki) sidebar. Review them for documented support, tips, and guides before asking for assistance on GitHub or Discord.
+
 ## Supported Platforms
 
  * Google Home
