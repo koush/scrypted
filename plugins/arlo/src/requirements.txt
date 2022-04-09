@@ -1,3 +1,2 @@
 sseclient==0.0.22
 requests
-aiofiles
