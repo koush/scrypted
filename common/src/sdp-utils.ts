@@ -124,13 +124,10 @@ export function findTracksByType(sdp: string, directions: TrackDirection[] = ['r
 }
 
 export function parseMLinePayloadTypes(mline: string) {
-    const payloadTypes = new Set<number>();
-    const addPts = (pts: string[]) => {
-        for (const pt of pts || []) {
-            payloadTypes.add(parseInt(pt));
-        }
-    };
-    addPts(mline.split(' ').slice(3));
+    const payloadTypes: number[] = [];
+    for (const pt of mline.split(' ').slice(3) || []) {
+        payloadTypes.push(parseInt(pt));
+    }
     return payloadTypes;
 }
 
@@ -144,14 +141,31 @@ export function parseMLine(mline: string) {
 }
 
 const acontrol = 'a=control:';
+const artpmap = 'a=rtpmap:';
 export function parseMSection(msection: string[]) {
     const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
+    const rtpmap = msection.find(line => line.startsWith(artpmap))?.toLowerCase();
+
+    let codec: string;
+    if (rtpmap?.includes('mpeg4')) {
+        codec = 'aac';
+    }
+    else if (rtpmap?.includes('opus')) {
+        codec = 'opus';
+    }
+    else if (rtpmap?.includes('pcm')) {
+        codec = 'pcm';
+    }
+    else if (rtpmap?.includes('h264')) {
+        codec = 'h264';
+    }
 
     return {
         ...parseMLine(msection[0]),
         lines: msection,
         contents: msection.join('\r\n'),
         control,
+        codec,
     }
 }
 

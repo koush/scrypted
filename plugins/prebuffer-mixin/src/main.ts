@@ -15,7 +15,7 @@ import sdk, { BufferConverter, FFMpegInput, MediaObject, MediaStreamOptions, Mix
 import crypto from 'crypto';
 import net from 'net';
 import { Duplex } from 'stream';
-import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
+import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
@@ -591,7 +591,7 @@ class PrebufferSession {
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
 
-      session = await startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, false, rbo);
+      session = await startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
     else {
@@ -612,27 +612,32 @@ class PrebufferSession {
           this.console.log('sdp', sdp);
 
           const parsedSdp = parseSdp(sdp);
-          const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
+          let channel = 0;
+          const mapping: RtspChannelCodecMapping = {};
+          // grab all available audio sections
+          if (!audioSoftMuted) {
+            for (const audioSection of parsedSdp.msections.filter(msection => msection.type === 'audio')) {
+              await rtspClient.setup(channel, audioSection.control);
+              mapping[channel] = audioSection.codec;
+              channel += 2;
+            }
+
+            if (channel === 0)
+              this.console.warn('sdp did not contain audio track and audio was not reported as missing.');
+          }
+
           const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
 
-          // sdp may contain multiple audio/video sections. take only the first.
-          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === audioSection || msection === videoSection);
+          // sdp may contain multiple audio/video sections. take only the first video section.
+          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === videoSection || msection.type === 'audio');
           sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
           this.sdp = Promise.resolve(sdp);
-          let channel = 0;
-          if (!audioSoftMuted) {
-            if (audioSection) {
-              await rtspClient.setup(channel, audioSection.control);
-              channel += 2;
-            }
-            else {
-              this.console.warn('sdp did not contain audio track and audio was not reported as missing.');
-            }
-          }
           await rtspClient.setup(channel, videoSection.control);
+          mapping[channel] = 'rtp-video';
           await rtspClient.play();
-          session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
+
+          session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, rbo, mapping);
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
           session.kill = async () => {
@@ -962,11 +967,14 @@ class PrebufferSession {
 
       if (container === 'rtsp') {
         const client = await listenZeroSingleClient();
+        // TODO: this works only because ffmpeg always requests all the streams in the sdp
+        // in a predictable fashion for the interleaved rtsp channels. Piping
+        // the source straight into the rtsp client works via dumb luck really.
         socketPromise = client.clientPromise.then(async (socket) => {
           let sdp = await this.sdp;
           sdp = addTrackControls(sdp);
           const server = new RtspServer(socket, sdp);
-          //server.console = this.console;
+          // server.console = this.console;
           await server.handlePlayback();
           return socket;
         })
@@ -991,14 +999,13 @@ class PrebufferSession {
       return containerUrl;
     }
 
-    const mediaStreamOptions: ResponseMediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
+    const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
     mediaStreamOptions.sdp = (await session.sdp)?.toString();
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
     const { reencodeAudio } = this.getAudioConfig();
 
-    let codecCopy = false;
     if (this.audioDisabled) {
       mediaStreamOptions.audio = null;
     }
@@ -1009,27 +1016,6 @@ class PrebufferSession {
         profile: 'aac_low',
       }
     }
-    else {
-      codecCopy = true;
-    }
-
-    if (codecCopy) {
-      // reported codecs may be wrong/cached/etc, so before blindly copying the audio codec info,
-      // verify what was found.
-      if (session?.mediaStreamOptions?.audio?.codec === session?.inputAudioCodec) {
-        mediaStreamOptions.audio = session?.mediaStreamOptions?.audio;
-      }
-      else {
-        mediaStreamOptions.audio = {
-          codec: session?.inputAudioCodec,
-        }
-      }
-    }
-
-    if (!mediaStreamOptions.video)
-      mediaStreamOptions.video = {};
-
-    mediaStreamOptions.video.codec = session.inputVideoCodec;
 
     if (session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
       Object.assign(mediaStreamOptions.video, {

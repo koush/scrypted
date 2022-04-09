@@ -4,17 +4,18 @@ import { ChildProcess } from 'child_process';
 import { FFMpegInput } from '@scrypted/sdk/types';
 import { bind, bindZero, listenZero, listenZeroSingleClient } from './listen-cluster';
 import { EventEmitter } from 'events';
-import sdk, { ResponseMediaStreamOptions } from "@scrypted/sdk";
+import sdk, { RequestMediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from './media-helpers';
 import { StreamChunk, StreamParser } from './stream-parser';
 import dgram from 'dgram';
 import { Duplex } from 'stream';
+import { cloneDeep } from './clone-deep';
 
 const { mediaManager } = sdk;
 
 export interface ParserSession<T extends string> {
     sdp: Promise<Buffer[]>;
-    mediaStreamOptions: ResponseMediaStreamOptions;
+    negotiateMediaStream(requestMediaStream: RequestMediaStreamOptions): ResponseMediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;
     inputVideoResolution?: string[];
@@ -306,9 +307,30 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         get isActive() { return isActive },
         kill,
         killed,
-        mediaStreamOptions: ffmpegInput.mediaStreamOptions || {
-            id: undefined,
-            name: undefined,
+        negotiateMediaStream: () => {
+            const ret: ResponseMediaStreamOptions = cloneDeep(ffmpegInput.mediaStreamOptions) || {
+                id: undefined,
+                name: undefined,
+            };
+
+            if (!ret.video)
+                ret.video = {};
+
+            ret.video.codec = inputVideoCodec;
+
+            // reported codecs may be wrong/cached/etc, so before blindly copying the audio codec info,
+            // verify what was found.
+            if (ret?.audio?.codec === inputAudioCodec) {
+                ret.audio = ffmpegInput?.mediaStreamOptions?.audio;
+            }
+            else {
+                ret.audio = {
+                    codec: inputAudioCodec,
+                }
+            }
+
+
+            return ret;
         },
         emit(container: T, chunk: StreamChunk) {
             events.emit(container, chunk);

@@ -1,7 +1,8 @@
+import { cloneDeep } from "@scrypted/common/src/clone-deep";
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { readLength } from "@scrypted/common/src/read-stream";
 import { RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
-import { findTrackByType } from "@scrypted/common/src/sdp-utils";
+import { findTrackByType, parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import sdk, { ResponseMediaStreamOptions } from "@scrypted/sdk";
 import net from 'net';
@@ -19,15 +20,22 @@ export function connectRFC4571Parser(url: string) {
     return socket;
 }
 
+export type RtspChannelCodecMapping = { [key: number]: string };
 
-export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, hasRstpPrefix?: boolean, options?: ParserOptions<"rtsp">): Promise<ParserSession<"rtsp">> {
+export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspMapping?: RtspChannelCodecMapping): Promise<ParserSession<"rtsp">> {
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
     events.on('error', e => console.error('rebroadcast error', e));
 
-    const audioPt = parseInt((sdp as string).match(/m=audio.* ([0-9]+)/)?.[1]);
-    const videoPt = parseInt((sdp as string).match(/m=video.* ([0-9]+)/)?.[1]);
+    const parsedSdp = parseSdp(sdp);
+    const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
+    const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
+    const audioPt = audioSection?.payloadTypes?.[0];
+    const videoPt = videoSection?.payloadTypes?.[0];
+
+    const inputAudioCodec = audioSection?.codec;
+    const inputVideoCodec = videoSection.codec;
 
     let sessionKilled: any;
     const killed = new Promise<void>(resolve => {
@@ -53,18 +61,23 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
         while (true) {
             let header: Buffer;
             let length: number;
-            if (hasRstpPrefix) {
+            let type: string;
+
+            if (rtspMapping) {
                 header = await readLength(socket, 4);
                 length = header.readUInt16BE(2);
+                const channel = header.readUInt8(1);
+                type = rtspMapping[channel];
             }
             else {
                 header = await readLength(socket, 2);
                 length = header.readUInt16BE(0);
             }
+
             const data = await readLength(socket, length);
             const pt = data[1] & 0x7f;
 
-            if (!hasRstpPrefix) {
+            if (!rtspMapping) {
                 const prefix = Buffer.alloc(2);
                 prefix[0] = RTSP_FRAME_MAGIC;
                 if (pt === audioPt) {
@@ -74,13 +87,12 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
                     prefix[1] = 2;
                 }
                 header = Buffer.concat([prefix, header]);
-            }
 
-            let type: string;
-            if (pt === audioPt)
-                type = 'rtp-audio';
-            else if (pt === videoPt)
-                type = 'rtp-video';
+                if (pt === audioPt)
+                    type = inputAudioCodec;
+                else if (pt === videoPt)
+                    type = inputVideoCodec;
+            }
 
             const chunk: StreamChunk = {
                 chunks: [header, data],
@@ -92,22 +104,6 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
     })()
         .finally(kill);
 
-    let inputAudioCodec: string;
-    let inputVideoCodec: string;
-    // todo: multiple codecs may be offered, default is the first one in the sdp.
-    const audio = findTrackByType(sdp, 'audio');
-    const video = findTrackByType(sdp, 'video');
-    if (audio) {
-        const lc = audio.section.toLowerCase();
-        if (lc.includes('mpeg4'))
-            inputAudioCodec = 'aac';
-        else if (lc.includes('pcm'))
-            inputAudioCodec = 'pcm';
-    }
-    if (video) {
-        if (video.section.toLowerCase().includes('h264'))
-            inputVideoCodec = 'h264';
-    }
 
     return {
         sdp: Promise.resolve([Buffer.from(sdp)]),
@@ -117,7 +113,42 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
         get isActive() { return isActive },
         kill,
         killed,
-        mediaStreamOptions,
+        negotiateMediaStream: (requestMediaStream) => {
+            const ret: ResponseMediaStreamOptions = cloneDeep(mediaStreamOptions) || {
+                id: undefined,
+                name: undefined,
+            };
+
+            if (!ret.video)
+                ret.video = {};
+
+            ret.video.codec = inputVideoCodec;
+
+            // some rtsp like unifi offer alternate audio tracks (aac and opus).
+            if (requestMediaStream?.audio?.codec && requestMediaStream?.audio?.codec !== inputAudioCodec) {
+                const alternateAudio = parsedSdp.msections.find(msection => msection.type === 'audio' && msection.codec === requestMediaStream?.audio?.codec);
+                if (alternateAudio) {
+                    ret.audio = {
+                        codec: requestMediaStream?.audio?.codec,
+                    };
+
+                    return ret;
+                }
+            }
+
+            // reported codecs may be wrong/cached/etc, so before blindly copying the audio codec info,
+            // verify what was found.
+            if (ret?.audio?.codec === inputAudioCodec) {
+                ret.audio = mediaStreamOptions?.audio;
+            }
+            else {
+                ret.audio = {
+                    codec: inputAudioCodec,
+                }
+            }
+
+            return ret;
+        },
         emit(container: 'rtsp', chunk: StreamChunk) {
             events.emit(container, chunk);
             return this;
