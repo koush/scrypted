@@ -1073,351 +1073,888 @@ class DeviceState:
 
     @property
     def id(self) -> str:
-        self.getScryptedProperty("id")
+        return self.getScryptedProperty("id")
     @id.setter
     def id(self, value: str):
         self.setScryptedProperty("id", value)
 
     @property
     def info(self) -> DeviceInformation:
-        self.getScryptedProperty("info")
+        return self.getScryptedProperty("info")
     @info.setter
     def info(self, value: DeviceInformation):
         self.setScryptedProperty("info", value)
 
     @property
     def interfaces(self) -> list[str]:
-        self.getScryptedProperty("interfaces")
+        return self.getScryptedProperty("interfaces")
     @interfaces.setter
     def interfaces(self, value: list[str]):
         self.setScryptedProperty("interfaces", value)
 
     @property
     def mixins(self) -> list[str]:
-        self.getScryptedProperty("mixins")
+        return self.getScryptedProperty("mixins")
     @mixins.setter
     def mixins(self, value: list[str]):
         self.setScryptedProperty("mixins", value)
 
     @property
     def name(self) -> str:
-        self.getScryptedProperty("name")
+        return self.getScryptedProperty("name")
     @name.setter
     def name(self, value: str):
         self.setScryptedProperty("name", value)
 
     @property
     def pluginId(self) -> str:
-        self.getScryptedProperty("pluginId")
+        return self.getScryptedProperty("pluginId")
     @pluginId.setter
     def pluginId(self, value: str):
         self.setScryptedProperty("pluginId", value)
 
     @property
     def providedInterfaces(self) -> list[str]:
-        self.getScryptedProperty("providedInterfaces")
+        return self.getScryptedProperty("providedInterfaces")
     @providedInterfaces.setter
     def providedInterfaces(self, value: list[str]):
         self.setScryptedProperty("providedInterfaces", value)
 
     @property
     def providedName(self) -> ScryptedDeviceType:
-        self.getScryptedProperty("providedName")
+        return self.getScryptedProperty("providedName")
     @providedName.setter
     def providedName(self, value: ScryptedDeviceType):
         self.setScryptedProperty("providedName", value)
 
     @property
     def providedRoom(self) -> str:
-        self.getScryptedProperty("providedRoom")
+        return self.getScryptedProperty("providedRoom")
     @providedRoom.setter
     def providedRoom(self, value: str):
         self.setScryptedProperty("providedRoom", value)
 
     @property
     def providedType(self) -> ScryptedDeviceType:
-        self.getScryptedProperty("providedType")
+        return self.getScryptedProperty("providedType")
     @providedType.setter
     def providedType(self, value: ScryptedDeviceType):
         self.setScryptedProperty("providedType", value)
 
     @property
     def providerId(self) -> str:
-        self.getScryptedProperty("providerId")
+        return self.getScryptedProperty("providerId")
     @providerId.setter
     def providerId(self, value: str):
         self.setScryptedProperty("providerId", value)
 
     @property
     def room(self) -> str:
-        self.getScryptedProperty("room")
+        return self.getScryptedProperty("room")
     @room.setter
     def room(self, value: str):
         self.setScryptedProperty("room", value)
 
     @property
     def type(self) -> ScryptedDeviceType:
-        self.getScryptedProperty("type")
+        return self.getScryptedProperty("type")
     @type.setter
     def type(self, value: ScryptedDeviceType):
         self.setScryptedProperty("type", value)
 
     @property
     def on(self) -> bool:
-        self.getScryptedProperty("on")
+        return self.getScryptedProperty("on")
     @on.setter
     def on(self, value: bool):
         self.setScryptedProperty("on", value)
 
     @property
     def brightness(self) -> float:
-        self.getScryptedProperty("brightness")
+        return self.getScryptedProperty("brightness")
     @brightness.setter
     def brightness(self, value: float):
         self.setScryptedProperty("brightness", value)
 
     @property
     def colorTemperature(self) -> float:
-        self.getScryptedProperty("colorTemperature")
+        return self.getScryptedProperty("colorTemperature")
     @colorTemperature.setter
     def colorTemperature(self, value: float):
         self.setScryptedProperty("colorTemperature", value)
 
     @property
     def rgb(self) -> ColorRgb:
-        self.getScryptedProperty("rgb")
+        return self.getScryptedProperty("rgb")
     @rgb.setter
     def rgb(self, value: ColorRgb):
         self.setScryptedProperty("rgb", value)
 
     @property
     def hsv(self) -> ColorHsv:
-        self.getScryptedProperty("hsv")
+        return self.getScryptedProperty("hsv")
     @hsv.setter
     def hsv(self, value: ColorHsv):
         self.setScryptedProperty("hsv", value)
 
     @property
     def running(self) -> bool:
-        self.getScryptedProperty("running")
+        return self.getScryptedProperty("running")
     @running.setter
     def running(self, value: bool):
         self.setScryptedProperty("running", value)
 
     @property
     def paused(self) -> bool:
-        self.getScryptedProperty("paused")
+        return self.getScryptedProperty("paused")
     @paused.setter
     def paused(self, value: bool):
         self.setScryptedProperty("paused", value)
 
     @property
     def docked(self) -> bool:
-        self.getScryptedProperty("docked")
+        return self.getScryptedProperty("docked")
     @docked.setter
     def docked(self, value: bool):
         self.setScryptedProperty("docked", value)
 
     @property
     def thermostatActiveMode(self) -> ThermostatMode:
-        self.getScryptedProperty("thermostatActiveMode")
+        return self.getScryptedProperty("thermostatActiveMode")
     @thermostatActiveMode.setter
     def thermostatActiveMode(self, value: ThermostatMode):
         self.setScryptedProperty("thermostatActiveMode", value)
 
     @property
     def thermostatAvailableModes(self) -> list[ThermostatMode]:
-        self.getScryptedProperty("thermostatAvailableModes")
+        return self.getScryptedProperty("thermostatAvailableModes")
     @thermostatAvailableModes.setter
     def thermostatAvailableModes(self, value: list[ThermostatMode]):
         self.setScryptedProperty("thermostatAvailableModes", value)
 
     @property
     def thermostatMode(self) -> ThermostatMode:
-        self.getScryptedProperty("thermostatMode")
+        return self.getScryptedProperty("thermostatMode")
     @thermostatMode.setter
     def thermostatMode(self, value: ThermostatMode):
         self.setScryptedProperty("thermostatMode", value)
 
     @property
     def thermostatSetpoint(self) -> float:
-        self.getScryptedProperty("thermostatSetpoint")
+        return self.getScryptedProperty("thermostatSetpoint")
     @thermostatSetpoint.setter
     def thermostatSetpoint(self, value: float):
         self.setScryptedProperty("thermostatSetpoint", value)
 
     @property
     def thermostatSetpointHigh(self) -> float:
-        self.getScryptedProperty("thermostatSetpointHigh")
+        return self.getScryptedProperty("thermostatSetpointHigh")
     @thermostatSetpointHigh.setter
     def thermostatSetpointHigh(self, value: float):
         self.setScryptedProperty("thermostatSetpointHigh", value)
 
     @property
     def thermostatSetpointLow(self) -> float:
-        self.getScryptedProperty("thermostatSetpointLow")
+        return self.getScryptedProperty("thermostatSetpointLow")
     @thermostatSetpointLow.setter
     def thermostatSetpointLow(self, value: float):
         self.setScryptedProperty("thermostatSetpointLow", value)
 
     @property
     def temperature(self) -> float:
-        self.getScryptedProperty("temperature")
+        return self.getScryptedProperty("temperature")
     @temperature.setter
     def temperature(self, value: float):
         self.setScryptedProperty("temperature", value)
 
     @property
     def temperatureUnit(self) -> TemperatureUnit:
-        self.getScryptedProperty("temperatureUnit")
+        return self.getScryptedProperty("temperatureUnit")
     @temperatureUnit.setter
     def temperatureUnit(self, value: TemperatureUnit):
         self.setScryptedProperty("temperatureUnit", value)
 
     @property
     def humidity(self) -> float:
-        self.getScryptedProperty("humidity")
+        return self.getScryptedProperty("humidity")
     @humidity.setter
     def humidity(self, value: float):
         self.setScryptedProperty("humidity", value)
 
     @property
     def lockState(self) -> LockState:
-        self.getScryptedProperty("lockState")
+        return self.getScryptedProperty("lockState")
     @lockState.setter
     def lockState(self, value: LockState):
         self.setScryptedProperty("lockState", value)
 
     @property
     def entryOpen(self) -> bool:
-        self.getScryptedProperty("entryOpen")
+        return self.getScryptedProperty("entryOpen")
     @entryOpen.setter
     def entryOpen(self, value: bool):
         self.setScryptedProperty("entryOpen", value)
 
     @property
     def batteryLevel(self) -> float:
-        self.getScryptedProperty("batteryLevel")
+        return self.getScryptedProperty("batteryLevel")
     @batteryLevel.setter
     def batteryLevel(self, value: float):
         self.setScryptedProperty("batteryLevel", value)
 
     @property
     def online(self) -> bool:
-        self.getScryptedProperty("online")
+        return self.getScryptedProperty("online")
     @online.setter
     def online(self, value: bool):
         self.setScryptedProperty("online", value)
 
     @property
     def updateAvailable(self) -> bool:
-        self.getScryptedProperty("updateAvailable")
+        return self.getScryptedProperty("updateAvailable")
     @updateAvailable.setter
     def updateAvailable(self, value: bool):
         self.setScryptedProperty("updateAvailable", value)
 
     @property
     def fromMimeType(self) -> str:
-        self.getScryptedProperty("fromMimeType")
+        return self.getScryptedProperty("fromMimeType")
     @fromMimeType.setter
     def fromMimeType(self, value: str):
         self.setScryptedProperty("fromMimeType", value)
 
     @property
     def toMimeType(self) -> str:
-        self.getScryptedProperty("toMimeType")
+        return self.getScryptedProperty("toMimeType")
     @toMimeType.setter
     def toMimeType(self, value: str):
         self.setScryptedProperty("toMimeType", value)
 
     @property
     def binaryState(self) -> bool:
-        self.getScryptedProperty("binaryState")
+        return self.getScryptedProperty("binaryState")
     @binaryState.setter
     def binaryState(self, value: bool):
         self.setScryptedProperty("binaryState", value)
 
     @property
     def intrusionDetected(self) -> bool:
-        self.getScryptedProperty("intrusionDetected")
+        return self.getScryptedProperty("intrusionDetected")
     @intrusionDetected.setter
     def intrusionDetected(self, value: bool):
         self.setScryptedProperty("intrusionDetected", value)
 
     @property
     def powerDetected(self) -> bool:
-        self.getScryptedProperty("powerDetected")
+        return self.getScryptedProperty("powerDetected")
     @powerDetected.setter
     def powerDetected(self, value: bool):
         self.setScryptedProperty("powerDetected", value)
 
     @property
     def audioDetected(self) -> bool:
-        self.getScryptedProperty("audioDetected")
+        return self.getScryptedProperty("audioDetected")
     @audioDetected.setter
     def audioDetected(self, value: bool):
         self.setScryptedProperty("audioDetected", value)
 
     @property
     def motionDetected(self) -> bool:
-        self.getScryptedProperty("motionDetected")
+        return self.getScryptedProperty("motionDetected")
     @motionDetected.setter
     def motionDetected(self, value: bool):
         self.setScryptedProperty("motionDetected", value)
 
     @property
     def ambientLight(self) -> float:
-        self.getScryptedProperty("ambientLight")
+        return self.getScryptedProperty("ambientLight")
     @ambientLight.setter
     def ambientLight(self, value: float):
         self.setScryptedProperty("ambientLight", value)
 
     @property
     def occupied(self) -> bool:
-        self.getScryptedProperty("occupied")
+        return self.getScryptedProperty("occupied")
     @occupied.setter
     def occupied(self, value: bool):
         self.setScryptedProperty("occupied", value)
 
     @property
     def flooded(self) -> bool:
-        self.getScryptedProperty("flooded")
+        return self.getScryptedProperty("flooded")
     @flooded.setter
     def flooded(self, value: bool):
         self.setScryptedProperty("flooded", value)
 
     @property
     def ultraviolet(self) -> float:
-        self.getScryptedProperty("ultraviolet")
+        return self.getScryptedProperty("ultraviolet")
     @ultraviolet.setter
     def ultraviolet(self, value: float):
         self.setScryptedProperty("ultraviolet", value)
 
     @property
     def luminance(self) -> float:
-        self.getScryptedProperty("luminance")
+        return self.getScryptedProperty("luminance")
     @luminance.setter
     def luminance(self, value: float):
         self.setScryptedProperty("luminance", value)
 
     @property
     def position(self) -> Position:
-        self.getScryptedProperty("position")
+        return self.getScryptedProperty("position")
     @position.setter
     def position(self, value: Position):
         self.setScryptedProperty("position", value)
 
     @property
     def humiditySetting(self) -> HumiditySettingStatus:
-        self.getScryptedProperty("humiditySetting")
+        return self.getScryptedProperty("humiditySetting")
     @humiditySetting.setter
     def humiditySetting(self, value: HumiditySettingStatus):
         self.setScryptedProperty("humiditySetting", value)
 
     @property
     def fan(self) -> FanStatus:
-        self.getScryptedProperty("fan")
+        return self.getScryptedProperty("fan")
     @fan.setter
     def fan(self, value: FanStatus):
         self.setScryptedProperty("fan", value)
+
+ScryptedInterfaceDescriptors = {
+  "ScryptedDevice": {
+    "name": "ScryptedDevice",
+    "methods": [
+      "listen",
+      "probe",
+      "setName",
+      "setRoom",
+      "setType"
+    ],
+    "properties": [
+      "id",
+      "info",
+      "interfaces",
+      "mixins",
+      "name",
+      "pluginId",
+      "providedInterfaces",
+      "providedName",
+      "providedRoom",
+      "providedType",
+      "providerId",
+      "room",
+      "type"
+    ]
+  },
+  "ScryptedPlugin": {
+    "name": "ScryptedPlugin",
+    "methods": [
+      "getPluginJson"
+    ],
+    "properties": []
+  },
+  "OnOff": {
+    "name": "OnOff",
+    "methods": [
+      "turnOff",
+      "turnOn"
+    ],
+    "properties": [
+      "on"
+    ]
+  },
+  "Brightness": {
+    "name": "Brightness",
+    "methods": [
+      "setBrightness"
+    ],
+    "properties": [
+      "brightness"
+    ]
+  },
+  "ColorSettingTemperature": {
+    "name": "ColorSettingTemperature",
+    "methods": [
+      "getTemperatureMaxK",
+      "getTemperatureMinK",
+      "setColorTemperature"
+    ],
+    "properties": [
+      "colorTemperature"
+    ]
+  },
+  "ColorSettingRgb": {
+    "name": "ColorSettingRgb",
+    "methods": [
+      "setRgb"
+    ],
+    "properties": [
+      "rgb"
+    ]
+  },
+  "ColorSettingHsv": {
+    "name": "ColorSettingHsv",
+    "methods": [
+      "setHsv"
+    ],
+    "properties": [
+      "hsv"
+    ]
+  },
+  "Notifier": {
+    "name": "Notifier",
+    "methods": [
+      "sendNotification"
+    ],
+    "properties": []
+  },
+  "StartStop": {
+    "name": "StartStop",
+    "methods": [
+      "start",
+      "stop"
+    ],
+    "properties": [
+      "running"
+    ]
+  },
+  "Pause": {
+    "name": "Pause",
+    "methods": [
+      "pause",
+      "resume"
+    ],
+    "properties": [
+      "paused"
+    ]
+  },
+  "Dock": {
+    "name": "Dock",
+    "methods": [
+      "dock"
+    ],
+    "properties": [
+      "docked"
+    ]
+  },
+  "TemperatureSetting": {
+    "name": "TemperatureSetting",
+    "methods": [
+      "setThermostatMode",
+      "setThermostatSetpoint",
+      "setThermostatSetpointHigh",
+      "setThermostatSetpointLow"
+    ],
+    "properties": [
+      "thermostatActiveMode",
+      "thermostatAvailableModes",
+      "thermostatMode",
+      "thermostatSetpoint",
+      "thermostatSetpointHigh",
+      "thermostatSetpointLow"
+    ]
+  },
+  "Thermometer": {
+    "name": "Thermometer",
+    "methods": [
+      "setTemperatureUnit"
+    ],
+    "properties": [
+      "temperature",
+      "temperatureUnit"
+    ]
+  },
+  "HumiditySensor": {
+    "name": "HumiditySensor",
+    "methods": [],
+    "properties": [
+      "humidity"
+    ]
+  },
+  "Camera": {
+    "name": "Camera",
+    "methods": [
+      "getPictureOptions",
+      "takePicture"
+    ],
+    "properties": []
+  },
+  "Microphone": {
+    "name": "Microphone",
+    "methods": [
+      "getAudioStream"
+    ],
+    "properties": []
+  },
+  "Display": {
+    "name": "Display",
+    "methods": [
+      "startDisplay",
+      "stopDisplay"
+    ],
+    "properties": []
+  },
+  "VideoCamera": {
+    "name": "VideoCamera",
+    "methods": [
+      "getVideoStream",
+      "getVideoStreamOptions"
+    ],
+    "properties": []
+  },
+  "VideoRecorder": {
+    "name": "VideoRecorder",
+    "methods": [
+      "getRecordingStream",
+      "getRecordingStreamOptions",
+      "getRecordingStreamThumbnail"
+    ],
+    "properties": []
+  },
+  "VideoClips": {
+    "name": "VideoClips",
+    "methods": [
+      "getVideoClip",
+      "getVideoClipThumbnail",
+      "getVideoClips",
+      "removeVideoClips"
+    ],
+    "properties": []
+  },
+  "VideoCameraConfiguration": {
+    "name": "VideoCameraConfiguration",
+    "methods": [
+      "setVideoStreamOptions"
+    ],
+    "properties": []
+  },
+  "Intercom": {
+    "name": "Intercom",
+    "methods": [
+      "startIntercom",
+      "stopIntercom"
+    ],
+    "properties": []
+  },
+  "Lock": {
+    "name": "Lock",
+    "methods": [
+      "lock",
+      "unlock"
+    ],
+    "properties": [
+      "lockState"
+    ]
+  },
+  "PasswordStore": {
+    "name": "PasswordStore",
+    "methods": [
+      "addPassword",
+      "getPasswords",
+      "removePassword"
+    ],
+    "properties": []
+  },
+  "Authenticator": {
+    "name": "Authenticator",
+    "methods": [
+      "checkPassword"
+    ],
+    "properties": []
+  },
+  "Scene": {
+    "name": "Scene",
+    "methods": [
+      "activate",
+      "deactivate",
+      "isReversible"
+    ],
+    "properties": []
+  },
+  "Entry": {
+    "name": "Entry",
+    "methods": [
+      "closeEntry",
+      "openEntry"
+    ],
+    "properties": []
+  },
+  "EntrySensor": {
+    "name": "EntrySensor",
+    "methods": [],
+    "properties": [
+      "entryOpen"
+    ]
+  },
+  "DeviceProvider": {
+    "name": "DeviceProvider",
+    "methods": [
+      "getDevice"
+    ],
+    "properties": []
+  },
+  "DeviceDiscovery": {
+    "name": "DeviceDiscovery",
+    "methods": [
+      "discoverDevices"
+    ],
+    "properties": []
+  },
+  "DeviceCreator": {
+    "name": "DeviceCreator",
+    "methods": [
+      "createDevice",
+      "getCreateDeviceSettings"
+    ],
+    "properties": []
+  },
+  "Battery": {
+    "name": "Battery",
+    "methods": [],
+    "properties": [
+      "batteryLevel"
+    ]
+  },
+  "Refresh": {
+    "name": "Refresh",
+    "methods": [
+      "getRefreshFrequency",
+      "refresh"
+    ],
+    "properties": []
+  },
+  "MediaPlayer": {
+    "name": "MediaPlayer",
+    "methods": [
+      "getMediaStatus",
+      "load",
+      "seek",
+      "skipNext",
+      "skipPrevious"
+    ],
+    "properties": []
+  },
+  "Online": {
+    "name": "Online",
+    "methods": [],
+    "properties": [
+      "online"
+    ]
+  },
+  "SoftwareUpdate": {
+    "name": "SoftwareUpdate",
+    "methods": [
+      "checkForUpdate",
+      "installUpdate"
+    ],
+    "properties": [
+      "updateAvailable"
+    ]
+  },
+  "BufferConverter": {
+    "name": "BufferConverter",
+    "methods": [
+      "convert"
+    ],
+    "properties": [
+      "fromMimeType",
+      "toMimeType"
+    ]
+  },
+  "Settings": {
+    "name": "Settings",
+    "methods": [
+      "getSettings",
+      "putSetting"
+    ],
+    "properties": []
+  },
+  "BinarySensor": {
+    "name": "BinarySensor",
+    "methods": [],
+    "properties": [
+      "binaryState"
+    ]
+  },
+  "IntrusionSensor": {
+    "name": "IntrusionSensor",
+    "methods": [],
+    "properties": [
+      "intrusionDetected"
+    ]
+  },
+  "PowerSensor": {
+    "name": "PowerSensor",
+    "methods": [],
+    "properties": [
+      "powerDetected"
+    ]
+  },
+  "AudioSensor": {
+    "name": "AudioSensor",
+    "methods": [],
+    "properties": [
+      "audioDetected"
+    ]
+  },
+  "MotionSensor": {
+    "name": "MotionSensor",
+    "methods": [],
+    "properties": [
+      "motionDetected"
+    ]
+  },
+  "AmbientLightSensor": {
+    "name": "AmbientLightSensor",
+    "methods": [],
+    "properties": [
+      "ambientLight"
+    ]
+  },
+  "OccupancySensor": {
+    "name": "OccupancySensor",
+    "methods": [],
+    "properties": [
+      "occupied"
+    ]
+  },
+  "FloodSensor": {
+    "name": "FloodSensor",
+    "methods": [],
+    "properties": [
+      "flooded"
+    ]
+  },
+  "UltravioletSensor": {
+    "name": "UltravioletSensor",
+    "methods": [],
+    "properties": [
+      "ultraviolet"
+    ]
+  },
+  "LuminanceSensor": {
+    "name": "LuminanceSensor",
+    "methods": [],
+    "properties": [
+      "luminance"
+    ]
+  },
+  "PositionSensor": {
+    "name": "PositionSensor",
+    "methods": [],
+    "properties": [
+      "position"
+    ]
+  },
+  "Readme": {
+    "name": "Readme",
+    "methods": [
+      "getReadmeMarkdown"
+    ],
+    "properties": []
+  },
+  "OauthClient": {
+    "name": "OauthClient",
+    "methods": [
+      "getOauthUrl",
+      "onOauthCallback"
+    ],
+    "properties": []
+  },
+  "MixinProvider": {
+    "name": "MixinProvider",
+    "methods": [
+      "canMixin",
+      "getMixin",
+      "releaseMixin"
+    ],
+    "properties": []
+  },
+  "HttpRequestHandler": {
+    "name": "HttpRequestHandler",
+    "methods": [
+      "onRequest"
+    ],
+    "properties": []
+  },
+  "EngineIOHandler": {
+    "name": "EngineIOHandler",
+    "methods": [
+      "onConnection"
+    ],
+    "properties": []
+  },
+  "PushHandler": {
+    "name": "PushHandler",
+    "methods": [
+      "onPush"
+    ],
+    "properties": []
+  },
+  "Program": {
+    "name": "Program",
+    "methods": [
+      "run"
+    ],
+    "properties": []
+  },
+  "Scriptable": {
+    "name": "Scriptable",
+    "methods": [
+      "eval",
+      "loadScripts",
+      "saveScript"
+    ],
+    "properties": []
+  },
+  "ObjectDetector": {
+    "name": "ObjectDetector",
+    "methods": [
+      "getDetectionInput",
+      "getObjectTypes"
+    ],
+    "properties": []
+  },
+  "ObjectDetection": {
+    "name": "ObjectDetection",
+    "methods": [
+      "detectObjects",
+      "getDetectionModel"
+    ],
+    "properties": []
+  },
+  "HumiditySetting": {
+    "name": "HumiditySetting",
+    "methods": [
+      "setHumidity"
+    ],
+    "properties": [
+      "humiditySetting"
+    ]
+  },
+  "Fan": {
+    "name": "Fan",
+    "methods": [
+      "setFan"
+    ],
+    "properties": [
+      "fan"
+    ]
+  },
+  "RTCSignalingChannel": {
+    "name": "RTCSignalingChannel",
+    "methods": [
+      "startRTCSignalingSession"
+    ],
+    "properties": []
+  },
+  "RTCSignalingClient": {
+    "name": "RTCSignalingClient",
+    "methods": [
+      "createRTCSignalingSession"
+    ],
+    "properties": []
+  }
+}
 

@@ -42,13 +42,12 @@ class SystemDeviceState(TypedDict):
     stateTime: int
     value: any
 
-
 class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
     def __init__(self, api: Any, systemState: Mapping[str, Mapping[str, SystemDeviceState]]) -> None:
         super().__init__()
         self.api = api
         self.systemState = systemState
-    
+
     async def getComponent(self, id: str) -> Any:
         return await self.api.getComponent(id)
 
@@ -61,12 +60,13 @@ class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):
         self.systemManager = systemManager
 
     def getScryptedProperty(self, property: str) -> Any:
-        deviceState = getattr(
-            self.systemManager.systemState, self.nativeId, None)
+        if property == ScryptedInterfaceProperty.id.value:
+            return self._id
+        deviceState = self.systemManager.systemState.get(self._id, None)
         if not deviceState:
-            print("missing nativeId id %s" % self.nativeId)
+            print("missing id %s" % self._id)
             return None
-        return getattr(deviceState, property, None)
+        return deviceState.get(property, None)
 
     def setScryptedProperty(self, property: str, value: Any):
         if property == ScryptedInterfaceProperty.id.value:

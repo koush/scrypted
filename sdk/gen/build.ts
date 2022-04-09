@@ -6,7 +6,7 @@ import fs, { mkdir } from "fs";
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schema.json')).toString());
 const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {};
 
-const allProperties: {[property: string]: any} = {};
+const allProperties: { [property: string]: any } = {};
 
 function toTypescriptType(type: any): string {
     if (type.type === 'array')
@@ -82,7 +82,7 @@ function toPythonType(type: any): string {
             return 'Any';
         case 'Buffer':
             return 'bytearray';
-            // generic return type... how to handle this?
+        // generic return type... how to handle this?
         case 'T':
             return 'Any';
     }
@@ -160,11 +160,10 @@ class ${e.name}(Enum):
 python += `
 class ScryptedInterfaceProperty(Enum):
 `
-    for (const val of properties) {
-        python += `    ${val} = "${val}"
+for (const val of properties) {
+    python += `    ${val} = "${val}"
 `;
 }
-
 
 python += `
 class DeviceState:
@@ -173,17 +172,20 @@ class DeviceState:
     def setScryptedProperty(self, property: str, value: Any):
         pass
 `
-    for (const [val, type] of Object.entries(allProperties)) {
-        python += `
+for (const [val, type] of Object.entries(allProperties)) {
+    python += `
     @property
     def ${val}(self) -> ${toPythonType(type)}:
-        self.getScryptedProperty("${val}")
+        return self.getScryptedProperty("${val}")
     @${val}.setter
     def ${val}(self, value: ${toPythonType(type)}):
         self.setScryptedProperty("${val}", value)
 `;
 }
 
+python += `
+ScryptedInterfaceDescriptors = ${JSON.stringify(ScryptedInterfaceDescriptors, null, 2)}
+`
 
 let seen = new Set<string>();
 seen.add('DeviceState');
@@ -206,14 +208,14 @@ while (dictionaryTypes.size) {
 class ${td.name}(TypedDict):
 `;
 
-    const properties = td.children?.filter((child: any) => child.kindString === 'Property') || [];
-    for (const property of properties) {
-        pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}
+        const properties = td.children?.filter((child: any) => child.kindString === 'Property') || [];
+        for (const property of properties) {
+            pythonUnknowns += `    ${property.name}: ${toPythonType(property.type)}
 `
-    }
-    pythonUnknowns += `    pass
+        }
+        pythonUnknowns += `    pass
 `;
-}
+    }
 
     python = pythonUnknowns + python;
     seen = newSeen;

@@ -50,10 +50,6 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
     async apply(target: any, thisArg: any, argArray?: any) {
         const method = target();
         const device = await this.ensureDevice();
-        if (false && method === 'refresh') {
-            const name = this.systemManager.state[this.id]?.[ScryptedInterfaceProperty.name].value;
-            this.systemManager.log.i(`requested refresh ${name}`);
-        }
         return (device as any)[method](...argArray);
     }
 
