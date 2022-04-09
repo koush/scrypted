@@ -59,8 +59,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     def plugin_verbosity(self):
         verbosity = self.storage.getItem("plugin_verbosity")
         if verbosity is None:
-            self.storage.setItem("plugin_verbosity", "Normal")
-            return "Normal"
+            verbosity = "Normal"
+            self.storage.setItem("plugin_verbosity", verbosity)
         return verbosity
 
     @property
@@ -79,11 +79,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self.storage.setItem("arlo_auth_headers", json.dumps(dict(self._arlo.request.session.headers.items())))
                 self.storage.setItem("arlo_user_id", self._arlo.user_id)
 
-                asyncio.get_event_loop().create_task(self.discoverDevices())
+                asyncio.get_event_loop().create_task(self.do_arlo_setup())
 
             return self._arlo
 
-        if self.arlo_username is None or self.arlo_password is None:
+        if not self.arlo_username or not self.arlo_password:
             return None
             
         self.logger.info("Trying to initialize Arlo client...")
@@ -94,7 +94,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 self._arlo.UseExistingAuth(self.arlo_user_id, json.loads(headers))
                 self.logger.info(f"Initialized Arlo client for {self.arlo_username}, reusing stored auth headers")
 
-                asyncio.get_event_loop().create_task(self.discoverDevices())
+                asyncio.get_event_loop().create_task(self.do_arlo_setup())
                 return self._arlo
             else:
                 self._arlo_mfa_complete_auth = self._arlo.LoginMFA()
@@ -105,6 +105,15 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             self._arlo = None
             self._arlo_mfa_code = None
             return None
+
+    async def do_arlo_setup(self):
+        try:
+            await self.discoverDevices()
+
+            for nativeId in self.arlo_cameras.keys():
+                self.getDevice(nativeId)
+        except Exception as e:
+            self.logger.error(f"Error performing post-login Arlo setup: {type(e)} with message {str(e)}")
 
     def get_current_log_level(self):
         return ArloProvider.plugin_verbosity_choices[self.plugin_verbosity]
@@ -221,9 +230,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         await scrypted_sdk.deviceManager.onDevicesChanged({
             "devices": devices,
         })
-
-        for nativeId in self.arlo_cameras.keys():
-            self.getDevice(nativeId)
 
         if len(cameras) != len(devices):
             self.logger.info(f"Discovered {len(cameras)} cameras, but only {len(devices)} are usable")

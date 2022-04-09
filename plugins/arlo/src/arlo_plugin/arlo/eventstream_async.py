@@ -36,7 +36,6 @@ class EventStream:
         self.event_stream = None
         self.initializing = True
         self.connected = False
-        self.registered = False
         self.queues = {}
         self.expire = expire
         self.event_stream_stop_event = threading.Event()
@@ -101,6 +100,7 @@ class EventStream:
                     if first_requeued is not None and first_requeued is event:
                         # if we reach here, we've cycled through the whole queue
                         # and found nothing for us, so go to the next queue
+                        q.put_nowait(event)
                         break
 
                     if event.expired:
@@ -171,7 +171,7 @@ class EventStream:
         self.connected = False
 
         def exit_queues(self):
-            for _, q in self.queues:
+            for q in self.queues.values():
                 q.put_nowait(None)
         self.event_loop.call_soon_threadsafe(exit_queues, self)
 

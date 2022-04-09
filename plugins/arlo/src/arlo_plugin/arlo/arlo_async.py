@@ -25,6 +25,7 @@ limitations under the License.
 
 from .request import Request
 from .eventstream_async import EventStream
+from .logging import logger
     
 # Import all of the other stuff.
 from datetime import datetime
@@ -174,7 +175,7 @@ class Arlo(object):
         self.Unsubscribe()
         return self.request.put(f'https://{self.BASE_URL}/hmsweb/logout')
 
-    async def Subscribe(self, basestation):
+    async def Subscribe(self, basestation, register_heartbeat=False):
         """
         Arlo uses the EventStream interface in the browser to do pub/sub style messaging.
         Unfortunately, this appears to be the only way Arlo communicates these messages.
@@ -184,22 +185,26 @@ class Arlo(object):
         This call registers the device (which should be the basestation) so that events will be sent to the EventStream
         when subsequent calls to /notify are made.
         """
-        basestation_id = basestation.get('deviceId')
-
         async def heartbeat(self, basestation, interval=60):
             await asyncio.sleep(interval)
             while self.event_stream and self.event_stream.connected:
-                self.Ping(basestation)
+                try:
+                    self.Ping(basestation)
+                except Exception as e:
+                    logger.warn(f"Ignoring error while pinging basestation: {e}")
                 await asyncio.sleep(interval)
 
         if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
             self.event_stream = EventStream(self)
             await self.event_stream.start()
 
-        if not self.event_stream.registered:
-            self.Notify(basestation, {"action":"set","resource":"subscriptions/"+self.user_id+"_web","publishResponse":False,"properties":{"devices":[basestation_id]}})
-            self.event_stream.registered = True
+        if register_heartbeat:
             asyncio.get_event_loop().create_task(heartbeat(self, basestation))
+
+        try:
+            self.Ping(basestation)
+        except Exception as e:
+            logger.warn(f"Ignoring error while pinging basestation: {e}")
 
     def Unsubscribe(self):
         """ This method stops the EventStream subscription and removes it from the event_stream collection. """
@@ -283,9 +288,9 @@ class Arlo(object):
                 return None
             return stop
 
-        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
+        asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper, register_heartbeat=True))
 
-    async def HandleEvents(self, basestation, resource, actions, callback):
+    async def HandleEvents(self, basestation, resource, actions, callback, register_heartbeat=False):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -293,8 +298,8 @@ class Arlo(object):
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
-        await self.Subscribe(basestation)
-        if self.event_stream and self.event_stream.connected and self.event_stream.registered:
+        await self.Subscribe(basestation, register_heartbeat=register_heartbeat)
+        if self.event_stream and self.event_stream.connected:
             seen_events = {}
             while self.event_stream.connected:
                 event, action = await self.event_stream.get(resource, actions, seen_events)
@@ -1506,6 +1511,9 @@ class Arlo(object):
         It can be streamed with: ffmpeg -re -i 'rtsps://<url>' -acodec copy -vcodec copy test.mp4
         The request to /users/devices/startStream returns: { url:rtsp://<url>:443/vzmodulelive?egressToken=b<xx>&userAgent=iOS&cameraId=<camid>}
         """
+        stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
+        return stream_url_dict['url'].replace("rtsp://", "rtsps://")
+
         resource = f"cameras/{camera.get('deviceId')}"
 
         # nonlocal variable hack for Python 2.x.
