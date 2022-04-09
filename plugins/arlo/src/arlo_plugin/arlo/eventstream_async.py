@@ -112,7 +112,7 @@ class EventStream:
                             first_requeued = event
                     else:
                         return event, action
-            await asyncio.sleep(random.uniform(0, 0.1))
+            await asyncio.sleep(random.uniform(0, 0.01))
 
     async def start(self):
         if self.event_stream is not None:
