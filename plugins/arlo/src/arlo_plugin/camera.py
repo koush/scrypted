@@ -43,6 +43,12 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
     async def takePicture(self, options=None):
         self.logger.info("Taking picture")
 
+        real_device = await scrypted_sdk.systemManager.api.getDeviceById(self.deviceState._id)
+        msos = await real_device.getVideoStreamOptions()
+        if any(["prebuffer" in m for m in msos]):
+            self.logger.info("Getting snapshot from prebuffer")
+            return await real_device.getVideoStream({"refresh": False})
+
         pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=10)
         self.logger.debug(f"Got snapshot URL for at {pic_url}")
 
