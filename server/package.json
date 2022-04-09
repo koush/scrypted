@@ -1,11 +1,11 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.159",
+  "version": "0.0.165",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.8",
     "@scrypted/ffmpeg": "^1.0.10",
-    "@scrypted/types": "^0.0.19",
+    "@scrypted/types": "^0.0.32",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
@@ -38,7 +38,7 @@
     "ws": "^8.2.3"
   },
   "optionalDependencies": {
-    "@koush/wrtc": "^0.5.2",
+    "@koush/wrtc": "^0.5.3",
     "mdns": "^2.7.2"
   },
   "devDependencies": {

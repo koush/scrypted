@@ -1,8 +1,7 @@
 import child_process from 'child_process';
-import net from 'net';
-import { listenZero } from "./listen-cluster";
-import { ffmpegLogInitialOutput } from "./media-helpers";
-import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingClientOptions, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingClientSession } from "@scrypted/sdk";
+import { listenZeroSingleClient } from "./listen-cluster";
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "./media-helpers";
+import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingOptions } from "@scrypted/sdk";
 import { RpcPeer } from "../../server/src/rpc";
 
 const { mediaManager } = sdk;
@@ -17,40 +16,25 @@ const configuration: RTCConfiguration = {
   ],
 };
 
-export function isPeerConnectionAlive(pc :RTCPeerConnection) {
-    if (pc.iceConnectionState === 'disconnected'
-      || pc.iceConnectionState === 'failed'
-      || pc.iceConnectionState === 'closed')
-      return false;
-    if (pc.connectionState === 'closed'
-      || pc.connectionState === 'disconnected'
-      || pc.connectionState === 'failed') 
+export function isPeerConnectionAlive(pc: RTCPeerConnection) {
+  if (pc.iceConnectionState === 'disconnected'
+    || pc.iceConnectionState === 'failed'
+    || pc.iceConnectionState === 'closed')
+    return false;
+  if (pc.connectionState === 'closed'
+    || pc.connectionState === 'disconnected'
+    || pc.connectionState === 'failed')
     return false;
   return true;
 }
 
 let wrtc: any;
 function initalizeWebRtc() {
-  if (wrtc)
-    return;
-  try {
-    wrtc = require('wrtc');
-  }
-  catch (e) {
-    console.warn('loading wrtc failed. trying @koush/wrtc fallback.');
-    wrtc = require('@koush/wrtc');
-  }
-
+  wrtc = require('@koush/wrtc');
   Object.assign(global, wrtc);
 }
 
-interface RTCSession {
-  pc: RTCPeerConnection;
-  pendingCandidates: RTCIceCandidate[];
-  resolve?: (value: any) => void;
-}
-
-export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, options?: {
+export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, console: Console, options?: {
   maxWidth: number,
 }): Promise<RTCPeerConnection> {
   initalizeWebRtc();
@@ -62,55 +46,47 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   const videoSource = new RTCVideoSource();
   pc.addTrack(videoSource.createTrack());
 
-
   let audioPort: number;
 
-  // wrtc causes browser to hang if there's no audio track? so always make sure one exists.
-  const noAudio = ffInput.mediaStreamOptions && ffInput.mediaStreamOptions.audio === null;
+  const audioSource = new RTCAudioSource();
+  pc.addTrack(audioSource.createTrack());
 
-  let audioServer: net.Server;
-  if (!noAudio) {
-    const audioSource = new RTCAudioSource();
-    pc.addTrack(audioSource.createTrack());
+  const audioServer = await listenZeroSingleClient();
+  audioServer.clientPromise.then(async (socket) => {
+    const sampleRate = 48000;
+    const channelCount = 2;
+    const bitsPerSample = 16;
 
-    audioServer = net.createServer(async (socket) => {
-      audioServer.close()
-      const { sample_rate, channels } = await sampleInfo;
-      const bitsPerSample = 16;
-      const channelCount = channels[1] === 'mono' ? 1 : 2;
-      const sampleRate = parseInt(sample_rate[1]);
+    const toRead = sampleRate / 100 * channelCount * 2;
+    socket.on('readable', () => {
+      while (true) {
+        const buffer: Buffer = socket.read(toRead);
+        if (!buffer)
+          return;
 
-      const toRead = sampleRate / 100 * channelCount * 2;
-      socket.on('readable', () => {
-        while (true) {
-          const buffer: Buffer = socket.read(toRead);
-          if (!buffer)
-            return;
+        const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + toRead)
+        const samples = new Int16Array(ab);  // 10 ms of 16-bit mono audio
 
-          const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + toRead)
-          const samples = new Int16Array(ab);  // 10 ms of 16-bit mono audio
-
-          const data = {
-            samples,
-            sampleRate,
-            bitsPerSample,
-            channelCount,
-          };
-          try {
-            audioSource.onData(data);
-          }
-          catch (e) {
-            cp.kill();
-            console.error(e);
-          }
+        const data = {
+          samples,
+          sampleRate,
+          bitsPerSample,
+          channelCount,
+        };
+        try {
+          audioSource.onData(data);
         }
-      });
+        catch (e) {
+          cp.kill();
+          console.error(e);
+        }
+      }
     });
-    audioPort = await listenZero(audioServer);
-  }
+  });
+  audioPort = audioServer.port;
 
-  const videoServer = net.createServer(async (socket) => {
-    videoServer.close()
+  const videoServer = await listenZeroSingleClient();
+  videoServer.clientPromise.then(async (socket) => {
     const res = await resolution;
     const width = parseInt(res[2]);
     const height = parseInt(res[3]);
@@ -131,28 +107,25 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
         }
       }
     });
-  });
-  const videoPort = await listenZero(videoServer);
+  })
 
   const args = [
     '-hide_banner',
-    // don't think this is actually necessary but whatever.
-    '-y',
   ];
 
   args.push(...ffInput.inputArguments);
 
-  if (!noAudio) {
-    // create a dummy audio track if none actually exists.
-    // this track will only be used if no audio track is available.
-    // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-    args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+  // create a dummy audio track if none actually exists.
+  // this track will only be used if no audio track is available.
+  // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
+  args.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
 
-    args.push('-vn');
-    args.push('-acodec', 'pcm_s16le');
-    args.push('-f', 's16le');
-    args.push(`tcp://127.0.0.1:${audioPort}`);
-  }
+  args.push('-vn');
+  args.push('-ar', '48000');
+  args.push('-ac', '2');
+  args.push('-acodec', 'pcm_s16le');
+  args.push('-f', 's16le');
+  args.push(`tcp://127.0.0.1:${audioPort}`);
 
   args.push('-an');
   // chromecast seems to crap out on higher than 15fps??? is there
@@ -165,10 +138,9 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
     args.push('-vf', 'scale=w=iw/2:h=ih/2');
   }
   args.push('-f', 'rawvideo');
-  args.push(`tcp://127.0.0.1:${videoPort}`);
+  args.push(`tcp://127.0.0.1:${videoServer.port}`);
 
-  console.log(ffInput);
-  console.log(args);
+  safePrintFFmpegArguments(console, args);
 
   const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
     // DO NOT IGNORE STDIO, NEED THE DATA FOR RESOLUTION PARSING, ETC.
@@ -176,24 +148,39 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
   ffmpegLogInitialOutput(console, cp);
   cp.on('error', e => console.error('ffmpeg error', e));
 
-  cp.on('exit', () => {
-    videoServer.close();
-    audioServer?.close();
-    pc.close();
-  });
+  const closePeerConnection = () => {
+    // causes wrtc crash???
+    // pc.close();
+  };
+
+  cp.on('exit', closePeerConnection);
 
   let outputSeen = false;
+  const checkOutputSeen = (data: any) => {
+    let stdout: string = data.toString();
+    if (outputSeen)
+      return stdout;
+    const index = stdout.indexOf('Output #0');
+    if (index === -1)
+      return stdout;
+
+    outputSeen = true;
+    stdout = stdout.substring(index);
+    return stdout;
+  }
   const resolution = new Promise<Array<string>>(resolve => {
     cp.stdout.on('data', data => {
-      const stdout = data.toString();
-      outputSeen = outputSeen || stdout.includes('Output #0');
+      const stdout = checkOutputSeen(data);
+      if (!outputSeen)
+        return;
       const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
       if (res && outputSeen)
         resolve(res);
     });
     cp.stderr.on('data', data => {
-      const stdout = data.toString();
-      outputSeen = outputSeen || stdout.includes('Output #0');
+      const stdout = checkOutputSeen(data);
+      if (!outputSeen)
+        return;
       const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
       if (res && outputSeen)
         resolve(res);
@@ -205,29 +192,16 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
     channels: string[];
   }
 
-  const sampleInfo = new Promise<SampleInfo>(resolve => {
-    const parser = (data: Buffer) => {
-      const stdout = data.toString();
-      const sample_rate = /([0-9]+) Hz/i.exec(stdout)
-      const channels = /Audio:.* (stereo|mono)/.exec(stdout)
-      if (sample_rate && channels) {
-        resolve({
-          sample_rate, channels,
-        });
-      }
-    };
-    cp.stdout.on('data', parser);
-    cp.stderr.on('data', parser);
-  });
-
   const cleanup = () => {
+    closePeerConnection();
     cp?.kill();
     setTimeout(() => cp?.kill('SIGKILL'), 1000);
   }
 
   const checkConn = () => {
-    if (!isPeerConnectionAlive(pc))
+    if (!isPeerConnectionAlive(pc)) {
       cleanup();
+    }
   }
 
   pc.addEventListener('connectionstatechange', checkConn);
@@ -235,20 +209,20 @@ export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, op
 
   setTimeout(() => {
     if (pc.connectionState !== 'connected') {
-      pc.close();
+      closePeerConnection();
       cp.kill();
     }
   }, 60000);
   return pc;
 }
 
-export async function startRTCPeerConnection(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingClientOptions & {
+export async function startRTCPeerConnection(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingOptions & {
   maxWidth: number,
 }) {
   const buffer = await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput);
   const ffInput = JSON.parse(buffer.toString());
 
-  const pc = await startRTCPeerConnectionFFmpegInput(ffInput, options);
+  const pc = await startRTCPeerConnectionFFmpegInput(ffInput, console, options);
 
   try {
     pc.onicecandidate = ev => {
@@ -285,7 +259,7 @@ export async function startRTCPeerConnection(console: Console, mediaObject: Medi
   }
 }
 
-export function startRTCPeerConnectionForBrowser(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingClientOptions) {
+export function startRTCPeerConnectionForBrowser(console: Console, mediaObject: MediaObject, session: RTCSignalingSession, options?: RTCSignalingOptions) {
   return startRTCPeerConnection(console, mediaObject, session, Object.assign({
     maxWidth: 960,
   }, options || {}));
@@ -306,20 +280,19 @@ export async function createBrowserSignalingSession(ws: WebSocket) {
     peer.handleMessage(json);
   };
 
-  const session: RTCSignalingClientSession = await peer.getParam('session');
+  const session: RTCSignalingSession = await peer.getParam('session');
   return session;
 }
 
 export async function startBrowserRTCSignaling(camera: ScryptedDevice & RTCSignalingChannel & VideoCamera, ws: WebSocket, console: Console) {
   try {
     const session = await createBrowserSignalingSession(ws);
-    const options = await session.getOptions();
 
     if (camera.interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
-      camera.startRTCSignalingSession(session, options);
+      camera.startRTCSignalingSession(session);
     }
     else {
-      return startRTCPeerConnectionForBrowser(console, await camera.getVideoStream(), session, options);
+      return startRTCPeerConnectionForBrowser(console, await camera.getVideoStream(), session);
     }
   }
   catch (e) {

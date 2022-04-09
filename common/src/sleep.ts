@@ -1,1 +1,1 @@
-export * from "../../server/src/sleep"
+export * from "@scrypted/server/src/sleep"

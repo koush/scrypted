@@ -1,53 +1,19 @@
-import type { RTCSignalingSendIceCandidate, RTCSignalingClientSession, RTCAVSignalingSetup, RTCSignalingClientOptions } from "@scrypted/sdk/types";
+import { RpcPeer } from "@scrypted/server/src/rpc";
+import type { RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions } from "@scrypted/sdk/types";
+export * from './rtc-connect';
 
-export async function startRTCSignalingSession(session: RTCSignalingClientSession, offer: RTCSessionDescriptionInit,
-    console: Console,
-    createSetup: () => Promise<RTCAVSignalingSetup>,
-    setRemoteDescription: (remoteDescription: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit>,
-    addIceCandidate?: (candidate: RTCIceCandidate) => Promise<void>) {
+function getUserAgent() {
     try {
-        const setup = await createSetup();
-        // console.log('offer', offer?.sdp, 'rtc setup', setup);
-        if (!offer) {
-            console.log('session.createLocalDescription');
-            const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-            console.log('rtc offer created');
-            const answer = await setRemoteDescription(offer);
-            console.log('rtc answer received');
-            await session.setRemoteDescription(answer, setup);
-            console.log('session.setRemoteDescription done');
-        }
-        else {
-            console.log('session.setRemoteDescription');
-            await session.setRemoteDescription(offer, setup);
-            console.log('session.createLocalDescription');
-            const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-            console.log('rtc answer created');
-            await setRemoteDescription(answer);
-            console.log('session.setRemoteDescription done');
-        }
+        return navigator.userAgent;
     }
     catch (e) {
-        console.error('RTC signaling failed', e);
-        throw e;
     }
 }
 
-export async function connectRTCSignalingClients(
-    client1: RTCSignalingClientSession,
-    setup1: RTCAVSignalingSetup,
-    client2: RTCSignalingClientSession,
-    setup2: RTCAVSignalingSetup,
-) {
-    const offer = await client1.createLocalDescription('offer', setup1, candidate => client2.addIceCandidate(candidate));
-    await client2.setRemoteDescription(offer, setup2);
-    const answer = await client2.createLocalDescription('answer', setup2, candidate => client2.addIceCandidate(candidate));
-    await client1.setRemoteDescription(answer, setup1);
-}
-
-export class BrowserSignalingSession implements RTCSignalingClientSession {
-    hasSetup = false;
-    options: RTCSignalingClientOptions = {
+export class BrowserSignalingSession implements RTCSignalingSession {
+    pc: RTCPeerConnection;
+    options: RTCSignalingOptions = {
+        userAgent: getUserAgent(),
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
                 codecs: undefined,
@@ -60,34 +26,43 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
         }
     };
 
-    constructor(public pc: RTCPeerConnection, cleanup?: () => void) {
-        const checkConn = () => {
-            console.log('iceConnectionState state', pc.iceConnectionState);
-            console.log('connectionState', pc.connectionState);
-            if (pc.iceConnectionState === 'disconnected'
-                || pc.iceConnectionState === 'failed'
-                || pc.iceConnectionState === 'closed') {
-                cleanup?.();
-            }
-            if (pc.connectionState === 'closed'
-                || pc.connectionState === 'disconnected'
-                || pc.connectionState === 'failed') {
-                cleanup?.();
-            }
-        }
+    constructor(public peerConnectionCreated?: (pc: RTCPeerConnection) => Promise<void>, public cleanup?: () => void) {
 
-        pc.addEventListener('connectionstatechange', checkConn);
-        pc.addEventListener('iceconnectionstatechange', checkConn);
     }
 
-    async getOptions(): Promise<RTCSignalingClientOptions> {
+    async getOptions(): Promise<RTCSignalingOptions> {
         return this.options;
     }
 
     async createPeerConnection(setup: RTCAVSignalingSetup) {
-        if (this.hasSetup)
+        if (this.pc)
             return;
-        this.hasSetup = true;
+
+        const checkConn = () => {
+            console.log('iceConnectionState', pc.iceConnectionState);
+            console.log('connectionState', pc.connectionState);
+            if (pc.iceConnectionState === 'disconnected'
+                || pc.iceConnectionState === 'failed'
+                || pc.iceConnectionState === 'closed') {
+                this.cleanup?.();
+            }
+            if (pc.connectionState === 'closed'
+                || pc.connectionState === 'disconnected'
+                || pc.connectionState === 'failed') {
+                this.cleanup?.();
+            }
+        }
+
+        const pc = this.pc = new RTCPeerConnection(setup.configuration);
+        await this.peerConnectionCreated?.(pc);
+
+        pc.addEventListener('connectionstatechange', checkConn);
+        pc.addEventListener('iceconnectionstatechange', checkConn);
+
+        pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState))
+        pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState))
+        pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
+
         if (setup.datachannel)
             this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
         if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
@@ -133,21 +108,25 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) {
         await this.createPeerConnection(setup);
 
-        const gatheringPromise = new Promise(resolve => this.pc.onicegatheringstatechange = () => {
-            if (this.pc.iceGatheringState === 'complete')
-                resolve(undefined);
-        });
-
-        if (sendIceCandidate) {
+        const gatheringPromise = new Promise(resolve => {
             this.pc.onicecandidate = ev => {
                 if (ev.candidate) {
                     console.log("local candidate", ev.candidate);
-                    sendIceCandidate(JSON.parse(JSON.stringify(ev.candidate)));
+                    sendIceCandidate?.(JSON.parse(JSON.stringify(ev.candidate)));
+                }
+                else {
+                    resolve(undefined);
                 }
             }
-        }
+
+            this.pc.onicegatheringstatechange = () => {
+                if (this.pc.iceGatheringState === 'complete')
+                    resolve(undefined);
+            }
+        });
 
         const toDescription = (init: RTCSessionDescriptionInit) => {
+            console.log('local description', init.sdp);
             return {
                 type: init.type,
                 sdp: init.sdp,
@@ -184,14 +163,33 @@ export class BrowserSignalingSession implements RTCSignalingClientSession {
 
     async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) {
         await this.pc.setRemoteDescription(description);
-
+        console.log('remote description', description.sdp);
     }
 
     async addIceCandidate(candidate: RTCIceCandidateInit) {
-        console.log("remote candidate", candidate);
         await this.pc.addIceCandidate(candidate);
+        console.log("remote candidate", candidate);
     }
 
     async endSession() {
     }
+}
+
+export async function createBrowserSignalingSession(ws: WebSocket, localName: string, remoteName: string) {
+    const peer = new RpcPeer(localName, remoteName, (message, reject) => {
+        const json = JSON.stringify(message);
+        try {
+            ws.send(json);
+        }
+        catch (e) {
+            reject?.(e);
+        }
+    });
+    ws.onmessage = message => {
+        const json = JSON.parse(message.data);
+        peer.handleMessage(json);
+    };
+
+    const session: RTCSignalingSession = await peer.getParam('session');
+    return session;
 }

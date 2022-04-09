@@ -1,20 +1,30 @@
-import { RTCAVSignalingSetup, RTCSignalingChannel, FFMpegInput, MediaStreamOptions } from "@scrypted/sdk/types";
-import { listenZeroSingleClient } from "./listen-cluster";
-import { Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpCodecParameters, RtpPacket, uint16Add } from "@koush/werift";
-import dgram from 'dgram';
-import { RtspServer } from "./rtsp-server";
-import { Socket } from "net";
-import { RTCSessionControl, RTCSignalingSession } from "@scrypted/sdk";
+import { Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpCodecParameters, RTCRtpTransceiver, RTCSessionDescription, RtpPacket, uint16Add } from "@koush/werift";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
-import { RpcPeer } from "../../server/src/rpc";
-import {addTrackControls} from './sdp-utils'
+import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
+import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
+import { RtspServer } from "@scrypted/common/src/rtsp-server";
+import { createSdpInput } from '@scrypted/common/src/sdp-utils';
+import sdk, { FFMpegInput, Intercom, MediaObject, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import { ChildProcess } from "child_process";
+import dgram from 'dgram';
+import { Socket } from "net";
+import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
+import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
+import { createRawResponse, isPeerConnectionAlive } from "./werift-util";
+
+const { mediaManager } = sdk;
+
+export interface RTCPeerConnectionPipe {
+    ffmpegInput: FFMpegInput;
+    intercom: Promise<Intercom>;
+}
 
 export async function createRTCPeerConnectionSource(options: {
     console: Console,
-    mediaStreamOptions: MediaStreamOptions,
+    mediaStreamOptions: ResponseMediaStreamOptions,
     channel: RTCSignalingChannel,
     useUdp: boolean,
-}): Promise<FFMpegInput> {
+}): Promise<RTCPeerConnectionPipe> {
     const { mediaStreamOptions, channel, console, useUdp } = options;
     const videoPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
     const audioPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
@@ -41,21 +51,19 @@ export async function createRTCPeerConnectionSource(options: {
         sessionControl?.endSession().catch(() => { });
     };
 
-    clientPromise.then(async (client) => {
+    const pcPromise = clientPromise.then(async (client) => {
         socket = client;
         const rtspServer = new RtspServer(socket, undefined, udp);
-        rtspServer.console = console;
+        // rtspServer.console = console;
         rtspServer.audioChannel = 0;
         rtspServer.videoChannel = 2;
 
         const pc = new RTCPeerConnection({
             codecs: {
                 audio: [
-                    new RTCRtpCodecParameters({
-                        mimeType: "audio/opus",
-                        clockRate: 48000,
-                        channels: 2,
-                    }),
+                    requiredAudioCodec,
+                    // these are some other option templates that may be worth considering
+                    // for fast path.
                     // new RTCRtpCodecParameters({
                     //     mimeType: "audio/opus",
                     //     clockRate: 8000,
@@ -73,39 +81,16 @@ export async function createRTCPeerConnectionSource(options: {
                     // }),
                 ],
                 video: [
-                    // h264 high
-                    // new RTCRtpCodecParameters(
-                    //     {
-                    //         clockRate: 90000,
-                    //         mimeType: "video/H264",
-                    //         rtcpFeedback: [
-                    //             { type: "transport-cc" },
-                    //             { type: "ccm", parameter: "fir" },
-                    //             { type: "nack" },
-                    //             { type: "nack", parameter: "pli" },
-                    //             { type: "goog-remb" },
-                    //         ],
-                    //         parameters: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f"
-                    //     },
-                    // ),
-                    new RTCRtpCodecParameters({
-                        mimeType: "video/H264",
-                        clockRate: 90000,
-                        rtcpFeedback: [
-                            { type: "transport-cc" },
-                            { type: "ccm", parameter: "fir" },
-                            { type: "nack" },
-                            { type: "nack", parameter: "pli" },
-                            { type: "goog-remb" },
-                        ],
-                        parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f'
-                    })
+                    requiredVideoCodec,
                 ],
             }
         });
 
         socket.on('close', cleanup);
         socket.on('error', cleanup);
+        pc.iceGatheringStateChange.subscribe(() => {
+            console.log('iceGatheringStateChange', pc.iceGatheringState);
+        });
         pc.iceConnectionStateChange.subscribe(() => {
             console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
             if (pc.iceConnectionState === 'disconnected'
@@ -123,11 +108,12 @@ export async function createRTCPeerConnectionSource(options: {
             }
         });
 
+        let audioTransceiver: RTCRtpTransceiver;
         const doSetup = async (setup: RTCAVSignalingSetup) => {
             let gotAudio = false;
             let gotVideo = false;
 
-            const audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
+            audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.onTrack.subscribe((track) => {
                 if (useUdp) {
                     track.onReceiveRtp.subscribe(rtp => {
@@ -200,15 +186,11 @@ export async function createRTCPeerConnectionSource(options: {
                     jitter.pipe(new RtspOutput())
                 }
 
-                // what is this for? it was in the example code, but as far as i can tell, it doesn't
-                // actually do anything?
-                // track.onReceiveRtp.once(() => {
-                //     pictureLossInterval = setInterval(() => videoTransceiver.receiver.sendRtcpPLI(track.ssrc!), 4000);
-                // });
-
                 track.onReceiveRtp.once(() => {
                     let firSequenceNumber = 0;
                     pictureLossInterval = setInterval(() => {
+                        // i think this is necessary for older clients like ring
+                        // which is really a sip gateway?
                         const fir = new FullIntraRequest({
                             senderSsrc: videoTransceiver.receiver.rtcpSsrc,
                             mediaSsrc: track.ssrc,
@@ -223,14 +205,43 @@ export async function createRTCPeerConnectionSource(options: {
                             feedback: fir,
                         });
                         videoTransceiver.receiver.dtlsTransport.sendRtcp([packet]);
+
+                        // from my testing with browser clients, the pli is what
+                        // triggers a i-frame to be sent, and not the prior FIR request.
+                        videoTransceiver.receiver.sendRtcpPLI(track.ssrc!);
                     }, 4000);
                 });
             });
         }
 
-        sessionControl = await channel.startRTCSignalingSession({
-            [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
-            createLocalDescription: async (type, setup, sendIceCandidate) => {
+        const handleRtspSetup = async (description: RTCSessionDescriptionInit) => {
+            if (description.type !== 'answer')
+                return;
+
+            rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
+            console.log('sdp sent', rtspServer.sdp);
+
+            if (useUdp) {
+                rtspServer.udpPorts = {
+                    video: videoPort,
+                    audio: audioPort,
+                };
+                rtspServer.client.write(rtspServer.sdp + '\r\n');
+                rtspServer.client.end();
+                rtspServer.client.on('data', () => { });
+                // rtspServer.client.destroy();
+            }
+            else {
+                await rtspServer.handleSetup();
+            }
+        }
+
+        class SignalingSession implements RTCSignalingSession {
+            getOptions(): Promise<RTCSignalingOptions> {
+                return;
+            }
+
+            async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
                 if (type === 'offer')
                     doSetup(setup);
                 if (setup.datachannel)
@@ -244,70 +255,105 @@ export async function createRTCPeerConnectionSource(options: {
                     sendIceCandidate?.(ev.candidate as any);
                 };
 
+                const handleRawResponse = async (response: RTCSessionDescription): Promise<RTCSessionDescriptionInit> => {
+                    const ret = createRawResponse(response);
+                    await handleRtspSetup(ret);
+                    return ret;
+                }
+
                 if (type === 'answer') {
                     let answer = await pc.createAnswer();
-                    console.log(answer.sdp);
+                    console.log('sdp received', answer.sdp);
                     const set = pc.setLocalDescription(answer);
                     if (sendIceCandidate)
-                        return answer as any;
+                        return handleRawResponse(answer);
                     await set;
                     await gatheringPromise;
                     answer = pc.localDescription || answer;
-                    return {
-                        sdp: answer.sdp,
-                        type: answer.type,
-                    };
+                    return handleRawResponse(answer);
                 }
                 else {
                     let offer = await pc.createOffer();
                     // console.log(offer.sdp);
                     const set = pc.setLocalDescription(offer);
                     if (sendIceCandidate)
-                        return offer as any;
+                        return handleRawResponse(offer);
                     await set;
                     await gatheringPromise;
                     offer = await pc.createOffer();
-                    return {
-                        sdp: offer.sdp,
-                        type: offer.type,
-                    };
+                    return handleRawResponse(offer);
                 }
-            },
-            setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
+            }
+            async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> {
                 if (description.type === 'offer')
                     doSetup(setup);
-                rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
-                console.log('rtsp sdp', rtspServer.sdp);
 
-                if (useUdp) {
-                    rtspServer.udpPorts = {
-                        video: videoPort,
-                        audio: audioPort,
-                    };
-                    rtspServer.client.write(rtspServer.sdp + '\r\n');
-                    rtspServer.client.end();
-                    rtspServer.client.on('data', () => { });
-                    // rtspServer.client.destroy();
-                    console.log('sdp sent');
-                }
-                else {
-                    await rtspServer.handleSetup();
-                }
+                await handleRtspSetup(description);
                 await pc.setRemoteDescription(description as any);
-            },
-            addIceCandidate: async (candidate: RTCIceCandidateInit) => {
+            }
+            async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
-            },
-        } as RTCSignalingSession);
-    })
-        .catch(e => cleanup);
+            }
 
+        }
 
+        sessionControl = await channel.startRTCSignalingSession(new SignalingSession());
+        console.log('session setup complete');
+
+        return pc;
+    });
+
+    pcPromise.catch(e => {
+        console.error('failed to create webrtc signaling session', e);
+        cleanup();
+    });
+
+    const intercom = pcPromise
+        .then(async (pc) => {
+            await pc.connectionStateChange.watch(state => state === 'connected');
+
+            const audioTransceiver = pc.transceivers.find(t => t.kind === 'audio');
+
+            let talkbackProcess: ChildProcess;
+
+            const track = audioTransceiver.sender.sendRtp;
+
+            const ret: Intercom = {
+                async startIntercom(media: MediaObject) {
+                    if (!isPeerConnectionAlive(pc))
+                        throw new Error('peer connection is closed');
+
+                    if (!track)
+                        throw new Error('peer connection does not support two way audio');
+
+                    const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(media, ScryptedMimeTypes.FFmpegInput);
+
+                    const { cp } = await startRtpForwarderProcess(console, ffmpegInput.inputArguments, {
+                        audio: {
+                            outputArguments: getFFmpegRtpAudioOutputArguments(),
+                            transceiver: audioTransceiver,
+                        },
+                    });
+
+                    ret.stopIntercom();
+
+                    talkbackProcess = cp;
+                },
+                async stopIntercom() {
+                    safeKillFFmpeg(talkbackProcess);
+                    talkbackProcess = undefined;
+                },
+            };
+
+            return ret;
+        });
+
+    let ffmpegInput: FFMpegInput;
     if (useUdp) {
         const url = `tcp://127.0.0.1:${port}`;
 
         mediaStreamOptions.container = 'sdp';
-        return {
+        ffmpegInput = {
             url,
             mediaStreamOptions,
             inputArguments: [
@@ -336,7 +382,7 @@ export async function createRTCPeerConnectionSource(options: {
     }
     else {
         const url = `rtsp://127.0.0.1:${port}`;
-        return {
+        ffmpegInput = {
             url,
             mediaStreamOptions,
             inputArguments: [
@@ -349,6 +395,11 @@ export async function createRTCPeerConnectionSource(options: {
                 '-i', url,
             ]
         };
+    }
+
+    return {
+        ffmpegInput,
+        intercom,
     }
 }
 
@@ -405,35 +456,7 @@ export class JitterBuffer extends Pipeline {
     };
 }
 
-// this is an sdp corresponding to what is requested from webrtc.
-// h264 baseline and opus are required codecs that all webrtc implementations must provide.
-function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
-    // replace all IPs
-    let outputSdp = sdp
-        .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
-        .replace(/m=audio \d+/, `m=audio ${audioPort}`)
-        .replace(/m=video \d+/, `m=video ${videoPort}`);
-
-        // filter all ice and rtcp mux info
-    let lines = outputSdp.split('\n').map(line => line.trim());
-    lines = lines
-        .filter(line => !line.includes('a=rtcp-mux'))
-        .filter(line => !line.includes('a=candidate'))
-        .filter(line => !line.includes('a=ice'));
-
-    outputSdp = lines.join('\r\n');
-
-    outputSdp = addTrackControls(outputSdp);
-
-    // only include the m sections.
-    outputSdp = outputSdp.split('m=')
-        .slice(1)
-        .map(line => 'm=' + line)
-        .join('');
-    return outputSdp;
-}
-
-export function getRTCMediaStreamOptions(id: string, name: string, useUdp: boolean): MediaStreamOptions {
+export function getRTCMediaStreamOptions(id: string, name: string, useUdp: boolean): ResponseMediaStreamOptions {
     return {
         // set by consumer
         id,

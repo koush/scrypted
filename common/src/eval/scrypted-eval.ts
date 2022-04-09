@@ -2,7 +2,7 @@ import type { TranspileOptions } from "typescript";
 import sdk, { ScryptedDeviceBase, MixinDeviceBase, ScryptedInterface, ScryptedDeviceType } from "@scrypted/sdk";
 import vm from "vm";
 import fs from 'fs';
-import { newThread } from '../../../server/src/threading';
+import { newThread } from '@scrypted/server/src/threading';
 import { ScriptDevice } from "./monaco/script-device";
 import { ScryptedInterfaceDescriptors } from "@scrypted/sdk/types";
 import fetch from 'node-fetch-commonjs';

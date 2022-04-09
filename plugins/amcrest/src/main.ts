@@ -9,7 +9,6 @@ import net from 'net';
 import { listenZero } from "@scrypted/common/src/listen-cluster";
 import { readLength } from "@scrypted/common/src/read-stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
-import { parse } from "path";
 
 const { mediaManager } = sdk;
 
@@ -30,7 +29,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     eventStream: Stream;
     cp: ChildProcess;
     client: AmcrestCameraClient;
-    maxExtraStreams: Promise<number>;
     videoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     onvifIntercom = new OnvifIntercom(this);
 
@@ -139,7 +137,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     if (this.storage.getItem('debug'))
                         this.console.log('event', data.toString());
                 });
-                events.on('event', (event: AmcrestEvent, index: string) => {
+                events.on('event', (event: AmcrestEvent, index: string, payload: string) => {
                     const channelNumber = this.getRtspChannel();
                     if (channelNumber) {
                         const idx = parseInt(index) + 1;
@@ -160,13 +158,23 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                     }
                     else if (event === AmcrestEvent.TalkInvite
                         || event === AmcrestEvent.PhoneCallDetectStart
-                        || event === AmcrestEvent.AlarmIPCStart || event === AmcrestEvent.DahuaTalkInvite) {
+                        || event === AmcrestEvent.AlarmIPCStart
+                        || event === AmcrestEvent.DahuaTalkInvite) {
                         this.binaryState = true;
                     }
                     else if (event === AmcrestEvent.TalkHangup
                         || event === AmcrestEvent.PhoneCallDetectStop
-                        || event === AmcrestEvent.AlarmIPCStop || event === AmcrestEvent.DahuaTalkHangup) {
+                        || event === AmcrestEvent.AlarmIPCStop
+                        || event === AmcrestEvent.DahuaTalkHangup) {
                         this.binaryState = false;
+                    }
+                    else if (event === AmcrestEvent.TalkPulse && doorbellType === AMCREST_DOORBELL_TYPE) {
+                        if (payload.includes('Invite')) {
+                            this.binaryState = true;
+                        }
+                        else if (payload.includes('Hangup')) {
+                            this.binaryState = false;
+                        }
                     }
                     else if (event === AmcrestEvent.DahuaTalkPulse && doorbellType === DAHUA_DOORBELL_TYPE) {
                         clearTimeout(pulseTimeout);
@@ -234,7 +242,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async takeSmartCameraPicture(option?: PictureOptions): Promise<MediaObject> {
-        return mediaManager.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
+        return this.createMediaObject(await this.getClient().jpegSnapshot(), 'image/jpeg');
     }
 
     async getUrlSettings() {
@@ -265,8 +273,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         const client = this.getClient();
 
-        if (!this.maxExtraStreams) {
-            this.maxExtraStreams = (async () => {
+        if (!this.videoStreamOptions) {
+            this.videoStreamOptions = (async () => {
                 let mas: string;
                 try {
                     const response = await client.digestAuth.request({
@@ -280,17 +288,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 catch (e) {
                     this.console.error('error retrieving max extra streams', e);
                     mas = this.storage.getItem('maxExtraStreams');
-                    this.maxExtraStreams = undefined;
                 }
-                return parseInt(mas) || 1;
-            })();
-        }
 
-        if (!this.videoStreamOptions) {
-            this.videoStreamOptions = (async () => {
-                const mas = await this.maxExtraStreams;
+                const maxExtraStreams = parseInt(mas) || 1;
                 const channel = parseInt(this.getRtspChannel()) || 1;
-                const vsos = [...Array(mas + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
+                const vsos = [...Array(maxExtraStreams + 1).keys()].map(subtype => this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/cam/realmonitor?channel=${channel}&subtype=${subtype}`, subtype));
 
                 try {
                     const capResponse = await client.digestAuth.request({
@@ -364,7 +366,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
 
         this.client = undefined;
-        this.maxExtraStreams = undefined;
+        this.videoStreamOptions = undefined;
 
         super.putSetting(key, value);
         const doorbellType = this.storage.getItem('doorbellType');

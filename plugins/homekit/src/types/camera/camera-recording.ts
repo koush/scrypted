@@ -1,15 +1,15 @@
 
-import { FFMpegFragmentedMP4Session, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
-import { parseFragmentedMP4 } from '@scrypted/common/src/stream-parser';
-import sdk, { AudioSensor, FFMpegInput, MediaStreamOptions, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import { FFMpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import sdk, { AudioSensor, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import fs from 'fs';
+import mkdirp from 'mkdirp';
 import net from 'net';
 import { Duplex, Writable } from 'stream';
 import { HomeKitSession } from '../../common';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
-import { evalRequest } from './camera-transcode';
-import fs from 'fs';
-import mkdirp from 'mkdirp';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
+import { evalRequest } from './camera-transcode';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -25,15 +25,8 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     const storage = deviceManager.getMixinStorage(device.id, undefined);
     const saveRecordings = device.mixins.includes(homekitSession.videoClipsId);
 
-    let selectedStream: MediaStreamOptions;
-    let recordingChannel = storage.getItem('recordingChannel');
-    if (recordingChannel) {
-        const msos = await device.getVideoStreamOptions();
-        selectedStream = msos.find(mso => mso.name === recordingChannel);
-    }
-
     const media = await device.getVideoStream({
-        id: selectedStream?.id,
+        destination: 'remote-recorder',
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
         container: 'mp4',
     });
@@ -185,9 +178,19 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         }
     };
 
+    // this will cause the generator to close/throw.
+    const cleanupPipes = () => {
+        socket?.destroy();
+        safeKillFFmpeg(cp);
+    }
+
     console.log(`motion recording started`);
     const { socket, cp, generator } = session;
-    const videoTimeout = setTimeout(() => generator.throw(new Error('homekit secure video max duration reached')), maxVideoDuration);
+    const videoTimeout = setTimeout(() => {
+        console.error('homekit secure video max duration reached');
+        cleanupPipes();
+    }, maxVideoDuration);
+
     let pending: Buffer[] = [];
     try {
         let i = 0;
@@ -222,13 +225,12 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         console.log(`motion recording finished`);
     }
     catch (e) {
-        console.log(`motion recording complete ${e}`);
+        console.log(`motion recording completed with error ${e}`);
     }
     finally {
         clearTimeout(videoTimeout);
         console.timeEnd('mp4 recording');
-        socket?.destroy();
-        cp?.kill('SIGKILL');
+        cleanupPipes();
         recordingFile?.end();
         recordingFile?.destroy();
         if (saveRecordings) {

@@ -1,14 +1,15 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
-import { ffmpegLogInitialOutput } from '../../../common/src/media-helpers';
-import { fitHeightToWidth } from "../../../common/src/resolution-utils";
-import { listenZero } from "../../../common/src/listen-cluster";
+import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
+import { listenZero } from "@scrypted/common/src/listen-cluster";
 import net from 'net';
 import WS from 'ws';
 import { once } from "events";
 import { FeatureFlagsShim } from "./shim";
 import { UnifiProtect } from "./main";
+import { Readable } from "stream";
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -20,7 +21,7 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
     }
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
         const buffer = await this.camera.getSnapshot(options, 'package-snapshot?');
-        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+        return this.createMediaObject(buffer, 'image/jpeg');
     }
     async getPictureOptions(): Promise<PictureOptions[]> {
         return;
@@ -29,7 +30,7 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
         const o = (await this.getVideoStreamOptions())[0];
         return this.camera.getVideoStream(o);
     }
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         const options = await this.camera.getVideoStreamOptions();
         return [options[options.length - 1]];
     }
@@ -90,6 +91,8 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
     }
 
     async startIntercom(media: MediaObject) {
+        this.stopIntercom();
+
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
         const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
 
@@ -106,9 +109,44 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         const websocket = new WS(talkbackUrl, { rejectUnauthorized: false });
         await once(websocket, 'open');
 
-        const server = new net.Server(async (socket) => {
-            server.close();
+        const args = [
+            '-hide_banner',
 
+            '-fflags', 'nobuffer',
+            '-flags', 'low_delay',
+
+            ...ffmpegInput.inputArguments,
+        ];
+
+        args.push(
+            "-acodec", "aac",
+            "-profile:a", "aac_low",
+            "-threads", "0",
+            "-avioflags", "direct",
+            '-fflags', '+flush_packets', '-flush_packets', '1',
+            "-flags", "+global_header",
+            "-ar", camera.talkbackSettings.samplingRate.toString(),
+            "-ac", camera.talkbackSettings.channels.toString(),
+            "-b:a", "16k",
+            "-f", "adts",
+            `pipe:3`,
+        );
+
+        this.console.log('starting 2 way audio', args);
+
+        const ffmpeg = await mediaManager.getFFmpegPath();
+        const cp = this.intercomProcess = child_process.spawn(ffmpeg, args, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+        this.intercomProcess.on('exit', () => {
+            this.intercomProcess = undefined;
+            websocket.close();
+        });
+
+        websocket.on('close', () => safeKillFFmpeg(cp));
+
+        (async () => {
+            const socket = cp.stdio[3] as Readable;
             this.console.log('sending audio data to', talkbackUrl);
 
             try {
@@ -119,43 +157,20 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
                         if (!data)
                             break;
                         websocket.send(data, e => {
-                            if (e)
-                                socket.destroy();
+                            if (e) {
+                                safeKillFFmpeg(cp);
+                            }
                         });
                     }
                 }
             }
             finally {
                 this.console.log('talkback ended')
-                this.intercomProcess.kill();
+                safeKillFFmpeg(cp);
             }
-        });
-        const port = await listenZero(server)
+        })();
 
-        const args = ffmpegInput.inputArguments.slice();
 
-        args.push(
-            "-acodec", "libfdk_aac",
-            "-profile:a", "aac_low",
-            "-threads", "0",
-            "-avioflags", "direct",
-            "-flush_packets", "1",
-            "-flags", "+global_header",
-            "-ar", camera.talkbackSettings.samplingRate.toString(),
-            "-ac", camera.talkbackSettings.channels.toString(),
-            "-b:a", "16k",
-            "-f", "adts",
-            `tcp://127.0.0.1:${port}`,
-        );
-
-        this.console.log('starting 2 way audio', args);
-
-        const ffmpeg = await mediaManager.getFFmpegPath();
-        this.intercomProcess = child_process.spawn(ffmpeg, args);
-        this.intercomProcess.on('exit', () => {
-            websocket.close();
-            this.intercomProcess = undefined;
-        });
         ffmpegLogInitialOutput(this.console, this.intercomProcess);
     }
 
@@ -186,7 +201,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             throw new Error('Event snapshot unavailable.');
         }
         const data = await response.arrayBuffer();
-        return mediaManager.createMediaObject(Buffer.from(data), 'image/jpeg');
+        return this.createMediaObject(Buffer.from(data), 'image/jpeg');
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -262,7 +277,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
 
     async takePicture(options?: PictureOptions): Promise<MediaObject> {
         const buffer = await this.getSnapshot(options);
-        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+        return this.createMediaObject(buffer, 'image/jpeg');
     }
     findCamera() {
         return this.protect.api.cameras.find(camera => camera.id === this.nativeId);
@@ -282,11 +297,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
             container: 'rtsp',
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
         } as MediaStreamUrl));
-        return mediaManager.createMediaObject(data, ScryptedMimeTypes.MediaStreamUrl);
+        return this.createMediaObject(data, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     createMediaStreamOptions(channel: ProtectCameraChannelConfig) {
-        const ret: MediaStreamOptions = {
+        const ret: ResponseMediaStreamOptions = {
             id: channel.id.toString(),
             name: channel.name,
             video: {
@@ -311,7 +326,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         return ret;
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         const camera = this.findCamera();
         const vsos = camera.channels
             .map(channel => this.createMediaStreamOptions(channel));
@@ -360,11 +375,11 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         })
 
         if (typeof media === 'string') {
-            media = await mediaManager.createMediaObjectFromUrl(media);
+            media = await mediaManager.createMediaObjectFromUrl(media, { sourceId: this.id });
         }
         if (media) {
             if (typeof media === 'string') {
-                media = await mediaManager.createMediaObjectFromUrl(media);
+                media = await mediaManager.createMediaObjectFromUrl(media, { sourceId: this.id });
             }
             this.startIntercom(media);
         }

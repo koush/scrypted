@@ -1,4 +1,4 @@
-import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaManager, HttpRequest } from '@scrypted/types'
+import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaManager, HttpRequest, ScryptedInterface } from '@scrypted/types'
 import { ScryptedRuntime } from '../runtime';
 import { Plugin } from '../db-types';
 import { PluginAPI, PluginAPIManagedListeners } from './plugin-api';
@@ -7,6 +7,8 @@ import { getState } from '../state';
 import { PluginHost } from './plugin-host';
 import debounce from 'lodash/debounce';
 import { RpcPeer } from '../rpc';
+import { propertyInterfaces } from './descriptor';
+import { checkProperty } from './plugin-state-check';
 
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;
@@ -42,7 +44,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
     // do we care about mixin validation here?
     // maybe to prevent/notify errant dangling events?
-    async onMixinEvent(id: string, nativeIdOrMixinDevice: ScryptedNativeId|any, eventInterface: any, eventData?: any) {
+    async onMixinEvent(id: string, nativeIdOrMixinDevice: ScryptedNativeId | any, eventInterface: any, eventData?: any) {
         // nativeId code path has been deprecated in favor of mixin object 12/10/2021
         const device = this.scrypted.findPluginDeviceById(id);
 
@@ -111,6 +113,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     }
 
     async setState(nativeId: ScryptedNativeId, key: string, value: any) {
+        checkProperty(key, value);
         this.scrypted.stateManager.setPluginState(this.pluginId, nativeId, key, value);
     }
 

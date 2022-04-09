@@ -2,10 +2,38 @@ import child_process from 'child_process';
 import { ChildProcess } from 'child_process';
 import sdk from "@scrypted/sdk";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
-import { MP4Atom, parseFragmentedMP4 } from './stream-parser';
-import { Duplex, Readable } from 'stream';
+import { Readable } from 'stream';
+import { readLength } from './read-stream';
 
 const { mediaManager } = sdk;
+
+export async function* parseFragmentedMP4(readable: Readable): AsyncGenerator<MP4Atom> {
+    while (true) {
+        const header = await readLength(readable, 8);
+        const length = header.readInt32BE(0) - 8;
+        const type = header.slice(4).toString();
+        const data = await readLength(readable, length);
+
+        yield {
+            header,
+            length,
+            type,
+            data,
+        };
+    }
+}
+
+export interface MP4Atom {
+    header: Buffer;
+    length: number;
+    type: string;
+    data: Buffer;
+}
+
+export const FFMPEG_FRAGMENTED_MP4_OUTPUT_ARGS = [
+    '-movflags', 'frag_keyframe+empty_moov+default_base_moof+skip_sidx+skip_trailer',
+    '-f', 'mp4',
+];
 
 export interface FFMpegFragmentedMP4Session {
     cp: ChildProcess;
@@ -17,8 +45,7 @@ export async function startFFMPegFragmentedMP4Session(inputArguments: string[], 
     args.push(
         ...videoOutputArgs,
         ...audioOutputArgs,
-        '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-        '-f', 'mp4',
+        ...FFMPEG_FRAGMENTED_MP4_OUTPUT_ARGS,
         'pipe:3',
     );
 

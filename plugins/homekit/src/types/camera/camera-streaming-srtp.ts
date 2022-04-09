@@ -1,7 +1,8 @@
 import { readLength } from '@scrypted/common/src/read-stream';
 import { parsePayloadTypes } from '@scrypted/common/src/sdp-utils';
-import sdk, { MediaStreamOptions, RequestMediaStreamOptions, VideoCamera } from '@scrypted/sdk';
+import sdk, { MediaStreamDestination, VideoCamera } from '@scrypted/sdk';
 import net from 'net';
+import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
 import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
@@ -12,7 +13,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamSrtp(device: & VideoCamera, console: Console, selectedStream: MediaStreamOptions, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamSrtp(device: & VideoCamera, console: Console, destination: MediaStreamDestination, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const vconfig = {
         keys: {
             localMasterKey: session.prepareRequest.video.srtp_key,
@@ -39,12 +40,11 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
         console.log(rtcp);
     })
 
-    const mo = await device.getVideoStream(Object.assign({
-        // directMediaStream: true,
-    } as RequestMediaStreamOptions, selectedStream));
+    const mo = await device.getVideoStream({ destination });
     const rfc = await mediaManager.convertMediaObjectToJSON<any>(mo, mo.mimeType);
     let { url, sdp } = rfc;
-    let socket: net.Socket;
+    session.mediaStreamOptions = rfc.mediaStreamOptions;
+    let socket: Readable;
     const isRtsp = url.startsWith('rtsp');
     if (isRtsp) {
         const rtspClient = new RtspClient(url);
@@ -53,7 +53,8 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
         sdp = sdpResponse.body.toString().trim();
         await rtspClient.setup(0, '/audio');
         await rtspClient.setup(2, '/video');
-        socket = await rtspClient.play();
+        await rtspClient.play();
+        socket = rtspClient.rfc4571;
     }
     else {
         const u = new URL(url);
@@ -79,7 +80,7 @@ export async function startCameraStreamSrtp(device: & VideoCamera, console: Cons
                 session.startRequest.audio.rtcp_interval,
                 session.startRequest.audio.packet_time,
                 session.startRequest.audio.sample_rate,
-                );
+            );
             while (true) {
                 // trim the rtsp framing
                 if (isRtsp)

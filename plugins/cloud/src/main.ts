@@ -1,10 +1,8 @@
 import axios from 'axios';
 import { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
 import qs from 'query-string';
-import { GcmRtcManager, GcmRtcConnection } from './legacy';
 import { Duplex } from 'stream';
 import net from 'net';
-import tls from 'tls';
 import HttpProxy from 'http-proxy';
 import { Server, createServer } from 'http';
 import Url from 'url';
@@ -12,24 +10,12 @@ import sdk from "@scrypted/sdk";
 import { once } from 'events';
 import path from 'path';
 import bpmux from 'bpmux';
+import { PushManager } from './push';
 
 const { deviceManager, endpointManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
 const SCRYPTED_SERVER = 'home.scrypted.app';
-
-export async function createDefaultRtcManager(): Promise<GcmRtcManager> {
-    const manager = await GcmRtcManager.start({
-        // Scrypted
-        '827888101440': '',
-    },
-        {
-            iceServers: [
-            ],
-        });
-
-    return manager;
-}
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
 
@@ -53,11 +39,14 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 }
 
 class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
-    manager: GcmRtcManager;
+    manager = new PushManager({
+        // Scrypted
+        [DEFAULT_SENDER_ID]: '',
+    });
     server: Server;
     proxy: HttpProxy;
     push: ScryptedPush;
-    cloudMessagePath: Promise<string>;
+    whitelisted = new Map<string, string>();
 
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
         const local = Url.parse(localUrl);
@@ -66,7 +55,13 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             return Buffer.from(`${baseUrl}${local.path}`);
         }
 
+        if (this.whitelisted.has(local.path)) {
+            return Buffer.from(this.whitelisted.get(local.path));
+        }
+
         const token_info = this.storage.getItem('token_info');
+        if (!token_info)
+            throw new Error('@scrypted/cloud is not logged in.');
         const q = qs.stringify({
             scope: local.path,
             ttl,
@@ -84,29 +79,51 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         })
 
         const url = `${baseUrl}${local.path}?${tokens}`;
+        this.whitelisted.set(local.path, url);
         return Buffer.from(url);
     }
-
 
     constructor() {
         super();
 
-        this.initialize();
-
         this.fromMimeType = ScryptedMimeTypes.LocalUrl;
         this.toMimeType = ScryptedMimeTypes.Url;
 
-        (async () => {
-            await deviceManager.onDeviceDiscovered(
-                {
-                    name: 'Cloud Push Endpoint',
-                    type: ScryptedDeviceType.API,
-                    nativeId: 'push',
-                    interfaces: [ScryptedInterface.BufferConverter],
-                },
-            );
-            this.push = new ScryptedPush(this);
-        })();
+        this.setupProxyServer();
+        this.setupCloudPush();
+
+        this.manager.on('registrationId', async (registrationId) => {
+            // currently the fcm registration id never changes, so, there's no need.
+            // if ever adding clockwork push, uncomment this.
+            // this.sendRegistrationId();
+        });
+    }
+
+    async sendRegistrationId(registrationId: string) {
+        const q = qs.stringify({
+            registrationId,
+            sender_id: DEFAULT_SENDER_ID,
+        })
+
+        const token_info = this.storage.getItem('token_info');
+        const response = await axios(`https://${SCRYPTED_SERVER}/_punch/scope?${q}`, {
+            headers: {
+                Authorization: `Bearer ${token_info}`
+            },
+        });
+        this.console.log('registered', response.data);
+    }
+
+    async setupCloudPush() {
+        await deviceManager.onDeviceDiscovered(
+            {
+                name: 'Cloud Push Endpoint',
+                type: ScryptedDeviceType.API,
+                nativeId: 'push',
+                interfaces: [ScryptedInterface.BufferConverter],
+            },
+        );
+        this.push = new ScryptedPush(this);
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
@@ -143,33 +160,21 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 description: 'Optional/Recommended: The hostname to reach this Scrypted server on https port 443. This will bypass usage of Scrypted cloud when possible. You will need to set up SSL termination.',
                 placeholder: 'my-server.dyndns.com'
             },
-            // {
-            //     title: 'Refresh Token',
-            //     value: this.storage.getItem('token_info'),
-            //     description: 'Authorization token used by Scrypted Cloud.',
-            //     readonly: true,
-            // },
         ];
     }
 
     async putSetting(key: string, value: string | number | boolean) {
         this.storage.setItem(key, value.toString());
-        this.cloudMessagePath = undefined;
     }
 
     async getCloudMessagePath() {
-        if (!this.cloudMessagePath) {
-            this.cloudMessagePath = (async () => {
-                const url = new URL(await endpointManager.getPublicLocalEndpoint());
-                return path.join(url.pathname, 'cloudmessage');
-            })()
-        }
-        return this.cloudMessagePath;
+        const url = new URL(await endpointManager.getPublicLocalEndpoint());
+        return path.join(url.pathname, 'cloudmessage');
     }
 
     async getOauthUrl(): Promise<string> {
         const args = qs.stringify({
-            registration_id: this.manager.registrationId,
+            registration_id: await this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
         })
         return `https://${SCRYPTED_SERVER}/_punch/login?${args}`;
@@ -180,7 +185,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     async onOauthCallback(callbackUrl: string) {
     }
 
-    async initialize() {
+    async setupProxyServer() {
         const ep = await endpointManager.getPublicLocalEndpoint();
         const httpsTarget = new URL(ep);
         httpsTarget.hostname = 'localhost';
@@ -244,10 +249,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             target: httpsTarget,
             secure: false,
         });
-        this.proxy.on('error', () => { })
+        this.proxy.on('error', () => { });
 
-        this.manager = await createDefaultRtcManager();
-        this.manager.on('unhandled', message => {
+        this.manager.on('message', async (message) => {
             if (message.type === 'cloudmessage') {
                 try {
                     const payload = JSON.parse(message.request) as HttpRequest;
@@ -262,40 +266,25 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 }
             }
             else if (message.type === 'callback') {
-                const client = net.connect(4000, 'home.scrypted.app');
-                client.write(this.manager.registrationId + '\n');
+                const client = net.connect(4000, SCRYPTED_SERVER);
+                const registrationId = await this.manager.registrationId;
+                client.write(registrationId + '\n');
                 const mux: any = new bpmux.BPMux(client as any);
                 mux.on('handshake', async (socket: Duplex) => {
                     let local: any;
 
                     await new Promise(resolve => process.nextTick(resolve));
-    
+
                     local = net.connect({
                         port,
                         host: '127.0.0.1',
                     });
                     await new Promise(resolve => process.nextTick(resolve));
-    
+
                     socket.pipe(local).pipe(socket);
                 })
             }
         });
-        // legacy
-        this.manager.listen("http://localhost", (conn: GcmRtcConnection) => {
-            conn.on('socket', async (command: string, socket: Duplex) => {
-                let local: any;
-
-                await new Promise(resolve => process.nextTick(resolve));
-
-                local = net.connect({
-                    port,
-                    host: '127.0.0.1',
-                });
-                await new Promise(resolve => process.nextTick(resolve));
-
-                socket.pipe(local).pipe(socket);
-            });
-        })
     }
 }
 

@@ -5,6 +5,7 @@ export interface DeviceState {
     interfaces?: string[];
     mixins?: string[];
     name?: string;
+    pluginId?: string;
     providedInterfaces?: string[];
     providedName?: ScryptedDeviceType;
     providedRoom?: string;
@@ -56,6 +57,7 @@ export declare class DeviceBase implements DeviceState {
     interfaces?: string[];
     mixins?: string[];
     name?: string;
+    pluginId?: string;
     providedInterfaces?: string[];
     providedName?: ScryptedDeviceType;
     providedRoom?: string;
@@ -107,6 +109,7 @@ export declare enum ScryptedInterfaceProperty {
     interfaces = "interfaces",
     mixins = "mixins",
     name = "name",
+    pluginId = "pluginId",
     providedInterfaces = "providedInterfaces",
     providedName = "providedName",
     providedRoom = "providedRoom",
@@ -172,6 +175,7 @@ export interface ScryptedDevice {
      */
     probe(): Promise<boolean>;
     id?: string;
+    pluginId?: string;
     interfaces?: string[];
     mixins?: string[];
     name?: string;
@@ -235,8 +239,19 @@ export declare enum ScryptedDeviceType {
     Thermostat = "Thermostat",
     Lock = "Lock",
     PasswordControl = "PasswordControl",
+    /**
+     * Displays have audio and video output.
+     */
     Display = "Display",
+    /**
+     * Smart Displays have two way audio and video.
+     */
+    SmartDisplay = "SmartDisplay",
     Speaker = "Speaker",
+    /**
+     * Smart Speakers have two way audio.
+     */
+    SmartSpeaker = "SmartSpeaker",
     Event = "Event",
     Entry = "Entry",
     Garage = "Garage",
@@ -316,17 +331,14 @@ export interface ColorHsv {
  * Notifier can be any endpoint that can receive messages, such as speakers, phone numbers, messaging clients, etc. The messages may optionally contain media.
  */
 export interface Notifier {
-    /**
-     * If a the media parameter is supplied, the mime type denotes how to send the media within notification. For example, specify 'image/*' to send a video MediaObject as an image.
-  Passing null uses the native type of the MediaObject. If that is not supported by the notifier, the media will be converted to a compatible type.
-     */
-    sendNotification(title: string, body: string, media: string | MediaObject, mimeType?: string): Promise<void>;
+    sendNotification(title: string, body: string, media?: string | MediaObject): Promise<void>;
 }
 /**
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.
  */
 export interface MediaObject {
-    mimeType?: string;
+    mimeType: string;
+    sourceId?: string;
 }
 /**
  * StartStop represents a device that can be started, stopped, and possibly paused and resumed. Typically vacuum cleaners or washers.
@@ -443,13 +455,22 @@ export declare enum ThermostatMode {
     On = "On"
 }
 export interface PictureDimensions {
-    width: number;
-    height: number;
+    width?: number;
+    height?: number;
 }
 export interface PictureOptions {
     id?: string;
-    name?: string;
+    /**
+     * The native dimensions of the camera.
+     */
     picture?: PictureDimensions;
+}
+export interface ResponsePictureOptions extends PictureOptions {
+    name?: string;
+    /**
+     * Flag that indicates that the request supports resizing to custom dimensions.
+     */
+    canResize?: boolean;
 }
 export interface RequestPictureOptions extends PictureOptions {
     reason?: 'user' | 'event';
@@ -467,7 +488,7 @@ export interface RequestPictureOptions extends PictureOptions {
  */
 export interface Camera {
     takePicture(options?: RequestPictureOptions): Promise<MediaObject>;
-    getPictureOptions(): Promise<PictureOptions[]>;
+    getPictureOptions(): Promise<ResponsePictureOptions[]>;
 }
 export interface VideoStreamOptions {
     codec?: string;
@@ -502,7 +523,7 @@ export declare type MediaStreamSource = "local" | "cloud";
  * is requested when calling getVideoStream.
  */
 export interface MediaStreamOptions {
-    id: string;
+    id?: string;
     name?: string;
     /**
      * Prebuffer time in milliseconds.
@@ -513,27 +534,30 @@ export interface MediaStreamOptions {
      */
     container?: string;
     /**
+    * Stream specific metadata.
+    */
+    metadata?: any;
+    /**
      * The tool used to generate the container. Ie, scrypted,
      * the ffmpeg tools, gstreamer.
      */
     tool?: string;
     video?: VideoStreamOptions;
     audio?: AudioStreamOptions;
-    /**
-    * Stream specific metadata.
-    */
-    metadata?: any;
-    source?: MediaStreamSource;
-    userConfigurable?: boolean;
 }
 export interface ResponseMediaStreamOptions extends MediaStreamOptions {
+    id: string;
     /**
      * The time in milliseconds that this stream must be refreshed again
      * via a call to getVideoStream.
      */
     refreshAt?: number;
+    source?: MediaStreamSource;
+    userConfigurable?: boolean;
+    sdp?: string;
 }
-export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
+export declare type MediaStreamDestination = "local" | "remote" | "low-resolution" | "local-recorder" | "remote-recorder";
+export interface RequestMediaStreamOptions extends MediaStreamOptions {
     /**
      * When retrieving media, setting disableMediaProxies=true
      * will bypass any intermediaries (NVR, rebroadcast) and retrieve
@@ -548,6 +572,18 @@ export interface RequestMediaStreamOptions extends ResponseMediaStreamOptions {
      * @default true
      */
     refresh?: boolean;
+    /**
+     * The intended destination for this media stream. May be used as
+     * a hint to determine which main/substream to send if no id
+     * is explicitly provided.
+     */
+    destination?: MediaStreamDestination;
+}
+/**
+ * Microphone devices can capture audio streams.
+ */
+export interface Microphone {
+    getAudioStream(): Promise<MediaObject>;
 }
 /**
  * VideoCamera devices can capture video streams.
@@ -565,7 +601,7 @@ export interface VideoCamera {
     /**
      * Get the available video streaming options.
      */
-    getVideoStreamOptions(): Promise<MediaStreamOptions[]>;
+    getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
 }
 export interface VideoCameraConfiguration {
     setVideoStreamOptions(options: MediaStreamOptions): Promise<void>;
@@ -599,11 +635,18 @@ export interface VideoClips {
     removeVideoClips(...videoClipIds: string[]): Promise<void>;
 }
 /**
- * Intercom devices can play back
+ * Intercom devices can playback audio.
  */
 export interface Intercom {
     startIntercom(media: MediaObject): Promise<void>;
     stopIntercom(): Promise<void>;
+}
+/**
+ * Display devices can play back audio and video.
+ */
+export interface Display {
+    startDisplay(media: MediaObject): Promise<void>;
+    stopDisplay(media: MediaObject): Promise<void>;
 }
 /**
  * Lock controls devices that can lock or unlock entries. Often works in tandem with PasswordControl.
@@ -756,12 +799,15 @@ export interface SoftwareUpdate {
     installUpdate(): Promise<void>;
     updateAvailable?: boolean;
 }
+export interface BufferConvertorOptions {
+    sourceId?: string;
+}
 /**
  * Add a converter to be used by Scrypted to convert buffers from one mime type to another mime type.
  * May optionally accept string urls if accept-url is a fromMimeType parameter.
  */
 export interface BufferConverter {
-    convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string): Promise<MediaObject | Buffer | any>;
+    convert(data: string | Buffer | any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<MediaObject | Buffer | any>;
     fromMimeType?: string;
     toMimeType?: string;
 }
@@ -950,6 +996,12 @@ export interface OauthClient {
      */
     onOauthCallback(callbackUrl: string): Promise<void>;
 }
+export interface MediaObjectOptions {
+    /**
+     * The device id of the source of the MediaObject.
+     */
+    sourceId?: string;
+}
 export interface MediaManager {
     /**
      * Additional plugin provided convertors to consider for use when converting MediaObjects.
@@ -980,19 +1032,19 @@ export interface MediaManager {
      */
     convertMediaObjectToUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string>;
     /**
-     * Create a MediaObject. The media will be created from the provided FFmpeg input arguments.
+     * Create a MediaObject from FFMpeg input arguments.
      */
-    createFFmpegMediaObject(ffmpegInput: FFMpegInput): Promise<MediaObject>;
+    createFFmpegMediaObject(ffmpegInput: FFMpegInput, options?: MediaObjectOptions): Promise<MediaObject>;
+    /**
+     * Create a MediaObject from an URL. The mime type will be determined dynamically while resolving the url.
+     */
+    createMediaObjectFromUrl(data: string, options?: MediaObjectOptions): Promise<MediaObject>;
     /**
      * Create a MediaObject.
      * If the data is a buffer, JSON object, or primitive type, it will be serialized.
      * All other objects will be objects will become RPC objects.
      */
-    createMediaObject(data: any | Buffer, mimeType: string): Promise<MediaObject>;
-    /**
-     * Create a MediaObject from an URL. The mime type should be provided, but it may be inferred from the URL path.
-     */
-    createMediaObjectFromUrl(data: string, mimeType?: string): Promise<MediaObject>;
+    createMediaObject(data: any | Buffer, mimeType: string, options?: MediaObjectOptions): Promise<MediaObject>;
     /**
      * Get the path to ffmpeg on the host system.
      */
@@ -1031,10 +1083,6 @@ export interface DeviceManager {
      */
     getDeviceState(nativeId?: ScryptedNativeId): DeviceState;
     /**
-     * Get the per script Storage object.
-     */
-    getDeviceStorage(): Storage;
-    /**
      * Get the storage for a mixin.
      * @param id The id of the device being mixined.
      * @param nativeId The nativeId of the MixinProvider.
@@ -1045,7 +1093,7 @@ export interface DeviceManager {
      */
     onMixinEvent(id: string, mixinDevice: any, eventInterface: string, eventData: any): Promise<void>;
     /**
-    * Get the per device Storage object.
+    * Get the device Storage object.
     */
     getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
     /**
@@ -1325,6 +1373,8 @@ export declare enum ScryptedInterface {
     Thermometer = "Thermometer",
     HumiditySensor = "HumiditySensor",
     Camera = "Camera",
+    Microphone = "Microphone",
+    Display = "Display",
     VideoCamera = "VideoCamera",
     VideoRecorder = "VideoRecorder",
     VideoClips = "VideoClips",
@@ -1372,20 +1422,29 @@ export declare enum ScryptedInterface {
     RTCSignalingChannel = "RTCSignalingChannel",
     RTCSignalingClient = "RTCSignalingClient"
 }
-export declare type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidate) => Promise<void>;
-export interface RTCSignalingClientSession extends RTCSignalingSession {
-    getOptions(): Promise<RTCSignalingClientOptions>;
-}
+export declare type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
 export interface RTCSignalingSession {
-    createLocalDescription: (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate) => Promise<RTCSessionDescriptionInit>;
-    setRemoteDescription: (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => Promise<void>;
-    addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
+    createLocalDescription(type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit>;
+    setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void>;
+    addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
+    getOptions(): Promise<RTCSignalingOptions>;
 }
-export interface RTCSignalingClientOptions {
+export interface RTCSignalingOptions {
+    /**
+     * Indicates that this client requires an answer, and is providing an offer.
+     */
+    offer?: RTCSessionDescriptionInit;
+    requiresOffer?: boolean;
+    disableTrickle?: boolean;
+    /**
+     * Hint to proxy the feed, as the target client may be inflexible.
+     */
+    proxy?: boolean;
     capabilities?: {
         video?: RTCRtpCapabilities;
         audio?: RTCRtpCapabilities;
     };
+    userAgent?: string;
 }
 export interface RTCSessionControl {
     getRefreshAt(): Promise<number | void>;
@@ -1397,7 +1456,7 @@ export interface RTCSessionControl {
  * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
  */
 export interface RTCSignalingClient {
-    createRTCSignalingSession(): Promise<RTCSignalingClientSession>;
+    createRTCSignalingSession(): Promise<RTCSignalingSession>;
 }
 /**
  * An inflexible RTC Signaling channel, typically a vendor, like Nest or Ring.
@@ -1405,7 +1464,7 @@ export interface RTCSignalingClient {
  * strict requirements and expectations on client setup.
  */
 export interface RTCSignalingChannel {
-    startRTCSignalingSession(session: RTCSignalingSession, options?: RTCSignalingClientOptions): Promise<RTCSessionControl | undefined>;
+    startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl | undefined>;
 }
 export interface RTCAVSignalingSetup {
     /**
@@ -1427,13 +1486,7 @@ export declare enum ScryptedMimeTypes {
     PushEndpoint = "text/x-push-endpoint",
     MediaStreamUrl = "text/x-media-url",
     FFmpegInput = "x-scrypted/x-ffmpeg-input",
-    /**
-     * An RTCSignalingChannel/VideoCamera will return x-scrypted-rtc-signaling-<unique-prefix>/x-<unique-suffix>.
-     * RTC clients can inspect the mime and convert the contents to a buffer containing the string device id.
-     * If the client does not support WebRTC, it may try to convert it to an FFmpeg media object,
-     * which should also be trapped and handled by the endpoint using its internal signaling.
-     */
-    RTCAVSignalingPrefix = "x-scrypted-rtc-signaling-",
+    RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel",
     SchemePrefix = "x-scrypted/x-scrypted-scheme-",
     MediaObject = "x-scrypted/x-scrypted-media-object"
 }

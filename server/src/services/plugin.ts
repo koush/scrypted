@@ -121,6 +121,11 @@ export class PluginComponent {
             try {
                 const registry = await this.npmInfo(plugin);
                 const version = registry['dist-tags'].latest;
+                if (registry?.versions?.[version]?.deprecated) {
+                    console.log('plugin deprecated, uninstalling:', plugin);
+                    await this.scrypted.removeDevice(this.scrypted.findPluginDevice(plugin));
+                    continue;
+                }
                 if (!semver.gt(version, host.packageJson.version)) {
                     console.log('plugin up to date:', plugin);
                     continue;

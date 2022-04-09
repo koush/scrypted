@@ -8,6 +8,8 @@ import { RpcPeer, RPCResultError } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
 import fs from 'fs';
+import { checkProperty } from './plugin-state-check';
+import _ from 'lodash';
 const { link } = require('linkfs');
 
 class DeviceLogger implements Logger {
@@ -115,12 +117,7 @@ class DeviceStateProxyHandler implements ProxyHandler<any> {
     }
 
     set?(target: any, p: PropertyKey, value: any, receiver: any) {
-        if (p === ScryptedInterfaceProperty.id)
-            throw new Error("id is read only");
-        if (p === ScryptedInterfaceProperty.mixins)
-            throw new Error("mixins is read only");
-        if (p === ScryptedInterfaceProperty.interfaces)
-            throw new Error("interfaces is a read only post-mixin computed property, use providedInterfaces");
+        checkProperty(p.toString(), value);
         const now = Date.now();
         this.deviceManager.systemManager.state[this.id][p as string] = {
             lastEventTime: now,
@@ -182,6 +179,21 @@ class DeviceManagerImpl implements DeviceManager {
             ms.set(id, ret);
         }
         return ret;
+    }
+    pruneMixinStorage() {
+        for (const nativeId of this.nativeIds.keys()) {
+            const storage = this.nativeIds.get(nativeId).storage;
+            for (const key of Object.keys(storage)) {
+                if (!key.startsWith('mixin:'))
+                    continue;
+                const [, id,] = key.split(':');
+                // there's no rush to persist this, it will happen automatically on the plugin
+                // persisting something at some point.
+                // the key itself is unreachable due to the device no longer existing.
+                if (id && !this.systemManager.state[id])
+                    delete storage[key];
+            }
+        }
     }
     async onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData: any) {
         return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);
@@ -330,7 +342,7 @@ export interface WebSocketCustomHandler {
 export type PluginReader = (name: string) => Buffer;
 
 export interface PluginRemoteAttachOptions {
-    createMediaManager?: (systemManager: SystemManager) => Promise<MediaManager>;
+    createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManager) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
@@ -354,7 +366,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const systemManager = new SystemManagerImpl();
         const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
-        const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager);
+        const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager, deviceManager);
         peer.params['mediaManager'] = mediaManager;
         const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
 
@@ -454,6 +466,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
             async setSystemState(state: { [id: string]: { [property: string]: SystemDeviceState } }) {
                 systemManager.state = state;
+                deviceManager.pruneMixinStorage();
                 done(ret);
             },
 

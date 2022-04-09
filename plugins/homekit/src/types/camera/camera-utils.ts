@@ -1,5 +1,5 @@
-import { MediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
-import { StartStreamRequest, H264Level, H264Profile } from '../../hap';
+import { MediaStreamDestination, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
+import { H264Level, H264Profile, StartStreamRequest } from '../../hap';
 
 export function profileToFfmpeg(profile: H264Profile): string {
     if (profile === H264Profile.HIGH)
@@ -53,21 +53,11 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     // future proof-ish for higher resolution watch.
     const isWatch = request.video.width <= 640;
 
-    const streamingChannel = isWatch
-        ? storage.getItem('streamingChannelWatch')
+    const destination: MediaStreamDestination = isWatch
+        ? 'low-resolution'
         : isLowBandwidth
-            ? storage.getItem('streamingChannelHub')
-            : storage.getItem('streamingChannel');
-    let selectedStream: MediaStreamOptions;
-    const msos = await device.getVideoStreamOptions();
-    if (streamingChannel)
-        selectedStream = msos?.find(mso => mso.name === streamingChannel);
-    if (!selectedStream)
-        selectedStream = msos?.[0];
-
-    selectedStream = selectedStream || {
-        id: undefined,
-    };
+            ? 'remote'
+            : 'local';
 
     const canDynamicBitrate = device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration);
 
@@ -77,7 +67,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
         return {
             dynamicBitrate: canDynamicBitrate && watchStreamingMode === 'Adaptive Bitrate',
             transcodeStreaming: watchStreamingMode === 'Transcode',
-            selectedStream,
+            destination,
             isWatch,
             isLowBandwidth,
         };
@@ -96,7 +86,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
         return {
             dynamicBitrate: canDynamicBitrate && hubStreamingMode === 'Adaptive Bitrate',
             transcodeStreaming: hubStreamingMode === 'Transcode',
-            selectedStream,
+            destination,
             isWatch,
             isLowBandwidth,
         }
@@ -107,7 +97,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     return {
         dynamicBitrate: false,
         transcodeStreaming: transcodeStreaming === 'true',
-        selectedStream,
+        destination,
         isWatch,
         isLowBandwidth,
     }

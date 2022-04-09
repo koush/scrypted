@@ -1,4 +1,4 @@
-import { Brightness, OnOff, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import { RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import { executeResponse } from "../common";
 import { commandHandlers } from "../handlers";
 
@@ -7,12 +7,12 @@ const {mediaManager, endpointManager, systemManager } = sdk;
 
 const tokens: { [token: string]: string } = {};
 
-export function canAccess(token: string): ScryptedDevice & VideoCamera & RTCSignalingChannel {
+export function canAccess(token: string) {
     const id = tokens[token];
-    return systemManager.getDeviceById(id) as ScryptedDevice & VideoCamera & RTCSignalingChannel;
+    return systemManager.getDeviceById(id) as ScryptedDevice & RTCSignalingChannel;
 }
 
-commandHandlers['action.devices.commands.GetCameraStream'] = async (device: ScryptedDevice & VideoCamera, execution) => {
+commandHandlers['action.devices.commands.GetCameraStream'] = async (device: ScryptedDevice, execution) => {
     const ret = executeResponse(device);
 
     const engineio = await endpointManager.getPublicLocalEndpoint() + 'engine.io/';

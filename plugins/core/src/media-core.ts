@@ -61,6 +61,9 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         if (path === ScryptedInterface.Camera) {
             return await systemManager.getDeviceById<Camera>(id).takePicture() as any;
         }
+        if (path === ScryptedInterface.VideoCamera) {
+            return await systemManager.getDeviceById<VideoCamera>(id).getVideoStream() as any;
+        }
         else {
             throw new Error('Unrecognized Scrypted Media interface.')
         }

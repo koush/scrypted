@@ -1,6 +1,6 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes } from "@scrypted/sdk";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
-import {SynologyApiClient, SynologyCameraStream, SynologyCamera} from "./api/synology-api-client";
+import { SynologyApiClient, SynologyCameraStream, SynologyCamera } from "./api/synology-api-client";
 
 const { deviceManager, mediaManager } = sdk;
 
@@ -19,26 +19,10 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
         this.streams = SynologyCameraDevice.identifyStreams(camera);
     }
 
-    private getDefaultStream(vsos: MediaStreamOptions[]) {
-        let defaultStreamIndex = vsos.findIndex(vso => vso.id === this.storage.getItem('defaultStream'));
-        if (defaultStreamIndex === -1)
-            defaultStreamIndex = 0;
-
-        return vsos[defaultStreamIndex];
-    }
-
     public async getSettings(): Promise<Setting[]> {
         const vsos = await this.getVideoStreamOptions();
-        const defaultStream = this.getDefaultStream(vsos);
 
         return [
-            {
-                title: 'Default Stream',
-                key: 'defaultStream',
-                value: defaultStream?.name,
-                choices: vsos.map(vso => vso.name),
-                description: 'The default stream to use when not specified',
-            },
             {
                 title: 'Motion Sensor Timeout',
                 key: 'sensorTimeout',
@@ -57,14 +41,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
     }
 
     public async putSetting(key: string, value: string | number | boolean) {
-        if (key === 'defaultStream') {
-            const vsos = await this.getVideoStreamOptions();
-            const stream = vsos.find(vso => vso.name === value);
-            this.storage.setItem('defaultStream', stream?.id);
-        }
-        else {
-            this.storage.setItem(key, value?.toString());
-        }
+        this.storage.setItem(key, value?.toString());
         this.onDeviceEvent(ScryptedInterface.Settings, undefined);
     }
 
@@ -87,31 +64,44 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
 
     public async takePicture(options?: PictureOptions): Promise<MediaObject> {
         const buffer = await this.getSnapshot(options);
-        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+        return this.createMediaObject(buffer, 'image/jpeg');
     }
 
     public async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const vsos = await this.getVideoStreamOptions();
-        const vso = vsos.find(check => check.id === options?.id) || this.getDefaultStream(vsos);
+        const vso = vsos.find(check => check.id === options?.id) || vsos[0];
 
         const rtspChannel = this.streams.find(check => check.id === vso.id);
 
-        const liveViewPaths = await this.provider.api.getCameraLiveViewPath([this.nativeId]);
-        if (!liveViewPaths?.length)
-            throw new Error(`Unable to locate RTSP stream for camera ${this.nativeId}`);
+        let rtspPath = null;
 
-        return mediaManager.createFFmpegMediaObject({
-            url: liveViewPaths[0].rtspPath,
+        if (vso.id !== '1') {
+            const cameraInfo = await this.provider.api.getCameraInfo(this.nativeId);
+            const camStream = cameraInfo?.stm_info?.find(el => el.stmNo.toString() == vso.id);
+            if (camStream)
+                rtspPath = Buffer.from(camStream.camPath, 'base64').toString('binary')
+        }
+
+        if (!rtspPath) {
+            const liveViewPaths = await this.provider.api.getCameraLiveViewPath([this.nativeId]);
+            if (!liveViewPaths?.length)
+                throw new Error(`Unable to locate RTSP stream for camera ${this.nativeId}`);
+
+            rtspPath = liveViewPaths[0].rtspPath;
+        }
+
+        return this.createMediaObject({
+            url: rtspPath,
             inputArguments: [
                 "-rtsp_transport", "tcp",
-                "-i", liveViewPaths[0].rtspPath,
+                "-i", rtspPath,
             ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
-        });
+        }, ScryptedMimeTypes.FFmpegInput);
     }
 
     private createMediaStreamOptions(stream: SynologyCameraStream) {
-        const ret: MediaStreamOptions = {
+        const ret: ResponseMediaStreamOptions = {
             id: stream.id,
             name: stream.id,
             container: 'rtsp',
@@ -129,7 +119,7 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
         return ret;
     }
 
-    public async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    public async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         const vsos = this.streams.map(channel => this.createMediaStreamOptions(channel));
         return vsos;
     }

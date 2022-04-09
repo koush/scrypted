@@ -19,9 +19,11 @@ You can use the admin page provided by your camera manufacturer to set the optim
 
 If recordings dont work, it's generally because of a few reasons, **follow the steps to determine where it is failing before asking for help**:
 
-1) The motion wasn't triggered. You can view if there are motion events in the camera "Events" section.
+1) The motion wasn't triggered. You can view if there are motion events in the camera `Events` section (a small icon button next to the `Console` button`.
 
-2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. Sometimes the home hubs bug out and stop responding to motion. Try rebooting the home hub(s) when this happens. **iPads and HomePods, which are wireless, are not reliable home hubs.**
+2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. If you do not see this, there are two possible causes and solutions:
+  * The Home Hubs are bugged out and have stopped responding to motion. Reboot all Home Hubs when this happens. **iPads and HomePods, which are wireless, are not reliable Home Hubs.** If you have an iPad as a Home Hub, remove it from acting as a Home Hub from within the iOS Home app. Unfortunately this is not possible to do with HomePods.
+  * Your iCloud account is in a bad state. Log out of iCloud on your iPhone, and log back in. Then disable and reenable HomeKit Secure Video on your cameras again.
 
 3) If HomeKit requested the video, but nothing showed up in the timeline, HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
 
@@ -35,10 +37,14 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
 If HomeKit is not discoverable, make sure LAN/WLAN multicast is enabled on your router.
 If HomeKit fails while pairing during a Docker install, ensure host networking is being used.
 
-### HomeKit Live Streaming Timeout (Recordings maybe working)
+### HomeKit Live Streaming Timeout (Recordings may be working)
 
-This is a networking issue with multiple interfaces. This is the problem 100% of the time. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to the IP Address of your ethernet manually.
-If your camera is on a separate VLAN, try disabling that to see if that is the issue.
+This is always a issue with the network setup. 
+  * Ensure you are not connected to a VPN.
+  * You may have multiple network interfaces, such as wired and wireless, and HomeKit is preferring the wireless interface. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to your wired IP address manually.
+  * If your camera/server/iOS are on a separate VLANs, try disabling VLANs to determine if that is the issue.
+
+This is probably a codec issue. Try enabling Transcoding on both Live and Remote streams.
 
 ### HomeKit Remote Streaming not Working
 

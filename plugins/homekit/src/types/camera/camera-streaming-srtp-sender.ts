@@ -16,6 +16,8 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
     let octetCount = 0;
     let lastRtcp = 0;
     let firstSequenceNumber = 0;
+    let allowRollover = false;
+    let rolloverCount = 0;
 
     let audioIntervalScale = 1;
     if (audioPacketTime) {
@@ -36,10 +38,21 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
         if (!firstSequenceNumber)
             firstSequenceNumber = rtp.header.sequenceNumber;
 
+        // rough rollover detection to keep packet count accurate.
+        // once within 256 packets of the 0 and 65536, wait for rollover.
+        if (!allowRollover) {
+            if (rtp.header.sequenceNumber > 0xFF00)
+                allowRollover = true;
+        }
+        else if (rtp.header.sequenceNumber < 0x00FF) {
+            allowRollover = false;
+            rolloverCount++;
+        }
+
         // depending where this stream is coming from (ie, rtsp/udp), we may not actually know how many packets
         // have been lost. just infer this i guess. unfortunately it is not possible to infer the octet count that
         // has been lost. should we make something up? does HAP behave correctly with only missing packet indicators?
-        const packetCount = rtp.header.sequenceNumber - firstSequenceNumber;
+        const packetCount = (rtp.header.sequenceNumber - firstSequenceNumber) + (rolloverCount * 0x10000);
 
         if (!firstTimestamp)
             firstTimestamp = rtp.header.timestamp;
@@ -59,7 +72,9 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
 
         lastTimestamp = rtp.header.timestamp;
 
-        if (now > lastRtcp + rtcpInterval * 1000) {
+        // packet count may be less than zero if rollover counting fails due to heavy packet loss or other
+        // unforseen edge cases.
+        if (now > lastRtcp + rtcpInterval * 1000 && packetCount > 0) {
             lastRtcp = now;
             const sr = new RtcpSrPacket({
                 ssrc,

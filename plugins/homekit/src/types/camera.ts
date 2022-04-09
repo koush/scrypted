@@ -1,15 +1,10 @@
-import { Camera, MotionSensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, AudioSensor, Intercom, ObjectsDetected, VideoCameraConfiguration, OnOff } from '@scrypted/sdk'
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common'
-import { CameraRecordingDelegate, AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, CameraRecordingOptions, RecordingManagement, OccupancySensor, CharacteristicEventTypes, DataStreamConnection, Service, WithUUID, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraStreamingOptions, Characteristic, VideoCodecType, H264Level, H264Profile, SRTPCryptoSuites } from '../hap';
-import { makeAccessory } from './common';
-
-import sdk from '@scrypted/sdk';
-
-import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
+import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
-
+import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
+import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, OccupancySensor, RecordingManagement, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
+import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
-import { pruneClips } from './camera/camera-recording-files';
+import { makeAccessory } from './common';
 
 const { deviceManager, systemManager } = sdk;
 

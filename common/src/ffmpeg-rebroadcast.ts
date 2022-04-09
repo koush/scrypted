@@ -1,39 +1,31 @@
 import { createServer, Server } from 'net';
 import child_process, { StdioOptions } from 'child_process';
 import { ChildProcess } from 'child_process';
-import { FFMpegInput, MediaStreamOptions } from '@scrypted/sdk/types';
+import { FFMpegInput } from '@scrypted/sdk/types';
 import { bind, bindZero, listenZero, listenZeroSingleClient } from './listen-cluster';
 import { EventEmitter } from 'events';
-import sdk from "@scrypted/sdk";
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from './media-helpers';
+import sdk, { ResponseMediaStreamOptions } from "@scrypted/sdk";
+import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from './media-helpers';
 import { StreamChunk, StreamParser } from './stream-parser';
 import dgram from 'dgram';
 import { Duplex } from 'stream';
 
 const { mediaManager } = sdk;
 
-export interface MP4Atom {
-    header: Buffer;
-    length: number;
-    type: string;
-    data: Buffer;
-}
-
 export interface ParserSession<T extends string> {
     sdp: Promise<Buffer[]>;
-    mediaStreamOptions: MediaStreamOptions;
+    mediaStreamOptions: ResponseMediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;
     inputVideoResolution?: string[];
     kill(): void;
-    isActive(): boolean;
+    killed: Promise<void>;
+    isActive: boolean;
 
     emit(container: T, chunk: StreamChunk): this;
     on(container: T, callback: (chunk: StreamChunk) => void): this;
-    on(event: 'killed', callback: () => void): this;
-    once(event: 'killed', callback: () => void): this;
     removeListener(event: T | 'killed', callback: any): this;
-    once(event: string | symbol, listener: (...args: any[]) => void): this;
+    once(event: T | 'killed', listener: (...args: any[]) => void): this;
 }
 
 export interface ParserOptions<T extends string> {
@@ -90,7 +82,7 @@ export async function parseAudioCodec(cp: ChildProcess) {
     return parseToken(cp, 'Audio');
 }
 
-export function setupActivityTimer (container: string, kill: () => void, events: {
+export function setupActivityTimer(container: string, kill: () => void, events: {
     once(event: 'killed', callback: () => void): void,
 }, timeout: number) {
     let dataTimeout: NodeJS.Timeout;
@@ -135,6 +127,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         ffmpegStartedResolve = r;
         ffmpegStartedReject = rj;
     });
+    let sessionKilled: any;
+    const killed = new Promise<void>(resolve => {
+        sessionKilled = resolve;
+    });
 
     function kill() {
         if (isActive) {
@@ -142,12 +138,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
             events.emit('error', new Error('killed'));
         }
         isActive = false;
-        cp?.kill();
-        // sometimes ffmpeg hangs trying to clean up (RTSP teardown etc), so
-        // give it a bit and then really kill it..
-        setTimeout(() => cp?.kill('SIGKILL'), 1000);
-        ffmpegStartedReject?.(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
         clearTimeout(ffmpegIncomingConnectionTimeout);
+        sessionKilled();
+        ffmpegStartedReject?.(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
+        safeKillFFmpeg(cp);
     }
 
 
@@ -156,6 +150,14 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
     ffmpegIncomingConnectionTimeout = setTimeout(kill, 30000);
 
     let needSdp = false;
+
+    const ensureActive = (killed: () => void) => {
+        if (!isActive) {
+            killed();
+            throw new Error('parser session was killed killed before ffmpeg connected');
+        }
+        events.on('killed', killed);
+    }
 
     // first see how many pipes are needed, and prep them for the child process
     const stdio: StdioOptions = ['pipe', 'pipe', 'pipe']
@@ -169,10 +171,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
             const udp = await bindZero(socket);
             const rtcp = dgram.createSocket('udp4');
             await bind(rtcp, udp.port + 1);
-            events.once('killed', () => {
+            ensureActive(() => {
                 socket.close();
                 rtcp.close();
-            })
+            });
             args.push(
                 ...parser.outputArguments,
                 // using rtp instead of udp gives us the rtcp messages too.
@@ -211,6 +213,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
             (async () => {
                 const socket = await tcp.clientPromise;
                 try {
+                    ensureActive(() => socket.destroy());
+
                     for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
                         ffmpegStartedResolve?.(undefined);
                         events.emit(container, chunk);
@@ -299,8 +303,9 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         inputAudioCodec,
         inputVideoCodec,
         inputVideoResolution,
-        isActive() { return isActive },
+        get isActive() { return isActive },
         kill,
+        killed,
         mediaStreamOptions: ffmpegInput.mediaStreamOptions || {
             id: undefined,
             name: undefined,

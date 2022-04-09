@@ -21,7 +21,7 @@ addSupportedType({
     probe(device) {
         return device.interfaces.includes(ScryptedInterface.TemperatureSetting) && device.interfaces.includes(ScryptedInterface.Thermometer);
     },
-    async getSyncResponse(device: ScryptedDevice & TemperatureSetting) {
+    async getSyncResponse(device: ScryptedDevice & TemperatureSetting & Thermometer) {
         const ret = syncResponse(device, 'action.devices.types.THERMOSTAT');
         ret.traits.push('action.devices.traits.TemperatureSetting');
 

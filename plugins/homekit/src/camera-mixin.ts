@@ -1,4 +1,4 @@
-import sdk, { MediaStreamOptions, ObjectDetector, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { ObjectDetector, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { getH264DecoderArgs, getH264EncoderArgs } from "../../../common/src/ffmpeg-hardware-acceleration";
 import { SettingsMixinDeviceOptions } from "../../../common/src/settings-mixin";
 import { HomekitMixin } from "./homekit-mixin";
@@ -21,51 +21,7 @@ export class CameraMixin extends HomekitMixin<any> {
         const settings: Setting[] = [];
         const realDevice = systemManager.getDeviceById<ObjectDetector & VideoCamera>(this.id);
 
-        let msos: MediaStreamOptions[] = [];
-        try {
-            msos = await realDevice.getVideoStreamOptions();
-        }
-        catch (e) {
-        }
-
-        if (msos?.length > 1) {
-            settings.push({
-                title: 'Live Stream',
-                key: 'streamingChannel',
-                value: this.storage.getItem('streamingChannel') || msos[0].name,
-                description: 'The media stream to use when streaming to HomeKit.',
-                choices: msos.map(mso => mso.name),
-            });
-
-            settings.push({
-                title: 'Remote Live Stream',
-                key: 'streamingChannelHub',
-                value: this.storage.getItem('streamingChannelHub') || msos[0].name,
-                description: 'The media stream to use when streaming from outside your home network. Selecting a low birate stream is recommended.',
-                choices: msos.map(mso => mso.name),
-            });
-
-            settings.push({
-                title: 'Apple Watch Live Stream',
-                key: 'streamingChannelWatch',
-                value: this.storage.getItem('streamingChannelWatch') || msos[0].name,
-                description: 'The media stream to use when streaming to Apple Watch. Selecting a low resolution (320x240) and low bitrate stream is recommended.',
-                choices: msos.map(mso => mso.name),
-            });
-        }
-
         const hasMotionSensor = this.storage.getItem('linkedMotionSensor') || this.interfaces.includes(ScryptedInterface.MotionSensor);
-        if (hasMotionSensor) {
-            if (msos?.length > 1) {
-                settings.push({
-                    title: 'Recording Stream',
-                    key: 'recordingChannel',
-                    value: this.storage.getItem('recordingChannel') || msos[0].name,
-                    description: 'The prebuffered media stream for HomeKit Secure Video.',
-                    choices: msos.map(mso => mso.name),
-                });
-            }
-        }
 
         settings.push(
             {

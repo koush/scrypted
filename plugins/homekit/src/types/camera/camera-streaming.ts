@@ -1,3 +1,4 @@
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import sdk, { Camera, Intercom, MediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
@@ -51,8 +52,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
         clearTimeout(idleTimeout);
         sessions.delete(sessionID);
         session.killed = true;
-        session.videoProcess?.kill('SIGKILL');
-        session.audioProcess?.kill('SIGKILL');
+        safeKillFFmpeg(session.videoProcess);
+        safeKillFFmpeg(session.audioProcess);
         session.videoReturn?.close();
         session.audioReturn?.close();
         session.rtpSink?.destroy();
@@ -159,14 +160,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             callback();
 
             if (request.type === StreamRequestTypes.RECONFIGURE) {
-                session?.tryReconfigureBitrate('reconfigure', request.video.max_bit_rate * 1000);
+                session.tryReconfigureBitrate?.('reconfigure', request.video.max_bit_rate * 1000);
                 return;
             }
 
             session.startRequest = request as StartStreamRequest;
 
             const {
-                selectedStream,
+                destination,
                 dynamicBitrate,
                 transcodeStreaming,
                 isLowBandwidth,
@@ -178,31 +179,38 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 isLowBandwidth,
                 isWatch,
                 transcodeStreaming,
-                stream: selectedStream?.name || 'Default/undefined',
+                destination,
             });
-
-            // if rebroadcast is being used, this will cause it to send
-            // a prebuffer which hopefully contains a key frame.
-            // it is safe to pipe this directly into ffmpeg because
-            // ffmpeg starts streaming after it finds the key frame.
-            selectedStream.prebuffer = undefined;
-
-            const minBitrate = selectedStream?.video?.minBitrate;
-            const maxBitrate = selectedStream?.video?.maxBitrate;
 
             session.startRequest = request as StartStreamRequest;
 
             if (dynamicBitrate) {
                 const initialBitrate = request.video.max_bit_rate * 1000;
-                const dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate, console);
+                let dynamicBitrateSession: DynamicBitrateSession;
+
+                function ensureDynamicBitrateSession() {
+                    if (dynamicBitrateSession)
+                        return;
+                    if (!session.mediaStreamOptions)
+                        return;
+                    const selectedStream = session.mediaStreamOptions
+                    const minBitrate = selectedStream?.video?.minBitrate;
+                    const maxBitrate = selectedStream?.video?.maxBitrate;
+                    if (!maxBitrate || !minBitrate)
+                        return;
+                    dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate, console);
+                    return dynamicBitrateSession;
+                }
 
                 session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
+                    if (!ensureDynamicBitrateSession())
+                        return;
                     dynamicBitrateSession.onBitrateReconfigured(bitrate);
                     const reconfigured: MediaStreamOptions = Object.assign({
-                        id: selectedStream?.id,
+                        id: session.mediaStreamOptions?.id,
                         video: {
                         },
-                    }, selectedStream || {});
+                    }, session.mediaStreamOptions || {});
                     reconfigured.video.bitrate = bitrate;
 
                     console.log(`reconfigure bitrate (${reason}) ${bitrate}`);
@@ -223,7 +231,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 const vrtcp = new SrtcpSession(vconfig);
 
                 session.videoReturn.on('message', data => {
-                    if (!dynamicBitrate)
+                    if (!!ensureDynamicBitrateSession())
                         return;
                     const d = vrtcp.decrypt(data);
                     const rtcp = RtcpPacketConverter.deSerialize(d);
@@ -236,7 +244,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                 // reset the video bitrate to max after a dynanic bitrate session ends.
                 session.videoReturn.on('close', async () => {
-                    session.tryReconfigureBitrate('stop', maxBitrate);
+                    if (!ensureDynamicBitrateSession())
+                        return;
+                    session.tryReconfigureBitrate('stop', session.mediaStreamOptions?.video?.maxBitrate);
                 });
             }
 
@@ -256,13 +266,13 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             try {
                 if (CAMERA_STREAM_PERFECT_CODECS) {
-                    await startCameraStreamSrtp(device, console, selectedStream, session, () => killSession(request.sessionID));
+                    await startCameraStreamSrtp(device, console, destination, session, () => killSession(request.sessionID));
                 }
                 else {
                     await startCameraStreamFfmpeg(device,
                         console,
                         storage,
-                        selectedStream,
+                        destination,
                         transcodeStreaming,
                         session,
                         () => killSession(request.sessionID));

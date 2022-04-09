@@ -1,1 +1,1 @@
-export * from '../../server/src/media-helpers';
+export * from '@scrypted/server/src/media-helpers';

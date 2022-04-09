@@ -1,3 +1,4 @@
+import { ResponseMediaStreamOptions } from '@scrypted/sdk';
 import { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { PrepareStreamRequest, StartStreamRequest } from '../../hap';
@@ -15,6 +16,7 @@ export interface CameraStreamingSession {
     audioReturn: dgram.Socket;
     rtpSink?: HomeKitRtpSink;
     tryReconfigureBitrate?: (reason: string, bitrate: number) => void;
+    mediaStreamOptions?: ResponseMediaStreamOptions;
 }
 
 export type KillCameraStreamingSession = () => void;

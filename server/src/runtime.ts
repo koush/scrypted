@@ -390,7 +390,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         const remaining = [...ids];
 
         // first pass:
-        // for every id, find anything it is acting as a mixin, and clear out the entry.
+        // for every id, find anything it is acting on as a mixin, and clear out the entry.
         while (remaining.length) {
             const id = remaining.pop();
 
@@ -594,7 +594,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     async removeDevice(device: PluginDevice) {
-        const providerId = getState(device, ScryptedInterfaceProperty.providerId);
+        // delete any devices provided by this device
         const providedDevices = Object.values(this.pluginDevices).filter(pluginDevice => getState(pluginDevice, ScryptedInterfaceProperty.providerId) === device._id);
         for (const provided of providedDevices) {
             if (provided === device)
@@ -606,22 +606,22 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.invalidatePluginDevice(device._id);
         delete this.pluginDevices[device._id];
         await this.datastore.remove(device);
-        if (providerId == null || providerId === device._id) {
-            const plugin = await this.datastore.tryGet(Plugin, device.pluginId);
-            this.killPlugin(plugin._id);
-            await this.datastore.remove(plugin);
-            rimraf.sync(getPluginVolume(plugin._id));
-        }
         this.stateManager.removeDevice(device._id);
 
-        const plugin = this.plugins[device.pluginId];
-        // remove the plugin too
+        // if this device is acting as a mixin on anything, can now remove invalidate it.
+        // when the mixin table is rebuilt, it will be automatically ignore and remove the dangling mixin.
+        this.invalidateMixins(new Set([device._id]));
+
+        // if the device is a plugin, kill and remove the plugin as well.
         if (!device.nativeId) {
-            plugin?.kill();
+            this.killPlugin(device.pluginId);
             await this.datastore.removeId(Plugin, device.pluginId);
+            rimraf.sync(getPluginVolume(device.pluginId));
         }
         else {
             try {
+                // notify the plugin that a device was removed.
+                const plugin = this.plugins[device.pluginId];
                 await plugin.remote.setNativeId(device.nativeId, undefined, undefined);
             }
             catch (e) {
@@ -743,6 +743,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 dirty = true;
                 interfaces.push(ScryptedInterface.ScryptedPlugin);
                 setState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces, PluginDeviceProxyHandler.sortInterfaces(interfaces));
+            }
+
+            if (!pluginDevice.pluginId) {
+                dirty = true;
+                setState(pluginDevice, ScryptedInterfaceProperty.pluginId, pluginDevice.pluginId);
             }
 
             if (dirty) {

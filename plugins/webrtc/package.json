@@ -1,6 +1,6 @@
 {
-   "name": "@scrypted/webrtc-source",
-   "version": "0.0.2",
+   "name": "@scrypted/webrtc",
+   "version": "0.0.12",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
@@ -13,23 +13,27 @@
    "keywords": [
       "scrypted",
       "plugin",
-      "webrtc",
-      "ring",
-      "google",
-      "nest"
+      "webrtc"
    ],
    "scrypted": {
-      "name": "WebRTC Source",
+      "name": "WebRTC Plugin",
       "type": "API",
       "interfaces": [
-         "MixinProvider"
+         "Settings",
+         "BufferConverter",
+         "MixinProvider",
+         "DeviceProvider",
+         "DeviceCreator"
       ]
    },
    "dependencies": {
-      "@types/node": "^16.6.1"
+      "@koush/werift": "file:../../external/werift/packages/webrtc",
+      "@scrypted/common": "file:../../common",
+      "@scrypted/sdk": "file:../../sdk",
+      "ip": "^1.1.5"
    },
    "devDependencies": {
-      "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk"
+      "@types/ip": "^1.1.0",
+      "@types/node": "^16.6.1"
    }
 }

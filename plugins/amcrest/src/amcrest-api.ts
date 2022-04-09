@@ -74,7 +74,7 @@ export class AmcrestCameraClient {
             // this.console?.log('event', data);
             for (const event of Object.values(AmcrestEvent)) {
                 if (data.indexOf(event) !== -1) {
-                    stream.emit('event', event, index);
+                    stream.emit('event', event, index, data);
                 }
             }
         });

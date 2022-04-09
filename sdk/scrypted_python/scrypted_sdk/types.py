@@ -51,6 +51,8 @@ class ScryptedDeviceType(Enum):
     Program = "Program"
     Scene = "Scene"
     Sensor = "Sensor"
+    SmartDisplay = "SmartDisplay"
+    SmartSpeaker = "SmartSpeaker"
     Speaker = "Speaker"
     Switch = "Switch"
     Thermostat = "Thermostat"
@@ -73,6 +75,7 @@ class ScryptedInterface(Enum):
     DeviceCreator = "DeviceCreator"
     DeviceDiscovery = "DeviceDiscovery"
     DeviceProvider = "DeviceProvider"
+    Display = "Display"
     Dock = "Dock"
     EngineIOHandler = "EngineIOHandler"
     Entry = "Entry"
@@ -87,6 +90,7 @@ class ScryptedInterface(Enum):
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
     MediaPlayer = "MediaPlayer"
+    Microphone = "Microphone"
     MixinProvider = "MixinProvider"
     MotionSensor = "MotionSensor"
     Notifier = "Notifier"
@@ -128,7 +132,7 @@ class ScryptedMimeTypes(Enum):
     MediaObject = "x-scrypted/x-scrypted-media-object"
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
-    RTCAVSignalingPrefix = "x-scrypted-rtc-signaling-"
+    RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     Url = "text/x-uri"
 
@@ -170,20 +174,6 @@ class PictureDimensions(TypedDict):
     width: float
     pass
 
-class ResponseMediaStreamOptions(TypedDict):
-    audio: AudioStreamOptions
-    container: str
-    id: str
-    metadata: Any
-    name: str
-    prebuffer: float
-    refreshAt: float
-    source: MediaStreamSource
-    tool: str
-    userConfigurable: bool
-    video: VideoStreamOptions
-    pass
-
 class VideoStreamOptions(TypedDict):
     bitrate: float
     codec: str
@@ -196,12 +186,19 @@ class VideoStreamOptions(TypedDict):
     width: float
     pass
 
+class MediaStreamDestination(TypedDict):
+    pass
+
 class MediaStreamSource(TypedDict):
     pass
 
 class BufferConverter(TypedDict):
     fromMimeType: str
     toMimeType: str
+    pass
+
+class BufferConvertorOptions(TypedDict):
+    sourceId: str
     pass
 
 class ColorHsv(TypedDict):
@@ -311,6 +308,10 @@ class HumiditySettingStatus(TypedDict):
 class Logger(TypedDict):
     pass
 
+class MediaObjectOptions(TypedDict):
+    sourceId: str
+    pass
+
 class MediaPlayerOptions(TypedDict):
     autoplay: bool
     mimeType: str
@@ -331,9 +332,7 @@ class MediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
-    source: MediaStreamSource
     tool: str
-    userConfigurable: bool
     video: VideoStreamOptions
     pass
 
@@ -363,12 +362,6 @@ class ObjectsDetected(TypedDict):
     timestamp: float
     pass
 
-class PictureOptions(TypedDict):
-    id: str
-    name: str
-    picture: PictureDimensions
-    pass
-
 class Position(TypedDict):
     accuracyRadius: float
     latitude: float
@@ -378,36 +371,26 @@ class Position(TypedDict):
 class RTCSessionControl(TypedDict):
     pass
 
-class RTCSignalingClientOptions(TypedDict):
-    capabilities: Any
-    pass
-
-class RTCSignalingClientSession(TypedDict):
-    pass
-
 class RTCSignalingSession(TypedDict):
     pass
 
 class RequestMediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
+    destination: MediaStreamDestination
     directMediaStream: bool
     id: str
     metadata: Any
     name: str
     prebuffer: float
     refresh: bool
-    refreshAt: float
-    source: MediaStreamSource
     tool: str
-    userConfigurable: bool
     video: VideoStreamOptions
     pass
 
 class RequestPictureOptions(TypedDict):
     bulkRequest: bool
     id: str
-    name: str
     periodicRequest: bool
     picture: PictureDimensions
     reason: Any | Any
@@ -420,11 +403,31 @@ class RequestRecordingStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
-    source: MediaStreamSource
     startTime: float
+    tool: str
+    video: VideoStreamOptions
+    pass
+
+class ResponseMediaStreamOptions(TypedDict):
+    audio: AudioStreamOptions
+    container: str
+    id: str
+    metadata: Any
+    name: str
+    prebuffer: float
+    refreshAt: float
+    sdp: str
+    source: MediaStreamSource
     tool: str
     userConfigurable: bool
     video: VideoStreamOptions
+    pass
+
+class ResponsePictureOptions(TypedDict):
+    canResize: bool
+    id: str
+    name: str
+    picture: PictureDimensions
     pass
 
 class ScriptSource(TypedDict):
@@ -440,6 +443,7 @@ class ScryptedDevice(TypedDict):
     interfaces: list[str]
     mixins: list[str]
     name: str
+    pluginId: str
     providedInterfaces: list[str]
     providedName: ScryptedDeviceType
     providedRoom: str
@@ -510,12 +514,12 @@ class Brightness:
 class BufferConverter:
     fromMimeType: str
     toMimeType: str
-    async def convert(self, data: Any, fromMimeType: str, toMimeType: str) -> Any:
+    async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: BufferConvertorOptions = None) -> Any:
         pass
     pass
 
 class Camera:
-    async def getPictureOptions(self) -> list[PictureOptions]:
+    async def getPictureOptions(self) -> list[ResponsePictureOptions]:
         pass
     async def takePicture(self, options: RequestPictureOptions = None) -> MediaObject:
         pass
@@ -557,6 +561,13 @@ class DeviceDiscovery:
 
 class DeviceProvider:
     def getDevice(self, nativeId: str) -> Any:
+        pass
+    pass
+
+class Display:
+    async def startDisplay(self, media: MediaObject) -> None:
+        pass
+    async def stopDisplay(self, media: MediaObject) -> None:
         pass
     pass
 
@@ -643,6 +654,11 @@ class MediaPlayer:
         pass
     pass
 
+class Microphone:
+    async def getAudioStream(self) -> MediaObject:
+        pass
+    pass
+
 class MixinProvider:
     async def canMixin(self, type: ScryptedDeviceType, interfaces: list[str]) -> list[str]:
         pass
@@ -657,7 +673,7 @@ class MotionSensor:
     pass
 
 class Notifier:
-    async def sendNotification(self, title: str, body: str, media: str | MediaObject, mimeType: str = None) -> None:
+    async def sendNotification(self, title: str, body: str, media: str | MediaObject = None) -> None:
         pass
     pass
 
@@ -734,12 +750,12 @@ class PushHandler:
     pass
 
 class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession, options: RTCSignalingClientOptions = None) -> RTCSessionControl:
+    async def startRTCSignalingSession(self, session: RTCSignalingSession) -> RTCSessionControl:
         pass
     pass
 
 class RTCSignalingClient:
-    async def createRTCSignalingSession(self) -> RTCSignalingClientSession:
+    async def createRTCSignalingSession(self) -> RTCSignalingSession:
         pass
     pass
 
@@ -779,6 +795,7 @@ class ScryptedDevice:
     interfaces: list[str]
     mixins: list[str]
     name: str
+    pluginId: str
     providedInterfaces: list[str]
     providedName: ScryptedDeviceType
     providedRoom: str
@@ -857,7 +874,7 @@ class UltravioletSensor:
 class VideoCamera:
     async def getVideoStream(self, options: RequestMediaStreamOptions = None) -> MediaObject:
         pass
-    async def getVideoStreamOptions(self) -> list[MediaStreamOptions]:
+    async def getVideoStreamOptions(self) -> list[ResponseMediaStreamOptions]:
         pass
     pass
 
@@ -914,7 +931,7 @@ class DeviceManager:
         pass
     def getDeviceState(self, nativeId: str = None) -> DeviceState:
         pass
-    def getDeviceStorage(self) -> Storage:
+    def getDeviceStorage(self, nativeId: str = None) -> Storage:
         pass
     def getMixinConsole(self, mixinId: str, nativeId: str = None) -> Console:
         pass
@@ -957,23 +974,23 @@ class SystemManager:
 
 class MediaManager:
     builtinConverters: list[BufferConverter]
-    async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> T:
+    async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
     async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:
         pass
     async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
-    async def convertMediaObjectToJSON(self, mediaObject: MediaObject, toMimeType: str) -> T:
+    async def convertMediaObjectToJSON(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
     async def convertMediaObjectToLocalUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
     async def convertMediaObjectToUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
-    async def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput) -> MediaObject:
+    async def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObject(self, data: Any, mimeType: str) -> MediaObject:
+    async def createMediaObject(self, data: Any, mimeType: str, options: MediaObjectOptions = None) -> MediaObject:
         pass
-    async def createMediaObjectFromUrl(self, data: str, mimeType: str = None) -> MediaObject:
+    async def createMediaObjectFromUrl(self, data: str, options: MediaObjectOptions = None) -> MediaObject:
         pass
     async def getFFmpegPath(self) -> str:
         pass
@@ -1002,6 +1019,7 @@ class ScryptedInterfaceProperty(Enum):
     interfaces = "interfaces"
     mixins = "mixins"
     name = "name"
+    pluginId = "pluginId"
     providedInterfaces = "providedInterfaces"
     providedName = "providedName"
     providedRoom = "providedRoom"
@@ -1087,6 +1105,13 @@ class DeviceState:
     @name.setter
     def name(self, value: str):
         self.setScryptedProperty("name", value)
+
+    @property
+    def pluginId(self) -> str:
+        self.getScryptedProperty("pluginId")
+    @pluginId.setter
+    def pluginId(self, value: str):
+        self.setScryptedProperty("pluginId", value)
 
     @property
     def providedInterfaces(self) -> list[str]:

@@ -83,7 +83,7 @@ export default {
         this.pc = undefined;
       }
     },
-    async fetchCamera(media) {
+    async fetchCamera() {
       let picture;
       if (this.device.interfaces.includes(ScryptedInterface.Camera)) {
         picture = await this.device.takePicture();
@@ -94,16 +94,10 @@ export default {
     },
   },
   mounted() {
-    if (this.device.interfaces.includes(ScryptedInterface.VideoCamera))
+    if (this.device.interfaces.includes(ScryptedInterface.RTCSignalingChannel))
       this.video = true;
 
-    if (this.device.interfaces.includes(ScryptedInterface.Camera)) {
-      const picture = this.device.takePicture();
-      this.fetchCamera(picture);
-    } else if (this.device.interfaces.includes(ScryptedInterface.VideoCamera)) {
-      const videoStream = this.device.getVideoStream();
-      this.fetchCamera(videoStream);
-    }
+    this.fetchCamera();
   },
 };
 </script>

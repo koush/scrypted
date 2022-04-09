@@ -1,29 +1,26 @@
 
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, MediaStreamOptions, Settings, Setting, ScryptedMimeTypes, FFMpegInput, RequestMediaStreamOptions, BufferConverter, ResponseMediaStreamOptions, VideoCameraConfiguration } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
-import { once } from 'events';
-import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityTimer, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { createMpegTsParser, createFragmentedMp4Parser, StreamChunk, StreamParser, MP4Atom, parseMp4StreamChunks } from '@scrypted/common/src/stream-parser';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityTimer, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { parsePayloadTypes, parseTrackIds } from '@scrypted/common/src/sdp-utils';
-import { createRtspParser, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
-import { Duplex } from 'stream';
-import net from 'net';
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
+import { createRtspParser, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
+import { addTrackControls, parsePayloadTypes, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
-import { addTrackControls } from '@scrypted/common/src/sdp-utils';
-import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
+import { createFragmentedMp4Parser, createMpegTsParser, parseMp4StreamChunks, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
+import sdk, { BufferConverter, FFMpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
+import net from 'net';
+import { Duplex } from 'stream';
+import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
+import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
-const defaultPrebufferDuration = 10000;
-const PREBUFFER_DURATION_MS = 'prebufferDuration';
-const SEND_KEYFRAME = 'sendKeyframe';
+const prebufferDurationMs = 10000;
 const DEFAULT_AUDIO = 'Default';
 const AAC_AUDIO = 'AAC or No Audio';
 const AAC_AUDIO_DESCRIPTION = `${AAC_AUDIO} (Copy)`;
@@ -389,9 +386,8 @@ class PrebufferSession {
     this.prebuffers.mp4 = [];
     this.prebuffers.mpegts = [];
     this.prebuffers.rtsp = [];
-    const prebufferDurationMs = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
 
-    let mso: MediaStreamOptions;
+    let mso: ResponseMediaStreamOptions;
     try {
       mso = (await this.mixinDevice.getVideoStreamOptions()).find(o => o.id === this.streamId);
     }
@@ -424,13 +420,6 @@ class PrebufferSession {
       && detectedAudioCodec === undefined) {
       this.console.warn('Camera did not report an audio codec, muting the audio stream and probing the codec.');
       probingAudioCodec = true;
-    }
-
-    // complain to the user about the codec if necessary. upstream may send a audio
-    // stream but report none exists (to request muting).
-    if (!audioSoftMuted && advertisedAudioCodec && detectedAudioCodec !== undefined
-      && detectedAudioCodec !== advertisedAudioCodec) {
-      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
     }
 
     // the assumed audio codec is the detected codec first and the reported codec otherwise.
@@ -619,25 +608,47 @@ class PrebufferSession {
           rtspClient.requestTimeout = 10000;
           await rtspClient.options();
           const sdpResponse = await rtspClient.describe();
-          const sdp = sdpResponse.body.toString().trim();
+          let sdp = sdpResponse.body.toString().trim();
           this.console.log('sdp', sdp);
+
+          const parsedSdp = parseSdp(sdp);
+          const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
+          const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
+
+          // sdp may contain multiple audio/video sections. take only the first.
+          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === audioSection || msection === videoSection);
+          sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
+
           this.sdp = Promise.resolve(sdp);
-          const { audio, video } = parseTrackIds(sdp);
           let channel = 0;
           if (!audioSoftMuted) {
-            await rtspClient.setup(channel, audio);
-            channel += 2;
+            if (audioSection) {
+              await rtspClient.setup(channel, audioSection.control);
+              channel += 2;
+            }
+            else {
+              this.console.warn('sdp did not contain audio track and audio was not reported as missing.');
+            }
           }
-          await rtspClient.setup(channel, video);
-          const socket = await rtspClient.play();
-          session = await startRFC4571Parser(this.console, socket, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
+          await rtspClient.setup(channel, videoSection.control);
+          await rtspClient.play();
+          session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, true, rbo);
           const sessionKill = session.kill.bind(session);
+          let issuedTeardown = false;
           session.kill = async () => {
             // issue a teardown to upstream to close gracefully but don't rely on it responding.
-            rtspClient.teardown().finally(sessionKill);
+            if (!issuedTeardown) {
+              issuedTeardown = true;
+              rtspClient.teardown().finally(sessionKill);
+            }
             await sleep(500);
+            rtspClient.client.destroy();
             sessionKill();
           }
+          if (!session.isActive)
+            throw new Error('parser was killed before rtsp client started');
+
+          rtspClient.readLoop().finally(() => session.kill());
         }
         catch (e) {
           rtspClient.client.destroy();
@@ -666,7 +677,7 @@ class PrebufferSession {
           const mp4Session = await startFFMPegFragmentedMP4Session(ffmpegInput.inputArguments, acodec, vcodec, this.console);
 
           const kill = () => {
-            mp4Session.cp.kill('SIGKILL');
+            safeKillFFmpeg(mp4Session.cp);
             session.kill();
             mp4Session.generator.throw(new Error('killed'));
           };
@@ -676,7 +687,7 @@ class PrebufferSession {
             return;
           }
 
-          session.once('killed', kill);
+          session.killed.finally(kill);
 
           const { resetActivityTimer } = setupActivityTimer('mp4', kill, session, rbo.timeout);
 
@@ -686,6 +697,19 @@ class PrebufferSession {
           }
         })
         .catch(() => { });
+    }
+
+    // complain to the user about the codec if necessary. upstream may send a audio
+    // stream but report none exists (to request muting).
+    if (!audioSoftMuted && advertisedAudioCodec && session.inputAudioCodec !== undefined
+      && session.inputAudioCodec !== advertisedAudioCodec) {
+      this.console.warn('Audio codec plugin reported vs detected mismatch', advertisedAudioCodec, detectedAudioCodec);
+    }
+
+    const advertisedVideoCodec = mso?.video?.codec;
+    if (advertisedVideoCodec && session.inputVideoCodec !== undefined
+      && session.inputVideoCodec !== advertisedVideoCodec) {
+      this.console.warn('Video codec plugin reported vs detected mismatch', advertisedVideoCodec, session.inputVideoCodec);
     }
 
     if (!session.inputAudioCodec) {
@@ -739,10 +763,10 @@ class PrebufferSession {
       }
 
       scheduleRefresh(mso);
-      session.once('killed', () => clearTimeout(refreshTimeout));
+      session.killed.finally(() => clearTimeout(refreshTimeout));
     }
 
-    session.once('killed', () => {
+    session.killed.finally(() => {
       clearTimeout(this.inactivityTimeout)
       this.parserSessionPromise = undefined;
       if (this.parserSession === session)
@@ -758,7 +782,7 @@ class PrebufferSession {
 
         const updateIdr = () => {
           if (this.prevIdr) {
-            const sendEvent = !this.detectedIdrInterval;
+            const sendEvent = typeof this.detectedIdrInterval !== 'number';
             this.detectedIdrInterval = now - this.prevIdr;
             // only on the first idr update should we send a settings refresh.
             if (sendEvent)
@@ -806,18 +830,22 @@ class PrebufferSession {
     this.console.log(this.streamName, 'active rebroadcast clients:', this.activeClients);
   }
 
-  inactivityCheck(session: ParserSession<PrebufferParsers>) {
-    this.printActiveClients();
+  inactivityCheck(session: ParserSession<PrebufferParsers>, resetTimeout: boolean) {
     if (this.activeClients)
       return;
 
+    // should bitrate be reset immediately once the stream goes inactive?
     if (this.needBitrateReset && this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
-        this.resetBitrate();
+      this.resetBitrate();
     }
 
     if (!this.stopInactive) {
       return;
     }
+
+    // passive clients should not reset timeouts.
+    if (this.inactivityTimeout && !resetTimeout)
+      return;
 
     clearTimeout(this.inactivityTimeout)
     this.inactivityTimeout = setTimeout(() => {
@@ -839,6 +867,8 @@ class PrebufferSession {
     requestedPrebuffer: number,
   }) {
     const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
+    if (requestedPrebuffer)
+      this.console.log('sending prebuffer', requestedPrebuffer);
 
     handleRebroadcasterClient(socketPromise, {
       // console: this.console,
@@ -862,9 +892,9 @@ class PrebufferSession {
         }
 
         const cleanup = () => {
-          destroy();
           session.removeListener(container, safeWriteData);
           session.removeListener('killed', cleanup);
+          destroy();
         }
 
         session.on(container, safeWriteData);
@@ -891,11 +921,9 @@ class PrebufferSession {
         return () => {
           if (isActiveClient) {
             this.activeClients--;
-            this.inactivityCheck(session);
+            this.printActiveClients();
           }
-          else {
-            // this.console.log('passive client request ended');
-          }
+          this.inactivityCheck(session, isActiveClient);
           cleanup();
         };
       }
@@ -903,20 +931,17 @@ class PrebufferSession {
   }
 
   async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+    if (options?.refresh === false && !this.parserSessionPromise)
+      throw new Error('Stream is currently unavailable and will not be started for this request. RequestMediaStreamOptions.refresh === false');
+
     this.ensurePrebufferSession();
 
     const session = await this.parserSessionPromise;
 
-    const sendKeyframe = this.storage.getItem(SEND_KEYFRAME) !== 'false';
     let requestedPrebuffer = options?.prebuffer;
     if (requestedPrebuffer == null) {
-      if (sendKeyframe) {
-        // get into the general area of finding a sync frame.
-        requestedPrebuffer = Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5;
-      }
-      else {
-        requestedPrebuffer = 0;
-      }
+      // get into the general area of finding a sync frame.
+      requestedPrebuffer = Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5;
     }
 
     const { rtspMode } = this.getRebroadcastMode();
@@ -966,7 +991,8 @@ class PrebufferSession {
       return containerUrl;
     }
 
-    const mediaStreamOptions: MediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
+    const mediaStreamOptions: ResponseMediaStreamOptions = Object.assign({}, session.mediaStreamOptions);
+    mediaStreamOptions.sdp = (await session.sdp)?.toString();
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
@@ -1000,11 +1026,16 @@ class PrebufferSession {
       }
     }
 
-    if (mediaStreamOptions.video && session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
+    if (!mediaStreamOptions.video)
+      mediaStreamOptions.video = {};
+
+    mediaStreamOptions.video.codec = session.inputVideoCodec;
+
+    if (session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
       Object.assign(mediaStreamOptions.video, {
         width: parseInt(session.inputVideoResolution[2]),
         height: parseInt(session.inputVideoResolution[3]),
-      })
+      });
     }
 
     const now = Date.now();
@@ -1033,14 +1064,15 @@ class PrebufferSession {
       mediaStreamOptions,
     }
 
-    const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
-    return mo;
+    return this.mixin.createMediaObject(ffmpegInput, ScryptedMimeTypes.FFmpegInput);
   }
 }
 
 class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraConfiguration> implements VideoCamera, Settings, VideoCameraConfiguration {
   released = false;
   sessions = new Map<string, PrebufferSession>();
+
+  streamSettings = createStreamSettings(this);
 
   constructor(public plugin: PrebufferProvider, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
@@ -1055,15 +1087,46 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
   }
 
   async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
+    if (options?.directMediaStream)
+      return this.mixinDevice.getVideoStream(options);
+
     await this.ensurePrebufferSessions();
 
-    const id = options?.id;
-    let session = this.sessions.get(id);
-    if (!session || options?.directMediaStream)
-      return this.mixinDevice.getVideoStream(options);
-    session.ensurePrebufferSession();
-    await session.parserSessionPromise;
-    session = this.sessions.get(id);
+    let id = options?.id;
+    if (options?.destination) {
+      const msos = await this.mixinDevice.getVideoStreamOptions();
+      let result: {
+        stream: ResponseMediaStreamOptions,
+        isDefault: boolean,
+      };
+
+      switch (options.destination) {
+        case 'remote':
+          result = this.streamSettings.getRemoteStream(msos);
+          break;
+        case 'low-resolution':
+          result = this.streamSettings.getLowResolutionStream(msos);
+          break;
+        case 'local-recorder':
+          result = this.streamSettings.getRecordingStream(msos);
+          break;
+        case 'remote-recorder':
+          result = this.streamSettings.getRemoteRecordingStream(msos);
+          break;
+        default:
+          result = this.streamSettings.getDefaultStream(msos);
+          break;
+      }
+
+      if (!result.isDefault || !id) {
+        id = result.stream.id;
+      }
+      else {
+        this.console.log('Default stream overriden by legacy stream id setting for ', id);
+      }
+    }
+
+    const session = this.sessions.get(id);
     if (!session)
       return this.mixinDevice.getVideoStream(options);
     return session.getVideoStream(options);
@@ -1071,7 +1134,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
   async ensurePrebufferSessions() {
     const msos = await this.mixinDevice.getVideoStreamOptions();
-    const enabled = this.getEnabledMediaStreamOptions(msos);
+    const enabled = this.getPrebufferedStreams(msos);
     const enabledIds = enabled ? enabled.map(mso => mso.id) : [undefined];
     const ids = msos?.map(mso => mso.id) || [undefined];
 
@@ -1094,19 +1157,17 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
           log.a(`Prebuffer is already available on ${this.name}. If this is a grouped device, disable the Rebroadcast extension.`)
         }
         const name = mso?.name;
-        const notEnabled = !enabledIds.includes(id)
-        const stopInactive = isBatteryPowered || notEnabled;
+        const enabled = enabledIds.includes(id);
+        const stopInactive = isBatteryPowered || !enabled;
         session = new PrebufferSession(this, mso, stopInactive);
         this.sessions.set(id, session);
-        if (id === msos?.[0]?.id)
-          this.sessions.set(undefined, session);
 
         if (isBatteryPowered) {
           this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
           continue;
         }
 
-        if (notEnabled) {
+        if (!enabled) {
           this.console.log('stream', name, 'will be rebroadcast on demand.');
           continue;
         }
@@ -1120,7 +1181,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
               active++;
               wasActive = true;
               this.online = !!active;
-              await once(ps, 'killed');
+              await ps.killed;
               this.console.error('prebuffer session ended');
             }
             catch (e) {
@@ -1139,51 +1200,31 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         })();
       }
     }
+
+    if (!this.sessions.has(undefined)) {
+      const defaultStreamName = this.streamSettings.storageSettings.values.defaultStream;
+      let defaultSession = this.sessions.get(msos?.find(mso => mso.name === defaultStreamName)?.id);
+      if (!defaultSession)
+        defaultSession = this.sessions.get(msos?.find(mso => mso.id === enabledIds[0])?.id);
+      if (!defaultSession)
+        defaultSession = this.sessions.get(msos?.find(mso => mso.id === ids?.[0])?.id);
+
+      if (defaultSession) {
+        this.sessions.set(undefined, defaultSession);
+        this.console.log('Default Stream:', defaultSession.advertisedMediaStreamOptions.id, defaultSession.advertisedMediaStreamOptions.name);
+      }
+      else {
+        this.console.warn('Unable to find Default Stream?');
+      }
+    }
+
     deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
   }
 
   async getMixinSettings(): Promise<Setting[]> {
     const settings: Setting[] = [];
 
-    try {
-      const msos = await this.mixinDevice.getVideoStreamOptions();
-      const enabledStreams = this.getEnabledMediaStreamOptions(msos);
-      if (msos?.length > 0) {
-        settings.push(
-          {
-            title: 'Prebuffered Streams',
-            description: 'The streams to prebuffer. Enable only as necessary to reduce traffic.',
-            key: 'enabledStreams',
-            value: enabledStreams.map(mso => mso.name || ''),
-            choices: msos.map(mso => mso.name),
-            multiple: true,
-          },
-        )
-      }
-    }
-    catch (e) {
-      this.console.error('error in getVideoStreamOptions', e);
-      throw e;
-    }
-
-
-    settings.push(
-      {
-        title: 'Prebuffer Duration',
-        description: 'Duration of the prebuffer in milliseconds.',
-        type: 'number',
-        key: PREBUFFER_DURATION_MS,
-        value: this.storage.getItem(PREBUFFER_DURATION_MS) || defaultPrebufferDuration.toString(),
-      },
-      {
-        title: 'Start at Previous Keyframe',
-        description: 'Start live streams from the previous key frame. Improves startup time.',
-        type: 'boolean',
-        key: SEND_KEYFRAME,
-        value: (this.storage.getItem(SEND_KEYFRAME) !== 'false').toString(),
-      },
-    );
-
+    settings.push(...await this.streamSettings.storageSettings.getSettings());
 
     for (const session of new Set([...this.sessions.values()])) {
       if (!session)
@@ -1193,53 +1234,37 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       }
       catch (e) {
         this.console.error('error in prebuffer session getMixinSettings', e);
-        throw e;
       }
     }
 
     return settings;
   }
 
-  async putMixinSetting(key: string, value: string | number | boolean): Promise<void> {
+  async putMixinSetting(key: string, value: SettingValue): Promise<void> {
     const sessions = this.sessions;
     this.sessions = new Map();
-    if (key === 'enabledStreams') {
-      this.storage.setItem(key, JSON.stringify(value));
-    }
-    else {
-      this.storage.setItem(key, value.toString());
-    }
+    if (this.streamSettings.storageSettings.settings[key])
+      await this.streamSettings.storageSettings.putSetting(key, value);
+    else
+      this.storage.setItem(key, value?.toString());
+
     for (const session of sessions.values()) {
       session?.parserSessionPromise?.then(session => session.kill());
     }
     this.ensurePrebufferSessions();
   }
 
-  getEnabledMediaStreamOptions(msos?: MediaStreamOptions[]) {
-    if (!msos)
-      return;
-
-    try {
-      const parsed: any[] = JSON.parse(this.storage.getItem('enabledStreams'));
-      const filtered = msos.filter(mso => parsed.includes(mso.name));
-      return filtered;
-    }
-    catch (e) {
-    }
-    // do not enable rebroadcast on cloud streams by default.
-    const firstNonCloudStream = msos.find(mso => mso.source !== 'cloud');
-    return firstNonCloudStream ? [firstNonCloudStream] : [];
+  getPrebufferedStreams(msos?: ResponseMediaStreamOptions[]) {
+    return getPrebufferedStreams(this.streamSettings.storageSettings, msos);
   }
 
-  async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
-    const ret: MediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
-    let enabledStreams = this.getEnabledMediaStreamOptions(ret);
-
-    const prebuffer = parseInt(this.storage.getItem(PREBUFFER_DURATION_MS)) || defaultPrebufferDuration;
+  async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
+    const ret: ResponseMediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
+    let enabledStreams = this.getPrebufferedStreams(ret);
 
     for (const mso of ret) {
       if (this.sessions.get(mso.id)?.parserSession || enabledStreams.includes(mso))
-        mso.prebuffer = prebuffer;
+        mso.prebuffer = prebufferDurationMs;
     }
 
     return ret;
@@ -1453,7 +1478,7 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
       mixinDeviceState,
       mixinProviderNativeId: this.nativeId,
       mixinDeviceInterfaces,
-      group: "Prebuffer Settings",
+      group: "Stream Selection",
       groupKey: "prebuffer",
     });
     this.currentMixins.set(mixinDeviceState.id, ret);

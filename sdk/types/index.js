@@ -11,6 +11,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["interfaces"] = "interfaces";
     ScryptedInterfaceProperty["mixins"] = "mixins";
     ScryptedInterfaceProperty["name"] = "name";
+    ScryptedInterfaceProperty["pluginId"] = "pluginId";
     ScryptedInterfaceProperty["providedInterfaces"] = "providedInterfaces";
     ScryptedInterfaceProperty["providedName"] = "providedName";
     ScryptedInterfaceProperty["providedRoom"] = "providedRoom";
@@ -72,6 +73,7 @@ exports.ScryptedInterfaceDescriptors = {
             'interfaces',
             'mixins',
             'name',
+            'pluginId',
             'providedInterfaces',
             'providedName',
             'providedRoom',
@@ -211,6 +213,21 @@ exports.ScryptedInterfaceDescriptors = {
         methods: [
             'getPictureOptions',
             'takePicture'
+        ],
+        properties: []
+    },
+    Microphone: {
+        name: 'Microphone',
+        methods: [
+            'getAudioStream'
+        ],
+        properties: []
+    },
+    Display: {
+        name: 'Display',
+        methods: [
+            'startDisplay',
+            'stopDisplay'
         ],
         properties: []
     },
@@ -593,8 +610,19 @@ var ScryptedDeviceType;
     ScryptedDeviceType["Thermostat"] = "Thermostat";
     ScryptedDeviceType["Lock"] = "Lock";
     ScryptedDeviceType["PasswordControl"] = "PasswordControl";
+    /**
+     * Displays have audio and video output.
+     */
     ScryptedDeviceType["Display"] = "Display";
+    /**
+     * Smart Displays have two way audio and video.
+     */
+    ScryptedDeviceType["SmartDisplay"] = "SmartDisplay";
     ScryptedDeviceType["Speaker"] = "Speaker";
+    /**
+     * Smart Speakers have two way audio.
+     */
+    ScryptedDeviceType["SmartSpeaker"] = "SmartSpeaker";
     ScryptedDeviceType["Event"] = "Event";
     ScryptedDeviceType["Entry"] = "Entry";
     ScryptedDeviceType["Garage"] = "Garage";
@@ -667,6 +695,8 @@ var ScryptedInterface;
     ScryptedInterface["Thermometer"] = "Thermometer";
     ScryptedInterface["HumiditySensor"] = "HumiditySensor";
     ScryptedInterface["Camera"] = "Camera";
+    ScryptedInterface["Microphone"] = "Microphone";
+    ScryptedInterface["Display"] = "Display";
     ScryptedInterface["VideoCamera"] = "VideoCamera";
     ScryptedInterface["VideoRecorder"] = "VideoRecorder";
     ScryptedInterface["VideoClips"] = "VideoClips";
@@ -722,13 +752,7 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["PushEndpoint"] = "text/x-push-endpoint";
     ScryptedMimeTypes["MediaStreamUrl"] = "text/x-media-url";
     ScryptedMimeTypes["FFmpegInput"] = "x-scrypted/x-ffmpeg-input";
-    /**
-     * An RTCSignalingChannel/VideoCamera will return x-scrypted-rtc-signaling-<unique-prefix>/x-<unique-suffix>.
-     * RTC clients can inspect the mime and convert the contents to a buffer containing the string device id.
-     * If the client does not support WebRTC, it may try to convert it to an FFmpeg media object,
-     * which should also be trapped and handled by the endpoint using its internal signaling.
-     */
-    ScryptedMimeTypes["RTCAVSignalingPrefix"] = "x-scrypted-rtc-signaling-";
+    ScryptedMimeTypes["RTCSignalingChannel"] = "x-scrypted/x-scrypted-rtc-signaling-channel";
     ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
     ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));

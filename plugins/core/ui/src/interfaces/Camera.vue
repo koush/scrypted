@@ -36,7 +36,7 @@ export default {
     return {
       src: "images/cameraloading.jpg",
       dialog: false,
-      disabled: !this.device.interfaces.includes(ScryptedInterface.VideoCamera),
+      disabled: !this.device.interfaces.includes(ScryptedInterface.RTCSignalingChannel),
     };
   },
   methods: {

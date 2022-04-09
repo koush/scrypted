@@ -1,8 +1,8 @@
 import { readLength, readLine } from './read-stream';
-import { Duplex, Readable } from 'stream';
+import { Duplex, PassThrough, Readable } from 'stream';
 import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
-import { findTrack } from './sdp-utils';
+import { findTrackByType } from './sdp-utils';
 import dgram from 'dgram';
 import net from 'net';
 import tls from 'tls';
@@ -118,7 +118,7 @@ export class RtspBase {
         }
         message += '\r\n';
         this.client.write(message);
-        this.console?.log('rtsp outgpoing message\n', message);
+        this.console?.log('rtsp outgoing message\n', message);
         this.console?.log();
         if (body)
             this.client.write(body);
@@ -140,6 +140,8 @@ export class RtspClient extends RtspBase {
     session: string;
     authorization: string;
     requestTimeout: number;
+    rfc4571 = new PassThrough();
+    needKeepAlive = false;
 
     constructor(public url: string, console?: Console) {
         super(console);
@@ -162,10 +164,16 @@ export class RtspClient extends RtspBase {
 
         let fullUrl = this.url;
         if (path) {
-            // strangely, RTSP urls do not behave like expected from an HTTP-ish server.
-            // ffmpeg will happily suffix path segments after query strings:
-            // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
-            fullUrl += '/' + path;
+            // a=control may be a full or "relative" url.
+            if (path.includes('rtsp://') || path.includes('rtsps://')) {
+                fullUrl = path;
+            }
+            else {
+                // strangely, relative RTSP urls do not behave like expected from an HTTP-ish server.
+                // ffmpeg will happily suffix path segments after query strings:
+                // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
+                fullUrl += '/' + path;
+            }
         }
 
         const sanitized = new URL(fullUrl);
@@ -184,6 +192,59 @@ export class RtspClient extends RtspBase {
             headers['Session'] = this.session;
 
         this.write(line, headers, body);
+    }
+
+    async handleDataPayload(header: Buffer) {
+        // todo: fix this, because calling teardown outside of the read loop causes this.
+        if (header[0] !== RTSP_FRAME_MAGIC)
+            throw new Error('RTSP Client expected frame magic but received: ' + header.toString());
+
+        const length = header.readUInt16BE(2);
+        const data = await readLength(this.client, length);
+
+        this.rfc4571.push(header);
+        this.rfc4571.push(data);
+    }
+
+    async readDataPayload() {
+        const header = await readLength(this.client, 4);
+        return this.handleDataPayload(header);
+    }
+
+    async readLoop() {
+        try {
+            while (true) {
+                if (this.needKeepAlive) {
+                    this.needKeepAlive = false;
+                    await this.getParameter();
+                }
+                await this.readDataPayload();
+            }
+        }
+        catch (e) {
+            this.client.destroy(e);
+            this.rfc4571.destroy(e);
+            throw e;
+        }
+    }
+
+    // rtsp over tcp will actually interleave RTSP request/responses
+    // within the RTSP data stream. The only way to tell if it's a request/response
+    // is to see if the header + data starts with RTSP/1.0 message line.
+    // Or RTSP, if looking at only the header bytes. Then grab the response out.
+    async readMessage(): Promise<string[]> {
+        while (true) {
+            const header = await readLength(this.client, 4);
+            if (header.toString() === 'RTSP') {
+                this.client.unshift(header);
+                const message = await super.readMessage();
+                this.console?.log('rtsp incoming message\n', message.join('\n'));
+                this.console?.log();
+                return message;
+            }
+
+            await this.handleDataPayload(header);
+        }
     }
 
     async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<{
@@ -245,9 +306,8 @@ export class RtspClient extends RtspBase {
         return this.request('OPTIONS', headers);
     }
 
-    async writeGetParameter() {
-        const headers: Headers = {};
-        return this.writeRequest('GET_PARAMETER', headers);
+    async getParameter() {
+        return this.request('GET_PARAMETER');
     }
 
     async describe(headers?: Headers) {
@@ -272,7 +332,7 @@ export class RtspClient extends RtspBase {
                 // one suggestion is calling OPTIONS, but apparently GET_PARAMETER is more reliable.
                 // https://stackoverflow.com/a/39818378
                 let interval = (timeout - 5) * 1000;
-                let timer = setInterval(() => this.writeGetParameter(), interval);
+                let timer = setInterval(() => this.needKeepAlive = true, interval);
                 this.client.once('close', () => clearInterval(timer));
             }
 
@@ -285,17 +345,16 @@ export class RtspClient extends RtspBase {
         const headers: any = {
             Range: `npt=${start}-`,
         };
-        await this.request('PLAY', headers);
-        return this.client;
+        return this.request('PLAY', headers);
     }
 
     async pause() {
-        await this.request('PAUSE');
-        return this.client;
+        return this.request('PAUSE');
     }
 
     async teardown() {
         try {
+            // todo: fix this, because calling teardown outside of the read loop causes this.
             return await this.request('TEARDOWN');
         }
         finally {
@@ -351,9 +410,10 @@ export class RtspServer {
     }> {
         while (true) {
             const header = await readLength(this.client, 4);
-            // this is the magic
-            // if (header[0] !== RTSP_FRAME_MAGIC)
-            //     throw new Error('RTSP frame magic expected, but got ' + header[0]);
+            // can this even happen? since the RTSP request method isn't a fixed
+            // value like the "RTSP" in the RTSP response, I don't think so?
+            if (header[0] !== RTSP_FRAME_MAGIC)
+                throw new Error('RTSP Server expected frame magic but received: ' + header.toString());
             const length = header.readUInt16BE(2);
             const packet = await readLength(this.client, length);
             const id = header.readUInt8(1);
@@ -424,8 +484,8 @@ export class RtspServer {
         const transport = requestHeaders['transport'];
         headers['Transport'] = transport;
         headers['Session'] = this.session;
-        let audioTrack = findTrack(this.sdp, 'audio');
-        let videoTrack = findTrack(this.sdp, 'video');
+        let audioTrack = findTrackByType(this.sdp, 'audio');
+        let videoTrack = findTrackByType(this.sdp, 'video');
         if (transport.includes('UDP')) {
             if (!this.udp) {
                 this.respond(461, 'Unsupported Transport', requestHeaders, {});
@@ -459,8 +519,8 @@ export class RtspServer {
 
     play(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
-        let audioTrack = findTrack(this.sdp, 'audio');
-        let videoTrack = findTrack(this.sdp, 'video');
+        let audioTrack = findTrackByType(this.sdp, 'audio');
+        let videoTrack = findTrackByType(this.sdp, 'video');
         let rtpInfo = '';
         if (audioTrack)
             rtpInfo = `url=${url}/trackID=${audioTrack.trackId};seq=0;rtptime=0`
@@ -539,7 +599,9 @@ export class RtspServer {
         this.console?.log('response headers', response);
         response += '\r\n';
         this.client.write(response);
-        if (buffer)
+        if (buffer) {
             this.client.write(buffer);
+            this.console?.log('response body', buffer.toString());
+        }
     }
 }

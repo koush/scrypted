@@ -218,6 +218,11 @@ async function start() {
 
     listenServerPort('SCRYPTED_SECURE_PORT', SCRYPTED_SECURE_PORT, secure);
     listenServerPort('SCRYPTED_INSECURE_PORT', SCRYPTED_INSECURE_PORT, insecure);
+    const legacyInsecure = http.createServer(app);
+    legacyInsecure.listen(10080);
+    legacyInsecure.on('error', () => {
+        // can ignore.
+    });
 
     console.log('#######################################################');
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);

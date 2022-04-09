@@ -1,5 +1,5 @@
 export * from './types/index'
-import { ScryptedInterfaceProperty, DeviceBase } from './types/index';
+import { ScryptedInterfaceProperty, DeviceBase, MediaObject } from './types/index';
 import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager, EventListenerRegister } from './types/index';
 import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types/index';
 
@@ -33,6 +33,18 @@ export class ScryptedDeviceBase extends DeviceBase {
     }
 
     return this._console;
+  }
+
+  async createMediaObject(data: any, mimeType: string) {
+    return mediaManager.createMediaObject(data, mimeType, {
+      sourceId: this.id,
+    });
+  }
+
+  getMediaObjectConsole(mediaObject: MediaObject): Console {
+    if (typeof mediaObject.sourceId !== 'string')
+      return this.console;
+    return deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
   }
 
   _lazyLoadDeviceState() {
@@ -100,6 +112,18 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
     }
 
     return this._console;
+  }
+
+  async createMediaObject(data: any, mimeType: string) {
+    return mediaManager.createMediaObject(data, mimeType, {
+      sourceId: this.id,
+    });
+  }
+
+  getMediaObjectConsole(mediaObject: MediaObject): Console {
+    if (typeof mediaObject.sourceId !== 'string')
+      return this.console;
+    return deviceManager.getMixinConsole(mediaObject.sourceId, this.mixinProviderNativeId);
   }
 
   /**

@@ -94,15 +94,22 @@ export abstract class PluginHttp<T> {
         }
 
         if (!isEngineIOEndpoint && isUpgrade) {
-            this.wss.handleUpgrade(req, req.socket, (req as any).upgradeHead, async (ws) => {
-                try {
-                    await this.handleWebSocket(endpoint, httpRequest, ws, pluginData);
-                }
-                catch (e) {
-                    console.error('websocket plugin error', e);
-                    ws.close();
-                }
-            });
+            try {
+                this.wss.handleUpgrade(req, req.socket, (req as any).upgradeHead, async (ws) => {
+                    try {
+                        await this.handleWebSocket(endpoint, httpRequest, ws, pluginData);
+                    }
+                    catch (e) {
+                        console.error('websocket plugin error', e);
+                        ws.close();
+                    }
+                });
+            }
+            catch (e) {
+                res.status(500);
+                res.send(e.toString());
+                console.error(e);
+            }
         }
         else {
             try {

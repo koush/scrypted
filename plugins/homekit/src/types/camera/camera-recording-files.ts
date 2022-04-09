@@ -2,6 +2,7 @@
 import sdk, { FFMpegInput, MediaObject, VideoClip, VideoClipOptions } from '@scrypted/sdk';
 import path from 'path';
 import fs from 'fs';
+import mkdirp from 'mkdirp';
 
 const { mediaManager } = sdk;
 export const VIDEO_CLIPS_NATIVE_ID = 'save-video-clips';
@@ -63,6 +64,7 @@ export async function pruneClips(pruneAge: number, console: Console) {
 
 export async function getSavePath() {
     const savePath = path.join(await mediaManager.getFilesPath(), 'hksv');
+    mkdirp.sync(savePath);
     return savePath;
 }
 
