@@ -175,7 +175,7 @@ class Arlo(object):
         self.Unsubscribe()
         return self.request.put(f'https://{self.BASE_URL}/hmsweb/logout')
 
-    async def Subscribe(self, basestation, register_heartbeat=False):
+    async def Subscribe(self, basestation_camera_tuples=[]):
         """
         Arlo uses the EventStream interface in the browser to do pub/sub style messaging.
         Unfortunately, this appears to be the only way Arlo communicates these messages.
@@ -185,26 +185,17 @@ class Arlo(object):
         This call registers the device (which should be the basestation) so that events will be sent to the EventStream
         when subsequent calls to /notify are made.
         """
-        async def heartbeat(self, basestation, interval=60):
-            await asyncio.sleep(interval)
-            while self.event_stream and self.event_stream.connected:
-                try:
-                    self.Ping(basestation)
-                except Exception as e:
-                    logger.warn(f"Ignoring error while pinging basestation: {e}")
-                await asyncio.sleep(interval)
-
         if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
             self.event_stream = EventStream(self)
             await self.event_stream.start()
 
-        if register_heartbeat:
-            asyncio.get_event_loop().create_task(heartbeat(self, basestation))
+        while not self.event_stream.connected:
+            await asyncio.sleep(0.5)
 
-        try:
-            self.Ping(basestation)
-        except Exception as e:
-            logger.warn(f"Ignoring error while pinging basestation: {e}")
+        self.event_stream.subscribe([
+            f"d/{basestation['xCloudId']}/out/cameras/{camera['deviceId']}/#"
+            for basestation, camera in basestation_camera_tuples
+        ])
 
     def Unsubscribe(self):
         """ This method stops the EventStream subscription and removes it from the event_stream collection. """
@@ -290,7 +281,7 @@ class Arlo(object):
 
         asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
-    async def HandleEvents(self, basestation, resource, actions, callback, register_heartbeat=False):
+    async def HandleEvents(self, basestation, resource, actions, callback):
         """
         Use this method to subscribe to the event stream and provide a callback that will be called for event event received.
         This function will allow you to potentially write a callback that can handle all of the events received from the event stream.
@@ -298,7 +289,7 @@ class Arlo(object):
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
-        await self.Subscribe(basestation, register_heartbeat=register_heartbeat)
+        await self.Subscribe()
         if self.event_stream and self.event_stream.connected:
             seen_events = {}
             while self.event_stream.connected:
@@ -332,7 +323,7 @@ class Arlo(object):
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
-        await self.Subscribe(basestation)
+        await self.Subscribe()
         trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.

@@ -125,22 +125,19 @@ class EventStream:
             self.connected = True
             self.initializing = False
 
-            # Subscribing in on_connect() means that if we lose the connection and
-            # reconnect then subscriptions will be renewed.
-            client.subscribe("d/#")
-
         def on_message(client, userdata, msg):
-            print(msg.topic, str(msg.payload))
+            payload = msg.payload.decode()
+            logger.debug(f"Received event: {payload}")
 
             try:
-                response = json.loads(str(msg.payload))
+                response = json.loads(payload.strip())
             except json.JSONDecodeError:
                 return
 
             if response.get('resource') is not None:
                 self.event_loop.call_soon_threadsafe(self._queue_response, response)
 
-        self.event_stream = mqtt.Client(client_id=f"user_{self.arlo.user_id}_{self._gen_client_number()}", transport="websockets")
+        self.event_stream = mqtt.Client(client_id=f"user_{self.arlo.user_id}_{self._gen_client_number()}", transport="websockets", clean_session=False)
         self.event_stream.username_pw_set(self.arlo.user_id, password=self.arlo.request.session.headers.get('Authorization'))
         self.event_stream.ws_set_options(path="/mqtt", headers={"Origin": "https://my.arlo.com"})
         self.event_stream.enable_logger(logger=logger)
@@ -150,7 +147,14 @@ class EventStream:
         self.event_stream.connect_async("mqtt-cluster.arloxcld.com", port=443)
         self.event_stream.loop_start()
 
+        while not self.connected:
+            await asyncio.sleep(0.5)
+
         asyncio.get_event_loop().create_task(self._clean_queues())
+
+    def subscribe(self, topics):
+        if topics:
+            self.event_stream.subscribe([(topic, 0) for topic in topics])
 
     def _queue_response(self, response):
         resource = response.get('resource')

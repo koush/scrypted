@@ -109,10 +109,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     async def do_arlo_setup(self):
         try:
             await self.discoverDevices()
-
-            for basestation in self.arlo_basestations.values():
-                await self.arlo.Subscribe(basestation, register_heartbeat=True)
-                break
+            await self.arlo.Subscribe([
+                (self.arlo_basestations[camera["parentId"]], camera) for camera in self.arlo_cameras.values()
+            ])
 
             for nativeId in self.arlo_cameras.keys():
                 self.getDevice(nativeId)
