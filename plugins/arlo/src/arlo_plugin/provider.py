@@ -112,6 +112,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             for basestation in self.arlo_basestations.values():
                 await self.arlo.Subscribe(basestation, register_heartbeat=True)
+                break
 
             for nativeId in self.arlo_cameras.keys():
                 self.getDevice(nativeId)

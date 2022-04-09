@@ -21,7 +21,7 @@
 import asyncio
 import json
 import random
-import sseclient
+import paho.mqtt.client as mqtt
 import threading
 import time
 import uuid
@@ -81,6 +81,9 @@ class EventStream:
 
             await asyncio.sleep(interval)
 
+    def _gen_client_number(self):
+        return random.randint(1000000000, 9999999999)
+
     async def get(self, resource, actions, skip_uuids={}):
         while True:
             for action in actions:
@@ -118,37 +121,34 @@ class EventStream:
         if self.event_stream is not None:
             return
 
-        def thread_main(self):
-            for event in self.event_stream:
-                logger.debug(f"Received event: {event}")
-                if event is None or self.event_stream_stop_event.is_set():
-                    return None
+        def on_connect(client, userdata, flags, rc):
+            self.connected = True
+            self.initializing = False
 
-                if event.data.strip() == "":
-                    continue
+            # Subscribing in on_connect() means that if we lose the connection and
+            # reconnect then subscriptions will be renewed.
+            client.subscribe("d/#")
 
-                try:
-                    response = json.loads(event.data)
-                except json.JSONDecodeError:
-                    continue
+        def on_message(client, userdata, msg):
+            print(msg.topic, str(msg.payload))
 
-                if self.connected:
-                    if response.get('action') == 'logout':
-                        self.disconnect()
-                        return None
-                    elif response.get('resource') is not None:
-                        self.event_loop.call_soon_threadsafe(self._queue_response, response)
-                elif response.get('status') == 'connected':
-                    self.initializing = False
-                    self.connected = True
+            try:
+                response = json.loads(str(msg.payload))
+            except json.JSONDecodeError:
+                return
 
-        self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization'), session=self.arlo.request.session)
-        self.event_stream_thread = threading.Thread(name="EventStream", target=thread_main, args=(self, ))
-        self.event_stream_thread.setDaemon(True)
-        self.event_stream_thread.start()
+            if response.get('resource') is not None:
+                self.event_loop.call_soon_threadsafe(self._queue_response, response)
 
-        while not self.connected and not self.event_stream_stop_event.is_set():
-            await asyncio.sleep(0.5)
+        self.event_stream = mqtt.Client(client_id=f"user_{self.arlo.user_id}_{self._gen_client_number()}", transport="websockets")
+        self.event_stream.username_pw_set(self.arlo.user_id, password=self.arlo.request.session.headers.get('Authorization'))
+        self.event_stream.ws_set_options(path="/mqtt", headers={"Origin": "https://my.arlo.com"})
+        self.event_stream.enable_logger(logger=logger)
+        self.event_stream.on_connect = on_connect
+        self.event_stream.on_message = on_message
+        self.event_stream.tls_set()
+        self.event_stream.connect_async("mqtt-cluster.arloxcld.com", port=443)
+        self.event_stream.loop_start()
 
         asyncio.get_event_loop().create_task(self._clean_queues())
 
