@@ -35,16 +35,12 @@ addSupportedType({
             enabledStreamingCodecTypes.push(AudioStreamingCodecType.AAC_ELD);
         }
         for (const type of enabledStreamingCodecTypes) {
-            // todo: fix this. at some point we were forcing 24k for opus regarding
-            // this comment:
-
-            // force 24k, because various parts of the pipeline make that assumption.
-            // off the top of my head:
-            // 1) opus rtp timestamp mangling assumes 24k for the interval of 480
-            // 2) opus and aac_eld talkback generates an sdp with 24k
             for (const samplerate of [
+                // required by watch
                 AudioStreamingSamplerate.KHZ_8,
+                // never seen this requested
                 AudioStreamingSamplerate.KHZ_16,
+                // requested (required?) by ios/mac.
                 AudioStreamingSamplerate.KHZ_24
             ]) {
                 codecs.push({

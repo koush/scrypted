@@ -163,11 +163,15 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
+        let opusFramesPerPacket = request.audio.packet_time / 20;
+
         const perfectOpus = requestedOpus
             && mso?.audio?.codec === 'opus'
-            && mso?.audio?.encoder === 'scrypted';
+            // sanity check this
+            && opusFramesPerPacket && opusFramesPerPacket === Math.round(opusFramesPerPacket);
 
         let hasAudio = true;
+
         if (!transcodeStreaming
             && (perfectAac || perfectOpus)
             && mso?.tool === 'scrypted') {
@@ -176,6 +180,11 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             );
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
+            // by default opus encodes with a packet time of 20. however, homekit may request another value,
+            // which we will repect by simply outputing frames of that duration, rather than packing
+            // 20 ms frames to accomodate.
+            opusFramesPerPacket = 1;
+
             audioArgs.push(
                 '-acodec', ...(requestedOpus ?
                     [
@@ -222,8 +231,11 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                     session.audiossrc, session.startRequest.audio.pt,
                     session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
                     session.startRequest.audio.rtcp_interval,
-                    session.startRequest.audio.packet_time,
-                    session.startRequest.audio.sample_rate,
+                    {
+                        audioPacketTime: session.startRequest.audio.packet_time,
+                        audioSampleRate: session.startRequest.audio.sample_rate,
+                        framesPerPacket: opusFramesPerPacket,
+                    }
                 );
                 audioForwarder.server.on('message', data => {
                     const packet = RtpPacket.deSerialize(data);

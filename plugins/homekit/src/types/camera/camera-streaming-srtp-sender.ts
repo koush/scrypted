@@ -6,8 +6,13 @@ import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/sr
 import { SrtpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtp';
 import { AudioStreamingSamplerate } from '../../hap';
 import { ntpTime } from './camera-utils';
+import { OpusRepacketizer } from './opus-repacketizer';
 
-export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, audioPacketTime?: number, audioSampleRate?: AudioStreamingSamplerate) {
+export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, audioOptions?: {
+    audioPacketTime: number,
+    audioSampleRate: AudioStreamingSamplerate,
+    framesPerPacket: number,
+}) {
     const srtpSession = new SrtpSession(config);
     const srtcpSession = new SrtcpSession(config);
 
@@ -18,10 +23,11 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
     let firstSequenceNumber = 0;
     let allowRollover = false;
     let rolloverCount = 0;
+    let packetizer: OpusRepacketizer;
 
     let audioIntervalScale = 1;
-    if (audioPacketTime) {
-        switch (audioSampleRate) {
+    if (audioOptions) {
+        switch (audioOptions.audioSampleRate) {
             case AudioStreamingSamplerate.KHZ_24:
                 audioIntervalScale = 3;
                 break;
@@ -29,7 +35,8 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
                 audioIntervalScale = 2;
                 break;
         }
-        audioIntervalScale = audioIntervalScale * audioPacketTime / 20;
+        audioIntervalScale = audioIntervalScale * audioOptions.audioPacketTime / 20;
+        packetizer = new OpusRepacketizer(audioOptions.framesPerPacket);
     }
 
     return (rtp: RtpPacket) => {
@@ -49,15 +56,20 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
             rolloverCount++;
         }
 
-        // depending where this stream is coming from (ie, rtsp/udp), we may not actually know how many packets
-        // have been lost. just infer this i guess. unfortunately it is not possible to infer the octet count that
-        // has been lost. should we make something up? does HAP behave correctly with only missing packet indicators?
-        const packetCount = (rtp.header.sequenceNumber - firstSequenceNumber) + (rolloverCount * 0x10000);
-
         if (!firstTimestamp)
             firstTimestamp = rtp.header.timestamp;
 
-        if (audioPacketTime) {
+        // depending where this stream is coming from (ie, rtsp/udp), we may not actually know how many packets
+        // have been lost. just infer this i guess. unfortunately it is not possible to infer the octet count that
+        // has been lost. should we make something up? does HAP behave correctly with only missing packet indicators?
+        let packetCount = (rtp.header.sequenceNumber - firstSequenceNumber) + (rolloverCount * 0x10000);
+
+        if (audioOptions.audioPacketTime) {
+            packetCount = Math.floor(packetCount / audioOptions.framesPerPacket);
+            rtp = packetizer.repacketize(rtp);
+            if (!rtp)
+                return;
+
             // from HAP spec:
             // RTP Payload Format for Opus Speech and Audio Codec RFC 7587 with an exception
             // that Opus audio RTP Timestamp shall be based on RFC 3550.
@@ -67,6 +79,12 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
             // HAP spec also states that it may request packet times of 20, 30, 40, or 60.
             // In practice, HAP has been seen to request 20 on LAN and 60 over LTE.
             // So the RTP timestamp must scale accordingly.
+
+            // Further investigation indicates that HAP doesn't care about the actual sample rate at all,
+            // that's merely a suggestion. When encoding Opus, it can seemingly be an arbitrary sample rate,
+            // audio will work so long as the rtp timestamps are created properly: which is a construct of the sample rate
+            // HAP requests, and the packet time is respected,
+            // opus 48khz will work just fine.
             rtp.header.timestamp = (firstTimestamp + packetCount * 180 * audioIntervalScale) % 0xFFFFFFFF;
         }
 
