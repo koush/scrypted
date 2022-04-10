@@ -157,10 +157,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         // homekit live streaming seems extremely picky about audio formats.
         // sending the incorrect packet time or bitrate, etc, can cause streaming
         // to fail altogether. these parameters can also change between LAN and LTE.
-        const perfectAac = audioCodec === AudioStreamingCodecType.AAC_ELD
-            && mso?.audio?.codec === 'aac'
-            && mso?.audio?.encoder === 'scrypted';
-
         const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
         let opusFramesPerPacket = request.audio.packet_time / 20;
@@ -173,7 +169,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         let hasAudio = true;
 
         if (!transcodeStreaming
-            && (perfectAac || perfectOpus)
+            && perfectOpus
             && mso?.tool === 'scrypted') {
             audioArgs.push(
                 "-acodec", "copy",
