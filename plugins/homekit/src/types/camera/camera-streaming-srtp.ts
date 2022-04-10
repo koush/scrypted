@@ -63,7 +63,13 @@ export async function startCameraStreamSrtp(media: any, console: Console, sessio
         await rtspClient.play();
         socket = rtspClient.rfc4571;
 
-        socket.once('close', () => killSession());
+        const cleanupClient = () => {
+            rtspClient.client.destroy();
+            killSession();
+        }
+
+        socket.once('close', cleanupClient);
+        rtspClient.readLoop().finally(cleanupClient);
     }
     else {
         const u = new URL(url);

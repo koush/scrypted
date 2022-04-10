@@ -2,10 +2,10 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityTimer, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parsePayloadTypes, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -17,6 +17,7 @@ import net from 'net';
 import { Duplex } from 'stream';
 import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
+import dgram from 'dgram';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -604,6 +605,14 @@ class PrebufferSession {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser');
         const rtspClient = new RtspClient(ffmpegInput.url, this.console);
+
+        let servers: dgram.Socket[] = [];
+        const cleanupServers = () => {
+          for (const server of servers) {
+            closeQuiet(server);
+          }
+        }
+
         try {
           rtspClient.requestTimeout = 10000;
           await rtspClient.options();
@@ -614,12 +623,36 @@ class PrebufferSession {
           const parsedSdp = parseSdp(sdp);
           let channel = 0;
           const mapping: RtspChannelCodecMapping = {};
+          const useUdp = false;
+
+          const doSetup = async (control: string, codec: string) => {
+            let setupChannel = channel;
+            if (useUdp) {
+              const rtspChannel = channel;
+              const { port, server } = await createBindZero();
+              servers.push(server);
+              setupChannel = port;
+              server.on('message', data => {
+                const prefix = Buffer.alloc(4);
+                prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
+                prefix.writeUInt8(rtspChannel, 1);
+                prefix.writeUInt16BE(data.length, 2);
+                const chunk: StreamChunk = {
+                  chunks: [prefix, data],
+                  type: codec,
+                };
+                session?.emit('rtsp', chunk);
+              })
+            }
+            await rtspClient.setup(setupChannel, control, useUdp);
+            mapping[channel] = codec;
+            channel += 2;
+          }
+
           // grab all available audio sections
           if (!audioSoftMuted) {
             for (const audioSection of parsedSdp.msections.filter(msection => msection.type === 'audio')) {
-              await rtspClient.setup(channel, audioSection.control);
-              mapping[channel] = audioSection.codec;
-              channel += 2;
+              await doSetup(audioSection.control, audioSection.codec)
             }
 
             if (channel === 0)
@@ -633,7 +666,7 @@ class PrebufferSession {
           sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
           this.sdp = Promise.resolve(sdp);
-          await rtspClient.setup(channel, videoSection.control);
+          await doSetup(videoSection.control, videoSection.codec);
           mapping[channel] = videoSection.codec;
           await rtspClient.play();
 
@@ -641,6 +674,7 @@ class PrebufferSession {
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
           session.kill = async () => {
+            cleanupServers();
             // issue a teardown to upstream to close gracefully but don't rely on it responding.
             if (!issuedTeardown) {
               issuedTeardown = true;
@@ -656,6 +690,7 @@ class PrebufferSession {
           rtspClient.readLoop().finally(() => session.kill());
         }
         catch (e) {
+          cleanupServers();
           rtspClient.client.destroy();
           throw e;
         }
