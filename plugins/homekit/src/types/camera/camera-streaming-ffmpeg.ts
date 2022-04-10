@@ -7,6 +7,7 @@ import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/we
 import { AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
 import { evalRequest } from '../camera/camera-transcode';
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
+import { startCameraStreamSrtp } from './camera-streaming-srtp';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
@@ -171,13 +172,14 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         if (!transcodeStreaming
             && perfectOpus
             && mso?.tool === 'scrypted') {
+
             audioArgs.push(
                 "-acodec", "copy",
             );
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
             // by default opus encodes with a packet time of 20. however, homekit may request another value,
-            // which we will repect by simply outputing frames of that duration, rather than packing
+            // which we will respect by simply outputing frames of that duration, rather than packing
             // 20 ms frames to accomodate.
             opusFramesPerPacket = 1;
 

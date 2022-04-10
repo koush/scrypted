@@ -22,8 +22,6 @@ const { mediaManager } = sdk;
 const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
 const v4v6Regex = /^::ffff:[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/;
 
-export const CAMERA_STREAM_PERFECT_CODECS = false;
-
 async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket, port: number }> {
     const socket = dgram.createSocket(socketType || 'udp4');
     while (true) {
@@ -278,18 +276,13 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             };
 
             try {
-                if (CAMERA_STREAM_PERFECT_CODECS) {
-                    await startCameraStreamSrtp(device, console, mediaOptions, session, () => killSession(request.sessionID));
-                }
-                else {
-                    await startCameraStreamFfmpeg(device,
-                        console,
-                        storage,
-                        mediaOptions,
-                        transcodeStreaming,
-                        session,
-                        () => killSession(request.sessionID));
-                }
+                await startCameraStreamFfmpeg(device,
+                    console,
+                    storage,
+                    mediaOptions,
+                    transcodeStreaming,
+                    session,
+                    () => killSession(request.sessionID));
             }
             catch (e) {
                 console.error('streaming error', e);

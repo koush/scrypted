@@ -64,7 +64,7 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
         // has been lost. should we make something up? does HAP behave correctly with only missing packet indicators?
         let packetCount = (rtp.header.sequenceNumber - firstSequenceNumber) + (rolloverCount * 0x10000);
 
-        if (audioOptions.audioPacketTime) {
+        if (audioOptions) {
             packetCount = Math.floor(packetCount / audioOptions.framesPerPacket);
             rtp = packetizer.repacketize(rtp);
             if (!rtp)
