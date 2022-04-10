@@ -5,21 +5,30 @@ import sdk from "@scrypted/sdk";
 import child_process from 'child_process';
 import dgram from 'dgram';
 
-const {mediaManager} = sdk;
+const { mediaManager } = sdk;
 
-export function getFFmpegRtpAudioOutputArguments() {
-    return [
+export function getFFmpegRtpAudioOutputArguments(inputCodec: string) {
+    const ret = [
         '-vn',
-        '-acodec', 'libopus',
-        '-ar', '48k',
-        // choose a better birate? this is on the high end recommendation for voice.
-        '-b:a', '40k',
-        '-ac', '2',
-        '-application', 'lowdelay',
-        '-frame_duration', '60',
-        // '-pkt_size', '1300',
-        '-fflags', '+flush_packets', '-flush_packets', '1',
-    ]
+    ];
+
+    if (inputCodec === 'opus') {
+        ret.push('-acodec', 'copy');
+    }
+    else {
+        ret.push(
+            '-acodec', 'libopus',
+            '-ar', '48k',
+            // choose a better birate? this is on the high end recommendation for voice.
+            '-b:a', '40k',
+            '-ac', '2',
+            '-application', 'lowdelay',
+            '-frame_duration', '60',
+            // '-pkt_size', '1300',
+            '-fflags', '+flush_packets', '-flush_packets', '1',
+        )
+    }
+    return ret;
 }
 
 export interface RtpTrack {
@@ -30,7 +39,7 @@ export interface RtpTrack {
 
 export type RtpTracks<T extends string> = {
     [key in T]: RtpTrack;
-}; 
+};
 
 export type RtpSockets<T extends string> = {
     [key in T]?: dgram.Socket;
@@ -40,9 +49,9 @@ export async function createTrackForwarders<T extends string>(rtpTracks: RtpTrac
     const sockets: RtpSockets<T> = {};
 
     for (const key of Object.keys(rtpTracks)) {
-        const {server,port} = await createBindZero();
+        const { server, port } = await createBindZero();
         sockets[key as T] = server;
-        const track = rtpTracks[key as T ];
+        const track = rtpTracks[key as T];
         const outputArguments = track.outputArguments;
         outputArguments.push(
             '-f', 'rtp', `rtp://127.0.0.1:${port}`,

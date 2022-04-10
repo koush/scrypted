@@ -64,6 +64,12 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             hasIntercom ? this.mixinDevice : undefined,
             async (destination) => {
                 const mo = await device.getVideoStream({
+                    video: {
+                        codec: 'h264',
+                    },
+                    audio: {
+                        codec: 'opus',
+                    },
                     destination,
                 });
                 const ffInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(mo, ScryptedMimeTypes.FFmpegInput);

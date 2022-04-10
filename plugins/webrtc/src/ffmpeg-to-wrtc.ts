@@ -269,7 +269,7 @@ export async function createRTCPeerConnectionSink(
                 audio: {
                     transceiver: audioTransceiver,
                     outputArguments: [
-                        ...getFFmpegRtpAudioOutputArguments(),
+                        ...getFFmpegRtpAudioOutputArguments(ffInput.mediaStreamOptions?.audio?.codec),
                     ]
                 }
             })
