@@ -634,7 +634,7 @@ class PrebufferSession {
 
           this.sdp = Promise.resolve(sdp);
           await rtspClient.setup(channel, videoSection.control);
-          mapping[channel] = 'rtp-video';
+          mapping[channel] = videoSection.codec;
           await rtspClient.play();
 
           session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, rbo, mapping);
@@ -870,6 +870,7 @@ class PrebufferSession {
     session: ParserSession<PrebufferParsers>,
     socketPromise: Promise<Duplex>,
     requestedPrebuffer: number,
+    filter?: (chunk: StreamChunk) => StreamChunk,
   }) {
     const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
     if (requestedPrebuffer)
@@ -889,6 +890,11 @@ class PrebufferSession {
         const now = Date.now();
 
         const safeWriteData = (chunk: StreamChunk) => {
+          if (options.filter) {
+            chunk = options.filter(chunk);
+            if (!chunk)
+              return;
+          }
           const buffered = writeData(chunk);
           if (buffered > 100000000) {
             this.console.log('more than 100MB has been buffered, did downstream die? killing connection.', this.streamName);
@@ -960,47 +966,74 @@ class PrebufferSession {
       requestedPrebuffer += (this.detectedIdrInterval || 4000) * 1.5;
     }
 
-    const createContainerServer = async (container: PrebufferParsers) => {
+    const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
+    let sdp = await this.sdp;
 
-      let socketPromise: Promise<Duplex>;
-      let containerUrl: string;
+    let socketPromise: Promise<Duplex>;
+    let url: string;
+    let filter: (chunk: StreamChunk) => StreamChunk;
 
-      if (container === 'rtsp') {
-        const client = await listenZeroSingleClient();
-        // TODO: this works only because ffmpeg always requests all the streams in the sdp
-        // in a predictable fashion for the interleaved rtsp channels. Piping
-        // the source straight into the rtsp client works via dumb luck really.
-        socketPromise = client.clientPromise.then(async (socket) => {
-          let sdp = await this.sdp;
-          sdp = addTrackControls(sdp);
-          const server = new RtspServer(socket, sdp);
-          // server.console = this.console;
-          await server.handlePlayback();
-          return socket;
-        })
-        containerUrl = client.url.replace('tcp://', 'rtsp://');
+    if (container === 'rtsp') {
+
+      let audioChannel: number;
+      let videoChannel: number;
+
+      const parsedSdp = parseSdp(sdp);
+      if (parsedSdp.msections.length > 2) {
+        parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
+        sdp = parsedSdp.toSdp();
+        filter = chunk => {
+          if (chunk.type === mediaStreamOptions.video?.codec && videoChannel !== undefined) {
+            const chunks = chunk.chunks.slice();
+            const header = chunks[0];
+            header.writeUInt8(videoChannel, 1);
+            return {
+              startStream: chunk.startStream,
+              chunks,
+            }
+          }
+          if (chunk.type === mediaStreamOptions.audio?.codec && audioChannel !== undefined) {
+            const chunks = chunk.chunks.slice();
+            const header = chunks[0];
+            header.writeUInt8(audioChannel, 1);
+            return {
+              startStream: chunk.startStream,
+              chunks,
+            }
+          }
+        }
       }
-      else {
-        const client = await listenZeroSingleClient();
-        socketPromise = client.clientPromise;
-        containerUrl = `tcp://127.0.0.1:${client.port}`
-      }
 
-      const isActiveClient = options?.refresh !== false;
-
-      this.handleRebroadcasterClient({
-        isActiveClient,
-        container,
-        requestedPrebuffer,
-        socketPromise,
-        session,
-      });
-
-      return containerUrl;
+      const client = await listenZeroSingleClient();
+      socketPromise = client.clientPromise.then(async (socket) => {
+        sdp = addTrackControls(sdp);
+        const server = new RtspServer(socket, sdp);
+        server.console = this.console;
+        await server.handlePlayback();
+        audioChannel = server.audioChannel;
+        videoChannel = server.videoChannel;
+        return socket;
+      })
+      url = client.url.replace('tcp://', 'rtsp://');
+    }
+    else {
+      const client = await listenZeroSingleClient();
+      socketPromise = client.clientPromise;
+      url = `tcp://127.0.0.1:${client.port}`
     }
 
-    const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
-    mediaStreamOptions.sdp = (await session.sdp)?.toString();
+    mediaStreamOptions.sdp = sdp;
+
+    const isActiveClient = options?.refresh !== false;
+
+    this.handleRebroadcasterClient({
+      isActiveClient,
+      container,
+      requestedPrebuffer,
+      socketPromise,
+      session,
+      filter,
+    });
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
 
@@ -1037,7 +1070,6 @@ class PrebufferSession {
 
     const length = Math.max(500000, available).toString();
 
-    const url = await createContainerServer(container);
     const ffmpegInput: FFMpegInput = {
       url,
       container,

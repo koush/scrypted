@@ -194,11 +194,16 @@ export function parseSdp(sdp: string) {
     if (msection)
         msections.push(msection);
 
-    return {
+    const ret = {
         header: {
             lines: header,
             contents: header.join('\r\n'),
         },
         msections: msections.map(parseMSection),
+        toSdp: () => {
+            return [...ret.header.lines, ...ret.msections.map(msection => msection.lines).flat()].join('\r\n');
+        }
     }
+
+    return ret;
 }
