@@ -25,8 +25,9 @@ from requests.exceptions import HTTPError
 class Request(object):
     """HTTP helper class"""
 
-    def __init__(self):
+    def __init__(self, timeout=5):
         self.session = requests.Session()
+        self.timeout = timeout
 
     def _request(self, url, method='GET', params={}, headers={}, stream=False, raw=False):
 
@@ -44,18 +45,18 @@ class Request(object):
 
         if method == 'GET':
             #print('COOKIES: ', self.session.cookies.get_dict())
-            r = self.session.get(url, params=params, headers=headers, stream=stream)
+            r = self.session.get(url, params=params, headers=headers, stream=stream, timeout=self.timeout)
             r.raise_for_status()
             if stream is True:
                 return r
         elif method == 'PUT':
-            r = self.session.put(url, json=params, headers=headers)
+            r = self.session.put(url, json=params, headers=headers, timeout=self.timeout)
             r.raise_for_status()
         elif method == 'POST':
-            r = self.session.post(url, json=params, headers=headers)
+            r = self.session.post(url, json=params, headers=headers, timeout=self.timeout)
             r.raise_for_status()
         elif method == 'OPTIONS':
-            r = self.session.options(url, headers=headers)
+            r = self.session.options(url, headers=headers, timeout=self.timeout)
             r.raise_for_status()
             return
 

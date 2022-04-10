@@ -13,13 +13,13 @@
 
     // docker installation
     // "scrypted.debugHost": "192.168.2.109",
-    // "scrypted.serverRoot": "/server/node_modules/@scrypted/server",
-    // "scrypted.volumeRoot": "/server/volume",
+    "scrypted.serverRoot": "/server/node_modules/@scrypted/server",
+    "scrypted.volumeRoot": "/server/volume",
 
     // local checkout
     "scrypted.debugHost": "127.0.0.1",
-    "scrypted.serverRoot": "/Volumes/Dev/scrypted/server",
-    "scrypted.volumeRoot": "${config:scrypted.serverRoot}/volume",
+    //"scrypted.serverRoot": "/Volumes/Dev/scrypted/server",
+    //"scrypted.volumeRoot": "${config:scrypted.serverRoot}/volume",
 
     "python.analysis.extraPaths": [
         "./node_modules/@scrypted/sdk/scrypted_python"

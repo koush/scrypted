@@ -21,7 +21,7 @@
 import asyncio
 import json
 import random
-import sseclient
+import paho.mqtt.client as mqtt
 import threading
 import time
 import uuid
@@ -32,11 +32,10 @@ from .logging import logger
 
 class EventStream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=5):
+    def __init__(self, arlo, expire=15):
         self.event_stream = None
         self.initializing = True
         self.connected = False
-        self.registered = False
         self.queues = {}
         self.expire = expire
         self.event_stream_stop_event = threading.Event()
@@ -82,7 +81,10 @@ class EventStream:
 
             await asyncio.sleep(interval)
 
-    async def get(self, resource, actions):
+    def _gen_client_number(self):
+        return random.randint(1000000000, 9999999999)
+
+    async def get(self, resource, actions, skip_uuids={}):
         while True:
             for action in actions:
                 key = f"{resource}/{action}"
@@ -93,52 +95,66 @@ class EventStream:
                 if q.empty():
                     continue
 
+                first_requeued = None
                 while not q.empty():
                     event = q.get_nowait()
                     q.task_done()
+
+                    if first_requeued is not None and first_requeued is event:
+                        # if we reach here, we've cycled through the whole queue
+                        # and found nothing for us, so go to the next queue
+                        q.put_nowait(event)
+                        break
+
                     if event.expired:
                         continue
+                    elif event.uuid in skip_uuids:
+                        q.put_nowait(event)
+
+                        if first_requeued is None:
+                            first_requeued = event
                     else:
                         return event, action
-            await asyncio.sleep(random.uniform(0, 0.1))
+            await asyncio.sleep(random.uniform(0, 0.01))
 
     async def start(self):
         if self.event_stream is not None:
             return
 
-        def thread_main(self):
-            for event in self.event_stream:
-                logger.debug(f"Received event: {event}")
-                if event is None or self.event_stream_stop_event.is_set():
-                    return None
+        def on_connect(client, userdata, flags, rc):
+            self.connected = True
+            self.initializing = False
 
-                if event.data.strip() == "":
-                    continue
+        def on_message(client, userdata, msg):
+            payload = msg.payload.decode()
+            logger.debug(f"Received event: {payload}")
 
-                try:
-                    response = json.loads(event.data)
-                except json.JSONDecodeError:
-                    continue
+            try:
+                response = json.loads(payload.strip())
+            except json.JSONDecodeError:
+                return
 
-                if self.connected:
-                    if response.get('action') == 'logout':
-                        self.disconnect()
-                        return None
-                    else:
-                        self.event_loop.call_soon_threadsafe(self._queue_response, response)
-                elif response.get('status') == 'connected':
-                    self.initializing = False
-                    self.connected = True
+            if response.get('resource') is not None:
+                self.event_loop.call_soon_threadsafe(self._queue_response, response)
 
-        self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization').decode(), session=self.arlo.request.session)
-        self.event_stream_thread = threading.Thread(name="EventStream", target=thread_main, args=(self, ))
-        self.event_stream_thread.setDaemon(True)
-        self.event_stream_thread.start()
+        self.event_stream = mqtt.Client(client_id=f"user_{self.arlo.user_id}_{self._gen_client_number()}", transport="websockets", clean_session=False)
+        self.event_stream.username_pw_set(self.arlo.user_id, password=self.arlo.request.session.headers.get('Authorization'))
+        self.event_stream.ws_set_options(path="/mqtt", headers={"Origin": "https://my.arlo.com"})
+        self.event_stream.enable_logger(logger=logger)
+        self.event_stream.on_connect = on_connect
+        self.event_stream.on_message = on_message
+        self.event_stream.tls_set()
+        self.event_stream.connect_async("mqtt-cluster.arloxcld.com", port=443)
+        self.event_stream.loop_start()
 
-        while not self.connected and not self.event_stream_stop_event.is_set():
+        while not self.connected:
             await asyncio.sleep(0.5)
 
         asyncio.get_event_loop().create_task(self._clean_queues())
+
+    def subscribe(self, topics):
+        if topics:
+            self.event_stream.subscribe([(topic, 0) for topic in topics])
 
     def _queue_response(self, response):
         resource = response.get('resource')
@@ -159,7 +175,7 @@ class EventStream:
         self.connected = False
 
         def exit_queues(self):
-            for _, q in self.queues:
+            for q in self.queues.values():
                 q.put_nowait(None)
         self.event_loop.call_soon_threadsafe(exit_queues, self)
 

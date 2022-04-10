@@ -25,6 +25,7 @@ limitations under the License.
 
 from .request import Request
 from .eventstream_async import EventStream
+from .logging import logger
     
 # Import all of the other stuff.
 from datetime import datetime
@@ -41,9 +42,11 @@ class Arlo(object):
     AUTH_URL = 'ocapi-app.arlo.com'
     TRANSID_PREFIX = 'web'
 
-    def __init__(self):
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
         self.event_stream = None
-        self.request = None
+        self.request = Request()
 
     def to_timestamp(self, dt):
         if sys.version[0] == '2':
@@ -88,9 +91,11 @@ class Arlo(object):
         now = datetime.today()
         return trans_type+"!" + float2hex(random.random() * math.pow(2, 32)).lower() + "!" + str(int((time.mktime(now.timetuple())*1e3 + now.microsecond/1e3)))
 
-    def LoginMFA(self, username, password):
-        self.username = username
-        self.password = password
+    def UseExistingAuth(self, user_id, headers):
+        self.user_id = user_id
+        self.request.session.headers.update(headers)
+
+    def LoginMFA(self):
         self.request = Request()
 
         headers = {
@@ -118,7 +123,7 @@ class Arlo(object):
             raw=True
         )
         self.user_id = auth_body['data']['userId']
-        self.request.session.headers.update({'Authorization': base64.b64encode(auth_body['data']['token'].encode('utf-8'))})
+        self.request.session.headers.update({'Authorization': base64.b64encode(auth_body['data']['token'].encode('utf-8')).decode()})
 
         # Retrieve MFA factor id
         factors_body = self.request.get(
@@ -158,7 +163,7 @@ class Arlo(object):
             # Update Authorization code with new code
             headers = {
                 'Auth-Version': '2',
-                'Authorization': finish_auth_body['data']['token'].encode('utf-8'),
+                'Authorization': finish_auth_body['data']['token'],
                 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
             }
             self.request.session.headers.update(headers)
@@ -170,7 +175,7 @@ class Arlo(object):
         self.Unsubscribe()
         return self.request.put(f'https://{self.BASE_URL}/hmsweb/logout')
 
-    async def Subscribe(self, basestation):
+    async def Subscribe(self, basestation_camera_tuples=[]):
         """
         Arlo uses the EventStream interface in the browser to do pub/sub style messaging.
         Unfortunately, this appears to be the only way Arlo communicates these messages.
@@ -180,22 +185,17 @@ class Arlo(object):
         This call registers the device (which should be the basestation) so that events will be sent to the EventStream
         when subsequent calls to /notify are made.
         """
-        basestation_id = basestation.get('deviceId')
-
-        async def heartbeat(self, basestation, interval=30):
-            await asyncio.sleep(interval)
-            while self.event_stream and self.event_stream.connected:
-                self.Ping(basestation)
-                await asyncio.sleep(interval)
-
         if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
             self.event_stream = EventStream(self)
             await self.event_stream.start()
 
-        if not self.event_stream.registered:
-            self.Notify(basestation, {"action":"set","resource":"subscriptions/"+self.user_id+"_web","publishResponse":False,"properties":{"devices":[basestation_id]}})
-            self.event_stream.registered = True
-            asyncio.get_event_loop().create_task(heartbeat(self, basestation))
+        while not self.event_stream.connected:
+            await asyncio.sleep(0.5)
+
+        self.event_stream.subscribe([
+            f"d/{basestation['xCloudId']}/out/cameras/{camera['deviceId']}/#"
+            for basestation, camera in basestation_camera_tuples
+        ])
 
     def Unsubscribe(self):
         """ This method stops the EventStream subscription and removes it from the event_stream collection. """
@@ -289,17 +289,14 @@ class Arlo(object):
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
-        await self.Subscribe(basestation)
-        if self.event_stream and self.event_stream.connected and self.event_stream.registered:
+        await self.Subscribe()
+        if self.event_stream and self.event_stream.connected:
             seen_events = {}
             while self.event_stream.connected:
-                event, action = await self.event_stream.get(resource, actions)
+                event, action = await self.event_stream.get(resource, actions, seen_events)
 
                 if event is None or self.event_stream.event_stream_stop_event.is_set():
                     return None
-
-                if event.uuid in seen_events:
-                    continue
 
                 seen_events[event.uuid] = event
                 response = callback(self, event.item)
@@ -326,7 +323,7 @@ class Arlo(object):
         if not callable(callback):
             raise Exception('The callback(self, event) should be a callable function.')
 
-        await self.Subscribe(basestation)
+        await self.Subscribe()
         trigger(self)
 
         # NOTE: Calling HandleEvents() calls Subscribe() again, which basically turns into a no-op. Hackie I know, but it cleans up the code a bit.
@@ -1515,7 +1512,10 @@ class Arlo(object):
             nl.stream_url_dict = self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/startStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"startUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId":camera.get('xCloudId')})
 
         def callback(self, event):
-            if event.get("properties", {}).get("activityState") == "userStreamActive":
+            properties = event.get("properties", {})
+            if properties.get("streamURL"):
+                nl.stream_url_dict['url'] = properties["streamURL"]
+            if properties.get("activityState") == "userStreamActive" or properties.get("activityState") == "startUserStream":
                 return nl.stream_url_dict['url'].replace("rtsp://", "rtsps://")
             return None
 
