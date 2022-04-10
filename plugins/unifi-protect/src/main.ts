@@ -274,15 +274,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
 
             const devices: Device[] = [];
 
-            if (!this.api.cameras) {
-                this.console.error('Cameras failed to load. Retrying in 10 seconds.');
-                setTimeout(() => {
-                    this.discoverDevices(0);
-                }, 10000);
-                return;
-            }
-
-            for (let camera of this.api.cameras) {
+            for (let camera of this.api.cameras || []) {
                 if (camera.isAdoptedByOther) {
                     this.console.log('skipping camera that is adopted by another nvr', camera.id, camera.name);
                     continue;
@@ -348,7 +340,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
-            for (const sensor of this.api.sensors) {
+            for (const sensor of this.api.sensors || []) {
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: sensor.name,
@@ -375,7 +367,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
-            for (const light of this.api.lights) {
+            for (const light of this.api.lights || []) {
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: light.name,
@@ -399,7 +391,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 devices.push(d);
             }
 
-            for (const lock of this.api.doorlocks) {
+            for (const lock of this.api.doorlocks || []) {
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: lock.name,
@@ -493,7 +485,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             this.lights.set(nativeId, ret);
             return ret;
         }
-        const lock = this.api.doorlocks.find(lock => lock.id === nativeId);
+        const lock = this.api.doorlocks?.find(lock => lock.id === nativeId);
         if (lock) {
             const ret = new UnifiLock(this, nativeId, lock);
             this.locks.set(nativeId, ret);
