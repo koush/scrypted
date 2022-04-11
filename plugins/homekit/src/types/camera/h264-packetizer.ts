@@ -14,7 +14,7 @@ export class H264Repacketizer {
 
     constructor(public maxPacketSize: number) {
         // 12 is the rtp/srtp header size.
-        this.fuaMax = maxPacketSize - 12 - FU_A_HEADER_SIZE;
+        this.fuaMax = maxPacketSize - 12 - FU_A_HEADER_SIZE;;
     }
 
     // a fragmentation unit (fua) is a NAL unit broken into multiple fragments.
@@ -27,6 +27,7 @@ export class H264Repacketizer {
         const initialNalType = data[0] & 0x1f;
         let actualStart: Buffer;
         let actualEnd: Buffer;
+
         if (initialNalType === 28) {
             const fnri = data[0] & (0x80 | 0x60);
             const originalNalType = data[1] & 0x1f;
@@ -168,10 +169,10 @@ export class H264Repacketizer {
     }
 
     repacketize(packet: RtpPacket): Buffer[] {
-        let marker = false;
         const ret: Buffer[] = [];
-
         const sequenceNumber = packet.header.sequenceNumber;
+        const hadMarker = packet.header.marker;
+
         if (packet.payload.length > this.maxPacketSize) {
             const nalType = packet.payload[0] & 0x1F;
             if (nalType === NAL_TYPE_STAP_A) {
@@ -181,16 +182,16 @@ export class H264Repacketizer {
                 packets.forEach((packetized, index) => {
                     if (index !== 0)
                         this.extraPackets++;
-                    marker = index === packets.length - 1;
+                    const marker = hadMarker && index === packets.length - 1;
                     ret.push(this.createPacket(packet, packetized, marker, sequenceNumber));
                 });
             }
             else if ((nalType >= 1 && nalType < 24) || nalType === NAL_TYPE_FU_A) {
-                const packets = this.packetizeFuA(packet.payload);
-                packets.forEach((packetized, index) => {
+                const fragments = this.packetizeFuA(packet.payload);
+                fragments.forEach((packetized, index) => {
                     if (index !== 0)
                         this.extraPackets++;
-                    marker = index === packets.length - 1;
+                    const marker = hadMarker && index === fragments.length - 1;
                     ret.push(this.createPacket(packet, packetized, marker, sequenceNumber));
                 });
             }
@@ -200,7 +201,7 @@ export class H264Repacketizer {
         }
         else {
             // can send this packet as is!
-            ret.push(this.createPacket(packet, packet.payload, true));
+            ret.push(this.createPacket(packet, packet.payload, packet.header.marker));
         }
 
         return ret;
