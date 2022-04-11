@@ -642,6 +642,7 @@ class PrebufferSession {
                   type: codec,
                 };
                 session?.emit('rtsp', chunk);
+                session?.resetActivityTimer?.();
               })
             }
             await rtspClient.setup(setupChannel, control, useUdp);

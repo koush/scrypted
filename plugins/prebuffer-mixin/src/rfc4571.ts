@@ -55,9 +55,9 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
     socket.on('close', kill);
     socket.on('error', kill);
 
-    (async () => {
-        const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.timeout);
+    const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.timeout);
 
+    (async () => {
         while (true) {
             let header: Buffer;
             let length: number;
@@ -113,6 +113,7 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
         get isActive() { return isActive },
         kill,
         killed,
+        resetActivityTimer,
         negotiateMediaStream: (requestMediaStream) => {
             const ret: ResponseMediaStreamOptions = cloneDeep(mediaStreamOptions) || {
                 id: undefined,
