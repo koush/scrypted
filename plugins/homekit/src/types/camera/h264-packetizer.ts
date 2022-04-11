@@ -2,8 +2,8 @@ import { RtpPacket } from "../../../../../external/werift/packages/rtp/src/rtp/r
 
 const PACKET_MAX = 1300;
 
-const NAL_TYPE_FU_A = 28;
 const NAL_TYPE_STAP_A = 24;
+const NAL_TYPE_FU_A = 28;
 
 const NAL_HEADER_SIZE = 1;
 const FU_A_HEADER_SIZE = 2;
@@ -14,10 +14,14 @@ const FUA_MAX = PACKET_MAX - FU_A_HEADER_SIZE;
 
 export class H264Repacketizer {
     extraPackets = 0;
-    // don't think this queue is actually necessary if repacketizing rtp vs packetizing h264 nal.
-    packetQueue: RtpPacket[];
 
+    // a fragmentation unit (fua) is a NAL unit broken into multiple fragments.
     packetizeFuA(data: Buffer): Buffer[] {
+        // handle both normal packets and fua packets.
+        // a fua packet can be fragmented easily into smaller packets, as
+        // it is already a fragment, and splitting segments is
+        // trivial.
+
         const initialNalType = data[0] & 0x1f;
         let actualStart: Buffer;
         let actualEnd: Buffer;
@@ -46,7 +50,6 @@ export class H264Repacketizer {
                 actualEnd = fuHeaderMiddle;
             }
         }
-
 
         const payloadSize = data.length - NAL_HEADER_SIZE;
         const numPackets = Math.ceil(payloadSize / FUA_MAX);
@@ -90,46 +93,66 @@ export class H264Repacketizer {
         return packages;
     }
 
-    packetizeStapA(startPacket: RtpPacket) {
-        const data = startPacket.payload;
+    // a stap a packet is a packet that aggregates multiple nals
+    depacketizeStapA(data: Buffer) {
+        const ret: Buffer[] = [];
+        let lastPos: number;
+        let pos = NAL_HEADER_SIZE;
+        while (pos < data.length) {
+            if (lastPos !== undefined)
+                ret.push(data.subarray(lastPos, pos));
+            const naluSize = data.readUInt16BE(pos);
+            pos += LENGTH_FIELD_SIZE;
+            lastPos = pos;
+            pos += naluSize;
+        }
+        ret.push(data.subarray(lastPos));
+        return ret;
+    }
+
+    packetizeOneStapA(datas: Buffer[]): Buffer {
+        const payload: Buffer[] = [];
+
+        if (!datas.length)
+            throw new Error('packetizeOneStapA requires at least one NAL');
+
         let counter = 0;
         let availableSize = PACKET_MAX - STAP_A_HEADER_SIZE;
 
-        let stapHeader = NAL_TYPE_STAP_A | (data[0] & 0xE0);
+        let stapHeader = NAL_TYPE_STAP_A | (datas[0][0] & 0xE0);
 
+        while (datas.length && datas[0].length + LENGTH_FIELD_SIZE <= availableSize && counter < 9) {
+            const nalu = datas.shift();
 
-        const payload: Buffer[] = [];
-
-        let nalu = data;
-
-        let packet: RtpPacket;
-        while (nalu.length <= availableSize && counter < 9) {
             stapHeader |= nalu[0] & 0x80;
 
             const nri = nalu[0] & 0x60;
-
-            if ((stapHeader & 0x60) < nri) {
+            if ((stapHeader & 0x60) < nri)
                 stapHeader = stapHeader & 0x9F | nri;
-            }
 
             availableSize -= LENGTH_FIELD_SIZE + nalu.length;
             counter += 1;
             const packed = Buffer.alloc(2);
             packed.writeUInt16BE(nalu.length, 0);
             payload.push(packed, nalu);
-
-            packet = this.packetQueue.shift();
-            if (!packet)
-                break;
         }
 
-        if (counter !== 0 && packet)
-            this.packetQueue.unshift(packet);
+        // is this possible?
+        if (counter === 0) {
+            console.warn('stap a packet is too large?');
+            return datas.shift();
+        }
 
-        if (counter <= 1)
-            return startPacket.payload;
+        payload.unshift(Buffer.from([stapHeader]));
+        return Buffer.concat(payload);
+    }
 
-        return Buffer.concat([Buffer.from([stapHeader]), ...payload])
+    packetizeStapA(datas: Buffer[]) {
+        const ret: Buffer[] = [];
+        while (datas.length) {
+            ret.push(this.packetizeOneStapA(datas));
+        }
+        return ret;
     }
 
     createPacket(rtp: RtpPacket, data: Buffer, marker: boolean, sequenceNumber?: number) {
@@ -139,42 +162,42 @@ export class H264Repacketizer {
         return rtp.serialize();
     }
 
-    packetizeQueue() {
+    repacketize(packet: RtpPacket): Buffer[] {
         let marker = false;
         const ret: Buffer[] = [];
-        while (this.packetQueue.length) {
-            const packet = this.packetQueue.shift();
-            const sequenceNumber = packet.header.sequenceNumber;
-            if (packet.payload.length > PACKET_MAX) {
+
+        const sequenceNumber = packet.header.sequenceNumber;
+        if (packet.payload.length > PACKET_MAX) {
+            const nalType = packet.payload[0] & 0x1F;
+            if (nalType === NAL_TYPE_STAP_A) {
+                // break the aggregated packet up and send it.
+                const depacketized = this.depacketizeStapA(packet.payload);
+                const packets = this.packetizeStapA(depacketized);
+                packets.forEach((packetized, index) => {
+                    if (index !== 0)
+                        this.extraPackets++;
+                    marker = index === packets.length - 1;
+                    ret.push(this.createPacket(packet, packetized, marker, sequenceNumber));
+                });
+            }
+            else if ((nalType >= 1 && nalType < 24) || nalType === NAL_TYPE_FU_A) {
                 const packets = this.packetizeFuA(packet.payload);
                 packets.forEach((packetized, index) => {
                     if (index !== 0)
                         this.extraPackets++;
-                    marker = index === packets.length - 1 && this.packetQueue.length === 0
+                    marker = index === packets.length - 1;
                     ret.push(this.createPacket(packet, packetized, marker, sequenceNumber));
                 });
             }
             else {
-                marker = this.packetQueue.length === 0;
-                ret.push(this.createPacket(packet, packet.payload, marker));
+                throw new Error('unknown nal unit type ' + nalType);
             }
         }
-        return ret;
-    }
-
-    repacketize(packet: RtpPacket): Buffer[] {
-        if (!this.packetQueue) {
-            this.packetQueue = [packet];
-            return;
+        else {
+            // can send this packet as is!
+            ret.push(this.createPacket(packet, packet.payload, true));
         }
 
-        if (packet.header.timestamp === this.packetQueue[0].header.timestamp) {
-            this.packetQueue.push(packet);
-            return;
-        }
-
-        const ret = this.packetizeQueue();
-        this.packetQueue = [packet];
         return ret;
     }
 }
