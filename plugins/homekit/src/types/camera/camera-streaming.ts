@@ -182,6 +182,34 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
+            const vconfig = {
+                keys: {
+                    localMasterKey: session.prepareRequest.video.srtp_key,
+                    localMasterSalt: session.prepareRequest.video.srtp_salt,
+                    remoteMasterKey: session.prepareRequest.video.srtp_key,
+                    remoteMasterSalt: session.prepareRequest.video.srtp_salt,
+                },
+                profile: ProtectionProfileAes128CmHmacSha1_80,
+            };
+            const vrtcp = new SrtcpSession(vconfig);
+
+            // watch for data to verify other side is alive.
+            const resetIdleTimeout = () => {
+                clearTimeout(idleTimeout);
+                idleTimeout = setTimeout(() => {
+                    console.log('HomeKit Streaming RTCP timed out. Terminating Streaming.');
+                    killSession(request.sessionID);
+                }, 30000);
+            }
+
+            let lastPacketLoss = 0;
+            const logPacketLoss = (rr: RtcpRrPacket) => {
+                if (rr.reports[0]?.packetsLost && rr.reports[0].packetsLost !== lastPacketLoss) {
+                    console.log('packet loss', rr.reports[0].packetsLost);
+                    lastPacketLoss = rr.reports[0].packetsLost;
+                }
+            }
+
             if (dynamicBitrate) {
                 const initialBitrate = request.video.max_bit_rate * 1000;
                 let dynamicBitrateSession: DynamicBitrateSession;
@@ -217,27 +245,18 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                 session.tryReconfigureBitrate('start', initialBitrate);
 
-                const vconfig = {
-                    keys: {
-                        localMasterKey: session.prepareRequest.video.srtp_key,
-                        localMasterSalt: session.prepareRequest.video.srtp_salt,
-                        remoteMasterKey: session.prepareRequest.video.srtp_key,
-                        remoteMasterSalt: session.prepareRequest.video.srtp_salt,
-                    },
-                    profile: ProtectionProfileAes128CmHmacSha1_80,
-                };
-                const vrtcp = new SrtcpSession(vconfig);
-
                 session.videoReturn.on('message', data => {
+                    resetIdleTimeout();
                     if (!!ensureDynamicBitrateSession())
                         return;
                     const d = vrtcp.decrypt(data);
                     const rtcp = RtcpPacketConverter.deSerialize(d);
-                    const rr = rtcp.find(packet => packet.type === 201);
+                    const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
                     if (!rr)
                         return;
-                    if (dynamicBitrateSession.shouldReconfigureBitrate(rr as RtcpRrPacket))
+                    if (dynamicBitrateSession.shouldReconfigureBitrate(rr))
                         session.tryReconfigureBitrate('rtcp', dynamicBitrateSession.currentBitrate)
+                    logPacketLoss(rr);
                 });
 
                 // reset the video bitrate to max after a dynanic bitrate session ends.
@@ -247,19 +266,18 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     session.tryReconfigureBitrate('stop', session.mediaStreamOptions?.video?.maxBitrate);
                 });
             }
-
-            // watch for data to verify other side is alive.
-            const resetIdleTimeout = () => {
-                clearTimeout(idleTimeout);
-                idleTimeout = setTimeout(() => {
-                    console.log('HomeKit Streaming RTCP timed out. Terminating Streaming.');
-                    killSession(request.sessionID);
-                }, 30000);
+            else {
+                session.videoReturn.on('message', data => {
+                    resetIdleTimeout();
+                    const d = vrtcp.decrypt(data);
+                    const rtcp = RtcpPacketConverter.deSerialize(d);
+                    const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
+                    if (!rr)
+                        return;
+                    logPacketLoss(rr);
+                });
             }
 
-            session.videoReturn.on('message', () => {
-                resetIdleTimeout();
-            });
             resetIdleTimeout();
 
             const mediaOptions: RequestMediaStreamOptions = {

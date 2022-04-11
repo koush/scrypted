@@ -1,17 +1,12 @@
 import { readLength } from '@scrypted/common/src/read-stream';
-import { parsePayloadTypes, parseSdp } from '@scrypted/common/src/sdp-utils';
-import sdk, { RequestMediaStreamOptions, VideoCamera } from '@scrypted/sdk';
+import { parseSdp } from '@scrypted/common/src/sdp-utils';
 import net from 'net';
 import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
-import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
-import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
-
-const { mediaManager } = sdk;
 
 export async function startCameraStreamSrtp(media: any, console: Console, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const vconfig = {
@@ -32,13 +27,6 @@ export async function startCameraStreamSrtp(media: any, console: Console, sessio
         },
         profile: ProtectionProfileAes128CmHmacSha1_80,
     };
-
-    const asrtcp = new SrtcpSession(aconfig);
-    session.audioReturn.on('message', data => {
-        const d = asrtcp.decrypt(data);
-        const rtcp = RtcpPacketConverter.deSerialize(d);
-        console.log(rtcp);
-    })
 
     let { url, sdp, mediaStreamOptions } = media;
     session.mediaStreamOptions = mediaStreamOptions;
