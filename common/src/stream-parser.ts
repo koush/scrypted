@@ -1,8 +1,8 @@
+import { Socket as DatagramSocket } from "dgram";
 import { once } from "events";
 import { Duplex } from "stream";
-import { Socket as DatagramSocket } from "dgram";
-import { readLength } from "./read-stream";
 import { FFMPEG_FRAGMENTED_MP4_OUTPUT_ARGS, MP4Atom, parseFragmentedMP4 } from "./ffmpeg-mp4-parser-session";
+import { readLength } from "./read-stream";
 
 export interface StreamParser {
     container: string;

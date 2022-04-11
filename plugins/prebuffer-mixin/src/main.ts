@@ -948,7 +948,7 @@ class PrebufferSession {
         session.once('killed', cleanup);
 
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
-        if (true) {
+        if (container !== 'rtsp') {
           for (const prebuffer of prebufferContainer) {
             if (prebuffer.time < now - requestedPrebuffer)
               continue;

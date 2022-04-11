@@ -31,6 +31,14 @@ export async function readMessage(client: Readable): Promise<string[]> {
     }
 }
 
+// https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
+
+const NAL_TYPE_SPS = 7;
+// aggregate NAL Unit
+const NAL_TYPE_STAP_A = 24;
+// fragmented NAL Unit (need to match against first)
+const NAL_TYPE_FU_A = 28;
+
 export function createRtspParser(options?: StreamParserOptions): RtspStreamParser {
     let resolve: any;
 
@@ -49,18 +57,43 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             '-f', 'rtsp',
         ],
         findSyncFrame(streamChunks: StreamChunk[]) {
-            for (let i = 0; i < streamChunks.length; i++) {
-                const chunk = streamChunks[i];
-                if (chunk.type === 'rtp-video') {
-                    const fragmentType = chunk.chunks[1].readUInt8(12) & 0x1f;
-                    const second = chunk.chunks[1].readUInt8(13);
-                    const nalType = second & 0x1f;
-                    const startBit = second & 0x80;
-                    if (((fragmentType === 28 || fragmentType === 29) && nalType === 5 && startBit == 128) || fragmentType == 5) {
-                        return streamChunks.slice(i);
+            let foundIndex: number;
+
+            for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
+                const streamChunk = streamChunks[prebufferIndex];
+                if (streamChunk.type !== 'h264')
+                    continue;
+
+                // last packet is rtp packet, strip off the rtp header (12 bytes)
+                const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
+                const naluType = nalu[0] & 0x1f;
+                if (naluType === NAL_TYPE_STAP_A) {
+                    let pos = 1;
+                    while (pos < nalu.length) {
+                        const naluLength = nalu.readUInt16BE(pos);
+                        pos += 2;
+                        const stapaType = nalu[pos] & 0x1f;
+                        if (stapaType === NAL_TYPE_SPS)
+                            foundIndex = prebufferIndex;
+                        pos += naluLength;
                     }
                 }
+                else if (naluType === NAL_TYPE_FU_A) {
+                    const fuaType = nalu[1] & 0x1f;
+                    const isFuStart = !!(nalu[1] & 0x80);
+
+                    if (fuaType === NAL_TYPE_SPS && isFuStart)
+                        foundIndex = prebufferIndex;
+                }
+                else if (naluType === NAL_TYPE_SPS) {
+                    foundIndex = prebufferIndex;
+                }
             }
+
+            if (foundIndex !== undefined)
+                return streamChunks.slice(foundIndex);
+
+            // oh well!
             return streamChunks;
         },
         sdp: new Promise<string>(r => resolve = r),
