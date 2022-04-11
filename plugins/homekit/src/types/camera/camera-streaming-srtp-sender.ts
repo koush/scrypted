@@ -9,7 +9,7 @@ import { ntpTime } from './camera-utils';
 import { H264Repacketizer } from './h264-packetizer';
 import { OpusRepacketizer } from './opus-repacketizer';
 
-export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, audioOptions?: {
+export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, maxPacketSize: number, rtcpInterval: number, audioOptions?: {
     audioPacketTime: number,
     audioSampleRate: AudioStreamingSamplerate,
     framesPerPacket: number,
@@ -42,7 +42,7 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
         opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
     }
     else {
-        h264Packetizer = new H264Repacketizer();
+        h264Packetizer = new H264Repacketizer(maxPacketSize);
     }
 
     function sendPacket(rtp: RtpPacket) {

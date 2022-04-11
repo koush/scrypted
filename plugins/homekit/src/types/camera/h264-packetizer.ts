@@ -1,7 +1,5 @@
 import { RtpPacket } from "../../../../../external/werift/packages/rtp/src/rtp/rtp";
 
-const PACKET_MAX = 1300;
-
 const NAL_TYPE_STAP_A = 24;
 const NAL_TYPE_FU_A = 28;
 
@@ -10,10 +8,14 @@ const FU_A_HEADER_SIZE = 2;
 const LENGTH_FIELD_SIZE = 2;
 const STAP_A_HEADER_SIZE = NAL_HEADER_SIZE + LENGTH_FIELD_SIZE;
 
-const FUA_MAX = PACKET_MAX - FU_A_HEADER_SIZE;
-
 export class H264Repacketizer {
     extraPackets = 0;
+    fuaMax: number;
+
+    constructor(public maxPacketSize: number) {
+        // 12 is the rtp/srtp header size.
+        this.fuaMax = maxPacketSize - 12 - FU_A_HEADER_SIZE;
+    }
 
     // a fragmentation unit (fua) is a NAL unit broken into multiple fragments.
     packetizeFuA(data: Buffer): Buffer[] {
@@ -52,7 +54,7 @@ export class H264Repacketizer {
         }
 
         const payloadSize = data.length - NAL_HEADER_SIZE;
-        const numPackets = Math.ceil(payloadSize / FUA_MAX);
+        const numPackets = Math.ceil(payloadSize / this.fuaMax);
         let numLargerPackets = payloadSize % numPackets;
         const packageSize = Math.floor(payloadSize / numPackets);
 
@@ -117,7 +119,7 @@ export class H264Repacketizer {
             throw new Error('packetizeOneStapA requires at least one NAL');
 
         let counter = 0;
-        let availableSize = PACKET_MAX - STAP_A_HEADER_SIZE;
+        let availableSize = this.maxPacketSize - STAP_A_HEADER_SIZE;
 
         let stapHeader = NAL_TYPE_STAP_A | (datas[0][0] & 0xE0);
 
@@ -139,7 +141,7 @@ export class H264Repacketizer {
 
         // is this possible?
         if (counter === 0) {
-            console.warn('stap a packet is too large?');
+            console.warn('stap a packet is too large. this may be a bug.');
             return datas.shift();
         }
 
@@ -159,7 +161,10 @@ export class H264Repacketizer {
         rtp.header.sequenceNumber = ((sequenceNumber || rtp.header.sequenceNumber) + this.extraPackets) % 0x10000;
         rtp.payload = data;
         rtp.header.marker = marker;
-        return rtp.serialize();
+        const ret = rtp.serialize();
+        if (ret.length > this.maxPacketSize)
+            console.warn('packet exceeded max packet size. this may a bug.');
+        return ret;
     }
 
     repacketize(packet: RtpPacket): Buffer[] {
@@ -167,7 +172,7 @@ export class H264Repacketizer {
         const ret: Buffer[] = [];
 
         const sequenceNumber = packet.header.sequenceNumber;
-        if (packet.payload.length > PACKET_MAX) {
+        if (packet.payload.length > this.maxPacketSize) {
             const nalType = packet.payload[0] & 0x1F;
             if (nalType === NAL_TYPE_STAP_A) {
                 // break the aggregated packet up and send it.
