@@ -96,7 +96,6 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
             firstTimestamp = rtp.header.timestamp;
 
         if (audioOptions) {
-            packetCount = Math.floor(packetCount / audioOptions.framesPerPacket);
             rtp = opusPacketizer.repacketize(rtp);
             if (!rtp)
                 return;
