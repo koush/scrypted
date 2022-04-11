@@ -5,19 +5,19 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityT
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
-import { addTrackControls, parsePayloadTypes, parseSdp } from '@scrypted/common/src/sdp-utils';
+import { createRtspParser, H264_NAL_TYPE_IDR, hasH264NaluType, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
+import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { createFragmentedMp4Parser, createMpegTsParser, parseMp4StreamChunks, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import sdk, { BufferConverter, FFMpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
+import dgram from 'dgram';
 import net from 'net';
 import { Duplex } from 'stream';
 import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
-import dgram from 'dgram';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -837,14 +837,8 @@ class PrebufferSession {
         if (chunk.type === 'mdat') {
           updateIdr();
         }
-        if (chunk.type === 'rtp-video') {
-          const fragmentType = chunk.chunks[1].readUInt8(12) & 0x1f;
-          const second = chunk.chunks[1].readUInt8(13);
-          const nalType = second & 0x1f;
-          const startBit = second & 0x80;
-          if (((fragmentType === 28 || fragmentType === 29) && nalType === 5 && startBit == 128) || fragmentType == 5) {
-            updateIdr();
-          }
+        if (chunk.type === 'h264' && hasH264NaluType(chunk, H264_NAL_TYPE_IDR)) {
+          updateIdr();
         }
 
         prebufferContainer.push({
@@ -948,7 +942,7 @@ class PrebufferSession {
         session.once('killed', cleanup);
 
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
-        if (container !== 'rtsp') {
+        if (true || container !== 'rtsp') {
           for (const prebuffer of prebufferContainer) {
             if (prebuffer.time < now - requestedPrebuffer)
               continue;
@@ -1008,34 +1002,24 @@ class PrebufferSession {
     let socketPromise: Promise<Duplex>;
     let url: string;
     let filter: (chunk: StreamChunk) => StreamChunk;
+    const codecMap = new Map<string, number>();
 
     if (container === 'rtsp') {
-
-      let audioChannel: number;
-      let videoChannel: number;
-
       const parsedSdp = parseSdp(sdp);
       if (parsedSdp.msections.length > 2) {
         parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
         sdp = parsedSdp.toSdp();
         filter = chunk => {
-          if (chunk.type === mediaStreamOptions.video?.codec && videoChannel !== undefined) {
-            const chunks = chunk.chunks.slice();
-            const header = chunks[0];
-            header.writeUInt8(videoChannel, 1);
-            return {
-              startStream: chunk.startStream,
-              chunks,
-            }
-          }
-          if (chunk.type === mediaStreamOptions.audio?.codec && audioChannel !== undefined) {
-            const chunks = chunk.chunks.slice();
-            const header = chunks[0];
-            header.writeUInt8(audioChannel, 1);
-            return {
-              startStream: chunk.startStream,
-              chunks,
-            }
+          const channel = codecMap.get(chunk.type);
+          if (channel == undefined)
+            return;
+          const chunks = chunk.chunks.slice();
+          const header = Buffer.from(chunks[0]);
+          header.writeUInt8(channel, 1);
+          chunks[0] = header;
+          return {
+            startStream: chunk.startStream,
+            chunks,
           }
         }
       }
@@ -1046,8 +1030,9 @@ class PrebufferSession {
         const server = new RtspServer(socket, sdp);
         server.console = this.console;
         await server.handlePlayback();
-        audioChannel = server.audioChannel;
-        videoChannel = server.videoChannel;
+        for (const track of Object.values(server.setupTracks)) {
+          codecMap.set(track.codec, track.destination);
+        }
         return socket;
       })
       url = client.url.replace('tcp://', 'rtsp://');
@@ -1155,6 +1140,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       };
 
       switch (options.destination) {
+        case 'medium-resolution':
         case 'remote':
           result = this.streamSettings.getRemoteStream(msos);
           break;
@@ -1467,7 +1453,13 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
     const json = JSON.parse(data.toString());
     const { url, sdp } = json;
 
-    const { audioPayloadTypes, videoPayloadTypes } = parsePayloadTypes(sdp);
+    const parsedSdp = parseSdp(sdp);
+    const trackLookups = new Map<number, string>();
+    for (const msection of parsedSdp.msections) {
+      for (const pt of msection.payloadTypes) {
+        trackLookups.set(pt, msection.control);
+      }
+    }
 
     const u = new URL(url);
     if (!u.protocol.startsWith('tcp'))
@@ -1499,19 +1491,15 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
         const length = header.readInt16BE(0);
         const data = await readLength(socket, length);
         const pt = data[1] & 0x7f;
-        if (audioPayloadTypes.has(pt)) {
-          rtsp.sendAudio(data, false);
-        }
-        else if (videoPayloadTypes.has(pt)) {
-          rtsp.sendVideo(data, false);
-        }
-        else {
+        const track = trackLookups.get(pt);
+        if (!track) {
           client.destroy();
           socket.destroy();
           throw new Error('unknown payload type ' + pt);
         }
+        rtsp.sendTrack(track, data, false);
       }
-    })
+    });
 
     return Buffer.from(JSON.stringify(ffmpeg));
   }
@@ -1532,7 +1520,7 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
       mixinDeviceState,
       mixinProviderNativeId: this.nativeId,
       mixinDeviceInterfaces,
-      group: "Stream Selection",
+      group: "Stream Management",
       groupKey: "prebuffer",
     });
     this.currentMixins.set(mixinDeviceState.id, ret);

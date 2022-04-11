@@ -2,7 +2,7 @@ import { readLength, readLine } from './read-stream';
 import { Duplex, PassThrough, Readable } from 'stream';
 import { randomBytes } from 'crypto';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
-import { findTrackByType } from './sdp-utils';
+import { parseSdp } from './sdp-utils';
 import dgram from 'dgram';
 import net from 'net';
 import tls from 'tls';
@@ -33,11 +33,42 @@ export async function readMessage(client: Readable): Promise<string[]> {
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 
-const NAL_TYPE_SPS = 7;
+export const H264_NAL_TYPE_IDR = 5;
+export const H264_NAL_TYPE_SPS = 7;
 // aggregate NAL Unit
-const NAL_TYPE_STAP_A = 24;
+export const H264_NAL_TYPE_STAP_A = 24;
 // fragmented NAL Unit (need to match against first)
-const NAL_TYPE_FU_A = 28;
+export const H264_NAL_TYPE_FU_A = 28;
+
+export function hasH264NaluType(streamChunk: StreamChunk, naluType: number) {
+    if (streamChunk.type !== 'h264')
+        return false;
+
+    const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
+    const checkNaluType = nalu[0] & 0x1f;
+    if (checkNaluType === H264_NAL_TYPE_STAP_A) {
+        let pos = 1;
+        while (pos < nalu.length) {
+            const naluLength = nalu.readUInt16BE(pos);
+            pos += 2;
+            const stapaType = nalu[pos] & 0x1f;
+            if (stapaType === naluType)
+                return true;
+            pos += naluLength;
+        }
+    }
+    else if (checkNaluType === H264_NAL_TYPE_FU_A) {
+        const fuaType = nalu[1] & 0x1f;
+        const isFuStart = !!(nalu[1] & 0x80);
+
+        if (fuaType === naluType && isFuStart)
+            return true;
+    }
+    else if (checkNaluType === naluType) {
+        return true;
+    }
+    return false;
+}
 
 export function createRtspParser(options?: StreamParserOptions): RtspStreamParser {
     let resolve: any;
@@ -61,33 +92,8 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
 
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
-                if (streamChunk.type !== 'h264')
-                    continue;
-
-                // last packet is rtp packet, strip off the rtp header (12 bytes)
-                const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
-                const naluType = nalu[0] & 0x1f;
-                if (naluType === NAL_TYPE_STAP_A) {
-                    let pos = 1;
-                    while (pos < nalu.length) {
-                        const naluLength = nalu.readUInt16BE(pos);
-                        pos += 2;
-                        const stapaType = nalu[pos] & 0x1f;
-                        if (stapaType === NAL_TYPE_SPS)
-                            foundIndex = prebufferIndex;
-                        pos += naluLength;
-                    }
-                }
-                else if (naluType === NAL_TYPE_FU_A) {
-                    const fuaType = nalu[1] & 0x1f;
-                    const isFuStart = !!(nalu[1] & 0x80);
-
-                    if (fuaType === NAL_TYPE_SPS && isFuStart)
-                        foundIndex = prebufferIndex;
-                }
-                else if (naluType === NAL_TYPE_SPS) {
+                if (hasH264NaluType(streamChunk, H264_NAL_TYPE_SPS))
                     foundIndex = prebufferIndex;
-                }
             }
 
             if (foundIndex !== undefined)
@@ -396,15 +402,19 @@ export class RtspClient extends RtspBase {
     }
 }
 
+export interface RtspTrack {
+    protocol: 'tcp' | 'udp';
+    destination: number;
+    codec: string;
+    control: string;
+}
+
 export class RtspServer {
-    videoChannel: number;
-    audioChannel: number;
     session: string;
     console: Console;
-    udpPorts = {
-        video: 0,
-        audio: 0,
-    };
+    setupTracks: {
+        [trackId: string]: RtspTrack;
+    } = {};
 
     constructor(public client: Duplex, public sdp?: string, public udp?: dgram.Socket, public checkRequest?: (method: string, url: string, headers: Headers, rawMessage: string[]) => Promise<boolean>) {
         this.session = randomBytes(4).toString('hex');
@@ -436,7 +446,7 @@ export class RtspServer {
     }
 
     async *handleRecord(): AsyncGenerator<{
-        type: 'audio' | 'video',
+        type: string,
         rtcp: boolean,
         header: Buffer,
         packet: Buffer,
@@ -450,8 +460,13 @@ export class RtspServer {
             const length = header.readUInt16BE(2);
             const packet = await readLength(this.client, length);
             const id = header.readUInt8(1);
+            const destination = id - (id % 2);
+            const track = Object.values(this.setupTracks).find(track => track.destination === destination);
+            if (!track)
+                throw new Error('RSTP Server received unknown channel: ' + id);
+
             yield {
-                type: id - (id % 2) === this.videoChannel ? 'video' : 'audio',
+                type: track.codec,
                 rtcp: id % 2 === 1,
                 header,
                 packet,
@@ -474,26 +489,22 @@ export class RtspServer {
         this.udp.send(packet, rtcp ? port + 1 : port, '127.0.0.1');
     }
 
-    sendVideo(packet: Buffer, rtcp: boolean) {
-        if (this.udp && this.udpPorts.video) {
-            this.sendUdp(this.udpPorts.video, packet, rtcp)
+    sendTrack(trackId: string, packet: Buffer, rtcp: boolean) {
+        const track = this.setupTracks[trackId];
+        if (!track) {
+            this.console?.warn('RTSP Server track not found:', trackId);
+            return;
         }
-        else {
-            if (this.videoChannel == null)
-                throw new Error('rtsp videoChannel not set up');
-            this.send(packet, rtcp ? this.videoChannel + 1 : this.videoChannel);
-        }
-    }
 
-    sendAudio(packet: Buffer, rtcp: boolean) {
-        if (this.udp && this.udpPorts.audio) {
-            this.sendUdp(this.udpPorts.audio, packet, rtcp)
+        if (track.protocol === 'udp') {
+            if (!this.udp)
+                this.console?.warn('RTSP Server UDP socket not available.');
+            else
+                this.sendUdp(track.destination, packet, rtcp);
+            return;
         }
-        else {
-            if (this.audioChannel == null)
-                throw new Error('rtsp audioChannel not set up');
-            this.send(packet, rtcp ? this.audioChannel + 1 : this.audioChannel);
-        }
+
+        this.send(packet, rtcp ? track.destination + 1 : track.destination);
     }
 
     options(url: string, requestHeaders: Headers) {
@@ -517,8 +528,13 @@ export class RtspServer {
         const transport = requestHeaders['transport'];
         headers['Transport'] = transport;
         headers['Session'] = this.session;
-        let audioTrack = findTrackByType(this.sdp, 'audio');
-        let videoTrack = findTrackByType(this.sdp, 'video');
+        const parsedSdp = parseSdp(this.sdp);
+        const msection = parsedSdp.msections.find(msection => url.endsWith(msection.control));
+        if (!msection) {
+            this.respond(404, 'Not Found', requestHeaders, headers);
+            return;
+        }
+
         if (transport.includes('UDP')) {
             if (!this.udp) {
                 this.respond(461, 'Unsupported Transport', requestHeaders, {});
@@ -526,25 +542,24 @@ export class RtspServer {
             }
             const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/);
             const [_, rtp, rtcp] = match;
-            if (audioTrack && url.includes(audioTrack.trackId))
-                this.udpPorts.audio = parseInt(rtp);
-            else if (videoTrack && url.includes(videoTrack.trackId))
-                this.udpPorts.video = parseInt(rtp);
-            else
-                this.console?.warn('unknown track id', url);
+            this.setupTracks[msection.control] = {
+                control: msection.control,
+                protocol: 'udp',
+                destination: parseInt(rtp),
+                codec: msection.codec,
+            }
         }
         else if (transport.includes('TCP')) {
             const match = transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
             if (match) {
                 const low = parseInt(match[1]);
                 const high = parseInt(match[2]);
-
-                if (audioTrack && url.includes(audioTrack.trackId))
-                    this.audioChannel = low;
-                else if (videoTrack && url.includes(videoTrack.trackId))
-                    this.videoChannel = low;
-                else
-                    this.console?.warn('unknown track id', url);
+                this.setupTracks[msection.control] = {
+                    control: msection.control,
+                    protocol: 'tcp',
+                    destination: low,
+                    codec: msection.codec,
+                }
             }
         }
         this.respond(200, 'OK', requestHeaders, headers)
@@ -552,15 +567,8 @@ export class RtspServer {
 
     play(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
-        let audioTrack = findTrackByType(this.sdp, 'audio');
-        let videoTrack = findTrackByType(this.sdp, 'video');
-        let rtpInfo = '';
-        if (audioTrack)
-            rtpInfo = `url=${url}/trackID=${audioTrack.trackId};seq=0;rtptime=0`
-        if (audioTrack && videoTrack)
-            rtpInfo += ',';
-        if (videoTrack)
-            rtpInfo += `url=${url}/trackID=${videoTrack.trackId};seq=0;rtptime=0`;
+        const rtpInfos = Object.values(this.setupTracks).map(track => `url=${url}/trackID=${track.control};seq=0;rtptime=0`);
+        const rtpInfo = rtpInfos.join(',');
         headers['RTP-Info'] = rtpInfo;
         headers['Range'] = 'npt=now-';
         headers['Session'] = this.session;

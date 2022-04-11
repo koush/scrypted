@@ -1,3 +1,4 @@
+// todo: move this to ring.
 export function replacePorts(sdp: string, audioPort: number, videoPort: number) {
     let outputSdp = sdp
         .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
@@ -9,15 +10,18 @@ export function replacePorts(sdp: string, audioPort: number, videoPort: number) 
 export function addTrackControls(sdp: string) {
     let lines = sdp.split('\n').map(line => line.trim());
     lines = lines.filter(line => !line.includes('a=control:'));
-    const vindex = lines.findIndex(line => line.startsWith('m=video'));
-    if (vindex !== -1)
-        lines.splice(vindex + 1, 0, 'a=control:trackID=video');
-    const aindex = lines.findIndex(line => line.startsWith('m=audio'));
-    if (aindex !== -1)
-        lines.splice(aindex + 1, 0, 'a=control:trackID=audio');
+    let trackCount = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.startsWith('m='))
+            continue;
+        lines.splice(i + 1, 0, 'a=control:trackID=' + trackCount);
+        trackCount++;
+    }
     return lines.join('\r\n')
 }
 
+// todo: move this to webrtc
 // this is an sdp corresponding to what is requested from webrtc.
 // h264 baseline and opus are required codecs that all webrtc implementations must provide.
 export function createSdpInput(audioPort: number, videoPort: number, sdp: string) {
@@ -46,6 +50,7 @@ export function createSdpInput(audioPort: number, videoPort: number, sdp: string
     return outputSdp;
 }
 
+// todo: move this to webrtc
 export function findFmtp(sdp: string, codec: string) {
     let lines = sdp.split('\n').map(line => line.trim());
 
@@ -60,24 +65,6 @@ export function findFmtp(sdp: string, codec: string) {
             fmtp,
         }
     })
-}
-
-export function parsePayloadTypes(sdp: string) {
-    const audioPayloadTypes = new Set<number>();
-    const videoPayloadTypes = new Set<number>();
-    const addPts = (set: Set<number>, pts: string[]) => {
-        for (const pt of pts || []) {
-            set.add(parseInt(pt));
-        }
-    };
-    const audioPts = sdp.match(/m=audio.*/)?.[0];
-    addPts(audioPayloadTypes, audioPts?.split(' ').slice(3));
-    const videoPts = sdp.match(/m=video.*/)?.[0];
-    addPts(videoPayloadTypes, videoPts?.split(' ').slice(3));
-    return {
-        audioPayloadTypes,
-        videoPayloadTypes,
-    }
 }
 
 function getSections(sdp: string) {

@@ -94,7 +94,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             title: 'Prebuffered Streams',
             description: 'Prebuffering maintains an active connection to the stream and improves load times. Prebuffer also retains the recent video for capturing motion events with HomeKit Secure video. Enabling Prebuffer is not recommended on Cloud cameras.',
             multiple: true,
-            hide: true,
+            hide: false,
         },
         ...streamTypes,
     });
@@ -139,21 +139,30 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
 
     storageSettings.options = {
         onGet: async () => {
+            let enabledStreams: StorageSetting;
+
             try {
                 const msos = await device.mixinDevice.getVideoStreamOptions();
 
+                enabledStreams = {
+                    defaultValue: getDefaultPrebufferedStreams(msos)?.map(mso => mso.name),
+                    choices: msos.map(mso => mso.name),
+                    hide: false,
+                };
+
                 if (msos?.length > 1) {
                     return {
-                        enabledStreams: {
-                            defaultValue: getDefaultPrebufferedStreams(msos)?.map(mso => mso.name),
-                            choices: msos.map(mso => mso.name),
-                            hide: false,
-                        },
+                        enabledStreams,
                         defaultStream: createStreamOptions(streamTypes.defaultStream, msos),
                         remoteStream: createStreamOptions(streamTypes.remoteStream, msos),
                         lowResolutionStream: createStreamOptions(streamTypes.lowResolutionStream, msos),
                         recordingStream: createStreamOptions(streamTypes.recordingStream, msos),
                         remoteRecordingStream: createStreamOptions(streamTypes.remoteRecordingStream, msos),
+                    }
+                }
+                else {
+                    return {
+                        enabledStreams,
                     }
                 }
             }

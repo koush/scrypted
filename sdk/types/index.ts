@@ -1132,7 +1132,7 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
   sdp?: string;
 }
 
-export type MediaStreamDestination = "local" | "remote" | "low-resolution" | "local-recorder" | "remote-recorder";
+export type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";
 
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
   /**

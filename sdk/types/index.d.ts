@@ -556,7 +556,7 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
     userConfigurable?: boolean;
     sdp?: string;
 }
-export declare type MediaStreamDestination = "local" | "remote" | "low-resolution" | "local-recorder" | "remote-recorder";
+export declare type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";
 export interface RequestMediaStreamOptions extends MediaStreamOptions {
     /**
      * When retrieving media, setting disableMediaProxies=true
