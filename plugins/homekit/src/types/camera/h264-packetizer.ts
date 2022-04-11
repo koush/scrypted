@@ -28,7 +28,7 @@ export class H264Repacketizer {
         let actualStart: Buffer;
         let actualEnd: Buffer;
 
-        if (initialNalType === 28) {
+        if (initialNalType === NAL_TYPE_FU_A) {
             const fnri = data[0] & (0x80 | 0x60);
             const originalNalType = data[1] & 0x1f;
             const isFuStart = !!(data[1] & 0x80);

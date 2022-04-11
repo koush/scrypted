@@ -76,7 +76,9 @@ export async function startCameraStreamSrtp(media: any, console: Console, sessio
         socket = net.connect(parseInt(u.port), u.hostname);
     }
 
-    const { audioPayloadTypes, videoPayloadTypes } = parsePayloadTypes(sdp);
+    const parsedSdp = parseSdp(sdp);
+    const audioPayloadTypes = parsedSdp.msections.find(msection => msection.type === 'audio')?.payloadTypes;
+    const videoPayloadTypes = parsedSdp.msections.find(msection => msection.type === 'video')?.payloadTypes;
 
     const startStreaming = async () => {
         try {
@@ -105,10 +107,10 @@ export async function startCameraStreamSrtp(media: any, console: Console, sessio
                 const length = header.readUInt16BE(0);
                 const data = await readLength(socket, length);
                 const rtp = RtpPacket.deSerialize(data);
-                if (audioPayloadTypes.has(rtp.header.payloadType)) {
+                if (audioPayloadTypes.includes(rtp.header.payloadType)) {
                     audioSender(rtp);
                 }
-                else if (videoPayloadTypes.has(rtp.header.payloadType)) {
+                else if (videoPayloadTypes.includes(rtp.header.payloadType)) {
                     videoSender(rtp);
                 }
                 else {
