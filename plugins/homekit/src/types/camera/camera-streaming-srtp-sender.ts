@@ -6,6 +6,7 @@ import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/sr
 import { SrtpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtp';
 import { AudioStreamingSamplerate } from '../../hap';
 import { ntpTime } from './camera-utils';
+import { H264Repacketizer } from './h264-packetizer';
 import { OpusRepacketizer } from './opus-repacketizer';
 
 export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number, audioOptions?: {
@@ -18,12 +19,14 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
 
     let firstTimestamp = 0;
     let lastTimestamp = 0;
+    let packetCount = 0;
     let octetCount = 0;
     let lastRtcp = 0;
     let firstSequenceNumber = 0;
     let allowRollover = false;
     let rolloverCount = 0;
-    let packetizer: OpusRepacketizer;
+    let opusPacketizer: OpusRepacketizer;
+    let h264Packetizer: H264Repacketizer;
 
     let audioIntervalScale = 1;
     if (audioOptions) {
@@ -36,12 +39,45 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
                 break;
         }
         audioIntervalScale = audioIntervalScale * audioOptions.audioPacketTime / 20;
-        packetizer = new OpusRepacketizer(audioOptions.framesPerPacket);
+        opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
+    }
+    else {
+        h264Packetizer = new H264Repacketizer();
+    }
+
+    function sendPacket(rtp: RtpPacket) {
+        const now = Date.now();
+
+        // packet count may be less than zero if rollover counting fails due to heavy packet loss or other
+        // unforseen edge cases.
+        if (now > lastRtcp + rtcpInterval * 1000 && packetCount > 0) {
+            lastRtcp = now;
+            const sr = new RtcpSrPacket({
+                ssrc,
+                senderInfo: new RtcpSenderInfo({
+                    ntpTimestamp: ntpTime(),
+                    rtpTimestamp: lastTimestamp,
+                    packetCount,
+                    octetCount,
+                }),
+            });
+
+            const packet = srtcpSession.encrypt(sr.serialize());
+            sender.send(packet, port, targetAddress);
+        }
+        lastTimestamp = rtp.header.timestamp;
+
+        packetCount++;
+        octetCount += rtp.payload.length;
+
+        rtp.header.ssrc = ssrc;
+        rtp.header.payloadType = payloadType;
+
+        const srtp = srtpSession.encrypt(rtp.payload, rtp.header);
+        sender.send(srtp, port, targetAddress);
     }
 
     return (rtp: RtpPacket) => {
-        const now = Date.now();
-
         if (!firstSequenceNumber)
             firstSequenceNumber = rtp.header.sequenceNumber;
 
@@ -59,14 +95,9 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
         if (!firstTimestamp)
             firstTimestamp = rtp.header.timestamp;
 
-        // depending where this stream is coming from (ie, rtsp/udp), we may not actually know how many packets
-        // have been lost. just infer this i guess. unfortunately it is not possible to infer the octet count that
-        // has been lost. should we make something up? does HAP behave correctly with only missing packet indicators?
-        let packetCount = (rtp.header.sequenceNumber - firstSequenceNumber) + (rolloverCount * 0x10000);
-
         if (audioOptions) {
             packetCount = Math.floor(packetCount / audioOptions.framesPerPacket);
-            rtp = packetizer.repacketize(rtp);
+            rtp = opusPacketizer.repacketize(rtp);
             if (!rtp)
                 return;
 
@@ -86,34 +117,15 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
             // HAP requests, and the packet time is respected,
             // opus 48khz will work just fine.
             rtp.header.timestamp = (firstTimestamp + packetCount * 180 * audioIntervalScale) % 0xFFFFFFFF;
+            sendPacket(rtp);
+            return;
         }
 
-        lastTimestamp = rtp.header.timestamp;
-
-        // packet count may be less than zero if rollover counting fails due to heavy packet loss or other
-        // unforseen edge cases.
-        if (now > lastRtcp + rtcpInterval * 1000 && packetCount > 0) {
-            lastRtcp = now;
-            const sr = new RtcpSrPacket({
-                ssrc,
-                senderInfo: new RtcpSenderInfo({
-                    ntpTimestamp: ntpTime(),
-                    rtpTimestamp: lastTimestamp,
-                    packetCount,
-                    octetCount,
-                }),
-            });
-
-            const packet = srtcpSession.encrypt(sr.serialize());
-            sender.send(packet, port, targetAddress);
+        const packets = h264Packetizer.repacketize(rtp);
+        if (!packets)
+            return;
+        for (const packet of packets) {
+            sendPacket(RtpPacket.deSerialize(packet));
         }
-
-        octetCount += rtp.payload.length;
-
-        rtp.header.ssrc = ssrc;
-        rtp.header.payloadType = payloadType;
-
-        const srtp = srtpSession.encrypt(rtp.payload, rtp.header);
-        sender.send(srtp, port, targetAddress);
     }
 }

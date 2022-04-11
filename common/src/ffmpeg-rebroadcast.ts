@@ -15,6 +15,7 @@ const { mediaManager } = sdk;
 
 export interface ParserSession<T extends string> {
     sdp: Promise<Buffer[]>;
+    resetActivityTimer?: () => void,
     negotiateMediaStream(requestMediaStream: RequestMediaStreamOptions): ResponseMediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;

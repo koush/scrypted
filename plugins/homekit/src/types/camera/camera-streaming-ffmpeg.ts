@@ -173,8 +173,8 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             && perfectOpus
             && mso?.tool === 'scrypted') {
 
-            // await startCameraStreamSrtp(videoInput, console, session, killSession);
-            // return;
+            await startCameraStreamSrtp(videoInput, console, session, killSession);
+            return;
 
             audioArgs.push(
                 "-acodec", "copy",

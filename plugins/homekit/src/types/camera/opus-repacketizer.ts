@@ -68,11 +68,11 @@ export class OpusRepacketizer {
     }
 
     // repacketize a packet with a single frame into a packet with multiple frames.
-    repacketize(packet: RtpPacket): RtpPacket {
+    repacketize(packet: RtpPacket): RtpPacket|undefined {
         if (this.framesPerPacket === 1)
             return packet;
 
-        if (packet[0] & 0b00000011)
+        if (packet.payload[0] & 0b00000011)
             throw new Error('expected opus packet with a single frame.');
         this.packets.push(packet);
 
