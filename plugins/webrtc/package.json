@@ -19,7 +19,6 @@
       "name": "WebRTC Plugin",
       "type": "API",
       "interfaces": [
-         "Settings",
          "BufferConverter",
          "MixinProvider",
          "DeviceProvider",

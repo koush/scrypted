@@ -260,7 +260,7 @@ export async function createRTCPeerConnectionSink(
                 video: {
                     transceiver: videoTransceiver,
                     outputArguments: [
-                        '-an',
+                        '-an', '-sn', '-dn',
                         ...videoArgs,
                         '-pkt_size', '1300',
                         '-fflags', '+flush_packets', '-flush_packets', '1',

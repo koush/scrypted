@@ -9,7 +9,7 @@ const { mediaManager } = sdk;
 
 export function getFFmpegRtpAudioOutputArguments(inputCodec: string) {
     const ret = [
-        '-vn',
+        '-vn', '-sn', '-dn',
     ];
 
     if (inputCodec === 'opus') {
