@@ -843,12 +843,8 @@ class PrebufferSession {
             // only on the first idr update should we send a settings refresh.
             if (sendEvent)
               deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
-            // wipe the previous idr to allow throttled calculation to work
-            prevIdr = undefined;
           }
-          else {
-            prevIdr = now;
-          }
+          prevIdr = now;
         }
 
         // this is only valid for mp4, so its no op for everything else
@@ -857,10 +853,10 @@ class PrebufferSession {
           updateIdr();
         }
         else if (chunk.type === 'h264') {
-          if (
-            (prevIdr === undefined
-              || this.detectedIdrInterval === undefined
-              || Date.now() > prevIdr + 4000)
+          // only compute idr every 30 seconds 
+          if (Date.now() > prevIdr + 30000)
+            prevIdr = undefined;
+          if ((prevIdr === undefined || this.detectedIdrInterval === undefined)
             && findH264NaluType(chunk, H264_NAL_TYPE_IDR)) {
             // only update the rtsp computed idr once a minute.
             // per packet bitscan is not great.
