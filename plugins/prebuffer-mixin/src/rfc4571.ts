@@ -127,6 +127,7 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
                     try {
                         const parsedSps = spsParse(sps);
                         inputVideoResolution = getSpsResolution(parsedSps);
+                        console.log(inputVideoResolution);
                         console.log('parsed bitstream sps', parsedSps);
                     }
                     catch (e) {

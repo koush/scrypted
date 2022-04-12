@@ -27,7 +27,7 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
         const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', true);
 
-        const { ffmpegInput, intercom } = await createRTCPeerConnectionSource({
+        const { mediaObject, intercom } = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions,
             channel: this,
@@ -37,7 +37,7 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
         this.intercom?.then(intercom => intercom.stopIntercom());
         this.intercom = intercom;
 
-        return mediaManager.createFFmpegMediaObject(ffmpegInput);
+        return mediaObject;
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {

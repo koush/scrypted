@@ -1,7 +1,7 @@
 import sdk, { MediaObject, Intercom, FFmpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
 import { RtspSmartCamera } from "../../rtsp/src/rtsp";
 import { parseSemicolonDelimited, RtspClient } from "@scrypted/common/src/rtsp-server";
-import { findTrack } from "@scrypted/common/src/sdp-utils";
+import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import child_process from 'child_process';
 
@@ -84,7 +84,8 @@ export class OnvifIntercom implements Intercom {
         });
         this.camera.console.log('ONVIF Backchannel SDP:');
         this.camera.console.log(describe.body?.toString());
-        const audioBackchannel = findTrack(describe.body.toString(), 'audio', ['sendonly']);
+        const parsedSdp = parseSdp(describe.body.toString());
+        const audioBackchannel = parsedSdp.msections.find(msection => msection.type === 'audio' && msection.direction === 'sendonly');
         if (!audioBackchannel)
             throw new Error('ONVIF audio backchannel not found');
 
@@ -96,7 +97,7 @@ export class OnvifIntercom implements Intercom {
             Transport: `RTP/AVP;unicast;client_port=${rtp}-${rtcp}`,
         };
 
-        const response = await this.intercomClient.request('SETUP', headers, audioBackchannel.trackId);
+        const response = await this.intercomClient.request('SETUP', headers, audioBackchannel.control);
         const transportDict = parseSemicolonDelimited(response.headers.transport);
         this.intercomClient.session = response.headers.session.split(';')[0];
 
@@ -108,7 +109,7 @@ export class OnvifIntercom implements Intercom {
 
         const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
-        const availableCodecs = [...parseCodecs(audioBackchannel.section)];
+        const availableCodecs = [...parseCodecs(audioBackchannel.contents)];
         let match: CodecMatch;
         let codec: SupportedCodec;
         for (const supported of availableCodecs) {

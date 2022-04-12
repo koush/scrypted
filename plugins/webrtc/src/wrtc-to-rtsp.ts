@@ -3,8 +3,8 @@ import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraR
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
-import { createSdpInput } from '@scrypted/common/src/sdp-utils';
-import sdk, { FFmpegInput, Intercom, MediaObject, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
+import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
 import dgram from 'dgram';
 import { Socket } from "net";
@@ -15,7 +15,7 @@ import { createRawResponse, isPeerConnectionAlive } from "./werift-util";
 const { mediaManager } = sdk;
 
 export interface RTCPeerConnectionPipe {
-    ffmpegInput: FFmpegInput;
+    mediaObject: MediaObject;
     intercom: Promise<Intercom>;
 }
 
@@ -55,8 +55,6 @@ export async function createRTCPeerConnectionSource(options: {
         socket = client;
         const rtspServer = new RtspServer(socket, undefined, udp);
         // rtspServer.console = console;
-        rtspServer.audioChannel = 0;
-        rtspServer.videoChannel = 2;
 
         const pc = new RTCPeerConnection({
             codecs: {
@@ -115,15 +113,16 @@ export async function createRTCPeerConnectionSource(options: {
 
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.onTrack.subscribe((track) => {
+                const audioTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'audio').control;
                 if (useUdp) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotAudio) {
                             gotAudio = true;
                             console.log('received first audio packet');
                         }
-                        rtspServer.sendAudio(rtp.serialize(), false);
+                        rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
                     });
-                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendAudio(rtp.serialize(), true));
+                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(audioTrack, rtp.serialize(), true));
                 }
                 else {
                     const jitter = new JitterBuffer({
@@ -133,7 +132,7 @@ export async function createRTCPeerConnectionSource(options: {
                     class RtspOutput extends Output {
                         pushRtcpPackets(packets: RtcpPacket[]): void {
                             for (const rtcp of packets) {
-                                rtspServer.sendAudio(rtcp.serialize(), true)
+                                rtspServer.sendTrack(audioTrack, rtcp.serialize(), true)
                             }
                         }
                         pushRtpPackets(packets: RtpPacket[]): void {
@@ -142,7 +141,7 @@ export async function createRTCPeerConnectionSource(options: {
                                 console.log('received first audio packet');
                             }
                             for (const rtp of packets) {
-                                rtspServer.sendAudio(rtp.serialize(), false);
+                                rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
                             }
                         }
                     }
@@ -152,15 +151,16 @@ export async function createRTCPeerConnectionSource(options: {
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
             videoTransceiver.onTrack.subscribe((track) => {
+                const videoTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'video').control;
                 if (useUdp) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotVideo) {
                             gotVideo = true;
                             console.log('received first video packet');
                         }
-                        rtspServer.sendVideo(rtp.serialize(), false);
+                        rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
                     });
-                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendVideo(rtp.serialize(), true));
+                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
                 }
                 else {
                     const jitter = new JitterBuffer({
@@ -170,7 +170,7 @@ export async function createRTCPeerConnectionSource(options: {
                     class RtspOutput extends Output {
                         pushRtcpPackets(packets: RtcpPacket[]): void {
                             for (const rtcp of packets) {
-                                rtspServer.sendVideo(rtcp.serialize(), true)
+                                rtspServer.sendTrack(videoTrack, rtcp.serialize(), true)
                             }
                         }
                         pushRtpPackets(packets: RtpPacket[]): void {
@@ -179,7 +179,7 @@ export async function createRTCPeerConnectionSource(options: {
                                 console.log('received first video packet');
                             }
                             for (const rtp of packets) {
-                                rtspServer.sendVideo(rtp.serialize(), false);
+                                rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
                             }
                         }
                     }
@@ -222,9 +222,21 @@ export async function createRTCPeerConnectionSource(options: {
             console.log('sdp sent', rtspServer.sdp);
 
             if (useUdp) {
-                rtspServer.udpPorts = {
-                    video: videoPort,
-                    audio: audioPort,
+                const parsedSdp = parseSdp(rtspServer.sdp);
+                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control;
+                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
+
+                rtspServer.setupTracks[videoTrack] = {
+                    protocol: 'udp',
+                    destination: videoPort,
+                    codec: undefined,
+                    control: videoTrack,
+                };
+                rtspServer.setupTracks[audioTrack] = {
+                    protocol: 'udp',
+                    destination: audioPort,
+                    codec: undefined,
+                    control: audioTrack,
                 };
                 rtspServer.client.write(rtspServer.sdp + '\r\n');
                 rtspServer.client.end();
@@ -330,7 +342,7 @@ export async function createRTCPeerConnectionSource(options: {
 
                     const { cp } = await startRtpForwarderProcess(console, ffmpegInput.inputArguments, {
                         audio: {
-                            outputArguments: getFFmpegRtpAudioOutputArguments(),
+                            outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec),
                             transceiver: audioTransceiver,
                         },
                     });
@@ -348,12 +360,11 @@ export async function createRTCPeerConnectionSource(options: {
             return ret;
         });
 
-    let ffmpegInput: FFmpegInput;
     if (useUdp) {
         const url = `tcp://127.0.0.1:${port}`;
 
         mediaStreamOptions.container = 'sdp';
-        ffmpegInput = {
+        const ffmpegInput: FFmpegInput = {
             url,
             mediaStreamOptions,
             inputArguments: [
@@ -379,28 +390,25 @@ export async function createRTCPeerConnectionSource(options: {
                 '-i', url,
             ]
         };
+
+        return {
+            mediaObject: await mediaManager.createFFmpegMediaObject(ffmpegInput),
+            intercom,
+        };
     }
     else {
         const url = `rtsp://127.0.0.1:${port}`;
-        ffmpegInput = {
+        const mediaStreamUrl : MediaStreamUrl = {
             url,
             mediaStreamOptions,
-            inputArguments: [
-                "-rtsp_transport", "tcp",
-                // see above for udp comments.
-                // unclear what this does in tcp. out of order packets in a tcp
-                // stream probably breaks things.
-                // should possibly use the werift jitter buffer in tcp mode to accomodate.
-                // "-max_delay", "0",
-                '-i', url,
-            ]
+        };
+
+        return {
+            mediaObject: await mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl),
+            intercom,
         };
     }
 
-    return {
-        ffmpegInput,
-        intercom,
-    }
 }
 
 interface ReceivedRtpPacket extends RtpPacket {

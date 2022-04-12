@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFmpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingOptions, RTCSignalingSendIceCandidate } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFmpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingOptions, RTCSignalingSendIceCandidate, ScryptedMimeTypes, MediaStreamUrl } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -268,14 +268,12 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
     }
 
     createFFmpegMediaObject(trackerId: string, url: string) {
-        return mediaManager.createFFmpegMediaObject({
+        const ret: MediaStreamUrl = {
             url,
             mediaStreamOptions: this.addRefreshOptions(trackerId, getSdmRtspMediaStreamOptions()),
-            inputArguments: [
-                "-rtsp_transport", "tcp",
-                "-i", url,
-            ],
-        });
+        };
+
+        return this.createMediaObject(ret, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     get isWebRtc() {

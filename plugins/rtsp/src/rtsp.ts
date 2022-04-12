@@ -1,4 +1,4 @@
-import sdk, { Setting, MediaObject, ScryptedInterface, FFmpegInput, PictureOptions, SettingValue, MediaStreamOptions, ResponseMediaStreamOptions, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { Setting, MediaObject, ScryptedInterface, FFmpegInput, PictureOptions, SettingValue, MediaStreamOptions, ResponseMediaStreamOptions, ScryptedMimeTypes, MediaStreamUrl } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 import url from 'url';
@@ -71,17 +71,13 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         return stringUrl;
     }
 
-    createFfmpegMediaObject(stringUrl: string, vso: ResponseMediaStreamOptions) {
-        const ret: FFmpegInput = {
+    createMediaStreamUrl(stringUrl: string, vso: ResponseMediaStreamOptions) {
+        const ret: MediaStreamUrl = {
             url: stringUrl,
-            inputArguments: [
-                "-rtsp_transport", this.getRtspTransport(),
-                "-i", stringUrl,
-            ],
             mediaStreamOptions: vso,
         };
 
-        return this.createMediaObject(ret, ScryptedMimeTypes.FFmpegInput);
+        return this.createMediaObject(ret, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     async createVideoStream(vso: UrlMediaStreamOptions): Promise<MediaObject> {
@@ -89,7 +85,7 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
             throw new Error('video streams not set up or no longer exists.');
 
         const stringUrl = this.addRtspCredentials(vso.url);
-        return this.createFfmpegMediaObject(stringUrl, vso);
+        return this.createMediaStreamUrl(stringUrl, vso);
     }
 
     // hide the description from CameraBase that indicates it is only used for snapshots
@@ -115,28 +111,8 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
         ];
     }
 
-    async getRtspTransportSettings(): Promise<Setting[]> {
-        return [
-            {
-                key: 'rtspTransport',
-                title: 'RTSP Transport',
-                group: 'Advanced',
-                description: 'The RTSP Transport to use when streaming video. TCP is the default.',
-                value: this.getRtspTransport(),
-                choices: [
-                    'tcp',
-                    'udp',
-                ],
-            },
-        ]
-    }
-
-    getRtspTransport() {
-        return this.storage.getItem('rtspTransport') || 'tcp'
-    }
-
     async getOtherSettings(): Promise<Setting[]> {
-        return this.getRtspTransportSettings();
+        return [];
     }
 
     async getUrlSettings(): Promise<Setting[]> {

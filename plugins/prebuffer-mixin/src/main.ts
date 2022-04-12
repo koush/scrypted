@@ -182,7 +182,7 @@ class PrebufferSession {
 
   getParser(rtspMode: boolean, muxingMp4: boolean, mediaStreamOptions: MediaStreamOptions) {
     if (!this.canUseRtspParser(muxingMp4, mediaStreamOptions))
-      return FFMPEG_PARSER_TCP;
+      return STRING_DEFAULT;
 
     const defaultValue = rtspMode
       && mediaStreamOptions?.tool === 'scrypted' ?

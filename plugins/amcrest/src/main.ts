@@ -58,7 +58,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         const url = `rtsp://${this.getRtspAddress()}/cam/playback?channel=1&starttime=${year}_${month}_${date}_${hours}_${minutes}_${seconds}`;
         const authedUrl = this.addRtspCredentials(url);
-        return this.createFfmpegMediaObject(authedUrl, undefined);
+        return this.createMediaStreamUrl(authedUrl, undefined);
     }
 
     getRecordingStreamOptions(): Promise<MediaStreamOptions[]> {

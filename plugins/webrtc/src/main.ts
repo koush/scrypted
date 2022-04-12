@@ -97,14 +97,14 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             return this.mixinDevice.getVideoStream(options);
         }
 
-        const { ffmpegInput } = await createRTCPeerConnectionSource({
+        const { mediaObject } = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
             useUdp: this.storageSettings.values.useUdp,
         });
 
-        return mediaManager.createFFmpegMediaObject(ffmpegInput);
+        return mediaObject;
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
@@ -115,7 +115,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         ret.push(this.createVideoStreamOptions());
         return ret;
     }
-
 }
 
 class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider, BufferConverter, MixinProvider, Settings {

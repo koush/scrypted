@@ -178,6 +178,15 @@ export function parseMSection(msection: string[]) {
         codec = 'h264';
     }
 
+    let direction: string;
+    for (const checkDirection of ['sendonly' , 'sendrecv', 'recvonly' , 'inactive']) {
+        const found = msection.find(line => line === 'a=' + checkDirection);
+        if (found) {
+            direction = checkDirection;
+            break;
+        }
+    }
+
     return {
         ...parseMLine(msection[0]),
         fmtp: parseFmtp(msection),
@@ -185,6 +194,7 @@ export function parseMSection(msection: string[]) {
         contents: msection.join('\r\n'),
         control,
         codec,
+        direction,
     }
 }
 

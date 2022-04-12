@@ -3,7 +3,7 @@ import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/co
 import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-connect";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
-import { createSdpInput, findFmtp } from "@scrypted/common/src/sdp-utils";
+import { createSdpInput, findFmtp, parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
@@ -151,9 +151,13 @@ export async function createRTCPeerConnectionSink(
                 const rtspServer = new RtspServer(client, sdp, audioOutput.server);
                 // rtspServer.console = console;
                 await rtspServer.handlePlayback();
+                const parsedSdp = parseSdp(rtspServer.sdp);
+                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
+
+
                 track.onReceiveRtp.subscribe(rtpPacket => {
                     rtpPacket.header.payloadType = 110;
-                    rtspServer.sendAudio(rtpPacket.serialize(), false);
+                    rtspServer.sendTrack(audioTrack, rtpPacket.serialize(), false);
                 })
             }
             catch (e) {

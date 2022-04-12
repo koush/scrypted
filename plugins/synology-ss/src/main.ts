@@ -1,8 +1,8 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, Device, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, PictureOptions, ResponseMediaStreamOptions, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { Camera, Device, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera } from "@scrypted/sdk";
 import { createInstanceableProviderPlugin, enableInstanceableProviderMode, isInstanceableProviderModeEnabled } from '../../../common/src/provider-plugin';
-import { SynologyApiClient, SynologyCameraStream, SynologyCamera } from "./api/synology-api-client";
+import { SynologyApiClient, SynologyCamera, SynologyCameraStream } from "./api/synology-api-client";
 
-const { deviceManager, mediaManager } = sdk;
+const { deviceManager } = sdk;
 
 class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpRequestHandler, MotionSensor, Settings, VideoCamera {
     private static readonly DefaultSensorTimeoutSecs: number = 30;
@@ -90,14 +90,11 @@ class SynologyCameraDevice extends ScryptedDeviceBase implements Camera, HttpReq
             rtspPath = liveViewPaths[0].rtspPath;
         }
 
-        return this.createMediaObject({
+        const mediaStreamUrl: MediaStreamUrl = {
             url: rtspPath,
-            inputArguments: [
-                "-rtsp_transport", "tcp",
-                "-i", rtspPath,
-            ],
             mediaStreamOptions: this.createMediaStreamOptions(rtspChannel),
-        }, ScryptedMimeTypes.FFmpegInput);
+        }
+        return this.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     private createMediaStreamOptions(stream: SynologyCameraStream) {
