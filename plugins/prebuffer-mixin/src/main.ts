@@ -33,7 +33,8 @@ const COMPATIBLE_AUDIO_CODECS = ['aac', 'mp3', 'mp2', 'opus'];
 const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
 
 const SCRYPTED_PARSER = 'Scrypted';
-const FFMPEG_PARSER = 'FFmpeg';
+const FFMPEG_PARSER_TCP = 'FFmpeg (TCP)';
+const FFMPEG_PARSER_UDP = 'FFmpeg (UDP)';
 const STRING_DEFAULT = 'Default';
 
 const VALID_AUDIO_CONFIGS = [
@@ -181,18 +182,20 @@ class PrebufferSession {
 
   getParser(rtspMode: boolean, muxingMp4: boolean, mediaStreamOptions: MediaStreamOptions) {
     if (!this.canUseRtspParser(muxingMp4, mediaStreamOptions))
-      return FFMPEG_PARSER;
+      return FFMPEG_PARSER_TCP;
 
     const defaultValue = rtspMode
       && mediaStreamOptions?.tool === 'scrypted' ?
-      SCRYPTED_PARSER : FFMPEG_PARSER;
+      SCRYPTED_PARSER : STRING_DEFAULT;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
     if (!rtspParser || rtspParser === STRING_DEFAULT)
       return defaultValue;
     if (rtspParser === SCRYPTED_PARSER)
       return SCRYPTED_PARSER;
-    if (rtspParser === FFMPEG_PARSER)
-      return FFMPEG_PARSER;
+    if (rtspParser === FFMPEG_PARSER_TCP)
+      return FFMPEG_PARSER_TCP;
+    if (rtspParser === FFMPEG_PARSER_UDP)
+      return FFMPEG_PARSER_UDP;
     return defaultValue;
   }
 
@@ -290,17 +293,21 @@ class PrebufferSession {
       && this.advertisedMediaStreamOptions?.container === 'rtsp') {
 
       const value = this.getParser(rtspMode, muxingMp4, this.advertisedMediaStreamOptions);
+      const defaultValue = rtspMode
+        && this.advertisedMediaStreamOptions?.tool === 'scrypted' ?
+        SCRYPTED_PARSER : 'FFmpeg';
 
       settings.push(
         {
           key: this.rtspParserKey,
           group,
           title: 'RTSP Parser',
-          description: `Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser is lower latency. The Scrypted Parser is only available when the Audo Codec is not Transcoding and the Rebroadcast Container is RTSP. The default is "${value}" for this camera.`,
+          description: `Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser is lower latency. The Scrypted Parser is only available when the Audo Codec is not Transcoding and the Rebroadcast Container is RTSP. The default is "${defaultValue}" for this camera.`,
           value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
           choices: [
             STRING_DEFAULT,
-            FFMPEG_PARSER,
+            FFMPEG_PARSER_TCP,
+            FFMPEG_PARSER_UDP,
             SCRYPTED_PARSER,
           ],
         }
@@ -699,6 +706,10 @@ class PrebufferSession {
         }
       }
       else {
+        if (parser === FFMPEG_PARSER_UDP)
+          ffmpegInput.inputArguments = ['-rtsp_transport', 'udp', '-i', ffmpegInput.url];
+        else if (parser === FFMPEG_PARSER_TCP)
+          ffmpegInput.inputArguments = ['-rtsp_transport', 'tcp', '-i', ffmpegInput.url];
         // create missing pts from dts so mpegts and mp4 muxing does not fail
         const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
         ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
@@ -958,7 +969,7 @@ class PrebufferSession {
         session.once('killed', cleanup);
 
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
-        if (true || container !== 'rtsp') {
+        if (container !== 'rtsp') {
           for (const prebuffer of prebufferContainer) {
             if (prebuffer.time < now - requestedPrebuffer)
               continue;
