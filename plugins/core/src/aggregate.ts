@@ -1,4 +1,4 @@
-import { EventListener, EventListenerRegister, FFMpegInput, LockState, MediaObject, MediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaObject, MediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import { startParserSession, ParserSession, createParserRebroadcaster, Rebroadcaster, createRebroadcaster } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { createMpegTsParser, StreamParser } from "@scrypted/common/src/stream-parser";
@@ -56,11 +56,11 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         const args = await Promise.allSettled(devices.map(async (device) => {
             const mo = await device.getVideoStream();
             const buffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
-            const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
+            const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
             return ffmpegInput;
         }));
 
-        const inputs = args.map(arg => (arg as PromiseFulfilledResult<FFMpegInput>).value).filter(input => !!input);
+        const inputs = args.map(arg => (arg as PromiseFulfilledResult<FFmpegInput>).value).filter(input => !!input);
 
         if (!inputs.length)
             throw new Error('no inputs');
@@ -77,7 +77,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             'nullsrc=size=1920x1080 [base];'
         ];
 
-        const filteredInput: FFMpegInput = {
+        const filteredInput: FFmpegInput = {
             url: undefined,
             inputArguments: [],
         };
@@ -165,7 +165,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
 
             const ret = await sessionPromise;
             const {url} = ret.rebroadcaster;
-            const ffmpegInput: FFMpegInput = {
+            const ffmpegInput: FFmpegInput = {
                 url,
                 container: 'mpegts',
                 inputArguments: [

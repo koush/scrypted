@@ -1,4 +1,4 @@
-import { ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedMimeTypes, FFMpegInput, ObjectsDetected, ObjectDetectionModel, ObjectDetectionSession, ObjectDetectionResult } from '@scrypted/sdk';
+import { ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, ObjectDetection, PictureOptions, ScryptedDeviceBase, DeviceProvider, ScryptedMimeTypes, FFmpegInput, ObjectsDetected, ObjectDetectionModel, ObjectDetectionSession, ObjectDetectionResult } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import * as tf from '@tensorflow/tfjs-node-gpu';
 import { ENV, tensor3d, Tensor3D } from '@tensorflow/tfjs-node-gpu';
@@ -11,7 +11,7 @@ import { Canvas, Image, ImageData } from 'canvas';
 import { randomBytes } from 'crypto';
 import { sleep } from './sleep';
 import { makeBoundingBoxFromFace } from './util';
-import { FFMpegRebroadcastSession, startRebroadcastSession } from '../../../common/src/ffmpeg-rebroadcast';
+import { FFmpegRebroadcastSession, startRebroadcastSession } from '../../../common/src/ffmpeg-rebroadcast';
 import { createRawVideoParser, PIXEL_FORMAT_RGB24, StreamChunk } from '@scrypted/common/src/stream-parser';
 import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
 import { once } from 'events';
@@ -145,7 +145,7 @@ interface DetectionSession {
   events: EventEmitter;
   running?: boolean;
 
-  rebroadcaster?: Promise<FFMpegRebroadcastSession<RebroadcastParsers>>;
+  rebroadcaster?: Promise<FFmpegRebroadcastSession<RebroadcastParsers>>;
   rebroadcasterTimeout?: NodeJS.Timeout;
 }
 
@@ -334,7 +334,7 @@ class TensorFlow extends ScryptedDeviceBase implements ObjectDetection, DevicePr
       return;
     }
 
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
     const rebroadcaster = startRebroadcastSession<RebroadcastParsers>(ffmpegInput, {
       console: this.console,
       parsers: {

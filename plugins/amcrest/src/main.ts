@@ -1,4 +1,4 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFMpegInput, ScryptedMimeTypes, PictureOptions, VideoCameraConfiguration, MediaStreamOptions, VideoRecorder, RequestRecordingStreamOptions } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFmpegInput, ScryptedMimeTypes, PictureOptions, VideoCameraConfiguration, MediaStreamOptions, VideoRecorder, RequestRecordingStreamOptions } from "@scrypted/sdk";
 import { Stream, PassThrough } from "stream";
 import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
 import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
@@ -408,7 +408,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const channel = this.getRtspChannel() || '1';
 
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
-        const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
+        const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
 
         const args = ffmpegInput.inputArguments.slice();
         args.unshift('-hide_banner');

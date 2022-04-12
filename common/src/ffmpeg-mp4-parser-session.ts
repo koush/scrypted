@@ -35,12 +35,12 @@ export const FFMPEG_FRAGMENTED_MP4_OUTPUT_ARGS = [
     '-f', 'mp4',
 ];
 
-export interface FFMpegFragmentedMP4Session {
+export interface FFmpegFragmentedMP4Session {
     cp: ChildProcess;
     generator: AsyncGenerator<MP4Atom>;
 }
 
-export async function startFFMPegFragmentedMP4Session(inputArguments: string[], audioOutputArgs: string[], videoOutputArgs: string[], console: Console): Promise<FFMpegFragmentedMP4Session> {
+export async function startFFMPegFragmentedMP4Session(inputArguments: string[], audioOutputArgs: string[], videoOutputArgs: string[], console: Console): Promise<FFmpegFragmentedMP4Session> {
     const args = inputArguments.slice();
     args.push(
         ...videoOutputArgs,

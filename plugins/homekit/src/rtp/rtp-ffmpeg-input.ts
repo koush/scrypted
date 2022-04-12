@@ -1,5 +1,5 @@
 import { listenZero } from "@scrypted/common/src/listen-cluster";
-import { FFMpegInput } from "@scrypted/sdk";
+import { FFmpegInput } from "@scrypted/sdk";
 import { Socket, SocketType } from "dgram";
 import { createServer, Server } from "net";
 import { AudioStreamingCodecType, AudioInfo, AudioStreamingSamplerate } from "../hap";
@@ -11,7 +11,7 @@ function pickPort() {
 export class HomeKitRtpSink {
     heartbeatTimer: NodeJS.Timeout;
 
-    constructor(public server: Server, public rtpPort: number, public ffmpegInput: FFMpegInput, public console: Console) {
+    constructor(public server: Server, public rtpPort: number, public ffmpegInput: FFmpegInput, public console: Console) {
     }
 
     // Send a regular heartbeat to FFmpeg to ensure the pipe remains open and the process alive.
@@ -143,7 +143,7 @@ export async function startRtpSink(socketType: SocketType, address: string, srtp
     });
     const sdpServerPort = await listenZero(server);
 
-    const ffmpegInput: FFMpegInput = {
+    const ffmpegInput: FFmpegInput = {
         url: undefined,
         mediaStreamOptions: {
             id: undefined,

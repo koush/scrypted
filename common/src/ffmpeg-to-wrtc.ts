@@ -1,7 +1,7 @@
 import child_process from 'child_process';
 import { listenZeroSingleClient } from "./listen-cluster";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "./media-helpers";
-import sdk, { FFMpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingOptions } from "@scrypted/sdk";
+import sdk, { FFmpegInput, ScryptedMimeTypes, MediaObject, RTCAVSignalingSetup, RTCSignalingChannel, RTCSignalingSession, ScryptedDevice, ScryptedInterface, VideoCamera, RTCSignalingOptions } from "@scrypted/sdk";
 import { RpcPeer } from "../../server/src/rpc";
 
 const { mediaManager } = sdk;
@@ -34,7 +34,7 @@ function initalizeWebRtc() {
   Object.assign(global, wrtc);
 }
 
-export async function startRTCPeerConnectionFFmpegInput(ffInput: FFMpegInput, console: Console, options?: {
+export async function startRTCPeerConnectionFFmpegInput(ffInput: FFmpegInput, console: Console, options?: {
   maxWidth: number,
 }): Promise<RTCPeerConnection> {
   initalizeWebRtc();

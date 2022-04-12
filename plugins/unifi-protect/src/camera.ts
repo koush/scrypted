@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFMpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl, ResponseMediaStreamOptions } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFmpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl, ResponseMediaStreamOptions } from "@scrypted/sdk";
 import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
@@ -94,7 +94,7 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         this.stopIntercom();
 
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
-        const ffmpegInput = JSON.parse(buffer.toString()) as FFMpegInput;
+        const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
 
         const camera = this.findCamera();
         const params = new URLSearchParams({ camera: camera.id });

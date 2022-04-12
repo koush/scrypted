@@ -1,4 +1,4 @@
-import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFMpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingOptions, RTCSignalingSendIceCandidate } from '@scrypted/sdk';
+import sdk, { DeviceManifest, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, HumiditySensor, MediaObject, MotionSensor, OauthClient, Refresh, ScryptedDeviceType, ScryptedInterface, Setting, Settings, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, VideoCamera, MediaStreamOptions, BinarySensor, DeviceInformation, RTCAVSignalingSetup, Camera, PictureOptions, ObjectsDetected, ObjectDetector, ObjectDetectionTypes, FFmpegInput, RequestMediaStreamOptions, Readme, RTCSignalingChannel, RTCSessionControl, RTCSignalingSession, ResponseMediaStreamOptions, RTCSignalingOptions, RTCSignalingSendIceCandidate } from '@scrypted/sdk';
 import { ScryptedDeviceBase } from '@scrypted/sdk';
 import qs from 'query-string';
 import ClientOAuth2 from 'client-oauth2';
@@ -299,7 +299,7 @@ class NestCamera extends ScryptedDeviceBase implements Readme, Camera, VideoCame
             const mso = getSdmRtspMediaStreamOptions();
             this.addRefreshOptions(trackerId, mso);
 
-            const ffmpegInput: FFMpegInput = {
+            const ffmpegInput: FFmpegInput = {
                 url: undefined,
                 mediaStreamOptions: mso,
                 inputArguments: undefined,

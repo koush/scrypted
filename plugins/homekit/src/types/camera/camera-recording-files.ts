@@ -1,5 +1,5 @@
 
-import sdk, { FFMpegInput, MediaObject, VideoClip, VideoClipOptions } from '@scrypted/sdk';
+import sdk, { FFmpegInput, MediaObject, VideoClip, VideoClipOptions } from '@scrypted/sdk';
 import path from 'path';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
@@ -177,7 +177,7 @@ export async function getVideoClipThumbnail(videoClipId: string): Promise<MediaO
         jpeg = fs.readFileSync(thumbnailPath);
     }
     else {
-        const ffmpegInput: FFMpegInput = {
+        const ffmpegInput: FFmpegInput = {
             url: undefined,
             inputArguments: [
                 '-ss', '00:00:04',

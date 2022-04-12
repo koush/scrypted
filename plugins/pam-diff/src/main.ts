@@ -1,4 +1,4 @@
-import { FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import { FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { ffmpegLogInitialOutput } from "../../../common/src/media-helpers";
 
@@ -67,7 +67,7 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         }
 
         const ffmpeg = await mediaManager.getFFmpegPath();
-        const ffmpegInput: FFMpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(
+        const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(
             mediaObject,
             ScryptedMimeTypes.FFmpegInput
         )).toString());

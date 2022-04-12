@@ -1,6 +1,6 @@
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import sdk, { FFMpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFmpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
@@ -27,12 +27,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // option, but not sure it matters since AAC-ELD is no longer in use.
     let audiomtu = 400;
 
-    const videoInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(await device.getVideoStream(requestOptions), ScryptedMimeTypes.FFmpegInput);
+    const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(await device.getVideoStream(requestOptions), ScryptedMimeTypes.FFmpegInput);
     session.mediaStreamOptions = videoInput.mediaStreamOptions;
     // test code path that allows using two ffmpeg processes. did not see
     // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame
     // to immediately finish. ffmpeg will only start sending on a key frame.
-    // const audioInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    // const audioInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
     const audioInput = videoInput;
 
     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);

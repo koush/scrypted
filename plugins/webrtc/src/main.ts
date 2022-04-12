@@ -1,6 +1,6 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFMpegInput, Intercom, MediaObject, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaObject, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import crypto from 'crypto';
 import { createRTCPeerConnectionSink } from "./ffmpeg-to-wrtc";
 import { WebRTCCamera } from "./webrtc-camera";
@@ -72,7 +72,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                     },
                     destination,
                 });
-                const ffInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
+                const ffInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
                 return ffInput;
             },
         );
@@ -138,7 +138,7 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
     }
 
     async convert(data: Buffer, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<RTCSignalingChannel> {
-        const ffmpegInput: FFMpegInput = JSON.parse(data.toString());
+        const ffmpegInput: FFmpegInput = JSON.parse(data.toString());
 
         const storageSettings = this.storageSettings;
         const console = deviceManager.getMixinConsole(options.sourceId, this.nativeId);

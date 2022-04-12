@@ -71,7 +71,7 @@ export class CameraMixin extends HomekitMixin<any> {
                 key: 'transcodeRecording',
                 type: 'boolean',
                 value: (this.storage.getItem('transcodeRecording') === 'true').toString(),
-                description: 'Use FFMpeg to transcode recordings to a format supported by HomeKit Secure Video.',
+                description: 'Use FFmpeg to transcode recordings to a format supported by HomeKit Secure Video.',
             });
 
             showTranscodeArgs = showTranscodeArgs || this.storage.getItem('transcodeRecording') === 'true';
@@ -83,7 +83,7 @@ export class CameraMixin extends HomekitMixin<any> {
             type: 'boolean',
             key: 'transcodeStreaming',
             value: (this.storage.getItem('transcodeStreaming') === 'true').toString(),
-            description: 'Use FFMpeg to transcode streaming to a format supported by HomeKit.',
+            description: 'Use FFmpeg to transcode streaming to a format supported by HomeKit.',
         });
 
         const transcodeEnabledValues = [

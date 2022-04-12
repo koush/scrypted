@@ -11,7 +11,7 @@ import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { createFragmentedMp4Parser, createMpegTsParser, parseMp4StreamChunks, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, FFMpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
 import dgram from 'dgram';
 import net from 'net';
@@ -606,7 +606,7 @@ class PrebufferSession {
     }
     else {
       const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
-      const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
+      const ffmpegInput = JSON.parse(moBuffer.toString()) as FFmpegInput;
       sessionMso = ffmpegInput.mediaStreamOptions;
 
       const parser = this.getParser(rtspMode, muxingMp4, ffmpegInput.mediaStreamOptions);
@@ -726,7 +726,7 @@ class PrebufferSession {
       })
         .then(async (stream) => {
           const extraInputArguments = this.storage.getItem(this.ffmpegInputArgumentsKey) || DEFAULT_FFMPEG_INPUT_ARGUMENTS;
-          const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(stream, ScryptedMimeTypes.FFmpegInput);
+          const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(stream, ScryptedMimeTypes.FFmpegInput);
           ffmpegInput.inputArguments.unshift(...extraInputArguments.split(' '));
           const mp4Session = await startFFMPegFragmentedMP4Session(ffmpegInput.inputArguments, acodec, vcodec, this.console);
 
@@ -804,7 +804,7 @@ class PrebufferSession {
           return;
         const mo = await this.mixinDevice.getVideoStream(mso);
         const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
-        const ffmpegInput = JSON.parse(moBuffer.toString()) as FFMpegInput;
+        const ffmpegInput = JSON.parse(moBuffer.toString()) as FFmpegInput;
         mso = ffmpegInput.mediaStreamOptions;
 
         scheduleRefresh(mso);
@@ -1115,7 +1115,7 @@ class PrebufferSession {
 
     const length = Math.max(500000, available).toString();
 
-    const ffmpegInput: FFMpegInput = {
+    const ffmpegInput: FFmpegInput = {
       url,
       container,
       inputArguments: [
@@ -1490,7 +1490,7 @@ class PrebufferProvider extends AutoenableMixinProvider implements MixinProvider
     if (!u.protocol.startsWith('tcp'))
       throw new Error('rfc4751 url must be tcp');
     const { clientPromise, url: clientUrl } = await listenZeroSingleClient();
-    const ffmpeg: FFMpegInput = {
+    const ffmpeg: FFmpegInput = {
       url: clientUrl,
       inputArguments: [
         "-rtsp_transport", "tcp",

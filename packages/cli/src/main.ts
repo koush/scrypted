@@ -7,7 +7,7 @@ import readline from 'readline-sync';
 import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
-import { connectScryptedClient, ScryptedMimeTypes, FFMpegInput } from '../../client/src/index';
+import { connectScryptedClient, ScryptedMimeTypes, FFmpegInput } from '../../client/src/index';
 import semver from 'semver';
 import child_process from 'child_process';
 
@@ -145,7 +145,7 @@ async function main() {
     }
     else if (process.argv[2] === 'ffplay') {
         const { sdk, pendingResult } = await runCommand();
-        const ffinput = await sdk.mediaManager.convertMediaObjectToJSON<FFMpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
+        const ffinput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
         console.log(ffinput);
         child_process.spawn('ffplay', ffinput.inputArguments, {
             stdio: 'inherit',

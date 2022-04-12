@@ -1,4 +1,4 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFMpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings } from "@scrypted/sdk";
+import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, ScryptedDeviceType, VideoCamera, MediaObject, MediaStreamOptions, ScryptedInterface, FFmpegInput, Camera, PictureOptions, SettingValue, DeviceCreator, DeviceCreatorSettings } from "@scrypted/sdk";
 import { recommendRebroadcast } from "./recommend";
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import https from 'https';

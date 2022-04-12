@@ -5,7 +5,7 @@ import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-connect";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, findFmtp } from "@scrypted/common/src/sdp-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
-import sdk, { FFMpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
 import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
@@ -45,7 +45,7 @@ export async function createRTCPeerConnectionSink(
     storageSettings: StorageSettings<WebRTCStorageSettingsKeys>,
     console: Console,
     intercom: Intercom,
-    getFFMpegInput: (destination: MediaStreamDestination) => Promise<FFMpegInput>,
+    getFFmpegInput: (destination: MediaStreamDestination) => Promise<FFmpegInput>,
     ) {
 
     const options = await clientSignalingSession.getOptions();
@@ -136,7 +136,7 @@ export async function createRTCPeerConnectionSink(
         audioTransceiver.onTrack.subscribe(async (track) => {
             try {
                 const url = rtspTcpServer.url.replace('tcp:', 'rtsp:');
-                const ffmpegInput: FFMpegInput = {
+                const ffmpegInput: FFmpegInput = {
                     url,
                     inputArguments: [
                         '-rtsp_transport', 'udp',
@@ -209,7 +209,7 @@ export async function createRTCPeerConnectionSink(
             if (options?.userAgent?.includes('Firefox/'))
                 sessionSupportsH264High = true;
 
-            const ffInput = await getFFMpegInput(isPrivate ? 'local' : 'remote');
+            const ffInput = await getFFmpegInput(isPrivate ? 'local' : 'remote');
             const { mediaStreamOptions } = ffInput;
 
             const videoArgs: string[] = [];

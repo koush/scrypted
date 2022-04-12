@@ -1,4 +1,4 @@
-import sdk, { FFMpegInput, MediaObject, MediaStreamOptions, Setting, SettingValue } from "@scrypted/sdk";
+import sdk, { FFmpegInput, MediaObject, MediaStreamOptions, Setting, SettingValue } from "@scrypted/sdk";
 import child_process, { ChildProcess } from "child_process";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common";
 // import {} from "../../../common/src/stream-parser"
@@ -131,7 +131,7 @@ class GStreamerCamera extends CameraBase<MediaStreamOptions> {
         }, 30000);
         const port = await listenZero(server);
 
-        const ret: FFMpegInput = {
+        const ret: FFmpegInput = {
             url: undefined,
             inputArguments: [
                 '-f',

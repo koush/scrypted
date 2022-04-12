@@ -4,7 +4,7 @@ import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-connect';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
-import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
@@ -82,7 +82,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
     rtpDescription: RtpDescription;
     audioOutForwarder: dgram.Socket;
     audioOutProcess: ChildProcess;
-    ffmpegInput: FFMpegInput;
+    ffmpegInput: FFmpegInput;
     refreshTimeout: NodeJS.Timeout;
     picturePromise: RefreshPromise<Buffer>;
 
@@ -100,7 +100,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
 
         this.stopIntercom();
 
-        const ffmpegInput: FFMpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
+        const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
         const ringRtpOptions = this.rtpDescription;
         let cameraSpeakerActive = false;
@@ -344,7 +344,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
             }
         });
 
-        const ffmpegInput: FFMpegInput = {
+        const ffmpegInput: FFmpegInput = {
             url: playbackUrl,
             mediaStreamOptions: Object.assign(this.getSipMediaStreamOptions(), {
                 refreshAt: Date.now() + STREAM_TIMEOUT,

@@ -1,7 +1,7 @@
 import { createServer, Server } from 'net';
 import child_process, { StdioOptions } from 'child_process';
 import { ChildProcess } from 'child_process';
-import { FFMpegInput } from '@scrypted/sdk/types';
+import { FFmpegInput } from '@scrypted/sdk/types';
 import { bind, bindZero, listenZero, listenZeroSingleClient } from './listen-cluster';
 import { EventEmitter } from 'events';
 import sdk, { RequestMediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
@@ -113,7 +113,7 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
 }
 
 
-export async function startParserSession<T extends string>(ffmpegInput: FFMpegInput, options: ParserOptions<T>): Promise<ParserSession<T>> {
+export async function startParserSession<T extends string>(ffmpegInput: FFmpegInput, options: ParserOptions<T>): Promise<ParserSession<T>> {
     const { console } = options;
 
     let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;

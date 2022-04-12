@@ -958,9 +958,9 @@ export interface MediaManager {
   convertMediaObjectToUrl(mediaObject: string | MediaObject, toMimeType: string): Promise<string>;
 
   /**
-   * Create a MediaObject from FFMpeg input arguments.
+   * Create a MediaObject from FFmpeg input arguments.
    */
-  createFFmpegMediaObject(ffmpegInput: FFMpegInput, options?: MediaObjectOptions): Promise<MediaObject>;
+  createFFmpegMediaObject(ffmpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObject>;
 
   /**
    * Create a MediaObject from an URL. The mime type will be determined dynamically while resolving the url.
@@ -989,7 +989,7 @@ export interface MediaStreamUrl {
   container?: string;
   mediaStreamOptions?: ResponseMediaStreamOptions;
 }
-export interface FFMpegInput extends MediaStreamUrl {
+export interface FFmpegInput extends MediaStreamUrl {
   inputArguments?: string[];
 }
 /**

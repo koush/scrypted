@@ -1,4 +1,4 @@
-import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFMpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { StorageSettings } from '../../../common/src/settings';
 
@@ -22,7 +22,7 @@ class SampleCameraDevice extends ScryptedDeviceBase implements Intercom, Camera,
     }
 
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
-        let ffmpegInput: FFMpegInput;
+        let ffmpegInput: FFmpegInput;
 
         // the input arguemnt to ffmpeg can be any valid ffmpeg input argument.
         // if its an url, note below that it is.
@@ -44,7 +44,7 @@ class SampleCameraDevice extends ScryptedDeviceBase implements Intercom, Camera,
 
 
     async startIntercom(media: MediaObject): Promise<void> {
-        const ffmpegInput: FFMpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
+        const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
         // something wants to start playback on the camera speaker.
         // use their ffmpeg input arguments to spawn ffmpeg to do playback.
         // some implementations read the data from an ffmpeg pipe output and POST to a url (like unifi/amcrest).

@@ -256,7 +256,7 @@ class EventListenerOptions(TypedDict):
 class EventListenerRegister(TypedDict):
     pass
 
-class FFMpegInput(TypedDict):
+class FFmpegInput(TypedDict):
     container: str
     inputArguments: list[str]
     mediaStreamOptions: ResponseMediaStreamOptions
@@ -986,7 +986,7 @@ class MediaManager:
         pass
     async def convertMediaObjectToUrl(self, mediaObject: str | MediaObject, toMimeType: str) -> str:
         pass
-    async def createFFmpegMediaObject(self, ffmpegInput: FFMpegInput, options: MediaObjectOptions = None) -> MediaObject:
+    async def createFFmpegMediaObject(self, ffmpegInput: FFmpegInput, options: MediaObjectOptions = None) -> MediaObject:
         pass
     async def createMediaObject(self, data: Any, mimeType: str, options: MediaObjectOptions = None) -> MediaObject:
         pass

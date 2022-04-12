@@ -1,4 +1,4 @@
-import sdk, { MediaObject, Intercom, FFMpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { MediaObject, Intercom, FFmpegInput, ScryptedMimeTypes } from "@scrypted/sdk";
 import { RtspSmartCamera } from "../../rtsp/src/rtsp";
 import { parseSemicolonDelimited, RtspClient } from "@scrypted/common/src/rtsp-server";
 import { findTrack } from "@scrypted/common/src/sdp-utils";
@@ -106,7 +106,7 @@ export class OnvifIntercom implements Intercom {
         const serverPorts = server_port.split('-');
         const serverRtp = parseInt(serverPorts[0]);
 
-        const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(media, ScryptedMimeTypes.FFmpegInput);
+        const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
         const availableCodecs = [...parseCodecs(audioBackchannel.section)];
         let match: CodecMatch;

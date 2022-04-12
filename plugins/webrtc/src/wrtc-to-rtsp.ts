@@ -4,7 +4,7 @@ import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput } from '@scrypted/common/src/sdp-utils';
-import sdk, { FFMpegInput, Intercom, MediaObject, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaObject, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
 import dgram from 'dgram';
 import { Socket } from "net";
@@ -15,7 +15,7 @@ import { createRawResponse, isPeerConnectionAlive } from "./werift-util";
 const { mediaManager } = sdk;
 
 export interface RTCPeerConnectionPipe {
-    ffmpegInput: FFMpegInput;
+    ffmpegInput: FFmpegInput;
     intercom: Promise<Intercom>;
 }
 
@@ -326,7 +326,7 @@ export async function createRTCPeerConnectionSource(options: {
                     if (!track)
                         throw new Error('peer connection does not support two way audio');
 
-                    const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFMpegInput>(media, ScryptedMimeTypes.FFmpegInput);
+                    const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
                     const { cp } = await startRtpForwarderProcess(console, ffmpegInput.inputArguments, {
                         audio: {
@@ -348,7 +348,7 @@ export async function createRTCPeerConnectionSource(options: {
             return ret;
         });
 
-    let ffmpegInput: FFMpegInput;
+    let ffmpegInput: FFmpegInput;
     if (useUdp) {
         const url = `tcp://127.0.0.1:${port}`;
 

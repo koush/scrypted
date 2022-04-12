@@ -1,5 +1,5 @@
 import { getInstalledFfmpeg } from '@scrypted/ffmpeg';
-import { BufferConverter, BufferConvertorOptions, DeviceManager, FFMpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
+import { BufferConverter, BufferConvertorOptions, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
 import child_process from 'child_process';
 import { once } from 'events';
@@ -67,7 +67,7 @@ export abstract class MediaManagerBase implements MediaManager {
             toMimeType: ScryptedMimeTypes.FFmpegInput,
             async convert(data, fromMimeType): Promise<Buffer> {
                 const url = data.toString();
-                const args: FFMpegInput = {
+                const args: FFmpegInput = {
                     url,
                     inputArguments: [
                         '-i', url,
@@ -102,7 +102,7 @@ export abstract class MediaManagerBase implements MediaManager {
                     );
                 }
 
-                const ret: FFMpegInput = Object.assign({
+                const ret: FFmpegInput = Object.assign({
                     inputArguments,
                 }, mediaUrl);
 
@@ -124,7 +124,7 @@ export abstract class MediaManagerBase implements MediaManager {
             convert: async (data, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<Buffer> => {
                 const console = this.getMixinConsole(options.sourceId, undefined);
 
-                const ffInput: FFMpegInput = JSON.parse(data.toString());
+                const ffInput: FFmpegInput = JSON.parse(data.toString());
 
                 const args = [
                     '-hide_banner',
@@ -269,7 +269,7 @@ export abstract class MediaManagerBase implements MediaManager {
         return new MediaObjectImpl();
     }
 
-    async createFFmpegMediaObject(ffMpegInput: FFMpegInput, options?: MediaObjectOptions): Promise<MediaObject> {
+    async createFFmpegMediaObject(ffMpegInput: FFmpegInput, options?: MediaObjectOptions): Promise<MediaObject> {
         return this.createMediaObjectRemote(Buffer.from(JSON.stringify(ffMpegInput)), ScryptedMimeTypes.FFmpegInput, options);
     }
 

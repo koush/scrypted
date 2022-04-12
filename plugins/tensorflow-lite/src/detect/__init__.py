@@ -19,7 +19,7 @@ from pipeline import run_pipeline
 
 from gi.repository import Gst
 
-from scrypted_sdk.types import FFMpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+from scrypted_sdk.types import FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
 def optional_chain(root, *keys):
     result = root
@@ -267,7 +267,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         print('detection starting', detection_id)
         b = await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, ScryptedMimeTypes.MediaStreamUrl.value)
         s = b.decode('utf8')
-        j: FFMpegInput = json.loads(s)
+        j: FFmpegInput = json.loads(s)
         container = j.get('container', None)
         videosrc = j['url']
         if videosrc.startswith('tcp://'):

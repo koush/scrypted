@@ -1,4 +1,4 @@
-import sdk, { FFMpegInput, Intercom, MediaObject, PictureOptions, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaObject, PictureOptions, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue } from "@scrypted/sdk";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "./common";
 import { StorageSettings } from "../../../common/src/settings";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "../../../common/src/media-helpers";
@@ -37,7 +37,7 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
 
     async startIntercom(media: MediaObject): Promise<void> {
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
-        const ffmpegInput: FFMpegInput = JSON.parse(buffer.toString());
+        const ffmpegInput: FFmpegInput = JSON.parse(buffer.toString());
 
         const args = ffmpegInput.inputArguments.slice();
         args.push(...this.storageSettings.values.ffmpegOutput.split(' '));
@@ -111,7 +111,7 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
         if (!ffmpegInput)
             throw new Error('video streams not set up or no longer exists.');
 
-        const ret: FFMpegInput = {
+        const ret: FFmpegInput = {
             url: options.url,
             inputArguments: ffmpegInput.split(' '),
             mediaStreamOptions: options,

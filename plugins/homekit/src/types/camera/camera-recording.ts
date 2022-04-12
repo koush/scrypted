@@ -1,7 +1,7 @@
 
-import { FFMpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
+import { FFmpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
-import sdk, { AudioSensor, FFMpegInput, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { AudioSensor, FFmpegInput, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import net from 'net';
@@ -36,7 +36,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
         container: 'mp4',
     });
-    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFMpegInput;
+    const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
     if (!ffmpegInput.mediaStreamOptions?.prebuffer) {
         log.a(`${device.name} is not prebuffered. Please install and enable the Rebroadcast plugin.`);
     }
@@ -47,7 +47,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
     const incompatibleStream = noAudio || transcodeRecording || isDefinitelyNotAAC;
 
-    let session: FFMpegFragmentedMP4Session & { socket?: Duplex };
+    let session: FFmpegFragmentedMP4Session & { socket?: Duplex };
 
     if (ffmpegInput.container === 'mp4' && ffmpegInput.url.startsWith('tcp://') && !incompatibleStream) {
         console.log('prebuffer is tcp/mp4/h264/aac compatible. using direct tcp.');
