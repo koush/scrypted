@@ -127,6 +127,37 @@ export function parseMLine(mline: string) {
     }
 }
 
+const afmtp = 'a=fmtp';
+export function parseFmtp(msection: string[]) {
+    return msection.filter(line => line.startsWith(afmtp))
+        .map(fmtpLine => {
+            const firstSpace = fmtpLine.indexOf(' ');
+            if (firstSpace === -1)
+                return;
+            const fmtp = fmtpLine.substring(0, firstSpace);
+            const paramLine = fmtpLine.substring(firstSpace + 1);
+            const payloadType = parseInt(fmtp.split(':')[1]);
+
+            if (!fmtp || !paramLine || payloadType === NaN) {
+                return;
+            }
+
+            const parameters: {
+                [key: string]: string;
+            } = {};
+
+            paramLine.split(';').map(param => param.trim()).forEach(param => {
+                const [key, ...value] = param.split('=');
+                parameters[key] = value.join('=');
+            });
+            return {
+                payloadType,
+                parameters,
+            }
+        })
+        .filter(fmtp => !!fmtp);
+}
+
 const acontrol = 'a=control:';
 const artpmap = 'a=rtpmap:';
 export function parseMSection(msection: string[]) {
@@ -149,6 +180,7 @@ export function parseMSection(msection: string[]) {
 
     return {
         ...parseMLine(msection[0]),
+        fmtp: parseFmtp(msection),
         lines: msection,
         contents: msection.join('\r\n'),
         control,

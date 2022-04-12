@@ -40,9 +40,9 @@ export const H264_NAL_TYPE_STAP_A = 24;
 // fragmented NAL Unit (need to match against first)
 export const H264_NAL_TYPE_FU_A = 28;
 
-export function hasH264NaluType(streamChunk: StreamChunk, naluType: number) {
+export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
-        return false;
+        return;
 
     const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
     const checkNaluType = nalu[0] & 0x1f;
@@ -53,7 +53,7 @@ export function hasH264NaluType(streamChunk: StreamChunk, naluType: number) {
             pos += 2;
             const stapaType = nalu[pos] & 0x1f;
             if (stapaType === naluType)
-                return true;
+                return nalu.subarray(pos, pos + naluLength);
             pos += naluLength;
         }
     }
@@ -62,12 +62,12 @@ export function hasH264NaluType(streamChunk: StreamChunk, naluType: number) {
         const isFuStart = !!(nalu[1] & 0x80);
 
         if (fuaType === naluType && isFuStart)
-            return true;
+            return nalu.subarray(1);
     }
     else if (checkNaluType === naluType) {
-        return true;
+        return nalu;
     }
-    return false;
+    return;
 }
 
 export function createRtspParser(options?: StreamParserOptions): RtspStreamParser {
@@ -92,7 +92,7 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
 
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
-                if (hasH264NaluType(streamChunk, H264_NAL_TYPE_SPS))
+                if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS))
                     foundIndex = prebufferIndex;
             }
 
@@ -567,8 +567,8 @@ export class RtspServer {
 
     play(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
-        const rtpInfos = Object.values(this.setupTracks).map(track => `url=${url}/trackID=${track.control};seq=0;rtptime=0`);
-        const rtpInfo = rtpInfos.join(',');
+        const rtpInfos = Object.values(this.setupTracks).map(track => `url=${url}/${track.control}`);
+        const rtpInfo = rtpInfos.join(',') + ';seq=0;rtptime=0';
         headers['RTP-Info'] = rtpInfo;
         headers['Range'] = 'npt=now-';
         headers['Session'] = this.session;

@@ -19,7 +19,10 @@ export interface ParserSession<T extends string> {
     negotiateMediaStream(requestMediaStream: RequestMediaStreamOptions): ResponseMediaStreamOptions;
     inputAudioCodec?: string;
     inputVideoCodec?: string;
-    inputVideoResolution?: string[];
+    inputVideoResolution?: {
+        width: number,
+        height: number,
+    },
     kill(): void;
     killed: Promise<void>;
     isActive: boolean;
@@ -304,7 +307,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFMpegIn
         sdp,
         inputAudioCodec,
         inputVideoCodec,
-        inputVideoResolution,
+        inputVideoResolution: {
+            width: parseInt(inputVideoResolution?.[1]),
+            height: parseInt(inputVideoResolution?.[2]),
+        },
         get isActive() { return isActive },
         kill,
         killed,
