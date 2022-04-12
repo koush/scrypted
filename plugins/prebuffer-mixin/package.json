@@ -31,8 +31,7 @@
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk",
-      "h264-sps-parser": "^0.2.0"
+      "@scrypted/sdk": "file:../../sdk"
    },
    "devDependencies": {
       "@types/node": "^14.17.11"

@@ -5,10 +5,9 @@ import { H264_NAL_TYPE_SPS, findH264NaluType, RTSP_FRAME_MAGIC } from "@scrypted
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
-import { parse as spsParse } from "h264-sps-parser";
+import { parse as spsParse ,getSpsResolution} from "./sps-parser";
 import net from 'net';
 import { EventEmitter, Readable } from "stream";
-import { getSpsResolution } from "./sps-util";
 
 export function connectRFC4571Parser(url: string) {
     const u = new URL(url);
