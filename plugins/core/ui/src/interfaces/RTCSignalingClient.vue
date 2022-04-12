@@ -27,20 +27,20 @@ export default {
     },
     async streamCamera() {
       this.cleanupPeerConnection();
-      const pc = (this.pc = new RTCPeerConnection());
-
-      pc.ontrack = (ev) => {
-        if (ev.track.kind === "audio") {
-          console.log("received audio track", ev.track);
-          const mediaStream = new MediaStream([ev.track]);
-          const remoteAudio = document.createElement("audio");
-          remoteAudio.srcObject = mediaStream;
-          remoteAudio.play();
-        }
-      };
 
       await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      const localSession = new BrowserSignalingSession(this.pc);
+      const localSession = new BrowserSignalingSession((pc) => {
+        this.pc = pc;
+        pc.ontrack = (ev) => {
+          if (ev.track.kind === "audio") {
+            console.log("received audio track", ev.track);
+            const mediaStream = new MediaStream([ev.track]);
+            const remoteAudio = document.createElement("audio");
+            remoteAudio.srcObject = mediaStream;
+            remoteAudio.play();
+          }
+        };
+      });
       const remoteSession = await this.rpc().createRTCSignalingSession();
       connectRTCSignalingClients(
         console,
