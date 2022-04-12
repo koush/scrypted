@@ -1,12 +1,14 @@
 import { cloneDeep } from "@scrypted/common/src/clone-deep";
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { readLength } from "@scrypted/common/src/read-stream";
-import { RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { H264_NAL_TYPE_SPS, findH264NaluType, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
+import { parse as spsParse } from "h264-sps-parser";
 import net from 'net';
 import { EventEmitter, Readable } from "stream";
+import { getSpsResolution } from "./sps-util";
 
 export function connectRFC4571Parser(url: string) {
     const u = new URL(url);
@@ -54,6 +56,29 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
 
     const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.timeout);
 
+    let inputVideoResolution: {
+        width: number;
+        height: number;
+    };
+
+    const sprop = parsedSdp.msections.find(msection => msection.codec === 'h264')
+        .fmtp?.[0]?.parameters?.['sprop-parameter-sets'];
+    const sdpSps = sprop?.split(',')?.[0];
+    // const sdpPps = sprop?.split(',')?.[1];
+
+    if (sdpSps) {
+        try {
+            const sps = Buffer.from(sdpSps, 'base64');
+            const parsedSps = spsParse(sps);
+            inputVideoResolution = getSpsResolution(parsedSps);
+            console.log('parsed sdp sps', parsedSps);
+        }
+        catch (e) {
+            console.warn('sdp sps parsing failed');
+        }
+    }
+    let startStream: Buffer;
+
     (async () => {
         while (true) {
             let header: Buffer;
@@ -92,9 +117,29 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
             }
 
             const chunk: StreamChunk = {
+                startStream,
                 chunks: [header, data],
                 type,
             };
+
+            if (!inputVideoResolution) {
+                const sps = findH264NaluType(chunk, H264_NAL_TYPE_SPS);
+                if (sps) {
+                    try {
+                        const parsedSps = spsParse(sps);
+                        inputVideoResolution = getSpsResolution(parsedSps);
+                        console.log('parsed bitstream sps', parsedSps);
+                    }
+                    catch (e) {
+                        console.warn('sps parsing failed');
+                        inputVideoResolution = {
+                            width: NaN,
+                            height: NaN,
+                        }
+                    }
+                }
+            }
+
             events.emit('rtsp', chunk);
             resetActivityTimer();
         }
@@ -106,7 +151,9 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
         sdp: Promise.resolve([Buffer.from(sdp)]),
         inputAudioCodec,
         inputVideoCodec,
-        inputVideoResolution: undefined,
+        get inputVideoResolution() {
+            return inputVideoResolution;
+        },
         get isActive() { return isActive },
         kill,
         killed,

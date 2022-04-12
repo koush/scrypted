@@ -5,7 +5,7 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityT
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, H264_NAL_TYPE_IDR, hasH264NaluType, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, H264_NAL_TYPE_IDR, findH264NaluType, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -68,8 +68,7 @@ class PrebufferSession {
   parsers: { [container: string]: StreamParser };
   sdp: Promise<string>;
 
-  detectedIdrInterval = 0;
-  prevIdr = 0;
+  detectedIdrInterval: number;
   audioDisabled = false;
 
   mixinDevice: VideoCamera & VideoCameraConfiguration;
@@ -317,6 +316,9 @@ class PrebufferSession {
     }
 
     if (session) {
+      const resolution = session.inputVideoResolution?.width && session.inputVideoResolution?.height
+        ? `${session.inputVideoResolution?.width}x${session.inputVideoResolution?.height}`
+        : 'unknown';
 
       settings.push(
         {
@@ -324,7 +326,7 @@ class PrebufferSession {
           group,
           title: 'Detected Resolution and Bitrate',
           readonly: true,
-          value: `${session?.inputVideoResolution?.[0] || "unknown"} @ ${bitrate || "unknown"} Kb/s`,
+          value: `${resolution} @ ${bitrate || "unknown"} Kb/s`,
           description: 'Configuring your camera to 1920x1080, 2000Kb/S, Variable Bit Rate, is recommended.',
         },
         {
@@ -817,19 +819,25 @@ class PrebufferSession {
     for (const container of PrebufferParserValues) {
       let shifts = 0;
 
+      let prevIdr: number;
+      this.detectedIdrInterval = undefined;
       session.on(container, (chunk: StreamChunk) => {
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
         const now = Date.now();
 
         const updateIdr = () => {
-          if (this.prevIdr) {
+          if (prevIdr) {
             const sendEvent = typeof this.detectedIdrInterval !== 'number';
-            this.detectedIdrInterval = now - this.prevIdr;
+            this.detectedIdrInterval = now - prevIdr;
             // only on the first idr update should we send a settings refresh.
             if (sendEvent)
               deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
+            // wipe the previous idr to allow throttled calculation to work
+            prevIdr = undefined;
           }
-          this.prevIdr = now;
+          else {
+            prevIdr = now;
+          }
         }
 
         // this is only valid for mp4, so its no op for everything else
@@ -837,8 +845,16 @@ class PrebufferSession {
         if (chunk.type === 'mdat') {
           updateIdr();
         }
-        if (chunk.type === 'h264' && hasH264NaluType(chunk, H264_NAL_TYPE_IDR)) {
-          updateIdr();
+        else if (chunk.type === 'h264') {
+          if (
+            (prevIdr === undefined
+              || this.detectedIdrInterval === undefined
+              || Date.now() > prevIdr + 4000)
+            && findH264NaluType(chunk, H264_NAL_TYPE_IDR)) {
+            // only update the rtsp computed idr once a minute.
+            // per packet bitscan is not great.
+            updateIdr();
+          }
         }
 
         prebufferContainer.push({
@@ -1071,11 +1087,8 @@ class PrebufferSession {
       }
     }
 
-    if (session.inputVideoResolution?.[2] && session.inputVideoResolution?.[3]) {
-      Object.assign(mediaStreamOptions.video, {
-        width: parseInt(session.inputVideoResolution[2]),
-        height: parseInt(session.inputVideoResolution[3]),
-      });
+    if (session.inputVideoResolution?.width && session.inputVideoResolution?.height) {
+      Object.assign(mediaStreamOptions.video, session.inputVideoResolution);
     }
 
     const now = Date.now();
@@ -1160,6 +1173,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
       if (!result.isDefault || !id) {
         id = result.stream.id;
+        this.console.log('Selected stream', result.stream.name);
       }
       else {
         this.console.log('Default stream overriden by legacy stream id setting for ', id);
