@@ -96,7 +96,7 @@ export abstract class MediaManagerBase implements MediaManager {
                     '-i', mediaUrl.url,
                 ];
 
-                if (mediaUrl.url.startsWith('rtsp://')) {
+                if (mediaUrl.url.startsWith('rtsp')) {
                     inputArguments.unshift(
                         "-rtsp_transport", "tcp",
                     );
