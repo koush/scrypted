@@ -12,8 +12,7 @@ import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 const { mediaManager } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, requestOptions: RequestMediaStreamOptions, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
-
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, videoInput: FFmpegInput, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const request = session.startRequest;
 
     const videomtu = session.startRequest.video.mtu;
@@ -27,8 +26,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // option, but not sure it matters since AAC-ELD is no longer in use.
     let audiomtu = 400;
 
-    const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(await device.getVideoStream(requestOptions), ScryptedMimeTypes.FFmpegInput);
-    session.mediaStreamOptions = videoInput.mediaStreamOptions;
     // test code path that allows using two ffmpeg processes. did not see
     // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame
     // to immediately finish. ffmpeg will only start sending on a key frame.
@@ -214,21 +211,11 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
             if (requestedOpus) {
                 // opus requires timestamp mangling.
-                const aconfig = {
-                    keys: {
-                        localMasterKey: session.prepareRequest.audio.srtp_key,
-                        localMasterSalt: session.prepareRequest.audio.srtp_salt,
-                        remoteMasterKey: session.prepareRequest.audio.srtp_key,
-                        remoteMasterSalt: session.prepareRequest.audio.srtp_salt,
-                    },
-                    profile: ProtectionProfileAes128CmHmacSha1_80,
-                };
-
                 const audioForwarder = await createBindZero();
                 audioForwarder.server.once('message', () => console.log('first opus packet received.'));
                 session.audioReturn.on('close', () => audioForwarder.server.close());
 
-                const audioSender = createCameraStreamSender(aconfig, session.audioReturn,
+                const audioSender = createCameraStreamSender(session.aconfig, session.audioReturn,
                     session.audiossrc, session.startRequest.audio.pt,
                     session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
                     undefined, session.startRequest.audio.rtcp_interval,

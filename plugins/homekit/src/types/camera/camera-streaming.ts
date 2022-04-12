@@ -1,5 +1,5 @@
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
-import sdk, { Camera, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
@@ -70,8 +70,25 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             const { socket: videoReturn, port: videoPort } = await getPort(socketType);
             const { socket: audioReturn, port: audioPort } = await getPort(socketType);
 
-
             const session: CameraStreamingSession = {
+                aconfig: {
+                    keys: {
+                        localMasterKey: request.audio.srtp_key,
+                        localMasterSalt: request.audio.srtp_salt,
+                        remoteMasterKey: request.audio.srtp_key,
+                        remoteMasterSalt: request.audio.srtp_salt,
+                    },
+                    profile: ProtectionProfileAes128CmHmacSha1_80,
+                },
+                vconfig: {
+                    keys: {
+                        localMasterKey: request.video.srtp_key,
+                        localMasterSalt: request.video.srtp_salt,
+                        remoteMasterKey: request.video.srtp_key,
+                        remoteMasterSalt: request.video.srtp_salt,
+                    },
+                    profile: ProtectionProfileAes128CmHmacSha1_80,
+                },
                 killed: false,
                 prepareRequest: request,
                 startRequest: null,
@@ -181,17 +198,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
 
             session.startRequest = request as StartStreamRequest;
-
-            const vconfig = {
-                keys: {
-                    localMasterKey: session.prepareRequest.video.srtp_key,
-                    localMasterSalt: session.prepareRequest.video.srtp_salt,
-                    remoteMasterKey: session.prepareRequest.video.srtp_key,
-                    remoteMasterSalt: session.prepareRequest.video.srtp_salt,
-                },
-                profile: ProtectionProfileAes128CmHmacSha1_80,
-            };
-            const vrtcp = new SrtcpSession(vconfig);
+            const vrtcp = new SrtcpSession(session.vconfig);
 
             // watch for data to verify other side is alive.
             const resetIdleTimeout = () => {
@@ -210,27 +217,29 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
-            if (dynamicBitrate) {
-                const initialBitrate = request.video.max_bit_rate * 1000;
-                let dynamicBitrateSession: DynamicBitrateSession;
+            const mediaOptions: RequestMediaStreamOptions = {
+                destination,
+                video: {
+                    codec: 'h264',
+                },
+                audio: {
+                    // opus is the preferred/default codec, and can be repacketized to fit any request if in use.
+                    // otherwise audio streaming for aac-eld needs to be transcoded, since nothing outputs aac-eld natively.
+                    // pcm/g711 the second best option for aac-eld, since it's raw audio.
+                    codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
+                },
+            };
 
-                function ensureDynamicBitrateSession() {
-                    if (dynamicBitrateSession)
-                        return;
-                    if (!session.mediaStreamOptions)
-                        return;
-                    const selectedStream = session.mediaStreamOptions
-                    const minBitrate = selectedStream?.video?.minBitrate;
-                    const maxBitrate = selectedStream?.video?.maxBitrate;
-                    if (!maxBitrate || !minBitrate)
-                        return;
-                    dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate, console);
-                    return dynamicBitrateSession;
-                }
+            const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(await device.getVideoStream(mediaOptions), ScryptedMimeTypes.FFmpegInput);
+            session.mediaStreamOptions = videoInput.mediaStreamOptions;
+            const minBitrate = session.mediaStreamOptions?.video?.minBitrate;
+            const maxBitrate = session.mediaStreamOptions?.video?.maxBitrate;
+
+            if (dynamicBitrate && maxBitrate && minBitrate) {
+                const initialBitrate = request.video.max_bit_rate * 1000;
+                let dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate, console);
 
                 session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
-                    if (!ensureDynamicBitrateSession())
-                        return;
                     dynamicBitrateSession.onBitrateReconfigured(bitrate);
                     const reconfigured: MediaStreamOptions = Object.assign({
                         id: session.mediaStreamOptions?.id,
@@ -247,22 +256,18 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                 session.videoReturn.on('message', data => {
                     resetIdleTimeout();
-                    if (!!ensureDynamicBitrateSession())
-                        return;
                     const d = vrtcp.decrypt(data);
                     const rtcp = RtcpPacketConverter.deSerialize(d);
                     const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
                     if (!rr)
                         return;
+                    logPacketLoss(rr);
                     if (dynamicBitrateSession.shouldReconfigureBitrate(rr))
                         session.tryReconfigureBitrate('rtcp', dynamicBitrateSession.currentBitrate)
-                    logPacketLoss(rr);
                 });
 
                 // reset the video bitrate to max after a dynanic bitrate session ends.
                 session.videoReturn.on('close', async () => {
-                    if (!ensureDynamicBitrateSession())
-                        return;
                     session.tryReconfigureBitrate('stop', session.mediaStreamOptions?.video?.maxBitrate);
                 });
             }
@@ -280,24 +285,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             resetIdleTimeout();
 
-            const mediaOptions: RequestMediaStreamOptions = {
-                destination,
-                video: {
-                    codec: 'h264',
-                },
-                audio: {
-                    // opus is the preferred/default codec, and can be repacketized to fit any request if in use.
-                    // otherwise audio streaming for aac-eld needs to be transcoded, since nothing outputs aac-eld natively.
-                    // pcm/g711 the second best option for aac-eld, since it's raw audio.
-                    codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
-                },
-            };
-
             try {
                 await startCameraStreamFfmpeg(device,
                     console,
                     storage,
-                    mediaOptions,
+                    videoInput,
                     transcodeStreaming,
                     session,
                     () => killSession(request.sessionID));

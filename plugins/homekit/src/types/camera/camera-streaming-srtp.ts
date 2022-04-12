@@ -1,35 +1,16 @@
 import { readLength } from '@scrypted/common/src/read-stream';
 import { parseSdp } from '@scrypted/common/src/sdp-utils';
+import { FFmpegInput } from '@scrypted/sdk';
 import net from 'net';
 import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
-export async function startCameraStreamSrtp(media: any, console: Console, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
-    const vconfig = {
-        keys: {
-            localMasterKey: session.prepareRequest.video.srtp_key,
-            localMasterSalt: session.prepareRequest.video.srtp_salt,
-            remoteMasterKey: session.prepareRequest.video.srtp_key,
-            remoteMasterSalt: session.prepareRequest.video.srtp_salt,
-        },
-        profile: ProtectionProfileAes128CmHmacSha1_80,
-    };
-    const aconfig = {
-        keys: {
-            localMasterKey: session.prepareRequest.audio.srtp_key,
-            localMasterSalt: session.prepareRequest.audio.srtp_salt,
-            remoteMasterKey: session.prepareRequest.audio.srtp_key,
-            remoteMasterSalt: session.prepareRequest.audio.srtp_salt,
-        },
-        profile: ProtectionProfileAes128CmHmacSha1_80,
-    };
-
-    let { url, sdp, mediaStreamOptions } = media;
-    session.mediaStreamOptions = mediaStreamOptions;
+export async function startCameraStreamSrtp(media: FFmpegInput, console: Console, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+    const { url, mediaStreamOptions } = media;
+    let { sdp } = mediaStreamOptions;
     let socket: Readable;
     const isRtsp = url.startsWith('rtsp');
 
@@ -72,11 +53,11 @@ export async function startCameraStreamSrtp(media: any, console: Console, sessio
         try {
             let opusFramesPerPacket = session.startRequest.audio.packet_time / 20;
 
-            const videoSender = createCameraStreamSender(vconfig, session.videoReturn,
+            const videoSender = createCameraStreamSender(session.vconfig, session.videoReturn,
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
                 session.startRequest.video.mtu, session.startRequest.video.rtcp_interval);
-            const audioSender = createCameraStreamSender(aconfig, session.audioReturn,
+            const audioSender = createCameraStreamSender(session.aconfig, session.audioReturn,
                 session.audiossrc, session.startRequest.audio.pt,
                 session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
                 undefined,
