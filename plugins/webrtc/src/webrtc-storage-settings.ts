@@ -2,12 +2,12 @@ import { getH264DecoderArgs, getH264EncoderArgs } from "@scrypted/common/src/ffm
 import { StorageSettings } from "@scrypted/common/src/settings";
 import { MixinDeviceBase, ScryptedDeviceBase } from "@scrypted/sdk";
 
-export type WebRTCStorageSettingsKeys = "useUdp" | "addExtraData" | "transcode" | "decoderArguments" | "encoderArguments" | "bitrate";
+export type WebRTCStorageSettingsKeys = "useSdp" | "addExtraData" | "transcode" | "decoderArguments" | "encoderArguments" | "bitrate";
 
 export function createWebRTCStorageSettings(device: MixinDeviceBase<any> | ScryptedDeviceBase): StorageSettings<WebRTCStorageSettingsKeys> {
     return new StorageSettings(device, {
-        useUdp: {
-            title: 'Use SDP/UDP instead of RTSP/TCP',
+        useSdp: {
+            title: 'Use SDP/UDP instead of RTSP',
             description: 'Experimental',
             type: 'boolean',
             defaultValue: true,

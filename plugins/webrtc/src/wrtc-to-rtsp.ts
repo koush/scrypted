@@ -23,9 +23,9 @@ export async function createRTCPeerConnectionSource(options: {
     console: Console,
     mediaStreamOptions: ResponseMediaStreamOptions,
     channel: RTCSignalingChannel,
-    useUdp: boolean,
+    useSdp: boolean,
 }): Promise<RTCPeerConnectionPipe> {
-    const { mediaStreamOptions, channel, console, useUdp } = options;
+    const { mediaStreamOptions, channel, console, useSdp: useUdp } = options;
     const videoPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
     const audioPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
 
@@ -106,6 +106,8 @@ export async function createRTCPeerConnectionSource(options: {
             }
         });
 
+        let audioTrack: string;
+        let videoTrack: string;
         let audioTransceiver: RTCRtpTransceiver;
         const doSetup = async (setup: RTCAVSignalingSetup) => {
             let gotAudio = false;
@@ -113,7 +115,6 @@ export async function createRTCPeerConnectionSource(options: {
 
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.onTrack.subscribe((track) => {
-                const audioTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'audio').control;
                 if (useUdp) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotAudio) {
@@ -151,7 +152,6 @@ export async function createRTCPeerConnectionSource(options: {
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
             videoTransceiver.onTrack.subscribe((track) => {
-                const videoTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'video').control;
                 if (useUdp) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotVideo) {
@@ -219,6 +219,8 @@ export async function createRTCPeerConnectionSource(options: {
                 return;
 
             rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
+            audioTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'audio').control;
+            videoTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'video').control;
             console.log('sdp sent', rtspServer.sdp);
 
             if (useUdp) {
@@ -464,14 +466,14 @@ export class JitterBuffer extends Pipeline {
     };
 }
 
-export function getRTCMediaStreamOptions(id: string, name: string, useUdp: boolean): ResponseMediaStreamOptions {
+export function getRTCMediaStreamOptions(id: string, name: string, useSdp: boolean): ResponseMediaStreamOptions {
     return {
         // set by consumer
         id,
         name,
         // not compatible with scrypted parser currently due to jitter issues
-        tool: useUdp ? undefined : 'scrypted',
-        container: useUdp ? 'sdp' : 'rtsp',
+        tool: useSdp ? undefined : 'scrypted',
+        container: useSdp ? 'sdp' : 'rtsp',
         video: {
             codec: 'h264',
         },

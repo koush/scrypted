@@ -1,6 +1,7 @@
-import sdk, { Intercom, MediaObject, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, VideoCamera } from "@scrypted/sdk";
+import { Intercom, MediaObject, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, VideoCamera } from "@scrypted/sdk";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
-const { mediaManager } = sdk;
+
+const useSdp = true;
 
 export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTCSignalingClient, RTCSignalingChannel, Intercom {
     pendingClient: (session: RTCSignalingSession) => void;
@@ -25,13 +26,13 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
     }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', true);
+        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', useSdp);
 
         const { mediaObject, intercom } = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions,
             channel: this,
-            useUdp: true,
+            useSdp,
         });
 
         this.intercom?.then(intercom => intercom.stopIntercom());
@@ -41,7 +42,7 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
-        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', true);
+        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', useSdp);
         return [
             mediaStreamOptions,
         ];

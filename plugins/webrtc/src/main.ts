@@ -87,7 +87,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
     }
 
     createVideoStreamOptions() {
-        const ret = getRTCMediaStreamOptions('webrtc', 'WebRTC', this.storageSettings.values.useUdp);
+        const ret = getRTCMediaStreamOptions('webrtc', 'WebRTC', this.storageSettings.values.useSdp);
         ret.source = 'cloud';
         return ret;
     }
@@ -101,7 +101,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
-            useUdp: this.storageSettings.values.useUdp,
+            useSdp: this.storageSettings.values.useSdp,
         });
 
         return mediaObject;
