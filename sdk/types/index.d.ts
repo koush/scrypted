@@ -1061,6 +1061,9 @@ export interface MediaStreamUrl {
 }
 export interface FFmpegInput extends MediaStreamUrl {
     inputArguments?: string[];
+    h264EncoderArguments?: string[];
+    videoDecoderArguments?: string[];
+    h264FilterArguments?: string[];
 }
 /**
  * DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted.

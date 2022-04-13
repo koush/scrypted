@@ -15,7 +15,6 @@ import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { DynamicBitrateSession } from './camera-dynamic-bitrate';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
-import { startCameraStreamSrtp } from './camera-streaming-srtp';
 import { getStreamingConfiguration } from './camera-utils';
 
 const { mediaManager } = sdk;
@@ -184,7 +183,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             const {
                 destination,
                 dynamicBitrate,
-                transcodeStreaming,
                 isLowBandwidth,
                 isWatch,
             } = await getStreamingConfiguration(device, storage, request)
@@ -193,7 +191,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 dynamicBitrate,
                 isLowBandwidth,
                 isWatch,
-                transcodeStreaming,
                 destination,
             });
 
@@ -290,7 +287,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     console,
                     storage,
                     videoInput,
-                    transcodeStreaming,
                     session,
                     () => killSession(request.sessionID));
             }

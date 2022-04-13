@@ -25,6 +25,7 @@
       "singleInstance": true,
       "type": "API",
       "interfaces": [
+         "Settings",
          "MixinProvider",
          "BufferConverter"
       ]

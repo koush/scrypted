@@ -258,9 +258,12 @@ class EventListenerRegister(TypedDict):
 
 class FFmpegInput(TypedDict):
     container: str
+    h264EncoderArguments: list[str]
+    h264FilterArguments: list[str]
     inputArguments: list[str]
     mediaStreamOptions: ResponseMediaStreamOptions
     url: str
+    videoDecoderArguments: list[str]
     pass
 
 class FanState(TypedDict):

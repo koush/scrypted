@@ -9,20 +9,21 @@ export const HOMEKIT_MIXIN = 'mixin:@scrypted/homekit';
 export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     storageSettings = new StorageSettings(this, {
         resetAccessory: {
-            group: 'HomeKit Pairing',
-            title: 'Reset Accessory',
-            description: 'Bridged devices will automatically relink as a new device. Accessory devices must be manually removed from the Home app and re-paired.',
-            type: 'button',
-            // generate a new reset accessory random value.
-            onPut: () => {
-                // also reset the username/mac for standalone accessories
-                this.storage.removeItem('mac');
-                this.alertReload();
+            title: 'Reset Pairing',
+            description: 'Resetting the pairing will resync it to HomeKit as a new device. Bridged devices will automatically relink as a new device. Accessory devices must be manually removed from the Home app and re-paired. Enter RESET to reset the pairing.',
+            placeholder: 'RESET',
+            mapPut: (oldValue, newValue) => {
+                if (newValue === 'RESET') {
+                    this.storage.removeItem('mac');
+                    this.alertReload();
+                    // generate a new reset accessory random value.
+                    return crypto.randomBytes(8).toString('hex');
+                }
+                throw new Error('HomeKit Accessory Reset cancelled.');
             },
-            mapPut: () => crypto.randomBytes(8).toString('hex'),
+            mapGet: () => '',
         },
         standalone: {
-            group: 'HomeKit Pairing',
             title: 'Standalone Accessory',
             description: 'Experimental: Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge, and the accessory will then need to be re-paired to HomeKit.'
                 + (this.interfaces.includes(ScryptedInterface.VideoCamera)

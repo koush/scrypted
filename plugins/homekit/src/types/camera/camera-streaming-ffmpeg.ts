@@ -1,18 +1,18 @@
+import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import sdk, { FFmpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFmpegInput, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
 import { AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
-import { evalRequest } from '../camera/camera-transcode';
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
+import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
 
-const { mediaManager } = sdk;
+const { mediaManager, log } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, videoInput: FFmpegInput, transcodeStreaming: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, ffmpegInput: FFmpegInput, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const request = session.startRequest;
 
     const videomtu = session.startRequest.video.mtu;
@@ -30,17 +30,16 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame
     // to immediately finish. ffmpeg will only start sending on a key frame.
     // const audioInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
-    const audioInput = videoInput;
+    const audioInput = ffmpegInput;
 
     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
-    const mso = videoInput.mediaStreamOptions;
+    const mso = ffmpegInput.mediaStreamOptions;
     const noAudio = mso?.audio === null;
     const hideBanner = [
         '-hide_banner',
     ];
-    const decoderArgs: string[] = [];
     const videoArgs: string[] = [];
     const audioArgs: string[] = [];
 
@@ -53,36 +52,42 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         nullAudioInput.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
     }
 
-    // decoder args
-    if (transcodeStreaming) {
-        // decoder arguments
-        const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
-        if (videoDecoderArguments) {
-            decoderArgs.push(...evalRequest(videoDecoderArguments, request));
-        }
-    }
+    const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
+    if (transcodingDebugMode)
+        transcodingDebugModeWarning();
+
+    const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
+    const needsFFmpeg = transcodingDebugMode || !!ffmpegInput.h264EncoderArguments?.length || !!ffmpegInput.h264FilterArguments?.length;
 
     videoArgs.push(
         "-an", '-sn', '-dn',
     );
 
     // encoder args
-    if (transcodeStreaming) {
-        const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
-        const videoCodec = h264EncoderArguments
-            ? evalRequest(h264EncoderArguments, request) :
+    if (transcodingDebugMode) {
+        const videoCodec =
             [
-                "-vcodec", "libx264",
-                // '-preset', 'ultrafast', '-tune', 'zerolatency',
-                '-pix_fmt', 'yuvj420p',
-                // '-color_range', 'mpeg',
-                "-bf", "0",
-                // "-profile:v", profileToFfmpeg(request.video.profile),
-                // '-level:v', levelToFfmpeg(request.video.level),
                 "-b:v", request.video.max_bit_rate.toString() + "k",
                 "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
                 "-maxrate", request.video.max_bit_rate.toString() + "k",
                 "-filter:v", "fps=" + request.video.fps.toString(),
+
+                ...getDebugModeH264EncoderArgs(),
+            ];
+
+        videoArgs.push(
+            ...videoCodec,
+        )
+    }
+    else if (ffmpegInput.h264EncoderArguments?.length) {
+        const videoCodec =
+            [
+                "-b:v", request.video.max_bit_rate.toString() + "k",
+                "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
+                "-maxrate", request.video.max_bit_rate.toString() + "k",
+                "-filter:v", "fps=" + request.video.fps.toString(),
+
+                ...ffmpegInput.h264EncoderArguments,
             ];
 
         videoArgs.push(
@@ -90,19 +95,15 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         )
     }
     else {
+        checkCompatibleCodec(console, device, videoCodec)
+
         videoArgs.push(
             "-vcodec", "copy",
         );
+    }
 
-        // 3/6/2022
-        // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
-        // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
-        // unless this flag is used.
-        // 3/7/2022
-        // This flag was enabled by default, but I believe this is causing issues with some users.
-        // Make it a setting.
-        if (storage.getItem('needsExtraData') === 'true')
-            videoArgs.push("-bsf:v", "dump_extra");
+    if (ffmpegInput.h264FilterArguments?.length) {
+        videoArgs.push(...ffmpegInput.h264FilterArguments);
     }
 
     let videoOutput = `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`;
@@ -137,7 +138,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     videoArgs.push(
         "-payload_type", (request as StartStreamRequest).video.pt.toString(),
         "-ssrc", session.videossrc.toString(),
-        // '-fflags', '+flush_packets', '-flush_packets', '1',
         "-f", "rtp",
         "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
         "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
@@ -166,37 +166,40 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         let hasAudio = true;
 
-        if (!transcodeStreaming
+        if (!needsFFmpeg
             && perfectOpus
             && mso?.tool === 'scrypted') {
 
-            await startCameraStreamSrtp(videoInput, console, session, killSession);
+            await startCameraStreamSrtp(ffmpegInput, console, session, killSession);
             return;
-
-            audioArgs.push(
-                "-acodec", "copy",
-            );
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
-            // by default opus encodes with a packet time of 20. however, homekit may request another value,
-            // which we will respect by simply outputing frames of that duration, rather than packing
-            // 20 ms frames to accomodate.
-            opusFramesPerPacket = 1;
+            if (!transcodingDebugMode && perfectOpus) {
+                audioArgs.push(
+                    "-acodec", "copy",
+                );
+            }
+            else {
+                // by default opus encodes with a packet time of 20. however, homekit may request another value,
+                // which we will respect by simply outputing frames of that duration, rather than packing
+                // 20 ms frames to accomodate.
+                opusFramesPerPacket = 1;
 
-            audioArgs.push(
-                '-acodec', ...(requestedOpus ?
-                    [
-                        'libopus',
-                        '-application', 'lowdelay',
-                        '-frame_duration', (request as StartStreamRequest).audio.packet_time.toString(),
-                    ] :
-                    ['libfdk_aac', '-profile:a', 'aac_eld']),
-                '-flags', '+global_header',
-                '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
-                '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
-                "-bufsize", `${(request as StartStreamRequest).audio.max_bit_rate * 4}k`,
-                '-ac', `${(request as StartStreamRequest).audio.channel}`,
-            )
+                audioArgs.push(
+                    '-acodec', ...(requestedOpus ?
+                        [
+                            'libopus',
+                            '-application', 'lowdelay',
+                            '-frame_duration', (request as StartStreamRequest).audio.packet_time.toString(),
+                        ] :
+                        ['libfdk_aac', '-profile:a', 'aac_eld']),
+                    '-flags', '+global_header',
+                    '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
+                    '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
+                    "-bufsize", `${(request as StartStreamRequest).audio.max_bit_rate * 4}k`,
+                    '-ac', `${(request as StartStreamRequest).audio.channel}`,
+                )
+            }
         }
         else {
             hasAudio = false;
@@ -240,8 +243,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                         ? "AES_CM_128_HMAC_SHA1_80"
                         : "AES_CM_256_HMAC_SHA1_80",
                     "-srtp_out_params", audioKey.toString('base64'),
-                    // not sure this has any effect? testing.
-                    // '-fflags', '+flush_packets', '-flush_packets', '1',
                     `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
                 )
             }
@@ -255,14 +256,16 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         return;
     }
 
-    if (audioInput !== videoInput) {
+    const videoDecoderArguments = ffmpegInput.videoDecoderArguments || [];
+
+    if (audioInput !== ffmpegInput) {
         safePrintFFmpegArguments(console, videoArgs);
         safePrintFFmpegArguments(console, audioArgs);
 
         const vp = child_process.spawn(ffmpegPath, [
             ...hideBanner,
-            ...decoderArgs,
-            ...videoInput.inputArguments,
+            ...videoDecoderArguments,
+            ...ffmpegInput.inputArguments,
             ...videoArgs,
         ]);
         session.videoProcess = vp;
@@ -271,7 +274,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         const ap = child_process.spawn(ffmpegPath, [
             ...hideBanner,
-            ...decoderArgs,
             ...audioInput.inputArguments,
             ...nullAudioInput,
             ...audioArgs,
@@ -283,8 +285,8 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     else {
         const args = [
             ...hideBanner,
-            ...decoderArgs,
-            ...videoInput.inputArguments,
+            ...videoDecoderArguments,
+            ...ffmpegInput.inputArguments,
             ...nullAudioInput,
             ...videoArgs,
             ...audioArgs,

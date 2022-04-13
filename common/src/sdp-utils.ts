@@ -177,6 +177,9 @@ export function parseMSection(msection: string[]) {
     else if (rtpmap?.includes('h264')) {
         codec = 'h264';
     }
+    else if (rtpmap?.includes('h265')) {
+        codec = 'h265';
+    }
 
     let direction: string;
     for (const checkDirection of ['sendonly' , 'sendrecv', 'recvonly' , 'inactive']) {

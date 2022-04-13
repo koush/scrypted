@@ -1,3 +1,4 @@
+import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { StorageSetting, StorageSettings } from "@scrypted/common/src/settings";
 import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
 
@@ -54,7 +55,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
     const streamTypes = getStreamTypes({
         defaultStream: {
             title: 'Local Stream',
-            description: 'The media stream to use when streaming on your local network. This is the default stream. This stream should be prebuffered. Recommended resolution: 1920x1080 to 4K.',
+            description: 'The media stream to use when streaming on your local network. This stream should be prebuffered. Recommended resolution: 1920x1080 to 4K.',
             hide: true,
             prefersPrebuffer: true,
             preferredResolution: 3840 * 2160,
@@ -97,9 +98,37 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             hide: false,
         },
         ...streamTypes,
+        transcodeStreams: {
+            group: 'Transcoding',
+            title: 'Transcode Streams',
+            description: 'The media streams to transcode. Transcoding audio and video is not recommended and should only be used when necessary. The Rebroadcast Plugin manages the system-wide Transcode settings and as well as a Readme for optimal configuration.',
+            multiple: true,
+            choices: Object.values(streamTypes).map(st => st.title),
+        },
+        // 3/6/2022
+        // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
+        // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
+        // unless this flag is used.
+        // 3/7/2022
+        // This flag was enabled by default, but I believe this is causing issues with some users.
+        // Make it a setting.
+        missingCodecParameters: {
+            group: 'Transcoding',
+            title: 'Add H264 Extra Data',
+            description: 'Some cameras do not include H264 extra data in the stream and this causes live streaming to always fail (but recordings may be working). This is a inexpensive video filter and does not perform a transcode. Enable this setting only as necessary.',
+            type: 'boolean',
+        },
+        videoDecoderArguments: {
+            group: 'Transcoding',
+            title: 'Video Decoder Arguments',
+            description: 'FFmpeg arguments used to decode input video when transcoding a stream.',
+            placeholder: '-hwaccel auto',
+            choices: Object.keys(getH264DecoderArgs()),
+            combobox: true,
+            mapPut: (oldValue, newValue) => getH264DecoderArgs()[newValue]?.join(' ') || newValue,
+        }
     });
 
-    
     function getDefaultMediaStream(v: StreamStorageSetting, msos: ResponseMediaStreamOptions[]) {
         const enabledStreams = getPrebufferedStreams(storageSettings, msos);
         const prebufferPreferenceStreams = v.prefersPrebuffer && enabledStreams?.length > 0 ? enabledStreams : msos;
@@ -116,6 +145,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             stream = getDefaultMediaStream(v, msos);
         }
         return {
+            title: streamTypes[key].title,
             isDefault,
             stream,
         };

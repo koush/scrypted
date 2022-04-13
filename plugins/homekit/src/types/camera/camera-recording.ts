@@ -1,4 +1,5 @@
 
+import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { FFmpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import sdk, { AudioSensor, FFmpegInput, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
@@ -9,7 +10,7 @@ import { Duplex, Writable } from 'stream';
 import { HomeKitSession } from '../../common';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
-import { evalRequest } from './camera-transcode';
+import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -43,9 +44,14 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
 
     const noAudio = ffmpegInput.mediaStreamOptions && ffmpegInput.mediaStreamOptions.audio === null;
     const audioCodec = ffmpegInput.mediaStreamOptions?.audio?.codec;
+    const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
-    const transcodeRecording = storage.getItem('transcodeRecording') === 'true';
+    const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
+    const transcodeRecording = !!ffmpegInput.h264EncoderArguments?.length;
     const incompatibleStream = noAudio || transcodeRecording || isDefinitelyNotAAC;
+
+    if (transcodingDebugMode)
+        transcodingDebugModeWarning();
 
     let session: FFmpegFragmentedMP4Session & { socket?: Duplex };
 
@@ -70,12 +76,9 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             }
         }
 
-        if (transcodeRecording) {
-            // decoder arguments
-            const videoDecoderArguments = storage.getItem('videoDecoderArguments') || '';
-            if (videoDecoderArguments) {
-                inputArguments.push(...evalRequest(videoDecoderArguments, request));
-            }
+        // decoder arguments
+        if (transcodeRecording && ffmpegInput.videoDecoderArguments?.length) {
+            inputArguments.push(...ffmpegInput.videoDecoderArguments);
         }
 
         inputArguments.push(...ffmpegInput.inputArguments)
@@ -89,8 +92,8 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         }
 
         let audioArgs: string[];
-        if (noAudio || transcodeRecording || isDefinitelyNotAAC) {
-            if (!(noAudio || transcodeRecording))
+        if (noAudio || transcodeRecording || isDefinitelyNotAAC || transcodingDebugMode) {
+            if (!(noAudio || transcodeRecording || transcodingDebugMode))
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
 
             let aacLowEncoder = 'aac';
@@ -120,32 +123,24 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         }
 
         let videoArgs: string[];
-        if (transcodeRecording) {
-            const h264EncoderArguments = storage.getItem('h264EncoderArguments') || '';
-            videoArgs = h264EncoderArguments
-                ? evalRequest(h264EncoderArguments, request) : [
-                    "-vcodec", "libx264",
-                    // '-preset', 'ultrafast', '-tune', 'zerolatency',
-                    '-pix_fmt', 'yuvj420p',
-                    // '-color_range', 'mpeg',
-                    "-bf", "0",
-                    // "-profile:v", profileToFfmpeg(request.video.profile),
-                    // '-level:v', levelToFfmpeg(request.video.level),
-                    '-b:v', `${configuration.videoCodec.bitrate}k`,
-                    "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
-                    "-maxrate", request.video.max_bit_rate.toString() + "k",
-                    "-filter:v", `fps=${request.video.fps},scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
-                    '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
-                ];
+        if (transcodingDebugMode) {
+            videoArgs = getDebugModeH264EncoderArgs();
+        }
+        else if (transcodeRecording) {
+            videoArgs = [
+                '-b:v', `${configuration.videoCodec.bitrate}k`,
+                "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
+                "-maxrate", request.video.max_bit_rate.toString() + "k",
+                "-filter:v", `fps=${request.video.fps},scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
+                '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
+
+                ...ffmpegInput.h264EncoderArguments,
+            ];
         }
         else {
+            checkCompatibleCodec(console, device, videoCodec)
             videoArgs = [
                 '-vcodec', 'copy',
-                // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
-                // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
-                // unless this flag is used.
-                // I believe this is causing issues. I think inly FTYP/MOOV should have SPS/PPS?
-                // "-bsf:v", "dump_extra",
             ];
         }
 
@@ -224,7 +219,6 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
                 saveFragment(i, fragment);
                 pending = [];
                 console.log(`motion fragment #${++i} sent. size:`, fragment.length);
-                // fs.writeFileSync(`/tmp/${device.id}-${i.toString().padStart(2, '0')}.mp4`, fragment);
                 yield fragment;
             }
         }

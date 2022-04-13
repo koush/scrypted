@@ -60,8 +60,8 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
         height: number;
     };
 
-    const sprop = parsedSdp.msections.find(msection => msection.codec === 'h264')
-        .fmtp?.[0]?.parameters?.['sprop-parameter-sets'];
+    const sprop = videoSection
+        ?.fmtp?.[0]?.parameters?.['sprop-parameter-sets'];
     const sdpSps = sprop?.split(',')?.[0];
     // const sdpPps = sprop?.split(',')?.[1];
 

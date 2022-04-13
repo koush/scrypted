@@ -87,10 +87,13 @@ export function getH264DecoderArgs(): CodecArgs {
     return ret;
 }
 
+export const LIBX264_ENCODER_TITLE = 'libx264 (Software)';
+
 export function getH264EncoderArgs() {
     const encoders: { [type: string]: string } = {};
 
     encoders['Copy Video, Transcode Audio'] = 'copy';
+
 
     if (isRaspberryPi()) {
         // encoders['Raspberry Pi OMX'] = 'h264_omx';
@@ -128,5 +131,16 @@ export function getH264EncoderArgs() {
             '-pix_fmt', 'yuv420p', '-c:v', 'h264_v4l2m2m',
         ]
     }
+
+    encoderArgs[LIBX264_ENCODER_TITLE] = getDebugModeH264EncoderArgs();
+
     return encoderArgs;
+}
+
+export function getDebugModeH264EncoderArgs() {
+    return [
+        "-c:v", "libx264",
+        '-preset', 'ultrafast',
+        "-bf", "0",
+    ];
 }

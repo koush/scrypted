@@ -1,5 +1,8 @@
 import { MediaStreamDestination, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import { H264Level, H264Profile, StartStreamRequest } from '../../hap';
+import sdk from '@scrypted/sdk';
+
+const { log } = sdk;
 
 export function profileToFfmpeg(profile: H264Profile): string {
     if (profile === H264Profile.HIGH)
@@ -46,6 +49,13 @@ export const ntpTime = () => {
 };
 
 export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, storage: Storage, request: StartStreamRequest) {
+    let adaptiveBitrate: string[] = [];
+    try {
+        adaptiveBitrate = JSON.parse(storage.getItem('adaptiveBitrate'));
+    }
+    catch (e) {
+    }
+
     // Have only ever seen 20 and 60 sent here. 60 is remote stream and watch.
     const isLowBandwidth = request.audio.packet_time > 20;
 
@@ -63,10 +73,8 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
 
     // watch will/should also be a low bandwidth device.
     if (isWatch) {
-        const watchStreamingMode = storage.getItem('watchStreamingMode');
         return {
-            dynamicBitrate: canDynamicBitrate && watchStreamingMode === 'Adaptive Bitrate',
-            transcodeStreaming: watchStreamingMode === 'Transcode',
+            dynamicBitrate: canDynamicBitrate && adaptiveBitrate.includes('Apple Watch'),
             destination,
             isWatch,
             isLowBandwidth,
@@ -74,31 +82,49 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     }
 
     if (isLowBandwidth) {
-        let hubStreamingMode = storage.getItem('hubStreamingMode');
-
-        // 3/19/2022 migrate setting.
-        if (storage.getItem('transcodeStreamingHub') === 'true') {
-            if (!hubStreamingMode)
-                hubStreamingMode = 'Transcode';
-            storage.removeItem('transcodeStreamingHub');
-        }
-
         return {
-            dynamicBitrate: canDynamicBitrate && hubStreamingMode === 'Adaptive Bitrate',
-            transcodeStreaming: hubStreamingMode === 'Transcode',
+            dynamicBitrate: canDynamicBitrate && adaptiveBitrate.includes('Remote Stream'),
             destination,
             isWatch,
             isLowBandwidth,
         }
     }
 
-    let transcodeStreaming = storage.getItem('transcodeStreaming');
-
     return {
-        dynamicBitrate: false,
-        transcodeStreaming: transcodeStreaming === 'true',
+        dynamicBitrate: canDynamicBitrate && adaptiveBitrate.includes('Local Stream'),
         destination,
         isWatch,
         isLowBandwidth,
+    }
+}
+
+export function transcodingDebugModeWarning() {
+    console.warn('=================================================================================');
+    console.warn('Transcoding Debug Mode is enabled on this camera.');
+    console.warn('This setting is used to diagnose camera issues, and should not be used long term.');
+    console.warn('The HomeKit Readme contains proper camera configuration to avoid transcoding.');
+    console.warn('More robust transcoding options are available within the Rebroadcast Plugin.');
+    console.warn('=================================================================================');
+}
+
+export function checkCompatibleCodec(console: Console, device: ScryptedDevice, videoCodec: String) {
+    if (!videoCodec) {
+        console.warn('=============================================================================');
+        console.warn('No video codec reported. This stream may fail. Enable the Rebroadcast Plugin.');
+        console.warn('Stream compatibility can be diagnosed by enabling Transcoding Debug Mode.');
+        console.warn('=============================================================================');
+        return;
+    }
+    const isDefinitelyNotH264 = videoCodec && videoCodec.toLowerCase().indexOf('h264') === -1;
+    if (isDefinitelyNotH264) {
+        const str = 
+        console.error('=============================================================================');
+        console.error(`${device.name} video codec must be h264 but is ${videoCodec}.`);
+        console.error('This stream may fail. Read the instructions in the HomeKit Plugin');
+        console.error('to properly configure your camera codec.');
+        console.error('Stream compatibility can be diagnosed by enabling Transcoding Debug Mode.');
+        console.error('=============================================================================');
+
+        log.a(`${device.name} video codec must be h264 but is ${videoCodec}. This stream may fail. Read the instructions in the HomeKit Plugin to properly configure your camera codec.`);
     }
 }
