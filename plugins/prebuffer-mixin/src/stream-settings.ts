@@ -101,7 +101,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         transcodeStreams: {
             group: 'Transcoding',
             title: 'Transcode Streams',
-            description: 'The media streams to transcode. Transcoding audio and video is not recommended and should only be used when necessary. The Rebroadcast Plugin manages the system-wide Transcode settings and as well as a Readme for optimal configuration.',
+            description: 'The media streams to transcode. Transcoding audio and video is not recommended and should only be used when necessary. The Rebroadcast Plugin manages the system-wide Transcode settings. See the Rebroadcast Readme for optimal configuration.',
             multiple: true,
             choices: Object.values(streamTypes).map(st => st.title),
         },
