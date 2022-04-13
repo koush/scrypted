@@ -140,7 +140,7 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
         const ffmpegInput: FFmpegInput = JSON.parse(data.toString());
 
         const storageSettings = this.storageSettings;
-        const console = deviceManager.getMixinConsole(options.sourceId, this.nativeId);
+        const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
 
         class OnDemandSignalingChannel implements RTCSignalingChannel {
             async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {

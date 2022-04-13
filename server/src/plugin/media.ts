@@ -122,7 +122,7 @@ export abstract class MediaManagerBase implements MediaManager {
             fromMimeType: ScryptedMimeTypes.FFmpegInput,
             toMimeType: 'image/jpeg',
             convert: async (data, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<Buffer> => {
-                const console = this.getMixinConsole(options.sourceId, undefined);
+                const console = this.getMixinConsole(options?.sourceId, undefined);
 
                 const ffInput: FFmpegInput = JSON.parse(data.toString());
 
