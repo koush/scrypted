@@ -5,7 +5,7 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityT
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, H264_NAL_TYPE_IDR, findH264NaluType, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, H264_NAL_TYPE_IDR, findH264NaluType, RtspClient, RtspServer, RTSP_FRAME_MAGIC, parseSemicolonDelimited } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -677,7 +677,6 @@ class PrebufferSession {
 
           this.sdp = Promise.resolve(sdp);
           await doSetup(videoSection.control, videoSection.codec);
-          mapping[channel] = videoSection.codec;
           await rtspClient.play();
 
           session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, rbo, mapping);
@@ -1148,6 +1147,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     let id = options?.id;
     let h264EncoderArguments: string[];
+    let destinationVideoBitrate: number;
 
     const msos = await this.mixinDevice.getVideoStreamOptions();
     let result: {
@@ -1156,23 +1156,30 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       title: string;
     };
 
+    const defaultLocalBitrate = 2000000;
+    const defaultLowResolutionBitrate = 512000;
     if (!options.id) {
       switch (options.destination) {
         case 'medium-resolution':
         case 'remote':
           result = this.streamSettings.getRemoteStream(msos);
+          destinationVideoBitrate = this.plugin.storageSettings.values.remoteStreamingBitrate;
           break;
         case 'low-resolution':
           result = this.streamSettings.getLowResolutionStream(msos);
+          destinationVideoBitrate = defaultLowResolutionBitrate;
           break;
         case 'local-recorder':
           result = this.streamSettings.getRecordingStream(msos);
+          destinationVideoBitrate = defaultLocalBitrate;
           break;
         case 'remote-recorder':
           result = this.streamSettings.getRemoteRecordingStream(msos);
+          destinationVideoBitrate = defaultLocalBitrate;
           break;
         default:
           result = this.streamSettings.getDefaultStream(msos);
+          destinationVideoBitrate = defaultLocalBitrate;
           break;
       }
 
@@ -1193,6 +1200,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     const ffmpegInput = await session.getVideoStream(options);
     ffmpegInput.h264EncoderArguments = h264EncoderArguments;
+    ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
 
     if (this.streamSettings.storageSettings.values.missingCodecParameters) {
       ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
@@ -1314,8 +1322,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
   }
 
   async putMixinSetting(key: string, value: SettingValue): Promise<void> {
-    const sessions = this.sessions;
-    this.sessions = new Map();
     if (this.streamSettings.storageSettings.settings[key])
       await this.streamSettings.storageSettings.putSetting(key, value);
     else
@@ -1324,6 +1330,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     // no prebuffer change necessary if the setting is a transcoding hint.
     if (this.streamSettings.storageSettings.settings[key]?.group === 'Transcoding')
       return;
+
+    const sessions = this.sessions;
+    this.sessions = new Map();
 
     // kill and reinitiate the prebuffers.
     for (const session of sessions.values()) {
@@ -1396,7 +1405,7 @@ class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider
     remoteStreamingBitrate: {
       title: 'Remote Streaming Bitrate',
       type: 'number',
-      defaultValue: 500000,
+      defaultValue: 1000000,
       description: 'The bitrate to use when remote streaming. This setting will only be used when transcoding or adaptive bitrate is enabled on a camera.',
     },
     h264EncoderArguments: {

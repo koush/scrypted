@@ -1,13 +1,13 @@
 import { cloneDeep } from "@scrypted/common/src/clone-deep";
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { readLength } from "@scrypted/common/src/read-stream";
-import { H264_NAL_TYPE_SPS, findH264NaluType, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { findH264NaluType, H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
-import { parse as spsParse ,getSpsResolution} from "./sps-parser";
 import net from 'net';
 import { EventEmitter, Readable } from "stream";
+import { getSpsResolution, parse as spsParse } from "./sps-parser";
 
 export function connectRFC4571Parser(url: string) {
     const u = new URL(url);

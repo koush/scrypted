@@ -1692,6 +1692,7 @@ export interface MediaStreamUrl {
 }
 export interface FFmpegInput extends MediaStreamUrl {
   inputArguments?: string[];
+  destinationVideoBitrate?: number;
   h264EncoderArguments?: string[];
   videoDecoderArguments?: string[];
   h264FilterArguments?: string[];

@@ -321,6 +321,25 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                             encName = `table.Encode[${channel - 1}].ExtraFormat[${i - 1}]`;
                         }
 
+                        const videoCodec = findValue(encodeResponse.data, encName, 'Video.Compression')
+                            ?.replace('.', '')?.toLowerCase()?.trim();
+                        let audioCodec = findValue(encodeResponse.data, encName, 'Audio.Compression')
+                            ?.replace('.', '')?.toLowerCase()?.trim();
+                        if (audioCodec?.includes('aac'))
+                            audioCodec = 'aac';
+                        else if (audioCodec.includes('g711'))
+                            audioCodec = 'pcm';
+
+                        vso.audio.codec = audioCodec;
+                        vso.video.codec = videoCodec;
+
+                        const width = findValue(encodeResponse.data, encName, 'Video.Width');
+                        const height = findValue(encodeResponse.data, encName, 'Video.Height');
+                        if (width && height) {
+                            vso.video.width = parseInt(width);
+                            vso.video.height = parseInt(height);
+                        }
+
                         const bitrateOptions = findValue(capResponse.data, capName, 'Video.BitRateOptions');
                         if (!bitrateOptions)
                             continue;

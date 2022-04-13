@@ -258,6 +258,7 @@ class EventListenerRegister(TypedDict):
 
 class FFmpegInput(TypedDict):
     container: str
+    destinationVideoBitrate: float
     h264EncoderArguments: list[str]
     h264FilterArguments: list[str]
     inputArguments: list[str]

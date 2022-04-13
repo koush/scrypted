@@ -70,7 +70,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 "-b:v", request.video.max_bit_rate.toString() + "k",
                 "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
                 "-maxrate", request.video.max_bit_rate.toString() + "k",
-                "-filter:v", "fps=" + request.video.fps.toString(),
+                "-r", request.video.fps.toString(),
 
                 ...getDebugModeH264EncoderArgs(),
             ];
@@ -80,12 +80,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         )
     }
     else if (ffmpegInput.h264EncoderArguments?.length) {
-        const videoCodec =
+        const bitrate = ffmpegInput.destinationVideoBitrate || (request.video.max_bit_rate * 1000);
+        const videoCodec: string[] =
             [
-                "-b:v", request.video.max_bit_rate.toString() + "k",
-                "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
-                "-maxrate", request.video.max_bit_rate.toString() + "k",
-                "-filter:v", "fps=" + request.video.fps.toString(),
+                "-b:v", bitrate.toString(),
+                "-bufsize", (2 * bitrate).toString(),
+                "-maxrate", bitrate.toString(),
+                "-r", request.video.fps.toString(),
 
                 ...ffmpegInput.h264EncoderArguments,
             ];

@@ -277,8 +277,6 @@ export class RtspClient extends RtspBase {
             if (header.toString() === 'RTSP') {
                 this.client.unshift(header);
                 const message = await super.readMessage();
-                this.console?.log('rtsp incoming message\n', message.join('\n'));
-                this.console?.log();
                 return message;
             }
 
