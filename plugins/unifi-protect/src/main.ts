@@ -7,6 +7,7 @@ import { FeatureFlagsShim, LastSeenShim } from "./shim";
 import { UnifiSensor } from "./sensor";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
+import {sleep} from "@scrypted/common/src/sleep";
 
 const { deviceManager } = sdk;
 
@@ -70,7 +71,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             keys.delete(k);
         }
         if (keys.size > 0)
-            ret.console.log('update packet', packet.payload);
+            ret?.console.log('update packet', packet.payload);
         return ret;
     }
 
@@ -245,6 +246,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             return
         }
 
+        this.api?.eventsWs?.removeAllListeners();
         if (!this.api) {
             this.api = new ProtectApi(ip, username, password, {
                 debug() { },
@@ -257,20 +259,24 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         try {
-            this.api.eventsWs?.removeListener('message', this.listener);
             if (!await this.api.refreshDevices()) {
-                this.console.log('refresh failed, trying again in 10 seconds.');
-                setTimeout(() => {
-                    this.discoverDevices(0);
-                }, 10000);
+                this.console.log('Refresh failed. Trying again in 10 seconds.');
+                await sleep(10000);
+                this.discoverDevices(0);
                 return;
             }
+
             this.api.eventsWs?.on('message', this.listener);
             this.api.eventsWs?.on('close', async () => {
                 this.console.error('Event Listener closed. Reconnecting in 10 seconds.');
-                await new Promise(resolve => setTimeout(resolve, 10000));
+                await sleep(10000);
                 this.discoverDevices(0);
-            })
+            });
+            this.api.eventsWs?.on('error', async () => {
+                this.console.error('Event Listener error. Reconnecting in 10 seconds.');
+                await sleep(10000);
+                this.discoverDevices(0);
+            });
 
             const devices: Device[] = [];
 
