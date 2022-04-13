@@ -1,6 +1,7 @@
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { Readable } from 'stream';
 import https from 'https';
+import { IncomingMessage } from 'http';
 
 export enum AmcrestEvent {
     MotionStart = "Code=VideoMotion;action=Start",
@@ -55,9 +56,19 @@ export class AmcrestCameraClient {
             responseType: 'stream',
             url,
         });
-        const stream = response.data as Readable;
+        const stream = response.data as IncomingMessage;
+        let activityTimeout: NodeJS.Timeout;
+        const resetActivityTimeout = () => {
+            clearTimeout(activityTimeout);
+            activityTimeout = setTimeout(() => {
+                stream.destroy();
+            }, 60000);
+        }
+        resetActivityTimeout();
 
         stream.on('data', (buffer: Buffer) => {
+            resetActivityTimeout();
+
             const data = buffer.toString();
             const parts = data.split(';');
             let index: string;
