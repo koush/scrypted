@@ -4,7 +4,7 @@ import { DeviceCreator } from '@scrypted/types';
 import { ScryptedInterface } from '@scrypted/types';
 import { Scriptable } from '@scrypted/types';
 import { SystemManager } from '@scrypted/types';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import semver from 'semver';
 const pluginSnapshot = require("!!raw-loader!./plugin-snapshot.ts").default.split('\n')
 .filter(line => !line.includes('SCRYPTED_FILTER_EXAMPLE_LINE'))
@@ -20,12 +20,19 @@ export interface PluginUpdateCheck {
 }
 
 export async function checkUpdate(npmPackage: string, npmPackageVersion: string): Promise<PluginUpdateCheck> {
+    let response: AxiosResponse<any>;
     // const response = await axios.get(`${componentPath}/npm/${npmPackage}`);
     // registry.npmjs.org does not support CORS on the package endpoints.
     // open issue:
     // https://github.com/npm/feedback/discussions/117
     // npmjs.cf is an unofficial CDN that provides it
-    const response = await axios.get(`https://registry.npmjs.cf/${npmPackage}`);
+    try {
+        response = await axios.get(`https://registry.npmjs.cf/${npmPackage}`);
+    }
+    catch (e) {
+        // sometimes registry.npmjs.cf busts up their CORS headers or goes down... fall back.
+        response = await axios.get(`${componentPath}/npm/${npmPackage}`);
+    }
     const { data } = response;
     const versions = Object.values(data.versions).sort((a: any, b: any) => semver.compare(a.version, b.version)).reverse();
     let updateAvailable: any;
