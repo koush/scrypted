@@ -49,7 +49,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
             self.logger.info("Getting snapshot from prebuffer")
             return await real_device.getVideoStream({"refresh": False})
 
-        pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=10)
+        pic_url = await asyncio.wait_for(self.provider.arlo.TriggerFullFrameSnapshot(self.arlo_basestation, self.arlo_device), timeout=30)
         self.logger.debug(f"Got snapshot URL for at {pic_url}")
 
         if pic_url is None:
@@ -78,7 +78,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
     async def getVideoStream(self, options=None):
         self.logger.info("Requesting stream")
 
-        rtsp_url = await asyncio.wait_for(self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device), timeout=10)
+        rtsp_url = await asyncio.wait_for(self.provider.arlo.StartStream(self.arlo_basestation, self.arlo_device), timeout=30)
         self.logger.debug(f"Got stream URL at {rtsp_url}")
 
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)

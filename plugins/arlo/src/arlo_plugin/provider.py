@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import requests
 
 import scrypted_sdk
 from scrypted_sdk import ScryptedDeviceBase
@@ -115,6 +116,12 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             for nativeId in self.arlo_cameras.keys():
                 self.getDevice(nativeId)
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"HTTPError '{str(e)}' while performing post-login Arlo setup, will retry with fresh login")
+            self._arlo = None
+            self._arlo_mfa_code = None
+            self.storage.setItem("arlo_auth_headers", None)
+            _ = self.arlo
         except Exception as e:
             self.logger.error(f"Error performing post-login Arlo setup: {type(e)} with message {str(e)}")
 
@@ -193,7 +200,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         self.logger.info(f"Discovered {len(basestations)} basestations")
 
         devices = []
-        cameras = self.arlo.GetDevices('camera')
+        cameras = self.arlo.GetDevices(['camera', "arloq", "doorbell"])
         for camera in cameras:
             if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
                 self.logger.debug(f"Skipping camera {camera['deviceId']} because its basestation was not found")
