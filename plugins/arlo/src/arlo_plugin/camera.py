@@ -66,7 +66,7 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
                 "video": {
                     "codec": 'h264',
                 },
-                "audio": {
+                "audio": None if self.arlo_device.get("modelId") == "VMC3030" else {
                     "codec": 'aac',
                 },
                 "source": 'cloud',
