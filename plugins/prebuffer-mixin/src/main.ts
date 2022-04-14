@@ -1158,8 +1158,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     const defaultLocalBitrate = 2000000;
     const defaultLowResolutionBitrate = 512000;
-    if (!options.id) {
-      switch (options.destination) {
+    if (!id) {
+      switch (options?.destination) {
         case 'medium-resolution':
         case 'remote':
           result = this.streamSettings.getRemoteStream(msos);
