@@ -59,6 +59,10 @@ export function cwdInstallDir(): { volume: string, installDir: string } {
 
 export async function installServe() {
     const { installDir } = cwdInstallDir();
+    const packageLockJson = path.join(installDir, 'package-lock.json');
+    // apparently corrupted or old version of package-lock.json prevents upgrades, so
+    // nuke it before installing.
+    rimraf.sync(packageLockJson);
     // something about low memory environments is causing npm install of node-pty to fail?
     // maybe too many concurrent post install things happening and node-gyp is failing to build?
     // not entirely sure i need this anymore, since I fixed various other install related
