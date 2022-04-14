@@ -21,16 +21,13 @@ export interface PluginUpdateCheck {
 
 export async function checkUpdate(npmPackage: string, npmPackageVersion: string): Promise<PluginUpdateCheck> {
     let response: AxiosResponse<any>;
-    // const response = await axios.get(`${componentPath}/npm/${npmPackage}`);
-    // registry.npmjs.org does not support CORS on the package endpoints.
-    // open issue:
-    // https://github.com/npm/feedback/discussions/117
-    // npmjs.cf is an unofficial CDN that provides it
     try {
-        response = await axios.get(`https://registry.npmjs.cf/${npmPackage}`);
+        response = await axios.get(`https://registry.npmjs.org/${npmPackage}`);
     }
     catch (e) {
-        // sometimes registry.npmjs.cf busts up their CORS headers or goes down... fall back.
+        // 4/13/2022 registry.npmjs.org added CORS headers, so using the CORS compatible mirror
+        // registry.npmjs.cf is no longer necessary. But just in case,
+        // if registry.npmjs.org busts up their CORS headers... have this fallback method.
         response = await axios.get(`${componentPath}/npm/${npmPackage}`);
     }
     const { data } = response;
