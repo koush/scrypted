@@ -1,4 +1,5 @@
 import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
+import { RTCSessionControl } from "@scrypted/types";
 import { MediaManager, MediaObject, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoRecorder } from "@scrypted/types";
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
@@ -15,7 +16,7 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
 }
 
 export async function streamMedia(device: RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
-  return new Promise(resolve => {
+  return new Promise(async (resolve) => {;
     const session = new BrowserSignalingSession(async (pc) => {
 
       pc.ontrack = ev => {
@@ -23,16 +24,13 @@ export async function streamMedia(device: RTCSignalingChannel, getVideo: () => H
           pc.getReceivers().map((receiver) => receiver.track)
         );
         getVideo().srcObject = mediaStream;
-        const remoteAudio = document.createElement("audio");
-        remoteAudio.srcObject = mediaStream;
-        remoteAudio.play();
         console.log('received track', ev.track);
       };
 
-      resolve(pc);
+      resolve({pc, control});
     });
 
-    device.startRTCSignalingSession(session);
+    const control: RTCSessionControl = await device.startRTCSignalingSession(session);
   });
 }
 

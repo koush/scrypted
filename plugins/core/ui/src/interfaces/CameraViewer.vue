@@ -214,20 +214,21 @@ export default {
       }, 2500);
     },
     cleanupConnection() {
-      if (this.pc) {
-        console.log("peer connection cleaned up");
-        this.pc.close();
-        this.pc = undefined;
-      }
+      this.pc?.close();
+      this.control?.endSession();
+      this.pc = undefined;
+      this.control = undefined;
     },
     async streamCamera() {
       this.cleanupConnection();
       this.startTime = null;
-      this.pc = await streamCamera(
+      const { pc, control } = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video
       );
+      this.pc = pc;
+      this.control = control;
     },
     async streamRecorder(startTime) {
       this.cleanupConnection();
