@@ -20,8 +20,6 @@ export class CameraMixin extends HomekitMixin<any> {
         const settings: Setting[] = [];
         const realDevice = systemManager.getDeviceById<ObjectDetector & VideoCamera>(this.id);
 
-        const hasMotionSensor = this.storage.getItem('linkedMotionSensor') || this.interfaces.includes(ScryptedInterface.MotionSensor);
-
         settings.push(
             {
                 title: 'Linked Motion Sensor',

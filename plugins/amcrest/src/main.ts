@@ -330,7 +330,8 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                         else if (audioCodec.includes('g711'))
                             audioCodec = 'pcm';
 
-                        vso.audio.codec = audioCodec;
+                        if (vso.audio)
+                            vso.audio.codec = audioCodec;
                         vso.video.codec = videoCodec;
 
                         const width = findValue(encodeResponse.data, encName, 'Video.Width');
