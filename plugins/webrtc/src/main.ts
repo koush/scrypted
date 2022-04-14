@@ -1,4 +1,5 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
+import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaObject, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import crypto from 'crypto';
@@ -18,7 +19,7 @@ const supportedTypes = [
 class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = createWebRTCStorageSettings(this);
 
-    constructor(options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
+    constructor(public plugin: WebRTCPlugin, options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
         super(options);
         // this.storageSettings.options = {
         //     hide: {
@@ -59,9 +60,9 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 
         return createRTCPeerConnectionSink(
             session,
-            this.storageSettings,
             this.console,
             hasIntercom ? this.mixinDevice : undefined,
+            this.plugin.storageSettings.values.maximumCompatibilityMode,
             async (destination) => {
                 const mo = await device.getVideoStream({
                     video: {
@@ -118,7 +119,14 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
 }
 
 class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider, BufferConverter, MixinProvider, Settings {
-    storageSettings = createWebRTCStorageSettings(this);
+    storageSettings = new StorageSettings(this, {
+        maximumCompatibilityMode: {
+            title: 'Maximum Compatibility Mode',
+            description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
+            defaultValue: true,
+            type: 'boolean',
+        }
+    });
 
     constructor() {
         super();
@@ -139,12 +147,13 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
     async convert(data: Buffer, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<RTCSignalingChannel> {
         const ffmpegInput: FFmpegInput = JSON.parse(data.toString());
 
-        const storageSettings = this.storageSettings;
         const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
+
+        const plugin = this;
 
         class OnDemandSignalingChannel implements RTCSignalingChannel {
             async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
-                return createRTCPeerConnectionSink(session, storageSettings, console, undefined, async () => ffmpegInput);
+                return createRTCPeerConnectionSink(session, console, undefined, plugin.storageSettings.values.maximumCompatibilityMode, async () => ffmpegInput);
             }
         }
 
@@ -190,7 +199,7 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        return new WebRTCMixin({
+        return new WebRTCMixin(this, {
             mixinDevice,
             mixinDeviceInterfaces,
             mixinDeviceState,

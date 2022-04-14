@@ -5,15 +5,14 @@ import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-connect";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
-import { StorageSettings } from "@scrypted/common/src/settings";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import { ChildProcess } from "child_process";
+import crypto from 'crypto';
 import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
-import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
+import { getFFmpegRtpAudioOutputArguments, RtpTrack, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
-import { WebRTCStorageSettingsKeys } from "./webrtc-storage-settings";
 import { isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager } = sdk;
@@ -43,11 +42,13 @@ function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection:
 
 export async function createRTCPeerConnectionSink(
     clientSignalingSession: RTCSignalingSession,
-    storageSettings: StorageSettings<WebRTCStorageSettingsKeys>,
     console: Console,
     intercom: Intercom,
+    maximumCompatibilityMode: boolean,
     getFFmpegInput: (destination: MediaStreamDestination) => Promise<FFmpegInput>,
-    ) {
+) {
+    const token = 'connection log =================================' + crypto.randomBytes(8).toString('hex');
+    console.time(token);
 
     const options = await clientSignalingSession.getOptions();
     const hasIntercom = !!intercom;
@@ -176,6 +177,7 @@ export async function createRTCPeerConnectionSink(
             if (pc.connectionState !== 'connected')
                 return;
 
+            console.timeLog(token, 'connected');
             connected = true;
 
             let isPrivate = true;
@@ -221,11 +223,11 @@ export async function createRTCPeerConnectionSink(
             const transcode = !sessionSupportsH264High
                 || mediaStreamOptions?.video?.codec !== 'h264'
                 || ffmpegInput.h264EncoderArguments?.length;
-            if (transcode) {
-                const bitrate = ffmpegInput.destinationVideoBitrate || 750000;
+            if (transcode || maximumCompatibilityMode) {
+                const bitrate = maximumCompatibilityMode ? 500000 : ffmpegInput.destinationVideoBitrate || 500000;
                 videoArgs.push(
                     // this might get wonky with 4:3?
-                    '-vf', "scale='min(1280,iw)':-2",
+                    '-vf', "scale='min(640,iw)':-2",
                     // this seems to cause issues with presets i think.
                     // '-level:v', '4.0',
                     "-b:v", bitrate.toString(),
@@ -233,15 +235,17 @@ export async function createRTCPeerConnectionSink(
                     "-maxrate", bitrate.toString(),
                     '-r', '15',
                 )
-                if (!sessionSupportsH264High) {
+                if (!sessionSupportsH264High || maximumCompatibilityMode) {
                     // baseline profile must use libx264, not sure other encoders properly support it.
                     videoArgs.push(
                         '-profile:v', 'baseline',
                         ...getDebugModeH264EncoderArgs(),
-                        // this causes chromecast to chop and show frames only every 10 seconds.
-                        // but it seems to work fine everywhere else?
-                        // '-tune', 'zerolatency',
                     );
+
+                    // this setting is heavily dependent on the bitrate being able to support it.
+                    // if the bitrate is too low it will chop.
+                    if (maximumCompatibilityMode)
+                        videoArgs.push('-tune', 'zerolatency');
                 }
                 else {
                     videoArgs.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
@@ -254,27 +258,31 @@ export async function createRTCPeerConnectionSink(
             if (ffmpegInput.h264FilterArguments)
                 videoArgs.push(...ffmpegInput.h264FilterArguments);
 
+
+            const audioRtpTrack: RtpTrack = {
+                transceiver: audioTransceiver,
+                outputArguments: [
+                    ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec),
+                ]
+            };
+
+            const videoRtpTrack: RtpTrack = {
+                transceiver: videoTransceiver,
+                outputArguments: [
+                    '-an', '-sn', '-dn',
+                    ...videoArgs,
+                    '-pkt_size', '1300',
+                ],
+                firstPacket: () => console.timeEnd(token),
+            };
+
             const { cp } = await startRtpForwarderProcess(console, [
                 ...(transcode ? ffmpegInput.videoDecoderArguments || [] : []),
-
                 ...ffmpegInput.inputArguments,
             ], {
-                video: {
-                    transceiver: videoTransceiver,
-                    outputArguments: [
-                        '-an', '-sn', '-dn',
-                        ...videoArgs,
-                        '-pkt_size', '1300',
-                        '-fflags', '+flush_packets', '-flush_packets', '1',
-                    ]
-                },
-                audio: {
-                    transceiver: audioTransceiver,
-                    outputArguments: [
-                        ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec),
-                    ]
-                }
-            })
+                video: videoRtpTrack,
+                audio: audioRtpTrack,
+            });
 
             cp.on('exit', cleanup);
             resolve(cp);

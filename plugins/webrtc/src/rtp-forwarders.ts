@@ -18,14 +18,14 @@ export function getFFmpegRtpAudioOutputArguments(inputCodec: string) {
     else {
         ret.push(
             '-acodec', 'libopus',
+            '-application', 'lowdelay',
+            '-frame_duration', '60',
+            '-flags' ,'+global_header',
             '-ar', '48k',
             // choose a better birate? this is on the high end recommendation for voice.
             '-b:a', '40k',
+            '-bufsize', '96k',
             '-ac', '2',
-            '-application', 'lowdelay',
-            '-frame_duration', '60',
-            // '-pkt_size', '1300',
-            '-fflags', '+flush_packets', '-flush_packets', '1',
         )
     }
     return ret;
@@ -35,6 +35,7 @@ export interface RtpTrack {
     outputArguments: string[];
     transceiver: RTCRtpTransceiver;
     onRtp?(buffer: Buffer): Buffer;
+    firstPacket?: () => void;
 }
 
 export type RtpTracks<T extends string> = {
@@ -45,13 +46,14 @@ export type RtpSockets<T extends string> = {
     [key in T]?: dgram.Socket;
 };
 
-export async function createTrackForwarders<T extends string>(rtpTracks: RtpTracks<T>) {
+export async function createTrackForwarders<T extends string>(console: Console, rtpTracks: RtpTracks<T>) {
     const sockets: RtpSockets<T> = {};
 
     for (const key of Object.keys(rtpTracks)) {
         const { server, port } = await createBindZero();
         sockets[key as T] = server;
         const track = rtpTracks[key as T];
+        server.once('message', () => track.firstPacket?.());
         const outputArguments = track.outputArguments;
         outputArguments.push(
             '-f', 'rtp', `rtp://127.0.0.1:${port}`,
@@ -79,20 +81,20 @@ export async function createTrackForwarders<T extends string>(rtpTracks: RtpTrac
     }
 }
 
-export async function startRtpForwarderProcess<T extends string>(console: Console, inputArguments: string[], rtpTracks: RtpTracks<T>) {
-    const forwarders = await createTrackForwarders(rtpTracks);
+export async function startRtpForwarderProcess<T extends string>(console: Console, inputArguments: string[], rtpTracks: RtpTracks<T>, options?: child_process.SpawnOptionsWithoutStdio) {
+    const forwarders = await createTrackForwarders(console, rtpTracks);
 
     const outputArguments: string[] = [];
 
     for (const key of Object.keys(rtpTracks)) {
+        outputArguments.push(
+
+        )
         outputArguments.push(...rtpTracks[key as T].outputArguments);
     }
 
     const args = [
         '-hide_banner',
-
-        '-fflags', 'nobuffer',
-        '-flags', 'low_delay',
 
         ...inputArguments,
 
@@ -106,7 +108,7 @@ export async function startRtpForwarderProcess<T extends string>(console: Consol
 
     safePrintFFmpegArguments(console, args);
 
-    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, options);
     ffmpegLogInitialOutput(console, cp);
     cp.on('exit', () => forwarders.close());
 
