@@ -125,6 +125,11 @@ class EventStream:
             self.connected = True
             self.initializing = False
 
+            client.subscribe([
+                (f"u/{self.arlo.user_id}/in/userSession/connect", 0),
+                (f"u/{self.arlo.user_id}/in/userSession/disconnect", 0),
+            ])
+
         def on_message(client, userdata, msg):
             payload = msg.payload.decode()
             logger.debug(f"Received event: {payload}")

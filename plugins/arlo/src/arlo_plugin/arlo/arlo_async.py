@@ -192,10 +192,36 @@ class Arlo(object):
         while not self.event_stream.connected:
             await asyncio.sleep(0.5)
 
-        self.event_stream.subscribe([
+        # subscribe to all camera topics
+        topics = [
             f"d/{basestation['xCloudId']}/out/cameras/{camera['deviceId']}/#"
             for basestation, camera in basestation_camera_tuples
-        ])
+        ]
+
+        # find unique basestations and subscribe to basestation topics
+        basestations = {}
+        for basestation, _ in basestation_camera_tuples:
+            basestations[basestation['deviceId']] = basestation
+        for basestation in basestations.values():
+            x_cloud_id = basestation['xCloudId']
+            topics += [
+                f"d/{x_cloud_id}/out/wifi/#",
+                f"d/{x_cloud_id}/out/subscriptions/#",
+                f"d/{x_cloud_id}/out/audioPlayback/#",
+                f"d/{x_cloud_id}/out/modes/#",
+                f"d/{x_cloud_id}/out/basestation/#",
+                f"d/{x_cloud_id}/out/siren/#",
+                f"d/{x_cloud_id}/out/devices/#",
+                f"d/{x_cloud_id}/out/storage/#",
+                f"d/{x_cloud_id}/out/schedule/#",
+                f"d/{x_cloud_id}/out/diagnostics/#",
+                f"d/{x_cloud_id}/out/automaticRevisionUpdate/#",
+                f"d/{x_cloud_id}/out/audio/#",
+                f"d/{x_cloud_id}/out/activeAutomations/#",
+                f"d/{x_cloud_id}/out/lte/#",
+            ]
+
+        self.event_stream.subscribe(topics)
 
     def Unsubscribe(self):
         """ This method stops the EventStream subscription and removes it from the event_stream collection. """
