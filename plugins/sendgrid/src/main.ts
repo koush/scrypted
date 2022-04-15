@@ -77,6 +77,8 @@ class SendGridProvider extends ScryptedDeviceBase implements Notifier, Settings 
             return;
         }
 
+        this.console.info('Starting to send email')
+
         let attachments = [];
 		if (typeof media === 'string') {
 			media = await mediaManager.createMediaObjectFromUrl(media as string);
