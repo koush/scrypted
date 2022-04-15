@@ -61,7 +61,8 @@ class SendGridProvider extends ScryptedDeviceBase implements Notifier, Settings 
             {
                 title: 'SendGrid API Key',
                 key: 'apikey',
-                value: this.storage.getItem('apikey')
+                value: this.storage.getItem('apikey'),
+                type: 'password'
             }
         ]
     }
