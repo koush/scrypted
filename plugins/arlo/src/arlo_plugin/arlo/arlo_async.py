@@ -185,9 +185,34 @@ class Arlo(object):
         This call registers the device (which should be the basestation) so that events will be sent to the EventStream
         when subsequent calls to /notify are made.
         """
+        async def heartbeat(self, basestations, interval=30):
+            await asyncio.sleep(interval)
+            while self.event_stream and self.event_stream.connected:
+                for basestation in basestations:
+                    self.Ping(basestation)
+                await asyncio.sleep(interval)
+
+        # find unique basestations and cameras
+        basestations, cameras = {}, {}
+        for basestation, camera in basestation_camera_tuples:
+            basestations[basestation['deviceId']] = basestation
+            cameras[camera['deviceId']] = camera
+
         if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
             self.event_stream = EventStream(self)
             await self.event_stream.start()
+
+            # filter out cameras without basestation, where they are their own basestations
+            proper_basestations = {}
+            for basestation in basestations.values():
+                if basestation['deviceId'] == basestation.get('parentId'):
+                    continue
+                proper_basestations[basestation['deviceId']] = basestation
+
+            logger.info(f"Will send heartbeat to the following basestations: {list(proper_basestations.keys())}")
+
+            # start heartbeat loop with only basestations
+            asyncio.get_event_loop().create_task(heartbeat(self, list(proper_basestations.values())))
 
         while not self.event_stream.connected:
             await asyncio.sleep(0.5)
@@ -198,10 +223,7 @@ class Arlo(object):
             for basestation, camera in basestation_camera_tuples
         ]
 
-        # find unique basestations and subscribe to basestation topics
-        basestations = {}
-        for basestation, _ in basestation_camera_tuples:
-            basestations[basestation['deviceId']] = basestation
+        # subscribe to basestation topics
         for basestation in basestations.values():
             x_cloud_id = basestation['xCloudId']
             topics += [
