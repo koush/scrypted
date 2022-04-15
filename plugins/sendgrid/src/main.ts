@@ -35,10 +35,6 @@ class SendGridProvider extends ScryptedDeviceBase implements Notifier, Settings 
             return
         }
 
-        if (this.sendgridClient) {
-            return
-        }
-
         this.sendgridClient = new MailService();
         this.sendgridClient.setApiKey(apikey);
         this.console.info('Initialized new SendGrid client')
@@ -72,7 +68,7 @@ class SendGridProvider extends ScryptedDeviceBase implements Notifier, Settings 
         this.initializeSendGrid();
     }
 
-	async sendNotification(title: string, body: string, media?: string | MediaObject): Promise<void> {
+    async sendNotification(title: string, body: string, media?: string | MediaObject): Promise<void> {
         if (!this.sendgridClient) {
             this.console.warn('SendGrid client not initialized, cannot send notification')
             return;
@@ -81,11 +77,11 @@ class SendGridProvider extends ScryptedDeviceBase implements Notifier, Settings 
         this.console.info('Starting to send email')
 
         let attachments = [];
-		if (typeof media === 'string') {
-			media = await mediaManager.createMediaObjectFromUrl(media as string);
+        if (typeof media === 'string') {
+            media = await mediaManager.createMediaObjectFromUrl(media as string);
         }
-		if (media) {
-			let data: Buffer = await mediaManager.convertMediaObjectToBuffer(media as MediaObject, 'image/png');
+        if (media) {
+            let data: Buffer = await mediaManager.convertMediaObjectToBuffer(media as MediaObject, 'image/png');
             let b64PictureData: string = data.toString('base64');
             attachments = [
                 {
@@ -102,12 +98,12 @@ class SendGridProvider extends ScryptedDeviceBase implements Notifier, Settings 
             from: this.from(),
             subject: title,
             html: body,
-            attachments: attachments 
+            attachments: attachments
         }
 
         await this.sendgridClient.send(msg);
         this.console.info(`Email sent to ${this.to()}`)
-	}
+    }
 };
 
 const provider = new SendGridProvider();
