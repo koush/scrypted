@@ -219,7 +219,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     ScryptedInterface.VideoCamera.value,
                     ScryptedInterface.Camera.value,
                     ScryptedInterface.MotionSensor.value,
-                    ScryptedInterface.Online.value,
                     ScryptedInterface.Refresh.value,
                 ],
                 "type": ScryptedDeviceType.Camera.value,
