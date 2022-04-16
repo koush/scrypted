@@ -38,7 +38,7 @@ interface DeviceProxyPair {
     proxy: ScryptedDevice;
 }
 
-const MIN_SCRYPTED_CORE_VERSION = 'v0.0.237';
+const MIN_SCRYPTED_CORE_VERSION = 'v0.0.238';
 const PLUGIN_DEVICE_STATE_VERSION = 2;
 
 interface HttpPluginData {
@@ -431,7 +431,13 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         return ret;
     }
 
-    async installNpm(pkg: string, version?: string): Promise<PluginHost> {
+    async installNpm(pkg: string, version?: string, installedSet?: Set<string>): Promise<PluginHost> {
+        if (!installedSet)
+            installedSet = new Set();
+        if (installedSet.has(pkg))
+            return;
+        installedSet.add(pkg);
+
         const registry = (await axios(`https://registry.npmjs.org/${pkg}`)).data;
         if (!version) {
             version = registry['dist-tags'].latest;
@@ -463,6 +469,20 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             if (!packageJsonEntry)
                 throw new Error('package.json not found. are you behind a firewall?');
             const packageJson = JSON.parse(packageJsonEntry.toString());
+
+            const pluginDependencies: string[] = packageJson.scrypted.pluginDependencies || [];
+            pluginDependencies.forEach(async (dep) => {
+                try {
+                    const depId = this.findPluginDevice(dep);
+                    if (depId)
+                        throw new Error('Plugin already installed.');
+                    await this.installNpm(dep);
+                }
+                catch (e) {
+                    console.log('Skipping', dep, ':', e.message);
+                }
+            });
+
             const npmPackage = packageJson.name;
             const plugin = await this.datastore.tryGet(Plugin, npmPackage) || new Plugin();
 

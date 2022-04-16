@@ -7,9 +7,9 @@ import { SystemManager } from '@scrypted/types';
 import axios, { AxiosResponse } from 'axios';
 import semver from 'semver';
 const pluginSnapshot = require("!!raw-loader!./plugin-snapshot.ts").default.split('\n')
-.filter(line => !line.includes('SCRYPTED_FILTER_EXAMPLE_LINE'))
-.join('\n')
-.trim();
+    .filter(line => !line.includes('SCRYPTED_FILTER_EXAMPLE_LINE'))
+    .join('\n')
+    .trim();
 
 import { getComponentWebPath } from "../helpers";
 const componentPath = getComponentWebPath('script');
@@ -62,34 +62,12 @@ export async function checkUpdate(npmPackage: string, npmPackageVersion: string)
     };
 }
 
-export function installNpm(systemManager: SystemManager, npmPackage: string, version?: string, installedSet?: Set<string>): Promise<string> {
-    if (!installedSet)
-        installedSet = new Set();
-    if (installedSet.has(npmPackage))
-        return;
-    installedSet.add(npmPackage);
+export async function installNpm(systemManager: SystemManager, npmPackage: string, version?: string): Promise<string> {
     let suffix = version ? `/${version}` : '';
-    const scryptedId = axios.post(
+    const response = await axios.post(
         `${componentPath}/install/${npmPackage}${suffix}`
-    ).then(response => response.data.id);
-
-    scryptedId.then(async (id) => {
-        const plugins = await systemManager.getComponent('plugins');
-        const packageJson = await plugins.getPackageJson(npmPackage);
-        for (const dep of packageJson.scrypted.pluginDependencies || []) {
-            try {
-                const depId = await plugins.getIdForPluginId(dep);
-                if (depId)
-                    throw new Error('Plugin already installed.');
-                installNpm(systemManager, dep, undefined, installedSet);
-            }
-            catch (e) {
-                console.log('Skipping', dep, ':', e.message);
-            }
-        }
-    });
-
-    return scryptedId;
+    );
+    return response.data.id;
 }
 
 export function getNpmPath(npmPackage: string) {
