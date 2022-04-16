@@ -38,7 +38,7 @@ interface DeviceProxyPair {
     proxy: ScryptedDevice;
 }
 
-const MIN_SCRYPTED_CORE_VERSION = 'v0.0.217';
+const MIN_SCRYPTED_CORE_VERSION = 'v0.0.237';
 const PLUGIN_DEVICE_STATE_VERSION = 2;
 
 interface HttpPluginData {
