@@ -50,8 +50,6 @@ class EventStream:
 
         await asyncio.sleep(interval)
         while not self.event_stream_stop_event.is_set():
-            empty_queues = []
-
             for key, q in self.queues.items():
                 items = []
                 num_dropped = 0
@@ -72,50 +70,63 @@ class EventStream:
                 if num_dropped > 0:
                     logger.debug(f"Cleaned {num_dropped} events from queue {key}")
 
-                if q.empty():
-                    empty_queues.append(key)
-
-            for key in empty_queues:
-                del self.queues[key]
-                logger.debug(f"Removed empty queue {key}")
-
             await asyncio.sleep(interval)
 
     def _gen_client_number(self):
         return random.randint(1000000000, 9999999999)
 
     async def get(self, resource, actions, skip_uuids={}):
-        while True:
-            for action in actions:
-                key = f"{resource}/{action}"
-                if key not in self.queues:
+        if len(actions) == 1:
+            action = actions[0]
+            key = f"{resource}/{action}"
+
+            while key not in self.queues:
+                await asyncio.sleep(0.5)
+            q = self.queues[key]
+
+            while True:
+                event = await q.get()
+                q.task_done()
+
+                if event.expired:
                     continue
-
-                q = self.queues[key]
-                if q.empty():
-                    continue
-
-                first_requeued = None
-                while not q.empty():
-                    event = q.get_nowait()
-                    q.task_done()
-
-                    if first_requeued is not None and first_requeued is event:
-                        # if we reach here, we've cycled through the whole queue
-                        # and found nothing for us, so go to the next queue
-                        q.put_nowait(event)
-                        break
-
-                    if event.expired:
+                elif event.uuid in skip_uuids:
+                    q.put_nowait(event)
+                    await asyncio.sleep(random.uniform(0, 0.01))
+                else:
+                    return event, action
+        else:
+            while True:
+                for action in actions:
+                    key = f"{resource}/{action}"
+                    if key not in self.queues:
                         continue
-                    elif event.uuid in skip_uuids:
-                        q.put_nowait(event)
 
-                        if first_requeued is None:
-                            first_requeued = event
-                    else:
-                        return event, action
-            await asyncio.sleep(random.uniform(0, 0.01))
+                    q = self.queues[key]
+                    if q.empty():
+                        continue
+
+                    first_requeued = None
+                    while not q.empty():
+                        event = q.get_nowait()
+                        q.task_done()
+
+                        if first_requeued is not None and first_requeued is event:
+                            # if we reach here, we've cycled through the whole queue
+                            # and found nothing for us, so go to the next queue
+                            q.put_nowait(event)
+                            break
+
+                        if event.expired:
+                            continue
+                        elif event.uuid in skip_uuids:
+                            q.put_nowait(event)
+
+                            if first_requeued is None:
+                                first_requeued = event
+                        else:
+                            return event, action
+                await asyncio.sleep(random.uniform(0, 0.01))
 
     async def start(self):
         if self.event_stream is not None:
