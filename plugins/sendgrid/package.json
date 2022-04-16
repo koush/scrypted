@@ -1,0 +1,38 @@
+{
+   "name": "@scrypted/sendgrid",
+   "version": "0.0.1",
+   "description": "Twilio SendGrid Plugin for Scrypted",
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "twilio",
+      "sendgrid",
+      "email"
+   ],
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "scrypted": {
+      "name": "Twilio SendGrid Plugin",
+      "type": "Notifier",
+      "interfaces": [
+         "Settings",
+         "Notifier"
+      ]
+   },
+   "dependencies": {
+      "@sendgrid/mail": "7.6.2"
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/node": "^17.0.24"
+   }
+}
