@@ -62,11 +62,10 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
   provider: EcobeeController;
   on: boolean;
 
-  constructor(nativeId: string, provider: EcobeeController, info: DeviceInformation) {
+  constructor(nativeId: string, provider: EcobeeController) {
     super(nativeId);
     this.provider = provider;
     this.revisionList = null;
-    this.info = info;
 
     this.temperatureUnit = TemperatureUnit.F
     const modes: ThermostatMode[] = [ThermostatMode.Cool, ThermostatMode.Heat, ThermostatMode.Auto, ThermostatMode.Off];
@@ -230,6 +229,10 @@ class EcobeeThermostat extends ScryptedDeviceBase implements HumiditySensor, The
 
   async setHumidity(humidity: HumidityCommand): Promise<void> {
     this.console.log(`setHumidity ${humidity.mode} ${humidity.humidifierSetpoint}: not yet supported`);
+  }
+
+  async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {
+    this.temperatureUnit = temperatureUnit;
   }
   
   async setThermostatMode(mode: ThermostatMode): Promise<void> {
@@ -623,7 +626,7 @@ class EcobeeController extends ScryptedDeviceBase implements DeviceProvider, Set
     for (let device of devices) {
       let providerDevice = this.devices.get(device.nativeId);
       if (!providerDevice) {
-        providerDevice = new EcobeeThermostat(device.nativeId, this, device.info)
+        providerDevice = new EcobeeThermostat(device.nativeId, this)
         this.devices.set(device.nativeId, providerDevice)
       }
     }
