@@ -185,6 +185,15 @@ class Arlo(object):
         This call registers the device (which should be the basestation) so that events will be sent to the EventStream
         when subsequent calls to /notify are made.
         """
+        async def heartbeat(self, basestations, interval=30):
+            while self.event_stream and self.event_stream.connected:
+                for basestation in basestations:
+                    try:
+                        self.Ping(basestation)
+                    except:
+                        pass
+                await asyncio.sleep(interval)
+
         if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
             self.event_stream = EventStream(self)
             await self.event_stream.start()
@@ -192,10 +201,55 @@ class Arlo(object):
         while not self.event_stream.connected:
             await asyncio.sleep(0.5)
 
-        self.event_stream.subscribe([
-            f"d/{basestation['xCloudId']}/out/cameras/{camera['deviceId']}/#"
-            for basestation, camera in basestation_camera_tuples
-        ])
+        # if tuples are provided, then this is the Subscribe initiated
+        # by the top level plugin, and we should add mqtt subscriptions
+        # and register basestation heartbeats
+        if len(basestation_camera_tuples) > 0:
+            # find unique basestations and cameras
+            basestations, cameras = {}, {}
+            for basestation, camera in basestation_camera_tuples:
+                basestations[basestation['deviceId']] = basestation
+                cameras[camera['deviceId']] = camera
+
+            # filter out cameras without basestation, where they are their own basestations
+            proper_basestations = {}
+            for basestation in basestations.values():
+                if basestation['deviceId'] == basestation.get('parentId'):
+                    continue
+                proper_basestations[basestation['deviceId']] = basestation
+
+            logger.info(f"Will send heartbeat to the following basestations: {list(proper_basestations.keys())}")
+
+            # start heartbeat loop with only basestations
+            asyncio.get_event_loop().create_task(heartbeat(self, list(proper_basestations.values())))
+
+            # subscribe to all camera topics
+            topics = [
+                f"d/{basestation['xCloudId']}/out/cameras/{camera['deviceId']}/#"
+                for basestation, camera in basestation_camera_tuples
+            ]
+
+            # subscribe to basestation topics
+            for basestation in basestations.values():
+                x_cloud_id = basestation['xCloudId']
+                topics += [
+                    f"d/{x_cloud_id}/out/wifi/#",
+                    f"d/{x_cloud_id}/out/subscriptions/#",
+                    f"d/{x_cloud_id}/out/audioPlayback/#",
+                    f"d/{x_cloud_id}/out/modes/#",
+                    f"d/{x_cloud_id}/out/basestation/#",
+                    f"d/{x_cloud_id}/out/siren/#",
+                    f"d/{x_cloud_id}/out/devices/#",
+                    f"d/{x_cloud_id}/out/storage/#",
+                    f"d/{x_cloud_id}/out/schedule/#",
+                    f"d/{x_cloud_id}/out/diagnostics/#",
+                    f"d/{x_cloud_id}/out/automaticRevisionUpdate/#",
+                    f"d/{x_cloud_id}/out/audio/#",
+                    f"d/{x_cloud_id}/out/activeAutomations/#",
+                    f"d/{x_cloud_id}/out/lte/#",
+                ]
+
+            self.event_stream.subscribe(topics)
 
     def Unsubscribe(self):
         """ This method stops the EventStream subscription and removes it from the event_stream collection. """
