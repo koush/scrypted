@@ -25,12 +25,9 @@ If recordings dont work, it's generally because of a few reasons, **follow the s
   * The Home Hubs are bugged out and have stopped responding to motion. Reboot all Home Hubs when this happens. **iPads and HomePods, which are wireless, are not reliable Home Hubs.** If you have an iPad as a Home Hub, remove it from acting as a Home Hub from within the iOS Home app. Unfortunately this is not possible to do with HomePods.
   * Your iCloud account is in a bad state. Log out of iCloud on your iPhone, and log back in. Then disable and reenable HomeKit Secure Video on your cameras again.
 
-3) If HomeKit requested the video, but nothing showed up in the timeline, HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
-
-4) The recordings are in a bad format that can't be used by HomeKit. See below for optimal HomeKit Codec Settings. Enabling Transcode Recordings may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load. 
-
-5) If your camera is on a separate VLAN, try disabling that to see if that is the issue.
-
+3) If HomeKit requested the video, but nothing showed up in the timeline:
+  * HomeKit may have decided the motion wasn't worth recording. Set your HomeKit recording options to all motion when testing.
+  * The recordings are in a bad format that can't be used by HomeKit. See below for optimal HomeKit Codec Settings. Enabling Transcode Recordings may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load. 
 
 ### HomeKit Discovery and Pairing Issues
 
