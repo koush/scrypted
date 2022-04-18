@@ -4,6 +4,7 @@ import { once } from 'events';
 export async function read16BELengthLoop(readable: Readable, options: {
   headerLength: number;
   offset?: number;
+  // optionally skip a header, and pause loop parsing until calee resumes.
   skipHeader?: (header: Buffer, resumeRead: () => void) => boolean;
   callback: (header: Buffer, data: Buffer) => void;
 }) {
@@ -32,7 +33,7 @@ export async function read16BELengthLoop(readable: Readable, options: {
         header = readable.read(headerLength);
         if (!header)
           return;
-        if (skipHeader(header, resumeRead)) {
+        if (skipHeader?.(header, resumeRead)) {
           skipCount++;
           header = undefined;
           continue;
