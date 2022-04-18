@@ -9,6 +9,7 @@ import tls from 'tls';
 import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
 import crypto from 'crypto';
 import { timeoutPromise } from './promise-utils';
+import { sleep } from './sleep';
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -347,6 +348,10 @@ export class RtspClient extends RtspBase {
         return this.request('GET_PARAMETER');
     }
 
+    writeGetParameter() {
+        return this.writeRequest('GET_PARAMETER');
+    }
+
     async describe(headers?: Headers) {
         return this.request('DESCRIBE', {
             ...(headers || {}),
@@ -385,6 +390,13 @@ export class RtspClient extends RtspBase {
         return this.request('PLAY', headers);
     }
 
+    writePlay(start: string = '0.000') {
+        const headers: any = {
+            Range: `npt=${start}-`,
+        };
+        return this.writeRequest('PLAY', headers);
+    }
+
     async pause() {
         return this.request('PAUSE');
     }
@@ -397,6 +409,10 @@ export class RtspClient extends RtspBase {
         finally {
             this.client.destroy();
         }
+    }
+
+    writeTeardown() {
+        this.writeRequest('TEARDOWN');
     }
 }
 

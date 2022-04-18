@@ -1,40 +1,124 @@
 import { Readable } from 'stream';
 import { once } from 'events';
 
+export async function read16BELengthLoop(readable: Readable, options: {
+  headerLength: number;
+  offset?: number;
+  skipHeader?: (header: Buffer, resumeRead: () => void) => boolean;
+  callback: (header: Buffer, data: Buffer) => void;
+}) {
+  let error: Error;
+  const { skipHeader, callback } = options;
+  const offset = options.offset || 0;
+  const headerLength = options.headerLength || 2;
+
+  readable.on('error', e => error = e);
+
+  let header: Buffer;
+  let length: number;
+  let skipCount = 0;
+  let readCount = 0;
+
+  const read = () => {
+    while (true) {
+      if (skipCount !== readCount)
+        return;
+      if (!header) {
+        header = readable.read(headerLength);
+        if (!header)
+          return;
+        if (skipHeader(header, () => readCount++)) {
+          skipCount++;
+          header = undefined;
+          return;
+        }
+        length = header.readUInt16BE(offset);
+      }
+      else {
+        const data = readable.read(length);
+        if (!data)
+          return;
+        callback(header, data);
+        header = undefined;
+      }
+    }
+  };
+
+  read();
+  readable.on('readable', read);
+
+  await once(readable, 'end');
+  throw new Error('stream ended');
+}
+
+
+async function readLengthRaw(readable: Readable, length: number): Promise<Buffer> {
+  if (!length) {
+    return Buffer.alloc(0);
+  }
+
+  {
+    const ret = readable.read(length);
+    if (ret) {
+      return ret;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const r = () => {
+      const ret = readable.read(length);
+      if (ret) {
+        readable.removeListener('readable', r);
+        resolve(ret);
+      }
+    };
+
+
+    readable.on('readable', r);
+  });
+}
+
 export async function readLength(readable: Readable, length: number): Promise<Buffer> {
-    if (!length) {
-        return Buffer.alloc(0);
+  if (readable.readableEnded || readable.destroyed)
+    throw new Error("stream ended");
+
+  if (!length) {
+    return Buffer.alloc(0);
+  }
+
+  {
+    const ret = readable.read(length);
+    if (ret) {
+      return ret;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const r = () => {
+      const ret = readable.read(length);
+      if (ret) {
+        cleanup();
+        resolve(ret);
+        return;
+      }
+
+      if (readable.readableEnded || readable.destroyed)
+        reject(new Error("stream ended during read"));
+    };
+
+    const e = () => {
+      cleanup();
+      reject(new Error(`stream ended during read for minimum ${length} bytes`))
+    };
+
+    const cleanup = () => {
+      readable.removeListener('readable', r);
+      readable.removeListener('end', e);
     }
 
-    {
-        const ret = readable.read(length);
-        if (ret) {
-            return ret;
-        }
-    }
-
-    return new Promise((resolve, reject) => {
-        const r = () => {
-            const ret = readable.read(length);
-            if (ret) {
-                cleanup();
-                resolve(ret);
-            }
-        };
-
-        const e = () => {
-            cleanup();
-            reject(new Error(`stream ended during read for minimum ${length} bytes`))
-        };
-
-        const cleanup = () => {
-            readable.removeListener('readable', r);
-            readable.removeListener('end', e);
-        }
-
-        readable.on('readable', r);
-        readable.on('end', e);
-    });
+    readable.on('readable', r);
+    readable.on('end', e);
+  });
 }
 
 const CHARCODE_NEWLINE = '\n'.charCodeAt(0);

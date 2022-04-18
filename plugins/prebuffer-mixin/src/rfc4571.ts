@@ -1,6 +1,6 @@
 import { cloneDeep } from "@scrypted/common/src/clone-deep";
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { readLength } from "@scrypted/common/src/read-stream";
+import { read16BELengthLoop, readLength } from "@scrypted/common/src/read-stream";
 import { findH264NaluType, H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
@@ -20,7 +20,11 @@ export function connectRFC4571Parser(url: string) {
 
 export type RtspChannelCodecMapping = { [key: number]: string };
 
-export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspMapping?: RtspChannelCodecMapping): Promise<ParserSession<"rtsp">> {
+export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspOptions?: {
+    channelMap: RtspChannelCodecMapping,
+    handleRTSP: () => Promise<void>,
+    onLoop?: () => void,
+}): Promise<ParserSession<"rtsp">> {
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
@@ -79,71 +83,80 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
     let startStream: Buffer;
 
     (async () => {
-        while (true) {
-            let header: Buffer;
-            let length: number;
-            let type: string;
+        const headerLength = rtspOptions?.channelMap ? 4 : 2;
+        const offset = rtspOptions?.channelMap ? 2 : 0;
+        const skipHeader = (header: Buffer, resumeRead: () => void) => {
+            if (header.toString() !== 'RTSP')
+                return false;
+            socket.unshift(header);
+            rtspOptions.handleRTSP().then(resumeRead);
+            return true;
+        }
+        await read16BELengthLoop(socket, {
+            headerLength,
+            offset,
+            skipHeader,
+            callback: (header, data) => {
+                let type: string;
 
-            if (rtspMapping) {
-                header = await readLength(socket, 4);
-                length = header.readUInt16BE(2);
-                const channel = header.readUInt8(1);
-                type = rtspMapping[channel];
-            }
-            else {
-                header = await readLength(socket, 2);
-                length = header.readUInt16BE(0);
-            }
+                rtspOptions?.onLoop?.();
 
-            const data = await readLength(socket, length);
-            const pt = data[1] & 0x7f;
-
-            if (!rtspMapping) {
-                const prefix = Buffer.alloc(2);
-                prefix[0] = RTSP_FRAME_MAGIC;
-                if (pt === audioPt) {
-                    prefix[1] = 0;
+                if (rtspOptions?.channelMap) {
+                    const channel = header.readUInt8(1);
+                    type = rtspOptions?.channelMap[channel];
                 }
-                else if (pt === videoPt) {
-                    prefix[1] = 2;
-                }
-                header = Buffer.concat([prefix, header]);
+                else {
+                    const pt = data[1] & 0x7f;
 
-                if (pt === audioPt)
-                    type = inputAudioCodec;
-                else if (pt === videoPt)
-                    type = inputVideoCodec;
-            }
-
-            const chunk: StreamChunk = {
-                startStream,
-                chunks: [header, data],
-                type,
-            };
-
-            if (!inputVideoResolution) {
-                const sps = findH264NaluType(chunk, H264_NAL_TYPE_SPS);
-                if (sps) {
-                    try {
-                        const parsedSps = spsParse(sps);
-                        inputVideoResolution = getSpsResolution(parsedSps);
-                        console.log(inputVideoResolution);
-                        console.log('parsed bitstream sps', parsedSps);
+                    const prefix = Buffer.alloc(2);
+                    prefix[0] = RTSP_FRAME_MAGIC;
+                    if (pt === audioPt) {
+                        prefix[1] = 0;
                     }
-                    catch (e) {
-                        console.warn('sps parsing failed');
-                        inputVideoResolution = {
-                            width: NaN,
-                            height: NaN,
+                    else if (pt === videoPt) {
+                        prefix[1] = 2;
+                    }
+                    header = Buffer.concat([prefix, header]);
+
+                    if (pt === audioPt)
+                        type = inputAudioCodec;
+                    else if (pt === videoPt)
+                        type = inputVideoCodec;
+                }
+
+                const chunk: StreamChunk = {
+                    startStream,
+                    chunks: [header, data],
+                    type,
+                };
+
+                if (!inputVideoResolution) {
+                    const sps = findH264NaluType(chunk, H264_NAL_TYPE_SPS);
+                    if (sps) {
+                        try {
+                            const parsedSps = spsParse(sps);
+                            inputVideoResolution = getSpsResolution(parsedSps);
+                            console.log(inputVideoResolution);
+                            console.log('parsed bitstream sps', parsedSps);
+                        }
+                        catch (e) {
+                            console.warn('sps parsing failed');
+                            inputVideoResolution = {
+                                width: NaN,
+                                height: NaN,
+                            }
                         }
                     }
                 }
-            }
 
-            events.emit('rtsp', chunk);
-            resetActivityTimer();
-        }
+                events.emit('rtsp', chunk);
+                resetActivityTimer();
+            }
+        });
     })()
+        .catch(e => {
+            throw e;
+        })
         .finally(kill);
 
 

@@ -97,11 +97,23 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
         kill();
     }
 
+    let lastTime = Date.now();
     function resetActivityTimer() {
-        if (!timeout)
-            return;
+        lastTime = Date.now();
+    }
+
+    function clearActivityTimer() {
         clearTimeout(dataTimeout);
-        dataTimeout = setTimeout(dataKill, timeout);
+    }
+
+    if (timeout) {
+        dataTimeout = setInterval(() => {
+            if (Date.now() > lastTime + timeout) {
+                clearInterval(dataTimeout);
+                dataTimeout = undefined;
+                dataKill();
+            }
+        }, timeout);
     }
 
     events.once('killed', () => clearTimeout(dataTimeout));
@@ -109,6 +121,7 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
     resetActivityTimer();
     return {
         resetActivityTimer,
+        clearActivityTimer,
     }
 }
 

@@ -1,11 +1,12 @@
 
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
+import { getH264EncoderArgs, LIBX264_ENCODER_TITLE } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityTimer, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, H264_NAL_TYPE_IDR, findH264NaluType, RtspClient, RtspServer, RTSP_FRAME_MAGIC, parseSemicolonDelimited } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -18,7 +19,6 @@ import net from 'net';
 import { Duplex } from 'stream';
 import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
-import { getH264EncoderArgs, LIBX264_ENCODER_TITLE } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -44,9 +44,8 @@ const VALID_AUDIO_CONFIGS = [
   TRANSCODE_AUDIO,
 ];
 
-interface PrebufferStreamChunk {
-  chunk: StreamChunk;
-  time: number;
+interface PrebufferStreamChunk extends StreamChunk {
+  time?: number;
 }
 
 interface Prebuffers {
@@ -70,7 +69,6 @@ class PrebufferSession {
   parsers: { [container: string]: StreamParser };
   sdp: Promise<string>;
 
-  detectedIdrInterval: number;
   audioDisabled = false;
 
   mixinDevice: VideoCamera & VideoCameraConfiguration;
@@ -105,6 +103,38 @@ class PrebufferSession {
       this.rtspServerPath = crypto.randomBytes(8).toString('hex');
       this.storage.setItem(rtspServerPathKey, this.rtspServerPath);
     }
+  }
+
+  getDetectedIdrInterval() {
+    const durations: number[] = [];
+    if (this.prebuffers.mp4.length) {
+      let last: number;
+
+      for (const chunk of this.prebuffers.mp4) {
+        if (chunk.type === 'mdat') {
+          if (last)
+            durations.push(chunk.time - last);
+          last = chunk.time;
+        }
+      }
+    }
+    else if (this.prebuffers.rtsp.length) {
+      let last: number;
+
+      for (const chunk of this.prebuffers.rtsp) {
+        if (findH264NaluType(chunk, H264_NAL_TYPE_IDR)) {
+          if (last)
+            durations.push(chunk.time - last);
+          last = chunk.time;
+        }
+      }
+    }
+
+    if (!durations.length)
+      return;
+
+    const total = durations.reduce((prev, current) => prev + current, 0);
+    return total / durations.length;
   }
 
   get maxBitrate() {
@@ -229,7 +259,7 @@ class PrebufferSession {
     const { muxingMp4, rtspMode, defaultMode } = this.getRebroadcastMode();
     for (const prebuffer of (muxingMp4 ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
-      for (const chunk of prebuffer.chunk.chunks) {
+      for (const chunk of prebuffer.chunks) {
         total += chunk.byteLength;
       }
     }
@@ -327,6 +357,7 @@ class PrebufferSession {
         ? `${session.inputVideoResolution?.width}x${session.inputVideoResolution?.height}`
         : 'unknown';
 
+        const idrInterval = this.getDetectedIdrInterval();
       settings.push(
         {
           key: 'detectedResolution',
@@ -350,7 +381,7 @@ class PrebufferSession {
           title: 'Detected Keyframe Interval',
           description: "Configuring your camera to 4 seconds is recommended (IDR aka Frame Interval = FPS * 4 seconds).",
           readonly: true,
-          value: (this.detectedIdrInterval || 0) / 1000 || 'unknown',
+          value: (idrInterval || 0) / 1000 || 'unknown',
         },
       );
     }
@@ -677,26 +708,41 @@ class PrebufferSession {
 
           this.sdp = Promise.resolve(sdp);
           await doSetup(videoSection.control, videoSection.codec);
-          await rtspClient.play();
+          rtspClient.writePlay();
 
-          session = await startRFC4571Parser(this.console, rtspClient.rfc4571, sdp, ffmpegInput.mediaStreamOptions, rbo, mapping);
+          session = await startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {
+            channelMap: mapping,
+            handleRTSP: async () => {
+              await rtspClient.readMessage();
+            },
+            onLoop: () => {
+              if (rtspClient.needKeepAlive) {
+                rtspClient.needKeepAlive = false;
+                rtspClient.writeGetParameter();
+              }
+            }
+          });
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
           session.kill = async () => {
-            cleanupServers();
-            // issue a teardown to upstream to close gracefully but don't rely on it responding.
-            if (!issuedTeardown) {
-              issuedTeardown = true;
-              rtspClient.teardown().finally(sessionKill);
+            try {
+              cleanupServers();
+              // issue a teardown to upstream to close gracefully but don't rely on it responding.
+              if (!issuedTeardown) {
+                issuedTeardown = true;
+                rtspClient.writeTeardown();
+              }
+              await sleep(500);
             }
-            await sleep(500);
-            rtspClient.client.destroy();
-            sessionKill();
+            finally {
+              rtspClient.client.destroy();
+              sessionKill();
+            }
           }
           if (!session.isActive)
             throw new Error('parser was killed before rtsp client started');
 
-          rtspClient.readLoop().finally(() => session.kill());
+          rtspClient.client.on('close', () => session.kill());
         }
         catch (e) {
           cleanupServers();
@@ -827,49 +873,22 @@ class PrebufferSession {
 
     for (const container of PrebufferParserValues) {
       let shifts = 0;
+      let prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
 
-      let prevIdr: number;
-      this.detectedIdrInterval = undefined;
-      session.on(container, (chunk: StreamChunk) => {
-        const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
+      session.on(container, (chunk: PrebufferStreamChunk) => {
         const now = Date.now();
 
-        const updateIdr = () => {
-          if (prevIdr) {
-            const sendEvent = typeof this.detectedIdrInterval !== 'number';
-            this.detectedIdrInterval = now - prevIdr;
-            // only on the first idr update should we send a settings refresh.
-            if (sendEvent)
-              deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
-          }
-          prevIdr = now;
-        }
-
-        // this is only valid for mp4, so its no op for everything else
-        // used to detect idr interval.
-        if (chunk.type === 'mdat') {
-          updateIdr();
-        }
-        else if (chunk.type === 'h264') {
-          if (findH264NaluType(chunk, H264_NAL_TYPE_IDR)) {
-            // only update the rtsp computed idr once a minute.
-            // per packet bitscan is not great.
-            updateIdr();
-          }
-        }
-
-        prebufferContainer.push({
-          time: now,
-          chunk,
-        });
+        chunk.time = now;
+        prebufferContainer.push(chunk);
 
         while (prebufferContainer.length && prebufferContainer[0].time < now - prebufferDurationMs) {
           prebufferContainer.shift();
           shifts++;
         }
 
-        if (shifts > 1000) {
-          this.prebuffers[container] = prebufferContainer.slice();
+        if (shifts > 100000) {
+          prebufferContainer = prebufferContainer.slice();
+          this.prebuffers[container] = prebufferContainer;
           shifts = 0;
         }
       });
@@ -960,17 +979,17 @@ class PrebufferSession {
 
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
         if (container !== 'rtsp') {
-          for (const prebuffer of prebufferContainer) {
-            if (prebuffer.time < now - requestedPrebuffer)
+          for (const chunk of prebufferContainer) {
+            if (chunk.time < now - requestedPrebuffer)
               continue;
 
-            safeWriteData(prebuffer.chunk);
+            safeWriteData(chunk);
           }
         }
         else {
           // for some reason this doesn't work as well as simply guessing and dumping.
           const parser = this.parsers[container];
-          const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer).map(pb => pb.chunk));
+          const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer));
           for (const prebuffer of availablePrebuffers) {
             safeWriteData(prebuffer);
           }
@@ -996,10 +1015,11 @@ class PrebufferSession {
 
     const session = await this.parserSessionPromise;
 
+    const idrInterval = this.getDetectedIdrInterval();
     let requestedPrebuffer = options?.prebuffer;
     if (requestedPrebuffer == null) {
       // get into the general area of finding a sync frame.
-      requestedPrebuffer = Math.max(4000, (this.detectedIdrInterval || 4000)) * 1.5;
+      requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
     }
 
     const { rtspMode } = this.getRebroadcastMode();
@@ -1010,7 +1030,7 @@ class PrebufferSession {
     // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
     // rewind a little bit earlier to gaurantee a valid full segment of that length is sent.
     if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
-      requestedPrebuffer += (this.detectedIdrInterval || 4000) * 1.5;
+      requestedPrebuffer += (idrInterval || 4000) * 1.5;
     }
 
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
@@ -1098,7 +1118,7 @@ class PrebufferSession {
     for (const prebuffer of prebufferContainer) {
       if (prebuffer.time < now - requestedPrebuffer)
         continue;
-      for (const chunk of prebuffer.chunk.chunks) {
+      for (const chunk of prebuffer.chunks) {
         available += chunk.length;
       }
     }
@@ -1494,7 +1514,8 @@ class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider
         await server.handlePlayback();
         const session = await prebufferSession.parserSessionPromise;
 
-        const requestedPrebuffer = Math.max(4000, (prebufferSession.detectedIdrInterval || 4000)) * 1.5;
+        const idrInterval = prebufferSession.getDetectedIdrInterval();
+        const requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
 
         prebufferSession.handleRebroadcasterClient({
           isActiveClient: true,
