@@ -3,6 +3,7 @@ import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/comm
 import { read16BELengthLoop, readLength } from "@scrypted/common/src/read-stream";
 import { findH264NaluType, H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
+import { sleep } from "@scrypted/common/src/sleep";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
 import net from 'net';
@@ -20,11 +21,13 @@ export function connectRFC4571Parser(url: string) {
 
 export type RtspChannelCodecMapping = { [key: number]: string };
 
-export async function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspOptions?: {
+const RTSP_BUFFER = Buffer.from('RTSP');
+
+export function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspOptions?: {
     channelMap: RtspChannelCodecMapping,
     handleRTSP: () => Promise<void>,
     onLoop?: () => void,
-}): Promise<ParserSession<"rtsp">> {
+}): ParserSession<"rtsp"> {
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
@@ -80,13 +83,15 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
             console.warn('sdp sps parsing failed');
         }
     }
-    let startStream: Buffer;
 
     (async () => {
+        // don't start parsing until next tick, to prevent missed packets.
+        await sleep(0);
+
         const headerLength = rtspOptions?.channelMap ? 4 : 2;
         const offset = rtspOptions?.channelMap ? 2 : 0;
         const skipHeader = (header: Buffer, resumeRead: () => void) => {
-            if (header.toString() !== 'RTSP')
+            if (header.compare(RTSP_BUFFER))
                 return false;
             socket.unshift(header);
             rtspOptions.handleRTSP().then(resumeRead);
@@ -125,7 +130,6 @@ export async function startRFC4571Parser(console: Console, socket: Readable, sdp
                 }
 
                 const chunk: StreamChunk = {
-                    startStream,
                     chunks: [header, data],
                     type,
                 };

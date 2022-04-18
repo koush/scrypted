@@ -708,9 +708,12 @@ class PrebufferSession {
 
           this.sdp = Promise.resolve(sdp);
           await doSetup(videoSection.control, videoSection.codec);
-          rtspClient.writePlay();
+          await rtspClient.play();
+          const earlyData = rtspClient.rfc4571.read();
+          if (earlyData)
+            rtspClient.client.unshift(earlyData);
 
-          session = await startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {
+          session = startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {
             channelMap: mapping,
             handleRTSP: async () => {
               await rtspClient.readMessage();

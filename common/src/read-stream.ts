@@ -18,6 +18,11 @@ export async function read16BELengthLoop(readable: Readable, options: {
   let length: number;
   let skipCount = 0;
   let readCount = 0;
+  
+  const resumeRead = () => {
+    readCount++;
+    read();
+  }
 
   const read = () => {
     while (true) {
@@ -27,10 +32,10 @@ export async function read16BELengthLoop(readable: Readable, options: {
         header = readable.read(headerLength);
         if (!header)
           return;
-        if (skipHeader(header, () => readCount++)) {
+        if (skipHeader(header, resumeRead)) {
           skipCount++;
           header = undefined;
-          return;
+          continue;
         }
         length = header.readUInt16BE(offset);
       }

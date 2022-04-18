@@ -129,7 +129,6 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
 export async function startParserSession<T extends string>(ffmpegInput: FFmpegInput, options: ParserOptions<T>): Promise<ParserSession<T>> {
     const { console } = options;
 
-    let ffmpegIncomingConnectionTimeout: NodeJS.Timeout;
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
@@ -139,12 +138,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     let inputVideoCodec: string;
     let inputVideoResolution: string[];
 
-    let ffmpegStartedResolve: any;
-    let ffmpegStartedReject: any;
-    const connectPromise = new Promise((r, rj) => {
-        ffmpegStartedResolve = r;
-        ffmpegStartedReject = rj;
-    });
     let sessionKilled: any;
     const killed = new Promise<void>(resolve => {
         sessionKilled = resolve;
@@ -156,16 +149,12 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
             events.emit('error', new Error('killed'));
         }
         isActive = false;
-        clearTimeout(ffmpegIncomingConnectionTimeout);
         sessionKilled();
-        ffmpegStartedReject?.(new Error('ffmpeg was killed before connecting to the rebroadcast session'));
         safeKillFFmpeg(cp);
     }
 
 
     const args = ffmpegInput.inputArguments.slice();
-
-    ffmpegIncomingConnectionTimeout = setTimeout(kill, 30000);
 
     let needSdp = false;
 
@@ -203,7 +192,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
             (async () => {
                 for await (const chunk of parser.parseDatagram(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
-                    ffmpegStartedResolve?.(undefined);
                     events.emit(container, chunk);
                     resetActivityTimer();
                 }
@@ -211,7 +199,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
             (async () => {
                 for await (const chunk of parser.parseDatagram(rtcp, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]), 'rtcp')) {
-                    ffmpegStartedResolve?.(undefined);
                     events.emit(container, chunk);
                     resetActivityTimer();
                 }
@@ -234,7 +221,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
                     ensureActive(() => socket.destroy());
 
                     for await (const chunk of parser.parse(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
-                        ffmpegStartedResolve?.(undefined);
                         events.emit(container, chunk);
                         resetActivityTimer();
                     }
@@ -295,7 +281,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
             const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
 
             for await (const chunk of parser.parse(pipe as any, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
-                ffmpegStartedResolve?.(undefined);
                 events.emit(container, chunk);
                 resetActivityTimer();
             }
@@ -310,11 +295,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     parseAudioCodec(cp).then(result => inputAudioCodec = result);
     parseVideoCodec(cp).then(result => inputVideoCodec = result);
     parseResolution(cp).then(result => inputVideoResolution = result);
-
-    await connectPromise;
-    ffmpegStartedResolve = undefined;
-    ffmpegStartedReject = undefined;
-    clearTimeout(ffmpegIncomingConnectionTimeout);
 
     return {
         sdp,
@@ -348,7 +328,6 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
                     codec: inputAudioCodec,
                 }
             }
-
 
             return ret;
         },
