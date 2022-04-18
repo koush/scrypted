@@ -561,16 +561,17 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 try {
                     peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
                     pluginConsole?.log('plugin successfully loaded');
-                    await options?.onPluginReady?.(ret, params, exports.default);
 
-                    const defaultExport = exports.default;
+                    let pluginInstance = exports.default;
                     // support exporting a plugin class, plugin main function,
                     // or a plugin instance
-                    if (defaultExport.toString().startsWith('class '))
-                        return new defaultExport();
-                    if (typeof defaultExport === 'function')
-                        return await defaultExport();
-                    return defaultExport;
+                    if (pluginInstance.toString().startsWith('class '))
+                        pluginInstance = new pluginInstance();
+                    if (typeof pluginInstance === 'function')
+                        pluginInstance = await pluginInstance();
+
+                    await options?.onPluginReady?.(ret, params, pluginInstance);
+                    return pluginInstance;
                 }
                 catch (e) {
                     pluginConsole?.error('plugin failed to start', e);

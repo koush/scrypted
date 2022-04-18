@@ -125,6 +125,8 @@ export class SystemManagerImpl implements SystemManager {
     getDeviceByName(name: string): any {
         for (const id of Object.keys(this.state)) {
             const s = this.state[id];
+            if ((s.interfaces?.value as string[])?.includes(ScryptedInterface.ScryptedPlugin) && s.pluginId?.value === name)
+                return this.getDeviceById(id);
             if (s.name.value === name)
                 return this.getDeviceById(id);
         }
