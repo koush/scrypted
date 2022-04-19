@@ -56,8 +56,12 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     catch (e) {
     }
 
-    // Have only ever seen 20 and 60 sent here. 60 is remote stream and watch.
-    const isLowBandwidth = request.audio.packet_time > 20;
+    // Observed packet times:
+    // Opus (Local): 20
+    // Opus (Remote): 60
+    // AAC-ELD (Local): 30
+    // AAC-ELD (Remote): 60
+    const isLowBandwidth = request.audio.packet_time >= 60;
 
     // watch is 448x368 and requests 320x240, everything else is > ~1280...
     // future proof-ish for higher resolution watch.
