@@ -23,7 +23,11 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                 codecs: undefined,
                 headerExtensions: undefined,
             },
-        }
+        },
+        screen: {
+            width: screen.width,
+            height: screen.height,
+        },
     };
 
     constructor(public peerConnectionCreated?: (pc: RTCPeerConnection) => Promise<void>, public cleanup?: () => void) {

@@ -2120,6 +2120,10 @@ export interface RTCSignalingOptions {
     audio?: RTCRtpCapabilities;
   };
   userAgent?: string;
+  screen?: {
+    width: number;
+    height: number;
+  };
 }
 
 export interface RTCSessionControl {
