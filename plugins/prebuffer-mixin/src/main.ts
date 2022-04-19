@@ -12,13 +12,14 @@ import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { createFragmentedMp4Parser, createMpegTsParser, parseMp4StreamChunks, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
 import dgram from 'dgram';
 import net from 'net';
 import { Duplex } from 'stream';
 import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
+import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -1172,6 +1173,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     let h264EncoderArguments: string[];
     let destinationVideoBitrate: number;
 
+    const transcodingEnabled = this.mixins?.includes(getTranscodeMixinProviderId());
+
     const msos = await this.mixinDevice.getVideoStreamOptions();
     let result: {
       stream: ResponseMediaStreamOptions,
@@ -1212,7 +1215,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       // encourage users at every step to configure proper codecs.
       // for this reason, do not automatically supply h264 encoder arguments
       // even if h264 is requested, to force a visible failure.
-      if (this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
+      if (transcodingEnabled && this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
         h264EncoderArguments = this.plugin.storageSettings.values.h264EncoderArguments?.split(' ');
       }
     }
@@ -1225,12 +1228,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     ffmpegInput.h264EncoderArguments = h264EncoderArguments;
     ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
 
-    if (this.streamSettings.storageSettings.values.missingCodecParameters) {
+    if (transcodingEnabled && this.streamSettings.storageSettings.values.missingCodecParameters) {
       ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
       ffmpegInput.h264FilterArguments.push("-bsf:v", "dump_extra");
     }
 
-    ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
+    if (transcodingEnabled)
+      ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
     return mediaManager.createFFmpegMediaObject(ffmpegInput, {
       sourceId: this.id,
     });
@@ -1418,7 +1422,7 @@ function millisUntilMidnight() {
   return (midnight.getTime() - new Date().getTime());
 }
 
-class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings {
+export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider {
   storageSettings = new StorageSettings(this, {
     rebroadcastPort: {
       title: 'Rebroadcast Port',
@@ -1472,6 +1476,22 @@ class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider
     setTimeout(() => deviceManager.requestRestart(), twoAM);
 
     this.startRtspServer();
+
+    process.nextTick(() => {
+      deviceManager.onDeviceDiscovered({
+        nativeId: TRANSCODE_MIXIN_PROVIDER_NATIVE_ID,
+        name: 'Transcoding',
+        interfaces: [
+          ScryptedInterface.MixinProvider,
+        ],
+        type: ScryptedDeviceType.API,
+      });
+    });
+  }
+
+  getDevice(nativeId: string) {
+    if (nativeId === TRANSCODE_MIXIN_PROVIDER_NATIVE_ID)
+      return new TranscodeMixinProvider(this);
   }
 
   getSettings(): Promise<Setting[]> {
@@ -1600,7 +1620,7 @@ class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
-    const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online];
+    const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online, REBROADCAST_MIXIN_INTERFACE_TOKEN];
     if (interfaces.includes(ScryptedInterface.VideoCameraConfiguration))
       ret.push(ScryptedInterface.VideoCameraConfiguration);
     return ret;
