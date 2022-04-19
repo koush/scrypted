@@ -224,10 +224,11 @@ export async function createRTCPeerConnectionSink(
                 || mediaStreamOptions?.video?.codec !== 'h264'
                 || ffmpegInput.h264EncoderArguments?.length;
             if (transcode || maximumCompatibilityMode) {
-                const bitrate = maximumCompatibilityMode ? 500000 : ffmpegInput.destinationVideoBitrate || 500000;
+                const bitrate = maximumCompatibilityMode ? 500000 : (ffmpegInput.destinationVideoBitrate || 500000);
+                const width = Math.min(options?.screen?.width || 960, 1280);
                 videoArgs.push(
                     // this might get wonky with 4:3?
-                    '-vf', "scale='min(960,iw)':-2",
+                    '-vf', `scale='min(${width},iw)':-2`,
                     // this seems to cause issues with presets i think.
                     // '-level:v', '4.0',
                     "-b:v", bitrate.toString(),
@@ -242,11 +243,8 @@ export async function createRTCPeerConnectionSink(
                         ...getDebugModeH264EncoderArgs(),
                     );
 
-                    // this setting is heavily dependent on the bitrate being able to support it.
-                    // if the bitrate is too low it will chop.
-                    // however, it seems to always chop on chromecast, regardless of bitrate.
-                    // if (maximumCompatibilityMode)
-                    //     videoArgs.push('-tune', 'zerolatency');
+                    if (sessionSupportsH264High)
+                        videoArgs.push('-tune', 'zerolatency');
                 }
                 else {
                     videoArgs.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
