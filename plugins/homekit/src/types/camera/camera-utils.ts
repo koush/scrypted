@@ -4,6 +4,9 @@ import sdk from '@scrypted/sdk';
 
 const { log } = sdk;
 
+// opus is now the default and aac-eld is no longer usable without this flag being set at compile time.
+export const FORCE_OPUS = true;
+
 export function profileToFfmpeg(profile: H264Profile): string {
     if (profile === H264Profile.HIGH)
         return "high";

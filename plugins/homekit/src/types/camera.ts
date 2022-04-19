@@ -4,6 +4,7 @@ import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } fro
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, OccupancySensor, RecordingManagement, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
+import { FORCE_OPUS } from './camera/camera-utils';
 import { makeAccessory } from './common';
 
 const { deviceManager, systemManager } = sdk;
@@ -20,10 +21,7 @@ addSupportedType({
         const storage = deviceManager.getMixinStorage(device.id, undefined);
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
-        // webrtc cameras (like ring and nest) must provide opus.
-        // use this hint to force opus usage. even if opus is not returned,
-        // for whatever reason, it will be transcoded to opus and that path will be used.
-        const forceOpus = homekitSession.storage.getItem('forceOpus') !== 'false';
+        const forceOpus = FORCE_OPUS;
 
         const codecs: AudioStreamingCodec[] = [];
         // homekit seems to prefer AAC_ELD if it is offered.
