@@ -1,35 +1,16 @@
-export async function startRTCSignalingSession(session, offer, console, createSetup, setRemoteDescription, addIceCandidate) {
+function getUserAgent() {
     try {
-        const setup = await createSetup();
-        // console.log('offer', offer?.sdp, 'rtc setup', setup);
-        if (!offer) {
-            console.log('session.createLocalDescription');
-            const offer = await session.createLocalDescription('offer', setup, addIceCandidate);
-            console.log('rtc offer received');
-            const answer = await setRemoteDescription(offer);
-            console.log('rtc answer received');
-            await session.setRemoteDescription(answer, setup);
-            console.log('session.setRemoteDescription done');
-        }
-        else {
-            console.log('session.setRemoteDescription');
-            await session.setRemoteDescription(offer, setup);
-            console.log('session.createLocalDescription');
-            const answer = await session.createLocalDescription('answer', setup, addIceCandidate);
-            console.log('rtc answer received');
-            await setRemoteDescription(answer);
-            console.log('session.setRemoteDescription done');
-        }
+        return navigator.userAgent;
     }
     catch (e) {
-        console.error('RTC signaling failed', e);
-        throw e;
     }
 }
 export class BrowserSignalingSession {
+    peerConnectionCreated;
+    cleanup;
     pc;
-    hasSetup = false;
     options = {
+        userAgent: getUserAgent(),
         capabilities: {
             audio: RTCRtpReceiver.getCapabilities?.('audio') || {
                 codecs: undefined,
@@ -39,54 +20,102 @@ export class BrowserSignalingSession {
                 codecs: undefined,
                 headerExtensions: undefined,
             },
-        }
+        },
+        screen: {
+            width: screen.width,
+            height: screen.height,
+        },
     };
-    constructor(pc, cleanup) {
-        this.pc = pc;
-        const checkConn = () => {
-            console.log('iceConnectionState state', pc.iceConnectionState);
-            console.log('connectionState', pc.connectionState);
-            if (pc.iceConnectionState === 'disconnected'
-                || pc.iceConnectionState === 'failed'
-                || pc.iceConnectionState === 'closed') {
-                cleanup();
-            }
-            if (pc.connectionState === 'closed'
-                || pc.connectionState === 'disconnected'
-                || pc.connectionState === 'failed') {
-                cleanup();
-            }
-        };
-        pc.addEventListener('connectionstatechange', checkConn);
-        pc.addEventListener('iceconnectionstatechange', checkConn);
+    constructor(peerConnectionCreated, cleanup) {
+        this.peerConnectionCreated = peerConnectionCreated;
+        this.cleanup = cleanup;
     }
     async getOptions() {
         return this.options;
     }
-    createPeerConnection(setup) {
-        if (this.hasSetup)
+    async createPeerConnection(setup) {
+        if (this.pc)
             return;
-        this.hasSetup = true;
+        const checkConn = () => {
+            console.log('iceConnectionState', pc.iceConnectionState);
+            console.log('connectionState', pc.connectionState);
+            if (pc.iceConnectionState === 'disconnected'
+                || pc.iceConnectionState === 'failed'
+                || pc.iceConnectionState === 'closed') {
+                this.cleanup?.();
+            }
+            if (pc.connectionState === 'closed'
+                || pc.connectionState === 'disconnected'
+                || pc.connectionState === 'failed') {
+                this.cleanup?.();
+            }
+        };
+        const pc = this.pc = new RTCPeerConnection(setup.configuration);
+        await this.peerConnectionCreated?.(pc);
+        pc.addEventListener('connectionstatechange', checkConn);
+        pc.addEventListener('iceconnectionstatechange', checkConn);
+        pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState));
+        pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState));
+        pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'));
         if (setup.datachannel)
             this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
-        this.pc.addTransceiver('audio', setup.audio);
-        this.pc.addTransceiver('video', setup.video);
+        if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
+            try {
+                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                for (const track of mic.getTracks()) {
+                    this.pc.addTrack(track);
+                }
+            }
+            catch (e) {
+                let silence = () => {
+                    let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+                    const dest = ctx.createMediaStreamDestination();
+                    oscillator.connect(dest);
+                    oscillator.start();
+                    return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
+                };
+                this.pc.addTrack(silence());
+            }
+        }
+        else {
+            this.pc.addTransceiver('audio', setup.audio);
+        }
+        if (setup.video.direction === 'sendrecv' || setup.video.direction === 'sendonly') {
+            try {
+                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                const camera = await navigator.mediaDevices.getUserMedia({ video: true });
+                for (const track of camera.getTracks()) {
+                    this.pc.addTrack(track);
+                }
+            }
+            catch (e) {
+                // what now
+            }
+        }
+        else {
+            this.pc.addTransceiver('video', setup.video);
+        }
     }
     async createLocalDescription(type, setup, sendIceCandidate) {
-        this.createPeerConnection(setup);
-        const gatheringPromise = new Promise(resolve => this.pc.onicegatheringstatechange = () => {
-            if (this.pc.iceGatheringState === 'complete')
-                resolve(undefined);
-        });
-        if (sendIceCandidate) {
+        await this.createPeerConnection(setup);
+        const gatheringPromise = new Promise(resolve => {
             this.pc.onicecandidate = ev => {
                 if (ev.candidate) {
                     console.log("local candidate", ev.candidate);
-                    sendIceCandidate(JSON.parse(JSON.stringify(ev.candidate)));
+                    sendIceCandidate?.(JSON.parse(JSON.stringify(ev.candidate)));
+                }
+                else {
+                    resolve(undefined);
                 }
             };
-        }
+            this.pc.onicegatheringstatechange = () => {
+                if (this.pc.iceGatheringState === 'complete')
+                    resolve(undefined);
+            };
+        });
         const toDescription = (init) => {
+            console.log('local description', init.sdp);
             return {
                 type: init.type,
                 sdp: init.sdp,
@@ -121,12 +150,36 @@ export class BrowserSignalingSession {
     }
     async setRemoteDescription(description, setup) {
         await this.pc.setRemoteDescription(description);
+        console.log('remote description', description.sdp);
     }
     async addIceCandidate(candidate) {
-        console.log("remote candidate", candidate);
         await this.pc.addIceCandidate(candidate);
+        console.log("remote candidate", candidate);
     }
     async endSession() {
     }
+}
+function logSendCandidate(console, type, session) {
+    return async (candidate) => {
+        console.log(`${type} trickled candidate:`, candidate.candidate);
+        return session.addIceCandidate(candidate);
+    };
+}
+export async function connectRTCSignalingClients(console, offerClient, offerSetup, answerClient, answerSetup) {
+    const offerOptions = await offerClient.getOptions();
+    const answerOptions = await answerClient.getOptions();
+    const disableTrickle = offerOptions?.disableTrickle || answerOptions?.disableTrickle;
+    if (offerOptions?.offer && answerOptions?.offer)
+        throw new Error('Both RTC clients have offers and can not negotiate. Consider implementing this in @scrypted/webrtc.');
+    if (offerOptions?.requiresOffer && answerOptions.requiresOffer)
+        throw new Error('Both RTC clients require offers and can not negotiate.');
+    offerSetup.type = 'offer';
+    answerSetup.type = 'answer';
+    const offer = await offerClient.createLocalDescription('offer', offerSetup, disableTrickle ? undefined : logSendCandidate(console, 'offer', answerClient));
+    console.log('offer sdp', offer.sdp);
+    await answerClient.setRemoteDescription(offer, answerSetup);
+    const answer = await answerClient.createLocalDescription('answer', answerSetup, disableTrickle ? undefined : logSendCandidate(console, 'answer', offerClient));
+    console.log('answer sdp', answer.sdp);
+    await offerClient.setRemoteDescription(answer, offerSetup);
 }
 //# sourceMappingURL=rtc-signaling.js.map

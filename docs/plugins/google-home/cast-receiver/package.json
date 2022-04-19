@@ -1,6 +1,8 @@
 {
   "dependencies": {
-    "@scrypted/sdk": "file:../../../../sdk"
+    "@scrypted/server": "file:../../../../server",
+    "@scrypted/sdk": "file:../../../../sdk",
+    "typescript": "^4.6.3"
   },
   "devDependencies": {
     "@types/node": "^17.0.18"

@@ -1,7 +1,5 @@
 import { RpcPeer } from "@scrypted/server/src/rpc";
-import type { RTCSignalingSession } from "@scrypted/sdk";
-
-export async function createBrowserSignalingSession(ws: WebSocket, localName: string, remoteName: string) {
+export async function createBrowserSignalingSession(ws, localName, remoteName) {
     const peer = new RpcPeer(localName, remoteName, (message, reject) => {
         const json = JSON.stringify(message);
         try {
@@ -15,7 +13,7 @@ export async function createBrowserSignalingSession(ws: WebSocket, localName: st
         const json = JSON.parse(message.data);
         peer.handleMessage(json);
     };
-
-    const session: RTCSignalingSession = await peer.getParam('session');
+    const session = await peer.getParam('session');
     return session;
 }
+//# sourceMappingURL=rtc-connect.js.map

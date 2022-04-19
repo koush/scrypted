@@ -47,22 +47,20 @@ document.addEventListener("DOMContentLoaded", function (event) {
         rpcPeer.handleMessage(JSON.parse(data));
       });
 
-      const pc = new RTCPeerConnection();
+      const cleanup = () => window.close();
 
-      const session = new BrowserSignalingSession(pc, () => window.close());
+      const session = new BrowserSignalingSession(pc => {
+        pc.ontrack = () => {
+          const mediaStream = new MediaStream(
+            pc.getReceivers().map((receiver) => receiver.track)
+          );
+          video.srcObject = mediaStream;
+        };
+      }, cleanup);
+
       rpcPeer.params['session'] = session;
       // this is deprecated, and part of the session now.
       rpcPeer.params['options'] = session.options;
-
-      pc.ontrack = () => {
-        const mediaStream = new MediaStream(
-          pc.getReceivers().map((receiver) => receiver.track)
-        );
-        video.srcObject = mediaStream;
-        const remoteAudio = document.createElement("audio");
-        remoteAudio.srcObject = mediaStream;
-        remoteAudio.play();
-      };
     });
 
     return null;

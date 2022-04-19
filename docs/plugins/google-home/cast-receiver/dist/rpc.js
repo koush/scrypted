@@ -400,7 +400,7 @@ export class RpcPeer {
                         result.result = this.serialize(value);
                     }
                     catch (e) {
-                        console.error('failure', rpcApply.method, e);
+                        // console.error('failure', rpcApply.method, e);
                         this.createErrorResult(result, e);
                     }
                     if (!rpcApply.oneway)
