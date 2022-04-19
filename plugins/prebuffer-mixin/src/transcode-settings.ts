@@ -1,4 +1,4 @@
-import sdk, { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import sdk, { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { RebroadcastPlugin } from "./main";
 const { deviceManager } = sdk;
 
@@ -12,9 +12,17 @@ export function getTranscodeMixinProviderId() {
     return transcodeMixin?.id;
 }
 
-export class TranscodeMixinProvider extends ScryptedDeviceBase implements MixinProvider {
+export class TranscodeMixinProvider extends ScryptedDeviceBase implements MixinProvider, Settings {
     constructor(public plugin: RebroadcastPlugin) {
         super(TRANSCODE_MIXIN_PROVIDER_NATIVE_ID);
+    }
+
+    getSettings(): Promise<Setting[]> {
+            return this.plugin.transcodeStorageSettings.getSettings();
+    }
+
+    putSetting(key: string, value: SettingValue): Promise<void> {
+        return this.plugin.transcodeStorageSettings.putSetting(key, value);
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {

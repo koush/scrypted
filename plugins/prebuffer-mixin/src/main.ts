@@ -1189,7 +1189,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         case 'medium-resolution':
         case 'remote':
           result = this.streamSettings.getRemoteStream(msos);
-          destinationVideoBitrate = this.plugin.storageSettings.values.remoteStreamingBitrate;
+          destinationVideoBitrate = this.plugin.transcodeStorageSettings.values.remoteStreamingBitrate;
           break;
         case 'low-resolution':
           result = this.streamSettings.getLowResolutionStream(msos);
@@ -1216,7 +1216,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       // for this reason, do not automatically supply h264 encoder arguments
       // even if h264 is requested, to force a visible failure.
       if (transcodingEnabled && this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
-        h264EncoderArguments = this.plugin.storageSettings.values.h264EncoderArguments?.split(' ');
+        h264EncoderArguments = this.plugin.transcodeStorageSettings.values.h264EncoderArguments?.split(' ');
       }
     }
 
@@ -1429,6 +1429,8 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       description: 'The port of the RTSP server that will rebroadcast your streams.',
       type: 'number',
     },
+  });
+  transcodeStorageSettings = new StorageSettings(this, {
     remoteStreamingBitrate: {
       title: 'Remote Streaming Bitrate',
       type: 'number',
@@ -1482,6 +1484,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         nativeId: TRANSCODE_MIXIN_PROVIDER_NATIVE_ID,
         name: 'Transcoding',
         interfaces: [
+          ScryptedInterface.Settings,
           ScryptedInterface.MixinProvider,
         ],
         type: ScryptedDeviceType.API,
