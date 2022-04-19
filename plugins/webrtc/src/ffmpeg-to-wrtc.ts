@@ -2,7 +2,7 @@ import { MediaStreamTrack, RTCPeerConnection } from "@koush/werift";
 import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
-import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-connect";
+import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
