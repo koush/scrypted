@@ -176,6 +176,15 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         onGet: async () => {
             let enabledStreams: StorageSetting;
 
+            const hideTranscode = device.mixins?.includes(getTranscodeMixinProviderId()) ? {
+                hide: false,
+            } : {};
+            const hideTranscodes = {
+                transcodeStreams: hideTranscode,
+                missingCodecParameters: hideTranscode,
+                videoDecoderArguments: hideTranscode,
+            };
+
             try {
                 const msos = await device.mixinDevice.getVideoStreamOptions();
 
@@ -185,10 +194,6 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                     hide: false,
                 };
 
-                const hideTranscode = device.mixins?.includes(getTranscodeMixinProviderId()) ? {
-                    hide: false,
-                } : {};
-
                 if (msos?.length > 1) {
                     return {
                         enabledStreams,
@@ -197,14 +202,13 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                         lowResolutionStream: createStreamOptions(streamTypes.lowResolutionStream, msos),
                         recordingStream: createStreamOptions(streamTypes.recordingStream, msos),
                         remoteRecordingStream: createStreamOptions(streamTypes.remoteRecordingStream, msos),
-                        transcodeStreams: hideTranscode,
-                        missingCodecParameters: hideTranscode,
-                        videoDecoderArguments: hideTranscode,
+                        ...hideTranscodes,
                     }
                 }
                 else {
                     return {
                         enabledStreams,
+                        ...hideTranscodes,
                     }
                 }
             }
@@ -213,6 +217,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             }
 
             return {
+                ...hideTranscodes,
             }
         }
     }

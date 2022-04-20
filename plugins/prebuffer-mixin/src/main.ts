@@ -87,7 +87,7 @@ class PrebufferSession {
   rtspServerPath: string;
   needBitrateReset = false;
 
-  constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: MediaStreamOptions, public stopInactive: boolean) {
+  constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: ResponseMediaStreamOptions, public stopInactive: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
@@ -217,8 +217,8 @@ class PrebufferSession {
       return STRING_DEFAULT;
 
     const defaultValue = rtspMode
-      && mediaStreamOptions?.tool === 'scrypted' ?
-      SCRYPTED_PARSER : STRING_DEFAULT;
+      ? SCRYPTED_PARSER
+      : STRING_DEFAULT;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
     if (!rtspParser || rtspParser === STRING_DEFAULT)
       return defaultValue;
@@ -231,9 +231,9 @@ class PrebufferSession {
     return defaultValue;
   }
 
-  getRebroadcastMode() {
+  getRebroadcastContainer() {
     let mode = this.storage.getItem(this.rebroadcastModeKey) || 'Default';
-    let defaultMode = 'MPEG-TS';
+    let defaultMode = 'RTSP';
     if (this.advertisedMediaStreamOptions?.tool === 'scrypted'
       && this.advertisedMediaStreamOptions?.container?.startsWith('rtsp')) {
       defaultMode = 'RTSP';
@@ -257,7 +257,7 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    const { muxingMp4, rtspMode, defaultMode } = this.getRebroadcastMode();
+    const { muxingMp4, rtspMode, defaultMode } = this.getRebroadcastContainer();
     for (const prebuffer of (muxingMp4 ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunks) {
@@ -271,24 +271,10 @@ class PrebufferSession {
 
     settings.push(
       {
-        title: 'Audio Codec Transcoding',
-        group,
-        description: 'Configuring your camera to output AAC, MP3, MP2, or Opus is recommended. PCM/G711 cameras should set this to Transcode.',
-        type: 'string',
-        key: this.audioConfigurationKey,
-        value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
-        choices: [
-          DEFAULT_AUDIO,
-          AAC_AUDIO_DESCRIPTION,
-          COMPATIBLE_AUDIO_DESCRIPTION,
-          TRANSCODE_AUDIO_DESCRIPTION,
-        ],
-      },
-      {
         title: 'Rebroadcast Container',
         group,
-        description: `Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP is lower latency. The default mode for this camera is ${defaultMode}.`,
-        placeholder: 'MPEG-TS',
+        description: `The container format to use when rebroadcasting. The default mode for this camera is ${defaultMode}.`,
+        placeholder: 'RTSP',
         choices: [
           STRING_DEFAULT,
           'MPEG-TS',
@@ -299,8 +285,22 @@ class PrebufferSession {
       }
     );
 
-    const addFFmpegInputArgumentsSettings = () => {
+    const addFFmpegSettings = () => {
       settings.push(
+        {
+          title: 'Audio Codec Transcoding',
+          group,
+          description: 'Configuring your camera to output Opus, PCM, or AAC is recommended.',
+          type: 'string',
+          key: this.audioConfigurationKey,
+          value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
+          choices: [
+            DEFAULT_AUDIO,
+            AAC_AUDIO_DESCRIPTION,
+            COMPATIBLE_AUDIO_DESCRIPTION,
+            TRANSCODE_AUDIO_DESCRIPTION,
+          ],
+        },
         {
           title: 'FFmpeg Input Arguments Prefix',
           group,
@@ -318,14 +318,12 @@ class PrebufferSession {
       )
     };
 
-
-    if (this.canUseRtspParser(muxingMp4, this.advertisedMediaStreamOptions)
+    if (this.canUseRtspParser(false, this.advertisedMediaStreamOptions)
       && rtspMode
       && this.advertisedMediaStreamOptions?.container === 'rtsp') {
 
-      const value = this.getParser(rtspMode, muxingMp4, this.advertisedMediaStreamOptions);
-      const defaultValue = rtspMode
-        && this.advertisedMediaStreamOptions?.tool === 'scrypted' ?
+      const value = this.getParser(rtspMode, false, this.advertisedMediaStreamOptions);
+      const defaultValue = rtspMode ?
         SCRYPTED_PARSER : 'FFmpeg';
 
       settings.push(
@@ -346,11 +344,11 @@ class PrebufferSession {
 
       if (value !== SCRYPTED_PARSER) {
         // ffmpeg parser is being used, so add ffmpeg input arguments option.
-        addFFmpegInputArgumentsSettings();
+        addFFmpegSettings();
       }
     }
     else {
-      addFFmpegInputArgumentsSettings();
+      addFFmpegSettings();
     }
 
     if (session) {
@@ -358,7 +356,7 @@ class PrebufferSession {
         ? `${session.inputVideoResolution?.width}x${session.inputVideoResolution?.height}`
         : 'unknown';
 
-        const idrInterval = this.getDetectedIdrInterval();
+      const idrInterval = this.getDetectedIdrInterval();
       settings.push(
         {
           key: 'detectedResolution',
@@ -374,7 +372,7 @@ class PrebufferSession {
           title: 'Detected Video/Audio Codecs',
           readonly: true,
           value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
-          description: 'Configuring your camera to H264 video and AAC/MP3/MP2/Opus audio is recommended.'
+          description: 'Configuring your camera to H264 video and Opus, PCM, or AAC audio is recommended.'
         },
         {
           key: 'detectedKeyframe',
@@ -446,7 +444,7 @@ class PrebufferSession {
 
     const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio } = this.getAudioConfig();
 
-    const { rtspMode, muxingMp4 } = this.getRebroadcastMode();
+    const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
 
     let detectedAudioCodec = this.storage.getItem(this.lastDetectedAudioCodecKey) || undefined;
     if (detectedAudioCodec === 'null')
@@ -477,9 +475,9 @@ class PrebufferSession {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
-          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec. Configuring your Camera to use AAC, MP3, MP2, or Opus audio is recommended. If this is not possible, Select 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
+          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec. Configuring your Camera to use Opus, PCM, or AAC audio is recommended. If this is not possible, Select 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
         }
-        this.console.warn('Configure your camera to output AAC, MP3, MP2, or Opus audio. Suboptimal audio codec in use:', assumedAudioCodec);
+        this.console.warn('Configure your camera to output Opus, PCM, or AAC audio. Suboptimal audio codec in use:', assumedAudioCodec);
       }
       else if (!audioSoftMuted && isUsingDefaultAudioConfig && advertisedAudioCodec === undefined && detectedAudioCodec !== undefined) {
         // handling compatible codecs that were unspecified...
@@ -633,15 +631,15 @@ class PrebufferSession {
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
 
-      session = await startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
+      session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
     else {
       const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFmpegInput;
-      sessionMso = ffmpegInput.mediaStreamOptions;
+      sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
-      const parser = this.getParser(rtspMode, muxingMp4, ffmpegInput.mediaStreamOptions);
+      const parser = this.getParser(rtspMode, muxingMp4, sessionMso);
       if (parser === SCRYPTED_PARSER) {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser');
@@ -1026,7 +1024,7 @@ class PrebufferSession {
       requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
     }
 
-    const { rtspMode } = this.getRebroadcastMode();
+    const { rtspMode } = this.getRebroadcastContainer();
     const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
     let container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
