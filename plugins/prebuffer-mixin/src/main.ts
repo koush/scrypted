@@ -331,7 +331,7 @@ class PrebufferSession {
           key: this.rtspParserKey,
           group,
           title: 'RTSP Parser',
-          description: `Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser is lower latency. The Scrypted Parser is only available when the Audo Codec is not Transcoding and the Rebroadcast Container is RTSP. The default is "${defaultValue}" for this camera.`,
+          description: `The RTSP Parser used to read the stream. The default is "${defaultValue}" for this camera.`,
           value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
           choices: [
             STRING_DEFAULT,
@@ -689,6 +689,22 @@ class PrebufferSession {
             channel += 2;
           }
 
+          let setupVideoSection: any;
+          for (const section of parsedSdp.msections) {
+            if (section.type === 'video') {
+              if (setupVideoSection) {
+                this.console.warn('additional video section found. skipping.');
+                continue;
+              }
+              setupVideoSection = section;
+            }
+            else if (section.type !== 'audio') {
+              this.console.warn('unknown section', section.type);
+              continue;
+            }
+            await doSetup(section.control, section.codec)
+          }
+
           // grab all available audio sections
           if (!audioSoftMuted) {
             for (const audioSection of parsedSdp.msections.filter(msection => msection.type === 'audio')) {
@@ -699,14 +715,11 @@ class PrebufferSession {
               this.console.warn('sdp did not contain audio track and audio was not reported as missing.');
           }
 
-          const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
-
           // sdp may contain multiple audio/video sections. take only the first video section.
-          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === videoSection || msection.type === 'audio');
+          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === setupVideoSection || msection.type === 'audio');
           sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
           this.sdp = Promise.resolve(sdp);
-          await doSetup(videoSection.control, videoSection.codec);
           await rtspClient.play();
           const earlyData = rtspClient.rfc4571.read();
           if (earlyData)
@@ -1044,24 +1057,25 @@ class PrebufferSession {
     const codecMap = new Map<string, number>();
 
     if (container === 'rtsp') {
+      let channelsMatch = true;
       const parsedSdp = parseSdp(sdp);
-      if (parsedSdp.msections.length > 2) {
-        parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
-        sdp = parsedSdp.toSdp();
-        filter = chunk => {
-          const channel = codecMap.get(chunk.type);
-          if (channel == undefined)
-            return;
-          const chunks = chunk.chunks.slice();
-          const header = Buffer.from(chunks[0]);
-          header.writeUInt8(channel, 1);
-          chunks[0] = header;
-          return {
-            startStream: chunk.startStream,
-            chunks,
-          }
+      // if (parsedSdp.msections.length > 2) {
+      parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
+      sdp = parsedSdp.toSdp();
+      filter = chunk => {
+        const channel = codecMap.get(chunk.type);
+        if (channel == undefined)
+          return;
+        const chunks = chunk.chunks.slice();
+        const header = Buffer.from(chunks[0]);
+        header.writeUInt8(channel, 1);
+        chunks[0] = header;
+        return {
+          startStream: chunk.startStream,
+          chunks,
         }
       }
+      // }
 
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise.then(async (socket) => {

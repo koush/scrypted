@@ -298,11 +298,17 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
     return {
         sdp,
-        inputAudioCodec,
-        inputVideoCodec,
-        inputVideoResolution: {
-            width: parseInt(inputVideoResolution?.[1]),
-            height: parseInt(inputVideoResolution?.[2]),
+        get inputAudioCodec() {
+            return inputAudioCodec;
+        },
+        get inputVideoCodec() {
+            return inputVideoCodec;
+        },
+        get inputVideoResolution() {
+            return {
+                width: parseInt(inputVideoResolution?.[1]),
+                height: parseInt(inputVideoResolution?.[2]),
+            }
         },
         get isActive() { return isActive },
         kill,
