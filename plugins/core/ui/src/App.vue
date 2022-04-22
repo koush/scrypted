@@ -320,6 +320,10 @@ export default {
         })
         .catch((e) => {
           this.loginResult = e.toString();
+          // cert may need to be reaccepted. force a window reload.
+          if (e.toString().includes('Network Error')) {
+            window.location.reload();
+          }
         });
     },
     async clearAlerts() {
