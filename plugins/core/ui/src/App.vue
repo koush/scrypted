@@ -320,9 +320,10 @@ export default {
         })
         .catch((e) => {
           this.loginResult = e.toString();
-          // cert may need to be reaccepted. force a window reload.
-          if (e.toString().includes('Network Error')) {
-            window.location.reload();
+          // cert may need to be reaccepted? Server is down? Go to the
+          // server root to force the network error to bypass the PWA cache.
+          if (e.toString().includes('Network Error') && window.location.href.startsWith('https:')) {
+            window.location = '/';
           }
         });
     },
