@@ -42,7 +42,8 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
         opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
     }
     else {
-        h264Packetizer = new H264Repacketizer(maxPacketSize);
+        // adjust for rtp header size
+        h264Packetizer = new H264Repacketizer(maxPacketSize - 12);
     }
 
     function sendPacket(rtp: RtpPacket) {
@@ -50,7 +51,7 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
 
         // packet count may be less than zero if rollover counting fails due to heavy packet loss or other
         // unforseen edge cases.
-        if (now > lastRtcp + rtcpInterval * 1000 && packetCount > 0) {
+        if (now > lastRtcp + rtcpInterval * 1000) {
             lastRtcp = now;
             const sr = new RtcpSrPacket({
                 ssrc,

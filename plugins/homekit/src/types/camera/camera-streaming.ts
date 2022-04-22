@@ -21,11 +21,11 @@ const { mediaManager } = sdk;
 const v4Regex = /^[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/
 const v4v6Regex = /^::ffff:[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}$/;
 
-async function getPort(socketType?: SocketType): Promise<{ socket: dgram.Socket, port: number }> {
+async function getPort(socketType: SocketType, address: string): Promise<{ socket: dgram.Socket, port: number }> {
     const socket = dgram.createSocket(socketType || 'udp4');
     while (true) {
         const port = Math.round(10000 + Math.random() * 30000);
-        socket.bind(port);
+        socket.bind(port, address);
         await once(socket, 'listening');
         return { socket, port };
     }
@@ -64,10 +64,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             const videossrc = CameraController.generateSynchronisationSource();
             const audiossrc = CameraController.generateSynchronisationSource();
+            const addressOverride = homekitSession.storage.getItem('addressOverride');
 
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-            const { socket: videoReturn, port: videoPort } = await getPort(socketType);
-            const { socket: audioReturn, port: audioPort } = await getPort(socketType);
+            const { socket: videoReturn, port: videoPort } = await getPort(socketType, addressOverride);
+            const { socket: audioReturn, port: audioPort } = await getPort(socketType, addressOverride);
 
             const session: CameraStreamingSession = {
                 aconfig: {
@@ -117,7 +118,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             }
 
             // plugin scope or device scope?
-            const addressOverride = homekitSession.storage.getItem('addressOverride');
             if (addressOverride) {
                 console.log('using address override', addressOverride);
                 response.addressOverride = addressOverride;
