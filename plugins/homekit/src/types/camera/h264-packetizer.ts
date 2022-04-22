@@ -14,7 +14,7 @@ export class H264Repacketizer {
 
     constructor(public maxPacketSize: number) {
         // 12 is the rtp/srtp header size.
-        this.fuaMax = maxPacketSize - 12 - FU_A_HEADER_SIZE;;
+        this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;;
     }
 
     // a fragmentation unit (fua) is a NAL unit broken into multiple fragments.
@@ -163,7 +163,7 @@ export class H264Repacketizer {
         rtp.payload = data;
         rtp.header.marker = marker;
         const ret = rtp.serialize();
-        if (ret.length > this.maxPacketSize)
+        if (data.length > this.maxPacketSize)
             console.warn('packet exceeded max packet size. this may a bug.');
         return ret;
     }

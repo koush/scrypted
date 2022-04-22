@@ -1,6 +1,8 @@
 import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { StorageSetting, StorageSettings } from "@scrypted/common/src/settings";
-import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
+import sdk, { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
+import { getTranscodeMixinProviderId } from "./transcode-settings";
+
 
 export function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[]) {
     if (!msos)
@@ -104,6 +106,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             description: 'The media streams to transcode. Transcoding audio and video is not recommended and should only be used when necessary. The Rebroadcast Plugin manages the system-wide Transcode settings. See the Rebroadcast Readme for optimal configuration.',
             multiple: true,
             choices: Object.values(streamTypes).map(st => st.title),
+            hide: true,
         },
         // 3/6/2022
         // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
@@ -117,6 +120,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             title: 'Add H264 Extra Data',
             description: 'Some cameras do not include H264 extra data in the stream and this causes live streaming to always fail (but recordings may be working). This is a inexpensive video filter and does not perform a transcode. Enable this setting only as necessary.',
             type: 'boolean',
+            hide: true,
         },
         videoDecoderArguments: {
             group: 'Transcoding',
@@ -126,6 +130,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             choices: Object.keys(getH264DecoderArgs()),
             combobox: true,
             mapPut: (oldValue, newValue) => getH264DecoderArgs()[newValue]?.join(' ') || newValue,
+            hide: true,
         }
     });
 
@@ -171,6 +176,15 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         onGet: async () => {
             let enabledStreams: StorageSetting;
 
+            const hideTranscode = device.mixins?.includes(getTranscodeMixinProviderId()) ? {
+                hide: false,
+            } : {};
+            const hideTranscodes = {
+                transcodeStreams: hideTranscode,
+                missingCodecParameters: hideTranscode,
+                videoDecoderArguments: hideTranscode,
+            };
+
             try {
                 const msos = await device.mixinDevice.getVideoStreamOptions();
 
@@ -188,11 +202,13 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                         lowResolutionStream: createStreamOptions(streamTypes.lowResolutionStream, msos),
                         recordingStream: createStreamOptions(streamTypes.recordingStream, msos),
                         remoteRecordingStream: createStreamOptions(streamTypes.remoteRecordingStream, msos),
+                        ...hideTranscodes,
                     }
                 }
                 else {
                     return {
                         enabledStreams,
+                        ...hideTranscodes,
                     }
                 }
             }
@@ -201,6 +217,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             }
 
             return {
+                ...hideTranscodes,
             }
         }
     }

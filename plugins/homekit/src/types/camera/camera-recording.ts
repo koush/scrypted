@@ -10,7 +10,7 @@ import { Duplex, Writable } from 'stream';
 import { HomeKitSession } from '../../common';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
-import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
+import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -97,7 +97,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
 
             let aacLowEncoder = 'aac';
-            const forceOpus = homekitSession.storage.getItem('forceOpus') !== 'false';
+            const forceOpus = FORCE_OPUS;
             if (!forceOpus) {
                 aacLowEncoder = 'libfdk_aac';
             }

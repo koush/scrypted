@@ -12,13 +12,14 @@ import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { sleep } from '@scrypted/common/src/sleep';
 import { createFragmentedMp4Parser, createMpegTsParser, parseMp4StreamChunks, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
 import dgram from 'dgram';
 import net from 'net';
 import { Duplex } from 'stream';
 import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
+import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -86,7 +87,7 @@ class PrebufferSession {
   rtspServerPath: string;
   needBitrateReset = false;
 
-  constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: MediaStreamOptions, public stopInactive: boolean) {
+  constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: ResponseMediaStreamOptions, public stopInactive: boolean) {
     this.storage = mixin.storage;
     this.console = mixin.console;
     this.mixinDevice = mixin.mixinDevice;
@@ -216,8 +217,8 @@ class PrebufferSession {
       return STRING_DEFAULT;
 
     const defaultValue = rtspMode
-      && mediaStreamOptions?.tool === 'scrypted' ?
-      SCRYPTED_PARSER : STRING_DEFAULT;
+      ? SCRYPTED_PARSER
+      : STRING_DEFAULT;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
     if (!rtspParser || rtspParser === STRING_DEFAULT)
       return defaultValue;
@@ -230,9 +231,9 @@ class PrebufferSession {
     return defaultValue;
   }
 
-  getRebroadcastMode() {
+  getRebroadcastContainer() {
     let mode = this.storage.getItem(this.rebroadcastModeKey) || 'Default';
-    let defaultMode = 'MPEG-TS';
+    let defaultMode = 'RTSP';
     if (this.advertisedMediaStreamOptions?.tool === 'scrypted'
       && this.advertisedMediaStreamOptions?.container?.startsWith('rtsp')) {
       defaultMode = 'RTSP';
@@ -256,7 +257,7 @@ class PrebufferSession {
 
     let total = 0;
     let start = 0;
-    const { muxingMp4, rtspMode, defaultMode } = this.getRebroadcastMode();
+    const { muxingMp4, rtspMode, defaultMode } = this.getRebroadcastContainer();
     for (const prebuffer of (muxingMp4 ? this.prebuffers.mp4 : this.prebuffers.rtsp)) {
       start = start || prebuffer.time;
       for (const chunk of prebuffer.chunks) {
@@ -270,24 +271,10 @@ class PrebufferSession {
 
     settings.push(
       {
-        title: 'Audio Codec Transcoding',
-        group,
-        description: 'Configuring your camera to output AAC, MP3, MP2, or Opus is recommended. PCM/G711 cameras should set this to Transcode.',
-        type: 'string',
-        key: this.audioConfigurationKey,
-        value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
-        choices: [
-          DEFAULT_AUDIO,
-          AAC_AUDIO_DESCRIPTION,
-          COMPATIBLE_AUDIO_DESCRIPTION,
-          TRANSCODE_AUDIO_DESCRIPTION,
-        ],
-      },
-      {
         title: 'Rebroadcast Container',
         group,
-        description: `Experimental: The container format to use when rebroadcasting. MPEG-TS is stable. RTSP is lower latency. The default mode for this camera is ${defaultMode}.`,
-        placeholder: 'MPEG-TS',
+        description: `The container format to use when rebroadcasting. The default mode for this camera is ${defaultMode}.`,
+        placeholder: 'RTSP',
         choices: [
           STRING_DEFAULT,
           'MPEG-TS',
@@ -298,8 +285,22 @@ class PrebufferSession {
       }
     );
 
-    const addFFmpegInputArgumentsSettings = () => {
+    const addFFmpegSettings = () => {
       settings.push(
+        {
+          title: 'Audio Codec Transcoding',
+          group,
+          description: 'Configuring your camera to output Opus, PCM, or AAC is recommended.',
+          type: 'string',
+          key: this.audioConfigurationKey,
+          value: this.storage.getItem(this.audioConfigurationKey) || DEFAULT_AUDIO,
+          choices: [
+            DEFAULT_AUDIO,
+            AAC_AUDIO_DESCRIPTION,
+            COMPATIBLE_AUDIO_DESCRIPTION,
+            TRANSCODE_AUDIO_DESCRIPTION,
+          ],
+        },
         {
           title: 'FFmpeg Input Arguments Prefix',
           group,
@@ -317,14 +318,12 @@ class PrebufferSession {
       )
     };
 
-
-    if (this.canUseRtspParser(muxingMp4, this.advertisedMediaStreamOptions)
+    if (this.canUseRtspParser(false, this.advertisedMediaStreamOptions)
       && rtspMode
       && this.advertisedMediaStreamOptions?.container === 'rtsp') {
 
-      const value = this.getParser(rtspMode, muxingMp4, this.advertisedMediaStreamOptions);
-      const defaultValue = rtspMode
-        && this.advertisedMediaStreamOptions?.tool === 'scrypted' ?
+      const value = this.getParser(rtspMode, false, this.advertisedMediaStreamOptions);
+      const defaultValue = rtspMode ?
         SCRYPTED_PARSER : 'FFmpeg';
 
       settings.push(
@@ -332,7 +331,7 @@ class PrebufferSession {
           key: this.rtspParserKey,
           group,
           title: 'RTSP Parser',
-          description: `Experimental: The RTSP Parser used to read the stream. FFmpeg is stable. The Scrypted parser is lower latency. The Scrypted Parser is only available when the Audo Codec is not Transcoding and the Rebroadcast Container is RTSP. The default is "${defaultValue}" for this camera.`,
+          description: `The RTSP Parser used to read the stream. The default is "${defaultValue}" for this camera.`,
           value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
           choices: [
             STRING_DEFAULT,
@@ -345,11 +344,11 @@ class PrebufferSession {
 
       if (value !== SCRYPTED_PARSER) {
         // ffmpeg parser is being used, so add ffmpeg input arguments option.
-        addFFmpegInputArgumentsSettings();
+        addFFmpegSettings();
       }
     }
     else {
-      addFFmpegInputArgumentsSettings();
+      addFFmpegSettings();
     }
 
     if (session) {
@@ -357,7 +356,7 @@ class PrebufferSession {
         ? `${session.inputVideoResolution?.width}x${session.inputVideoResolution?.height}`
         : 'unknown';
 
-        const idrInterval = this.getDetectedIdrInterval();
+      const idrInterval = this.getDetectedIdrInterval();
       settings.push(
         {
           key: 'detectedResolution',
@@ -373,7 +372,7 @@ class PrebufferSession {
           title: 'Detected Video/Audio Codecs',
           readonly: true,
           value: (session?.inputVideoCodec?.toString() || 'unknown') + '/' + (session?.inputAudioCodec?.toString() || 'unknown'),
-          description: 'Configuring your camera to H264 video and AAC/MP3/MP2/Opus audio is recommended.'
+          description: 'Configuring your camera to H264 video and Opus, PCM, or AAC audio is recommended.'
         },
         {
           key: 'detectedKeyframe',
@@ -445,7 +444,7 @@ class PrebufferSession {
 
     const { isUsingDefaultAudioConfig, aacAudio, compatibleAudio, reencodeAudio } = this.getAudioConfig();
 
-    const { rtspMode, muxingMp4 } = this.getRebroadcastMode();
+    const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
 
     let detectedAudioCodec = this.storage.getItem(this.lastDetectedAudioCodecKey) || undefined;
     if (detectedAudioCodec === 'null')
@@ -476,9 +475,9 @@ class PrebufferSession {
       if (audioIncompatible) {
         // show an alert that rebroadcast needs an explicit setting by the user.
         if (isUsingDefaultAudioConfig) {
-          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec. Configuring your Camera to use AAC, MP3, MP2, or Opus audio is recommended. If this is not possible, Select 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
+          log.a(`${this.mixin.name} is using the ${assumedAudioCodec} audio codec. Configuring your Camera to use Opus, PCM, or AAC audio is recommended. If this is not possible, Select 'Transcode Audio' in the camera stream's Rebroadcast settings to suppress this alert.`);
         }
-        this.console.warn('Configure your camera to output AAC, MP3, MP2, or Opus audio. Suboptimal audio codec in use:', assumedAudioCodec);
+        this.console.warn('Configure your camera to output Opus, PCM, or AAC audio. Suboptimal audio codec in use:', assumedAudioCodec);
       }
       else if (!audioSoftMuted && isUsingDefaultAudioConfig && advertisedAudioCodec === undefined && detectedAudioCodec !== undefined) {
         // handling compatible codecs that were unspecified...
@@ -632,15 +631,15 @@ class PrebufferSession {
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
 
-      session = await startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
+      session = startRFC4571Parser(this.console, connectRFC4571Parser(url), sdp, mediaStreamOptions, rbo);
       this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
     }
     else {
       const moBuffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
       const ffmpegInput = JSON.parse(moBuffer.toString()) as FFmpegInput;
-      sessionMso = ffmpegInput.mediaStreamOptions;
+      sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
-      const parser = this.getParser(rtspMode, muxingMp4, ffmpegInput.mediaStreamOptions);
+      const parser = this.getParser(rtspMode, muxingMp4, sessionMso);
       if (parser === SCRYPTED_PARSER) {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser');
@@ -690,6 +689,22 @@ class PrebufferSession {
             channel += 2;
           }
 
+          let setupVideoSection: any;
+          for (const section of parsedSdp.msections) {
+            if (section.type === 'video') {
+              if (setupVideoSection) {
+                this.console.warn('additional video section found. skipping.');
+                continue;
+              }
+              setupVideoSection = section;
+            }
+            else if (section.type !== 'audio') {
+              this.console.warn('unknown section', section.type);
+              continue;
+            }
+            await doSetup(section.control, section.codec)
+          }
+
           // grab all available audio sections
           if (!audioSoftMuted) {
             for (const audioSection of parsedSdp.msections.filter(msection => msection.type === 'audio')) {
@@ -700,14 +715,11 @@ class PrebufferSession {
               this.console.warn('sdp did not contain audio track and audio was not reported as missing.');
           }
 
-          const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
-
           // sdp may contain multiple audio/video sections. take only the first video section.
-          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === videoSection || msection.type === 'audio');
+          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === setupVideoSection || msection.type === 'audio');
           sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
           this.sdp = Promise.resolve(sdp);
-          await doSetup(videoSection.control, videoSection.codec);
           await rtspClient.play();
           const earlyData = rtspClient.rfc4571.read();
           if (earlyData)
@@ -939,7 +951,7 @@ class PrebufferSession {
     session: ParserSession<PrebufferParsers>,
     socketPromise: Promise<Duplex>,
     requestedPrebuffer: number,
-    filter?: (chunk: StreamChunk) => StreamChunk,
+    filter?: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk,
   }) {
     const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
     if (requestedPrebuffer)
@@ -958,9 +970,9 @@ class PrebufferSession {
 
         const now = Date.now();
 
-        const safeWriteData = (chunk: StreamChunk) => {
+        const safeWriteData = (chunk: StreamChunk, prebuffer?: boolean) => {
           if (options.filter) {
-            chunk = options.filter(chunk);
+            chunk = options.filter(chunk, prebuffer);
             if (!chunk)
               return;
           }
@@ -986,7 +998,7 @@ class PrebufferSession {
             if (chunk.time < now - requestedPrebuffer)
               continue;
 
-            safeWriteData(chunk);
+            safeWriteData(chunk, true);
           }
         }
         else {
@@ -994,7 +1006,7 @@ class PrebufferSession {
           const parser = this.parsers[container];
           const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer));
           for (const prebuffer of availablePrebuffers) {
-            safeWriteData(prebuffer);
+            safeWriteData(prebuffer, true);
           }
         }
 
@@ -1025,7 +1037,7 @@ class PrebufferSession {
       requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
     }
 
-    const { rtspMode } = this.getRebroadcastMode();
+    const { rtspMode } = this.getRebroadcastContainer();
     const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
     let container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
@@ -1041,26 +1053,29 @@ class PrebufferSession {
 
     let socketPromise: Promise<Duplex>;
     let url: string;
-    let filter: (chunk: StreamChunk) => StreamChunk;
+    let filter: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk;
     const codecMap = new Map<string, number>();
 
     if (container === 'rtsp') {
       const parsedSdp = parseSdp(sdp);
-      if (parsedSdp.msections.length > 2) {
-        parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
-        sdp = parsedSdp.toSdp();
-        filter = chunk => {
-          const channel = codecMap.get(chunk.type);
-          if (channel == undefined)
-            return;
-          const chunks = chunk.chunks.slice();
-          const header = Buffer.from(chunks[0]);
-          header.writeUInt8(channel, 1);
-          chunks[0] = header;
-          return {
-            startStream: chunk.startStream,
-            chunks,
-          }
+      parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
+      const filterPrebufferAudio = false;//options?.prebuffer === undefined;
+      const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
+      sdp = parsedSdp.toSdp();
+      filter = (chunk, prebuffer) => {
+        const channel = codecMap.get(chunk.type);
+        if (channel == undefined)
+          return;
+        // if no prebuffer is explicitly requested, don't send prebuffer audio
+        if (prebuffer && filterPrebufferAudio && chunk.type !== videoCodec)
+          return;
+        const chunks = chunk.chunks.slice();
+        const header = Buffer.from(chunks[0]);
+        header.writeUInt8(channel, 1);
+        chunks[0] = header;
+        return {
+          startStream: chunk.startStream,
+          chunks,
         }
       }
 
@@ -1072,6 +1087,7 @@ class PrebufferSession {
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
           codecMap.set(track.codec, track.destination);
+          codecMap.set(`rtcp-${track.codec}`, track.destination + 1);
         }
         return socket;
       })
@@ -1172,6 +1188,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     let h264EncoderArguments: string[];
     let destinationVideoBitrate: number;
 
+    const transcodingEnabled = this.mixins?.includes(getTranscodeMixinProviderId());
+
     const msos = await this.mixinDevice.getVideoStreamOptions();
     let result: {
       stream: ResponseMediaStreamOptions,
@@ -1186,7 +1204,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         case 'medium-resolution':
         case 'remote':
           result = this.streamSettings.getRemoteStream(msos);
-          destinationVideoBitrate = this.plugin.storageSettings.values.remoteStreamingBitrate;
+          destinationVideoBitrate = this.plugin.transcodeStorageSettings.values.remoteStreamingBitrate;
           break;
         case 'low-resolution':
           result = this.streamSettings.getLowResolutionStream(msos);
@@ -1212,8 +1230,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       // encourage users at every step to configure proper codecs.
       // for this reason, do not automatically supply h264 encoder arguments
       // even if h264 is requested, to force a visible failure.
-      if (this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
-        h264EncoderArguments = this.plugin.storageSettings.values.h264EncoderArguments?.split(' ');
+      if (transcodingEnabled && this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
+        h264EncoderArguments = this.plugin.transcodeStorageSettings.values.h264EncoderArguments?.split(' ');
       }
     }
 
@@ -1225,12 +1243,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     ffmpegInput.h264EncoderArguments = h264EncoderArguments;
     ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
 
-    if (this.streamSettings.storageSettings.values.missingCodecParameters) {
+    if (transcodingEnabled && this.streamSettings.storageSettings.values.missingCodecParameters) {
       ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
       ffmpegInput.h264FilterArguments.push("-bsf:v", "dump_extra");
     }
 
-    ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
+    if (transcodingEnabled)
+      ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
     return mediaManager.createFFmpegMediaObject(ffmpegInput, {
       sourceId: this.id,
     });
@@ -1418,13 +1437,15 @@ function millisUntilMidnight() {
   return (midnight.getTime() - new Date().getTime());
 }
 
-class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings {
+export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider {
   storageSettings = new StorageSettings(this, {
     rebroadcastPort: {
       title: 'Rebroadcast Port',
       description: 'The port of the RTSP server that will rebroadcast your streams.',
       type: 'number',
     },
+  });
+  transcodeStorageSettings = new StorageSettings(this, {
     remoteStreamingBitrate: {
       title: 'Remote Streaming Bitrate',
       type: 'number',
@@ -1472,6 +1493,23 @@ class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider
     setTimeout(() => deviceManager.requestRestart(), twoAM);
 
     this.startRtspServer();
+
+    process.nextTick(() => {
+      deviceManager.onDeviceDiscovered({
+        nativeId: TRANSCODE_MIXIN_PROVIDER_NATIVE_ID,
+        name: 'Transcoding',
+        interfaces: [
+          ScryptedInterface.Settings,
+          ScryptedInterface.MixinProvider,
+        ],
+        type: ScryptedDeviceType.API,
+      });
+    });
+  }
+
+  getDevice(nativeId: string) {
+    if (nativeId === TRANSCODE_MIXIN_PROVIDER_NATIVE_ID)
+      return new TranscodeMixinProvider(this);
   }
 
   getSettings(): Promise<Setting[]> {
@@ -1600,7 +1638,7 @@ class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
-    const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online];
+    const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online, REBROADCAST_MIXIN_INTERFACE_TOKEN];
     if (interfaces.includes(ScryptedInterface.VideoCameraConfiguration))
       ret.push(ScryptedInterface.VideoCameraConfiguration);
     return ret;

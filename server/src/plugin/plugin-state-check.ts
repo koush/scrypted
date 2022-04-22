@@ -9,6 +9,10 @@ export function checkProperty(key: string, value: any) {
     if (key === ScryptedInterfaceProperty.interfaces)
         throw new Error("interfaces is a read only post-mixin computed property, use providedInterfaces");
     const iface = propertyInterfaces[key.toString()];
-    if (iface === ScryptedInterface.ScryptedDevice)
-        throw new Error(`${key.toString()} can not be set. Use DeviceManager.onDevicesChanges or DeviceManager.onDeviceDiscovered to update the device description.`);
+    if (iface === ScryptedInterface.ScryptedDevice) {
+        // only allow info to be set, since that doesn't actually change the descriptor
+        // or the provided* properties (room, interfaces, name, type).
+        if (key !== ScryptedInterfaceProperty.info)
+            throw new Error(`${key.toString()} can not be set. Use DeviceManager.onDevicesChanges or DeviceManager.onDeviceDiscovered to update the device description.`);
+    }
 }

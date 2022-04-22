@@ -111,7 +111,7 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             for await (const { type, rtcp, header, packet } of server.handleRecord()) {
                 yield {
                     chunks: [header, packet],
-                    type: `${rtcp ? 'rtcp' : 'rtp'}-${type}`,
+                    type: `${rtcp ? 'rtcp-' : ''}${type}`,
                     width,
                     height,
                 }
@@ -178,7 +178,7 @@ const quote = (str: string): string => `"${str.replace(/"/g, '\\"')}"`;
 export class RtspClient extends RtspBase {
     cseq = 0;
     session: string;
-    authorization: string;
+    wwwAuthenticate: string;
     requestTimeout: number;
     rfc4571 = new PassThrough();
     needKeepAlive = false;
@@ -224,9 +224,10 @@ export class RtspClient extends RtspBase {
         const line = `${method} ${fullUrl} RTSP/1.0`;
         const cseq = this.cseq++;
         headers['CSeq'] = cseq.toString();
+        headers['User-Agent'] = 'Scrypted';
 
-        if (this.authorization)
-            headers['Authorization'] = this.authorization;
+        if (this.wwwAuthenticate)
+            headers['Authorization'] = this.createAuthorizationHeader(method);
 
         if (this.session)
             headers['Session'] = this.session;
@@ -285,6 +286,39 @@ export class RtspClient extends RtspBase {
         }
     }
 
+    createAuthorizationHeader(method: string) {
+        if (!this.wwwAuthenticate)
+            throw new Error('no WWW-Authenticate found');
+
+        const parsedUrl = new URL(this.url);
+
+        if (this.wwwAuthenticate.includes('Basic')) {
+            const hash = BASIC.computeHash(parsedUrl);
+            return `Basic ${hash}`;
+        }
+
+        const wwwAuth = DIGEST.parseWWWAuthenticateRest(this.wwwAuthenticate);
+
+        const username = decodeURIComponent(parsedUrl.username);
+        const password = decodeURIComponent(parsedUrl.password);
+
+        const ha1 = crypto.createHash('md5').update(`${username}:${wwwAuth.realm}:${password}`).digest('hex');
+        const ha2 = crypto.createHash('md5').update(`${method}:${parsedUrl.pathname}`).digest('hex');
+        const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
+
+        const params = {
+            username,
+            realm: wwwAuth.realm,
+            nonce: wwwAuth.nonce,
+            uri: parsedUrl.pathname,
+            algorithm: 'MD5',
+            response: hash,
+        };
+
+        const paramsString = Object.entries(params).map(([key, value]) => `${key}=${value && quote(value)}`).join(', ');
+        return `Digest ${paramsString}`;
+    }
+
     async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<{
         headers: Headers,
         body: Buffer
@@ -302,34 +336,7 @@ export class RtspClient extends RtspBase {
             if (authenticating)
                 throw new Error('auth failed');
 
-            const parsedUrl = new URL(this.url);
-
-            if (wwwAuthenticate.includes('Basic')) {
-                const hash = BASIC.computeHash(parsedUrl);
-                this.authorization = `Basic ${hash}`;
-            }
-            else {
-                const wwwAuth = DIGEST.parseWWWAuthenticateRest(wwwAuthenticate);
-
-                const username = decodeURIComponent(parsedUrl.username);
-                const password = decodeURIComponent(parsedUrl.password);
-
-                const ha1 = crypto.createHash('md5').update(`${username}:${wwwAuth.realm}:${password}`).digest('hex');
-                const ha2 = crypto.createHash('md5').update(`${method}:${parsedUrl.pathname}`).digest('hex');
-                const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
-
-                const params = {
-                    username,
-                    realm: wwwAuth.realm,
-                    nonce: wwwAuth.nonce,
-                    uri: parsedUrl.pathname,
-                    algorithm: 'MD5',
-                    response: hash,
-                };
-
-                const paramsString = Object.entries(params).map(([key, value]) => `${key}=${value && quote(value)}`).join(', ');
-                this.authorization = `Digest ${paramsString}`;
-            }
+            this.wwwAuthenticate = wwwAuthenticate;
 
             return this.request(method, headers, path, body, true);
         }

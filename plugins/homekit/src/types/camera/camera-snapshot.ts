@@ -29,7 +29,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             pendingPicture = mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
         }
         else {
-            pendingPicture = Promise.reject(new Error('Camera does not provide native snapshots. Please install the snapshot plugin.'));
+            pendingPicture = Promise.reject(new Error('Camera does not provide native snapshots. Please install the Snapshot Plugin.'));
         }
 
         const wrapped = pendingPicture;

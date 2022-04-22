@@ -4,6 +4,9 @@ import sdk from '@scrypted/sdk';
 
 const { log } = sdk;
 
+// opus is now the default and aac-eld is no longer usable without this flag being set at compile time.
+export const FORCE_OPUS = true;
+
 export function profileToFfmpeg(profile: H264Profile): string {
     if (profile === H264Profile.HIGH)
         return "high";
@@ -56,8 +59,12 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     catch (e) {
     }
 
-    // Have only ever seen 20 and 60 sent here. 60 is remote stream and watch.
-    const isLowBandwidth = request.audio.packet_time > 20;
+    // Observed packet times:
+    // Opus (Local): 20
+    // Opus (Remote): 60
+    // AAC-ELD (Local): 30
+    // AAC-ELD (Remote): 60
+    const isLowBandwidth = request.audio.packet_time >= 60;
 
     // watch is 448x368 and requests 320x240, everything else is > ~1280...
     // future proof-ish for higher resolution watch.

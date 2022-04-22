@@ -68,18 +68,33 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                     framesPerPacket: opusFramesPerPacket,
                 }
             );
-            while (true) {
-                // trim the rtsp framing
-                if (isRtsp)
-                    await readLength(socket, 2);
-                const header = await readLength(socket, 2);
-                const length = header.readUInt16BE(0);
+            let running = true;
+            session.audioReturn.once('close', () => running = false);
+            session.videoReturn.once('close', () => running = false);
+            const headerLength = isRtsp ? 4 : 2;
+            const lengthOffset = isRtsp ? 2 : 0;
+            while (running) {
+                let isAudio = false;
+                let isVideo = false;
+                const header = await readLength(socket, headerLength);
+                const length = header.readUInt16BE(lengthOffset);
                 const data = await readLength(socket, length);
                 const rtp = RtpPacket.deSerialize(data);
-                if (audioPayloadTypes.includes(rtp.header.payloadType)) {
+                if (!running)
+                    break;
+                if (isRtsp) {
+                    const channel = header.readUInt8(1);
+                    isAudio = channel === 0;
+                    isVideo = channel === 2;
+                }
+                else {
+                    isAudio = audioPayloadTypes.includes(rtp.header.payloadType);
+                    isVideo = videoPayloadTypes.includes(rtp.header.payloadType);
+                }
+                if (isAudio) {
                     audioSender(rtp);
                 }
-                else if (videoPayloadTypes.includes(rtp.header.payloadType)) {
+                else if (isVideo) {
                     videoSender(rtp);
                 }
                 else {
