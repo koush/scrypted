@@ -951,7 +951,7 @@ class PrebufferSession {
     session: ParserSession<PrebufferParsers>,
     socketPromise: Promise<Duplex>,
     requestedPrebuffer: number,
-    filter?: (chunk: StreamChunk) => StreamChunk,
+    filter?: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk,
   }) {
     const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
     if (requestedPrebuffer)
@@ -970,9 +970,9 @@ class PrebufferSession {
 
         const now = Date.now();
 
-        const safeWriteData = (chunk: StreamChunk) => {
+        const safeWriteData = (chunk: StreamChunk, prebuffer?: boolean) => {
           if (options.filter) {
-            chunk = options.filter(chunk);
+            chunk = options.filter(chunk, prebuffer);
             if (!chunk)
               return;
           }
@@ -998,7 +998,7 @@ class PrebufferSession {
             if (chunk.time < now - requestedPrebuffer)
               continue;
 
-            safeWriteData(chunk);
+            safeWriteData(chunk, true);
           }
         }
         else {
@@ -1006,7 +1006,7 @@ class PrebufferSession {
           const parser = this.parsers[container];
           const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer));
           for (const prebuffer of availablePrebuffers) {
-            safeWriteData(prebuffer);
+            safeWriteData(prebuffer, true);
           }
         }
 
@@ -1053,18 +1053,21 @@ class PrebufferSession {
 
     let socketPromise: Promise<Duplex>;
     let url: string;
-    let filter: (chunk: StreamChunk) => StreamChunk;
+    let filter: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk;
     const codecMap = new Map<string, number>();
 
     if (container === 'rtsp') {
-      let channelsMatch = true;
       const parsedSdp = parseSdp(sdp);
-      // if (parsedSdp.msections.length > 2) {
       parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
+      const filterPrebufferAudio = false;//options?.prebuffer === undefined;
+      const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
       sdp = parsedSdp.toSdp();
-      filter = chunk => {
+      filter = (chunk, prebuffer) => {
         const channel = codecMap.get(chunk.type);
         if (channel == undefined)
+          return;
+        // if no prebuffer is explicitly requested, don't send prebuffer audio
+        if (prebuffer && filterPrebufferAudio && chunk.type !== videoCodec)
           return;
         const chunks = chunk.chunks.slice();
         const header = Buffer.from(chunks[0]);
@@ -1075,7 +1078,6 @@ class PrebufferSession {
           chunks,
         }
       }
-      // }
 
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise.then(async (socket) => {
@@ -1085,6 +1087,7 @@ class PrebufferSession {
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
           codecMap.set(track.codec, track.destination);
+          codecMap.set(`rtcp-${track.codec}`, track.destination + 1);
         }
         return socket;
       })

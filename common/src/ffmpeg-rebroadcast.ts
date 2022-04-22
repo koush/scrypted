@@ -293,7 +293,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
     // tbh parsing stdout is super sketchy way of doing this.
     parseAudioCodec(cp).then(result => inputAudioCodec = result);
-    parseVideoCodec(cp).then(result => inputVideoCodec = result);
+    await parseVideoCodec(cp).then(result => inputVideoCodec = result);
     parseResolution(cp).then(result => inputVideoResolution = result);
 
     return {

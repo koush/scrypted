@@ -111,7 +111,7 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             for await (const { type, rtcp, header, packet } of server.handleRecord()) {
                 yield {
                     chunks: [header, packet],
-                    type: `${rtcp ? 'rtcp' : 'rtp'}-${type}`,
+                    type: `${rtcp ? 'rtcp-' : ''}${type}`,
                     width,
                     height,
                 }

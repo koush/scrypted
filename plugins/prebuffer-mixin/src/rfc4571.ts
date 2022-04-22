@@ -109,6 +109,11 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
                 if (rtspOptions?.channelMap) {
                     const channel = header.readUInt8(1);
                     type = rtspOptions?.channelMap[channel];
+                    if (!type) {
+                        const rtpType = rtspOptions?.channelMap[channel - 1];
+                        if (rtpType)
+                            type = `rtcp-${rtpType}`;
+                    }
                 }
                 else {
                     const pt = data[1] & 0x7f;
