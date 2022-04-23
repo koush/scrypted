@@ -689,34 +689,31 @@ class PrebufferSession {
             channel += 2;
           }
 
-          let setupVideoSection: any;
-          for (const section of parsedSdp.msections) {
+          let setupVideoSection = false;
+
+          parsedSdp.msections = parsedSdp.msections.filter(section => {
             if (section.type === 'video') {
               if (setupVideoSection) {
                 this.console.warn('additional video section found. skipping.');
-                continue;
+                return false;
               }
-              setupVideoSection = section;
+              setupVideoSection = true;
             }
             else if (section.type !== 'audio') {
               this.console.warn('unknown section', section.type);
-              continue;
+              return false;
             }
+            else if (audioSoftMuted) {
+              return false;
+            }
+            return true;
+          });
+
+          for (const section of parsedSdp.msections) {
             await doSetup(section.control, section.codec)
           }
 
-          // grab all available audio sections
-          if (!audioSoftMuted) {
-            for (const audioSection of parsedSdp.msections.filter(msection => msection.type === 'audio')) {
-              await doSetup(audioSection.control, audioSection.codec)
-            }
-
-            if (channel === 0)
-              this.console.warn('sdp did not contain audio track and audio was not reported as missing.');
-          }
-
           // sdp may contain multiple audio/video sections. take only the first video section.
-          parsedSdp.msections = parsedSdp.msections.filter(msection => msection === setupVideoSection || msection.type === 'audio');
           sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
           this.sdp = Promise.resolve(sdp);
