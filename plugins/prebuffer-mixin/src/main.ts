@@ -1027,11 +1027,11 @@ class PrebufferSession {
 
     const session = await this.parserSessionPromise;
 
-    const idrInterval = this.getDetectedIdrInterval();
+    const idrInterval = Math.max(4000, this.getDetectedIdrInterval() || 4000);
     let requestedPrebuffer = options?.prebuffer;
     if (requestedPrebuffer == null) {
       // get into the general area of finding a sync frame.
-      requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
+      requestedPrebuffer = idrInterval * 1.5;
     }
 
     const { rtspMode } = this.getRebroadcastContainer();
@@ -1041,8 +1041,8 @@ class PrebufferSession {
 
     // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
     // rewind a little bit earlier to gaurantee a valid full segment of that length is sent.
-    if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
-      requestedPrebuffer += (idrInterval || 4000) * 1.5;
+    if (requestedPrebuffer && container !== 'mp4' && options?.container === 'mp4') {
+      requestedPrebuffer += idrInterval * 1.5;
     }
 
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
@@ -1056,7 +1056,7 @@ class PrebufferSession {
     if (container === 'rtsp') {
       const parsedSdp = parseSdp(sdp);
       parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
-      const filterPrebufferAudio = false;//options?.prebuffer === undefined;
+      const filterPrebufferAudio = options?.prebuffer === undefined;
       const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
       sdp = parsedSdp.toSdp();
       filter = (chunk, prebuffer) => {
@@ -1080,7 +1080,7 @@ class PrebufferSession {
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
         const server = new RtspServer(socket, sdp);
-        server.console = this.console;
+        // server.console = this.console;
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
           codecMap.set(track.codec, track.destination);

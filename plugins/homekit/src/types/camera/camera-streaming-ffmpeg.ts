@@ -146,12 +146,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         videoOutput,
     );
 
-    const srtpSenderCompatible = !needsFFmpeg && mso?.container === 'rtsp' && mso?.tool === 'scrypted';
+    const videoIsSrtpSenderCompatible = !needsFFmpeg && mso?.container === 'rtsp' && mso?.tool === 'scrypted';
     const audioCodec = request.audio.codec;
     const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
     if (noAudio) {
-        if (srtpSenderCompatible) {
+        if (videoIsSrtpSenderCompatible) {
             await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
             return;
         }
@@ -172,9 +172,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             // sanity check this
             && opusFramesPerPacket && opusFramesPerPacket === Math.round(opusFramesPerPacket);
 
-        let hasAudio = true;
-
-        if (srtpSenderCompatible && perfectOpus) {
+        if (videoIsSrtpSenderCompatible && perfectOpus) {
             await startCameraStreamSrtp(ffmpegInput, console, false, session, killSession);
             return;
         }
@@ -205,17 +203,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                     '-ac', `${request.audio.channel}`,
                 )
             }
-        }
-        else {
-            hasAudio = false;
-            console.warn(device.name, 'unknown audio codec, audio will not be streamed.', request);
-
-            if (srtpSenderCompatible) {
-                await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
-                return;
-            }
-        }
-        if (hasAudio) {
             audioArgs.push(
                 "-payload_type", request.audio.pt.toString(),
                 "-ssrc", session.audiossrc.toString(),
@@ -257,6 +244,14 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 )
             }
         }
+        else {
+            console.warn(device.name, 'homekit requested unknown audio codec, audio will not be streamed.', request);
+
+            if (videoIsSrtpSenderCompatible) {
+                await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
+                return;
+            }
+        }
     }
 
     const ffmpegPath = await mediaManager.getFFmpegPath();
@@ -278,7 +273,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // is fully spun up.
     // By demuxing the audio and video into srtp and ffmpeg, the video is allowed to start up
     // immediately.
-    if (srtpSenderCompatible && requestedOpus) {
+    if (videoIsSrtpSenderCompatible) {
         console.log('requesting second audio only stream');
         const mediaOptions: RequestMediaStreamOptions = {
             destination,
