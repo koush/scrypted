@@ -13,6 +13,8 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
     let { sdp } = mediaStreamOptions;
     let socket: Readable;
     const isRtsp = url.startsWith('rtsp');
+    let audioChannel: number;
+    let videoChannel: number;
 
     const cleanup = () => {
         socket.destroy();
@@ -27,8 +29,17 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
         const parsedSdp = parseSdp(sdp);
         const video = parsedSdp.msections.find(msection => msection.type === 'video');
         const audio = parsedSdp.msections.find(msection => msection.type === 'audio');
-        await rtspClient.setup(0, audio.control);
-        await rtspClient.setup(2, video.control);
+
+        let channel = 0;
+        if (audio) {
+            audioChannel = channel;
+            channel += 2;
+            await rtspClient.setup(audioChannel, audio.control);
+        }
+        videoChannel = channel;
+        channel +=2;
+        await rtspClient.setup(videoChannel, video.control);
+
         await rtspClient.play();
         socket = rtspClient.rfc4571;
 
@@ -84,8 +95,8 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                     break;
                 if (isRtsp) {
                     const channel = header.readUInt8(1);
-                    isAudio = channel === 0;
-                    isVideo = channel === 2;
+                    isAudio = channel === audioChannel;
+                    isVideo = channel === videoChannel;
                 }
                 else {
                     isAudio = audioPayloadTypes.includes(rtp.header.payloadType);

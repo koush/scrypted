@@ -146,7 +146,15 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         videoOutput,
     );
 
-    if (!noAudio) {
+    if (noAudio) {
+        if (!needsFFmpeg
+            && mso?.tool === 'scrypted') {
+
+            await startCameraStreamSrtp(ffmpegInput, console, session, killSession);
+            return;
+        }
+    }
+    else {
         // audio encoding
         const audioCodec = (request as StartStreamRequest).audio.codec;
         audioArgs.push(
