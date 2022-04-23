@@ -1110,6 +1110,7 @@ class PrebufferSession {
     });
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
+    mediaStreamOptions.tool = 'scrypted';
 
     const { reencodeAudio } = this.getAudioConfig();
 
@@ -1125,7 +1126,9 @@ class PrebufferSession {
     }
 
     if (session.inputVideoResolution?.width && session.inputVideoResolution?.height) {
-      Object.assign(mediaStreamOptions.video, session.inputVideoResolution);
+      // this may be an audio only request.
+      if (mediaStreamOptions.video)
+        Object.assign(mediaStreamOptions.video, session.inputVideoResolution);
     }
 
     const now = Date.now();

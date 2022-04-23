@@ -186,10 +186,16 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
                 name: undefined,
             };
 
-            if (!ret.video)
+            // if the source doesn't provide a video codec, dummy one up
+            if (ret.video === undefined)
                 ret.video = {};
 
-            ret.video.codec = inputVideoCodec;
+            // the requests does not want video
+            if (requestMediaStream?.video === null)
+                ret.video = null;
+
+            if (ret.video)
+                ret.video.codec = inputVideoCodec;
 
             // some rtsp like unifi offer alternate audio tracks (aac and opus).
             if (requestMediaStream?.audio?.codec && requestMediaStream?.audio?.codec !== inputAudioCodec) {

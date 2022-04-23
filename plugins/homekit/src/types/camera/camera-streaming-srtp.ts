@@ -8,7 +8,7 @@ import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/r
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
-export async function startCameraStreamSrtp(media: FFmpegInput, console: Console, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamSrtp(media: FFmpegInput, console: Console, muteAudio: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const { url, mediaStreamOptions } = media;
     let { sdp } = mediaStreamOptions;
     let socket: Readable;
@@ -31,7 +31,7 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
         const audio = parsedSdp.msections.find(msection => msection.type === 'audio');
 
         let channel = 0;
-        if (audio) {
+        if (audio && !muteAudio) {
             audioChannel = channel;
             channel += 2;
             await rtspClient.setup(audioChannel, audio.control);

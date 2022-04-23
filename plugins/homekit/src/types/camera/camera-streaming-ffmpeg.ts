@@ -1,7 +1,7 @@
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import sdk, { FFmpegInput, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFmpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
@@ -12,7 +12,7 @@ import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-util
 
 const { mediaManager, log } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, ffmpegInput: FFmpegInput, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, destination: MediaStreamDestination, ffmpegInput: FFmpegInput, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const request = session.startRequest;
 
     const videomtu = session.startRequest.video.mtu;
@@ -30,7 +30,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame
     // to immediately finish. ffmpeg will only start sending on a key frame.
     // const audioInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
-    const audioInput = ffmpegInput;
+    let audioInput = ffmpegInput;
 
     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
@@ -137,7 +137,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     }
 
     videoArgs.push(
-        "-payload_type", (request as StartStreamRequest).video.pt.toString(),
+        "-payload_type", request.video.pt.toString(),
         "-ssrc", session.videossrc.toString(),
         "-f", "rtp",
         "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
@@ -146,26 +146,25 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         videoOutput,
     );
 
-    if (noAudio) {
-        if (!needsFFmpeg
-            && mso?.tool === 'scrypted') {
+    const srtpSenderCompatible = !needsFFmpeg && mso?.container === 'rtsp' && mso?.tool === 'scrypted';
+    const audioCodec = request.audio.codec;
+    const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
-            await startCameraStreamSrtp(ffmpegInput, console, session, killSession);
+    if (noAudio) {
+        if (srtpSenderCompatible) {
+            await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
             return;
         }
     }
     else {
         // audio encoding
-        const audioCodec = (request as StartStreamRequest).audio.codec;
         audioArgs.push(
             "-vn", '-sn', '-dn',
         );
 
-        // homekit live streaming seems extremely picky about audio formats.
-        // sending the incorrect packet time or bitrate, etc, can cause streaming
-        // to fail altogether. these parameters can also change between LAN and LTE.
-        const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
-
+        // homekit live streaming is extremely picky about audio audio packet time.
+        // not sending packets of the correct duration will result in mute or choppy audio.
+        // the packet time parameter is different between LAN and LTE.
         let opusFramesPerPacket = request.audio.packet_time / 20;
 
         const perfectOpus = requestedOpus
@@ -175,11 +174,8 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         let hasAudio = true;
 
-        if (!needsFFmpeg
-            && perfectOpus
-            && mso?.tool === 'scrypted') {
-
-            await startCameraStreamSrtp(ffmpegInput, console, session, killSession);
+        if (srtpSenderCompatible && perfectOpus) {
+            await startCameraStreamSrtp(ffmpegInput, console, false, session, killSession);
             return;
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
@@ -199,24 +195,29 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                         [
                             'libopus',
                             '-application', 'lowdelay',
-                            '-frame_duration', (request as StartStreamRequest).audio.packet_time.toString(),
+                            '-frame_duration', request.audio.packet_time.toString(),
                         ] :
                         ['libfdk_aac', '-profile:a', 'aac_eld']),
                     '-flags', '+global_header',
-                    '-ar', `${(request as StartStreamRequest).audio.sample_rate}k`,
-                    '-b:a', `${(request as StartStreamRequest).audio.max_bit_rate}k`,
-                    "-bufsize", `${(request as StartStreamRequest).audio.max_bit_rate * 4}k`,
-                    '-ac', `${(request as StartStreamRequest).audio.channel}`,
+                    '-ar', `${request.audio.sample_rate}k`,
+                    '-b:a', `${request.audio.max_bit_rate}k`,
+                    "-bufsize", `${request.audio.max_bit_rate * 4}k`,
+                    '-ac', `${request.audio.channel}`,
                 )
             }
         }
         else {
             hasAudio = false;
             console.warn(device.name, 'unknown audio codec, audio will not be streamed.', request);
+
+            if (srtpSenderCompatible) {
+                await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
+                return;
+            }
         }
         if (hasAudio) {
             audioArgs.push(
-                "-payload_type", (request as StartStreamRequest).audio.pt.toString(),
+                "-payload_type", request.audio.pt.toString(),
                 "-ssrc", session.audiossrc.toString(),
                 "-f", "rtp",
             );
@@ -266,6 +267,46 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     }
 
     const videoDecoderArguments = ffmpegInput.videoDecoderArguments || [];
+
+    // From my naive observations, ffmpeg seems to drop the first few packets if it is
+    // performing encoder/decoder initialization. This causes a 1 keyframe delay in stream start,
+    // even if the keyframe is container at stream start.
+    // It seems that it receives the SPS/PPS, initializes the decoder, and during that init,
+    // it will drop all incoming packets on the floor.
+    // The other theory is that audio decoder initialization may also cause these dropped packets.
+    // In any case, something is causing ffmpeg to drop packets during startup until the a/v pipeline
+    // is fully spun up.
+    // By demuxing the audio and video into srtp and ffmpeg, the video is allowed to start up
+    // immediately.
+    if (srtpSenderCompatible && requestedOpus) {
+        console.log('requesting second audio only stream');
+        const mediaOptions: RequestMediaStreamOptions = {
+            destination,
+            video: null,
+            audio: {
+                // opus is the preferred/default codec, and can be repacketized to fit any request if in use.
+                // otherwise audio streaming for aac-eld needs to be transcoded, since nothing outputs aac-eld natively.
+                // pcm/g711 the second best option for aac-eld, since it's raw audio.
+                codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
+            },
+        };
+
+        const audioMediaObject = await device.getVideoStream(mediaOptions);
+        audioInput = await mediaManager.convertMediaObjectToJSON(audioMediaObject, ScryptedMimeTypes.FFmpegInput);
+
+        const ap = child_process.spawn(ffmpegPath, [
+            ...hideBanner,
+            ...audioInput.inputArguments,
+            ...nullAudioInput,
+            ...audioArgs,
+        ]);
+        session.audioProcess = ap;
+        ffmpegLogInitialOutput(console, ap);
+        ap.on('exit', killSession);
+
+        await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
+        return;
+    }
 
     if (audioInput !== ffmpegInput) {
         safePrintFFmpegArguments(console, videoArgs);

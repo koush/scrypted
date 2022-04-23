@@ -286,6 +286,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 await startCameraStreamFfmpeg(device,
                     console,
                     storage,
+                    destination,
                     videoInput,
                     session,
                     () => killSession(request.sessionID));
