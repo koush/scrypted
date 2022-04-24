@@ -146,7 +146,15 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         videoOutput,
     );
 
-    const videoIsSrtpSenderCompatible = !needsFFmpeg && mso?.container === 'rtsp' && mso?.tool === 'scrypted';
+    const videoIsSrtpSenderCompatible = !needsFFmpeg
+        && mso?.container === 'rtsp'
+        // The upstream sender is provided by scrypted (rebroadcast), and we can
+        // safely request the video be ommited. this is not possible with ffmpeg,
+        // which may possibly pull all streams that are available in the sdp.
+        // Consider removing this check upon ffmpeg verification. the only reason this matters
+        // is because that scrypted is guaranteed to provide only the subset of requested streams
+        // per spec. Ie, requesting only video or only audio.
+        && mso?.tool === 'scrypted';
     const audioCodec = request.audio.codec;
     const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
@@ -264,25 +272,28 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     const videoDecoderArguments = ffmpegInput.videoDecoderArguments || [];
 
     // From my naive observations, ffmpeg seems to drop the first few packets if it is
-    // performing encoder/decoder initialization. This causes a 1 keyframe delay in stream start,
-    // even if the keyframe is container at stream start.
-    // It seems that it receives the SPS/PPS, initializes the decoder, and during that init,
-    // it will drop all incoming packets on the floor.
-    // The other theory is that audio decoder initialization may also cause these dropped packets.
-    // In any case, something is causing ffmpeg to drop packets during startup until the a/v pipeline
-    // is fully spun up.
-    // By demuxing the audio and video into srtp and ffmpeg, the video is allowed to start up
-    // immediately.
-    if (videoIsSrtpSenderCompatible) {
+    // performing encoder/decoder initialization. Thiss is particularly problematic if
+    // the stream starts on a key frame, meaning it will wait an entire IDR interval
+    // before rendering.
+    // Two theories:
+    // The first is that the SPS/PPS initializes the decoder/parser, and during that init,
+    // it will drop all incoming packets on the floor until it is ready.
+    // The other theory is that audio decoder initialization may cause dropped video packets
+    // while the pipeline spins up.
+    // By demuxing the audio and video into separate srtp sender and ffmpeg forwarder,
+    // the video is allowed to start up immediately.
+    // This should only be used when opus is requested, because then both streams will be sent
+    // via the srtp sender (opus will be forwarded repacketized after transcoding).
+    // It is unclear if this will work reliably with ffmpeg/aac-eld which uses it's own
+    // ntp timestamp algorithm. aac-eld is deprecated in any case.
+    if (videoIsSrtpSenderCompatible && requestedOpus) {
         console.log('requesting second audio only stream');
         const mediaOptions: RequestMediaStreamOptions = {
             destination,
+            // exclude video.
             video: null,
             audio: {
-                // opus is the preferred/default codec, and can be repacketized to fit any request if in use.
-                // otherwise audio streaming for aac-eld needs to be transcoded, since nothing outputs aac-eld natively.
-                // pcm/g711 the second best option for aac-eld, since it's raw audio.
-                codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
+                codec: AudioStreamingCodecType.OPUS,
             },
         };
 
