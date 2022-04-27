@@ -17,7 +17,7 @@ import crypto from 'crypto';
 import dgram from 'dgram';
 import net from 'net';
 import { Duplex } from 'stream';
-import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
+import { connectRFC4571Parser, requeueRtspVideoData, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
@@ -656,6 +656,14 @@ class PrebufferSession {
           rtspClient.requestTimeout = 10000;
           await rtspClient.options();
           const sdpResponse = await rtspClient.describe();
+          const contentBase = sdpResponse.headers['content-base'];
+          if (contentBase) {
+            const url = new URL(contentBase);
+            const existing = new URL(rtspClient.url);
+            url.username = existing.username;
+            url.password = existing.password;
+            rtspClient.url = url.toString();
+          }
           let sdp = sdpResponse.body.toString().trim();
           this.console.log('sdp', sdp);
 
@@ -718,21 +726,11 @@ class PrebufferSession {
 
           this.sdp = Promise.resolve(sdp);
           await rtspClient.play();
-          const earlyData = rtspClient.rfc4571.read();
-          if (earlyData)
-            rtspClient.client.unshift(earlyData);
+          requeueRtspVideoData(rtspClient);
 
           session = startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {
             channelMap: mapping,
-            handleRTSP: async () => {
-              await rtspClient.readMessage();
-            },
-            onLoop: () => {
-              if (rtspClient.needKeepAlive) {
-                rtspClient.needKeepAlive = false;
-                rtspClient.writeGetParameter();
-              }
-            }
+            rtspClient,
           });
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
@@ -990,7 +988,7 @@ class PrebufferSession {
         session.once('killed', cleanup);
 
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
-        if (container !== 'rtsp') {
+        if (true || container !== 'rtsp') {
           for (const chunk of prebufferContainer) {
             if (chunk.time < now - requestedPrebuffer)
               continue;

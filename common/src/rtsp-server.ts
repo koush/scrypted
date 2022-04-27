@@ -212,22 +212,21 @@ export class RtspClient extends RtspBase {
                 // strangely, relative RTSP urls do not behave like expected from an HTTP-ish server.
                 // ffmpeg will happily suffix path segments after query strings:
                 // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
-                fullUrl += '/' + path;
+                fullUrl += (fullUrl.endsWith('/') ? '' : '/') + path;
             }
         }
 
         const sanitized = new URL(fullUrl);
         sanitized.username = '';
         sanitized.password = '';
-        fullUrl = sanitized.toString();
 
-        const line = `${method} ${fullUrl} RTSP/1.0`;
+        const line = `${method} ${sanitized} RTSP/1.0`;
         const cseq = this.cseq++;
         headers['CSeq'] = cseq.toString();
         headers['User-Agent'] = 'Scrypted';
 
         if (this.wwwAuthenticate)
-            headers['Authorization'] = this.createAuthorizationHeader(method);
+            headers['Authorization'] = this.createAuthorizationHeader(method, new URL(fullUrl));
 
         if (this.session)
             headers['Session'] = this.session;
@@ -286,31 +285,35 @@ export class RtspClient extends RtspBase {
         }
     }
 
-    createAuthorizationHeader(method: string) {
+    createAuthorizationHeader(method: string, url: URL) {
         if (!this.wwwAuthenticate)
             throw new Error('no WWW-Authenticate found');
 
-        const parsedUrl = new URL(this.url);
-
         if (this.wwwAuthenticate.includes('Basic')) {
-            const hash = BASIC.computeHash(parsedUrl);
+            const hash = BASIC.computeHash(url);
             return `Basic ${hash}`;
         }
 
         const wwwAuth = DIGEST.parseWWWAuthenticateRest(this.wwwAuthenticate);
 
-        const username = decodeURIComponent(parsedUrl.username);
-        const password = decodeURIComponent(parsedUrl.password);
+        const authedUrl = new URL(this.url);
+        const username = decodeURIComponent(authedUrl.username);
+        const password = decodeURIComponent(authedUrl.password);
+
+        const strippedUrl = new URL(url);
+        strippedUrl.username = '';
+        strippedUrl.password = '';
 
         const ha1 = crypto.createHash('md5').update(`${username}:${wwwAuth.realm}:${password}`).digest('hex');
-        const ha2 = crypto.createHash('md5').update(`${method}:${parsedUrl.pathname}`).digest('hex');
+        const ha2 = crypto.createHash('md5').update(`${method}:${strippedUrl}`).digest('hex');
         const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
+
 
         const params = {
             username,
             realm: wwwAuth.realm,
             nonce: wwwAuth.nonce,
-            uri: parsedUrl.pathname,
+            uri: strippedUrl.toString(),
             algorithm: 'MD5',
             response: hash,
         };
