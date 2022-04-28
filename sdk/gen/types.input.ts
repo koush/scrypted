@@ -51,13 +51,9 @@ export interface EventListenerOptions {
    */
   watch?: boolean;
 }
-export interface EventListener {
-  /**
-   * This device type can be hooked by Automation actions to handle events. The event source, event details (interface, time, property), and event data are all passed to the listener as arguments.
-   */
-  (eventSource: ScryptedDevice | undefined, eventDetails: EventDetails, eventData: any): void;
 
-}
+export type EventListener = (eventSource: ScryptedDevice | undefined, eventDetails: EventDetails, eventData: any) => void;
+
 export interface EventDetails {
   changed?: boolean;
   eventInterface?: string;
