@@ -10,7 +10,7 @@ import { ChildProcess } from "child_process";
 import crypto from 'crypto';
 import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
-import { getFFmpegRtpAudioOutputArguments, RtpTrack, startRtpForwarderProcess } from "./rtp-forwarders";
+import { getFFmpegRtpAudioOutputArguments, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
 import { isPeerConnectionAlive } from "./werift-util";
@@ -224,7 +224,8 @@ export async function createRTCPeerConnectionSink(
                 || mediaStreamOptions?.video?.codec !== 'h264'
                 || ffmpegInput.h264EncoderArguments?.length;
             if (transcode || maximumCompatibilityMode) {
-                const bitrate = maximumCompatibilityMode ? 500000 : (ffmpegInput.destinationVideoBitrate || 500000);
+                const conservativeDefaultBitrate = 500000;
+                const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
                 const width = Math.min(options?.screen?.width || 960, 1280);
                 videoArgs.push(
                     // this might get wonky with 4:3?
@@ -235,7 +236,7 @@ export async function createRTCPeerConnectionSink(
                     "-bufsize", (2 * bitrate).toString(),
                     "-maxrate", bitrate.toString(),
                     '-r', '15',
-                )
+                );
                 if (!sessionSupportsH264High || maximumCompatibilityMode) {
                     // baseline profile must use libx264, not sure other encoders properly support it.
                     videoArgs.push(
@@ -243,8 +244,11 @@ export async function createRTCPeerConnectionSink(
                         ...getDebugModeH264EncoderArgs(),
                     );
 
-                    if (sessionSupportsH264High)
-                        videoArgs.push('-tune', 'zerolatency');
+                    // unable to find conditions to make this working properly.
+                    // encoding results in chop if bitrate is not sufficient.
+                    // this may need to be aligned with h264 level?
+                    // or no bitrate hint?
+                    // videoArgs.push('-tune', 'zerolatency');
                 }
                 else {
                     videoArgs.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
@@ -261,7 +265,7 @@ export async function createRTCPeerConnectionSink(
             const audioRtpTrack: RtpTrack = {
                 transceiver: audioTransceiver,
                 outputArguments: [
-                    ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec),
+                    ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
                 ]
             };
 
@@ -275,13 +279,23 @@ export async function createRTCPeerConnectionSink(
                 firstPacket: () => console.timeEnd(token),
             };
 
+            let tracks: RtpTracks<any>;
+            if (ffmpegInput.mediaStreamOptions?.audio === null) {
+                tracks = {
+                    video: videoRtpTrack,
+                }
+            }
+            else {
+                tracks = {
+                    video: videoRtpTrack,
+                    audio: audioRtpTrack,
+                }
+            }
+
             const { cp } = await startRtpForwarderProcess(console, [
                 ...(transcode ? ffmpegInput.videoDecoderArguments || [] : []),
                 ...ffmpegInput.inputArguments,
-            ], {
-                video: videoRtpTrack,
-                audio: audioRtpTrack,
-            });
+            ], tracks);
 
             cp.on('exit', cleanup);
             resolve(cp);

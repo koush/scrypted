@@ -7,12 +7,12 @@ import dgram from 'dgram';
 
 const { mediaManager } = sdk;
 
-export function getFFmpegRtpAudioOutputArguments(inputCodec: string) {
+export function getFFmpegRtpAudioOutputArguments(inputCodec: string, maximumCompatibilityMode: boolean) {
     const ret = [
         '-vn', '-sn', '-dn',
     ];
 
-    if (inputCodec === 'opus') {
+    if (inputCodec === 'opus' && !maximumCompatibilityMode) {
         ret.push('-acodec', 'copy');
     }
     else {
@@ -50,9 +50,9 @@ export async function createTrackForwarders<T extends string>(console: Console, 
     const sockets: RtpSockets<T> = {};
 
     for (const key of Object.keys(rtpTracks)) {
+        const track = rtpTracks[key as T];
         const { server, port } = await createBindZero();
         sockets[key as T] = server;
-        const track = rtpTracks[key as T];
         server.once('message', () => track.firstPacket?.());
         const outputArguments = track.outputArguments;
         outputArguments.push(
@@ -87,21 +87,14 @@ export async function startRtpForwarderProcess<T extends string>(console: Consol
     const outputArguments: string[] = [];
 
     for (const key of Object.keys(rtpTracks)) {
-        outputArguments.push(
-
-        )
-        outputArguments.push(...rtpTracks[key as T].outputArguments);
+        const track = rtpTracks[key as T];
+        outputArguments.push(...track.outputArguments);
     }
 
     const args = [
         '-hide_banner',
 
         ...inputArguments,
-
-        // create a dummy audio track if none actually exists.
-        // this track will only be used if no audio track is available.
-        // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        '-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest',
 
         ...outputArguments,
     ];

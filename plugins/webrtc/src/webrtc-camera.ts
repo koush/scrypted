@@ -1,4 +1,5 @@
 import { Intercom, MediaObject, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingClient, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedDeviceBase, VideoCamera } from "@scrypted/sdk";
+import { WebRTCPlugin } from "./main";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from "./wrtc-to-rtsp";
 
 const useSdp = true;
@@ -7,7 +8,7 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
     pendingClient: (session: RTCSignalingSession) => void;
     intercom: Promise<Intercom>;
 
-    constructor(nativeId: string) {
+    constructor(public plugin: WebRTCPlugin, nativeId: string) {
         super(nativeId);
     }
 
@@ -32,7 +33,8 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
             console: this.console,
             mediaStreamOptions,
             channel: this,
-            useSdp,
+            maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
+            useUdp: useSdp,
         });
 
         this.intercom?.then(intercom => intercom.stopIntercom());

@@ -102,7 +102,8 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
-            useSdp: this.storageSettings.values.useSdp,
+            maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
+            useUdp: this.storageSettings.values.useSdp,
         });
 
         return mediaObject;
@@ -118,7 +119,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
     }
 }
 
-class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider, BufferConverter, MixinProvider, Settings {
+export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, DeviceProvider, BufferConverter, MixinProvider, Settings {
     storageSettings = new StorageSettings(this, {
         maximumCompatibilityMode: {
             title: 'Maximum Compatibility Mode',
@@ -244,7 +245,7 @@ class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreator, Dev
     }
 
     getDevice(nativeId: string) {
-        return new WebRTCCamera(nativeId);
+        return new WebRTCCamera(this, nativeId);
     }
 }
 
