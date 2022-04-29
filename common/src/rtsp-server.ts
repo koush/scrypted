@@ -100,6 +100,16 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
             if (foundIndex !== undefined)
                 return streamChunks.slice(foundIndex);
 
+            // some streams don't contain codec info, so find an idr frame instead.
+            for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
+                const streamChunk = streamChunks[prebufferIndex];
+                if (findH264NaluType(streamChunk, H264_NAL_TYPE_IDR))
+                    foundIndex = prebufferIndex;
+            }
+
+            if (foundIndex !== undefined)
+                return streamChunks.slice(foundIndex);
+
             // oh well!
             return streamChunks;
         },

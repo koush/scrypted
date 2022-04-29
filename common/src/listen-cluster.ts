@@ -18,8 +18,8 @@ export async function closeQuiet(socket: dgram.Socket | net.Server) {
     }
 }
 
-export async function bindUdp(server: dgram.Socket, usePort: number) {
-    server.bind(usePort);
+export async function bindUdp(server: dgram.Socket, usePort: number, address?: string) {
+    server.bind(usePort, address);
     await once(server, 'listening');
     const port = server.address().port;
     return {
