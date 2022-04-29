@@ -988,7 +988,7 @@ class PrebufferSession {
         session.once('killed', cleanup);
 
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
-        if (true || container !== 'rtsp') {
+        if (container !== 'rtsp') {
           for (const chunk of prebufferContainer) {
             if (chunk.time < now - requestedPrebuffer)
               continue;
@@ -997,7 +997,6 @@ class PrebufferSession {
           }
         }
         else {
-          // for some reason this doesn't work as well as simply guessing and dumping.
           const parser = this.parsers[container];
           const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer));
           for (const prebuffer of availablePrebuffers) {
