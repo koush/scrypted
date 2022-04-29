@@ -288,15 +288,17 @@ export class H264Repacketizer {
         }
 
         if (nalType === NAL_TYPE_FU_A) {
+            // fua may share a timestamp as stapa, but don't aggregated with stapa
+            this.flushPendingStapA(ret);
+
             const data = packet.payload;
             const originalNalType = data[1] & 0x1f;
             const isFuStart = !!(data[1] & 0x80);
+            // if this is an idr frame, but no sps has been sent, dummy one up.
+            // the stream may not contain sps.
             if (originalNalType === NAL_TYPE_IDR && isFuStart && !this.seenSps) {
                 this.maybeSendSpsPps(packet, ret);
             }
-
-            // fua may share a timestamp as stapa, but don't aggregated with stapa
-            this.flushPendingStapA(ret);
 
             if (!this.pendingFuA) {
                 // the fua packet may already fit, in which case we could just send it.
@@ -358,6 +360,12 @@ export class H264Repacketizer {
             if (nalType === NAL_TYPE_SEI) {
                 this.extraPackets--;
                 return ret;
+            }
+
+            if (nalType === NAL_TYPE_IDR && !this.seenSps) {
+                // if this is an idr frame, but no sps has been sent, dummy one up.
+                // the stream may not contain sps.
+                this.maybeSendSpsPps(packet, ret);
             }
 
             if (packet.payload.length > this.maxPacketSize) {
