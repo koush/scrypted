@@ -9,11 +9,17 @@ import { ntpTime } from './camera-utils';
 import { H264Repacketizer } from './h264-packetizer';
 import { OpusRepacketizer } from './opus-repacketizer';
 
-export function createCameraStreamSender(config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, maxPacketSize: number, rtcpInterval: number, audioOptions?: {
-    audioPacketTime: number,
-    audioSampleRate: AudioStreamingSamplerate,
-    framesPerPacket: number,
-}) {
+export function createCameraStreamSender(console: Console, config: Config, sender: dgram.Socket, ssrc: number, payloadType: number, port: number, targetAddress: string, rtcpInterval: number,
+    videoOptions?: {
+        maxPacketSize: number,
+        sps: Buffer,
+        pps: Buffer,
+    },
+    audioOptions?: {
+        audioPacketTime: number,
+        audioSampleRate: AudioStreamingSamplerate,
+        framesPerPacket: number,
+    }) {
     const srtpSession = new SrtpSession(config);
     const srtcpSession = new SrtcpSession(config);
 
@@ -42,8 +48,10 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
         opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
     }
     else {
-        // adjust for rtp header size
-        h264Packetizer = new H264Repacketizer(maxPacketSize - 12);
+        // adjust for rtp header size for the rtp packet header (12) and 16 for... whatever else
+        // may not be accomodated.
+        const adjustedMtu = videoOptions.maxPacketSize - 12 - 16;
+        h264Packetizer = new H264Repacketizer(adjustedMtu, videoOptions);
     }
 
     function sendPacket(rtp: RtpPacket) {
@@ -79,8 +87,10 @@ export function createCameraStreamSender(config: Config, sender: dgram.Socket, s
     }
 
     return (rtp: RtpPacket) => {
-        if (!firstSequenceNumber)
+        if (!firstSequenceNumber) {
+            console.log(`sending first ${audioOptions ? 'audio' : 'video'} packet`);
             firstSequenceNumber = rtp.header.sequenceNumber;
+        }
 
         // rough rollover detection to keep packet count accurate.
         // once within 256 packets of the 0 and 65536, wait for rollover.

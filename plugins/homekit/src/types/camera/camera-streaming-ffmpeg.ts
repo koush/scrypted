@@ -160,6 +160,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
     if (noAudio) {
         if (videoIsSrtpSenderCompatible) {
+            console.log('camera has perfect codecs (no audio), using srtp only fast path.');
             await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
             return;
         }
@@ -181,6 +182,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             && opusFramesPerPacket && opusFramesPerPacket === Math.round(opusFramesPerPacket);
 
         if (videoIsSrtpSenderCompatible && perfectOpus) {
+            console.log('camera has perfect codecs, using srtp only fast path.');
             await startCameraStreamSrtp(ffmpegInput, console, false, session, killSession);
             return;
         }
@@ -220,13 +222,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             if (requestedOpus) {
                 // opus requires timestamp mangling.
                 const audioForwarder = await createBindZero();
-                audioForwarder.server.once('message', () => console.log('first opus packet received.'));
+                audioForwarder.server.once('message', () => console.log('first forwarded opus packet received.'));
                 session.audioReturn.on('close', () => audioForwarder.server.close());
 
-                const audioSender = createCameraStreamSender(session.aconfig, session.audioReturn,
+                const audioSender = createCameraStreamSender(console, session.aconfig, session.audioReturn,
                     session.audiossrc, session.startRequest.audio.pt,
                     session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
-                    undefined, session.startRequest.audio.rtcp_interval,
+                    session.startRequest.audio.rtcp_interval, undefined,
                     {
                         audioPacketTime: session.startRequest.audio.packet_time,
                         audioSampleRate: session.startRequest.audio.sample_rate,
@@ -256,6 +258,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             console.warn(device.name, 'homekit requested unknown audio codec, audio will not be streamed.', request);
 
             if (videoIsSrtpSenderCompatible) {
+                console.log('camera has perfect codecs (unknown audio), using srtp only fast path.');
                 await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
                 return;
             }

@@ -1,5 +1,5 @@
 import { readLength } from '@scrypted/common/src/read-stream';
-import { parseSdp } from '@scrypted/common/src/sdp-utils';
+import { getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { FFmpegInput } from '@scrypted/sdk';
 import net from 'net';
 import { Readable } from 'stream';
@@ -37,7 +37,7 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
             await rtspClient.setup(audioChannel, audio.control);
         }
         videoChannel = channel;
-        channel +=2;
+        channel += 2;
         await rtspClient.setup(videoChannel, video.control);
 
         await rtspClient.play();
@@ -57,22 +57,27 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
     }
 
     const parsedSdp = parseSdp(sdp);
+    const video = parsedSdp.msections.find(msection => msection.type === 'video');
     const audioPayloadTypes = parsedSdp.msections.find(msection => msection.type === 'audio')?.payloadTypes;
-    const videoPayloadTypes = parsedSdp.msections.find(msection => msection.type === 'video')?.payloadTypes;
+    const videoPayloadTypes = video?.payloadTypes;
 
     const startStreaming = async () => {
         try {
             let opusFramesPerPacket = session.startRequest.audio.packet_time / 20;
 
-            const videoSender = createCameraStreamSender(session.vconfig, session.videoReturn,
+            const videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
-                session.startRequest.video.mtu, session.startRequest.video.rtcp_interval);
-            const audioSender = createCameraStreamSender(session.aconfig, session.audioReturn,
+                session.startRequest.video.rtcp_interval,
+                {
+                    maxPacketSize: session.startRequest.video.mtu,
+                    ...getSpsPps(video),
+                });
+            const audioSender = createCameraStreamSender(console, session.aconfig, session.audioReturn,
                 session.audiossrc, session.startRequest.audio.pt,
                 session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
-                undefined,
                 session.startRequest.audio.rtcp_interval,
+                undefined,
                 {
                     audioPacketTime: session.startRequest.audio.packet_time,
                     audioSampleRate: session.startRequest.audio.sample_rate,
@@ -101,6 +106,8 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                 else {
                     isAudio = audioPayloadTypes.includes(rtp.header.payloadType);
                     isVideo = videoPayloadTypes.includes(rtp.header.payloadType);
+                    if (isAudio && isVideo)
+                        throw new Error('audio and video on same channel?');
                 }
                 if (isAudio) {
                     audioSender(rtp);
