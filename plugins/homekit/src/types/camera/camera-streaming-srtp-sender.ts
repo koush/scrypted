@@ -83,14 +83,10 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         rtp.header.payloadType = payloadType;
 
         const srtp = srtpSession.encrypt(rtp.payload, rtp.header);
-        // if (!audioOptions)
-        //     console.log('sent', rtp.header.sequenceNumber);
         sender.send(srtp, port, targetAddress);
     }
 
     return (rtp: RtpPacket) => {
-        // console.log('received', rtp.header.sequenceNumber);
-
         if (!firstSequenceNumber) {
             console.log(`sending first ${audioOptions ? 'audio' : 'video'} packet`);
             firstSequenceNumber = rtp.header.sequenceNumber;
@@ -133,9 +129,6 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             rtp.header.timestamp = (firstTimestamp + packetCount * 180 * audioIntervalScale) % 0xFFFFFFFF;
             sendPacket(rtp);
             return;
-        }
-        else {
-            // console.log('video', Date.now())
         }
 
         const packets = h264Packetizer.repacketize(rtp);
