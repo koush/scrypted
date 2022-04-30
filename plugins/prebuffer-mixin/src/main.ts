@@ -1131,7 +1131,6 @@ class PrebufferSession {
     });
 
     mediaStreamOptions.prebuffer = requestedPrebuffer;
-    mediaStreamOptions.tool = 'scrypted';
 
     const { reencodeAudio } = this.getAudioConfig();
 

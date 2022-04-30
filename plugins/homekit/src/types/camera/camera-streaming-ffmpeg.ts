@@ -146,6 +146,14 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         videoOutput,
     );
 
+    let rtpSender = storage.getItem('rtpSender') || 'Default';
+    console.log({
+        tool: mso?.tool,
+        rtpSender,
+    });
+    if (rtpSender === 'Default' && mso?.tool === 'scrypted')
+        rtpSender = 'Scrypted';
+
     const videoIsSrtpSenderCompatible = !needsFFmpeg
         && mso?.container === 'rtsp'
         // The upstream sender is provided by scrypted (rebroadcast), and we can
@@ -154,7 +162,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         // Consider removing this check upon ffmpeg verification. the only reason this matters
         // is because that scrypted is guaranteed to provide only the subset of requested streams
         // per spec. Ie, requesting only video or only audio.
-        && mso?.tool === 'scrypted';
+        && rtpSender === 'Scrypted';
     const audioCodec = request.audio.codec;
     const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
