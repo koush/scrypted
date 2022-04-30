@@ -18,6 +18,7 @@ RUN() {
 
 echo "Installing Scrypted dependencies..."
 RUN brew update
+RUN brew install node@16
 # needed by scrypted-ffmpeg
 RUN brew install sdl2
 # gstreamer plugins
@@ -27,26 +28,36 @@ RUN brew install gst-python
 RUN pip3 install --upgrade pip
 RUN pip3 install aiofiles debugpy typing_extensions typing opencv-python
 
-echo "Installing Scrypted..."
-RUN npx -y scrypted install-server
-
 echo "Installing Scrypted Launch Agent..."
 
 RUN mkdir -p ~/Library/LaunchAgents
 
-NPX_PATH=$(which npx)
-if [ -z "$NPX_PATH" ]
+NODE_16_PATH=$(brew --prefix node@16)
+if [ ! -d "$NODE_16_PATH" ]
 then
-    echo "Unable to determine npx path."
+    echo "Unable to determine node@16 path."
     exit 1
 fi
 
-NPX_BIN_PATH=$(dirname $NPX_PATH)
-if [ -z "$NPX_BIN_PATH" ]
+NODE_16_BIN_PATH=$NODE_16_PATH/bin
+if [ ! -d "$NODE_16_BIN_PATH" ]
 then
-    echo "Unable to determine npx bin path."
+    echo "Unable to determine node@16 bin path."
+    echo "$NODE_16_BIN_PATH does not exist."
     exit 1
 fi
+
+export PATH=$NODE_16_BIN_PATH:$PATH
+
+NPX_PATH=$NODE_16_BIN_PATH/npx
+if [ ! -f "$NPX_PATH" ]
+then
+    echo "Unable to find npx."
+    exit 1
+fi
+
+echo "Installing Scrypted..."
+RUN $NPX_PATH -y scrypted install-server
 
 BREW_PREFIX=$(brew --prefix)
 if [ -z "$BREW_PREFIX" ]
@@ -85,7 +96,7 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
     <key>EnvironmentVariables</key>
         <dict>
             <key>PATH</key>
-                <string>$NPX_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$NODE_16_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
         </dict>
