@@ -5,7 +5,7 @@ import ClientOAuth2 from 'client-oauth2';
 import { URL } from 'url';
 import axios from 'axios';
 import throttle from 'lodash/throttle';
-import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-connect';
+import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { sleep } from '@scrypted/common/src/sleep';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
@@ -636,23 +636,23 @@ export class GoogleSmartDeviceAccess extends ScryptedDeviceBase implements Oauth
                 key: 'projectId',
                 title: 'Project ID',
                 description: 'Google Device Access Project ID',
-                value: this.storage.getItem('projectId'), // || '778da527-9690-4368-9c96-6872bb29e7a0',
+                value: this.storage.getItem('projectId'),
             },
             {
                 key: 'clientId',
                 title: 'Google OAuth Client ID',
-                description: 'Optional: The Google OAuth Client ID to use. The default value will use Scrypted Cloud OAuth login.',
-                value: this.storage.getItem('clientId') || '827888101440-6jsq0saim1fh1abo6bmd9qlhslemok2t.apps.googleusercontent.com',
+                description: 'The Google OAuth Client ID from Google Cloud Project.',
+                value: this.storage.getItem('clientId'),
             },
             {
                 key: 'clientSecret',
                 title: 'Google OAuth Client Secret',
-                description: 'Optional: The Google OAuth Client Secret to use. The default value will use Scrypted Cloud login.',
-                value: this.storage.getItem('clientSecret') || 'nXgrebmaHNvZrKV7UDJV3hmg',
+                description: 'The Google OAuth Client Secret from Google Cloud Project.',
+                value: this.storage.getItem('clientSecret'),
             },
             {
                 title: "PubSub Address",
-                description: "The PubSub address to enter in Google Cloud console.",
+                description: "The PubSub address to enter in Google Cloud Project.",
                 key: 'pubsubAddress',
                 readonly: true,
                 value: endpoint,

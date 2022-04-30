@@ -6,7 +6,7 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityT
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, parseSemicolonDelimited, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -17,7 +17,7 @@ import crypto from 'crypto';
 import dgram from 'dgram';
 import net from 'net';
 import { Duplex } from 'stream';
-import { connectRFC4571Parser, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
+import { connectRFC4571Parser, requeueRtspVideoData, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
@@ -34,7 +34,8 @@ const TRANSCODE_AUDIO_DESCRIPTION = `${TRANSCODE_AUDIO} (Transcode)`;
 const COMPATIBLE_AUDIO_CODECS = ['aac', 'mp3', 'mp2', 'opus'];
 const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
 
-const SCRYPTED_PARSER = 'Scrypted';
+const SCRYPTED_PARSER_TCP = 'Scrypted (TCP)';
+const SCRYPTED_PARSER_UDP = 'Scrypted (UDP)';
 const FFMPEG_PARSER_TCP = 'FFmpeg (TCP)';
 const FFMPEG_PARSER_UDP = 'FFmpeg (UDP)';
 const STRING_DEFAULT = 'Default';
@@ -217,13 +218,15 @@ class PrebufferSession {
       return STRING_DEFAULT;
 
     const defaultValue = rtspMode
-      ? SCRYPTED_PARSER
+      ? SCRYPTED_PARSER_TCP
       : STRING_DEFAULT;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
     if (!rtspParser || rtspParser === STRING_DEFAULT)
       return defaultValue;
-    if (rtspParser === SCRYPTED_PARSER)
-      return SCRYPTED_PARSER;
+    if (rtspParser === SCRYPTED_PARSER_TCP)
+      return SCRYPTED_PARSER_TCP;
+    if (rtspParser === SCRYPTED_PARSER_UDP)
+      return SCRYPTED_PARSER_UDP;
     if (rtspParser === FFMPEG_PARSER_TCP)
       return FFMPEG_PARSER_TCP;
     if (rtspParser === FFMPEG_PARSER_UDP)
@@ -324,7 +327,7 @@ class PrebufferSession {
 
       const value = this.getParser(rtspMode, false, this.advertisedMediaStreamOptions);
       const defaultValue = rtspMode ?
-        SCRYPTED_PARSER : 'FFmpeg';
+        SCRYPTED_PARSER_TCP : FFMPEG_PARSER_TCP;
 
       settings.push(
         {
@@ -335,14 +338,15 @@ class PrebufferSession {
           value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
           choices: [
             STRING_DEFAULT,
+            SCRYPTED_PARSER_TCP,
+            SCRYPTED_PARSER_UDP,
             FFMPEG_PARSER_TCP,
             FFMPEG_PARSER_UDP,
-            SCRYPTED_PARSER,
           ],
         }
       );
 
-      if (value !== SCRYPTED_PARSER) {
+      if (value !== SCRYPTED_PARSER_TCP) {
         // ffmpeg parser is being used, so add ffmpeg input arguments option.
         addFFmpegSettings();
       }
@@ -640,7 +644,7 @@ class PrebufferSession {
       sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
       const parser = this.getParser(rtspMode, muxingMp4, sessionMso);
-      if (parser === SCRYPTED_PARSER) {
+      if (parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP) {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser');
         const rtspClient = new RtspClient(ffmpegInput.url, this.console);
@@ -656,19 +660,29 @@ class PrebufferSession {
           rtspClient.requestTimeout = 10000;
           await rtspClient.options();
           const sdpResponse = await rtspClient.describe();
+          const contentBase = sdpResponse.headers['content-base'];
+          if (contentBase) {
+            const url = new URL(contentBase);
+            const existing = new URL(rtspClient.url);
+            url.username = existing.username;
+            url.password = existing.password;
+            rtspClient.url = url.toString();
+          }
           let sdp = sdpResponse.body.toString().trim();
           this.console.log('sdp', sdp);
 
           const parsedSdp = parseSdp(sdp);
           let channel = 0;
           const mapping: RtspChannelCodecMapping = {};
-          const useUdp = false;
+          const useUdp = parser === SCRYPTED_PARSER_UDP;
 
           const doSetup = async (control: string, codec: string) => {
             let setupChannel = channel;
+            let setupServer: dgram.Socket;
             if (useUdp) {
               const rtspChannel = channel;
               const { port, server } = await createBindZero();
+              setupServer = server;
               servers.push(server);
               setupChannel = port;
               server.on('message', data => {
@@ -684,9 +698,18 @@ class PrebufferSession {
                 session?.resetActivityTimer?.();
               })
             }
-            await rtspClient.setup(setupChannel, control, useUdp);
+            const udpSetup = await rtspClient.setup(setupChannel, control, useUdp);
             mapping[channel] = codec;
             channel += 2;
+
+            if (setupServer) {
+              const punch = Buffer.alloc(1);
+              const transport = udpSetup.headers['transport'];
+              const match = transport.match(/.*?server_port=([0-9]+)-([0-9]+)/);
+              const [_, rtp, rtcp] = match;
+              const { hostname } = new URL(rtspClient.url);
+              setupServer.send(punch, parseInt(rtp), hostname)
+            }
           }
 
           let setupVideoSection = false;
@@ -717,22 +740,21 @@ class PrebufferSession {
           sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
           this.sdp = Promise.resolve(sdp);
-          await rtspClient.play();
-          const earlyData = rtspClient.rfc4571.read();
-          if (earlyData)
-            rtspClient.client.unshift(earlyData);
+
+          const play = await rtspClient.play();
+          let udpSessionTimeout: number;
+
+          if (useUdp) {
+            const sessionDict = parseSemicolonDelimited(play.headers.session);
+            udpSessionTimeout = parseInt(sessionDict['timeout']);
+          }
+          
+          requeueRtspVideoData(rtspClient);
 
           session = startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {
             channelMap: mapping,
-            handleRTSP: async () => {
-              await rtspClient.readMessage();
-            },
-            onLoop: () => {
-              if (rtspClient.needKeepAlive) {
-                rtspClient.needKeepAlive = false;
-                rtspClient.writeGetParameter();
-              }
-            }
+            rtspClient,
+            udpSessionTimeout,
           });
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
@@ -999,7 +1021,6 @@ class PrebufferSession {
           }
         }
         else {
-          // for some reason this doesn't work as well as simply guessing and dumping.
           const parser = this.parsers[container];
           const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer));
           for (const prebuffer of availablePrebuffers) {
@@ -1027,11 +1048,11 @@ class PrebufferSession {
 
     const session = await this.parserSessionPromise;
 
-    const idrInterval = this.getDetectedIdrInterval();
+    const idrInterval = Math.max(4000, this.getDetectedIdrInterval() || 4000);
     let requestedPrebuffer = options?.prebuffer;
     if (requestedPrebuffer == null) {
       // get into the general area of finding a sync frame.
-      requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
+      requestedPrebuffer = idrInterval * 1.5;
     }
 
     const { rtspMode } = this.getRebroadcastContainer();
@@ -1041,8 +1062,8 @@ class PrebufferSession {
 
     // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
     // rewind a little bit earlier to gaurantee a valid full segment of that length is sent.
-    if (options?.prebuffer && container !== 'mp4' && options?.container === 'mp4') {
-      requestedPrebuffer += (idrInterval || 4000) * 1.5;
+    if (requestedPrebuffer && container !== 'mp4' && options?.container === 'mp4') {
+      requestedPrebuffer += idrInterval * 1.5;
     }
 
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
@@ -1056,7 +1077,7 @@ class PrebufferSession {
     if (container === 'rtsp') {
       const parsedSdp = parseSdp(sdp);
       parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
-      const filterPrebufferAudio = false;//options?.prebuffer === undefined;
+      const filterPrebufferAudio = options?.prebuffer === undefined;
       const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
       sdp = parsedSdp.toSdp();
       filter = (chunk, prebuffer) => {
@@ -1080,7 +1101,7 @@ class PrebufferSession {
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
         const server = new RtspServer(socket, sdp);
-        server.console = this.console;
+        // server.console = this.console;
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
           codecMap.set(track.codec, track.destination);
@@ -1125,7 +1146,9 @@ class PrebufferSession {
     }
 
     if (session.inputVideoResolution?.width && session.inputVideoResolution?.height) {
-      Object.assign(mediaStreamOptions.video, session.inputVideoResolution);
+      // this may be an audio only request.
+      if (mediaStreamOptions.video)
+        Object.assign(mediaStreamOptions.video, session.inputVideoResolution);
     }
 
     const now = Date.now();

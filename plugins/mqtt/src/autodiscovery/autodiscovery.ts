@@ -248,13 +248,13 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
             client.subscribe(brightnessStateTopic);
             this.bindMessage(brightnessStateTopic,
                 payload => this.brightness =
-                 unscaleBrightness(this.eval(config.brightness_value_template || '{{ value_json.brightness }}', payload), config.brightness_scale));
+                    unscaleBrightness(this.eval(config.brightness_value_template || '{{ value_json.brightness }}', payload), config.brightness_scale));
         }
         if (this.providedInterfaces.includes(ScryptedInterface.OnOff)) {
             const config = this.loadComponentConfig(ScryptedInterface.OnOff);
             client.subscribe(config.state_topic);
             this.bindMessage(config.state_topic,
-                payload => this.on = 
+                payload => this.on =
                     (config.payload_on || 'ON') === this.eval(config.state_value_template || '{{ value_json.state }}', payload));
         }
         if (this.providedInterfaces.includes(ScryptedInterface.Lock)) {
@@ -313,7 +313,9 @@ export class MqttAutoDiscoveryDevice extends ScryptedDeviceBase implements OnOff
         const config = this.loadComponentConfig(ScryptedInterface.OnOff);
         if (config.on_command_type === 'brightness')
             return this.publishValue(config.brightness_command_topic,
-                config.brightness_value_template, 255, 255);
+                config.brightness_value_template,
+                config.brightness_scale || 255,
+                config.brightness_scale || 255);
         return this.publishValue(config.command_topic,
             config.brightness_value_template,
             config.payload_on, 'ON');

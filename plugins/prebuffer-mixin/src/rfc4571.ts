@@ -1,7 +1,7 @@
 import { cloneDeep } from "@scrypted/common/src/clone-deep";
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { read16BELengthLoop, readLength } from "@scrypted/common/src/read-stream";
-import { findH264NaluType, H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { findH264NaluType, H264_NAL_TYPE_SPS, RtspClient, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { sleep } from "@scrypted/common/src/sleep";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
@@ -23,10 +23,16 @@ export type RtspChannelCodecMapping = { [key: number]: string };
 
 const RTSP_BUFFER = Buffer.from('RTSP');
 
+export function requeueRtspVideoData(rtspClient: RtspClient) {
+    const videoData = rtspClient.rfc4571.read();
+    if (videoData)
+      rtspClient.client.unshift(videoData);
+}
+
 export function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspOptions?: {
     channelMap: RtspChannelCodecMapping,
-    handleRTSP: () => Promise<void>,
-    onLoop?: () => void,
+    rtspClient: RtspClient,
+    udpSessionTimeout: number,
 }): ParserSession<"rtsp"> {
     let isActive = true;
     const events = new EventEmitter();
@@ -57,8 +63,12 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         socket.destroy();
     };
 
-    socket.on('close', kill);
-    socket.on('error', kill);
+    socket.on('close', () => {
+        kill();
+    });
+    socket.on('error', () => {
+        kill();
+    });
 
     const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.timeout);
 
@@ -88,13 +98,29 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         // don't start parsing until next tick, to prevent missed packets.
         await sleep(0);
 
+        if (rtspOptions?.udpSessionTimeout) {
+            while (true) {
+                await sleep(rtspOptions.udpSessionTimeout * 1000 - 5000);
+                await rtspOptions.rtspClient.getParameter();
+            }
+        }
+
         const headerLength = rtspOptions?.channelMap ? 4 : 2;
         const offset = rtspOptions?.channelMap ? 2 : 0;
         const skipHeader = (header: Buffer, resumeRead: () => void) => {
-            if (header.compare(RTSP_BUFFER))
+            if (!rtspOptions?.rtspClient.needKeepAlive)
                 return false;
+
             socket.unshift(header);
-            rtspOptions.handleRTSP().then(resumeRead);
+            rtspOptions.rtspClient.needKeepAlive = false;
+            rtspOptions.rtspClient.getParameter().then(() => {
+                requeueRtspVideoData(rtspOptions.rtspClient);
+                resumeRead();
+            })
+            .catch(e => {
+                console.error('error during RTSP keepalive', e);
+                kill();
+            });
             return true;
         }
         await read16BELengthLoop(socket, {
@@ -103,8 +129,6 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
             skipHeader,
             callback: (header, data) => {
                 let type: string;
-
-                rtspOptions?.onLoop?.();
 
                 if (rtspOptions?.channelMap) {
                     const channel = header.readUInt8(1);
@@ -166,7 +190,9 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         .catch(e => {
             throw e;
         })
-        .finally(kill);
+        .finally(() => {
+            kill();
+        });
 
 
     return {
@@ -177,7 +203,9 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
             return inputVideoResolution;
         },
         get isActive() { return isActive },
-        kill,
+        kill() {
+            kill();
+        },
         killed,
         resetActivityTimer,
         negotiateMediaStream: (requestMediaStream) => {
@@ -186,10 +214,16 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
                 name: undefined,
             };
 
-            if (!ret.video)
+            // if the source doesn't provide a video codec, dummy one up
+            if (ret.video === undefined)
                 ret.video = {};
 
-            ret.video.codec = inputVideoCodec;
+            // the requests does not want video
+            if (requestMediaStream?.video === null)
+                ret.video = null;
+
+            if (ret.video)
+                ret.video.codec = inputVideoCodec;
 
             // some rtsp like unifi offer alternate audio tracks (aac and opus).
             if (requestMediaStream?.audio?.codec && requestMediaStream?.audio?.codec !== inputAudioCodec) {

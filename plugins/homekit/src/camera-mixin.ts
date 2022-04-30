@@ -64,6 +64,18 @@ export class CameraMixin extends HomekitMixin<any> {
         }
 
         settings.push({
+            title: 'RTP Sender',
+            key: 'rtpSender',
+            description: 'The RTP Sender used by Scrypted. FFMpeg is stable. Scrypted is experimental and much faster.',
+            choices: [
+                'Default',
+                'Scrypted',
+                'FFmpeg',
+            ],
+            value: this.storage.getItem('rtpSender') || 'Default',
+        });
+
+        settings.push({
             title: 'Transcoding Debug Mode',
             key: 'transcodingDebugMode',
             description: 'Force transcoding on this camera for streaming and recording. This setting can be used to diagnose errors with HomeKit functionality. Enable the Rebroadcast plugin for more robust transcoding options.',

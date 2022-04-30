@@ -1,4 +1,4 @@
-import { DeviceProvider, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty } from "@scrypted/types";
+import { DeviceProvider, EventDetails, EventListener, EventListenerOptions, EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty } from "@scrypted/types";
 import { ScryptedRuntime } from "../runtime";
 import { PluginDevice } from "../db-types";
 import { MixinProvider } from "@scrypted/types";
@@ -309,7 +309,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         return new Proxy(() => prop, this);
     }
 
-    listen(event: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
+    listen(event: string | EventListenerOptions, callback: EventListener): EventListenerRegister {
         return this.scrypted.stateManager.listenDevice(this.id, event, (eventDetails, eventData) => callback(this.scrypted.getDevice(this.id), eventDetails, eventData));
     }
     async setName(name: string): Promise<void> {

@@ -1,4 +1,4 @@
-import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger } from "@scrypted/types";
+import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger, EventListener } from "@scrypted/types";
 import { PluginAPI } from "./plugin-api";
 import {  PrimitiveProxyHandler, RpcPeer } from '../rpc';
 import { EventRegistry } from "../event-registry";
@@ -53,7 +53,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         return (device as any)[method](...argArray);
     }
 
-    listen(event: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
+    listen(event: string | EventListenerOptions, callback: EventListener): EventListenerRegister {
         return this.systemManager.listenDevice(this.id, event, callback);
     }
 
@@ -131,10 +131,10 @@ export class SystemManagerImpl implements SystemManager {
                 return this.getDeviceById(id);
         }
     }
-    listen(callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
+    listen(callback: EventListener): EventListenerRegister {
         return this.events.listen(makeOneWayCallback((id, eventDetails, eventData) => callback(this.getDeviceById(id), eventDetails, eventData)));
     }
-    listenDevice(id: string, options: string | EventListenerOptions, callback: (eventSource: ScryptedDevice, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
+    listenDevice(id: string, options: string | EventListenerOptions, callback: EventListener): EventListenerRegister {
         let { event, watch } = (options || {}) as EventListenerOptions;
         if (!event && typeof options === 'string')
             event = options as string;

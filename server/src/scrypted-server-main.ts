@@ -268,6 +268,7 @@ async function start() {
             });
         }
         catch (e) {
+            console.error('plugin installation failed', e);
             res.status(500);
             res.end();
         }

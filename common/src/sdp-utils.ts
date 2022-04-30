@@ -182,7 +182,7 @@ export function parseMSection(msection: string[]) {
     }
 
     let direction: string;
-    for (const checkDirection of ['sendonly' , 'sendrecv', 'recvonly' , 'inactive']) {
+    for (const checkDirection of ['sendonly', 'sendrecv', 'recvonly', 'inactive']) {
         const found = msection.find(line => line === 'a=' + checkDirection);
         if (found) {
             direction = checkDirection;
@@ -238,4 +238,30 @@ export function parseSdp(sdp: string) {
     }
 
     return ret;
+}
+
+export function getSpsPps(
+    section: {
+        fmtp: {
+            payloadType: number;
+            parameters: {
+                [key: string]: string;
+            };
+        }[]
+    }
+) {
+    const spspps = section?.fmtp?.[0]?.parameters?.['sprop-parameter-sets']?.split(',');
+    if (!spspps) {
+        return {
+            sps: undefined,
+            pps: undefined,
+        };
+    }
+
+    const [sps, pps] = spspps;
+
+    return {
+        sps: Buffer.from(sps, 'base64'),
+        pps: Buffer.from(pps, 'base64'),
+    }
 }

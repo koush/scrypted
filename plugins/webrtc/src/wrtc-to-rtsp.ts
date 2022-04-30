@@ -23,9 +23,10 @@ export async function createRTCPeerConnectionSource(options: {
     console: Console,
     mediaStreamOptions: ResponseMediaStreamOptions,
     channel: RTCSignalingChannel,
-    useSdp: boolean,
+    maximumCompatibilityMode: boolean,
+    useUdp: boolean,
 }): Promise<RTCPeerConnectionPipe> {
-    const { mediaStreamOptions, channel, console, useSdp: useUdp } = options;
+    const { mediaStreamOptions, channel, console, useUdp, maximumCompatibilityMode } = options;
     const videoPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
     const audioPort = useUdp ? Math.round(Math.random() * 10000 + 30000) : 0;
 
@@ -219,15 +220,12 @@ export async function createRTCPeerConnectionSource(options: {
                 return;
 
             rtspServer.sdp = createSdpInput(audioPort, videoPort, description.sdp);
-            audioTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'audio').control;
-            videoTrack = parseSdp(rtspServer.sdp).msections.find(msection => msection.type === 'video').control;
+            const parsedSdp = parseSdp(rtspServer.sdp);
+            audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
+            videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control;
             console.log('sdp sent', rtspServer.sdp);
 
             if (useUdp) {
-                const parsedSdp = parseSdp(rtspServer.sdp);
-                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control;
-                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
-
                 rtspServer.setupTracks[videoTrack] = {
                     protocol: 'udp',
                     destination: videoPort,
@@ -344,7 +342,7 @@ export async function createRTCPeerConnectionSource(options: {
 
                     const { cp } = await startRtpForwarderProcess(console, ffmpegInput.inputArguments, {
                         audio: {
-                            outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec),
+                            outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
                             transceiver: audioTransceiver,
                         },
                     });
