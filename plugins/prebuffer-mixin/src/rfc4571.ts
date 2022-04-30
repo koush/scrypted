@@ -32,6 +32,7 @@ export function requeueRtspVideoData(rtspClient: RtspClient) {
 export function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspOptions?: {
     channelMap: RtspChannelCodecMapping,
     rtspClient: RtspClient,
+    udpSessionTimeout: number,
 }): ParserSession<"rtsp"> {
     let isActive = true;
     const events = new EventEmitter();
@@ -62,8 +63,12 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         socket.destroy();
     };
 
-    socket.on('close', kill);
-    socket.on('error', kill);
+    socket.on('close', () => {
+        kill();
+    });
+    socket.on('error', () => {
+        kill();
+    });
 
     const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.timeout);
 
@@ -92,6 +97,13 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
     (async () => {
         // don't start parsing until next tick, to prevent missed packets.
         await sleep(0);
+
+        if (rtspOptions?.udpSessionTimeout) {
+            while (true) {
+                await sleep(rtspOptions.udpSessionTimeout * 1000 - 5000);
+                await rtspOptions.rtspClient.getParameter();
+            }
+        }
 
         const headerLength = rtspOptions?.channelMap ? 4 : 2;
         const offset = rtspOptions?.channelMap ? 2 : 0;
@@ -178,7 +190,9 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         .catch(e => {
             throw e;
         })
-        .finally(kill);
+        .finally(() => {
+            kill();
+        });
 
 
     return {
@@ -189,7 +203,9 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
             return inputVideoResolution;
         },
         get isActive() { return isActive },
-        kill,
+        kill() {
+            kill();
+        },
         killed,
         resetActivityTimer,
         negotiateMediaStream: (requestMediaStream) => {

@@ -6,7 +6,7 @@ import { handleRebroadcasterClient, ParserOptions, ParserSession, setupActivityT
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, parseSemicolonDelimited, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -34,7 +34,8 @@ const TRANSCODE_AUDIO_DESCRIPTION = `${TRANSCODE_AUDIO} (Transcode)`;
 const COMPATIBLE_AUDIO_CODECS = ['aac', 'mp3', 'mp2', 'opus'];
 const DEFAULT_FFMPEG_INPUT_ARGUMENTS = '-fflags +genpts';
 
-const SCRYPTED_PARSER = 'Scrypted';
+const SCRYPTED_PARSER_TCP = 'Scrypted (TCP)';
+const SCRYPTED_PARSER_UDP = 'Scrypted (UDP)';
 const FFMPEG_PARSER_TCP = 'FFmpeg (TCP)';
 const FFMPEG_PARSER_UDP = 'FFmpeg (UDP)';
 const STRING_DEFAULT = 'Default';
@@ -217,13 +218,15 @@ class PrebufferSession {
       return STRING_DEFAULT;
 
     const defaultValue = rtspMode
-      ? SCRYPTED_PARSER
+      ? SCRYPTED_PARSER_TCP
       : STRING_DEFAULT;
     const rtspParser = this.storage.getItem(this.rtspParserKey);
     if (!rtspParser || rtspParser === STRING_DEFAULT)
       return defaultValue;
-    if (rtspParser === SCRYPTED_PARSER)
-      return SCRYPTED_PARSER;
+    if (rtspParser === SCRYPTED_PARSER_TCP)
+      return SCRYPTED_PARSER_TCP;
+    if (rtspParser === SCRYPTED_PARSER_UDP)
+      return SCRYPTED_PARSER_UDP;
     if (rtspParser === FFMPEG_PARSER_TCP)
       return FFMPEG_PARSER_TCP;
     if (rtspParser === FFMPEG_PARSER_UDP)
@@ -324,7 +327,7 @@ class PrebufferSession {
 
       const value = this.getParser(rtspMode, false, this.advertisedMediaStreamOptions);
       const defaultValue = rtspMode ?
-        SCRYPTED_PARSER : 'FFmpeg';
+        SCRYPTED_PARSER_TCP : FFMPEG_PARSER_TCP;
 
       settings.push(
         {
@@ -335,14 +338,15 @@ class PrebufferSession {
           value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
           choices: [
             STRING_DEFAULT,
+            SCRYPTED_PARSER_TCP,
+            SCRYPTED_PARSER_UDP,
             FFMPEG_PARSER_TCP,
             FFMPEG_PARSER_UDP,
-            SCRYPTED_PARSER,
           ],
         }
       );
 
-      if (value !== SCRYPTED_PARSER) {
+      if (value !== SCRYPTED_PARSER_TCP) {
         // ffmpeg parser is being used, so add ffmpeg input arguments option.
         addFFmpegSettings();
       }
@@ -640,7 +644,7 @@ class PrebufferSession {
       sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
       const parser = this.getParser(rtspMode, muxingMp4, sessionMso);
-      if (parser === SCRYPTED_PARSER) {
+      if (parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP) {
         usingScryptedParser = true;
         this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser');
         const rtspClient = new RtspClient(ffmpegInput.url, this.console);
@@ -670,13 +674,15 @@ class PrebufferSession {
           const parsedSdp = parseSdp(sdp);
           let channel = 0;
           const mapping: RtspChannelCodecMapping = {};
-          const useUdp = false;
+          const useUdp = parser === SCRYPTED_PARSER_UDP;
 
           const doSetup = async (control: string, codec: string) => {
             let setupChannel = channel;
+            let setupServer: dgram.Socket;
             if (useUdp) {
               const rtspChannel = channel;
               const { port, server } = await createBindZero();
+              setupServer = server;
               servers.push(server);
               setupChannel = port;
               server.on('message', data => {
@@ -692,9 +698,18 @@ class PrebufferSession {
                 session?.resetActivityTimer?.();
               })
             }
-            await rtspClient.setup(setupChannel, control, useUdp);
+            const udpSetup = await rtspClient.setup(setupChannel, control, useUdp);
             mapping[channel] = codec;
             channel += 2;
+
+            if (setupServer) {
+              const punch = Buffer.alloc(1);
+              const transport = udpSetup.headers['transport'];
+              const match = transport.match(/.*?server_port=([0-9]+)-([0-9]+)/);
+              const [_, rtp, rtcp] = match;
+              const { hostname } = new URL(rtspClient.url);
+              setupServer.send(punch, parseInt(rtp), hostname)
+            }
           }
 
           let setupVideoSection = false;
@@ -725,12 +740,21 @@ class PrebufferSession {
           sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
           this.sdp = Promise.resolve(sdp);
-          await rtspClient.play();
+
+          const play = await rtspClient.play();
+          let udpSessionTimeout: number;
+
+          if (useUdp) {
+            const sessionDict = parseSemicolonDelimited(play.headers.session);
+            udpSessionTimeout = parseInt(sessionDict['timeout']);
+          }
+          
           requeueRtspVideoData(rtspClient);
 
           session = startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {
             channelMap: mapping,
             rtspClient,
+            udpSessionTimeout,
           });
           const sessionKill = session.kill.bind(session);
           let issuedTeardown = false;
