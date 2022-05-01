@@ -140,11 +140,11 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         tool: mso?.tool,
         rtpSender,
     });
-    if (rtpSender === 'Default' && mso?.tool === 'scrypted')
+    if (rtpSender === 'Default')
         rtpSender = 'Scrypted';
 
     if (rtpSender === 'Scrypted' && needsFFmpeg) {
-        console.warn('Scrypted RTP Sender can not be used since transcoding is enabled.');
+        console.warn('Scrypted RTP Sender can not be used since transcoding is enabled or the stream container is not RTSP.');
     }
 
     const videoIsSrtpSenderCompatible = !needsFFmpeg && rtpSender === 'Scrypted';
