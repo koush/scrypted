@@ -59,7 +59,10 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         transcodingDebugModeWarning();
 
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
-    const needsFFmpeg = transcodingDebugMode || !!ffmpegInput.h264EncoderArguments?.length || !!ffmpegInput.h264FilterArguments?.length;
+    const needsFFmpeg = transcodingDebugMode
+        || !!ffmpegInput.h264EncoderArguments?.length
+        || !!ffmpegInput.h264FilterArguments?.length
+        || ffmpegInput.container !== 'rtsp';
 
     videoArgs.push(
         "-an", '-sn', '-dn',
@@ -112,28 +115,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     let videoOutput = `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`;
 
     if (false) {
-        // this test code helped me determine ffmpeg behavior when streaming
-        // beginning with a non key frame.
-        // ffmpeg will only start sending rtp data once an sps/pps/keyframe has been received.
-        // when using ffmpeg, it is safe to pipe a prebuffer, even when using cellular
-        // or apple watch.
+        // this test path is to force forwarding of packets through the correct port expected by HAP.
         const videoForwarder = await createBindZero();
-        videoForwarder.server.once('message', () => console.log('first opus packet received.'));
+        videoForwarder.server.once('message', () => console.log('first forwarded h264 packet received.'));
         session.videoReturn.on('close', () => videoForwarder.server.close());
-        let needSpsPps = true;
         videoForwarder.server.on('message', data => {
-            // const packet = RtpPacket.deSerialize(data);
-            // rtp header is ~12
-            // sps/pps is ~32-40.
-            if (needSpsPps) {
-                if (data.length > 64) {
-                    console.log('not sps/pps');
-                    return;
-                }
-                needSpsPps = false;
-                console.log('found sps/pps');
-            }
-            videoForwarder.server.send(data, session.prepareRequest.video.port, session.prepareRequest.targetAddress);
+            session.videoReturn.send(data, session.prepareRequest.video.port, session.prepareRequest.targetAddress);
         });
         videoOutput = `srtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
     }
@@ -160,9 +147,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         console.warn('Scrypted RTP Sender can not be used since transcoding is enabled.');
     }
 
-    const videoIsSrtpSenderCompatible = !needsFFmpeg
-        && mso?.container === 'rtsp'
-        && rtpSender === 'Scrypted';
+    const videoIsSrtpSenderCompatible = !needsFFmpeg && rtpSender === 'Scrypted';
     const audioCodec = request.audio.codec;
     const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
@@ -302,33 +287,37 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         const udpPort = Math.floor(Math.random() * 10000 + 30000);
 
-
-        const ffmpegAudioTranscodeArguments = [
-            ...hideBanner,
-            '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
-            '-f', 'sdp', '-i', 'pipe:3',
-            ...nullAudioInput,
-            ...audioArgs,
-        ];
-        safePrintFFmpegArguments(console, ffmpegAudioTranscodeArguments);
-        const ap = child_process.spawn(ffmpegPath, ffmpegAudioTranscodeArguments, {
-            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-        });
-
-        session.audioProcess = ap;
-        ffmpegLogInitialOutput(console, ap);
-        ap.on('exit', killSession);
-
         const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session, killSession);
 
         const audioSdp = parseSdp(fullSdp);
-        audioSdp.msections = [audioSdp.msections.find(msection => msection.type === 'audio')];
-        const ffmpegSdp = addTrackControls(replacePorts(audioSdp.toSdp(), udpPort, 0));
-        console.log('demuxed audio sdp', ffmpegSdp);
+        const audioSection = audioSdp.msections.find(msection => msection.type === 'audio');
+        if (audioSection) {
+            const ffmpegAudioTranscodeArguments = [
+                ...hideBanner,
+                '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
+                '-f', 'sdp', '-i', 'pipe:3',
+                ...nullAudioInput,
+                ...audioArgs,
+            ];
+            safePrintFFmpegArguments(console, ffmpegAudioTranscodeArguments);
+            const ap = child_process.spawn(ffmpegPath, ffmpegAudioTranscodeArguments, {
+                stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+            });
 
-        const pipe = ap.stdio[3] as Writable;
-        pipe.write(ffmpegSdp);
-        pipe.end();
+            session.audioProcess = ap;
+            ffmpegLogInitialOutput(console, ap);
+            ap.on('exit', killSession);
+            audioSdp.msections = [audioSection];
+            const ffmpegSdp = addTrackControls(replacePorts(audioSdp.toSdp(), udpPort, 0));
+            console.log('demuxed audio sdp', ffmpegSdp);
+
+            const pipe = ap.stdio[3] as Writable;
+            pipe.write(ffmpegSdp);
+            pipe.end();
+        }
+        else {
+            console.warn('sdp is missing audio. audio will be muted.');
+        }
 
         return;
     }
