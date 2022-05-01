@@ -11,7 +11,7 @@ fi
 RUN() {
     # echo "Running: $@"
     $@
-    if [ "$?" != "0" ]
+    if [ $? -ne 0 ]
     then
         echo 'Error during previous command.'
         exit 1

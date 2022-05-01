@@ -9,22 +9,31 @@ fi
 RUN() {
     echo "Running: $@"
     $@
-    if [ "$?" != "0" ]
+    if [ $? -ne 0 ]
     then
         echo 'Error during previous command.'
         exit 1
     fi
 }
 
+RUN_IGNORE() {
+    echo "Running: $@"
+    $@
+    if [ $? -ne 0 ]
+    then
+        echo 'Error during previous command. Ignoring.'
+    fi
+}
+
 echo "Installing Scrypted dependencies..."
-RUN brew update
-RUN brew install node@16
+RUN_IGNORE brew update
+RUN_IGNORE brew install node@16
 # needed by scrypted-ffmpeg
-RUN brew install sdl2
+RUN_IGNORE brew install sdl2
 # gstreamer plugins
-RUN brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
+RUN_IGNORE brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly
 # gst python bindings
-RUN brew install gst-python
+RUN_IGNORE brew install gst-python
 RUN pip3 install --upgrade pip
 RUN pip3 install aiofiles debugpy typing_extensions typing opencv-python
 
