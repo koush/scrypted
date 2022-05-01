@@ -16,6 +16,7 @@ RUN() {
     fi
 }
 
+# brew install likes to return non zero on success.
 RUN_IGNORE() {
     echo "Running: $@"
     $@
@@ -26,7 +27,7 @@ RUN_IGNORE() {
 }
 
 echo "Installing Scrypted dependencies..."
-RUN_IGNORE brew update
+RUN brew update
 RUN_IGNORE brew install node@16
 # needed by scrypted-ffmpeg
 RUN_IGNORE brew install sdl2
