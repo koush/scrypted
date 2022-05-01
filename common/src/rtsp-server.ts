@@ -385,7 +385,11 @@ export class RtspClient extends RtspBase {
         const headers: any = {
             Transport: `RTP/AVP/${protocol};unicast;${client}=${channelOrPort}-${channelOrPort + 1}`,
         };
-        const response = await this.request('SETUP', headers, path)
+        const response = await this.request('SETUP', headers, path);
+        let interleaved: {
+            begin: number;
+            end: number;
+        };
         if (response.headers.session) {
             const sessionDict = parseSemicolonDelimited(response.headers.session);
             let timeout = parseInt(sessionDict['timeout']);
@@ -400,7 +404,19 @@ export class RtspClient extends RtspBase {
 
             this.session = response.headers.session.split(';')[0];
         }
-        return response;
+        if (response.headers.transport) {
+            const match = response.headers.transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
+            if (match) {
+                const [_, begin, end] = match;
+                if (begin && end) {
+                    interleaved = {
+                        begin: parseInt(begin),
+                        end: parseInt(end),
+                    };
+                }
+            }
+        }
+        return Object.assign({ interleaved }, response);
     }
 
     async play(start: string = '0.000') {

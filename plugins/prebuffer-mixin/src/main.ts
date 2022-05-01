@@ -678,11 +678,11 @@ class PrebufferSession {
 
           const doSetup = async (control: string, codec: string) => {
             let setupChannel = channel;
-            let setupServer: dgram.Socket;
+            let udp: dgram.Socket;
             if (useUdp) {
               const rtspChannel = channel;
               const { port, server } = await createBindZero();
-              setupServer = server;
+              udp = server;
               servers.push(server);
               setupChannel = port;
               server.on('message', data => {
@@ -698,18 +698,26 @@ class PrebufferSession {
                 session?.resetActivityTimer?.();
               })
             }
-            const udpSetup = await rtspClient.setup(setupChannel, control, useUdp);
-            mapping[channel] = codec;
-            channel += 2;
+            const setupResult = await rtspClient.setup(setupChannel, control, useUdp);
 
-            if (setupServer) {
+            if (udp) {
               const punch = Buffer.alloc(1);
-              const transport = udpSetup.headers['transport'];
+              const transport = setupResult.headers['transport'];
               const match = transport.match(/.*?server_port=([0-9]+)-([0-9]+)/);
               const [_, rtp, rtcp] = match;
               const { hostname } = new URL(rtspClient.url);
-              setupServer.send(punch, parseInt(rtp), hostname)
+              udp.send(punch, parseInt(rtp), hostname)
+
+              mapping[channel] = codec;
             }
+            else {
+              if (setupResult.interleaved)
+                mapping[setupResult.interleaved.begin] = codec;
+              else
+                mapping[channel] = codec;
+            }
+
+            channel += 2;
           }
 
           let setupVideoSection = false;
@@ -748,7 +756,7 @@ class PrebufferSession {
             const sessionDict = parseSemicolonDelimited(play.headers.session);
             udpSessionTimeout = parseInt(sessionDict['timeout']);
           }
-          
+
           requeueRtspVideoData(rtspClient);
 
           session = startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {

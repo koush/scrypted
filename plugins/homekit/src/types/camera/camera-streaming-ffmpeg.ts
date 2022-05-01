@@ -1,8 +1,10 @@
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
+import { Writable } from 'stream';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
@@ -154,14 +156,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     if (rtpSender === 'Default' && mso?.tool === 'scrypted')
         rtpSender = 'Scrypted';
 
+    if (rtpSender === 'Scrypted' && needsFFmpeg) {
+        console.warn('Scrypted RTP Sender can not be used since transcoding is enabled.');
+    }
+
     const videoIsSrtpSenderCompatible = !needsFFmpeg
         && mso?.container === 'rtsp'
-        // The upstream sender is provided by scrypted (rebroadcast), and we can
-        // safely request the video be ommited. this is not possible with ffmpeg,
-        // which may possibly pull all streams that are available in the sdp.
-        // Consider removing this check upon ffmpeg verification. the only reason this matters
-        // is because that scrypted is guaranteed to provide only the subset of requested streams
-        // per spec. Ie, requesting only video or only audio.
         && rtpSender === 'Scrypted';
     const audioCodec = request.audio.codec;
     const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
@@ -169,7 +169,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     if (noAudio) {
         if (videoIsSrtpSenderCompatible) {
             console.log('camera has perfect codecs (no audio), using srtp only fast path.');
-            await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
+            await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session, killSession);
             return;
         }
     }
@@ -191,7 +191,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         if (videoIsSrtpSenderCompatible && perfectOpus) {
             console.log('camera has perfect codecs, using srtp only fast path.');
-            await startCameraStreamSrtp(ffmpegInput, console, false, session, killSession);
+            await startCameraStreamSrtp(ffmpegInput, console, { mute: false }, session, killSession);
             return;
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
@@ -267,7 +267,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
             if (videoIsSrtpSenderCompatible) {
                 console.log('camera has perfect codecs (unknown audio), using srtp only fast path.');
-                await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
+                await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session, killSession);
                 return;
             }
         }
@@ -298,30 +298,38 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // It is unclear if this will work reliably with ffmpeg/aac-eld which uses it's own
     // ntp timestamp algorithm. aac-eld is deprecated in any case.
     if (videoIsSrtpSenderCompatible && requestedOpus) {
-        console.log('requesting second audio only stream');
-        const mediaOptions: RequestMediaStreamOptions = {
-            destination,
-            // exclude video.
-            video: null,
-            audio: {
-                codec: AudioStreamingCodecType.OPUS,
-            },
-        };
+        console.log('camera has perfect codecs (demuxed audio), using srtp fast path.');
 
-        const audioMediaObject = await device.getVideoStream(mediaOptions);
-        audioInput = await mediaManager.convertMediaObjectToJSON(audioMediaObject, ScryptedMimeTypes.FFmpegInput);
+        const udpPort = Math.floor(Math.random() * 10000 + 30000);
 
-        const ap = child_process.spawn(ffmpegPath, [
+
+        const ffmpegAudioTranscodeArguments = [
             ...hideBanner,
-            ...audioInput.inputArguments,
+            '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
+            '-f', 'sdp', '-i', 'pipe:3',
             ...nullAudioInput,
             ...audioArgs,
-        ]);
+        ];
+        safePrintFFmpegArguments(console, ffmpegAudioTranscodeArguments);
+        const ap = child_process.spawn(ffmpegPath, ffmpegAudioTranscodeArguments, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+
         session.audioProcess = ap;
         ffmpegLogInitialOutput(console, ap);
-        ap.on('exit', killSession);
+        //ap.on('exit', killSession);
 
-        await startCameraStreamSrtp(ffmpegInput, console, true, session, killSession);
+        const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session, killSession);
+
+        const audioSdp = parseSdp(fullSdp);
+        audioSdp.msections = [audioSdp.msections.find(msection => msection.type === 'audio')];
+        const ffmpegSdp = addTrackControls(replacePorts(audioSdp.toSdp(), udpPort, 0));
+        console.log('demuxed audio sdp', ffmpegSdp);
+
+        const pipe = ap.stdio[3] as Writable;
+        pipe.write(ffmpegSdp);
+        pipe.end();
+
         return;
     }
 
