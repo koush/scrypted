@@ -317,7 +317,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         session.audioProcess = ap;
         ffmpegLogInitialOutput(console, ap);
-        //ap.on('exit', killSession);
+        ap.on('exit', killSession);
 
         const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session, killSession);
 
