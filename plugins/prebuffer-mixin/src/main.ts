@@ -675,6 +675,13 @@ class PrebufferSession {
           let channel = 0;
           const mapping: RtspChannelCodecMapping = {};
           const useUdp = parser === SCRYPTED_PARSER_UDP;
+          let udpSessionTimeout: number;
+          const checkUdpSessionTimeout = (headers: { [key: string]: string }) => {
+            if (useUdp && headers.session && !udpSessionTimeout) {
+              const sessionDict = parseSemicolonDelimited(headers.session);
+              udpSessionTimeout = parseInt(sessionDict['timeout']);
+            }
+          }
 
           const doSetup = async (control: string, codec: string) => {
             let setupChannel = channel;
@@ -699,6 +706,7 @@ class PrebufferSession {
               })
             }
             const setupResult = await rtspClient.setup(setupChannel, control, useUdp);
+            checkUdpSessionTimeout(setupResult.headers);
 
             if (udp) {
               const punch = Buffer.alloc(1);
@@ -750,12 +758,7 @@ class PrebufferSession {
           this.sdp = Promise.resolve(sdp);
 
           const play = await rtspClient.play();
-          let udpSessionTimeout: number;
-
-          if (useUdp) {
-            const sessionDict = parseSemicolonDelimited(play.headers.session);
-            udpSessionTimeout = parseInt(sessionDict['timeout']);
-          }
+          checkUdpSessionTimeout(play.headers);
 
           requeueRtspVideoData(rtspClient);
 
@@ -1030,7 +1033,12 @@ class PrebufferSession {
         }
         else {
           const parser = this.parsers[container];
-          const availablePrebuffers = parser.findSyncFrame(prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer));
+          const filtered = prebufferContainer.filter(pb => pb.time >= now - requestedPrebuffer);
+          let availablePrebuffers = parser.findSyncFrame(filtered);
+          if (!availablePrebuffers) {
+            this.console.warn('Unable to find sync frame in rtsp prebuffer.');
+            availablePrebuffers = filtered;
+          }
           for (const prebuffer of availablePrebuffers) {
             safeWriteData(prebuffer, true);
           }
