@@ -1,7 +1,7 @@
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import { parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
+import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { Writable } from 'stream';
@@ -302,10 +302,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         const udpPort = Math.floor(Math.random() * 10000 + 30000);
 
-        const audioSdp = parseSdp(ffmpegInput.mediaStreamOptions.sdp);
-        audioSdp.msections = [audioSdp.msections.find(msection => msection.type === 'audio')];
-        const ffmpegSdp = replacePorts(audioSdp.toSdp(), udpPort, 0);
-        console.log('demuxed audio sdp', ffmpegSdp);
 
         const ffmpegAudioTranscodeArguments = [
             ...hideBanner,
@@ -319,15 +315,21 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
         });
 
+        session.audioProcess = ap;
+        ffmpegLogInitialOutput(console, ap);
+        //ap.on('exit', killSession);
+
+        const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session, killSession);
+
+        const audioSdp = parseSdp(fullSdp);
+        audioSdp.msections = [audioSdp.msections.find(msection => msection.type === 'audio')];
+        const ffmpegSdp = addTrackControls(replacePorts(audioSdp.toSdp(), udpPort, 0));
+        console.log('demuxed audio sdp', ffmpegSdp);
+
         const pipe = ap.stdio[3] as Writable;
         pipe.write(ffmpegSdp);
         pipe.end();
 
-        session.audioProcess = ap;
-        ffmpegLogInitialOutput(console, ap);
-        ap.on('exit', killSession);
-
-        await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session, killSession);
         return;
     }
 

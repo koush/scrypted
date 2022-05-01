@@ -39,11 +39,15 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
         if (audio && !audioMode.mute) {
             audioChannel = channel;
             channel += 2;
-            await rtspClient.setup(audioChannel, audio.control);
+            const a = await rtspClient.setup(audioChannel, audio.control);
+            if (a.interleaved)
+                audioChannel = a.interleaved.begin;
         }
         videoChannel = channel;
         channel += 2;
-        await rtspClient.setup(videoChannel, video.control);
+        const v = await rtspClient.setup(videoChannel, video.control);
+        if (v.interleaved)
+            videoChannel = v.interleaved.begin;
 
         await rtspClient.play();
         socket = rtspClient.rfc4571;
@@ -139,4 +143,5 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
     }
 
     startStreaming();
+    return sdp;
 }
