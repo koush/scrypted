@@ -8,7 +8,12 @@ import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/r
 import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
-export async function startCameraStreamSrtp(media: FFmpegInput, console: Console, muteAudio: boolean, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export interface AudioMode {
+    mute: boolean;
+    udpPort?: number;
+}
+
+export async function startCameraStreamSrtp(media: FFmpegInput, console: Console, audioMode: AudioMode, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
     const { url, mediaStreamOptions } = media;
     let { sdp } = mediaStreamOptions;
     let socket: Readable;
@@ -31,7 +36,7 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
         const audio = parsedSdp.msections.find(msection => msection.type === 'audio');
 
         let channel = 0;
-        if (audio && !muteAudio) {
+        if (audio && !audioMode.mute) {
             audioChannel = channel;
             channel += 2;
             await rtspClient.setup(audioChannel, audio.control);
@@ -110,7 +115,12 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                         throw new Error('audio and video on same channel?');
                 }
                 if (isAudio) {
-                    audioSender(rtp);
+                    if (audioMode.udpPort) {
+                        session.audioReturn.send(rtp.serialize(), audioMode.udpPort, '127.0.0.1');
+                    }
+                    else {
+                        audioSender(rtp);
+                    }
                 }
                 else if (isVideo) {
                     videoSender(rtp);
