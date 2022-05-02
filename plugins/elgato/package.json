@@ -1,0 +1,42 @@
+{
+   "name": "@scrypted/elgato",
+   "version": "0.1.0",
+   "description": "An Elgato KeyLight plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
+   },
+   "keywords": [
+      "elgato",
+      "keylight",
+      "scrypted",
+      "plugin"
+   ],
+   "scrypted": {
+      "name": "Elgato Controller",
+      "singleInstance": true,
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider"
+      ]
+   },
+   "devDependencies": {
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/bonjour": "^3.5.10",
+      "@types/node": "^16.7.1",
+      "@types/request-promise": "^4.1.48"
+   },
+   "dependencies": {
+      "bonjour": "^3.5.0",
+      "request-promise": "^4.2.6"
+   }
+}
