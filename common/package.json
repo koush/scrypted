@@ -10,7 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@koush/werift": "file:../external/werift/packages/webrtc",
     "@koush/wrtc": "^0.5.3",
     "@scrypted/server": "file:../server",
     "@scrypted/sdk": "file:../sdk",
