@@ -130,17 +130,16 @@ export class H264Repacketizer {
         let counter = 0;
         let availableSize = this.maxPacketSize - STAP_A_HEADER_SIZE;
 
-        let stapHeader = NAL_TYPE_STAP_A | (datas[0][0] & 0xE0);
+        // h264/rtp spec: https://datatracker.ietf.org/doc/html/rfc6184#section-5.6
+        // The value of NRI MUST be the maximum of all the NAL units carried
+        // in the aggregation packet.
+
+        // homekit does not want NRI aggregation in the sps/pps stap-a for some reason?
+        // homekit also chokes if the stap-a contains SEI. very picky!
+        const stapHeader = NAL_TYPE_STAP_A;
 
         while (datas.length && datas[0].length + LENGTH_FIELD_SIZE <= availableSize && counter < 9) {
             const nalu = datas.shift();
-
-            stapHeader |= nalu[0] & 0x80;
-
-            const nri = nalu[0] & 0x60;
-            if ((stapHeader & 0x60) < nri)
-                stapHeader = stapHeader & 0x9F | nri;
-
             availableSize -= LENGTH_FIELD_SIZE + nalu.length;
             counter += 1;
             const packed = Buffer.alloc(2);
@@ -169,13 +168,17 @@ export class H264Repacketizer {
     createPacket(rtp: RtpPacket, data: Buffer, marker: boolean) {
         const originalSequenceNumber = rtp.header.sequenceNumber;
         const originalMarker = rtp.header.marker;
+        // homekit chokes on padding.
+        const hadPadding = rtp.header.padding;
         const originalPayload = rtp.payload;
         rtp.header.sequenceNumber = (rtp.header.sequenceNumber + this.extraPackets + 0x10000) % 0x10000;
         rtp.header.marker = marker;
+        rtp.header.padding = false;
         rtp.payload = data;
         const ret = rtp.serialize();
         rtp.header.sequenceNumber = originalSequenceNumber;
         rtp.header.marker = originalMarker;
+        rtp.header.padding = hadPadding;
         rtp.payload = originalPayload;
         if (data.length > this.maxPacketSize)
             console.warn('packet exceeded max packet size. this may a bug.');

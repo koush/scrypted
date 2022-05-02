@@ -111,7 +111,6 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
                 return streamChunks.slice(foundIndex);
 
             // oh well!
-            return streamChunks;
         },
         sdp: new Promise<string>(r => resolve = r),
         async *parse(duplex, width, height) {

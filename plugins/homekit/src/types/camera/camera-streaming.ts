@@ -204,6 +204,17 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }, 30000);
             }
 
+            // There are two modes for sending rtp audio/video to homekit: ffmpeg and scrypted's custom implementation.
+            // When using FFmpeg, the video and audio return rtcp and return packets are received on the correct ports.
+            // However, the video and audio (when using AAC) are send from random ffmpeg ports. FFmpeg does not
+            // support rtp/rtcp mux. There's currently a test path that does support forwarding video from the
+            // correct port, but it is not enabled by default, since there seems to be no issues with HomeKit
+            // accepting data from a random port. This, however, may be problematic with UDP punching if
+            // the iOS device is behind a firewall for some weird reason.
+            // When using Scrypted, the correct ports are used.
+            // This packet loss logger seems to quickly (around 500ms) report a missing packet, if
+            // the Home app does not start receiving packets. This is easily reproduceable with FFmpeg,
+            // as it is slow to start.
             let lastPacketLoss = 0;
             const logPacketLoss = (rr: RtcpRrPacket) => {
                 if (rr.reports[0]?.packetsLost && rr.reports[0].packetsLost !== lastPacketLoss) {
