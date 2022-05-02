@@ -28,10 +28,11 @@ export function isPeerConnectionAlive(pc: RTCPeerConnection) {
   return true;
 }
 
+// legacy
 let wrtc: any;
 function initalizeWebRtc() {
-  wrtc = require('@koush/wrtc');
-  Object.assign(global, wrtc);
+  // wrtc = require('@koush/wrtc');
+  // Object.assign(global, wrtc);
 }
 
 export async function startRTCPeerConnectionFFmpegInput(ffInput: FFmpegInput, console: Console, options?: {

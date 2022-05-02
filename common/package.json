@@ -10,7 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@koush/wrtc": "^0.5.3",
     "@scrypted/server": "file:../server",
     "@scrypted/sdk": "file:../sdk",
     "http-auth-utils": "^3.0.2",

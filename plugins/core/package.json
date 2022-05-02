@@ -33,7 +33,6 @@
       ]
    },
    "dependencies": {
-      "@koush/wrtc": "^0.5.3",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "mime": "^3.0.0",

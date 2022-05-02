@@ -20,6 +20,10 @@ npm ci
 npm run build
 popd
 
+pushd external/werift
+npm install
+popd
+
 for plugin in ffmpeg-camera rtsp amcrest onvif hikvision unifi-protect homekit
 do
     echo $plugin
