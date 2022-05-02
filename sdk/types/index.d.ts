@@ -50,6 +50,7 @@ export interface DeviceState {
     position?: Position;
     pm25Density?: number;
     vocDensity?: number;
+    airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
 }
@@ -104,6 +105,7 @@ export declare class DeviceBase implements DeviceState {
     position?: Position;
     pm25Density?: number;
     vocDensity?: number;
+    airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
 }
@@ -158,6 +160,7 @@ export declare enum ScryptedInterfaceProperty {
     position = "position",
     pm25Density = "pm25Density",
     vocDensity = "vocDensity",
+    airQuality = "airQuality",
     humiditySetting = "humiditySetting",
     fan = "fan"
 }
@@ -1431,6 +1434,7 @@ export declare enum ScryptedInterface {
     PositionSensor = "PositionSensor",
     PM25Sensor = "PM25Sensor",
     VOCSensor = "VOCSensor",
+    AirQualitySensor = "AirQualitySensor",
     Readme = "Readme",
     OauthClient = "OauthClient",
     MixinProvider = "MixinProvider",

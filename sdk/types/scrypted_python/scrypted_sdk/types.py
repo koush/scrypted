@@ -69,6 +69,7 @@ class ScryptedDeviceType(Enum):
     Valve = "Valve"
 
 class ScryptedInterface(Enum):
+    AirQualitySensor = "AirQualitySensor"
     AmbientLightSensor = "AmbientLightSensor"
     AudioSensor = "AudioSensor"
     Authenticator = "Authenticator"
@@ -496,6 +497,10 @@ class VideoClipOptions(TypedDict):
     reverseOrder: bool
     startId: str
     startTime: float
+    pass
+
+class AirQualitySensor:
+    airQuality: AirQuality
     pass
 
 class AmbientLightSensor:
@@ -1086,6 +1091,7 @@ class ScryptedInterfaceProperty(Enum):
     position = "position"
     pm25Density = "pm25Density"
     vocDensity = "vocDensity"
+    airQuality = "airQuality"
     humiditySetting = "humiditySetting"
     fan = "fan"
 
@@ -1444,6 +1450,13 @@ class DeviceState:
     @vocDensity.setter
     def vocDensity(self, value: float):
         self.setScryptedProperty("vocDensity", value)
+
+    @property
+    def airQuality(self) -> AirQuality:
+        return self.getScryptedProperty("airQuality")
+    @airQuality.setter
+    def airQuality(self, value: AirQuality):
+        self.setScryptedProperty("airQuality", value)
 
     @property
     def humiditySetting(self) -> HumiditySettingStatus:
@@ -1897,6 +1910,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "vocDensity"
+    ]
+  },
+  "AirQualitySensor": {
+    "name": "AirQualitySensor",
+    "methods": [],
+    "properties": [
+      "airQuality"
     ]
   },
   "Readme": {

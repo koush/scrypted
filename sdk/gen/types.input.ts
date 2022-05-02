@@ -1393,6 +1393,7 @@ export enum ScryptedInterface {
   PositionSensor = "PositionSensor",
   PM25Sensor = "PM25Sensor",
   VOCSensor = "VOCSensor",
+  AirQualitySensor = "AirQualitySensor",
   Readme = "Readme",
   OauthClient = "OauthClient",
   MixinProvider = "MixinProvider",

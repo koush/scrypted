@@ -56,6 +56,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["position"] = "position";
     ScryptedInterfaceProperty["pm25Density"] = "pm25Density";
     ScryptedInterfaceProperty["vocDensity"] = "vocDensity";
+    ScryptedInterfaceProperty["airQuality"] = "airQuality";
     ScryptedInterfaceProperty["humiditySetting"] = "humiditySetting";
     ScryptedInterfaceProperty["fan"] = "fan";
 })(ScryptedInterfaceProperty = exports.ScryptedInterfaceProperty || (exports.ScryptedInterfaceProperty = {}));
@@ -499,6 +500,13 @@ exports.ScryptedInterfaceDescriptors = {
             'vocDensity'
         ]
     },
+    AirQualitySensor: {
+        name: 'AirQualitySensor',
+        methods: [],
+        properties: [
+            'airQuality'
+        ]
+    },
     Readme: {
         name: 'Readme',
         methods: [
@@ -756,6 +764,7 @@ var ScryptedInterface;
     ScryptedInterface["PositionSensor"] = "PositionSensor";
     ScryptedInterface["PM25Sensor"] = "PM25Sensor";
     ScryptedInterface["VOCSensor"] = "VOCSensor";
+    ScryptedInterface["AirQualitySensor"] = "AirQualitySensor";
     ScryptedInterface["Readme"] = "Readme";
     ScryptedInterface["OauthClient"] = "OauthClient";
     ScryptedInterface["MixinProvider"] = "MixinProvider";
