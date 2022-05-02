@@ -7,6 +7,14 @@ from typing import Callable
 from .other import *
 
 
+class AirQuality(Enum):
+    Excellent = "Excellent"
+    Fair = "Fair"
+    Good = "Good"
+    Inferior = "Inferior"
+    Poor = "Poor"
+    Unknown = "Unknown"
+
 class FanMode(Enum):
     Auto = "Auto"
     Manual = "Manual"
@@ -100,6 +108,7 @@ class ScryptedInterface(Enum):
     OccupancySensor = "OccupancySensor"
     OnOff = "OnOff"
     Online = "Online"
+    PM25Sensor = "PM25Sensor"
     PasswordStore = "PasswordStore"
     Pause = "Pause"
     PositionSensor = "PositionSensor"
@@ -120,6 +129,7 @@ class ScryptedInterface(Enum):
     TemperatureSetting = "TemperatureSetting"
     Thermometer = "Thermometer"
     UltravioletSensor = "UltravioletSensor"
+    VOCSensor = "VOCSensor"
     VideoCamera = "VideoCamera"
     VideoCameraConfiguration = "VideoCameraConfiguration"
     VideoClips = "VideoClips"
@@ -718,6 +728,10 @@ class Online:
     online: bool
     pass
 
+class PM25Sensor:
+    pm25Density: float
+    pass
+
 class PasswordStore:
     async def addPassword(self, password: str) -> None:
         pass
@@ -873,6 +887,10 @@ class Thermometer:
 
 class UltravioletSensor:
     ultraviolet: float
+    pass
+
+class VOCSensor:
+    vocDensity: float
     pass
 
 class VideoCamera:
@@ -1066,6 +1084,8 @@ class ScryptedInterfaceProperty(Enum):
     ultraviolet = "ultraviolet"
     luminance = "luminance"
     position = "position"
+    pm25Density = "pm25Density"
+    vocDensity = "vocDensity"
     humiditySetting = "humiditySetting"
     fan = "fan"
 
@@ -1410,6 +1430,20 @@ class DeviceState:
     @position.setter
     def position(self, value: Position):
         self.setScryptedProperty("position", value)
+
+    @property
+    def pm25Density(self) -> float:
+        return self.getScryptedProperty("pm25Density")
+    @pm25Density.setter
+    def pm25Density(self, value: float):
+        self.setScryptedProperty("pm25Density", value)
+
+    @property
+    def vocDensity(self) -> float:
+        return self.getScryptedProperty("vocDensity")
+    @vocDensity.setter
+    def vocDensity(self, value: float):
+        self.setScryptedProperty("vocDensity", value)
 
     @property
     def humiditySetting(self) -> HumiditySettingStatus:
@@ -1849,6 +1883,20 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "position"
+    ]
+  },
+  "PM25Sensor": {
+    "name": "PM25Sensor",
+    "methods": [],
+    "properties": [
+      "pm25Density"
+    ]
+  },
+  "VOCSensor": {
+    "name": "VOCSensor",
+    "methods": [],
+    "properties": [
+      "vocDensity"
     ]
   },
   "Readme": {

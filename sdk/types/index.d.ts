@@ -48,6 +48,8 @@ export interface DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
+    pm25Density?: number;
+    vocDensity?: number;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
 }
@@ -100,6 +102,8 @@ export declare class DeviceBase implements DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
+    pm25Density?: number;
+    vocDensity?: number;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
 }
@@ -152,6 +156,8 @@ export declare enum ScryptedInterfaceProperty {
     ultraviolet = "ultraviolet",
     luminance = "luminance",
     position = "position",
+    pm25Density = "pm25Density",
+    vocDensity = "vocDensity",
     humiditySetting = "humiditySetting",
     fan = "fan"
 }
@@ -849,6 +855,23 @@ export interface LuminanceSensor {
 export interface PositionSensor {
     position?: Position;
 }
+export interface PM25Sensor {
+    pm25Density?: number;
+}
+export interface VOCSensor {
+    vocDensity?: number;
+}
+export declare enum AirQuality {
+    Unknown = "Unknown",
+    Excellent = "Excellent",
+    Good = "Good",
+    Fair = "Fair",
+    Inferior = "Inferior",
+    Poor = "Poor"
+}
+export interface AirQualitySensor {
+    airQuality?: AirQuality;
+}
 export interface Position {
     /**
      * The accuracy radius of this position in meters.
@@ -1406,6 +1429,8 @@ export declare enum ScryptedInterface {
     UltravioletSensor = "UltravioletSensor",
     LuminanceSensor = "LuminanceSensor",
     PositionSensor = "PositionSensor",
+    PM25Sensor = "PM25Sensor",
+    VOCSensor = "VOCSensor",
     Readme = "Readme",
     OauthClient = "OauthClient",
     MixinProvider = "MixinProvider",

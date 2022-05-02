@@ -49,6 +49,8 @@ export interface DeviceState {
   ultraviolet?: number
   luminance?: number
   position?: Position
+  pm25Density?: number
+  vocDensity?: number
   humiditySetting?: HumiditySettingStatus
   fan?: FanStatus
 }
@@ -102,6 +104,8 @@ export class DeviceBase implements DeviceState {
   ultraviolet?: number
   luminance?: number
   position?: Position
+  pm25Density?: number
+  vocDensity?: number
   humiditySetting?: HumiditySettingStatus
   fan?: FanStatus
 }
@@ -156,6 +160,8 @@ export enum ScryptedInterfaceProperty {
   ultraviolet = "ultraviolet",
   luminance = "luminance",
   position = "position",
+  pm25Density = "pm25Density",
+  vocDensity = "vocDensity",
   humiditySetting = "humiditySetting",
   fan = "fan",
 
@@ -586,6 +592,20 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     methods: [],
     properties: [
       'position'
+    ]
+  },
+  PM25Sensor: {
+    name: 'PM25Sensor',
+    methods: [],
+    properties: [
+      'pm25Density'
+    ]
+  },
+  VOCSensor: {
+    name: 'VOCSensor',
+    methods: [],
+    properties: [
+      'vocDensity'
     ]
   },
   Readme: {
@@ -1461,6 +1481,23 @@ export interface LuminanceSensor {
 export interface PositionSensor {
   position?: Position;
 }
+export interface PM25Sensor {
+  pm25Density?: number;
+}
+export interface VOCSensor {
+  vocDensity?: number;
+}
+export enum AirQuality {
+  Unknown = "Unknown",
+  Excellent = "Excellent",
+  Good = "Good",
+  Fair = "Fair",
+  Inferior = "Inferior",
+  Poor = "Poor",
+}
+export interface AirQualitySensor {
+  airQuality?: AirQuality;
+}
 export interface Position {
   /**
    * The accuracy radius of this position in meters.
@@ -2075,6 +2112,8 @@ export enum ScryptedInterface {
   UltravioletSensor = "UltravioletSensor",
   LuminanceSensor = "LuminanceSensor",
   PositionSensor = "PositionSensor",
+  PM25Sensor = "PM25Sensor",
+  VOCSensor = "VOCSensor",
   Readme = "Readme",
   OauthClient = "OauthClient",
   MixinProvider = "MixinProvider",

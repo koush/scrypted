@@ -760,6 +760,23 @@ export interface LuminanceSensor {
 export interface PositionSensor {
   position?: Position;
 }
+export interface PM25Sensor {
+  pm25Density?: number;
+}
+export interface VOCSensor {
+  vocDensity?: number;
+}
+export enum AirQuality {
+  Unknown = "Unknown",
+  Excellent = "Excellent",
+  Good = "Good",
+  Fair = "Fair",
+  Inferior = "Inferior",
+  Poor = "Poor",
+}
+export interface AirQualitySensor {
+  airQuality?: AirQuality;
+}
 export interface Position {
   /**
    * The accuracy radius of this position in meters.
@@ -1374,6 +1391,8 @@ export enum ScryptedInterface {
   UltravioletSensor = "UltravioletSensor",
   LuminanceSensor = "LuminanceSensor",
   PositionSensor = "PositionSensor",
+  PM25Sensor = "PM25Sensor",
+  VOCSensor = "VOCSensor",
   Readme = "Readme",
   OauthClient = "OauthClient",
   MixinProvider = "MixinProvider",

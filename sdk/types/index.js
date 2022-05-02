@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
+exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.AirQuality = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
 class DeviceBase {
 }
 exports.DeviceBase = DeviceBase;
@@ -54,6 +54,8 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["ultraviolet"] = "ultraviolet";
     ScryptedInterfaceProperty["luminance"] = "luminance";
     ScryptedInterfaceProperty["position"] = "position";
+    ScryptedInterfaceProperty["pm25Density"] = "pm25Density";
+    ScryptedInterfaceProperty["vocDensity"] = "vocDensity";
     ScryptedInterfaceProperty["humiditySetting"] = "humiditySetting";
     ScryptedInterfaceProperty["fan"] = "fan";
 })(ScryptedInterfaceProperty = exports.ScryptedInterfaceProperty || (exports.ScryptedInterfaceProperty = {}));
@@ -483,6 +485,20 @@ exports.ScryptedInterfaceDescriptors = {
             'position'
         ]
     },
+    PM25Sensor: {
+        name: 'PM25Sensor',
+        methods: [],
+        properties: [
+            'pm25Density'
+        ]
+    },
+    VOCSensor: {
+        name: 'VOCSensor',
+        methods: [],
+        properties: [
+            'vocDensity'
+        ]
+    },
     Readme: {
         name: 'Readme',
         methods: [
@@ -671,6 +687,15 @@ var LockState;
     LockState["Unlocked"] = "Unlocked";
     LockState["Jammed"] = "Jammed";
 })(LockState = exports.LockState || (exports.LockState = {}));
+var AirQuality;
+(function (AirQuality) {
+    AirQuality["Unknown"] = "Unknown";
+    AirQuality["Excellent"] = "Excellent";
+    AirQuality["Good"] = "Good";
+    AirQuality["Fair"] = "Fair";
+    AirQuality["Inferior"] = "Inferior";
+    AirQuality["Poor"] = "Poor";
+})(AirQuality = exports.AirQuality || (exports.AirQuality = {}));
 var MediaPlayerState;
 (function (MediaPlayerState) {
     MediaPlayerState["Idle"] = "Idle";
@@ -729,6 +754,8 @@ var ScryptedInterface;
     ScryptedInterface["UltravioletSensor"] = "UltravioletSensor";
     ScryptedInterface["LuminanceSensor"] = "LuminanceSensor";
     ScryptedInterface["PositionSensor"] = "PositionSensor";
+    ScryptedInterface["PM25Sensor"] = "PM25Sensor";
+    ScryptedInterface["VOCSensor"] = "VOCSensor";
     ScryptedInterface["Readme"] = "Readme";
     ScryptedInterface["OauthClient"] = "OauthClient";
     ScryptedInterface["MixinProvider"] = "MixinProvider";
