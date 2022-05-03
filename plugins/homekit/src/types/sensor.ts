@@ -1,7 +1,23 @@
-import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer } from '@scrypted/sdk';
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
+
+function airQualityToHomekit(airQuality: AirQuality) {
+    switch (airQuality) {
+        case AirQuality.Excellent:
+            return Characteristic.AirQuality.EXCELLENT;
+        case AirQuality.Good:
+            return Characteristic.AirQuality.GOOD;
+        case AirQuality.Fair:
+            return Characteristic.AirQuality.FAIR;
+        case AirQuality.Inferior:
+            return Characteristic.AirQuality.INFERIOR;
+        case AirQuality.Poor:
+            return Characteristic.AirQuality.POOR;
+    }
+    return Characteristic.AirQuality.UNKNOWN;
+}
 
 const supportedSensors: string[] = [
     ScryptedInterface.Thermometer,
@@ -13,6 +29,9 @@ const supportedSensors: string[] = [
     ScryptedInterface.Thermometer,
     ScryptedInterface.HumiditySensor,
     ScryptedInterface.FloodSensor,
+    ScryptedInterface.AirQualitySensor,
+    ScryptedInterface.PM25Sensor,
+    ScryptedInterface.VOCSensor,
 ];
 
 addSupportedType({
@@ -24,7 +43,7 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor, homekitSession: HomeKitSession) => {
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor, homekitSession: HomeKitSession) => {
         const accessory = makeAccessory(device, homekitSession);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
@@ -73,6 +92,16 @@ addSupportedType({
             const service = accessory.addService(Service.LeakSensor, device.name);
             bindCharacteristic(device, ScryptedInterface.FloodSensor, service, Characteristic.LeakDetected,
                 () => !!device.flooded);
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.AirQualitySensor)) {
+            const service = accessory.addService(Service.AirQualitySensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.AirQualitySensor, service, Characteristic.AirQuality,
+                () => airQualityToHomekit(device.airQuality));
+            bindCharacteristic(device, ScryptedInterface.PM25Sensor, service, Characteristic.PM2_5Density,
+                () => device.pm25Density || 0);
+            bindCharacteristic(device, ScryptedInterface.VOCSensor, service, Characteristic.VOCDensity,
+                () => device.vocDensity || 0);
         }
 
         // todo: more sensors.
