@@ -5,7 +5,7 @@ import net from 'net';
 import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
+import { CameraStreamingSession, KillCameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
 export interface AudioMode {
@@ -98,6 +98,9 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
             session.videoReturn.once('close', () => running = false);
             const headerLength = isRtsp ? 4 : 2;
             const lengthOffset = isRtsp ? 2 : 0;
+
+            await waitForFirstVideoRtcp(console, session);
+
             while (running) {
                 let isAudio = false;
                 let isVideo = false;

@@ -95,6 +95,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 audioProcess: null,
                 videoReturn,
                 audioReturn,
+                videoReturnRtcpReady: once(videoReturn, 'message'),
             }
 
             sessions.set(request.sessionID, session);

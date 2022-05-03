@@ -2,12 +2,12 @@ import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardwar
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
-import sdk, { FFmpegInput, MediaStreamDestination, RequestMediaStreamOptions, ScryptedDevice, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { Writable } from 'stream';
 import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { AudioStreamingCodecType, SRTPCryptoSuites, StartStreamRequest } from '../../hap';
-import { CameraStreamingSession, KillCameraStreamingSession } from './camera-streaming-session';
+import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
+import { CameraStreamingSession, KillCameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
@@ -321,6 +321,8 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         return;
     }
+
+    await waitForFirstVideoRtcp(console, session);
 
     if (audioInput !== ffmpegInput) {
         safePrintFFmpegArguments(console, videoArgs);

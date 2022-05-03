@@ -17,9 +17,16 @@ export interface CameraStreamingSession {
     audioProcess: ChildProcess;
     videoReturn: dgram.Socket;
     audioReturn: dgram.Socket;
+    videoReturnRtcpReady: Promise<any>;
     rtpSink?: HomeKitRtpSink;
     tryReconfigureBitrate?: (reason: string, bitrate: number) => void;
     mediaStreamOptions?: ResponseMediaStreamOptions;
 }
 
 export type KillCameraStreamingSession = () => void;
+
+export async function waitForFirstVideoRtcp(console: Console, session: CameraStreamingSession) {
+    console.log('Waiting for video RTCP packet before sending video.');
+    await session.videoReturnRtcpReady;
+    console.log('Received first video RTCP packet.');
+}
