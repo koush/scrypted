@@ -10,6 +10,7 @@ function getUserAgent() {
 
 export class BrowserSignalingSession implements RTCSignalingSession {
     pc: RTCPeerConnection;
+    peerConnectionCreated?: (pc: RTCPeerConnection) => Promise<void>;
     options: RTCSignalingOptions = {
         userAgent: getUserAgent(),
         capabilities: {
@@ -28,7 +29,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         },
     };
 
-    constructor(public peerConnectionCreated?: (pc: RTCPeerConnection) => Promise<void>, public cleanup?: () => void) {
+    constructor(public cleanup?: () => void) {
 
     }
 

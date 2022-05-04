@@ -16,9 +16,9 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
 }
 
 export async function streamMedia(device: RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
-  return new Promise(async (resolve) => {;
-    const session = new BrowserSignalingSession(async (pc) => {
-
+  const session = new BrowserSignalingSession();
+  const pc = new Promise(resolve => {
+    session.peerConnectionCreated = async (pc) => {
       pc.ontrack = ev => {
         const mediaStream = new MediaStream(
           pc.getReceivers().map((receiver) => receiver.track)
@@ -26,12 +26,15 @@ export async function streamMedia(device: RTCSignalingChannel, getVideo: () => H
         getVideo().srcObject = mediaStream;
         console.log('received track', ev.track);
       };
+      resolve(pc);
+    };
+  })
 
-      resolve({pc, control});
-    });
-
-    const control: RTCSessionControl = await device.startRTCSignalingSession(session);
-  });
+  const control: RTCSessionControl = await device.startRTCSignalingSession(session);
+  return {
+    control,
+    pc: await pc,
+  }
 }
 
 export async function createBlobUrl(mediaManager: MediaManager, mediaObject: MediaObject): Promise<string> {
