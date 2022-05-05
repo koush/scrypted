@@ -1375,6 +1375,10 @@ export interface Setting {
     description?: string;
     placeholder?: string;
     type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface';
+    /**
+     * The range of allowed numbers, if any, when the type is 'number'.
+     */
+    range?: [number, number];
     readonly?: boolean;
     choices?: string[];
     combobox?: boolean;

@@ -477,6 +477,7 @@ class Setting(TypedDict):
     key: str
     multiple: bool
     placeholder: str
+    range: tuple[float, float]
     readonly: bool
     title: str
     type: Any | Any | Any | Any | Any | Any | Any | Any | Any
