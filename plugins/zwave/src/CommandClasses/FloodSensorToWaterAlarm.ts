@@ -6,7 +6,8 @@ import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
 
 export class FloodSensorToWaterAlarm extends Notification implements FloodSensor {
   static getInterfaces(node: ZWaveNode, valueId: ValueID): string[] {
-    if (Notification.checkInterface(node, valueId, 'Water leak detected', 'Water leak detected (location provided)')) {
+    if (Notification.checkInterface(node, valueId, 'Water leak detected')
+      || Notification.checkInterface(node, valueId, 'Water leak detected (location provided)')) {
       return ['FloodSensor'];
     }
     return null;
