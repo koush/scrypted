@@ -46,7 +46,7 @@ export class Logger extends EventEmitter implements PluginLogger {
     }
 
     purge(before: number) {
-        this.logs = this.logs.filter(log => log.timestamp < before);
+        this.logs = this.logs.filter(log => log.timestamp > before);
         for (const child of Object.values(this.children)) {
             child.purge(before);
         }
