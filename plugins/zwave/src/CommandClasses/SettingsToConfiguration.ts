@@ -21,6 +21,8 @@ export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings
             setting.description = metadata.description;
             if ((metadata as any).states)
                 setting.choices = Object.values((metadata as any).states);
+                if ((metadata as any).allowManualEntry)
+                    setting.combobox = true;
             const value = node.getValue(valueId) as any;
             setting.value = setting.choices?.[value] || value;
             settings.push(setting);
@@ -38,7 +40,9 @@ export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings
         const node = this.instance.getNodeUnsafe();
         const metadata = node.getValueMetadata(valueId);
         if ((metadata as any).states) {
-            value = Object.entries((metadata as any).states).find(([, v]) => v === value)?.[0];
+            const stateValue = Object.entries((metadata as any).states).find(([, v]) => v === value)?.[0];
+            if (stateValue)
+                value = stateValue
         }
         if (metadata.type === 'number')
             value = parseInt(value);
