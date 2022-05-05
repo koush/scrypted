@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.175",
+  "version": "0.0.176",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.8",
