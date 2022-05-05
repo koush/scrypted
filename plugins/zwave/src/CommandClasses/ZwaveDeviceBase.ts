@@ -2,7 +2,7 @@ import sdk, { ScryptedDeviceBase, Device, Refresh, Setting, Settings } from "@sc
 import { getHash } from "../Types";
 import { CommandClassInfo, getCommandClassIndex, getCommandClass } from ".";
 import { ZwaveControllerProvider, NodeLiveness } from "../main";
-import { Endpoint, ValueID, ZWaveController, ZWaveNode, ZWaveNodeValueUpdatedArgs } from "zwave-js";
+import { Endpoint, ValueID, ZWaveController, ZWaveNode, ZWaveNodeValueUpdatedArgs, NodeStatus, InterviewStage, ZWavePlusRoleType } from "zwave-js";
 import { CommandClasses, ValueMetadataNumeric } from "@zwave-js/core"
 
 const { deviceManager } = sdk;
@@ -110,13 +110,63 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
         return this.putZWaveSetting(key, value);
     }
     async getZWaveSettings(): Promise<Setting[]> {
+        const node = this.instance.getNodeUnsafe();
         return [
+            {
+                group: 'Z-Wave Node Info',
+                title: 'ID',
+                key: 'zwave:nodeId',
+                readonly: true,
+                value: node.id,
+            },
+            {
+                group: 'Z-Wave Node Info',
+                title: 'Status',
+                key: 'zwave:nodeStatus',
+                readonly: true,
+                value: NodeStatus[node.status],
+            },
+            {
+                group: 'Z-Wave Node Info',
+                title: 'Interview Stage',
+                key: 'zwave:interviewStage',
+                readonly: true,
+                value: InterviewStage[node.interviewStage],
+            },
+            {
+                group: 'Z-Wave Node Info',
+                title: 'Device Class',
+                key: 'zwave:deviceClass',
+                readonly: true,
+                value: node.deviceClass.specific.label,
+            },
+            {
+                group: 'Z-Wave Node Info',
+                title: 'ZWave+ Role Type',
+                key: 'zwave:roleType',
+                readonly: true,
+                value: ZWavePlusRoleType[node.zwavePlusRoleType] || "n/a",
+            },
+            {
+                group: 'Z-Wave Node Info',
+                title: 'Firmware',
+                key: 'zwave:firmware',
+                readonly: true,
+                value: node.firmwareVersion,
+            },
             {
                 group: 'Z-Wave Node Management',
                 title: 'Force Remove Node',
                 key: 'zwave:forceRemove',
                 placeholder: `Confirm Node ID to remove: ${this.instance.nodeId}`,
                 value: '',
+            },
+            {
+                group: 'Z-Wave Node Management',
+                title: 'Refresh Info',
+                key: 'zwave:refreshInfo',
+                type: 'button',
+                description: 'Resets (almost) all information about this node and forces a fresh interview.'
             }
         ];
     }
@@ -125,6 +175,16 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
         if (key === 'zwave:forceRemove' && value === this.instance.nodeId.toString()) {
             this.zwaveController.controller.removeFailedNode(this.instance.nodeId);
             deviceManager.onDeviceRemoved(this.nativeId);
+        }
+        if (key === 'zwave:refreshInfo') {
+            this.console.log(`[${this.name}] Refreshing Info`)
+            if (!this.instance.getNodeUnsafe().ready) {
+                this.console.log(`${this.name} Refresh failed, device not ready`);
+                return
+            }
+            this.instance.getNodeUnsafe().refreshInfo().then((r) => {
+                this.console.log(`[${this.name}] Refresh Completed`)
+            })
         }
     }
 }
