@@ -28,7 +28,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     let packetCount = 0;
     let octetCount = 0;
     let lastRtcp = 0;
-    let firstSequenceNumber = 0;
+    let firstSequenceNumber: number;
     let allowRollover = false;
     let rolloverCount = 0;
     let opusPacketizer: OpusRepacketizer;
@@ -87,7 +87,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     }
 
     return (rtp: RtpPacket) => {
-        if (!firstSequenceNumber) {
+        if (firstSequenceNumber === undefined) {
             console.log(`sending first ${audioOptions ? 'audio' : 'video'} packet`);
             firstSequenceNumber = rtp.header.sequenceNumber;
         }
