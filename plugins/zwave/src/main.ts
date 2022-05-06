@@ -4,7 +4,7 @@ import { CommandClassInfo, getCommandClass, getCommandClassIndex } from "./Comma
 import { ZwaveDeviceBase } from "./CommandClasses/ZwaveDeviceBase";
 import { getHash, getNodeHash, getInstanceHash } from "./Types";
 import debounce from "lodash/debounce";
-import { Driver, Endpoint, ZWaveController, ZWaveNode, InclusionUserCallbacks, InclusionGrant, InclusionStrategy, NodeStatus } from "zwave-js";
+import { Driver, Endpoint, ZWaveController, ZWaveNode, InclusionUserCallbacks, InclusionGrant, InclusionStrategy, NodeStatus, InclusionState } from "zwave-js";
 import { ValueID, CommandClasses } from "@zwave-js/core"
 import { randomBytes } from "crypto";
 import path from "path";
@@ -169,6 +169,48 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     async getSettings(): Promise<Setting[]> {
         return [
             {
+                group: 'Inclusion',
+                title: 'Inclusion State',
+                key: 'inclusionState',
+                readonly: true,
+                value: InclusionState[this.controller.inclusionState],
+            },
+            {
+                group: 'Inclusion',
+                title: 'Exclude Device',
+                key: 'exclusion',
+                type: 'button',
+                description: 'Enter exclusion mode and remove devices.',
+            },
+            {
+                group: 'Inclusion',
+                title: 'Include Device',
+                key: 'inclusion',
+                type: 'button',
+                description: 'Enter inclusion mode and add devices.',
+            },
+            {
+                group: 'Inclusion',
+                key: 'confirmPin',
+                title: 'Confirm PIN',
+                description: 'Some devices will require confirmation of a PIN while including them. Enter the PIN here when prompted.',
+            },
+            {
+                group: 'Network',
+                title: 'Healing State',
+                key: 'healingState',
+                readonly: true,
+                value: this.controller.isHealNetworkActive ? 'Healing' : 'Not Healing',
+            },
+            {
+                group: 'Network',
+                title: 'Heal Network',
+                key: 'heal',
+                type: 'button',
+                description: 'Heal the Z-Wave Network. This operation may take a long time and the network may become unreponsive while in progress.',
+            },
+            {
+                group: 'Adapter',
                 title: 'Serial Port',
                 key: 'serialPort',
                 value: this.storage.getItem('serialPort'),
@@ -176,52 +218,33 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 placeholder: '/dev/tty.usbmodem14501',
             },
             {
+                group: 'Adapter',
                 title: 'Network Key',
                 key: 'networkKey',
                 value: this.storage.getItem('networkKey'),
                 description: 'The 16 byte hex encoded Network Security Key',
             },
             {
+                group: 'Adapter',
                 title: 'S2 Access Control Key',
                 key: 's2AccessControlKey',
                 value: this.storage.getItem('s2AccessControlKey'),
                 description: 'The 16 byte hex encoded S2 Access Control Key',
             },
             {
+                group: 'Adapter',
                 title: 'S2 Authenticated Key',
                 key: 's2AuthenticatedKey',
                 value: this.storage.getItem('s2AuthenticatedKey'),
                 description: 'The 16 byte hex encoded S2 Authenticated Key',
             },
             {
+                group: 'Adapter',
                 title: 'S2 Unauthenticated Key',
                 key: 's2UnauthenticatedKey',
                 value: this.storage.getItem('s2UnauthenticatedKey'),
                 description: 'The 16 byte hex encoded S2 Unauthenticated Key',
             },
-            {
-                title: 'Heal Network',
-                key: 'heal',
-                type: 'button',
-                description: 'Heal the Z-Wave Network. This operation may take a long time and the network may become unreponsive while in progress.',
-            },
-            {
-                title: 'Exclude Device',
-                key: 'exclusion',
-                type: 'button',
-                description: 'Enter exclusion mode and remove devices.',
-            },
-            {
-                title: 'Include Device',
-                key: 'inclusion',
-                type: 'button',
-                description: 'Enter inclusion mode and add devices.',
-            },
-            {
-                key: 'confirmPin',
-                title: 'Confirm PIN',
-                description: 'Some devices will require confirmation of a PIN while including them. Enter the PIN here when prompted.',
-            }
         ]
     }
 
