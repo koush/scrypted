@@ -2,7 +2,7 @@ import sdk, { ScryptedDeviceBase, Device, Refresh, Setting, Settings } from "@sc
 import { getHash } from "../Types";
 import { CommandClassInfo, getCommandClassIndex, getCommandClass } from ".";
 import { ZwaveControllerProvider, NodeLiveness } from "../main";
-import { Endpoint, ValueID, ZWaveController, ZWaveNode, ZWaveNodeValueUpdatedArgs, NodeStatus, InterviewStage, ZWavePlusRoleType } from "zwave-js";
+import { Endpoint, ValueID, ZWaveController, ZWaveNode, ZWaveNodeValueUpdatedArgs, NodeStatus, InterviewStage, ZWavePlusRoleType, NodeStatistics } from "zwave-js";
 import { CommandClasses, ValueMetadataNumeric } from "@zwave-js/core"
 
 const { deviceManager } = sdk;
@@ -36,10 +36,22 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
     commandClasses: CommandClassInfo[] = [];
     zwaveController: ZwaveControllerProvider;
     transientState: TransientState = {};
+    statistics: NodeStatistics;
 
     constructor(controller: ZWaveController, instance: Endpoint) {
         super(getHash(controller, instance));
         this.instance = instance;
+
+        const node = this.instance.getNodeUnsafe()
+        node.on('wake up', node => {
+            this.console.log(`[${node.id}] woke up`)
+        });
+        node.on('sleep', node => {
+            this.console.log(`[${node.id}] sleeping`)
+        });
+        node.on('statistics updated', (node: ZWaveNode, statistics: NodeStatistics) => {
+            this.statistics = statistics;
+        });
     }
 
     getValueId(valueId: ValueID): ValueID {
@@ -113,60 +125,88 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
         const node = this.instance.getNodeUnsafe();
         return [
             {
-                group: 'Z-Wave Node Info',
+                group: 'Info',
+                title: 'Device Info',
+                key: 'zwave:deviceInfo',
+                readonly: true,
+                value: node.deviceDatabaseUrl,
+            },
+            {
+                group: 'Info',
                 title: 'ID',
                 key: 'zwave:nodeId',
                 readonly: true,
                 value: node.id,
             },
             {
-                group: 'Z-Wave Node Info',
+                group: 'Info',
                 title: 'Status',
                 key: 'zwave:nodeStatus',
                 readonly: true,
                 value: NodeStatus[node.status],
             },
             {
-                group: 'Z-Wave Node Info',
+                group: 'Info',
                 title: 'Interview Stage',
                 key: 'zwave:interviewStage',
                 readonly: true,
                 value: InterviewStage[node.interviewStage],
             },
             {
-                group: 'Z-Wave Node Info',
+                group: 'Info',
                 title: 'Device Class',
                 key: 'zwave:deviceClass',
                 readonly: true,
                 value: node.deviceClass.specific.label,
             },
             {
-                group: 'Z-Wave Node Info',
+                group: 'Info',
                 title: 'ZWave+ Role Type',
                 key: 'zwave:roleType',
                 readonly: true,
                 value: ZWavePlusRoleType[node.zwavePlusRoleType] || "n/a",
             },
             {
-                group: 'Z-Wave Node Info',
+                group: 'Info',
                 title: 'Firmware',
                 key: 'zwave:firmware',
                 readonly: true,
                 value: node.firmwareVersion,
             },
             {
-                group: 'Z-Wave Node Management',
+                group: 'Info',
                 title: 'Force Remove Node',
                 key: 'zwave:forceRemove',
                 placeholder: `Confirm Node ID to remove: ${this.instance.nodeId}`,
                 value: '',
             },
             {
-                group: 'Z-Wave Node Management',
+                group: 'Info',
                 title: 'Refresh Info',
                 key: 'zwave:refreshInfo',
                 type: 'button',
                 description: 'Resets (almost) all information about this node and forces a fresh interview.'
+            },
+            {
+                group: 'Statistics',
+                title: 'Commands (RX/TX)',
+                key: 'zwave:commands',
+                readonly: true,
+                value: this.statistics ? `${this.statistics.commandsRX} / ${this.statistics.commandsTX}` : 'n/a',
+            },
+            {
+                group: 'Statistics',
+                title: 'Commands Dropped (RX/TX)',
+                key: 'zwave:commandsDropped',
+                readonly: true,
+                value: this.statistics ? `${this.statistics.commandsDroppedRX} / ${this.statistics.commandsDroppedTX}` : 'n/a',
+            },
+            {
+                group: 'Statistics',
+                title: 'RTT',
+                key: 'zwave:rtt',
+                readonly: true,
+                value: this.statistics ? `${this.statistics.rtt}ms` : 'n/a',
             }
         ];
     }
