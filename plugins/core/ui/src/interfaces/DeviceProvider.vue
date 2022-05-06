@@ -1,25 +1,21 @@
 <template>
   <v-flex xs12>
-    <v-dialog
-      v-if="createDeviceSettings"
-      :value="true"
-      max-width="600px"
-    >
-      <Settings v-model="createDeviceSettings" :noTitle="true" class="pa-2">
-        <template v-slot:append>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn text color="primary" @click="createDevice">Create</v-btn>
-          </v-card-actions>
-        </template>
-      </Settings>
-    </v-dialog>
     <v-card-actions
       v-if="
         device.interfaces.includes('DeviceCreator') ||
         device.interfaces.includes('DeviceDiscovery')
       "
     >
+      <v-dialog max-width="600px" v-model="showCreateDeviceSettings">
+        <Settings v-model="createDeviceSettings" :noTitle="true" class="pa-2">
+          <template v-slot:append>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn text color="primary" @click="createDevice">Create</v-btn>
+            </v-card-actions>
+          </template>
+        </Settings>
+      </v-dialog>
       <v-btn
         v-if="device.interfaces.includes('DeviceCreator')"
         text
@@ -34,6 +30,7 @@
         >Discover Devices</v-btn
       > -->
     </v-card-actions>
+
     <v-card-text>These things were created by {{ device.name }}.</v-card-text>
     <DeviceGroup :deviceGroup="managedDevices"></DeviceGroup>
   </v-flex>
@@ -48,7 +45,7 @@ export default {
   mixins: [RPCInterface],
   data() {
     return {
-      junk: {},
+      showCreateDeviceSettings: false,
       showCreateDevice: false,
       createDeviceSettings: null,
     };
@@ -76,6 +73,7 @@ export default {
         this.createDeviceSettings = {
           settings,
         };
+        this.showCreateDeviceSettings = true;
       }
     },
   },
