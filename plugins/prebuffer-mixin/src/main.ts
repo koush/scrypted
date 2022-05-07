@@ -851,8 +851,10 @@ class PrebufferSession {
           return;
 
         let { isDefault } = this.getParser(rtspMode, sessionMso);
-        if (!isDefault)
+        if (!isDefault) {
+          this.console.warn('SEI packet detected while operating with Scrypted Parser. If there are issues streaming, consider using the Default parser.');
           return;
+        }
         this.console.warn('SEI packet detected while operating with Scrypted Parser as default. Restarting rebroadcast.');
         session.kill();
         this.startPrebufferSession();
