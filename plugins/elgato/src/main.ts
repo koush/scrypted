@@ -4,20 +4,6 @@ import { KeyLight } from './lights';
 import sdk, { Device, ScryptedDeviceBase, OnOff, Brightness, ColorSettingTemperature, Refresh, ScryptedDeviceType, DeviceProvider } from '@scrypted/sdk';
 const { deviceManager } = sdk;
 
-
-const StateSetters = {
-  OnOff: function (s, state) {
-    state.on = !!(s && s.power);
-  },
-  Brightness: function (s, state) {
-    state.brightness = (s && s.color && s.color.brightness) || 0;
-  },
-  ColorSettingTemperature: function (s, state) {
-    state.colorTemperature = (s && s.color && s.color.kelvin) || 0;
-  },
-}
-
-
 class ElgatoDevice extends ScryptedDeviceBase implements OnOff, Brightness, ColorSettingTemperature, Refresh {
   light: KeyLight;
   device: Device;
@@ -111,7 +97,7 @@ class ElgatoController implements DeviceProvider {
   }
 
   async discoverDevices(duration: number) {
-    const browser = this.bonjour.find({ type: 'elgato key' });
+    const browser = bonjour().find({ type: 'elgato key' });
     browser.on('up', service => {
         let newLight = new KeyLight(service['referer'].address, service.port, service.name);
         this.newLight(newLight);
