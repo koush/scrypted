@@ -3,6 +3,7 @@ import { RtpHeader, RtpPacket } from "../../../../../external/werift/packages/rt
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 const NAL_TYPE_STAP_A = 24;
 const NAL_TYPE_FU_A = 28;
+const NAL_TYPE_NON_IDR = 1;
 const NAL_TYPE_IDR = 5;
 const NAL_TYPE_SEI = 6;
 const NAL_TYPE_SPS = 7;
@@ -38,12 +39,17 @@ export class H264Repacketizer {
     pendingFuA: RtpPacket[];
     seenSps = false;
 
-    constructor(public maxPacketSize: number, public codecInfo: {
+    constructor(public console: Console, public maxPacketSize: number, public codecInfo: {
         sps: Buffer,
         pps: Buffer,
     }) {
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;;
+    }
+
+    shouldFilter(nalType: number) {
+        return false;
+        return nalType === NAL_TYPE_SEI;
     }
 
     // a fragmentation unit (fua) is a NAL unit broken into multiple fragments.
@@ -79,18 +85,15 @@ export class H264Repacketizer {
         }
 
         const payloadSize = data.length - NAL_HEADER_SIZE;
-        const numPackets = Math.ceil(payloadSize / this.fuaMax);
-        let numLargerPackets = payloadSize % numPackets;
-        const packageSize = Math.floor(payloadSize / numPackets);
 
         const fnri = data[0] & (0x80 | 0x60);
-        const nal = data[0] & 0x1F;
+        const nalType = data[0] & 0x1F;
 
         const fuIndicator = fnri | NAL_TYPE_FU_A;
 
-        const fuHeaderMiddle = Buffer.from([fuIndicator, nal]);
-        const fuHeaderStart = noStart ? fuHeaderMiddle : Buffer.from([fuIndicator, nal | 0x80]);
-        const fuHeaderEnd = noEnd ? fuHeaderMiddle : Buffer.from([fuIndicator, nal | 0x40]);
+        const fuHeaderMiddle = Buffer.from([fuIndicator, nalType]);
+        const fuHeaderStart = noStart ? fuHeaderMiddle : Buffer.from([fuIndicator, nalType | 0x80]);
+        const fuHeaderEnd = noEnd ? fuHeaderMiddle : Buffer.from([fuIndicator, nalType | 0x40]);
         let fuHeader = fuHeaderStart;
 
         const packages: Buffer[] = [];
@@ -98,15 +101,9 @@ export class H264Repacketizer {
 
         while (offset < data.length) {
             let payload: Buffer;
-            if (numLargerPackets > 0) {
-                numLargerPackets -= 1;
-                payload = data.subarray(offset, offset + packageSize + 1);
-                offset += packageSize + 1;
-            }
-            else {
-                payload = data.subarray(offset, offset + packageSize);
-                offset += packageSize;
-            }
+            const packageSize = Math.min(this.fuaMax, data.length - offset);
+            payload = data.subarray(offset, offset + packageSize);
+            offset += packageSize;
 
             if (offset === data.length) {
                 fuHeader = fuHeaderEnd;
@@ -135,7 +132,6 @@ export class H264Repacketizer {
         // in the aggregation packet.
 
         // homekit does not want NRI aggregation in the sps/pps stap-a for some reason?
-        // homekit also chokes if the stap-a contains SEI. very picky!
         const stapHeader = NAL_TYPE_STAP_A;
 
         while (datas.length && datas[0].length + LENGTH_FIELD_SIZE <= availableSize && counter < 9) {
@@ -149,7 +145,7 @@ export class H264Repacketizer {
 
         // is this possible?
         if (counter === 0) {
-            console.warn('stap a packet is too large. this may be a bug.');
+            this.console.warn('stap a packet is too large. this may be a bug.');
             return datas.shift();
         }
 
@@ -181,7 +177,7 @@ export class H264Repacketizer {
         rtp.header.padding = hadPadding;
         rtp.payload = originalPayload;
         if (data.length > this.maxPacketSize)
-            console.warn('packet exceeded max packet size. this may a bug.');
+            this.console.warn('packet exceeded max packet size. this may a bug.');
         return ret;
     }
 
@@ -193,7 +189,7 @@ export class H264Repacketizer {
 
         const aggregates = this.packetizeStapA(this.pendingStapA.map(packet => packet.payload));
         if (aggregates.length !== 1) {
-            console.error('expected only 1 packet for sps/pps stapa');
+            this.console.error('expected only 1 packet for sps/pps stapa');
             this.pendingStapA = undefined;
             return;
         }
@@ -219,18 +215,18 @@ export class H264Repacketizer {
         const hasFuStart = !!(first.payload[1] & 0x80);
         const hasFuEnd = !!(last.payload[1] & 0x40);
 
-        const originalNalType = first.payload[1] & 0x1f;
+        let originalNalType = first.payload[1] & 0x1f;
         let lastSequenceNumber: number;
         for (const packet of this.pendingFuA) {
             const nalType = packet.payload[1] & 0x1f;
             if (nalType !== originalNalType) {
-                console.error('nal type mismatch');
+                this.console.error('nal type mismatch');
                 this.pendingFuA = undefined;
                 return;
             }
             if (lastSequenceNumber !== undefined) {
                 if (packet.header.sequenceNumber !== (lastSequenceNumber + 1) % 0x10000) {
-                    console.error('fua packet is missing. skipping refragmentation.');
+                    this.console.error('fua packet is missing. skipping refragmentation.');
                     this.pendingFuA = undefined;
                     return;
                 }
@@ -269,7 +265,7 @@ export class H264Repacketizer {
 
         const aggregates = this.packetizeStapA([this.codecInfo.sps, this.codecInfo.pps]);
         if (aggregates.length !== 1) {
-            console.error('expected only 1 packet for sps/pps stapa');
+            this.console.error('expected only 1 packet for sps/pps stapa');
             return;
         }
         this.createRtpPackets(packet, aggregates, ret);
@@ -296,6 +292,12 @@ export class H264Repacketizer {
 
             const data = packet.payload;
             const originalNalType = data[1] & 0x1f;
+
+            if (this.shouldFilter(originalNalType)) {
+                this.extraPackets--;
+                return ret;
+            }
+
             const isFuStart = !!(data[1] & 0x80);
             // if this is an idr frame, but no sps has been sent, dummy one up.
             // the stream may not contain sps.
@@ -339,9 +341,15 @@ export class H264Repacketizer {
                 .filter(payload => {
                     const nalType = payload[0] & 0x1F;
                     this.seenSps = this.seenSps || (nalType === NAL_TYPE_SPS);
-                    // SEI nal causes homekit to fail
-                    return nalType !== NAL_TYPE_SEI;
+                    if (this.shouldFilter(nalType)) {
+                        return false;
+                    }
+                    return true;
                 });
+            if (depacketized.length === 0) {
+                this.extraPackets--;
+                return ret;
+            }
             const aggregates = this.packetizeStapA(depacketized);
             this.createRtpPackets(packet, aggregates, ret);
         }
@@ -359,8 +367,7 @@ export class H264Repacketizer {
 
             this.flushPendingStapA(ret);
 
-            // SEI nal causes homekit to fail
-            if (nalType === NAL_TYPE_SEI) {
+            if (this.shouldFilter(nalType)) {
                 this.extraPackets--;
                 return ret;
             }
@@ -381,7 +388,7 @@ export class H264Repacketizer {
             }
         }
         else {
-            console.error('unknown nal unit type ' + nalType);
+            this.console.error('unknown nal unit type ' + nalType);
             this.extraPackets--;
         }
 

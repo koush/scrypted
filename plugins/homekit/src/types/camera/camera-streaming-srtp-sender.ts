@@ -50,8 +50,8 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     else {
         // adjust for rtp header size for the rtp packet header (12) and 16 for... whatever else
         // may not be accomodated.
-        const adjustedMtu = videoOptions.maxPacketSize - 12 - 16;
-        h264Packetizer = new H264Repacketizer(adjustedMtu, videoOptions);
+        const adjustedMtu = videoOptions.maxPacketSize - 12;
+        h264Packetizer = new H264Repacketizer(console, adjustedMtu, videoOptions);
     }
 
     function sendPacket(rtp: RtpPacket) {
