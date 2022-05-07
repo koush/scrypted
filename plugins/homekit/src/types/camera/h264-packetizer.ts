@@ -48,6 +48,10 @@ export class H264Repacketizer {
     }
 
     shouldFilter(nalType: number) {
+        // currently nothing is filtered, but it seems that some SEI packets cause issues
+        // and should be ignored, while others show up in the stap-a sps/pps packet
+        // and work just fine. unclear what these packets contain, but handling them properly
+        // is one of the last necessary steps to make the rtp sender reliable.
         return false;
         return nalType === NAL_TYPE_SEI;
     }
@@ -355,6 +359,12 @@ export class H264Repacketizer {
         }
         else if (nalType >= 1 && nalType < 24) {
             this.flushPendingFuA(ret);
+
+            if (this.shouldFilter(nalType)) {
+                this.flushPendingStapA(ret);
+                this.extraPackets--;
+                return ret;
+            }
 
             // codec information should be aggregated. usually around 50 bytes total.
             if (nalType === NAL_TYPE_SPS || nalType === NAL_TYPE_PPS) {
