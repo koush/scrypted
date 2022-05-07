@@ -1,5 +1,6 @@
 import { bindUdp } from '@scrypted/common/src/listen-cluster';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
@@ -93,7 +94,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 audioProcess: null,
                 videoReturn,
                 audioReturn,
-                videoReturnRtcpReady: once(videoReturn, 'message'),
+                videoReturnRtcpReady: timeoutPromise(1000, once(videoReturn, 'message')).catch(() => {
+                    console.warn('Video RTCP Packet timed out. This may be a firewall issue preventing the iOS device from sending UDP packets back to Scrypted.');
+                }),
             }
 
             sessions.set(request.sessionID, session);
