@@ -80,7 +80,7 @@ export class KeyLight {
     }
 
     async setColorTemperature(kelvin: number) {
-        let temperature = Math.round(Math.pow(987007 * kelvin, -0.999));
+        let temperature = Math.round(987007 * Math.pow(kelvin, -0.999));
         let optionsCall = await put(`http://${this.ip}:${this.port}/elgato/lights`, {
                     body: JSON.stringify({
                         "numberOfLights": 1,

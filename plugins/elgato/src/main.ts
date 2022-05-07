@@ -31,7 +31,7 @@ class ElgatoDevice extends ScryptedDeviceBase implements OnOff, Brightness, Colo
     this.on = !!this.light.options.lights[0].on;
     this.brightness = this.light.options.lights[0].brightness;
     let temperature = this.light.options.lights[0].temperature;
-    let kelvin = Math.round(Math.pow(1000000 * temperature, -1))
+    let kelvin = Math.round(1000000 * Math.pow(temperature, -1))
     this.temperature = kelvin;
   }
 
