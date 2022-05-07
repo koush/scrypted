@@ -51,8 +51,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
         session.videoReturn?.close();
         session.audioReturn?.close();
         session.rtpSink?.destroy();
-        if (twoWayAudio)
-            device.stopIntercom();
     }
 
     const delegate: CameraStreamingDelegate = {
@@ -318,19 +316,29 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                 // demux the audio return socket to distinguish between rtp audio return
                 // packets and rtcp.
-                // send the audio return off to the rtp 
+                // send the audio return off to the rtp
+                let startedIntercom = false;
                 session.audioReturn.on('message', buffer => {
                     const rtp = RtpPacket.deSerialize(buffer);
                     if (rtp.header.payloadType === session.startRequest.audio.pt) {
+                        if (!startedIntercom) {
+                            console.log('Received first two way audio packet, starting intercom.');
+                            startedIntercom = true;
+                            mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput)
+                                .then(mo => {
+                                    device.startIntercom(mo);
+                                    session.audioReturn.once('close', () => {
+                                        console.log('Stopping intercom.');
+                                        device.stopIntercom();
+                                    });
+                                });
+                        }
                         session.audioReturn.send(buffer, session.rtpSink.rtpPort);
                     }
                     else {
                         session.rtpSink.heartbeat(session.audioReturn, buffer);
                     }
                 });
-
-                const mo = await mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput);
-                device.startIntercom(mo);
             }
         },
     };
