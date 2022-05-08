@@ -95,7 +95,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 videoReturn,
                 audioReturn,
                 videoReturnRtcpReady: timeoutPromise(1000, once(videoReturn, 'message')).catch(() => {
-                    console.warn('Video RTCP Packet timed out. This may be a firewall issue preventing the iOS device from sending UDP packets back to Scrypted.');
+                    console.warn('Video RTCP Packet timed out. There may be a network (routing/firewall) issue preventing the Apple device sending UDP packets back to Scrypted.');
                 }),
             }
 
