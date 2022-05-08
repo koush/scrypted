@@ -1,4 +1,4 @@
-# A Elgato plugin
+# An Elgato KeyLight plugin
 
 ## npm commands
  * npm run scrypted-webpack
