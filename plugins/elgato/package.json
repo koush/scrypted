@@ -31,11 +31,10 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",
       "@types/axios": "^0.14.0",
-      "@types/bonjour": "^3.5.10",
       "@types/node": "^16.7.1"
    },
    "dependencies": {
       "axios": "^0.27.2",
-      "bonjour": "^3.5.0"
+      "bonjour-service": "^1.0.12"
    }
 }

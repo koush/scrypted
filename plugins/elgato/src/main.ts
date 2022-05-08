@@ -1,5 +1,5 @@
 
-import bonjour, { Browser } from "bonjour";
+import Bonjour from "bonjour-service";
 import { KeyLight } from './lights';
 import sdk, { Device, ScryptedDeviceBase, OnOff, Brightness, ColorSettingTemperature, Refresh, ScryptedDeviceType, DeviceProvider } from '@scrypted/sdk';
 const { deviceManager, log } = sdk;
@@ -99,7 +99,7 @@ class ElgatoController implements DeviceProvider {
   }
 
   async discoverDevices(duration: number) {
-    const browser = bonjour().find({ type: 'elg' });
+    const browser = new Bonjour().find({ type: 'elg' });
     log.i(`discoverDevices...`)
     browser.on('up', service => {
         log.i(`found light: ${service.name}`)
