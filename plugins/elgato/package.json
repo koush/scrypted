@@ -23,7 +23,6 @@
    ],
    "scrypted": {
       "name": "Elgato Controller",
-      "singleInstance": true,
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider"
