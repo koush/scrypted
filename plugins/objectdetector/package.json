@@ -31,7 +31,6 @@
    ],
    "scrypted": {
       "name": "Video Analysis Plugin",
-      "singleInstance": true,
       "type": "API",
       "interfaces": [
          "MixinProvider"

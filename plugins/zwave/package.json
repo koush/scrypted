@@ -23,7 +23,6 @@
    "scrypted": {
       "name": "Z-Wave Controller",
       "type": "DeviceProvider",
-      "singleInstance": true,
       "realfs": true,
       "interfaces": [
          "DeviceProvider",

@@ -28,7 +28,6 @@
    ],
    "scrypted": {
       "name": "TensorFlow Face Recognition Plugin",
-      "singleInstance": true,
       "type": "API",
       "interfaces": [
          "DeviceProvider",

@@ -20,7 +20,6 @@
    "scrypted": {
       "name": "Google Cloud Text to Speech",
       "type": "DeviceProvider",
-      "singleInstance": true,
       "interfaces": [
          "BufferConverter",
          "Settings"

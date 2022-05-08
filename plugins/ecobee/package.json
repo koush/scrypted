@@ -23,7 +23,6 @@
     ],
     "scrypted": {
         "name": "Ecobee Plugin",
-        "singleInstance": true,
         "type": "DeviceProvider",
         "interfaces": [
             "DeviceProvider",

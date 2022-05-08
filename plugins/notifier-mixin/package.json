@@ -23,7 +23,6 @@
    ],
    "scrypted": {
       "name": "Text to Speech Mixin for TVs and Speakers",
-      "singleInstance": true,
       "type": "API",
       "interfaces": [
          "MixinProvider"

@@ -22,7 +22,6 @@
    ],
    "scrypted": {
       "name": "LIFX Controller",
-      "singleInstance": true,
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider"

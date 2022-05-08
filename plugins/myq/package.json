@@ -22,7 +22,6 @@
    ],
    "scrypted": {
       "name": "MyQ Garage Controller",
-      "singleInstance": true,
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",

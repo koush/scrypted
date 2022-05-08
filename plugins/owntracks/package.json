@@ -21,7 +21,6 @@
    ],
    "scrypted": {
       "name": "Owntracks Plugin",
-      "singleInstance": true,
       "type": "DeviceProvider",
       "interfaces": [
          "PushHandler",

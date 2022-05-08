@@ -22,7 +22,6 @@
    ],
    "scrypted": {
       "name": "Rebroadcast Plugin",
-      "singleInstance": true,
       "type": "API",
       "interfaces": [
          "DeviceProvider",
