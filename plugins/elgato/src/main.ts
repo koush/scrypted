@@ -94,7 +94,7 @@ class ElgatoController implements DeviceProvider {
       type: ScryptedDeviceType.Light,
     };
 
-    deviceManager.onDeviceDiscovered(info);
+    await deviceManager.onDeviceDiscovered(info);
     this.lights[light.info.serialNumber] = new ElgatoDevice(light, info);
   }
 
