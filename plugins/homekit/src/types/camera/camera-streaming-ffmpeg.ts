@@ -113,25 +113,54 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     }
 
     let videoOutput = `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`;
+    let useSrtp = true;
 
+    // this test path is to force forwarding of packets through the correct port expected by HAP
+    // or alternatively used to inspect ffmpeg packets to compare vs what scrypted sends.
     if (false) {
-        // this test path is to force forwarding of packets through the correct port expected by HAP.
+        const useRtpSender = true;
         const videoForwarder = await createBindZero();
         videoForwarder.server.once('message', () => console.log('first forwarded h264 packet received.'));
         session.videoReturn.on('close', () => videoForwarder.server.close());
-        videoForwarder.server.on('message', data => {
-            session.videoReturn.send(data, session.prepareRequest.video.port, session.prepareRequest.targetAddress);
-        });
-        videoOutput = `srtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
+        if (useRtpSender) {
+            useSrtp = false;
+            const videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
+                session.videossrc, session.startRequest.video.pt,
+                session.prepareRequest.video.port, session.prepareRequest.targetAddress,
+                session.startRequest.video.rtcp_interval, {
+                    maxPacketSize: session.startRequest.video.mtu,
+                    sps: undefined,
+                    pps: undefined,
+                }
+            );
+            videoForwarder.server.on('message', data => {
+                const rtp = RtpPacket.deSerialize(data);
+                if (rtp.header.payloadType !== session.startRequest.video.pt)
+                    return;
+                videoSender(rtp);
+            });
+            videoOutput = `rtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
+        }
+        else {
+            videoForwarder.server.on('message', data => {
+                session.videoReturn.send(data, session.prepareRequest.video.port, session.prepareRequest.targetAddress);
+            });
+            videoOutput = `srtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
+        }
+    }
+
+    if (useSrtp) {
+        videoArgs.push(
+            "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
+            "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
+            "-srtp_out_params", videoKey.toString('base64'),
+        );
     }
 
     videoArgs.push(
         "-payload_type", request.video.pt.toString(),
         "-ssrc", session.videossrc.toString(),
         "-f", "rtp",
-        "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
-        "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
-        "-srtp_out_params", videoKey.toString('base64'),
         videoOutput,
     );
 

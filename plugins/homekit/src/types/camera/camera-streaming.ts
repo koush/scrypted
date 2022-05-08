@@ -1,5 +1,6 @@
 import { bindUdp } from '@scrypted/common/src/listen-cluster';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
@@ -51,8 +52,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
         session.videoReturn?.close();
         session.audioReturn?.close();
         session.rtpSink?.destroy();
-        if (twoWayAudio)
-            device.stopIntercom();
     }
 
     const delegate: CameraStreamingDelegate = {
@@ -95,7 +94,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 audioProcess: null,
                 videoReturn,
                 audioReturn,
-                videoReturnRtcpReady: once(videoReturn, 'message'),
+                videoReturnRtcpReady: timeoutPromise(1000, once(videoReturn, 'message')).catch(() => {
+                    console.warn('Video RTCP Packet timed out. This may be a firewall issue preventing the iOS device from sending UDP packets back to Scrypted.');
+                }),
             }
 
             sessions.set(request.sessionID, session);
@@ -318,19 +319,29 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
                 // demux the audio return socket to distinguish between rtp audio return
                 // packets and rtcp.
-                // send the audio return off to the rtp 
+                // send the audio return off to the rtp
+                let startedIntercom = false;
                 session.audioReturn.on('message', buffer => {
                     const rtp = RtpPacket.deSerialize(buffer);
                     if (rtp.header.payloadType === session.startRequest.audio.pt) {
+                        if (!startedIntercom) {
+                            console.log('Received first two way audio packet, starting intercom.');
+                            startedIntercom = true;
+                            mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput)
+                                .then(mo => {
+                                    device.startIntercom(mo);
+                                    session.audioReturn.once('close', () => {
+                                        console.log('Stopping intercom.');
+                                        device.stopIntercom();
+                                    });
+                                });
+                        }
                         session.audioReturn.send(buffer, session.rtpSink.rtpPort);
                     }
                     else {
                         session.rtpSink.heartbeat(session.audioReturn, buffer);
                     }
                 });
-
-                const mo = await mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput);
-                device.startIntercom(mo);
             }
         },
     };
