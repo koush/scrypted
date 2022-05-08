@@ -51,12 +51,10 @@ addSupportedType({
             const service = accessory.addService(Service.ContactSensor, device.name);
             bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ContactSensorState,
                 () => !!device.binaryState);
-        }
-
-        if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
-            const service = accessory.addService(Service.ContactSensor, device.name + ' Entry Sensor', 'EntrySensor');
+        } else if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
+            const service = accessory.addService(Service.ContactSensor, device.name);
             bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.ContactSensorState,
-                () => !! device.entryOpen);
+                () => !!device.entryOpen);
         }
 
         if (device.interfaces.includes(ScryptedInterface.OccupancySensor)) {
