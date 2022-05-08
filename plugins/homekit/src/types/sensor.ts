@@ -1,4 +1,4 @@
-import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality } from '@scrypted/sdk';
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -32,6 +32,7 @@ const supportedSensors: string[] = [
     ScryptedInterface.AirQualitySensor,
     ScryptedInterface.PM25Sensor,
     ScryptedInterface.VOCSensor,
+    ScryptedInterface.EntrySensor,
 ];
 
 addSupportedType({
@@ -43,13 +44,17 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor, homekitSession: HomeKitSession) => {
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor, homekitSession: HomeKitSession) => {
         const accessory = makeAccessory(device, homekitSession);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name);
             bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ContactSensorState,
                 () => !!device.binaryState);
+        } else if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
+            const service = accessory.addService(Service.ContactSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.ContactSensorState,
+                () => !!device.entryOpen);
         }
 
         if (device.interfaces.includes(ScryptedInterface.OccupancySensor)) {
