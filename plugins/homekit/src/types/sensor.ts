@@ -54,7 +54,7 @@ addSupportedType({
         }
 
         if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
-            const service = accessory.addService(Service.ContactSensor, device.name);
+            const service = accessory.addService(Service.ContactSensor, device.name + ' Entry Sensor', 'EntrySensor');
             bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.ContactSensorState,
                 () => !! device.entryOpen);
         }
