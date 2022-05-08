@@ -1,4 +1,4 @@
-import { put, get } from "request-promise";
+import axios from 'axios';
 
 export class KeyLight {
     ip: string;
@@ -23,75 +23,79 @@ export class KeyLight {
     }
 
     async getSettings() {
-        let settingsCall = await get(`http://${this.ip}:${this.port}/elgato/lights/settings`);
-        this.settings = await JSON.parse(settingsCall);
+        const { data, status } = await axios.get<KeyLightSettings>(`http://${this.ip}:${this.port}/elgato/lights/settings`);
+        this.settings = data;
     }
 
     async getOptions() {
-        let optionsCall = await get(`http://${this.ip}:${this.port}/elgato/lights`);
-        this.options = await JSON.parse(optionsCall);
+        const { data, status } = await axios.get<KeyLightOptions>(`http://${this.ip}:${this.port}/elgato/lights`);
+        this.options = data;
     }
 
     async getInfo() {
-        let infoCall = await get(`http://${this.ip}:${this.port}/elgato/accessory-info`);
-        this.info = await JSON.parse(infoCall);
+        const { data, status } = await axios.get<KeyLightInfo>(`http://${this.ip}:${this.port}/elgato/accessory-info`);
+        this.info = data;
     }
 
     async turnOn() {
-        let optionsCall = await put(`http://${this.ip}:${this.port}/elgato/lights`, {
-                    body: JSON.stringify({
-                        "numberOfLights": 1,
-                        "lights": [
-                            {
-                                "on": 1
-                            }
-                        ]
-                    })
-                });
-        this.options = await JSON.parse(optionsCall);
+        const { data } = await axios.put<KeyLightOptions>(
+            `http://${this.ip}:${this.port}/elgato/lights`, 
+            {
+                "numberOfLights": 1,
+                "lights": [
+                    {
+                        "on": 1
+                    }
+                ]
+            }
+        );
+        this.options = data;
     }
 
     async turnOff() {
-        let optionsCall = await put(`http://${this.ip}:${this.port}/elgato/lights`, {
-                    body: JSON.stringify({
-                        "numberOfLights": 1,
-                        "lights": [
-                            {
-                                "on": 0
-                            }
-                        ]
-                    })
-                });
-        this.options = await JSON.parse(optionsCall);
+        const { data } = await axios.put<KeyLightOptions>(
+            `http://${this.ip}:${this.port}/elgato/lights`, 
+            {
+                "numberOfLights": 1,
+                "lights": [
+                    {
+                        "on": 0
+                    }
+                ]
+            }
+        );
+        this.options = data;
     }
 
     async setBrightness(level: number) {
-        let optionsCall = await put(`http://${this.ip}:${this.port}/elgato/lights`, {
-                    body: JSON.stringify({
-                        "numberOfLights": 1,
-                        "lights": [
-                            {
-                                "brightness": level,
-                            }
-                        ]
-                    })
-                });
-        this.options = await JSON.parse(optionsCall);
+        const { data } = await axios.put<KeyLightOptions>(
+            `http://${this.ip}:${this.port}/elgato/lights`, 
+            {
+                "numberOfLights": 1,
+                "lights": [
+                    {
+                        "brightness": level,
+                    }
+                ]
+            }
+        );
+        this.options = data;
     }
 
     async setColorTemperature(temperature: number) {
-        let optionsCall = await put(`http://${this.ip}:${this.port}/elgato/lights`, {
-                    body: JSON.stringify({
-                        "numberOfLights": 1,
-                        "lights": [
-                            {
-                                "temperature": temperature,
-                            }
-                        ]
-                    })
-                });
-        this.options = await JSON.parse(optionsCall);
-      }
+        const { data } = await axios.put<KeyLightOptions>(
+            `http://${this.ip}:${this.port}/elgato/lights`, 
+            {
+                "numberOfLights": 1,
+                "lights": [
+                    {
+                        "temperature": temperature,
+                    }
+                ]
+            }
+        );
+        this.options = data;
+    }
 }
 
 export interface KeyLightSettings {
