@@ -865,8 +865,10 @@ class ScryptedPlugin:
     pass
 
 class SecuritySystem:
-    securitySystem: SecuritySystemState
-    async def setSecuritySystem(self, mode: SecuritySystemMode) -> None:
+    securitySystemState: SecuritySystemState
+    async def armSecuritySystem(self, mode: SecuritySystemMode) -> None:
+        pass
+    async def disarmSecuritySystem(self) -> None:
         pass
     pass
 
@@ -1116,7 +1118,7 @@ class ScryptedInterfaceProperty(Enum):
     ultraviolet = "ultraviolet"
     luminance = "luminance"
     position = "position"
-    securitySystem = "securitySystem"
+    securitySystemState = "securitySystemState"
     pm25Density = "pm25Density"
     vocDensity = "vocDensity"
     airQuality = "airQuality"
@@ -1466,11 +1468,11 @@ class DeviceState:
         self.setScryptedProperty("position", value)
 
     @property
-    def securitySystem(self) -> SecuritySystemState:
-        return self.getScryptedProperty("securitySystem")
-    @securitySystem.setter
-    def securitySystem(self, value: SecuritySystemState):
-        self.setScryptedProperty("securitySystem", value)
+    def securitySystemState(self) -> SecuritySystemState:
+        return self.getScryptedProperty("securitySystemState")
+    @securitySystemState.setter
+    def securitySystemState(self, value: SecuritySystemState):
+        self.setScryptedProperty("securitySystemState", value)
 
     @property
     def pm25Density(self) -> float:
@@ -1936,10 +1938,11 @@ ScryptedInterfaceDescriptors = {
   "SecuritySystem": {
     "name": "SecuritySystem",
     "methods": [
-      "setSecuritySystem"
+      "armSecuritySystem",
+      "disarmSecuritySystem"
     ],
     "properties": [
-      "securitySystem"
+      "securitySystemState"
     ]
   },
   "PM25Sensor": {

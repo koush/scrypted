@@ -48,7 +48,7 @@ export interface DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
-    securitySystem?: SecuritySystemState;
+    securitySystemState?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
     airQuality?: AirQuality;
@@ -104,7 +104,7 @@ export declare class DeviceBase implements DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
-    securitySystem?: SecuritySystemState;
+    securitySystemState?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
     airQuality?: AirQuality;
@@ -160,7 +160,7 @@ export declare enum ScryptedInterfaceProperty {
     ultraviolet = "ultraviolet",
     luminance = "luminance",
     position = "position",
-    securitySystem = "securitySystem",
+    securitySystemState = "securitySystemState",
     pm25Density = "pm25Density",
     vocDensity = "vocDensity",
     airQuality = "airQuality",
@@ -905,8 +905,9 @@ export interface SecuritySystemState {
     obstruction?: SecuritySystemObstruction;
 }
 export interface SecuritySystem {
-    securitySystem?: SecuritySystemState;
-    setSecuritySystem(mode: SecuritySystemMode): Promise<void>;
+    securitySystemState?: SecuritySystemState;
+    armSecuritySystem(mode: SecuritySystemMode): Promise<void>;
+    disarmSecuritySystem(): Promise<void>;
 }
 export interface ZoneHistory {
     firstEntry: number;

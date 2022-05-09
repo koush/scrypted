@@ -808,8 +808,9 @@ export interface SecuritySystemState {
 }
 
 export interface SecuritySystem {
-  securitySystem?: SecuritySystemState;
-  setSecuritySystem(mode: SecuritySystemMode): Promise<void>;
+  securitySystemState?: SecuritySystemState;
+  armSecuritySystem(mode: SecuritySystemMode): Promise<void>;
+  disarmSecuritySystem(): Promise<void>;
 }
 
 export interface ZoneHistory {

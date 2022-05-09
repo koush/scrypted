@@ -54,7 +54,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["ultraviolet"] = "ultraviolet";
     ScryptedInterfaceProperty["luminance"] = "luminance";
     ScryptedInterfaceProperty["position"] = "position";
-    ScryptedInterfaceProperty["securitySystem"] = "securitySystem";
+    ScryptedInterfaceProperty["securitySystemState"] = "securitySystemState";
     ScryptedInterfaceProperty["pm25Density"] = "pm25Density";
     ScryptedInterfaceProperty["vocDensity"] = "vocDensity";
     ScryptedInterfaceProperty["airQuality"] = "airQuality";
@@ -490,10 +490,11 @@ exports.ScryptedInterfaceDescriptors = {
     SecuritySystem: {
         name: 'SecuritySystem',
         methods: [
-            'setSecuritySystem'
+            'armSecuritySystem',
+            'disarmSecuritySystem'
         ],
         properties: [
-            'securitySystem'
+            'securitySystemState'
         ]
     },
     PM25Sensor: {
