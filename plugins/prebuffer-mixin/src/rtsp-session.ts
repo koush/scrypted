@@ -28,25 +28,11 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
     const rtspClient = new RtspClient(url, console);
     rtspClient.requestTimeout = options.rtspRequestTimeout;
 
-    let issuedTeardown = false;
-    const cleanupSockets = async () => {
+    const cleanupSockets = () => {
         for (const server of servers) {
             closeQuiet(server);
         }
-        // issue a teardown to upstream to close gracefully
-        if (issuedTeardown)
-            return;
-        issuedTeardown = true;
-        try {
-            rtspClient.writeTeardown();
-            await sleep(500);
-        }
-        catch (e) {
-        }
-        finally {
-            // will trigger after teardown returns
-            rtspClient.client.destroy();
-        }
+        rtspClient.safeTeardown();
     }
 
     let sessionKilled: any;

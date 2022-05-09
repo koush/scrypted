@@ -129,11 +129,8 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         // don't start parsing until next tick, to prevent missed packets.
         await sleep(0);
 
-        const headerLength = 2;
-        const offset = 0;
         await read16BELengthLoop(socket, {
-            headerLength,
-            offset,
+            headerLength: 2,
             skipHeader: undefined,
             callback: (header, data) => {
                 let type: string;

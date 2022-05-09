@@ -7,6 +7,7 @@ import tls from 'tls';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
 import { parseSdp } from './sdp-utils';
+import { sleep } from './sleep';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
 
 export const RTSP_FRAME_MAGIC = 36;
@@ -226,6 +227,7 @@ export class RtspClient extends RtspBase {
     requestTimeout: number;
     needKeepAlive = false;
     setupOptions = new Map<number, RtspClientTcpSetupOptions>();
+    issuedTeardown = false;
 
     constructor(public url: string, console?: Console) {
         super(console);
@@ -240,6 +242,23 @@ export class RtspClient extends RtspBase {
         }
         else {
             this.client = net.connect(port, u.hostname);
+        }
+    }
+
+    async safeTeardown() {
+        // issue a teardown to upstream to close gracefully
+        if (this.issuedTeardown)
+            return;
+        this.issuedTeardown = true;
+        try {
+            this.writeTeardown();
+            await sleep(500);
+        }
+        catch (e) {
+        }
+        finally {
+            // will trigger after teardown returns
+            this.client.destroy();
         }
     }
 
@@ -413,7 +432,7 @@ export class RtspClient extends RtspBase {
         });
     }
 
-    async setup(options?: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions) {
+    async setup(options: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions) {
         const protocol = options.type === 'udp' ? 'UDP' : 'TCP';
         const client = options.type === 'udp' ? 'client_port' : 'interleaved';
         const headers: any = {
