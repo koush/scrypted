@@ -28,6 +28,8 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
         session.kill();
     };
 
+    session.killPromise.finally(cleanup);
+
     if (isRtsp) {
         rtspClient = new RtspClient(url);
         rtspClient.requestTimeout = 1000;

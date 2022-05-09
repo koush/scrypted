@@ -124,6 +124,7 @@ class ScryptedInterface(Enum):
     Scriptable = "Scriptable"
     ScryptedDevice = "ScryptedDevice"
     ScryptedPlugin = "ScryptedPlugin"
+    SecuritySystem = "SecuritySystem"
     Settings = "Settings"
     SoftwareUpdate = "SoftwareUpdate"
     StartStop = "StartStop"
@@ -146,6 +147,18 @@ class ScryptedMimeTypes(Enum):
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     Url = "text/x-uri"
+
+class SecuritySystemMode(Enum):
+    AwayArmed = "AwayArmed"
+    Disarmed = "Disarmed"
+    HomeArmed = "HomeArmed"
+    NightArmed = "NightArmed"
+
+class SecuritySystemObstruction(Enum):
+    Error = "Error"
+    Occupied = "Occupied"
+    Sensor = "Sensor"
+    Time = "Time"
 
 class TemperatureUnit(Enum):
     C = "C"
@@ -466,6 +479,13 @@ class ScryptedDevice(TypedDict):
     providerId: str
     room: str
     type: ScryptedDeviceType
+    pass
+
+class SecuritySystemState(TypedDict):
+    mode: SecuritySystemMode
+    obstruction: SecuritySystemObstruction
+    supportedModes: list[SecuritySystemMode]
+    triggered: bool
     pass
 
 class Setting(TypedDict):
@@ -844,6 +864,12 @@ class ScryptedPlugin:
         pass
     pass
 
+class SecuritySystem:
+    securitySystem: SecuritySystemState
+    async def setSecuritySystem(self, mode: SecuritySystemMode) -> None:
+        pass
+    pass
+
 class Settings:
     async def getSettings(self) -> list[Setting]:
         pass
@@ -1090,6 +1116,7 @@ class ScryptedInterfaceProperty(Enum):
     ultraviolet = "ultraviolet"
     luminance = "luminance"
     position = "position"
+    securitySystem = "securitySystem"
     pm25Density = "pm25Density"
     vocDensity = "vocDensity"
     airQuality = "airQuality"
@@ -1437,6 +1464,13 @@ class DeviceState:
     @position.setter
     def position(self, value: Position):
         self.setScryptedProperty("position", value)
+
+    @property
+    def securitySystem(self) -> SecuritySystemState:
+        return self.getScryptedProperty("securitySystem")
+    @securitySystem.setter
+    def securitySystem(self, value: SecuritySystemState):
+        self.setScryptedProperty("securitySystem", value)
 
     @property
     def pm25Density(self) -> float:
@@ -1897,6 +1931,15 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "position"
+    ]
+  },
+  "SecuritySystem": {
+    "name": "SecuritySystem",
+    "methods": [
+      "setSecuritySystem"
+    ],
+    "properties": [
+      "securitySystem"
     ]
   },
   "PM25Sensor": {

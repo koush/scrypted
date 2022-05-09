@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.AirQuality = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
+exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.SecuritySystemObstruction = exports.SecuritySystemMode = exports.AirQuality = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
 class DeviceBase {
 }
 exports.DeviceBase = DeviceBase;
@@ -54,6 +54,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["ultraviolet"] = "ultraviolet";
     ScryptedInterfaceProperty["luminance"] = "luminance";
     ScryptedInterfaceProperty["position"] = "position";
+    ScryptedInterfaceProperty["securitySystem"] = "securitySystem";
     ScryptedInterfaceProperty["pm25Density"] = "pm25Density";
     ScryptedInterfaceProperty["vocDensity"] = "vocDensity";
     ScryptedInterfaceProperty["airQuality"] = "airQuality";
@@ -486,6 +487,15 @@ exports.ScryptedInterfaceDescriptors = {
             'position'
         ]
     },
+    SecuritySystem: {
+        name: 'SecuritySystem',
+        methods: [
+            'setSecuritySystem'
+        ],
+        properties: [
+            'securitySystem'
+        ]
+    },
     PM25Sensor: {
         name: 'PM25Sensor',
         methods: [],
@@ -704,6 +714,20 @@ var AirQuality;
     AirQuality["Inferior"] = "Inferior";
     AirQuality["Poor"] = "Poor";
 })(AirQuality = exports.AirQuality || (exports.AirQuality = {}));
+var SecuritySystemMode;
+(function (SecuritySystemMode) {
+    SecuritySystemMode["Disarmed"] = "Disarmed";
+    SecuritySystemMode["HomeArmed"] = "HomeArmed";
+    SecuritySystemMode["AwayArmed"] = "AwayArmed";
+    SecuritySystemMode["NightArmed"] = "NightArmed";
+})(SecuritySystemMode = exports.SecuritySystemMode || (exports.SecuritySystemMode = {}));
+var SecuritySystemObstruction;
+(function (SecuritySystemObstruction) {
+    SecuritySystemObstruction["Sensor"] = "Sensor";
+    SecuritySystemObstruction["Occupied"] = "Occupied";
+    SecuritySystemObstruction["Time"] = "Time";
+    SecuritySystemObstruction["Error"] = "Error";
+})(SecuritySystemObstruction = exports.SecuritySystemObstruction || (exports.SecuritySystemObstruction = {}));
 var MediaPlayerState;
 (function (MediaPlayerState) {
     MediaPlayerState["Idle"] = "Idle";
@@ -762,6 +786,7 @@ var ScryptedInterface;
     ScryptedInterface["UltravioletSensor"] = "UltravioletSensor";
     ScryptedInterface["LuminanceSensor"] = "LuminanceSensor";
     ScryptedInterface["PositionSensor"] = "PositionSensor";
+    ScryptedInterface["SecuritySystem"] = "SecuritySystem";
     ScryptedInterface["PM25Sensor"] = "PM25Sensor";
     ScryptedInterface["VOCSensor"] = "VOCSensor";
     ScryptedInterface["AirQualitySensor"] = "AirQualitySensor";

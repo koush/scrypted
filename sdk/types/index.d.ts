@@ -48,6 +48,7 @@ export interface DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
+    securitySystem?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
     airQuality?: AirQuality;
@@ -103,6 +104,7 @@ export declare class DeviceBase implements DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
+    securitySystem?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
     airQuality?: AirQuality;
@@ -158,6 +160,7 @@ export declare enum ScryptedInterfaceProperty {
     ultraviolet = "ultraviolet",
     luminance = "luminance",
     position = "position",
+    securitySystem = "securitySystem",
     pm25Density = "pm25Density",
     vocDensity = "vocDensity",
     airQuality = "airQuality",
@@ -855,6 +858,14 @@ export interface UltravioletSensor {
 export interface LuminanceSensor {
     luminance?: number;
 }
+export interface Position {
+    /**
+     * The accuracy radius of this position in meters.
+     */
+    accuracyRadius?: number;
+    latitude?: number;
+    longitude?: number;
+}
 export interface PositionSensor {
     position?: Position;
 }
@@ -875,13 +886,27 @@ export declare enum AirQuality {
 export interface AirQualitySensor {
     airQuality?: AirQuality;
 }
-export interface Position {
-    /**
-     * The accuracy radius of this position in meters.
-     */
-    accuracyRadius?: number;
-    latitude?: number;
-    longitude?: number;
+export declare enum SecuritySystemMode {
+    Disarmed = "Disarmed",
+    HomeArmed = "HomeArmed",
+    AwayArmed = "AwayArmed",
+    NightArmed = "NightArmed"
+}
+export declare enum SecuritySystemObstruction {
+    Sensor = "Sensor",
+    Occupied = "Occupied",
+    Time = "Time",
+    Error = "Error"
+}
+export interface SecuritySystemState {
+    mode: SecuritySystemMode;
+    triggered?: boolean;
+    supportedModes?: SecuritySystemMode[];
+    obstruction?: SecuritySystemObstruction;
+}
+export interface SecuritySystem {
+    securitySystem?: SecuritySystemState;
+    setSecuritySystem(mode: SecuritySystemMode): Promise<void>;
 }
 export interface ZoneHistory {
     firstEntry: number;
@@ -1436,6 +1461,7 @@ export declare enum ScryptedInterface {
     UltravioletSensor = "UltravioletSensor",
     LuminanceSensor = "LuminanceSensor",
     PositionSensor = "PositionSensor",
+    SecuritySystem = "SecuritySystem",
     PM25Sensor = "PM25Sensor",
     VOCSensor = "VOCSensor",
     AirQualitySensor = "AirQualitySensor",
