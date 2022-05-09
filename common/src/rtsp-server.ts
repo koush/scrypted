@@ -9,7 +9,6 @@ import tls from 'tls';
 import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
 import crypto from 'crypto';
 import { timeoutPromise } from './promise-utils';
-import { sleep } from './sleep';
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -617,7 +616,7 @@ export class RtspServer {
                 control: msection.control,
                 protocol: 'udp',
                 destination: parseInt(rtp),
-                codec: msection.codec || (msection.type === 'audio' ? 'pcm' : undefined),
+                codec: msection.codec,
             }
         }
         else if (transport.includes('TCP')) {
@@ -629,7 +628,7 @@ export class RtspServer {
                     control: msection.control,
                     protocol: 'tcp',
                     destination: low,
-                    codec: msection.codec || (msection.type === 'audio' ? 'pcm' : undefined),
+                    codec: msection.codec,
                 }
             }
         }
