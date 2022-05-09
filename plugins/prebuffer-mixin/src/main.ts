@@ -1120,7 +1120,11 @@ class PrebufferSession {
 
     if (container === 'rtsp') {
       const parsedSdp = parseSdp(sdp);
-      parsedSdp.msections = parsedSdp.msections.filter(msection => msection.codec === mediaStreamOptions.video?.codec || msection.codec === mediaStreamOptions.audio?.codec);
+      const videoSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.video?.codec) || parsedSdp.msections.find(msection => msection.type === 'video');
+      let audioSection = parsedSdp.msections.find(msection => msection.codec && msection.codec === mediaStreamOptions.audio?.codec) || parsedSdp.msections.find(msection => msection.type === 'audio');
+      if (mediaStreamOptions.audio === null)
+        audioSection = undefined;
+      parsedSdp.msections = parsedSdp.msections.filter(msection => msection === videoSection || msection === audioSection);
       const filterPrebufferAudio = options?.prebuffer === undefined;
       const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
       sdp = parsedSdp.toSdp();
