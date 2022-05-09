@@ -91,25 +91,46 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
         ],
         findSyncFrame(streamChunks: StreamChunk[]) {
             let foundIndex: number;
+            let nonVideo: {
+                [codec: string]: StreamChunk,
+            } = {};
+
+            const createSyncFrame = () => {
+                const ret = streamChunks.slice(foundIndex);
+                // for (const nv of Object.values(nonVideo)) {
+                //     ret.unshift(nv);
+                // }
+                return ret;
+            }
 
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
+                if (streamChunk.type !== 'h264') {
+                    nonVideo[streamChunk.type] = streamChunk;
+                    continue;
+                }
+
                 if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS))
                     foundIndex = prebufferIndex;
             }
 
             if (foundIndex !== undefined)
-                return streamChunks.slice(foundIndex);
+                return createSyncFrame();
 
+            nonVideo = {};
             // some streams don't contain codec info, so find an idr frame instead.
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
+                if (streamChunk.type !== 'h264') {
+                    nonVideo[streamChunk.type] = streamChunk;
+                    continue;
+                }
                 if (findH264NaluType(streamChunk, H264_NAL_TYPE_IDR))
                     foundIndex = prebufferIndex;
             }
 
             if (foundIndex !== undefined)
-                return streamChunks.slice(foundIndex);
+                return createSyncFrame();
 
             // oh well!
         },
@@ -596,7 +617,7 @@ export class RtspServer {
                 control: msection.control,
                 protocol: 'udp',
                 destination: parseInt(rtp),
-                codec: msection.codec,
+                codec: msection.codec || (msection.type === 'audio' ? 'pcm' : undefined),
             }
         }
         else if (transport.includes('TCP')) {
@@ -608,7 +629,7 @@ export class RtspServer {
                     control: msection.control,
                     protocol: 'tcp',
                     destination: low,
-                    codec: msection.codec,
+                    codec: msection.codec || (msection.type === 'audio' ? 'pcm' : undefined),
                 }
             }
         }
