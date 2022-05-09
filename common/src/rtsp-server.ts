@@ -1,14 +1,13 @@
-import { readLength, readLine } from './read-stream';
-import { Duplex, PassThrough, Readable } from 'stream';
-import { randomBytes } from 'crypto';
-import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
-import { parseSdp } from './sdp-utils';
+import crypto, { randomBytes } from 'crypto';
 import dgram from 'dgram';
-import net from 'net';
-import tls from 'tls';
 import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
-import crypto from 'crypto';
+import net from 'net';
+import { Duplex, PassThrough, Readable } from 'stream';
+import tls from 'tls';
 import { timeoutPromise } from './promise-utils';
+import { readLength, readLine } from './read-stream';
+import { parseSdp } from './sdp-utils';
+import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -204,14 +203,29 @@ export class RtspBase {
 
 const quote = (str: string): string => `"${str.replace(/"/g, '\\"')}"`;
 
+export interface RtspClientSetupOptions {
+    type: 'tcp' | 'udp';
+    port: number;
+    path?: string;
+}
+
+export interface RtspClientTcpSetupOptions extends RtspClientSetupOptions {
+    type: 'tcp';
+    onData: (header: Buffer, data: Buffer) => void;
+}
+
+export interface RtspClientUdpSetupOptions extends RtspClientSetupOptions {
+    type: 'udp';
+}
+
 // probably only works with scrypted rtsp server.
 export class RtspClient extends RtspBase {
     cseq = 0;
     session: string;
     wwwAuthenticate: string;
     requestTimeout: number;
-    rfc4571 = new PassThrough();
     needKeepAlive = false;
+    setupOptions = new Map<number, RtspClientTcpSetupOptions>();
 
     constructor(public url: string, console?: Console) {
         super(console);
@@ -269,11 +283,12 @@ export class RtspClient extends RtspBase {
         if (header[0] !== RTSP_FRAME_MAGIC)
             throw new Error('RTSP Client expected frame magic but received: ' + header.toString());
 
+        const channel = header.readUInt8(1);
         const length = header.readUInt16BE(2);
         const data = await readLength(this.client, length);
 
-        this.rfc4571.push(header);
-        this.rfc4571.push(data);
+        const options = this.setupOptions.get(channel);
+        options?.onData?.(header, data);
     }
 
     async readDataPayload() {
@@ -293,7 +308,6 @@ export class RtspClient extends RtspBase {
         }
         catch (e) {
             this.client.destroy(e);
-            this.rfc4571.destroy(e);
             throw e;
         }
     }
@@ -399,13 +413,13 @@ export class RtspClient extends RtspBase {
         });
     }
 
-    async setup(channelOrPort: number, path?: string, udp?: boolean) {
-        const protocol = udp ? 'UDP' : 'TCP';
-        const client = udp ? 'client_port' : 'interleaved';
+    async setup(options?: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions) {
+        const protocol = options.type === 'udp' ? 'UDP' : 'TCP';
+        const client = options.type === 'udp' ? 'client_port' : 'interleaved';
         const headers: any = {
-            Transport: `RTP/AVP/${protocol};unicast;${client}=${channelOrPort}-${channelOrPort + 1}`,
+            Transport: `RTP/AVP/${protocol};unicast;${client}=${options.port}-${options.port + 1}`,
         };
-        const response = await this.request('SETUP', headers, path);
+        const response = await this.request('SETUP', headers, options.path);
         let interleaved: {
             begin: number;
             end: number;
@@ -436,6 +450,8 @@ export class RtspClient extends RtspBase {
                 }
             }
         }
+        if (options.type === 'tcp')
+            this.setupOptions.set(interleaved.begin, options);
         return Object.assign({ interleaved }, response);
     }
 

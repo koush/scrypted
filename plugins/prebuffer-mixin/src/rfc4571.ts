@@ -1,14 +1,59 @@
 import { cloneDeep } from "@scrypted/common/src/clone-deep";
 import { ParserOptions, ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { read16BELengthLoop, readLength } from "@scrypted/common/src/read-stream";
-import { findH264NaluType, H264_NAL_TYPE_SPS, RtspClient, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { read16BELengthLoop } from "@scrypted/common/src/read-stream";
+import { findH264NaluType, H264_NAL_TYPE_SPS, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { sleep } from "@scrypted/common/src/sleep";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
-import { ResponseMediaStreamOptions } from "@scrypted/sdk";
+import { MediaStreamOptions, ResponseMediaStreamOptions } from "@scrypted/sdk";
+import { parse as spsParse } from "h264-sps-parser";
 import net from 'net';
 import { EventEmitter, Readable } from "stream";
-import { getSpsResolution, parse as spsParse } from "./sps-parser";
+import { getSpsResolution } from "./sps-resolution";
+
+export function negotiateMediaStream(sdp: string, mediaStreamOptions: MediaStreamOptions, inputVideoCodec: string, inputAudioCodec: string, requestMediaStream: MediaStreamOptions) {
+    const parsedSdp = parseSdp(sdp);
+    const ret: ResponseMediaStreamOptions = cloneDeep(mediaStreamOptions) || {
+        id: undefined,
+        name: undefined,
+    };
+
+    // if the source doesn't provide a video codec, dummy one up
+    if (ret.video === undefined)
+        ret.video = {};
+
+    // the requests does not want video
+    if (requestMediaStream?.video === null)
+        ret.video = null;
+
+    if (ret.video)
+        ret.video.codec = inputVideoCodec;
+
+    // some rtsp like unifi offer alternate audio tracks (aac and opus).
+    if (requestMediaStream?.audio?.codec && requestMediaStream?.audio?.codec !== inputAudioCodec) {
+        const alternateAudio = parsedSdp.msections.find(msection => msection.type === 'audio' && msection.codec === requestMediaStream?.audio?.codec);
+        if (alternateAudio) {
+            ret.audio = {
+                codec: requestMediaStream?.audio?.codec,
+            };
+
+            return ret;
+        }
+    }
+
+    // reported codecs may be wrong/cached/etc, so before blindly copying the audio codec info,
+    // verify what was found.
+    if (ret?.audio?.codec === inputAudioCodec) {
+        ret.audio = mediaStreamOptions?.audio;
+    }
+    else {
+        ret.audio = {
+            codec: inputAudioCodec,
+        }
+    }
+
+    return ret;
+}
 
 export function connectRFC4571Parser(url: string) {
     const u = new URL(url);
@@ -19,21 +64,7 @@ export function connectRFC4571Parser(url: string) {
     return socket;
 }
 
-export type RtspChannelCodecMapping = { [key: number]: string };
-
-const RTSP_BUFFER = Buffer.from('RTSP');
-
-export function requeueRtspVideoData(rtspClient: RtspClient) {
-    const videoData = rtspClient.rfc4571.read();
-    if (videoData)
-      rtspClient.client.unshift(videoData);
-}
-
-export function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">, rtspOptions?: {
-    channelMap: RtspChannelCodecMapping,
-    rtspClient: RtspClient,
-    udpSessionTimeout: number,
-}): ParserSession<"rtsp"> {
+export function startRFC4571Parser(console: Console, socket: Readable, sdp: string, mediaStreamOptions: ResponseMediaStreamOptions, options?: ParserOptions<"rtsp">): ParserSession<"rtsp"> {
     let isActive = true;
     const events = new EventEmitter();
     // need this to prevent kill from throwing due to uncaught Error during cleanup
@@ -98,65 +129,30 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         // don't start parsing until next tick, to prevent missed packets.
         await sleep(0);
 
-        if (rtspOptions?.udpSessionTimeout) {
-            while (true) {
-                await sleep(rtspOptions.udpSessionTimeout * 1000 - 5000);
-                await rtspOptions.rtspClient.getParameter();
-            }
-        }
-
-        const headerLength = rtspOptions?.channelMap ? 4 : 2;
-        const offset = rtspOptions?.channelMap ? 2 : 0;
-        const skipHeader = (header: Buffer, resumeRead: () => void) => {
-            if (!rtspOptions?.rtspClient.needKeepAlive)
-                return false;
-
-            socket.unshift(header);
-            rtspOptions.rtspClient.needKeepAlive = false;
-            rtspOptions.rtspClient.getParameter().then(() => {
-                requeueRtspVideoData(rtspOptions.rtspClient);
-                resumeRead();
-            })
-            .catch(e => {
-                console.error('error during RTSP keepalive', e);
-                kill();
-            });
-            return true;
-        }
+        const headerLength = 2;
+        const offset = 0;
         await read16BELengthLoop(socket, {
             headerLength,
             offset,
-            skipHeader,
+            skipHeader: undefined,
             callback: (header, data) => {
                 let type: string;
+                const pt = data[1] & 0x7f;
 
-                if (rtspOptions?.channelMap) {
-                    const channel = header.readUInt8(1);
-                    type = rtspOptions?.channelMap[channel];
-                    if (!type) {
-                        const rtpType = rtspOptions?.channelMap[channel - 1];
-                        if (rtpType)
-                            type = `rtcp-${rtpType}`;
-                    }
+                const prefix = Buffer.alloc(2);
+                prefix[0] = RTSP_FRAME_MAGIC;
+                if (pt === audioPt) {
+                    prefix[1] = 0;
                 }
-                else {
-                    const pt = data[1] & 0x7f;
-
-                    const prefix = Buffer.alloc(2);
-                    prefix[0] = RTSP_FRAME_MAGIC;
-                    if (pt === audioPt) {
-                        prefix[1] = 0;
-                    }
-                    else if (pt === videoPt) {
-                        prefix[1] = 2;
-                    }
-                    header = Buffer.concat([prefix, header]);
-
-                    if (pt === audioPt)
-                        type = inputAudioCodec;
-                    else if (pt === videoPt)
-                        type = inputVideoCodec;
+                else if (pt === videoPt) {
+                    prefix[1] = 2;
                 }
+                header = Buffer.concat([prefix, header]);
+
+                if (pt === audioPt)
+                    type = inputAudioCodec;
+                else if (pt === videoPt)
+                    type = inputVideoCodec;
 
                 const chunk: StreamChunk = {
                     chunks: [header, data],
@@ -209,46 +205,7 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         killed,
         resetActivityTimer,
         negotiateMediaStream: (requestMediaStream) => {
-            const ret: ResponseMediaStreamOptions = cloneDeep(mediaStreamOptions) || {
-                id: undefined,
-                name: undefined,
-            };
-
-            // if the source doesn't provide a video codec, dummy one up
-            if (ret.video === undefined)
-                ret.video = {};
-
-            // the requests does not want video
-            if (requestMediaStream?.video === null)
-                ret.video = null;
-
-            if (ret.video)
-                ret.video.codec = inputVideoCodec;
-
-            // some rtsp like unifi offer alternate audio tracks (aac and opus).
-            if (requestMediaStream?.audio?.codec && requestMediaStream?.audio?.codec !== inputAudioCodec) {
-                const alternateAudio = parsedSdp.msections.find(msection => msection.type === 'audio' && msection.codec === requestMediaStream?.audio?.codec);
-                if (alternateAudio) {
-                    ret.audio = {
-                        codec: requestMediaStream?.audio?.codec,
-                    };
-
-                    return ret;
-                }
-            }
-
-            // reported codecs may be wrong/cached/etc, so before blindly copying the audio codec info,
-            // verify what was found.
-            if (ret?.audio?.codec === inputAudioCodec) {
-                ret.audio = mediaStreamOptions?.audio;
-            }
-            else {
-                ret.audio = {
-                    codec: inputAudioCodec,
-                }
-            }
-
-            return ret;
+            return negotiateMediaStream(sdp, mediaStreamOptions, inputVideoCodec, inputAudioCodec, requestMediaStream);
         },
         emit(container: 'rtsp', chunk: StreamChunk) {
             events.emit(container, chunk);

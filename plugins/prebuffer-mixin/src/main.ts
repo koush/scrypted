@@ -2,20 +2,21 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getH264EncoderArgs, LIBX264_ENCODER_TITLE } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { TimeoutError, timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, H264_NAL_TYPE_SEI, parseSemicolonDelimited, RtspClient, RtspServer, RTSP_FRAME_MAGIC } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, H264_NAL_TYPE_SEI, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import { sleep } from '@scrypted/common/src/sleep';
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import sdk, { BufferConverter, DeviceProvider, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
 import dgram from 'dgram';
 import net from 'net';
 import { Duplex } from 'stream';
-import { connectRFC4571Parser, requeueRtspVideoData, RtspChannelCodecMapping, startRFC4571Parser } from './rfc4571';
+import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
+import { startRtspSession } from './rtsp-session';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
@@ -672,154 +673,12 @@ class PrebufferSession {
       }
 
       if (usingScryptedParser) {
-        this.console.log('bypassing ffmpeg: using scrypted rtsp/rfc4571 parser');
-        const rtspClient = new RtspClient(ffmpegInput.url, this.console);
-
-        let servers: dgram.Socket[] = [];
-        const cleanupServers = () => {
-          for (const server of servers) {
-            closeQuiet(server);
-          }
-        }
-
-        try {
-          rtspClient.requestTimeout = 10000;
-          await rtspClient.options();
-          const sdpResponse = await rtspClient.describe();
-          const contentBase = sdpResponse.headers['content-base'];
-          if (contentBase) {
-            const url = new URL(contentBase);
-            const existing = new URL(rtspClient.url);
-            url.username = existing.username;
-            url.password = existing.password;
-            rtspClient.url = url.toString();
-          }
-          let sdp = sdpResponse.body.toString().trim();
-          this.console.log('sdp', sdp);
-
-          const parsedSdp = parseSdp(sdp);
-          let channel = 0;
-          const mapping: RtspChannelCodecMapping = {};
-          const useUdp = parser === SCRYPTED_PARSER_UDP;
-          let udpSessionTimeout: number;
-          const checkUdpSessionTimeout = (headers: { [key: string]: string }) => {
-            if (useUdp && headers.session && !udpSessionTimeout) {
-              const sessionDict = parseSemicolonDelimited(headers.session);
-              udpSessionTimeout = parseInt(sessionDict['timeout']);
-            }
-          }
-
-          const doSetup = async (control: string, codec: string) => {
-            let setupChannel = channel;
-            let udp: dgram.Socket;
-            if (useUdp) {
-              const rtspChannel = channel;
-              const { port, server } = await createBindZero();
-              udp = server;
-              servers.push(server);
-              setupChannel = port;
-              server.on('message', data => {
-                const prefix = Buffer.alloc(4);
-                prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
-                prefix.writeUInt8(rtspChannel, 1);
-                prefix.writeUInt16BE(data.length, 2);
-                const chunk: StreamChunk = {
-                  chunks: [prefix, data],
-                  type: codec,
-                };
-                session?.emit('rtsp', chunk);
-                session?.resetActivityTimer?.();
-              })
-            }
-            const setupResult = await rtspClient.setup(setupChannel, control, useUdp);
-            checkUdpSessionTimeout(setupResult.headers);
-
-            if (udp) {
-              const punch = Buffer.alloc(1);
-              const transport = setupResult.headers['transport'];
-              const match = transport.match(/.*?server_port=([0-9]+)-([0-9]+)/);
-              const [_, rtp, rtcp] = match;
-              const { hostname } = new URL(rtspClient.url);
-              udp.send(punch, parseInt(rtp), hostname)
-
-              mapping[channel] = codec;
-            }
-            else {
-              if (setupResult.interleaved)
-                mapping[setupResult.interleaved.begin] = codec;
-              else
-                mapping[channel] = codec;
-            }
-
-            channel += 2;
-          }
-
-          let setupVideoSection = false;
-
-          parsedSdp.msections = parsedSdp.msections.filter(section => {
-            if (section.type === 'video') {
-              if (setupVideoSection) {
-                this.console.warn('additional video section found. skipping.');
-                return false;
-              }
-              setupVideoSection = true;
-            }
-            else if (section.type !== 'audio') {
-              this.console.warn('unknown section', section.type);
-              return false;
-            }
-            else if (audioSoftMuted) {
-              return false;
-            }
-            return true;
-          });
-
-          for (const section of parsedSdp.msections) {
-            await doSetup(section.control, section.codec)
-          }
-
-          // sdp may contain multiple audio/video sections. take only the first video section.
-          sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
-
-          this.sdp = Promise.resolve(sdp);
-
-          const play = await rtspClient.play();
-          checkUdpSessionTimeout(play.headers);
-
-          requeueRtspVideoData(rtspClient);
-
-          session = startRFC4571Parser(this.console, rtspClient.client, sdp, ffmpegInput.mediaStreamOptions, rbo, {
-            channelMap: mapping,
-            rtspClient,
-            udpSessionTimeout,
-          });
-          const sessionKill = session.kill.bind(session);
-          let issuedTeardown = false;
-          session.kill = async () => {
-            try {
-              cleanupServers();
-              // issue a teardown to upstream to close gracefully but don't rely on it responding.
-              if (!issuedTeardown) {
-                issuedTeardown = true;
-                rtspClient.writeTeardown();
-              }
-              await sleep(500);
-            }
-            finally {
-              rtspClient.client.destroy();
-              sessionKill();
-            }
-          }
-          if (!session.isActive)
-            throw new Error('parser was killed before rtsp client started');
-
-          rtspClient.client.on('close', () => session.kill());
-        }
-        catch (e) {
-          cleanupServers();
-          rtspClient.client.destroy();
-          throw e;
-        }
+        session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
+          useUdp: parser === SCRYPTED_PARSER_UDP,
+          audioSoftMuted,
+          rtspRequestTimeout: 10000,
+        });
+        this.sdp = session.sdp.then(buffers => Buffer.concat(buffers).toString());
       }
       else {
         if (parser === FFMPEG_PARSER_UDP)
