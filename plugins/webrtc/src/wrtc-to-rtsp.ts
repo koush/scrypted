@@ -326,7 +326,7 @@ export async function createRTCPeerConnectionSource(options: {
 
             const audioTransceiver = pc.transceivers.find(t => t.kind === 'audio');
 
-            let talkbackProcess: ChildProcess;
+            let destroyProcess: () => void;
 
             const track = audioTransceiver.sender.sendRtp;
 
@@ -340,20 +340,19 @@ export async function createRTCPeerConnectionSource(options: {
 
                     const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
-                    const { cp } = await startRtpForwarderProcess(console, ffmpegInput.inputArguments, {
+                    const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
                         audio: {
                             outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
-                            transceiver: audioTransceiver,
+                            onRtp: (buffer: Buffer) => audioTransceiver.sender.sendRtp(buffer),
                         },
                     });
 
                     ret.stopIntercom();
 
-                    talkbackProcess = cp;
+                    destroyProcess = destroy;
                 },
                 async stopIntercom() {
-                    safeKillFFmpeg(talkbackProcess);
-                    talkbackProcess = undefined;
+                    destroyProcess();
                 },
             };
 

@@ -168,139 +168,133 @@ export async function createRTCPeerConnectionSink(
         })
     }
 
-    const cpPromise: Promise<ChildProcess> = new Promise(resolve => {
-        let connected = false;
-        pc.connectionStateChange.subscribe(async () => {
-            if (connected)
-                return;
-
-            if (pc.connectionState !== 'connected')
-                return;
-
-            console.timeLog(token, 'connected');
-            connected = true;
-
-            let isPrivate = true;
-            for (const ice of pc.validIceTransports()) {
-                const [address, port] = ice.connection.remoteAddr;
-                isPrivate = isPrivate && ip.isPrivate(address);
-                console.log('ice transport ip', address);
-            }
-
-            console.log('Connection is local network:', isPrivate);
-
-            // should really inspect the session description here.
-
-            // we assume that the camera doesn't output h264 baseline, because
-            // that is awful quality. so check to see if the session has an
-            // explicit list of supported codecs with a passable h264 high on it.
-            let sessionSupportsH264High = !!options?.capabilities?.video?.codecs
-                ?.filter(codec => codec.mimeType.toLowerCase() === 'video/h264')
-                // 42 is baseline profile
-                // 64001f (chrome) or 640c1f (safari) is high profile.
-                // firefox only advertises 42e01f.
-                // nest hub max offers high 640015. this means the level (hex 15) is 2.1,
-                // this corresponds to a resolution of 480p according to the spec?
-                // https://en.wikipedia.org/wiki/Advanced_Video_Coding#Levels
-                // however, the 640x1f indicates a max resolution of 720p, but
-                // desktop browsers can handle 1080p+ fine regardless, since it does
-                // not actually seem to confirm the level. the level is merely a hint
-                // to make a rough guess as to the decoding capability of the client.
-                ?.find(codec => {
-                    let sdpFmtpLine = codec.sdpFmtpLine.toLowerCase();
-                    return sdpFmtpLine.includes('profile-level-id=64001f')
-                        || sdpFmtpLine.includes('profile-level-id=640c1f');
-                });
-
-            // firefox is misleading. special case that to disable transcoding.
-            if (options?.userAgent?.includes('Firefox/'))
-                sessionSupportsH264High = true;
-
-            const ffmpegInput = await getFFmpegInput(isPrivate ? 'local' : 'remote');
-            const { mediaStreamOptions } = ffmpegInput;
-
-            const videoArgs: string[] = [];
-            const transcode = !sessionSupportsH264High
-                || mediaStreamOptions?.video?.codec !== 'h264'
-                || ffmpegInput.h264EncoderArguments?.length;
-            if (transcode || maximumCompatibilityMode) {
-                const conservativeDefaultBitrate = 500000;
-                const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
-                const width = Math.min(options?.screen?.width || 960, 1280);
-                videoArgs.push(
-                    // this might get wonky with 4:3?
-                    '-vf', `scale='min(${width},iw)':-2`,
-                    // this seems to cause issues with presets i think.
-                    // '-level:v', '4.0',
-                    "-b:v", bitrate.toString(),
-                    "-bufsize", (2 * bitrate).toString(),
-                    "-maxrate", bitrate.toString(),
-                    '-r', '15',
-                );
-                if (!sessionSupportsH264High || maximumCompatibilityMode) {
-                    // baseline profile must use libx264, not sure other encoders properly support it.
-                    videoArgs.push(
-                        '-profile:v', 'baseline',
-                        ...getDebugModeH264EncoderArgs(),
-                    );
-
-                    // unable to find conditions to make this working properly.
-                    // encoding results in chop if bitrate is not sufficient.
-                    // this may need to be aligned with h264 level?
-                    // or no bitrate hint?
-                    // videoArgs.push('-tune', 'zerolatency');
-                }
-                else {
-                    videoArgs.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
-                }
-            }
-            else {
-                videoArgs.push('-vcodec', 'copy')
-            }
-
-            if (ffmpegInput.h264FilterArguments)
-                videoArgs.push(...ffmpegInput.h264FilterArguments);
-
-
-            const audioRtpTrack: RtpTrack = {
-                transceiver: audioTransceiver,
-                outputArguments: [
-                    ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
-                ]
-            };
-
-            const videoRtpTrack: RtpTrack = {
-                transceiver: videoTransceiver,
-                outputArguments: [
-                    '-an', '-sn', '-dn',
-                    ...videoArgs,
-                    '-pkt_size', '1300',
-                ],
-                firstPacket: () => console.timeEnd(token),
-            };
-
-            let tracks: RtpTracks<any>;
-            if (ffmpegInput.mediaStreamOptions?.audio === null) {
-                tracks = {
-                    video: videoRtpTrack,
-                }
-            }
-            else {
-                tracks = {
-                    video: videoRtpTrack,
-                    audio: audioRtpTrack,
-                }
-            }
-
-            const { cp } = await startRtpForwarderProcess(console, [
-                ...(transcode ? ffmpegInput.videoDecoderArguments || [] : []),
-                ...ffmpegInput.inputArguments,
-            ], tracks);
-
-            cp.on('exit', cleanup);
-            resolve(cp);
+    const forwarderPromise = (async () => {
+        await new Promise(resolve => {
+            pc.connectionStateChange.subscribe(() => {
+                if (pc.connectionState === 'connected')
+                    resolve(undefined);
+            })
         });
-    });
+
+        console.timeLog(token, 'connected');
+
+        let isPrivate = true;
+        for (const ice of pc.validIceTransports()) {
+            const [address, port] = ice.connection.remoteAddr;
+            isPrivate = isPrivate && ip.isPrivate(address);
+            console.log('ice transport ip', address);
+        }
+
+        console.log('Connection is local network:', isPrivate);
+
+        // should really inspect the session description here.
+
+        // we assume that the camera doesn't output h264 baseline, because
+        // that is awful quality. so check to see if the session has an
+        // explicit list of supported codecs with a passable h264 high on it.
+        let sessionSupportsH264High = !!options?.capabilities?.video?.codecs
+            ?.filter(codec => codec.mimeType.toLowerCase() === 'video/h264')
+            // 42 is baseline profile
+            // 64001f (chrome) or 640c1f (safari) is high profile.
+            // firefox only advertises 42e01f.
+            // nest hub max offers high 640015. this means the level (hex 15) is 2.1,
+            // this corresponds to a resolution of 480p according to the spec?
+            // https://en.wikipedia.org/wiki/Advanced_Video_Coding#Levels
+            // however, the 640x1f indicates a max resolution of 720p, but
+            // desktop browsers can handle 1080p+ fine regardless, since it does
+            // not actually seem to confirm the level. the level is merely a hint
+            // to make a rough guess as to the decoding capability of the client.
+            ?.find(codec => {
+                let sdpFmtpLine = codec.sdpFmtpLine.toLowerCase();
+                return sdpFmtpLine.includes('profile-level-id=64001f')
+                    || sdpFmtpLine.includes('profile-level-id=640c1f');
+            });
+
+        // firefox is misleading. special case that to disable transcoding.
+        if (options?.userAgent?.includes('Firefox/'))
+            sessionSupportsH264High = true;
+
+        const ffmpegInput = await getFFmpegInput(isPrivate ? 'local' : 'remote');
+        const { mediaStreamOptions } = ffmpegInput;
+
+        const videoArgs: string[] = [];
+        const transcode = !sessionSupportsH264High
+            || mediaStreamOptions?.video?.codec !== 'h264'
+            || ffmpegInput.h264EncoderArguments?.length;
+        if (transcode || maximumCompatibilityMode) {
+            const conservativeDefaultBitrate = 500000;
+            const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
+            const width = Math.min(options?.screen?.width || 960, 1280);
+            videoArgs.push(
+                // this might get wonky with 4:3?
+                '-vf', `scale='min(${width},iw)':-2`,
+                // this seems to cause issues with presets i think.
+                // '-level:v', '4.0',
+                "-b:v", bitrate.toString(),
+                "-bufsize", (2 * bitrate).toString(),
+                "-maxrate", bitrate.toString(),
+                '-r', '15',
+            );
+            if (!sessionSupportsH264High || maximumCompatibilityMode) {
+                // baseline profile must use libx264, not sure other encoders properly support it.
+                videoArgs.push(
+                    '-profile:v', 'baseline',
+                    ...getDebugModeH264EncoderArgs(),
+                );
+
+                // unable to find conditions to make this working properly.
+                // encoding results in chop if bitrate is not sufficient.
+                // this may need to be aligned with h264 level?
+                // or no bitrate hint?
+                // videoArgs.push('-tune', 'zerolatency');
+            }
+            else {
+                videoArgs.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
+            }
+        }
+        else {
+            videoArgs.push('-vcodec', 'copy')
+        }
+
+        if (ffmpegInput.h264FilterArguments)
+            videoArgs.push(...ffmpegInput.h264FilterArguments);
+
+        const audioRtpTrack: RtpTrack = {
+            codecCopy: maximumCompatibilityMode ? undefined : 'opus',
+            onRtp: buffer => audioTransceiver.sender.sendRtp(buffer),
+            outputArguments: [
+                ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
+            ]
+        };
+
+        const videoRtpTrack: RtpTrack = {
+            codecCopy: maximumCompatibilityMode ? undefined : 'h264',
+            packetSize: 1300,
+            onRtp: buffer => videoTransceiver.sender.sendRtp(buffer),
+            outputArguments: [
+                '-an', '-sn', '-dn',
+                ...videoArgs,
+            ],
+            firstPacket: () => console.timeEnd(token),
+        };
+
+        let tracks: RtpTracks;
+        if (ffmpegInput.mediaStreamOptions?.audio === null) {
+            tracks = {
+                video: videoRtpTrack,
+            }
+        }
+        else {
+            tracks = {
+                video: videoRtpTrack,
+                audio: audioRtpTrack,
+            }
+        }
+
+        const ret = await startRtpForwarderProcess(console, ffmpegInput, tracks);
+        ret.killPromise.finally(cleanup);
+        return ret;
+    })();
 
     const cleanup = async () => {
         // no need to explicitly stop intercom as the server closing will terminate it.
@@ -310,8 +304,8 @@ export async function createRTCPeerConnectionSink(
         await Promise.allSettled([
             rtspTcpServer?.clientPromise.then(client => client.destroy()),
             pc?.close(),
-            cpPromise?.then(cp => safeKillFFmpeg(cp)),
-        ])
+            forwarderPromise?.then(f => f.kill()),
+        ]);
     };
 
     pc.connectionStateChange.subscribe(() => {
