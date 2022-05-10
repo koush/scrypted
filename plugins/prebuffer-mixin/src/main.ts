@@ -982,6 +982,8 @@ class PrebufferSession {
 
     // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
     // rewind a little bit earlier to gaurantee a valid full segment of that length is sent.
+    // ffmpeg will toss the first keyframe/segment when reading from rtsp. seems it is due to
+    // needing to continue reading the input while readying decoders or muxers or something.
     if (requestedPrebuffer && container !== 'mp4' && options?.container === 'mp4') {
       requestedPrebuffer += idrInterval * 1.5;
     }
