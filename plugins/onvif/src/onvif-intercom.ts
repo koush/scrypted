@@ -125,6 +125,10 @@ export class OnvifIntercom implements Intercom {
         if (!match)
             throw new Error('no supported codec was found for back channel');
 
+        const ssrcBuffer = Buffer.from(transportDict.ssrc, 'hex');
+        // ffmpeg expects ssrc as signed int32.
+        const ssrc = ssrcBuffer.readInt32BE(0);
+
         const args = [
             '-hide_banner',
             ...ffmpegInput.inputArguments,
@@ -133,7 +137,7 @@ export class OnvifIntercom implements Intercom {
             '-ar', match.sampleRate,
             '-ac', match.channels || '1',
             "-payload_type", match.payloadType,
-            "-ssrc", parseInt(transportDict.ssrc, 16).toString(),
+            "-ssrc", ssrc.toString(),
             '-f', 'rtp',
             `rtp://${this.camera.getIPAddress()}:${serverRtp}?localrtpport=${rtp}&localrtcpport=${rtcp}`,
         ];
