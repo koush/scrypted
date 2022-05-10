@@ -56,11 +56,11 @@ export async function parseResolution(cp: ChildProcess) {
     });
 }
 
-async function parseToken(cp: ChildProcess, token: string) {
+async function parseInputToken(cp: ChildProcess, token: string) {
     return new Promise<string>(resolve => {
         const parser = (data: Buffer) => {
-            const stdout: string = data.toString();
-            const idx = stdout.indexOf(`${token}: `);
+            const stdout: string = data.toString().split('Output ')[0];
+            const idx = stdout.lastIndexOf(`${token}: `);
             if (idx !== -1) {
                 const check = stdout.substring(idx + token.length + 1).trim();
                 let next = check.indexOf(' ');
@@ -80,11 +80,11 @@ async function parseToken(cp: ChildProcess, token: string) {
 }
 
 export async function parseVideoCodec(cp: ChildProcess) {
-    return parseToken(cp, 'Video');
+    return parseInputToken(cp, 'Video');
 }
 
 export async function parseAudioCodec(cp: ChildProcess) {
-    return parseToken(cp, 'Audio');
+    return parseInputToken(cp, 'Audio');
 }
 
 export function setupActivityTimer(container: string, kill: () => void, events: {

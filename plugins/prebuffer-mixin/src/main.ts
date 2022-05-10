@@ -268,7 +268,7 @@ class PrebufferSession {
 
     return {
       rtspMode: mode?.startsWith('RTSP'),
-      muxingMp4: !rtspMode || mode?.includes('MP4'),
+      muxingMp4: !rtspMode,
     };
   }
 
@@ -307,7 +307,7 @@ class PrebufferSession {
       }
     );
 
-    const addFFmpegSettings = () => {
+    const addFFmpegAudioSettings = () => {
       settings.push(
         {
           title: 'Audio Codec Transcoding',
@@ -323,6 +323,11 @@ class PrebufferSession {
             TRANSCODE_AUDIO_DESCRIPTION,
           ],
         },
+      );
+    };
+
+    const addFFmpegInputSettings = () => {
+      settings.push(
         {
           title: 'FFmpeg Input Arguments Prefix',
           group,
@@ -338,7 +343,9 @@ class PrebufferSession {
           combobox: true,
         },
       )
-    };
+    }
+
+    let usingFFmpeg = muxingMp4;
 
     if (this.canUseRtspParser(this.advertisedMediaStreamOptions)) {
       const canUseScryptedParser = rtspMode;
@@ -350,13 +357,15 @@ class PrebufferSession {
         SCRYPTED_PARSER_UDP,
       ] : [];
 
+      const currentParser = this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT;
+
       settings.push(
         {
           key: this.rtspParserKey,
           group,
           title: 'RTSP Parser',
           description: `The RTSP Parser used to read the stream. The default is "${defaultValue}" for this container.`,
-          value: this.storage.getItem(this.rtspParserKey) || STRING_DEFAULT,
+          value: currentParser,
           choices: [
             STRING_DEFAULT,
             ...scryptedOptions,
@@ -365,9 +374,17 @@ class PrebufferSession {
           ],
         }
       );
+
+      if (!(currentParser === STRING_DEFAULT ? defaultValue : currentParser).includes('Scrypted')) {
+        usingFFmpeg = true;
+      }
     }
-    else {
-      addFFmpegSettings();
+
+    if (muxingMp4) {
+      addFFmpegAudioSettings();
+    }
+    if (usingFFmpeg) {
+      addFFmpegInputSettings();
     }
 
     if (session) {
@@ -958,7 +975,7 @@ class PrebufferSession {
       requestedPrebuffer = idrInterval * 1.5;
     }
 
-    const { rtspMode } = this.getRebroadcastContainer();
+    const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
     const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
     let container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
@@ -1044,7 +1061,7 @@ class PrebufferSession {
     if (this.audioDisabled) {
       mediaStreamOptions.audio = null;
     }
-    else if (reencodeAudio) {
+    else if (reencodeAudio && muxingMp4) {
       mediaStreamOptions.audio = {
         codec: 'aac',
         encoder: 'aac',
