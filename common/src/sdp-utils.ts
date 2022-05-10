@@ -7,6 +7,14 @@ export function replacePorts(sdp: string, audioPort: number, videoPort: number) 
     return outputSdp;
 }
 
+export function replaceSectionPort(sdp: string, section: string, port: number) {
+    const regex = new RegExp(`m=${section} \\d+`)
+    let outputSdp = sdp
+        .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
+        .replace(regex, `m=${section} ${port}`);
+    return outputSdp;
+}
+
 export function addTrackControls(sdp: string) {
     let lines = sdp.split('\n').map(line => line.trim());
     lines = lines.filter(line => !line.includes('a=control:'));

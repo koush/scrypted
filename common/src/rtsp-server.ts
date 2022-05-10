@@ -212,7 +212,7 @@ export interface RtspClientSetupOptions {
 
 export interface RtspClientTcpSetupOptions extends RtspClientSetupOptions {
     type: 'tcp';
-    onData: (header: Buffer, data: Buffer) => void;
+    onRtp: (rtspHeader: Buffer, rtp: Buffer) => void;
 }
 
 export interface RtspClientUdpSetupOptions extends RtspClientSetupOptions {
@@ -307,7 +307,7 @@ export class RtspClient extends RtspBase {
         const data = await readLength(this.client, length);
 
         const options = this.setupOptions.get(channel);
-        options?.onData?.(header, data);
+        options?.onRtp?.(header, data);
     }
 
     async readDataPayload() {

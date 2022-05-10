@@ -128,7 +128,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                     path: control,
                     type: 'tcp',
                     port: setupChannel,
-                    onData: (header, data) => {
+                    onRtp: (header, data) => {
                         const chunk: StreamChunk = {
                             chunks: [header, data],
                             type: codec,
