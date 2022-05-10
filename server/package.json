@@ -1,11 +1,11 @@
 {
   "name": "@scrypted/server",
-  "version": "0.0.176",
+  "version": "0.0.177",
   "description": "",
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.8",
     "@scrypted/ffmpeg": "^1.0.10",
-    "@scrypted/types": "^0.0.39",
+    "@scrypted/types": "^0.0.41",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
