@@ -58,6 +58,7 @@ class ScryptedDeviceType(Enum):
     Person = "Person"
     Program = "Program"
     Scene = "Scene"
+    SecuritySystem = "SecuritySystem"
     Sensor = "Sensor"
     SmartDisplay = "SmartDisplay"
     SmartSpeaker = "SmartSpeaker"

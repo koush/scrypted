@@ -106,6 +106,7 @@ export enum ScryptedDeviceType {
   Irrigation = "Irrigation",
   Valve = "Valve",
   Person = "Person",
+  SecuritySystem = "SecuritySystem",
   Unknown = "Unknown",
 }
 /**

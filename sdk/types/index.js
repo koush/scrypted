@@ -668,6 +668,7 @@ var ScryptedDeviceType;
     ScryptedDeviceType["Irrigation"] = "Irrigation";
     ScryptedDeviceType["Valve"] = "Valve";
     ScryptedDeviceType["Person"] = "Person";
+    ScryptedDeviceType["SecuritySystem"] = "SecuritySystem";
     ScryptedDeviceType["Unknown"] = "Unknown";
 })(ScryptedDeviceType = exports.ScryptedDeviceType || (exports.ScryptedDeviceType = {}));
 var HumidityMode;
