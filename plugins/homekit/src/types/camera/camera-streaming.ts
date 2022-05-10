@@ -5,11 +5,11 @@ import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStr
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
-import { RtcpRrPacket } from '@koush/werift/packages/rtp/src/rtcp/rr';
-import { RtcpPacketConverter } from '@koush/werift/packages/rtp/src/rtcp/rtcp';
-import { RtpPacket } from '@koush/werift/packages/rtp/src/rtp/rtp';
-import { ProtectionProfileAes128CmHmacSha1_80 } from '@koush/werift/packages/rtp/src/srtp/const';
-import { SrtcpSession } from '@koush/werift/packages/rtp/src/srtp/srtcp';
+import { RtcpRrPacket } from '@koush/werift/lib/rtp/src/rtcp/rr';
+import { RtcpPacketConverter } from '@koush/werift/lib/rtp/src/rtcp/rtcp';
+import { RtpPacket } from '@koush/werift/lib/rtp/src/rtp/rtp';
+import { ProtectionProfileAes128CmHmacSha1_80 } from '@koush/werift/lib/rtp/src/srtp/const';
+import { SrtcpSession } from '@koush/werift/lib/rtp/src/srtp/srtcp';
 import { HomeKitSession } from '../../common';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';

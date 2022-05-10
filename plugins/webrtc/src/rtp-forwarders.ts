@@ -264,6 +264,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         sockets = [];
         forwarders.close();
         safeKillFFmpeg(cp);
+        rtspClient?.safeTeardown();
     };
     const killPromise = new Promise(resolve => {
         const resolveKill = () => {

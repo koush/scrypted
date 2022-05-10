@@ -5,7 +5,7 @@ import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/s
 import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { Writable } from 'stream';
-import { RtpPacket } from '@koush/werift/packages/rtp/src/rtp/rtp';
+import { RtpPacket } from '@koush/werift/lib/rtp/src/rtp/rtp';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
