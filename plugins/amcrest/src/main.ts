@@ -1,14 +1,13 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting, ScryptedDeviceType, Intercom, FFmpegInput, ScryptedMimeTypes, PictureOptions, VideoCameraConfiguration, MediaStreamOptions, VideoRecorder, RequestRecordingStreamOptions } from "@scrypted/sdk";
-import { Stream, PassThrough } from "stream";
-import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
-import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { EventEmitter } from "stream";
-import child_process, { ChildProcess } from 'child_process';
-import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
-import net from 'net';
 import { listenZero } from "@scrypted/common/src/listen-cluster";
+import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
+import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, RequestRecordingStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import child_process, { ChildProcess } from 'child_process';
+import net from 'net';
+import { EventEmitter, PassThrough, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
+import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
 
 const { mediaManager } = sdk;
 
@@ -327,6 +326,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                             ?.replace('.', '')?.toLowerCase()?.trim();
                         if (audioCodec?.includes('aac'))
                             audioCodec = 'aac';
+                        else if (audioCodec.includes('g711a'))
+                            audioCodec = 'pcm_alaw';
+                        else if (audioCodec.includes('g711u'))
+                            audioCodec = 'pcm_ulaw';
                         else if (audioCodec.includes('g711'))
                             audioCodec = 'pcm';
 
