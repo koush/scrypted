@@ -1,6 +1,6 @@
 import { ResponseMediaStreamOptions } from '@scrypted/sdk';
 import dgram from 'dgram';
-import type { Config } from '../../../../../external/werift/packages/rtp/src/srtp/session';
+import type { Config } from '@koush/werift/packages/rtp/src/srtp/session';
 import { PrepareStreamRequest, StartStreamRequest } from '../../hap';
 
 export interface CameraStreamingSession {

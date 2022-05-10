@@ -1,4 +1,4 @@
-import { RtpPacket } from "../../../../../external/werift/packages/rtp/src/rtp/rtp";
+import { RtpPacket } from "@koush/werift/packages/rtp/src/rtp/rtp";
 
 // https://datatracker.ietf.org/doc/html/rfc6716
 

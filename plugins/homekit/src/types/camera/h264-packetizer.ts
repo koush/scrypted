@@ -1,4 +1,4 @@
-import { RtpHeader, RtpPacket } from "../../../../../external/werift/packages/rtp/src/rtp/rtp";
+import { RtpHeader, RtpPacket } from "@koush/werift/packages/rtp/src/rtp/rtp";
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 const NAL_TYPE_STAP_A = 24;

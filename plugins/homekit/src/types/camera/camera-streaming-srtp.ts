@@ -4,7 +4,7 @@ import { FFmpegInput } from '@scrypted/sdk';
 import net from 'net';
 import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
-import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
+import { RtpPacket } from '@koush/werift/packages/rtp/src/rtp/rtp';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 
@@ -49,7 +49,7 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                     type: 'tcp',
                     port: channel,
                     path: audio.control,
-                    onData: (header, data) => {
+                    onRtp: (header, data) => {
                         if (session.killed)
                             return;
                         const rtp = RtpPacket.deSerialize(data);
@@ -67,7 +67,7 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                 type: 'tcp',
                 port: channel,
                 path: video.control,
-                onData: (header, data) => {
+                onRtp: (header, data) => {
                     if (session.killed)
                         return;
                     const rtp = RtpPacket.deSerialize(data);

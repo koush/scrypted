@@ -1,9 +1,9 @@
 import dgram from 'dgram';
-import { RtcpSenderInfo, RtcpSrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/sr';
-import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { Config } from '../../../../../external/werift/packages/rtp/src/srtp/session';
-import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { SrtpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtp';
+import { RtcpSenderInfo, RtcpSrPacket } from '@koush/werift/packages/rtp/src/rtcp/sr';
+import { RtpPacket } from '@koush/werift/packages/rtp/src/rtp/rtp';
+import { Config } from '@koush/werift/packages/rtp/src/srtp/session';
+import { SrtcpSession } from '@koush/werift/packages/rtp/src/srtp/srtcp';
+import { SrtpSession } from '@koush/werift/packages/rtp/src/srtp/srtp';
 import { AudioStreamingSamplerate } from '../../hap';
 import { ntpTime } from './camera-utils';
 import { H264Repacketizer } from './h264-packetizer';
