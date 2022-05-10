@@ -1,4 +1,4 @@
-import { RtcpRrPacket } from '@koush/werift/lib/rtp/src/rtcp/rr';
+import type { RtcpRrPacket } from '@koush/werift-src/packages/rtp/src/rtcp/rr';
 
 export class DynamicBitrateSession {
     currentBitrate: number;

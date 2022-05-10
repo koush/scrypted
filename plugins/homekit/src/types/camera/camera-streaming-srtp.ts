@@ -1,10 +1,10 @@
+import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { FFmpegInput } from '@scrypted/sdk';
 import net from 'net';
 import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
-import { RtpPacket } from '@koush/werift/lib/rtp/src/rtp/rtp';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 

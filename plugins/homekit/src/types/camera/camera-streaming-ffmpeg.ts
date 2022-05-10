@@ -1,3 +1,4 @@
+import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
@@ -5,7 +6,6 @@ import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/s
 import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { Writable } from 'stream';
-import { RtpPacket } from '@koush/werift/lib/rtp/src/rtp/rtp';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';

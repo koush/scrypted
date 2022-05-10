@@ -201,7 +201,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         // starting on a non keyframe. unsure, so skip that one.
         // rebroadcast plugin rtsp mode is the culprit here, and there's no fix. rebroadcast
         // will send an extra fragment, so one can be skipped safely without any loss.
-        let needSkip = ffmpegInput.mediaStreamOptions?.prebuffer && ffmpegInput.container !== 'mp4';
+        let needSkip = false; //ffmpegInput.mediaStreamOptions?.prebuffer && ffmpegInput.container !== 'mp4';
         for await (const box of generator) {
             const { header, type, data } = box;
             // console.log('motion fragment box', type);
