@@ -3,16 +3,14 @@ import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-p
 import { getH264EncoderArgs, LIBX264_ENCODER_TITLE } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { TimeoutError, timeoutPromise } from '@scrypted/common/src/promise-utils';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, H264_NAL_TYPE_SEI, RtspClient, RtspServer } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, H264_NAL_TYPE_SEI, RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import sdk, { BufferConverter, DeviceProvider, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
-import dgram from 'dgram';
 import net from 'net';
 import { Duplex } from 'stream';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
@@ -880,6 +878,7 @@ class PrebufferSession {
   }
 
   async handleRebroadcasterClient(options: {
+    requestedContainer: string,
     isActiveClient: boolean,
     container: PrebufferParsers,
     session: ParserSession<PrebufferParsers>,
@@ -927,7 +926,16 @@ class PrebufferSession {
         session.once('killed', cleanup);
 
         const prebufferContainer: PrebufferStreamChunk[] = this.prebuffers[container];
-        if (container !== 'rtsp') {
+        // if the requested container or the source container is not rtsp, use an exact seek.
+        // this works better when the requested container is mp4, and rtsp is the source.
+        // if starting on a sync frame, ffmpeg will skip the first segment while initializing
+        // on live sources like rtsp. the buffer before the sync frame stream will be enough
+        // for ffmpeg to analyze and start up in time for the sync frame.
+        // may be worth considering playing with a few other things to avoid this:
+        // mpeg-ts as a container (would need to write a muxer)
+        // specifying the buffer before the sync frame with probesize.
+        if (container !== 'rtsp'
+          || (options?.requestedContainer && options?.requestedContainer !== 'rtsp')) {
           for (const chunk of prebufferContainer) {
             if (chunk.time < now - requestedPrebuffer)
               continue;
@@ -979,14 +987,6 @@ class PrebufferSession {
     const defaultContainer = rtspMode ? 'rtsp' : 'mpegts';
 
     let container: PrebufferParsers = this.parsers[options?.container] ? options?.container as PrebufferParsers : defaultContainer;
-
-    // If a mp4 prebuffer was explicitly requested, but an mp4 prebuffer is not available (rtsp mode),
-    // rewind a little bit earlier to gaurantee a valid full segment of that length is sent.
-    // ffmpeg will toss the first keyframe/segment when reading from rtsp. seems it is due to
-    // needing to continue reading the input while readying decoders or muxers or something.
-    if (requestedPrebuffer && container !== 'mp4' && options?.container === 'mp4') {
-      requestedPrebuffer += idrInterval * 1.5;
-    }
 
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
     let sdp = await this.sdp;
@@ -1048,6 +1048,7 @@ class PrebufferSession {
     const isActiveClient = options?.refresh !== false;
 
     this.handleRebroadcasterClient({
+      requestedContainer: options?.container,
       isActiveClient,
       container,
       requestedPrebuffer,
@@ -1505,6 +1506,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         const requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
 
         prebufferSession.handleRebroadcasterClient({
+          requestedContainer: 'rtsp',
           isActiveClient: true,
           container: 'rtsp',
           session,

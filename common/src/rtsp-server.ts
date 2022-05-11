@@ -2,7 +2,7 @@ import crypto, { randomBytes } from 'crypto';
 import dgram from 'dgram';
 import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
 import net from 'net';
-import { Duplex, PassThrough, Readable } from 'stream';
+import { Duplex, Readable } from 'stream';
 import tls from 'tls';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';

@@ -2,7 +2,6 @@ import { ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-r
 import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
 import { parseSemicolonDelimited, RtspClient, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
-import { sleep } from "@scrypted/common/src/sleep";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
 import dgram from 'dgram';

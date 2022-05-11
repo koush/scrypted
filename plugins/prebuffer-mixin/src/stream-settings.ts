@@ -1,6 +1,6 @@
 import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { StorageSetting, StorageSettings } from "@scrypted/common/src/settings";
-import sdk, { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
+import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
 import { getTranscodeMixinProviderId } from "./transcode-settings";
 
 
