@@ -664,6 +664,7 @@ class PrebufferSession {
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
     let usingScryptedParser = false;
+    let restartOnSei = false;
 
     if (rtspMode && isRfc4571) {
       usingScryptedParser = true;
@@ -681,10 +682,20 @@ class PrebufferSession {
 
       let { parser, isDefault } = this.getParser(rtspMode, sessionMso);
       usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
-      if (isDefault && (parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP) && this.getLastH264Probe().seiDetected) {
-        this.console.warn('SEI packet detected was in video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
-        usingScryptedParser = false;
-        parser = FFMPEG_PARSER_TCP;
+
+      // if the stream is not marked as scrypted parser compatible by the plugin,
+      // play it safe and restart the stream when an sei packet is detected.
+      restartOnSei = usingScryptedParser && isDefault && sessionMso.tool !== 'scrypted';
+
+      if (isDefault && usingScryptedParser && this.getLastH264Probe().seiDetected) {
+        if (sessionMso.tool === 'scrypted') {
+          this.console.warn('SEI packet detected was in video stream, but stream is marked safe by Scrypted. The Default Scrypted RTSP Parser will  be used. This can be overriden by setting the RTSP Parser to Scrypted.');
+        }
+        else {
+          this.console.warn('SEI packet detected was in video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
+          usingScryptedParser = false;
+          parser = FFMPEG_PARSER_TCP;
+        }
       }
 
       if (usingScryptedParser) {
@@ -725,7 +736,7 @@ class PrebufferSession {
           return;
 
         let { isDefault } = this.getParser(rtspMode, sessionMso);
-        if (!isDefault) {
+        if (!isDefault || sessionMso.tool === 'scrypted') {
           this.console.warn('SEI packet detected while operating with Scrypted Parser. If there are issues streaming, consider using the Default parser.');
           return;
         }
