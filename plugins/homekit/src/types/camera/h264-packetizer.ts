@@ -1,13 +1,14 @@
 import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
-const NAL_TYPE_STAP_A = 24;
-const NAL_TYPE_FU_A = 28;
-const NAL_TYPE_NON_IDR = 1;
-const NAL_TYPE_IDR = 5;
-const NAL_TYPE_SEI = 6;
-const NAL_TYPE_SPS = 7;
-const NAL_TYPE_PPS = 8;
+export const NAL_TYPE_STAP_A = 24;
+export const NAL_TYPE_FU_A = 28;
+export const NAL_TYPE_NON_IDR = 1;
+export const NAL_TYPE_IDR = 5;
+export const NAL_TYPE_SEI = 6;
+export const NAL_TYPE_SPS = 7;
+export const NAL_TYPE_PPS = 8;
+export const NAL_TYPE_DELIMITER = 9;
 
 const NAL_HEADER_SIZE = 1;
 const FU_A_HEADER_SIZE = 2;

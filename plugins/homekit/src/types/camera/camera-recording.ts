@@ -1,22 +1,90 @@
 
 import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { FFmpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
-import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { timeoutPromise } from "@scrypted/common/src/promise-utils";
 import sdk, { AudioSensor, FFmpegInput, MotionSensor, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera } from '@scrypted/sdk';
+import child_process from "child_process";
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import net from 'net';
-import { Duplex, Writable } from 'stream';
+import { Duplex, Readable, Writable } from 'stream';
 import { HomeKitSession } from '../../common';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
+import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
 
 const { log, mediaManager, deviceManager } = sdk;
 
 export const iframeIntervalSeconds = 4;
 // have seen strange issues where homekit never terminates the video.
 const maxVideoDuration = 3 * 60 * 1000;
+
+const allowedNaluTypes = [
+    NAL_TYPE_STAP_A,
+    NAL_TYPE_SPS,
+    NAL_TYPE_PPS,
+    NAL_TYPE_SEI,
+    NAL_TYPE_DELIMITER,
+];
+
+
+async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
+    const cp = child_process.spawn(await mediaManager.getFFmpegPath(), [
+        '-hide_banner',
+        '-f', 'mp4',
+        '-i', 'pipe:3',
+        '-vcodec', 'copy',
+        '-f', 'h264',
+        'pipe:4',
+    ], {
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+    });
+    ffmpegLogInitialOutput(console, cp);
+    const input = cp.stdio[3] as Writable;
+    input.write(mp4);
+    input.end();
+
+    const output = cp.stdio[4] as Readable;
+
+    const buffers: Buffer[] = [];
+    output.on('data', data => buffers.push(data));
+
+    try {
+        await timeoutPromise(1000, new Promise(resolve => cp.on('exit', resolve)));
+        const h264 = Buffer.concat(buffers);
+        let offset = 0;
+        while (offset < h264.length - 6) {
+            if (h264.readInt32BE(offset) !== 1) {
+                offset++;
+                continue;
+            }
+            offset += 4;
+            let naluType = h264.readUInt8(offset) & 0x1f;
+            if (naluType === NAL_TYPE_FU_A) {
+                offset++;
+                naluType = h264.readUInt8(offset) & 0x1f;
+            }
+
+            if (naluType === NAL_TYPE_IDR)
+                return true;
+
+            if (allowedNaluTypes.includes(naluType)) {
+                offset++;
+                continue;
+            }
+            console.warn('skipping mp4 fragment: non idr frame', naluType);
+            return false;
+        }
+        console.warn('skipping mp4 fragment: no idr frame found');
+        return false;
+    }
+    catch (e) {
+        console.warn('skipping mp4 fragment: error', e);
+        return false;
+    }
+}
 
 export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration, console: Console, homekitSession: HomeKitSession): AsyncGenerator<Buffer, void, unknown> {
@@ -26,6 +94,9 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
     const storage = deviceManager.getMixinStorage(device.id, undefined);
     const saveRecordings = device.mixins.includes(homekitSession.videoClipsId);
 
+    // request more than needed, and determine what to do with the fragments after receiving them.
+    const prebuffer = configuration.mediaContainerConfiguration.prebufferLength * 2.5;
+
     const media = await device.getVideoStream({
         destination: 'remote-recorder',
         video: {
@@ -34,7 +105,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         audio: {
             codec: 'aac',
         },
-        prebuffer: configuration.mediaContainerConfiguration.prebufferLength,
+        prebuffer,
         container: 'mp4',
     });
     const ffmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
@@ -81,7 +152,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
             inputArguments.push(...ffmpegInput.videoDecoderArguments);
         }
 
-        inputArguments.push(...ffmpegInput.inputArguments)
+        inputArguments.push(...ffmpegInput.inputArguments);
 
         if (noAudio) {
             console.log(device.name, 'adding dummy audio track');
@@ -197,20 +268,46 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         let i = 0;
         console.time('mp4 recording');
         // if ffmpeg is being used to parse a prebuffered stream that is NOT mp4 (despite our request),
-        // it seems that ffmpeg outputs a bad first fragment. it may be missing various codec informations or
-        // starting on a non keyframe. unsure, so skip that one.
-        // rebroadcast plugin rtsp mode is the culprit here, and there's no fix. rebroadcast
-        // will send an extra fragment, so one can be skipped safely without any loss.
-        // update: rebroadcast plugin has been fixed to properly start on keyframes.
-        // this hack is no longer necessary as the issue does not repro with the keyframe fix.
-        let needSkip = false; //ffmpegInput.mediaStreamOptions?.prebuffer && ffmpegInput.container !== 'mp4';
+        // it seems that ffmpeg may output a bad first fragment. it may be missing various codec informations or
+        // it may start on a non keyframe. HAP requires every fragment start on a keyframe.
+
+        // ffmpeg will also toss the first keyframe/segment when reading from rtsp (a live source).
+        // seems it is due to needing to continue reading the input while readying decoders or muxers or something.
+        // this may result in the prebuffer being lost.
+
+        // lossy sources like rtp/udp may also exihibit missing keyframes with bad packet loss.
+
+        // hap will also terminate the connection if too much prebuffer is sent too quickly.
+        let checkMp4 = ffmpegInput.container !== 'mp4';
+        let needSkip = true;
+        let ftyp: Buffer[];
+        let moov: Buffer[];
         for await (const box of generator) {
             const { header, type, data } = box;
             // console.log('motion fragment box', type);
 
+            if (checkMp4 && !ftyp && type === 'ftyp')
+                ftyp = [header, data];
+            if (checkMp4 && !moov && type === 'moov')
+                moov = [header, data];
+            if (type === 'mdat' && checkMp4) {
+                checkMp4 = false;
+                // pending will contain the moof
+                try {
+                    if (!await checkMp4StartsWithKeyFrame(console, Buffer.concat([...ftyp, ...moov, ...pending, header, data]))) {
+                        needSkip = false;
+                        pending = [];
+                        continue;
+                    }
+                }
+                finally {
+                    ftyp = undefined;
+                    moov = undefined;
+                }
+            }
+
             // every moov/moof frame designates an iframe?
             pending.push(header, data);
-
             if (type === 'moov' || type === 'mdat') {
                 if (type === 'mdat' && needSkip) {
                     pending = [];
