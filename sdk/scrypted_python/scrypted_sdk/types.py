@@ -129,6 +129,7 @@ class ScryptedInterface(Enum):
     Settings = "Settings"
     SoftwareUpdate = "SoftwareUpdate"
     StartStop = "StartStop"
+    TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
     Thermometer = "Thermometer"
     UltravioletSensor = "UltravioletSensor"
@@ -896,6 +897,10 @@ class StartStop:
         pass
     pass
 
+class TamperSensor:
+    tampered: bool
+    pass
+
 class TemperatureSetting:
     thermostatActiveMode: ThermostatMode
     thermostatAvailableModes: list[ThermostatMode]
@@ -1110,6 +1115,7 @@ class ScryptedInterfaceProperty(Enum):
     toMimeType = "toMimeType"
     binaryState = "binaryState"
     intrusionDetected = "intrusionDetected"
+    tampered = "tampered"
     powerDetected = "powerDetected"
     audioDetected = "audioDetected"
     motionDetected = "motionDetected"
@@ -1404,6 +1410,13 @@ class DeviceState:
     @intrusionDetected.setter
     def intrusionDetected(self, value: bool):
         self.setScryptedProperty("intrusionDetected", value)
+
+    @property
+    def tampered(self) -> bool:
+        return self.getScryptedProperty("tampered")
+    @tampered.setter
+    def tampered(self, value: bool):
+        self.setScryptedProperty("tampered", value)
 
     @property
     def powerDetected(self) -> bool:
@@ -1871,6 +1884,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "intrusionDetected"
+    ]
+  },
+  "TamperSensor": {
+    "name": "TamperSensor",
+    "methods": [],
+    "properties": [
+      "tampered"
     ]
   },
   "PowerSensor": {

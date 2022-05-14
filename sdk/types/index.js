@@ -45,6 +45,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["toMimeType"] = "toMimeType";
     ScryptedInterfaceProperty["binaryState"] = "binaryState";
     ScryptedInterfaceProperty["intrusionDetected"] = "intrusionDetected";
+    ScryptedInterfaceProperty["tampered"] = "tampered";
     ScryptedInterfaceProperty["powerDetected"] = "powerDetected";
     ScryptedInterfaceProperty["audioDetected"] = "audioDetected";
     ScryptedInterfaceProperty["motionDetected"] = "motionDetected";
@@ -424,6 +425,13 @@ exports.ScryptedInterfaceDescriptors = {
             'intrusionDetected'
         ]
     },
+    TamperSensor: {
+        name: 'TamperSensor',
+        methods: [],
+        properties: [
+            'tampered'
+        ]
+    },
     PowerSensor: {
         name: 'PowerSensor',
         methods: [],
@@ -779,6 +787,7 @@ var ScryptedInterface;
     ScryptedInterface["Settings"] = "Settings";
     ScryptedInterface["BinarySensor"] = "BinarySensor";
     ScryptedInterface["IntrusionSensor"] = "IntrusionSensor";
+    ScryptedInterface["TamperSensor"] = "TamperSensor";
     ScryptedInterface["PowerSensor"] = "PowerSensor";
     ScryptedInterface["AudioSensor"] = "AudioSensor";
     ScryptedInterface["MotionSensor"] = "MotionSensor";

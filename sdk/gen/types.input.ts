@@ -731,6 +731,9 @@ export interface BinarySensor {
 export interface IntrusionSensor {
   intrusionDetected?: boolean;
 }
+export interface TamperSensor {
+  tampered?: boolean;
+}
 export interface PowerSensor {
   powerDetected?: boolean;
 }
@@ -1415,6 +1418,7 @@ export enum ScryptedInterface {
   Settings = "Settings",
   BinarySensor = "BinarySensor",
   IntrusionSensor = "IntrusionSensor",
+  TamperSensor = "TamperSensor",
   PowerSensor = "PowerSensor",
   AudioSensor = "AudioSensor",
   MotionSensor = "MotionSensor",
