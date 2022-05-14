@@ -1,15 +1,14 @@
 import { MediaStreamTrack, RTCPeerConnection } from "@koush/werift";
 import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
-import { safeKillFFmpeg } from "@scrypted/common/src/media-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
-import { ChildProcess } from "child_process";
 import crypto from 'crypto';
 import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
+import { waitConnected } from "./peerconnection-util";
 import { getFFmpegRtpAudioOutputArguments, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
@@ -169,17 +168,12 @@ export async function createRTCPeerConnectionSink(
     }
 
     const forwarderPromise = (async () => {
-        await new Promise(resolve => {
-            pc.connectionStateChange.subscribe(() => {
-                if (pc.connectionState === 'connected')
-                    resolve(undefined);
-            })
-        });
+        await waitConnected(pc);
 
         console.timeLog(token, 'connected');
 
         let isPrivate = true;
-        for (const ice of pc.validIceTransports()) {
+        for (const ice of pc.iceTransports) {
             const [address, port] = ice.connection.remoteAddr;
             isPrivate = isPrivate && ip.isPrivate(address);
             console.log('ice transport ip', address);
