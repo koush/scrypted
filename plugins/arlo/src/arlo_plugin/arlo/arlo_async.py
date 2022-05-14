@@ -1638,7 +1638,7 @@ class Arlo(object):
                 return url
             return None
 
-        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "lastImageSnapshotAvailable", "is"], trigger, callback)
 
 #    def StartRecording(self, basestation, camera):
 #        """
