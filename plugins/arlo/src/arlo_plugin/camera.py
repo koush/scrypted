@@ -7,7 +7,7 @@ from scrypted_sdk.types import Camera, VideoCamera, MotionSensor, Battery, Scryp
 from .logging import ScryptedDeviceLoggerMixin
 
 class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery, ScryptedDeviceLoggerMixin):
-    timeout = 60
+    timeout = 30
     nativeId = None
     arlo_device = None
     arlo_basestation = None

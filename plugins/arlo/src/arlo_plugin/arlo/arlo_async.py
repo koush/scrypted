@@ -1633,7 +1633,11 @@ class Arlo(object):
             self.request.post("https://my.arlo.com/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
 
         def callback(self, event):
-            url = event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
+            properties = event.get("properties", {})
+            url = properties.get("presignedFullFrameSnapshotUrl")
+            if url:
+                return url
+            url = properties.get("presignedLastImageUrl")
             if url:
                 return url
             return None
