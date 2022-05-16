@@ -4,8 +4,10 @@ import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '@koush/werift-src/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
 import { bindUdp, closeQuiet } from '@scrypted/common/src/listen-cluster';
+import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
+import { once } from 'events';
 import os from 'os';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
@@ -66,6 +68,16 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 closeQuiet(audioReturn);
             });
 
+            const isHomeHub = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(request.targetAddress);
+            if (isHomeHub)
+                console.log('Streaming request is coming from the active HomeHub. Will wait for initial RTCP packet.');
+
+            const videoReturnRtcpReady = !isHomeHub
+                ? undefined
+                : timeoutPromise(1000, once(videoReturn, 'message')).catch(() => {
+                    console.warn('Video RTCP Packet timed out. There may be a network (routing/firewall) issue preventing the Apple device sending UDP packets back to Scrypted.');
+                });
+
             const session: CameraStreamingSession = {
                 aconfig: {
                     keys: {
@@ -94,14 +106,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 audiossrc,
                 videoReturn,
                 audioReturn,
-                videoReturnRtcpReady: Promise.resolve(undefined),
-                // waitForFirstVideoRtcp no longer seems necessary as of the GM release
-                // of ios 15.5 and macos 12.4
-                // videoReturnRtcpReady: timeoutPromise(1000, once(videoReturn, 'message')).catch(() => {
-                //     console.warn('Video RTCP Packet timed out. There may be a network (routing/firewall) issue preventing the Apple device sending UDP packets back to Scrypted.');
-                // }),
+                videoReturnRtcpReady,
             };
-
 
             sessions.set(request.sessionID, session);
 
@@ -184,9 +190,10 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
-            const forceLowBandwidth = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
-            if (forceLowBandwidth)
-                console.log('Streaming request is coming from the active HomeHub. Low bandwidth stream will be selected in case this is a remote wifi connection.');
+            // const forceLowBandwidth = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
+            // if (forceLowBandwidth)
+            //     console.log('Streaming request is coming from the active HomeHub. Low bandwidth stream will be selected in case this is a remote wifi connection.');
+            const forceLowBandwidth = false;
 
             const {
                 destination,

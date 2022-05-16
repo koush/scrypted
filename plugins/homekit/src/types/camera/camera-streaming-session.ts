@@ -27,9 +27,13 @@ export interface CameraStreamingSession {
 // macos 12.3 beta 1
 
 // bug seems resolved:
-// ios 15.5 gm
 // macos 12.4
+
+// bug is still present:
+// ios 15.5 RC
 export async function waitForFirstVideoRtcp(console: Console, session: CameraStreamingSession) {
+    if (!session.videoReturnRtcpReady)
+        return;
     console.log('Waiting for video RTCP packet before sending video.');
     await session.videoReturnRtcpReady;
     console.log('Received first video RTCP packet.');
