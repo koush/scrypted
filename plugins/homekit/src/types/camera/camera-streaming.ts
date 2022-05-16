@@ -235,6 +235,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
+            const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
             const mediaOptions: RequestMediaStreamOptions = {
                 destination,
                 video: {
@@ -246,6 +247,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     // pcm/g711 the second best option for aac-eld, since it's raw audio.
                     codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
                 },
+                tool: transcodingDebugMode ? 'ffmpeg' : 'scrypted',
             };
 
             const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(await device.getVideoStream(mediaOptions), ScryptedMimeTypes.FFmpegInput);
