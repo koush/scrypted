@@ -15,7 +15,6 @@ const supportedTypes = [
     ScryptedDeviceType.Doorbell,
 ];
 
-
 class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = createWebRTCStorageSettings(this);
 
@@ -63,7 +62,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             this.console,
             hasIntercom ? this.mixinDevice : undefined,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
-            async (destination) => {
+            async (tool, destination) => {
                 const mo = await device.getVideoStream({
                     video: {
                         codec: 'h264',
@@ -72,6 +71,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
                         codec: 'opus',
                     },
                     destination,
+                    tool,
                 });
                 const ffInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
                 return ffInput;
@@ -191,7 +191,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             return ret;
         }
-        else if (supportedTypes.includes(type)) {
+        else if (supportedTypes.includes(type) && interfaces.includes(ScryptedInterface.VideoCamera)) {
             return [
                 ScryptedInterface.RTCSignalingChannel,
                 ScryptedInterface.Settings,

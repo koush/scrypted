@@ -4,7 +4,7 @@ import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/co
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
-import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import crypto from 'crypto';
 import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
@@ -44,7 +44,7 @@ export async function createRTCPeerConnectionSink(
     console: Console,
     intercom: Intercom,
     maximumCompatibilityMode: boolean,
-    getFFmpegInput: (destination: MediaStreamDestination) => Promise<FFmpegInput>,
+    getFFmpegInput: (tool: MediaStreamTool, destination: MediaStreamDestination) => Promise<FFmpegInput>,
 ) {
     const token = 'connection log =================================' + crypto.randomBytes(8).toString('hex');
     console.time(token);
@@ -208,14 +208,23 @@ export async function createRTCPeerConnectionSink(
         if (options?.userAgent?.includes('Firefox/'))
             sessionSupportsH264High = true;
 
-        const ffmpegInput = await getFFmpegInput(isPrivate ? 'local' : 'remote');
+        const willTranscode = !sessionSupportsH264High || maximumCompatibilityMode;
+        if (willTranscode) {
+            console.log('Requesting medium-resolution stream', {
+                sessionSupportsH264High,
+                maximumCompatibilityMode,
+            });
+        }
+        const requestDestination: MediaStreamDestination = willTranscode ? 'medium-resolution' : 'local';
+        const ffmpegInput = await getFFmpegInput(willTranscode ? 'ffmpeg' : 'scrypted', isPrivate ? requestDestination : 'remote');
         const { mediaStreamOptions } = ffmpegInput;
 
         const videoArgs: string[] = [];
-        const transcode = !sessionSupportsH264High
+        const transcode = willTranscode
             || mediaStreamOptions?.video?.codec !== 'h264'
             || ffmpegInput.h264EncoderArguments?.length;
-        if (transcode || maximumCompatibilityMode) {
+            
+        if (transcode) {
             const conservativeDefaultBitrate = 500000;
             const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
             const width = Math.min(options?.screen?.width || 960, 1280);
@@ -262,7 +271,7 @@ export async function createRTCPeerConnectionSink(
         };
 
         const videoRtpTrack: RtpTrack = {
-            codecCopy: maximumCompatibilityMode ? undefined : 'h264',
+            codecCopy: transcode ? undefined : 'h264',
             packetSize: 1300,
             onRtp: buffer => videoTransceiver.sender.sendRtp(buffer),
             outputArguments: [

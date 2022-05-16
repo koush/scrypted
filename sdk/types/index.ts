@@ -1132,6 +1132,7 @@ export interface AudioStreamOptions {
 }
 
 export type MediaStreamSource = "local" | "cloud";
+export type MediaStreamTool = 'ffmpeg' | 'scrypted' | 'gstreamer';
 
 /**
  * Options passed to VideoCamera.getVideoStream to
@@ -1159,11 +1160,10 @@ export interface MediaStreamOptions {
   metadata?: any;
 
   /**
-   * The tool used to generate the container. Ie, scrypted,
+   * The tool was used to write the container or will be used to read teh container. Ie, scrypted,
    * the ffmpeg tools, gstreamer.
    */
-  // should this be in the request too as a hint for the preferred tool to use?
-  tool?: string;
+  tool?: MediaStreamTool;
 
   video?: VideoStreamOptions;
   audio?: AudioStreamOptions;

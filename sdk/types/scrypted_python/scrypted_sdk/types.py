@@ -218,6 +218,9 @@ class MediaStreamDestination(TypedDict):
 class MediaStreamSource(TypedDict):
     pass
 
+class MediaStreamTool(TypedDict):
+    pass
+
 class BufferConverter(TypedDict):
     fromMimeType: str
     toMimeType: str
@@ -362,7 +365,7 @@ class MediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
-    tool: str
+    tool: MediaStreamTool
     video: VideoStreamOptions
     pass
 
@@ -414,7 +417,7 @@ class RequestMediaStreamOptions(TypedDict):
     name: str
     prebuffer: float
     refresh: bool
-    tool: str
+    tool: MediaStreamTool
     video: VideoStreamOptions
     pass
 
@@ -434,7 +437,7 @@ class RequestRecordingStreamOptions(TypedDict):
     name: str
     prebuffer: float
     startTime: float
-    tool: str
+    tool: MediaStreamTool
     video: VideoStreamOptions
     pass
 
@@ -448,7 +451,7 @@ class ResponseMediaStreamOptions(TypedDict):
     refreshAt: float
     sdp: str
     source: MediaStreamSource
-    tool: str
+    tool: MediaStreamTool
     userConfigurable: bool
     video: VideoStreamOptions
     pass
