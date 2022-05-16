@@ -1,7 +1,8 @@
 import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
+import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
+import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
     type: ScryptedDeviceType.Thermostat,
@@ -10,8 +11,8 @@ addSupportedType({
             return false;
         return true;
     },
-    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting, homekitSession: HomeKitSession) => {
-        const accessory = makeAccessory(device, homekitSession);
+    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting, homekitPlugin: HomeKitPlugin) => {
+        const accessory = makeAccessory(device, homekitPlugin);
         const service = accessory.addService(Service.Thermostat, device.name);
         service.setPrimaryService();
 

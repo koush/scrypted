@@ -1,6 +1,8 @@
 import { ScryptedDeviceType } from '@scrypted/sdk';
+import { randomBytes } from 'crypto';
 import { Categories, HAPStorage } from './hap';
 import './types';
+import os from 'os';
 
 class HAPLocalStorage {
     initSync() {
@@ -75,4 +77,21 @@ export function typeToCategory(type: ScryptedDeviceType): Categories {
         case ScryptedDeviceType.Vacuum:
             return Categories.OUTLET;
     }
+}
+
+export function createHAPUsername() {
+    const buffers = [];
+    for (let i = 0; i < 6; i++) {
+        buffers.push(randomBytes(1).toString('hex'));
+    }
+    return buffers.join(':');
+}
+
+export function getAddresses() {
+    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
+    return addresses;
+}
+
+export function getRandomPort() {
+    return Math.round(30000 + Math.random() * 20000);
 }

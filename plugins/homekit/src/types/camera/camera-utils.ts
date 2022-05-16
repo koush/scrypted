@@ -1,6 +1,7 @@
 import { MediaStreamDestination, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import { H264Level, H264Profile, StartStreamRequest } from '../../hap';
 import sdk from '@scrypted/sdk';
+import { HomeKitPlugin } from "../../main";
 
 const { log } = sdk;
 
@@ -51,7 +52,7 @@ export const ntpTime = () => {
     return buf.readBigUInt64BE();
 };
 
-export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, storage: Storage, request: StartStreamRequest) {
+export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, isLowBandwidth: boolean, storage: Storage, request: StartStreamRequest) {
     let adaptiveBitrate: string[] = [];
     try {
         adaptiveBitrate = JSON.parse(storage.getItem('adaptiveBitrate'));
@@ -64,7 +65,8 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     // Opus (Remote): 60
     // AAC-ELD (Local): 30
     // AAC-ELD (Remote): 60
-    const isLowBandwidth = request.audio.packet_time >= 60;
+    if (!isLowBandwidth)
+        isLowBandwidth = request.audio.packet_time >= 60;
 
     // watch is 448x368 and requests 320x240, everything else is > ~1280...
     // future proof-ish for higher resolution watch.

@@ -1,7 +1,8 @@
 import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor, IntrusionSensor } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
+import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
+import type { HomeKitPlugin } from "../main";
 
 function airQualityToHomekit(airQuality: AirQuality) {
     switch (airQuality) {
@@ -45,8 +46,8 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & IntrusionSensor, homekitSession: HomeKitSession) => {
-        const accessory = makeAccessory(device, homekitSession);
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & IntrusionSensor, homekitPlugin: HomeKitPlugin) => {
+        const accessory = makeAccessory(device, homekitPlugin);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name);

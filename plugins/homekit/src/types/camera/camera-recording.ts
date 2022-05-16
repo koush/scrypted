@@ -9,11 +9,12 @@ import fs from 'fs';
 import mkdirp from 'mkdirp';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
-import { HomeKitSession } from '../../common';
+import {  } from '../../common';
 import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
 import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
+import type { HomeKitPlugin } from "../../main";
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -87,12 +88,12 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
 }
 
 export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
-    configuration: CameraRecordingConfiguration, console: Console, homekitSession: HomeKitSession): AsyncGenerator<Buffer, void, unknown> {
+    configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin): AsyncGenerator<Buffer, void, unknown> {
 
     console.log(device.name, 'recording session starting', configuration);
 
     const storage = deviceManager.getMixinStorage(device.id, undefined);
-    const saveRecordings = device.mixins.includes(homekitSession.videoClipsId);
+    const saveRecordings = device.mixins.includes(homekitPlugin.videoClipsId);
 
     // request more than needed, and determine what to do with the fragments after receiving them.
     const prebuffer = configuration.mediaContainerConfiguration.prebufferLength * 2.5;
@@ -333,7 +334,7 @@ export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCam
         recordingFile?.end();
         recordingFile?.destroy();
         if (saveRecordings) {
-            homekitSession.cameraMixins.get(device.id)?.onDeviceEvent(ScryptedInterface.VideoClips, undefined);
+            homekitPlugin.cameraMixins.get(device.id)?.onDeviceEvent(ScryptedInterface.VideoClips, undefined);
             deviceManager.onDeviceEvent(VIDEO_CLIPS_NATIVE_ID, ScryptedInterface.VideoClips, undefined);
         }
     }

@@ -1,21 +1,22 @@
 import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { addSupportedType, DummyDevice, HomeKitSession, supportedTypes } from '../common';
+import { addSupportedType, DummyDevice, supportedTypes } from '../common';
 import { Characteristic, CharacteristicEventTypes, Service, StatelessProgrammableSwitch } from '../hap';
 import { makeAccessory } from './common';
+import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
     type: ScryptedDeviceType.Doorbell,
     probe(device: DummyDevice): boolean {
         return device.interfaces.includes(ScryptedInterface.BinarySensor);
     },
-    getAccessory: async (device: ScryptedDevice & BinarySensor, homekitSession: HomeKitSession) => {
+    getAccessory: async (device: ScryptedDevice & BinarySensor, homekitPlugin: HomeKitPlugin) => {
         const faux: DummyDevice = {
             interfaces: device.interfaces,
             type: device.type,
         };
         faux.type = ScryptedDeviceType.Camera;
         const cameraCheck = supportedTypes[ScryptedInterface.Camera];
-        const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitSession) : makeAccessory(device, homekitSession);
+        const accessory = cameraCheck.probe(faux) ? await cameraCheck.getAccessory(device, homekitPlugin) : makeAccessory(device, homekitPlugin);
 
         const service = accessory.addService(Service.Doorbell);
 

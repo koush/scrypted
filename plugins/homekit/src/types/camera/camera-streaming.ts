@@ -4,13 +4,11 @@ import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '@koush/werift-src/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
 import { bindUdp, closeQuiet } from '@scrypted/common/src/listen-cluster';
-import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
-import { once } from 'events';
 import os from 'os';
-import { HomeKitSession } from '../../common';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
+import type { HomeKitPlugin } from "../../main";
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { DynamicBitrateSession } from './camera-dynamic-bitrate';
@@ -31,17 +29,17 @@ async function getPort(socketType: SocketType, address: string): Promise<{ socke
 export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & Intercom,
     console: Console,
     storage: Storage,
-    homekitSession: HomeKitSession) {
+    homekitPlugin: HomeKitPlugin) {
     const sessions = new Map<string, CameraStreamingSession>();
     const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
 
     const delegate: CameraStreamingDelegate = {
-        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitSession, console),
+        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitPlugin, console),
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
 
             const videossrc = CameraController.generateSynchronisationSource();
             const audiossrc = CameraController.generateSynchronisationSource();
-            const addressOverride = homekitSession.storage.getItem('addressOverride') || undefined;
+            const addressOverride = homekitPlugin.storageSettings.values.addressOverride || undefined;
 
             const { sessionID } = request;
             let killResolve: any;
@@ -186,12 +184,16 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
+            const forceLowBandwidth = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
+            if (forceLowBandwidth)
+                console.log('Streaming request is coming from the active HomeHub. Low bandwidth stream will be selected in case this is a remote wifi connection.');
+
             const {
                 destination,
                 dynamicBitrate,
                 isLowBandwidth,
                 isWatch,
-            } = await getStreamingConfiguration(device, storage, request)
+            } = await getStreamingConfiguration(device, forceLowBandwidth, storage, request)
 
             console.log({
                 dynamicBitrate,

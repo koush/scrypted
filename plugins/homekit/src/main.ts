@@ -1,15 +1,14 @@
 import qrcode from '@koush/qrcode-terminal';
+import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import { sleep } from '@scrypted/common/src/sleep';
 import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
-import { randomBytes } from 'crypto';
-import os from 'os';
 import packageJson from "../package.json";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
-import { HomeKitSession, SnapshotThrottle, supportedTypes } from './common';
+import { SnapshotThrottle, supportedTypes } from './common';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
-import { getHAPUUID, initializeHapStorage, typeToCategory } from './hap-utils';
+import { createHAPUsername, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { randomPinCode } from './pincode';
 import './types';
@@ -21,32 +20,69 @@ const { systemManager, deviceManager } = sdk;
 initializeHapStorage();
 const includeToken = 4;
 
-
-function getAddresses() {
-    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
-    return addresses;
-}
-
-class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, HomeKitSession, DeviceProvider {
+export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, Settings, DeviceProvider {
     bridge = new Bridge('Scrypted', getHAPUUID(this.storage));
     snapshotThrottles = new Map<string, SnapshotThrottle>();
-    pincode = randomPinCode();
     homekitConnections = new Set<string>();
     standalones = new Map<string, Accessory>();
     videoClips: VideoClipsMixinProvider;
     videoClipsId: string;
     cameraMixins = new Map<string, CameraMixin>();
+    storageSettings = new StorageSettings(this, {
+        pincode: {
+            group: 'Pairing',
+            title: "Manual Pairing Code",
+            defaultValue: randomPinCode(),
+        },
+        qrCode: {
+            group: 'Pairing',
+            title: "Camera QR Code",
+            readonly: true,
+            defaultValue: "The Pairing QR Code can be viewed in the 'Console'",
+        },
+        mac: {
+            group: 'Pairing',
+            title: "Username Override",
+            persistedDefaultValue: createHAPUsername(),
+        },
+        addressOverride: {
+            group: 'Network',
+            title: 'Scrypted Server Address',
+            key: 'addressOverride',
+            description: 'Optional: The IP address used by the Scrypted server. Set this to the wired IP address to prevent usage of a wireless address.',
+            placeholder: '192.168.2.100',
+            combobox: true,
+            async onGet() {
+                return {
+                    choices: getAddresses(),
+                }
+            }
+        },
+        portOverride: {
+            group: 'Network',
+            title: 'Bridge Port',
+            persistedDefaultValue: createRandomPort(),
+            description: 'Optional: The TCP port used by the Scrypted bridge. If none is specified, a random port will be chosen.',
+            type: 'number',
+        },
+        advertiserOverride: {
+            group: 'Network',
+            title: 'mDNS Advertiser',
+            description: 'Optional: Override the mDNS advertiser used to locate the Scrypted bridge',
+            choices: [MDNSAdvertiser.BONJOUR, MDNSAdvertiser.CIAO],
+            defaultValue: MDNSAdvertiser.CIAO,
+        },
+        lastKnownHomeHub: {
+            hide: true,
+            description: 'The last home hub to request a recording. Internally used to determine if a streaming request is coming from remote wifi.',
+        }
+    });
 
     constructor() {
         super();
         this.start();
 
-        if (this.storage.getItem('blankSnapshots') === 'true') {
-            this.storage.removeItem('blankSnapshots');
-            this.log.a(`The "Never Wait for Snapshots" setting has been moved to the Snapshot Plugin. Install the plugin and enable it on your preferred cameras. origin:/#/component/plugin/install/@scrypted/snapshot`);
-        }
-
-        (async() => {
+        (async () => {
             await deviceManager.onDevicesChanged({
                 devices: [
                     {
@@ -73,76 +109,14 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
         throw new Error('unknown device: ' + nativeId);
     }
 
-    getUsername(storage: Storage) {
-        let username = storage.getItem("mac");
-        // the HAP sample uses the mac address, but this is problematic if running
-        // side by side with homebridge, multi instance, etc.
-        if (!username) {
-            const buffers = [];
-            for (let i = 0; i < 6; i++) {
-                buffers.push(randomBytes(1).toString('hex'));
-            }
-            username = buffers.join(':');
-            storage.setItem('mac', username);
-        }
-        return username;
-    }
-
     async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                group: 'Pairing',
-                title: "Manual Pairing Code",
-                key: "pairingCode",
-                readonly: true,
-                value: this.pincode,
-            },
-            {
-                group: 'Pairing',
-                title: "Camera QR Code",
-                key: "qrCode",
-                readonly: true,
-                value: "The Pairing QR Code can be viewed in the 'Console'",
-            },
-            {
-                group: 'Pairing',
-                title: "Username Override",
-                value: this.getUsername(this.storage),
-                key: "mac",
-            },
-            {
-                group: 'Network',
-                title: 'Scrypted Server Address',
-                value: this.storage.getItem('addressOverride'),
-                key: 'addressOverride',
-                description: 'Optional: The IP address used by the Scrypted server. Set this to the wired IP address to prevent usage of a wireless address.',
-                choices: getAddresses(),
-                placeholder: '192.168.2.100',
-                combobox: true,
-            },
-            {
-                group: 'Network',
-                title: 'Bridge Port',
-                value: this.getHAPPort().toString(),
-                key: 'portOverride',
-                description: 'Optional: The TCP port used by the Scrypted bridge. If none is specified, a random port will be chosen.',
-                type: 'number',
-            },
-            {
-                group: 'Network',
-                title: 'mDNS Advertiser',
-                description: 'Optional: Override the mDNS advertiser used to locate the Scrypted bridge',
-                key: 'advertiserOverride',
-                choices: [MDNSAdvertiser.BONJOUR, MDNSAdvertiser.CIAO],
-                value: this.getAdvertiser(),
-            },
-        ]
+        return this.storageSettings.getSettings();
     }
 
     async putSetting(key: string, value: string | number | boolean): Promise<void> {
-        this.storage.setItem(key, value.toString());
+        await this.storageSettings.putSetting(key, value);
 
-        if (key === 'portOverride' || key === 'advertiserOverride') {
+        if (key === this.storageSettings.keys.portOverride || key === this.storageSettings.keys.addressOverride) {
             this.log.a('Reload the HomeKit plugin to apply this change.');
         }
     }
@@ -217,12 +191,12 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                     const publish = () => {
                         published = true;
                         accessory.publish({
-                            username: this.getUsername(mixinStorage),
+                            username: this.storageSettings.values.mac,
                             port: 0,
-                            pincode: this.pincode,
+                            pincode: this.storageSettings.values.pincode,
                             category: standaloneCategory,
                             addIdentifyingMaterial: false,
-                            advertiser: this.getAdvertiser(),
+                            advertiser: this.storageSettings.values.advertiserOverride,
                         });
                     }
 
@@ -272,7 +246,7 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
         this.storage.setItem('defaultIncluded', JSON.stringify(defaultIncluded));
 
-        const username = this.getUsername(this.storage);
+        const username = this.storageSettings.values.mac
         const info = this.bridge.getService(Service.AccessoryInformation)!;
         info.updateCharacteristic(Characteristic.Manufacturer, "scrypted.app");
         info.updateCharacteristic(Characteristic.Model, "scrypted");
@@ -281,11 +255,11 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
 
         const publishInfo: PublishInfo = {
             username,
-            port: this.getHAPPort(),
-            pincode: this.pincode,
+            port: this.storageSettings.values.portOverride,
+            pincode: this.storageSettings.values.pincode,
             category: Categories.BRIDGE,
             addIdentifyingMaterial: true,
-            advertiser: this.getAdvertiser(),
+            advertiser: this.storageSettings.values.advertiserOverride,
         };
 
         this.bridge.publish(publishInfo, true);
@@ -332,28 +306,6 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
                 return;
             }
         });
-    }
-
-    getAdvertiser() {
-        const advertiser = this.storage.getItem('advertiserOverride');
-        switch (advertiser) {
-            case MDNSAdvertiser.BONJOUR:
-                return MDNSAdvertiser.BONJOUR;
-            case MDNSAdvertiser.CIAO:
-                return MDNSAdvertiser.CIAO;
-        }
-
-        // return os.platform() === 'win32' ? MDNSAdvertiser.CIAO : MDNSAdvertiser.BONJOUR;
-        return MDNSAdvertiser.CIAO;
-    }
-
-    getHAPPort() {
-        let port = parseInt(this.storage.getItem('portOverride')) || 0;
-        if (!port) {
-            port = Math.round(10000 + Math.random() * 30000);
-            this.storage.setItem('portOverride', port.toString());
-        }
-        return port;
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]) {
@@ -415,4 +367,4 @@ class HomeKit extends ScryptedDeviceBase implements MixinProvider, Settings, Hom
     }
 }
 
-export default new HomeKit();
+export default new HomeKitPlugin();

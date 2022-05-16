@@ -1,15 +1,16 @@
 import { Entry, EntrySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
+import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, NodeCallback, Service } from '../hap';
 import { makeAccessory } from './common';
+import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
     type: ScryptedDeviceType.Garage,
     probe(device: DummyDevice): boolean {
         return device.interfaces.includes(ScryptedInterface.Entry) && device.interfaces.includes(ScryptedInterface.EntrySensor);
     },
-    getAccessory: async (device: ScryptedDevice & Entry & EntrySensor, homekitSession: HomeKitSession) => {
-        const accessory = makeAccessory(device, homekitSession);
+    getAccessory: async (device: ScryptedDevice & Entry & EntrySensor, homekitPlugin: HomeKitPlugin) => {
+        const accessory = makeAccessory(device, homekitPlugin);
 
         const service = accessory.addService(Service.GarageDoorOpener, device.name);
 

@@ -1,11 +1,12 @@
 import sdk, { AudioSensor, Camera, Intercom, MotionSensor, ObjectsDetected, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { defaultObjectDetectionContactSensorTimeout } from '../camera-mixin';
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
+import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { AudioRecordingCodec, AudioRecordingCodecType, AudioRecordingSamplerate, AudioStreamingCodec, AudioStreamingCodecType, AudioStreamingSamplerate, CameraController, CameraRecordingDelegate, CameraRecordingOptions, CameraStreamingOptions, Characteristic, CharacteristicEventTypes, DataStreamConnection, H264Level, H264Profile, OccupancySensor, RecordingManagement, Service, SRTPCryptoSuites, VideoCodecType, WithUUID } from '../hap';
 import { handleFragmentsRequests, iframeIntervalSeconds } from './camera/camera-recording';
 import { createCameraStreamingDelegate } from './camera/camera-streaming';
 import { FORCE_OPUS } from './camera/camera-utils';
 import { makeAccessory } from './common';
+import type { HomeKitPlugin } from '../main';
 
 const { deviceManager, systemManager } = sdk;
 
@@ -16,7 +17,7 @@ addSupportedType({
     probe(device: DummyDevice) {
         return device.interfaces.includes(ScryptedInterface.VideoCamera);
     },
-    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff, homekitSession: HomeKitSession) {
+    async getAccessory(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & MotionSensor & AudioSensor & Intercom & OnOff, homekitPlugin: HomeKitPlugin) {
         const console = deviceManager.getMixinConsole(device.id, undefined);
         const storage = deviceManager.getMixinStorage(device.id, undefined);
         const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
@@ -92,7 +93,7 @@ addSupportedType({
         let recordingDelegate: CameraRecordingDelegate | undefined;
         let recordingOptions: CameraRecordingOptions | undefined;
 
-        const accessory = makeAccessory(device, homekitSession);
+        const accessory = makeAccessory(device, homekitPlugin);
 
         const detectAudio = storage.getItem('detectAudio') === 'true';
         const needAudioMotionService = device.interfaces.includes(ScryptedInterface.AudioSensor) && detectAudio;
@@ -103,8 +104,9 @@ addSupportedType({
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
                 handleFragmentsRequests(connection: DataStreamConnection): AsyncGenerator<Buffer, void, unknown> {
+                    homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
                     const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
-                    return handleFragmentsRequests(device, configuration, console, homekitSession)
+                    return handleFragmentsRequests(device, configuration, console, homekitPlugin)
                 }
             };
 
@@ -176,7 +178,7 @@ addSupportedType({
             };
         }
 
-        const delegate = createCameraStreamingDelegate(device, console, storage, homekitSession);
+        const delegate = createCameraStreamingDelegate(device, console, storage, homekitPlugin);
 
         const controller = new CameraController({
             cameraStreamCount: 8,
