@@ -889,7 +889,7 @@ class PrebufferSession {
   }
 
   async handleRebroadcasterClient(options: {
-    requestedContainer: string,
+    findSyncFrame: boolean,
     isActiveClient: boolean,
     container: PrebufferParsers,
     session: ParserSession<PrebufferParsers>,
@@ -945,8 +945,7 @@ class PrebufferSession {
         // may be worth considering playing with a few other things to avoid this:
         // mpeg-ts as a container (would need to write a muxer)
         // specifying the buffer before the sync frame with probesize.
-        if (container !== 'rtsp'
-          || (options?.requestedContainer && options?.requestedContainer !== 'rtsp')) {
+        if (container !== 'rtsp' || !options.findSyncFrame) {
           for (const chunk of prebufferContainer) {
             if (chunk.time < now - requestedPrebuffer)
               continue;
@@ -979,7 +978,7 @@ class PrebufferSession {
     })
   }
 
-  async getVideoStream(options?: RequestMediaStreamOptions) {
+  async getVideoStream(findSyncFrame: boolean, options?: RequestMediaStreamOptions) {
     if (options?.refresh === false && !this.parserSessionPromise)
       throw new Error('Stream is currently unavailable and will not be started for this request. RequestMediaStreamOptions.refresh === false');
 
@@ -990,8 +989,8 @@ class PrebufferSession {
     const idrInterval = Math.max(4000, this.getDetectedIdrInterval() || 4000);
     let requestedPrebuffer = options?.prebuffer;
     if (requestedPrebuffer == null) {
-      // get into the general area of finding a sync frame.
-      requestedPrebuffer = idrInterval * 1.5;
+      // try to gaurantee a sync frame, but don't send too much prebuffer.
+      requestedPrebuffer = idrInterval;
     }
 
     const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
@@ -1059,7 +1058,7 @@ class PrebufferSession {
     const isActiveClient = options?.refresh !== false;
 
     this.handleRebroadcasterClient({
-      requestedContainer: options?.container,
+      findSyncFrame,
       isActiveClient,
       container,
       requestedPrebuffer,
@@ -1197,7 +1196,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     if (!session)
       return this.mixinDevice.getVideoStream(options);
 
-    const ffmpegInput = await session.getVideoStream(options);
+    // ffmpeg probing works better if the stream does NOT start on a sync frame. the pre-sps/pps data is used
+    // as part of the stream analysis, and sync frame is immediately used. otherwise the sync frame is
+    // read and tossed during rtsp analysis.
+    // if ffmpeg is not in used (ie, not transcoding or implicitly rtsp),
+    // trust that downstream is not using ffmpeg and start with a sync frame.
+    const findSyncFrame = !transcodingEnabled && (!options?.container || options?.container === 'rtsp');
+    const ffmpegInput = await session.getVideoStream(findSyncFrame, options);
     ffmpegInput.h264EncoderArguments = h264EncoderArguments;
     ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
 
@@ -1517,7 +1522,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         const requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
 
         prebufferSession.handleRebroadcasterClient({
-          requestedContainer: 'rtsp',
+          findSyncFrame: true,
           isActiveClient: true,
           container: 'rtsp',
           session,
