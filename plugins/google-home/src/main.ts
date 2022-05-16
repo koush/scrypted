@@ -16,7 +16,7 @@ import { canAccess } from './commands/camerastream';
 import { URL } from 'url';
 import { homegraph } from '@googleapis/homegraph';
 import type { JSONClient } from 'google-auth-library/build/src/auth/googleauth';
-import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
+import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 
 import ciao, { Protocol } from '@homebridge/ciao';
 
