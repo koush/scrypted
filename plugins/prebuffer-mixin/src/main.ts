@@ -986,11 +986,10 @@ class PrebufferSession {
 
     const session = await this.parserSessionPromise;
 
-    const idrInterval = Math.max(4000, this.getDetectedIdrInterval() || 4000);
     let requestedPrebuffer = options?.prebuffer;
     if (requestedPrebuffer == null) {
       // try to gaurantee a sync frame, but don't send too much prebuffer.
-      requestedPrebuffer = idrInterval;
+      requestedPrebuffer = Math.max(4000, this.getDetectedIdrInterval() || 4000);;
     }
 
     const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
@@ -1201,7 +1200,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     // read and tossed during rtsp analysis.
     // if ffmpeg is not in used (ie, not transcoding or implicitly rtsp),
     // trust that downstream is not using ffmpeg and start with a sync frame.
-    const findSyncFrame = !transcodingEnabled && (!options?.container || options?.container === 'rtsp');
+    const findSyncFrame = !transcodingEnabled
+      && (!options?.container || options?.container === 'rtsp')
+      && options?.tool !== 'ffmpeg';
     const ffmpegInput = await session.getVideoStream(findSyncFrame, options);
     ffmpegInput.h264EncoderArguments = h264EncoderArguments;
     ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
@@ -1518,8 +1519,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         await server.handlePlayback();
         const session = await prebufferSession.parserSessionPromise;
 
-        const idrInterval = prebufferSession.getDetectedIdrInterval();
-        const requestedPrebuffer = Math.max(4000, (idrInterval || 4000)) * 1.5;
+        const requestedPrebuffer = Math.max(4000, prebufferSession.getDetectedIdrInterval() || 4000);;
 
         prebufferSession.handleRebroadcasterClient({
           findSyncFrame: true,
