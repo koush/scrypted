@@ -116,9 +116,16 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             filter.join(' '),
         );
 
-        const parsers ={
+        const parsers = {
             mpegts: createMpegTsParser({
-                vcodec: ['-vcodec', 'libx264'],
+                vcodec: [
+                    "-b:v", '2000k',
+                    "-c:v", "libx264",
+                    '-preset', 'ultrafast',
+                    "-bf", "0",
+                    '-r', '15',
+                    '-force_key_frames', 'expr:gte(t,n_forced*4)',
+                ],
             })
         };
         const ret = await startParserSession(filteredInput, {
@@ -126,8 +133,8 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             parsers,
             timeout: 30000,
         });
-        
-        let rebroadcaster = await createParserRebroadcaster(ret, 'mpegts',{
+
+        let rebroadcaster = await createParserRebroadcaster(ret, 'mpegts', {
             idle: {
                 timeout: 30000,
                 callback: () => ret.kill(),
@@ -141,16 +148,20 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         };
     };
 
+    const createVideoStreamOptions = () => {
+        if (devices.length === 1)
+            return devices[0].getVideoStreamOptions();
+        return [{
+            id: 'default',
+            name: 'Default',
+            video: {},
+            audio: null,
+        }]
+    }
+
     return {
         async getVideoStreamOptions() {
-            if (devices.length === 1)
-                return devices[0].getVideoStreamOptions();
-            return [{
-                id: 'default',
-                name: 'Default',
-                video: {},
-                audio: null,
-            }]
+            return createVideoStreamOptions();
         },
 
         async getVideoStream(options) {
@@ -160,21 +171,22 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             if (!sessionPromise) {
                 sessionPromise = getVideoStreamWrapped(options);
                 const ret = await sessionPromise;
-                ret.session.on('killed', () => sessionPromise = undefined);
+                ret.session.killed.finally(() => sessionPromise = undefined);
             }
 
             const ret = await sessionPromise;
-            const {url} = ret.rebroadcaster;
+            const { url } = ret.rebroadcaster;
             const ffmpegInput: FFmpegInput = {
                 url,
+                mediaStreamOptions: createVideoStreamOptions()[0],
                 container: 'mpegts',
                 inputArguments: [
-                  ...(ret.parsers.mpegts.inputArguments || []),
-                  '-f', ret.parsers.mpegts.container,
-                  '-i', url,
+                    ...(ret.parsers.mpegts.inputArguments || []),
+                    '-f', ret.parsers.mpegts.container,
+                    '-i', url,
                 ],
-              }
-              
+            }
+
             return mediaManager.createFFmpegMediaObject(ffmpegInput);
         }
     }
