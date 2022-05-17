@@ -47,10 +47,8 @@ interface PrebufferStreamChunk extends StreamChunk {
   time?: number;
 }
 
-interface Prebuffers {
-  mp4: PrebufferStreamChunk[];
-  mpegts: PrebufferStreamChunk[];
-  rtsp: PrebufferStreamChunk[];
+type Prebuffers<T extends string> = {
+  [key in T]: PrebufferStreamChunk[];
 }
 
 type PrebufferParsers = 'mpegts' | 'mp4' | 'rtsp';
@@ -64,7 +62,7 @@ class PrebufferSession {
 
   parserSessionPromise: Promise<ParserSession<PrebufferParsers>>;
   parserSession: ParserSession<PrebufferParsers>;
-  prebuffers: Prebuffers = {
+  prebuffers: Prebuffers<PrebufferParsers> = {
     mp4: [],
     mpegts: [],
     rtsp: [],
@@ -185,9 +183,9 @@ class PrebufferSession {
   }
 
   clearPrebuffers() {
-    this.prebuffers.mp4 = [];
-    this.prebuffers.mpegts = [];
-    this.prebuffers.rtsp = [];
+    for (const prebuffer of PrebufferParserValues) {
+      this.prebuffers[prebuffer] = [];
+    }
   }
 
   ensurePrebufferSession() {
@@ -465,9 +463,7 @@ class PrebufferSession {
   }
 
   async startPrebufferSession() {
-    this.prebuffers.mp4 = [];
-    this.prebuffers.mpegts = [];
-    this.prebuffers.rtsp = [];
+    this.clearPrebuffers();
 
     let mso: ResponseMediaStreamOptions;
     try {
