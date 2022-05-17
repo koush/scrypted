@@ -110,13 +110,16 @@ export async function createRTCPeerConnectionSource(options: {
         let audioTrack: string;
         let videoTrack: string;
         let audioTransceiver: RTCRtpTransceiver;
+
+        const useRtspJitterBuffer = false;
+
         const doSetup = async (setup: RTCAVSignalingSetup) => {
             let gotAudio = false;
             let gotVideo = false;
 
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.onTrack.subscribe((track) => {
-                if (useUdp) {
+                if (useUdp || !useRtspJitterBuffer) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotAudio) {
                             gotAudio = true;
@@ -147,13 +150,13 @@ export async function createRTCPeerConnectionSource(options: {
                             }
                         }
                     }
-                    jitter.pipe(new RtspOutput())
+                    jitter.pipe(new RtspOutput());
                 }
             });
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
             videoTransceiver.onTrack.subscribe((track) => {
-                if (useUdp) {
+                if (useUdp || !useRtspJitterBuffer) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotVideo) {
                             gotVideo = true;
@@ -184,7 +187,7 @@ export async function createRTCPeerConnectionSource(options: {
                             }
                         }
                     }
-                    jitter.pipe(new RtspOutput())
+                    jitter.pipe(new RtspOutput());
                 }
 
                 track.onReceiveRtp.once(() => {
@@ -397,7 +400,7 @@ export async function createRTCPeerConnectionSource(options: {
     }
     else {
         const url = `rtsp://127.0.0.1:${port}`;
-        const mediaStreamUrl : MediaStreamUrl = {
+        const mediaStreamUrl: MediaStreamUrl = {
             url,
             mediaStreamOptions,
         };
