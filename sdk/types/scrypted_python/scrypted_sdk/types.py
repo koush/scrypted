@@ -209,6 +209,7 @@ class VideoStreamOptions(TypedDict):
     keyframeInterval: float
     maxBitrate: float
     minBitrate: float
+    profile: str
     width: float
     pass
 

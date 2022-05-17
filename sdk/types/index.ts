@@ -1109,6 +1109,7 @@ export interface Camera {
 
 export interface VideoStreamOptions {
   codec?: string;
+  profile?: string;
   width?: number;
   height?: number;
   bitrate?: number;
