@@ -223,7 +223,6 @@ export async function createRTCPeerConnectionSink(
         const transcode = willTranscode
             || mediaStreamOptions?.video?.codec !== 'h264'
             || ffmpegInput.h264EncoderArguments?.length;
-        const width = Math.min(options?.screen?.width || 960, 1280);
 
         if (transcode) {
             const conservativeDefaultBitrate = 500000;
@@ -245,7 +244,7 @@ export async function createRTCPeerConnectionSink(
             if (filterIndex !== -1)
                 ffmpegInput.inputArguments[filterIndex + 1] = ffmpegInput.inputArguments[filterIndex + 1] + ` [unscaled]; [unscaled] ${scaleFilter}`;
             else
-                videoArgs.push(scaleFilter)
+                videoArgs.push('-vf', scaleFilter)
 
             if (!sessionSupportsH264High || maximumCompatibilityMode) {
                 // baseline profile must use libx264, not sure other encoders properly support it.
@@ -265,7 +264,7 @@ export async function createRTCPeerConnectionSink(
             }
         }
         else {
-            videoArgs.push('-vf', '-vcodec', 'copy')
+            videoArgs.push('-vcodec', 'copy')
         }
 
         if (ffmpegInput.h264FilterArguments)
