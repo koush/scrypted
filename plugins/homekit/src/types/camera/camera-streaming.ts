@@ -190,10 +190,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
-            // const forceLowBandwidth = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
-            // if (forceLowBandwidth)
-            //     console.log('Streaming request is coming from the active HomeHub. Low bandwidth stream will be selected in case this is a remote wifi connection.');
-            const forceLowBandwidth = false;
+            const forceLowBandwidth = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
+            if (forceLowBandwidth)
+                console.log('Streaming request is coming from the active HomeHub. Low bandwidth stream will be selected in case this is a remote wifi connection.');
 
             const {
                 destination,
