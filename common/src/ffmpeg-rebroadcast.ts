@@ -57,7 +57,8 @@ export async function parseResolution(cp: ChildProcess) {
 }
 
 async function parseInputToken(cp: ChildProcess, token: string) {
-    return new Promise<string>(resolve => {
+    return new Promise<string>((resolve, reject) => {
+        cp.on('exit', () => reject(new Error('ffmpeg exited while waiting to parse stream information')));
         const parser = (data: Buffer) => {
             const stdout: string = data.toString().split('Output ')[0];
             const idx = stdout.lastIndexOf(`${token}: `);
@@ -103,7 +104,7 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
     }
 
     function clearActivityTimer() {
-        clearTimeout(dataTimeout);
+        clearInterval(dataTimeout);
     }
 
     if (timeout) {
@@ -116,7 +117,7 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
         }, timeout);
     }
 
-    events.once('killed', () => clearTimeout(dataTimeout));
+    events.once('killed', () => clearInterval(dataTimeout));
 
     resetActivityTimer();
     return {
