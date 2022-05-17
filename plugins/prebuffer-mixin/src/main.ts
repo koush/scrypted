@@ -1187,19 +1187,30 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       }
     }
 
-    const session = this.sessions.get(id);
-    if (!session)
-      return this.mixinDevice.getVideoStream(options);
+    let session = this.sessions.get(id);
+    let ffmpegInput: FFmpegInput;
+    if (session.advertisedMediaStreamOptions.container === 'rawvideo') {
+      this.console.log('Source is rawvideo. Using a direct media stream.');
+      session = undefined;
+    }
+    if (!session) {
+      const mo = await this.mixinDevice.getVideoStream(options);
+      if (!transcodingEnabled)
+        return mo;
+      ffmpegInput = await mediaManager.convertMediaObjectToJSON(mo, ScryptedMimeTypes.FFmpegInput);
+    }
+    else {
+      // ffmpeg probing works better if the stream does NOT start on a sync frame. the pre-sps/pps data is used
+      // as part of the stream analysis, and sync frame is immediately used. otherwise the sync frame is
+      // read and tossed during rtsp analysis.
+      // if ffmpeg is not in used (ie, not transcoding or implicitly rtsp),
+      // trust that downstream is not using ffmpeg and start with a sync frame.
+      const findSyncFrame = !transcodingEnabled
+        && (!options?.container || options?.container === 'rtsp')
+        && options?.tool !== 'ffmpeg';
+      ffmpegInput = await session.getVideoStream(findSyncFrame, options);
+    }
 
-    // ffmpeg probing works better if the stream does NOT start on a sync frame. the pre-sps/pps data is used
-    // as part of the stream analysis, and sync frame is immediately used. otherwise the sync frame is
-    // read and tossed during rtsp analysis.
-    // if ffmpeg is not in used (ie, not transcoding or implicitly rtsp),
-    // trust that downstream is not using ffmpeg and start with a sync frame.
-    const findSyncFrame = !transcodingEnabled
-      && (!options?.container || options?.container === 'rtsp')
-      && options?.tool !== 'ffmpeg';
-    const ffmpegInput = await session.getVideoStream(findSyncFrame, options);
     ffmpegInput.h264EncoderArguments = h264EncoderArguments;
     ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
 
