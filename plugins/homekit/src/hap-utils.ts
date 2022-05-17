@@ -1,8 +1,10 @@
-import { ScryptedDeviceType } from '@scrypted/sdk';
+import { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType } from '@scrypted/sdk';
 import { randomBytes } from 'crypto';
 import { Categories, HAPStorage } from './hap';
 import './types';
 import os from 'os';
+import { StorageSettingsDict } from '@scrypted/common/src/settings';
+import crypto from 'crypto';
 
 class HAPLocalStorage {
     initSync() {
@@ -94,4 +96,15 @@ export function getAddresses() {
 
 export function getRandomPort() {
     return Math.round(30000 + Math.random() * 20000);
+}
+
+export function createHAPUsernameStorageSettingsDict(): StorageSettingsDict<'mac'> {
+    return {
+        mac: {
+            hide: true,
+            group: 'Pairing',
+            title: "Username Override",
+            persistedDefaultValue: createHAPUsername(),
+        },
+    }
 }

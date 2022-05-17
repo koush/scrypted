@@ -1,4 +1,4 @@
-import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 
 const { systemManager } = sdk;
 
@@ -59,6 +59,11 @@ export interface StorageSetting extends Setting {
 
 export type StorageSettingsDict<T extends string> = { [key in T]: StorageSetting };
 
+export interface StorageSettingsDevice {
+    storage: Storage;
+    onDeviceEvent(eventInterface: string, eventData: any): Promise<void>;
+}
+
 export class StorageSettings<T extends string> implements Settings {
     public values: { [key in T]: any } = {} as any;
     public hasValue: { [key in T]: boolean } = {} as any;
@@ -69,7 +74,7 @@ export class StorageSettings<T extends string> implements Settings {
         onGet?: () => Promise<Partial<StorageSettingsDict<T>>>,
     };
 
-    constructor(public device: ScryptedDeviceBase | MixinDeviceBase<any>, public settings: StorageSettingsDict<T>) {
+    constructor(public device: StorageSettingsDevice, public settings: StorageSettingsDict<T>) {
         for (const key of Object.keys(settings)) {
             const setting = settings[key as T];
             const rawGet = () => this.getItem(key as T);

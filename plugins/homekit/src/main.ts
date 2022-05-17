@@ -8,12 +8,13 @@ import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
-import { createHAPUsername, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, typeToCategory } from './hap-utils';
+import { createHAPUsernameStorageSettingsDict, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
+import crypto from 'crypto';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -36,15 +37,26 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         },
         qrCode: {
             group: 'Pairing',
-            title: "Camera QR Code",
+            title: "QR Code",
             readonly: true,
             defaultValue: "The Pairing QR Code can be viewed in the 'Console'",
         },
-        mac: {
-            group: 'Pairing',
-            title: "Username Override",
-            persistedDefaultValue: createHAPUsername(),
+        resetAccessory: {
+            title: 'Reset Pairing',
+            description: 'This will reset the Scrypted HomeKit Bridge and all bridged devices. The previous Scrypted HomeKit Bridge must be removed from the Home app, and Scrypted must be paired with HomeKit again.',
+            placeholder: 'RESET',
+            mapPut: (oldValue, newValue) => {
+                if (newValue === 'RESET') {
+                    this.storage.removeItem(this.storageSettings.keys.mac);
+                    this.log.a(`You must reload the HomeKit plugin for the changes to take effect.`);
+                    // generate a new reset accessory random value.
+                    return crypto.randomBytes(8).toString('hex');
+                }
+                throw new Error('HomeKit Accessory Reset cancelled.');
+            },
+            mapGet: () => '',
         },
+        ...createHAPUsernameStorageSettingsDict(),
         addressOverride: {
             group: 'Network',
             title: 'Scrypted Server Address',
@@ -187,11 +199,17 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                 if (standalone && standaloneCategory) {
                     this.standalones.set(device.id, accessory);
 
+                    const storageSettings = new StorageSettings({
+                        storage: mixinStorage,
+                        onDeviceEvent: async () => {
+                        }
+                    }, createHAPUsernameStorageSettingsDict())
+
                     let published = false;
                     const publish = () => {
                         published = true;
                         accessory.publish({
-                            username: this.storageSettings.values.mac,
+                            username: storageSettings.values.mac,
                             port: 0,
                             pincode: this.storageSettings.values.pincode,
                             category: standaloneCategory,

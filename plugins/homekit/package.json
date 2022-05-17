@@ -45,5 +45,5 @@
       "@types/node": "^14.17.9",
       "@types/url-parse": "^1.4.3"
    },
-   "version": "0.0.281"
+   "version": "0.0.282"
 }
