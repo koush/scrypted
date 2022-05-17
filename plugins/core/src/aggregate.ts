@@ -1,6 +1,4 @@
-import { createParserRebroadcaster, ParserSession, Rebroadcaster, startParserSession } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { createRawVideoParser, PIXEL_FORMAT_RGB24, StreamParser } from "@scrypted/common/src/stream-parser";
-import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 const { systemManager, mediaManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
@@ -39,17 +37,7 @@ aggregators.set(ScryptedInterface.Lock,
 
 
 function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamera {
-    let sessionPromise: Promise<{
-        session: ParserSession<"rawvideo">;
-        rebroadcaster: Rebroadcaster;
-        parsers: { rawvideo: StreamParser };
-    }>;
-
-    async function getVideoStreamWrapped(options: MediaStreamOptions) {
-        if (sessionPromise) {
-            console.error('session already active?');
-        }
-
+    async function getVideoStreamWrapped(options: RequestMediaStreamOptions) {
         const args = await Promise.allSettled(devices.map(async (device) => {
             const mo = await device.getVideoStream();
             const buffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
@@ -76,6 +64,8 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
 
         const filteredInput: FFmpegInput = {
             url: undefined,
+            container: 'rawvideo',
+            mediaStreamOptions: (await createVideoStreamOptions())?.[0],
             inputArguments: [],
         };
 
@@ -113,33 +103,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             filter.join(' '),
         );
 
-        const parsers = {
-            rawvideo: createRawVideoParser({
-                size: {
-                    width: 1920,
-                    height: 1080,
-                },
-                pixelFormat: PIXEL_FORMAT_RGB24,
-            }),
-        };
-        const ret = await startParserSession(filteredInput, {
-            console,
-            parsers,
-            timeout: 30000,
-        });
-
-        let rebroadcaster = await createParserRebroadcaster(ret, 'rawvideo', {
-            idle: {
-                timeout: 30000,
-                callback: () => ret.kill(),
-            }
-        })
-
-        return {
-            session: ret,
-            rebroadcaster,
-            parsers,
-        };
+        return filteredInput;
     };
 
     const createVideoStreamOptions: () => Promise<ResponseMediaStreamOptions[]> = async () => {
@@ -148,7 +112,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         return [{
             id: 'default',
             name: 'Default',
-            container: 'rawvideo',
+            container: 'ffmpeg',
             video: {},
             audio: null,
         }]
@@ -163,24 +127,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             if (devices.length === 1)
                 return devices[0].getVideoStream(options);
 
-            if (!sessionPromise) {
-                sessionPromise = getVideoStreamWrapped(options);
-                const ret = await sessionPromise;
-                ret.session.killed.finally(() => sessionPromise = undefined);
-            }
-
-            const ret = await sessionPromise;
-            const { url } = ret.rebroadcaster;
-            const ffmpegInput: FFmpegInput = {
-                url,
-                mediaStreamOptions: (await createVideoStreamOptions())?.[0],
-                container: 'rawvideo',
-                inputArguments: [
-                    ...(ret.parsers.rawvideo.inputArguments || []),
-                    '-f', ret.parsers.rawvideo.container,
-                    '-i', url,
-                ],
-            }
+            const ffmpegInput = await getVideoStreamWrapped(options);
 
             return mediaManager.createFFmpegMediaObject(ffmpegInput);
         }

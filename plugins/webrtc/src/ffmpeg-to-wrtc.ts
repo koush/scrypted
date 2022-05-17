@@ -223,14 +223,13 @@ export async function createRTCPeerConnectionSink(
         const transcode = willTranscode
             || mediaStreamOptions?.video?.codec !== 'h264'
             || ffmpegInput.h264EncoderArguments?.length;
-            
+        const width = Math.min(options?.screen?.width || 960, 1280);
+
         if (transcode) {
             const conservativeDefaultBitrate = 500000;
             const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
             const width = Math.min(options?.screen?.width || 960, 1280);
             videoArgs.push(
-                // this might get wonky with 4:3?
-                '-vf', `scale='min(${width},iw)':-2`,
                 // this seems to cause issues with presets i think.
                 // '-level:v', '4.0',
                 "-b:v", bitrate.toString(),
@@ -238,6 +237,16 @@ export async function createRTCPeerConnectionSink(
                 "-maxrate", bitrate.toString(),
                 '-r', '15',
             );
+
+            const scaleFilter = `scale='min(${width},iw)':-2`;
+            let filterIndex = ffmpegInput.inputArguments.findIndex(f => f === '-vf');
+            if (filterIndex === -1)
+                filterIndex = ffmpegInput.inputArguments.findIndex(f => f === '-filter_complex');
+            if (filterIndex !== -1)
+                ffmpegInput.inputArguments[filterIndex + 1] = ffmpegInput.inputArguments[filterIndex + 1] + ` [unscaled]; [unscaled] ${scaleFilter}`;
+            else
+                videoArgs.push(scaleFilter)
+
             if (!sessionSupportsH264High || maximumCompatibilityMode) {
                 // baseline profile must use libx264, not sure other encoders properly support it.
                 videoArgs.push(
@@ -256,7 +265,7 @@ export async function createRTCPeerConnectionSink(
             }
         }
         else {
-            videoArgs.push('-vcodec', 'copy')
+            videoArgs.push('-vf', '-vcodec', 'copy')
         }
 
         if (ffmpegInput.h264FilterArguments)

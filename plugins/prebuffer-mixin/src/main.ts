@@ -108,6 +108,10 @@ class PrebufferSession {
     }
   }
 
+  get canPrebuffer() {
+    return this.advertisedMediaStreamOptions.container !== 'rawvideo' && this.advertisedMediaStreamOptions.container !== 'ffmpeg';
+  }
+
   getLastH264Probe(): H264Probe {
     const str = this.storage.getItem(this.lastH264ProbeKey);
     if (!str) {
@@ -1189,8 +1193,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     let session = this.sessions.get(id);
     let ffmpegInput: FFmpegInput;
-    if (session.advertisedMediaStreamOptions.container === 'rawvideo') {
-      this.console.log('Source is rawvideo. Using a direct media stream.');
+    if (!session.canPrebuffer) {
+      this.console.log('Source container can not be prebuffered. Using a direct media stream.');
       session = undefined;
     }
     if (!session) {
