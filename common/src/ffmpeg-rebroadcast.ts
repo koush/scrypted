@@ -294,8 +294,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
     // tbh parsing stdout is super sketchy way of doing this.
     parseAudioCodec(cp).then(result => inputAudioCodec = result);
-    await parseVideoCodec(cp).then(result => inputVideoCodec = result);
     parseResolution(cp).then(result => inputVideoResolution = result);
+    await parseVideoCodec(cp).then(result => inputVideoCodec = result);
 
     return {
         sdp,
@@ -307,8 +307,8 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         },
         get inputVideoResolution() {
             return {
-                width: parseInt(inputVideoResolution?.[1]),
-                height: parseInt(inputVideoResolution?.[2]),
+                width: parseInt(inputVideoResolution?.[2]),
+                height: parseInt(inputVideoResolution?.[3]),
             }
         },
         get isActive() { return isActive },

@@ -209,7 +209,7 @@ export function createFragmentedMp4Parser(options?: StreamParserOptions): Stream
 }
 
 export interface RawVideoParserOptions {
-    size?: {
+    size: {
         width: number,
         height: number
     };
@@ -232,10 +232,9 @@ export const PIXEL_FORMAT_RGB24: RawVideoPixelFormat = {
     computeLength: (width, height) => width * height * 3,
 }
 
-export function createRawVideoParser(options?: RawVideoParserOptions): StreamParser {
+export function createRawVideoParser(options: RawVideoParserOptions): StreamParser {
     const pixelFormat = options?.pixelFormat || PIXEL_FORMAT_YUV420P;
     let filter: string;
-    options = options || {};
     const { size, everyNFrames } = options;
     if (size) {
         filter = `scale=${size.width}:${size.height}`;
@@ -248,21 +247,28 @@ export function createRawVideoParser(options?: RawVideoParserOptions): StreamPar
         filter = filter + `select=not(mod(n\\,${everyNFrames}))`
     }
 
+    const inputArguments: string[] = [];
+    if (options.size)
+        inputArguments.push('-s', `${options.size.width}x${options.size.height}`);
+
+    inputArguments.push('-pix_fmt', pixelFormat.name);
     return {
+        inputArguments,
         container: 'rawvideo',
         outputArguments: [
-            ...(filter ? ['-vf', filter] : []),
+            '-s', `${options.size.width}x${options.size.height}`,
             '-an',
             '-vcodec', 'rawvideo',
             '-pix_fmt', pixelFormat.name,
             '-f', 'rawvideo',
         ],
         async *parse(socket: Duplex, width: number, height: number): AsyncGenerator<StreamChunk> {
+            width = size?.width || width;
+            height = size?.height || height
+
             if (!width || !height)
                 throw new Error("error parsing rawvideo, unknown width and height");
 
-            width = size?.width || width;
-            height = size?.height || height
             const toRead = pixelFormat.computeLength(width, height);
             while (true) {
                 const buffer = await readLength(socket, toRead);
