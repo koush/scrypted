@@ -41,7 +41,8 @@ export interface ParserOptions<T extends string> {
 }
 
 export async function parseResolution(cp: ChildProcess) {
-    return new Promise<string[]>(resolve => {
+    return new Promise<string[]>((resolve, reject) => {
+        cp.on('exit', () => reject(new Error('ffmpeg exited while waiting to parse stream resolution')));
         const parser = (data: Buffer) => {
             const stdout = data.toString();
             const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
@@ -58,7 +59,7 @@ export async function parseResolution(cp: ChildProcess) {
 
 async function parseInputToken(cp: ChildProcess, token: string) {
     return new Promise<string>((resolve, reject) => {
-        cp.on('exit', () => reject(new Error('ffmpeg exited while waiting to parse stream information')));
+        cp.on('exit', () => reject(new Error('ffmpeg exited while waiting to parse stream information: ' + token)));
         const parser = (data: Buffer) => {
             const stdout: string = data.toString().split('Output ')[0];
             const idx = stdout.lastIndexOf(`${token}: `);

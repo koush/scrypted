@@ -197,7 +197,8 @@ class PrebufferSession {
       return;
     this.console.log(this.streamName, 'prebuffer session started');
     this.parserSessionPromise = this.startPrebufferSession();
-    this.parserSessionPromise.catch(() => this.parserSessionPromise = undefined);
+    this.parserSessionPromise.catch(e => this.parserSessionPromise = undefined);
+    this.parserSessionPromise.then(pso => pso.killed.finally(() => this.parserSessionPromise = undefined));
   }
 
   getAudioConfig(): {
@@ -746,6 +747,7 @@ class PrebufferSession {
       }
     }
     const removeSeiProbe = () => session.removeListener('rtsp', seiProbe);
+    session.killed.finally(() => clearTimeout(seiTimeout));
     session.on('rtsp', seiProbe);
     const seiTimeout = setTimeout(() => {
       removeSeiProbe();
@@ -753,7 +755,7 @@ class PrebufferSession {
         seiDetected: false,
       }
       this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
-    }, 10000);
+    }, this.getLastH264Probe().seiDetected ? 60000 : 10000);
 
     // complain to the user about the codec if necessary. upstream may send a audio
     // stream but report none exists (to request muting).
@@ -792,6 +794,13 @@ class PrebufferSession {
     }
 
     this.parserSession = session;
+    session.killed.finally(() => {
+      if (this.parserSession === session)
+        this.parserSession = undefined;
+    });
+    session.killed.finally(() => {
+      clearTimeout(this.inactivityTimeout)
+    });
 
     // settings ui refresh
     deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
@@ -821,13 +830,6 @@ class PrebufferSession {
       scheduleRefresh(mso);
       session.killed.finally(() => clearTimeout(refreshTimeout));
     }
-
-    session.killed.finally(() => {
-      clearTimeout(this.inactivityTimeout)
-      this.parserSessionPromise = undefined;
-      if (this.parserSession === session)
-        this.parserSession = undefined;
-    });
 
     for (const container of PrebufferParserValues) {
       let shifts = 0;
@@ -901,17 +903,25 @@ class PrebufferSession {
     if (requestedPrebuffer)
       this.console.log('sending prebuffer', requestedPrebuffer);
 
+    // in case the client never connects, do an inactivity check.
+    socketPromise.catch(() => this.inactivityCheck(session, false));
+    socketPromise.then(socket => {
+      if (isActiveClient) {
+        this.activeClients++;
+        this.printActiveClients();
+      }
+      socket.once('close', () => {
+        if (isActiveClient) {
+          this.activeClients--;
+          this.printActiveClients();
+        }
+        this.inactivityCheck(session, isActiveClient);
+      })
+    });
+
     handleRebroadcasterClient(socketPromise, {
       // console: this.console,
       connect: (writeData, destroy) => {
-        if (isActiveClient) {
-          this.activeClients++;
-          this.printActiveClients();
-        }
-        else {
-          // this.console.log('passive client request started');
-        }
-
         const now = Date.now();
 
         const safeWriteData = (chunk: StreamChunk, prebuffer?: boolean) => {
@@ -966,14 +976,7 @@ class PrebufferSession {
           }
         }
 
-        return () => {
-          if (isActiveClient) {
-            this.activeClients--;
-            this.printActiveClients();
-          }
-          this.inactivityCheck(session, isActiveClient);
-          cleanup();
-        };
+        return cleanup;
       }
     })
   }
