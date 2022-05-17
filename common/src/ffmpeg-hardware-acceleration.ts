@@ -140,6 +140,7 @@ export function getH264EncoderArgs() {
 export function getDebugModeH264EncoderArgs() {
     return [
         "-c:v", "libx264",
+        '-pix_fmt', 'yuvj420p',
         '-preset', 'ultrafast',
         "-bf", "0",
         '-force_key_frames', 'expr:gte(t,n_forced*4)',
