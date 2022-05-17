@@ -1,7 +1,6 @@
-import { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaObject, MediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
-import sdk from "@scrypted/sdk";
-import { startParserSession, ParserSession, createParserRebroadcaster, Rebroadcaster, createRebroadcaster } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { createMpegTsParser, StreamParser } from "@scrypted/common/src/stream-parser";
+import { createParserRebroadcaster, ParserSession, Rebroadcaster, startParserSession } from "@scrypted/common/src/ffmpeg-rebroadcast";
+import { createRawVideoParser, PIXEL_FORMAT_RGB24, StreamParser } from "@scrypted/common/src/stream-parser";
+import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 const { systemManager, mediaManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
@@ -39,13 +38,11 @@ aggregators.set(ScryptedInterface.Lock,
     values => values.reduce((prev, cur) => cur === LockState.Unlocked ? cur : prev, LockState.Locked));
 
 
-type AggregateCameraParsers = "mpegts";
-
 function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamera {
     let sessionPromise: Promise<{
-        session: ParserSession<"mpegts">;
+        session: ParserSession<"rawvideo">;
         rebroadcaster: Rebroadcaster;
-        parsers: { mpegts: StreamParser };
+        parsers: { rawvideo: StreamParser };
     }>;
 
     async function getVideoStreamWrapped(options: MediaStreamOptions) {
@@ -84,13 +81,13 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
 
         for (let i = 0; i < inputs.length; i++) {
             filteredInput.inputArguments.push(...inputs[i].inputArguments);
-            filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
+            filter.push(`[${i}:v] scale=-1:${h},pad=${w}:ih:(ow-iw)/2 [pos${i}];`)
         }
         for (let i = inputs.length; i < dim * dim; i++) {
             filteredInput.inputArguments.push(
                 '-f', 'lavfi', '-i', `color=black:s=${w}x${h}`,
             );
-            filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
+            filter.push(`[${i}:v] scale=${w}x${h} [pos${i}];`)
         }
 
         filteredInput.inputArguments.push(
@@ -117,16 +114,13 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         );
 
         const parsers = {
-            mpegts: createMpegTsParser({
-                vcodec: [
-                    "-b:v", '2000k',
-                    "-c:v", "libx264",
-                    '-preset', 'ultrafast',
-                    "-bf", "0",
-                    '-r', '15',
-                    '-force_key_frames', 'expr:gte(t,n_forced*4)',
-                ],
-            })
+            rawvideo: createRawVideoParser({
+                size: {
+                    width: 1920,
+                    height: 1080,
+                },
+                pixelFormat: PIXEL_FORMAT_RGB24,
+            }),
         };
         const ret = await startParserSession(filteredInput, {
             console,
@@ -134,7 +128,7 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             timeout: 30000,
         });
 
-        let rebroadcaster = await createParserRebroadcaster(ret, 'mpegts', {
+        let rebroadcaster = await createParserRebroadcaster(ret, 'rawvideo', {
             idle: {
                 timeout: 30000,
                 callback: () => ret.kill(),
@@ -148,12 +142,13 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
         };
     };
 
-    const createVideoStreamOptions = () => {
+    const createVideoStreamOptions: () => Promise<ResponseMediaStreamOptions[]> = async () => {
         if (devices.length === 1)
             return devices[0].getVideoStreamOptions();
         return [{
             id: 'default',
             name: 'Default',
+            container: 'rawvideo',
             video: {},
             audio: null,
         }]
@@ -178,11 +173,11 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             const { url } = ret.rebroadcaster;
             const ffmpegInput: FFmpegInput = {
                 url,
-                mediaStreamOptions: createVideoStreamOptions()[0],
-                container: 'mpegts',
+                mediaStreamOptions: (await createVideoStreamOptions())?.[0],
+                container: 'rawvideo',
                 inputArguments: [
-                    ...(ret.parsers.mpegts.inputArguments || []),
-                    '-f', ret.parsers.mpegts.container,
+                    ...(ret.parsers.rawvideo.inputArguments || []),
+                    '-f', ret.parsers.rawvideo.container,
                     '-i', url,
                 ],
             }
