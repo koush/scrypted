@@ -8,8 +8,8 @@ export function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[])
     if (!msos)
         return;
 
-    // do not enable rebroadcast on cloud streams by default.
-    const firstNonCloudStream = msos.find(mso => mso.source !== 'cloud');
+    // do not enable rebroadcast on cloud streams or rawvideo by default.
+    const firstNonCloudStream = msos.find(mso => mso.source !== 'cloud' && mso.container !== 'rawvideo');
     return firstNonCloudStream ? [firstNonCloudStream] : [];
 }
 
