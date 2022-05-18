@@ -38,8 +38,13 @@ export const H264_NAL_TYPE_SEI = 6;
 export const H264_NAL_TYPE_SPS = 7;
 // aggregate NAL Unit
 export const H264_NAL_TYPE_STAP_A = 24;
+export const H264_NAL_TYPE_STAP_B = 25;
 // fragmented NAL Unit (need to match against first)
 export const H264_NAL_TYPE_FU_A = 28;
+export const H264_NAL_TYPE_FU_B = 29;
+
+export const H264_NAL_TYPE_MTAP16 = 26;
+export const H264_NAL_TYPE_MTAP32 = 27;
 
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
@@ -69,6 +74,34 @@ export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
         return nalu;
     }
     return;
+}
+
+export function getNaluTypes(streamChunk: StreamChunk) {
+    const ret = new Set<number>();
+    if (streamChunk.type !== 'h264')
+        return ret;
+
+    const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
+    const naluType = nalu[0] & 0x1f;
+    if (naluType === H264_NAL_TYPE_STAP_A) {
+        let pos = 1;
+        while (pos < nalu.length) {
+            const naluLength = nalu.readUInt16BE(pos);
+            pos += 2;
+            const stapaType = nalu[pos] & 0x1f;
+            ret.add(stapaType);
+            pos += naluLength;
+        }
+    }
+    else if (naluType === H264_NAL_TYPE_FU_A) {
+        const fuaType = nalu[1] & 0x1f;
+        ret.add(fuaType);
+    }
+    else {
+        ret.add(naluType);
+    }
+
+    return ret;
 }
 
 export function createRtspParser(options?: StreamParserOptions): RtspStreamParser {

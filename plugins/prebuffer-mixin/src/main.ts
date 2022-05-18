@@ -4,12 +4,12 @@ import { getH264EncoderArgs, LIBX264_ENCODER_TITLE } from '@scrypted/common/src/
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, H264_NAL_TYPE_IDR, H264_NAL_TYPE_SEI, RtspServer } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, FFmpegInput, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
 import net from 'net';
 import { Duplex } from 'stream';
@@ -54,10 +54,6 @@ type Prebuffers<T extends string> = {
 type PrebufferParsers = 'mpegts' | 'mp4' | 'rtsp';
 const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 'rtsp'];
 
-interface H264Probe {
-  seiDetected?: boolean;
-}
-
 class PrebufferSession {
 
   parserSessionPromise: Promise<ParserSession<PrebufferParsers>>;
@@ -69,6 +65,7 @@ class PrebufferSession {
   };
   parsers: { [container: string]: StreamParser };
   sdp: Promise<string>;
+  usingScryptedParser = false;
 
   audioDisabled = false;
 
@@ -112,7 +109,7 @@ class PrebufferSession {
     return this.advertisedMediaStreamOptions.container !== 'rawvideo' && this.advertisedMediaStreamOptions.container !== 'ffmpeg';
   }
 
-  getLastH264Probe(): H264Probe {
+  getLastH264Probe(): H264Info {
     const str = this.storage.getItem(this.lastH264ProbeKey);
     if (!str) {
       return {};
@@ -124,6 +121,16 @@ class PrebufferSession {
     catch (e) {
       return {};
     }
+  }
+
+  getLastH264Oddities() {
+    const lastProbe = this.getLastH264Probe();
+    const h264Oddities = lastProbe.fuab
+      || lastProbe.mtap16
+      || lastProbe.mtap32
+      || lastProbe.sei
+      || lastProbe.stapb;
+    return h264Oddities;
   }
 
   getDetectedIdrInterval() {
@@ -350,7 +357,7 @@ class PrebufferSession {
 
     if (this.canUseRtspParser(this.advertisedMediaStreamOptions)) {
       const canUseScryptedParser = rtspMode;
-      const defaultValue = canUseScryptedParser && !this.getLastH264Probe()?.seiDetected ?
+      const defaultValue = canUseScryptedParser && !this.getLastH264Oddities() ?
         SCRYPTED_PARSER_TCP : FFMPEG_PARSER_TCP;
 
       const scryptedOptions = canUseScryptedParser ? [
@@ -388,6 +395,19 @@ class PrebufferSession {
       addFFmpegInputSettings();
     }
 
+    const addOddities = () => {
+      settings.push(
+        {
+          key: 'detectedOddities',
+          group,
+          title: 'Detected H264 Oddities',
+          readonly: true,
+          value: JSON.stringify(this.getLastH264Probe()),
+          description: 'Cameras with oddities in the H264 video stream may not function correctly with Scrypted RTSP Parsers or Senders.',
+        }
+      )
+    };
+
     if (session) {
       const resolution = session.inputVideoResolution?.width && session.inputVideoResolution?.height
         ? `${session.inputVideoResolution?.width}x${session.inputVideoResolution?.height}`
@@ -419,15 +439,8 @@ class PrebufferSession {
           readonly: true,
           value: (idrInterval || 0) / 1000 || 'unknown',
         },
-        {
-          key: 'detectedSEI',
-          group,
-          title: 'Detected H264 SEI',
-          readonly: true,
-          value: `${!!this.getLastH264Probe().seiDetected}`,
-          description: 'Cameras with SEI in the H264 video stream may not function correctly with Scrypted RTSP Parsers.',
-        }
       );
+      addOddities();
     }
     else {
       settings.push(
@@ -439,7 +452,8 @@ class PrebufferSession {
           value: 'Idle',
           readonly: true,
         },
-      )
+      );
+      addOddities();
     }
 
     if (rtspMode) {
@@ -664,11 +678,12 @@ class PrebufferSession {
     // before launching the parser session, clear out the last detected codec.
     // an erroneous cached codec could cause ffmpeg to fail to start.
     this.storage.removeItem(this.lastDetectedAudioCodecKey);
-    let usingScryptedParser = false;
-    let restartOnSei = false;
+    this.usingScryptedParser = false;
+
+    const h264Oddities = this.getLastH264Oddities();
 
     if (rtspMode && isRfc4571) {
-      usingScryptedParser = true;
+      this.usingScryptedParser = true;
       this.console.log('bypassing ffmpeg: using scrypted rfc4571 parser')
       const json = await mediaManager.convertMediaObjectToJSON<any>(mo, 'x-scrypted/x-rfc4571');
       const { url, sdp, mediaStreamOptions } = json;
@@ -682,24 +697,20 @@ class PrebufferSession {
       sessionMso = ffmpegInput.mediaStreamOptions || this.advertisedMediaStreamOptions;
 
       let { parser, isDefault } = this.getParser(rtspMode, sessionMso);
-      usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
+      this.usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
 
-      // if the stream is not marked as scrypted parser compatible by the plugin,
-      // play it safe and restart the stream when an sei packet is detected.
-      restartOnSei = usingScryptedParser && isDefault && sessionMso.tool !== 'scrypted';
+      // if (isDefault && this.usingScryptedParser && h264Oddities) {
+      //   if (sessionMso.tool === 'scrypted') {
+      //     this.console.warn('H264 oddities were detected in video stream, but stream is marked safe by Scrypted. The Default Scrypted RTSP Parser will  be used. This can be overriden by setting the RTSP Parser to Scrypted.');
+      //   }
+      //   else {
+      //     this.console.warn('H264 oddities were detected in video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
+      //     this.usingScryptedParser = false;
+      //     parser = FFMPEG_PARSER_TCP;
+      //   }
+      // }
 
-      if (isDefault && usingScryptedParser && this.getLastH264Probe().seiDetected) {
-        if (sessionMso.tool === 'scrypted') {
-          this.console.warn('SEI packet detected was in video stream, but stream is marked safe by Scrypted. The Default Scrypted RTSP Parser will  be used. This can be overriden by setting the RTSP Parser to Scrypted.');
-        }
-        else {
-          this.console.warn('SEI packet detected was in video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
-          usingScryptedParser = false;
-          parser = FFMPEG_PARSER_TCP;
-        }
-      }
-
-      if (usingScryptedParser) {
+      if (this.usingScryptedParser) {
         session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
           useUdp: parser === SCRYPTED_PARSER_UDP,
           audioSoftMuted,
@@ -719,43 +730,58 @@ class PrebufferSession {
       }
     }
 
-    // watch the stream for 10 seconds to see if an sei packet is encountered.
-    // if one is found and using scrypted parser as default, will need to restart rebroadcast to prevent
-    // downstream issues.
-    const seiProbe = (chunk: StreamChunk) => {
-      if (chunk.type !== 'h264')
-        return;
-      const seiDetected = !!findH264NaluType(chunk, H264_NAL_TYPE_SEI);
-      if (seiDetected) {
-        removeSeiProbe();
-        clearTimeout(seiTimeout);
-        const h264Probe: H264Probe = {
-          seiDetected,
-        }
-        this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
-        if (!usingScryptedParser)
+    if (this.usingScryptedParser) {
+      // watch the stream for 10 seconds to see if an weird nalu is encountered.
+      // if one is found and using scrypted parser as default, will need to restart rebroadcast to prevent
+      // downstream issues.
+      const h264Probe: H264Info = {};
+      let reportedOddity = false;
+      const oddityProbe = (chunk: StreamChunk) => {
+        if (chunk.type !== 'h264')
           return;
 
-        let { isDefault } = this.getParser(rtspMode, sessionMso);
-        if (!isDefault || sessionMso.tool === 'scrypted') {
-          this.console.warn('SEI packet detected while operating with Scrypted Parser. If there are issues streaming, consider using the Default parser.');
-          return;
+        const types = getNaluTypes(chunk);
+        h264Probe.fuab ||= types.has(H264_NAL_TYPE_FU_B);
+        h264Probe.stapb ||= types.has(H264_NAL_TYPE_STAP_B);
+        h264Probe.mtap16 ||= types.has(H264_NAL_TYPE_MTAP16);
+        h264Probe.mtap32 ||= types.has(H264_NAL_TYPE_MTAP32);
+        h264Probe.sei ||= types.has(H264_NAL_TYPE_SEI);
+        const oddity = h264Probe.fuab || h264Probe.stapb || h264Probe.mtap16 || h264Probe.mtap32 || h264Probe.sei;
+        if (oddity && !reportedOddity) {
+          reportedOddity = true;
+          let { isDefault } = this.getParser(rtspMode, sessionMso);
+          this.console.warn('H264 oddity detected.');
+          if (!isDefault) {
+            this.console.warn('If there are issues streaming, consider using the Default parser.');
+            return;
+          }
+
+          if (sessionMso.tool === 'scrypted') {
+            this.console.warn('Stream tool is marked safe as "scrypted", ignoring oddity. If there are issues streaming, consider switching to FFmpeg parser.');
+            return;
+          }
+
+          // if (!this.inactivityTimeout) {
+          //   this.console.warn('Oddity in prebuffered stream. Restarting rebroadcast to use FFmpeg instead.');
+          //   session.kill(new Error('restarting due to H264 oddity detection'));
+          //   this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
+          //   removeOddityProbe();
+          //   this.startPrebufferSession();
+          //   return;
+          // }
+
+          // this.console.warn('Oddity in non prebuffered stream. Next restart will use FFmpeg instead.');
         }
-        this.console.warn('SEI packet detected while operating with Scrypted Parser as default. Restarting rebroadcast.');
-        session.kill(new Error('restarting due to SEI packet detection'));
-        this.startPrebufferSession();
       }
+      const removeOddityProbe = () => session.removeListener('rtsp', oddityProbe);
+      session.killed.finally(() => clearTimeout(oddityTimeout));
+      session.on('rtsp', oddityProbe);
+      const oddityTimeout = setTimeout(() => {
+        removeOddityProbe();
+        this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
+      }, h264Oddities ? 60000 : 10000);
+
     }
-    const removeSeiProbe = () => session.removeListener('rtsp', seiProbe);
-    session.killed.finally(() => clearTimeout(seiTimeout));
-    session.on('rtsp', seiProbe);
-    const seiTimeout = setTimeout(() => {
-      removeSeiProbe();
-      const h264Probe: H264Probe = {
-        seiDetected: false,
-      }
-      this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
-    }, this.getLastH264Probe().seiDetected ? 60000 : 10000);
 
     // complain to the user about the codec if necessary. upstream may send a audio
     // stream but report none exists (to request muting).
@@ -798,9 +824,7 @@ class PrebufferSession {
       if (this.parserSession === session)
         this.parserSession = undefined;
     });
-    session.killed.finally(() => {
-      clearTimeout(this.inactivityTimeout)
-    });
+    session.killed.finally(() => clearTimeout(this.inactivityTimeout));
 
     // settings ui refresh
     deviceManager.onMixinEvent(this.mixin.id, this.mixin.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
@@ -1002,6 +1026,8 @@ class PrebufferSession {
 
     const mediaStreamOptions: ResponseMediaStreamOptions = session.negotiateMediaStream(options);
     let sdp = await this.sdp;
+    if (!mediaStreamOptions.video?.h264Info && this.usingScryptedParser)
+      mediaStreamOptions.video.h264Info = this.getLastH264Probe();
 
     let socketPromise: Promise<Duplex>;
     let url: string;
@@ -1391,8 +1417,11 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     let enabledStreams = this.getPrebufferedStreams(ret);
 
     for (const mso of ret) {
-      if (this.sessions.get(mso.id)?.parserSession || enabledStreams.includes(mso))
+      const session = this.sessions.get(mso.id);
+      if (session?.parserSession || enabledStreams.includes(mso))
         mso.prebuffer = prebufferDurationMs;
+      if (session && !mso.video?.h264Info)
+        mso.video.h264Info = session.getLastH264Probe();
     }
 
     return ret;

@@ -178,6 +178,14 @@ class ThermostatMode(Enum):
     Purifier = "Purifier"
 
 
+class H264Info(TypedDict):
+    fuab: bool
+    mtap16: bool
+    mtap32: bool
+    sei: bool
+    stapb: bool
+    pass
+
 class AudioStreamOptions(TypedDict):
     bitrate: float
     codec: str
@@ -203,6 +211,7 @@ class VideoStreamOptions(TypedDict):
     bitrate: float
     codec: str
     fps: float
+    h264Info: H264Info
     height: float
     idrIntervalMillis: float
     keyframeInterval: float

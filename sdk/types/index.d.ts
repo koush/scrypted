@@ -498,6 +498,13 @@ export interface Camera {
     takePicture(options?: RequestPictureOptions): Promise<MediaObject>;
     getPictureOptions(): Promise<ResponsePictureOptions[]>;
 }
+export interface H264Info {
+    sei?: boolean;
+    stapb?: boolean;
+    mtap16?: boolean;
+    mtap32?: boolean;
+    fuab?: boolean;
+}
 export interface VideoStreamOptions {
     codec?: string;
     profile?: string;
@@ -515,6 +522,7 @@ export interface VideoStreamOptions {
      * Key Frame interval in frames.
      */
     keyframeInterval?: number;
+    h264Info?: H264Info;
 }
 export interface AudioStreamOptions {
     codec?: string;
