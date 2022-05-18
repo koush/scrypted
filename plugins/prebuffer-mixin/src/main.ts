@@ -1234,7 +1234,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
           ffmpegInput.h264FilterArguments[filterIndex + 1] = ffmpegInput.h264FilterArguments[filterIndex + 1] + `[prefilter] ; [prefilter] ${this.streamSettings.storageSettings.values.videoFilterArguments}`;
         else
           ffmpegInput.h264FilterArguments.push('-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments);
-    }
+      }
       else {
         ffmpegInput.h264FilterArguments.push('-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments);
       }
@@ -1263,59 +1263,64 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     const isBatteryPowered = this.mixinDeviceInterfaces.includes(ScryptedInterface.Battery);
 
+    if (!enabledIds.length)
+      this.online = true;
+
     let active = 0;
     for (const id of ids) {
       let session = this.sessions.get(id);
-      if (!session) {
-        const mso = msos?.find(mso => mso.id === id);
-        if (mso?.prebuffer) {
-          log.a(`Prebuffer is already available on ${this.name}. If this is a grouped device, disable the Rebroadcast extension.`)
-        }
-        const name = mso?.name;
-        const enabled = enabledIds.includes(id);
-        const stopInactive = isBatteryPowered || !enabled;
-        session = new PrebufferSession(this, mso, stopInactive);
-        this.sessions.set(id, session);
 
-        if (isBatteryPowered) {
-          this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
-          continue;
-        }
+      if (session)
+        continue;
 
-        if (!enabled) {
-          this.console.log('stream', name, 'will be rebroadcast on demand.');
-          continue;
-        }
-
-        (async () => {
-          while (this.sessions.get(id) === session && !this.released) {
-            session.ensurePrebufferSession();
-            let wasActive = false;
-            try {
-              this.console.log('prebuffer session starting');
-              const ps = await session.parserSessionPromise;
-              this.console.log('prebuffer session started');
-              active++;
-              wasActive = true;
-              this.online = !!active;
-              await ps.killed;
-              this.console.error('prebuffer session ended');
-            }
-            catch (e) {
-              this.console.error('prebuffer session ended with error', e);
-            }
-            finally {
-              if (wasActive)
-                active--;
-              wasActive = false;
-              this.online = !!active;
-            }
-            this.console.log('restarting prebuffer session in 5 seconds');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          }
-          this.console.log('exiting prebuffer session (released or restarted with new configuration)');
-        })();
+      const mso = msos?.find(mso => mso.id === id);
+      if (mso?.prebuffer) {
+        log.a(`Prebuffer is already available on ${this.name}. If this is a grouped device, disable the Rebroadcast extension.`)
       }
+      const name = mso?.name;
+      const enabled = enabledIds.includes(id);
+      const stopInactive = isBatteryPowered || !enabled;
+      session = new PrebufferSession(this, mso, stopInactive);
+      this.sessions.set(id, session);
+
+      if (isBatteryPowered) {
+        this.console.log('camera is battery powered, prebuffering and rebroadcasting will only work on demand.');
+        continue;
+      }
+
+      if (!enabled) {
+        this.console.log('stream', name, 'will be rebroadcast on demand.');
+        continue;
+      }
+
+      (async () => {
+        while (this.sessions.get(id) === session && !this.released) {
+          session.ensurePrebufferSession();
+          let wasActive = false;
+          try {
+            this.console.log('prebuffer session starting');
+            const ps = await session.parserSessionPromise;
+            this.console.log('prebuffer session started');
+            active++;
+            wasActive = true;
+            this.online = !!active;
+            await ps.killed;
+            this.console.error('prebuffer session ended');
+          }
+          catch (e) {
+            this.console.error('prebuffer session ended with error', e);
+          }
+          finally {
+            if (wasActive)
+              active--;
+            wasActive = false;
+            this.online = !!active;
+          }
+          this.console.log('restarting prebuffer session in 5 seconds');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        this.console.log('exiting prebuffer session (released or restarted with new configuration)');
+      })();
     }
 
     if (!this.sessions.has(undefined)) {
