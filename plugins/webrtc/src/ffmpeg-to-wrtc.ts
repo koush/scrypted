@@ -227,7 +227,7 @@ export async function createRTCPeerConnectionSink(
         if (transcode) {
             const conservativeDefaultBitrate = 500000;
             const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
-            const width = Math.min(options?.screen?.width || 960, 1280);
+            const width = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
             videoArgs.push(
                 // this seems to cause issues with presets i think.
                 // '-level:v', '4.0',

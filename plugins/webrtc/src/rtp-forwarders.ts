@@ -165,9 +165,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     && audioCodec
                     && audio.codecCopy === ffmpegInput.mediaStreamOptions?.audio?.codec) {
 
-                        console.log('audio codec matched:', rtpTracks.audio.codecCopy);
+                    console.log('audio codec matched:', audio.codecCopy);
 
-                        delete rtpTracks.audio;
+                    delete rtpTracks.audio;
 
                     await rtspClient.setup({
                         type: 'tcp',
@@ -179,7 +179,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     });
                 }
                 else {
-                    console.log('audio codec transcoding:', rtpTracks.audio.codecCopy);
+                    console.log('audio codec transcoding:', audio.codecCopy);
                     if (!audioSection)
                         audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
 
@@ -224,7 +224,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         }
     }
     else {
-        console.log('video codec/container not matched, transcoding:', rtpTracks.audio.codecCopy);
+        console.log('video codec/container not matched, transcoding:', rtpTracks.audio?.codecCopy);
     }
 
     const forwarders = await createTrackForwarders(console, rtpTracks);

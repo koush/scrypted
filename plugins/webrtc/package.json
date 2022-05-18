@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/webrtc",
-   "version": "0.0.29",
+   "version": "0.0.31",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
