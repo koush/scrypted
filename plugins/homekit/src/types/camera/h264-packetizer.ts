@@ -279,6 +279,13 @@ export class H264Repacketizer {
 
     repacketize(packet: RtpPacket): Buffer[] {
         const ret: Buffer[] = [];
+
+        // empty packets are apparently valid from webrtc. filter those out.
+        if (!packet.payload.length) {
+            this.extraPackets--;
+            return ret;
+        }
+
         const nalType = packet.payload[0] & 0x1F;
 
         // fragmented packets must share a timestamp
