@@ -96,7 +96,6 @@ class ScryptedInterface(Enum):
     HumiditySensor = "HumiditySensor"
     HumiditySetting = "HumiditySetting"
     Intercom = "Intercom"
-    IntrusionSensor = "IntrusionSensor"
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
     MediaPlayer = "MediaPlayer"
@@ -526,6 +525,9 @@ class VideoClipOptions(TypedDict):
     startTime: float
     pass
 
+class TamperState(TypedDict):
+    pass
+
 class AirQualitySensor:
     airQuality: AirQuality
     pass
@@ -669,10 +671,6 @@ class Intercom:
         pass
     async def stopIntercom(self) -> None:
         pass
-    pass
-
-class IntrusionSensor:
-    intrusionDetected: bool
     pass
 
 class Lock:
@@ -902,7 +900,7 @@ class StartStop:
     pass
 
 class TamperSensor:
-    tampered: bool
+    tampered: TamperState
     pass
 
 class TemperatureSetting:
@@ -1118,7 +1116,6 @@ class ScryptedInterfaceProperty(Enum):
     fromMimeType = "fromMimeType"
     toMimeType = "toMimeType"
     binaryState = "binaryState"
-    intrusionDetected = "intrusionDetected"
     tampered = "tampered"
     powerDetected = "powerDetected"
     audioDetected = "audioDetected"
@@ -1409,17 +1406,10 @@ class DeviceState:
         self.setScryptedProperty("binaryState", value)
 
     @property
-    def intrusionDetected(self) -> bool:
-        return self.getScryptedProperty("intrusionDetected")
-    @intrusionDetected.setter
-    def intrusionDetected(self, value: bool):
-        self.setScryptedProperty("intrusionDetected", value)
-
-    @property
-    def tampered(self) -> bool:
+    def tampered(self) -> TamperState:
         return self.getScryptedProperty("tampered")
     @tampered.setter
-    def tampered(self, value: bool):
+    def tampered(self, value: TamperState):
         self.setScryptedProperty("tampered", value)
 
     @property
@@ -1881,13 +1871,6 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "binaryState"
-    ]
-  },
-  "IntrusionSensor": {
-    "name": "IntrusionSensor",
-    "methods": [],
-    "properties": [
-      "intrusionDetected"
     ]
   },
   "TamperSensor": {

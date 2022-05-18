@@ -729,11 +729,9 @@ export interface Settings {
 export interface BinarySensor {
   binaryState?: boolean;
 }
-export interface IntrusionSensor {
-  intrusionDetected?: boolean;
-}
+export type TamperState = 'intrusion' | 'motion' | 'magnetic' | 'cover';
 export interface TamperSensor {
-  tampered?: boolean;
+  tampered?: TamperState;
 }
 export interface PowerSensor {
   powerDetected?: boolean;
@@ -1418,7 +1416,6 @@ export enum ScryptedInterface {
   BufferConverter = "BufferConverter",
   Settings = "Settings",
   BinarySensor = "BinarySensor",
-  IntrusionSensor = "IntrusionSensor",
   TamperSensor = "TamperSensor",
   PowerSensor = "PowerSensor",
   AudioSensor = "AudioSensor",

@@ -44,7 +44,6 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["fromMimeType"] = "fromMimeType";
     ScryptedInterfaceProperty["toMimeType"] = "toMimeType";
     ScryptedInterfaceProperty["binaryState"] = "binaryState";
-    ScryptedInterfaceProperty["intrusionDetected"] = "intrusionDetected";
     ScryptedInterfaceProperty["tampered"] = "tampered";
     ScryptedInterfaceProperty["powerDetected"] = "powerDetected";
     ScryptedInterfaceProperty["audioDetected"] = "audioDetected";
@@ -418,13 +417,6 @@ exports.ScryptedInterfaceDescriptors = {
             'binaryState'
         ]
     },
-    IntrusionSensor: {
-        name: 'IntrusionSensor',
-        methods: [],
-        properties: [
-            'intrusionDetected'
-        ]
-    },
     TamperSensor: {
         name: 'TamperSensor',
         methods: [],
@@ -786,7 +778,6 @@ var ScryptedInterface;
     ScryptedInterface["BufferConverter"] = "BufferConverter";
     ScryptedInterface["Settings"] = "Settings";
     ScryptedInterface["BinarySensor"] = "BinarySensor";
-    ScryptedInterface["IntrusionSensor"] = "IntrusionSensor";
     ScryptedInterface["TamperSensor"] = "TamperSensor";
     ScryptedInterface["PowerSensor"] = "PowerSensor";
     ScryptedInterface["AudioSensor"] = "AudioSensor";

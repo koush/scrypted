@@ -38,8 +38,7 @@ export interface DeviceState {
     fromMimeType?: string;
     toMimeType?: string;
     binaryState?: boolean;
-    intrusionDetected?: boolean;
-    tampered?: boolean;
+    tampered?: TamperState;
     powerDetected?: boolean;
     audioDetected?: boolean;
     motionDetected?: boolean;
@@ -95,8 +94,7 @@ export declare class DeviceBase implements DeviceState {
     fromMimeType?: string;
     toMimeType?: string;
     binaryState?: boolean;
-    intrusionDetected?: boolean;
-    tampered?: boolean;
+    tampered?: TamperState;
     powerDetected?: boolean;
     audioDetected?: boolean;
     motionDetected?: boolean;
@@ -152,7 +150,6 @@ export declare enum ScryptedInterfaceProperty {
     fromMimeType = "fromMimeType",
     toMimeType = "toMimeType",
     binaryState = "binaryState",
-    intrusionDetected = "intrusionDetected",
     tampered = "tampered",
     powerDetected = "powerDetected",
     audioDetected = "audioDetected",
@@ -834,11 +831,9 @@ export interface Settings {
 export interface BinarySensor {
     binaryState?: boolean;
 }
-export interface IntrusionSensor {
-    intrusionDetected?: boolean;
-}
+export declare type TamperState = 'intrusion' | 'motion' | 'magnetic' | 'cover';
 export interface TamperSensor {
-    tampered?: boolean;
+    tampered?: TamperState;
 }
 export interface PowerSensor {
     powerDetected?: boolean;
@@ -1461,7 +1456,6 @@ export declare enum ScryptedInterface {
     BufferConverter = "BufferConverter",
     Settings = "Settings",
     BinarySensor = "BinarySensor",
-    IntrusionSensor = "IntrusionSensor",
     TamperSensor = "TamperSensor",
     PowerSensor = "PowerSensor",
     AudioSensor = "AudioSensor",
