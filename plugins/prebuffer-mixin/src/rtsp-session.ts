@@ -39,10 +39,10 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
         sessionKilled = resolve;
     });
 
-    const kill = () => {
+    const kill = (error?: Error) => {
         if (isActive) {
             events.emit('killed');
-            events.emit('error', new Error('killed'));
+            events.emit('error', error || new Error('killed'));
         }
         isActive = false;
         sessionKilled();
@@ -50,10 +50,10 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
     };
 
     rtspClient.client.on('close', () => {
-        kill();
+        kill(new Error('rtsp socket closed'));
     });
-    rtspClient.client.on('error', () => {
-        kill();
+    rtspClient.client.on('error', e => {
+        kill(e);
     });
 
     const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.rtspRequestTimeout);
@@ -177,7 +177,9 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
 
         // don't start parsing until next tick when this function returns to allow
         // event handlers to be set prior to parsing.
-        process.nextTick(() => rtspClient.readLoop().finally(kill));
+        process.nextTick(() => rtspClient.readLoop()
+            .catch(e => kill(e))
+            .finally(() => kill(new Error('rtsp read loop exited'))));
 
         // this return block is intentional, to ensure that the remaining code happens sync.
         return (() => {
@@ -217,8 +219,8 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                     return inputVideoResolution;
                 },
                 get isActive() { return isActive },
-                kill() {
-                    kill();
+                kill(error?: Error) {
+                    kill(error);
                 },
                 killed,
                 resetActivityTimer,

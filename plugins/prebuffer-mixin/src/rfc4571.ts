@@ -84,10 +84,10 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         sessionKilled = resolve;
     });
 
-    const kill = () => {
+    const kill = (error?: Error) => {
         if (isActive) {
             events.emit('killed');
-            events.emit('error', new Error('killed'));
+            events.emit('error', error || new Error('killed'));
         }
         isActive = false;
         sessionKilled();
@@ -95,10 +95,10 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
     };
 
     socket.on('close', () => {
-        kill();
+        kill(new Error('rfc4751 socket closed'));
     });
-    socket.on('error', () => {
-        kill();
+    socket.on('error', e => {
+        kill(e);
     });
 
     const { resetActivityTimer } = setupActivityTimer('rtsp', kill, events, options?.timeout);
@@ -184,7 +184,7 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
             throw e;
         })
         .finally(() => {
-            kill();
+            kill(new Error('parser exited'));
         });
 
 
@@ -196,8 +196,8 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
             return inputVideoResolution;
         },
         get isActive() { return isActive },
-        kill() {
-            kill();
+        kill(error?: Error) {
+            kill(error);
         },
         killed,
         resetActivityTimer,

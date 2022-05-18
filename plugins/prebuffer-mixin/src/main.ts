@@ -742,7 +742,7 @@ class PrebufferSession {
           return;
         }
         this.console.warn('SEI packet detected while operating with Scrypted Parser as default. Restarting rebroadcast.');
-        session.kill();
+        session.kill(new Error('restarting due to SEI packet detection'));
         this.startPrebufferSession();
       }
     }
@@ -789,7 +789,7 @@ class PrebufferSession {
 
     if (probingAudioCodec) {
       this.console.warn('Audio probe complete, ending rebroadcast session and restarting with detected codecs.');
-      session.kill();
+      session.kill(new Error('audio probe completed, restarting'));
       return this.startPrebufferSession();
     }
 
@@ -886,7 +886,7 @@ class PrebufferSession {
         return;
       }
       this.console.log(this.streamName, 'terminating rebroadcast due to inactivity');
-      session.kill();
+      session.kill(new Error('stream inactivity'));
     }, 30000);
   }
 
@@ -1278,7 +1278,9 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
             session.ensurePrebufferSession();
             let wasActive = false;
             try {
+              this.console.log('prebuffer session starting');
               const ps = await session.parserSessionPromise;
+              this.console.log('prebuffer session started');
               active++;
               wasActive = true;
               this.online = !!active;
@@ -1356,7 +1358,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     // kill and reinitiate the prebuffers.
     for (const session of sessions.values()) {
-      session?.parserSessionPromise?.then(session => session.kill());
+      session?.parserSessionPromise?.then(session => session.kill(new Error('rebroadcast settings changed')));
     }
     this.ensurePrebufferSessions();
   }
@@ -1399,7 +1401,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       session.clearPrebuffers();
       session.parserSessionPromise?.then(parserSession => {
         this.console.log('prebuffer session released');
-        parserSession.kill();
+        parserSession.kill(new Error('rebroadcast disabled'));
         session.clearPrebuffers();
       });
     }
