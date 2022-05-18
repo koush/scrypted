@@ -238,7 +238,7 @@ export async function createRTCPeerConnectionSink(
             );
 
             const scaleFilter = `scale='min(${width},iw)':-2`;
-            if (ffmpegInput.h264FilterArguments.length) {
+            if (ffmpegInput.h264FilterArguments?.length) {
                 const filterIndex = ffmpegInput.h264FilterArguments?.findIndex(f => f === '-filter_complex');
                 if (filterIndex !== undefined && filterIndex !== -1)
                     ffmpegInput.h264FilterArguments[filterIndex + 1] = ffmpegInput.h264FilterArguments[filterIndex + 1] + `[unscaled] ; [unscaled] ${scaleFilter}`;
@@ -246,6 +246,7 @@ export async function createRTCPeerConnectionSink(
                     ffmpegInput.h264FilterArguments.push('-filter_complex', scaleFilter);
             }
             else {
+                ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
                 ffmpegInput.h264FilterArguments.push('-filter_complex', scaleFilter);
             }
 
