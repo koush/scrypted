@@ -118,6 +118,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         && rtpTracks.video.codecCopy
         && rtpTracks.video.codecCopy === ffmpegInput.mediaStreamOptions?.video?.codec) {
 
+        console.log('video codec matched:', rtpTracks.video.codecCopy);
+
         const { video, audio } = rtpTracks;
         delete rtpTracks.video;
         const videoCodec = video.codecCopy;
@@ -162,7 +164,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                 if (audioSection
                     && audioCodec
                     && audio.codecCopy === ffmpegInput.mediaStreamOptions?.audio?.codec) {
-                    delete rtpTracks.audio;
+
+                        console.log('audio codec matched:', rtpTracks.audio.codecCopy);
+
+                        delete rtpTracks.audio;
 
                     await rtspClient.setup({
                         type: 'tcp',
@@ -174,6 +179,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     });
                 }
                 else {
+                    console.log('audio codec transcoding:', rtpTracks.audio.codecCopy);
                     if (!audioSection)
                         audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
 
@@ -181,7 +187,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         console.warn(`audio section not found in sdp.`);
                     }
                     else {
-                        const newSdp = parseSdp(sdp);
+                        const newSdp = Object.assign({}, parsedSdp);
                         newSdp.msections = newSdp.msections.filter(msection => msection === audioSection);
                         const udpPort = Math.floor(Math.random() * 10000 + 30000);
                         pipeSdp = addTrackControls(replaceSectionPort(newSdp.toSdp(), 'audio', udpPort));
@@ -216,6 +222,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             rtspClient.client.destroy();
             throw e;
         }
+    }
+    else {
+        console.log('video codec/container not matched, transcoding:', rtpTracks.audio.codecCopy);
     }
 
     const forwarders = await createTrackForwarders(console, rtpTracks);
