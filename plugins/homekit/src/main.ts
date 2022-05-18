@@ -205,9 +205,12 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         }
                     }, createHAPUsernameStorageSettingsDict())
 
+                    const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
+
                     let published = false;
                     const publish = () => {
                         published = true;
+                        mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
                         accessory.publish({
                             username: storageSettings.values.mac,
                             port: 0,
@@ -218,41 +221,30 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         });
                     }
 
-                    const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
-                    const maybeUnpublish = async () => {
-                        // wait a bit for things to settle before unpublishing
-                        sleep(5000);
-                        // maybe it was already unpublished due to a weird race condition.
-                        if (!published)
-                            return;
-                        // the online state may no longer be applicable (rebroadcast removed)
-                        if (!device.interfaces.includes(ScryptedInterface.Online))
-                            return;
-
-                        mixinConsole.warn('Device is in accessory mode has gone offline. HomeKit services are being unpublished. ')
+                    const unpublish = () => {
+                        mixinConsole.warn('Device is in accessory mode and is offline. HomeKit services are being unpublished. ')
                         published = false;
                         // hack to allow republishing.
                         accessory.controllerStorage = new ControllerStorage(accessory);
                         accessory.unpublish();
                     }
 
-                    if (device.interfaces.includes(ScryptedInterface.Online)) {
-                        if (device.online) {
+                    const updateDeviceAdvertisement = () => {
+                        const isOnline = !device.interfaces.includes(ScryptedInterface.Online) || device.online;
+                        if (isOnline && !published) {
                             publish();
                         }
-                        else {
-                            mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
+                        else if (!isOnline && published) {
+                            unpublish();
                         }
-                        device.listen(ScryptedInterface.Online, () => {
-                            if (device.online && !published)
-                                publish();
-                            else if (!device.online)
-                                maybeUnpublish();
-                        });
                     }
-                    else {
-                        publish();
-                    }
+
+                    updateDeviceAdvertisement();
+                    if (!published)
+                        mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
+
+                    // throttle this in case the device comes back online very quickly.
+                    device.listen(ScryptedInterface.Online, () => setTimeout(updateDeviceAdvertisement, 30000));
                 }
                 else {
                     if (standalone)
