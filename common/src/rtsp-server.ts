@@ -300,7 +300,7 @@ export class RtspClient extends RtspBase {
     async handleDataPayload(header: Buffer) {
         // todo: fix this, because calling teardown outside of the read loop causes this.
         if (header[0] !== RTSP_FRAME_MAGIC)
-            throw new Error('RTSP Client expected frame magic but received: ' + header.toString());
+            throw new Error('RTSP Client received invalid frame magic. This may be a bug in your camera firmware. If this error persists, switch your RTSP Parser to FFmpeg or Scrypted (UDP): ' + header.toString());
 
         const channel = header.readUInt8(1);
         const length = header.readUInt16BE(2);
