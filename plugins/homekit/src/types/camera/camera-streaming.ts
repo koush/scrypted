@@ -68,16 +68,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 closeQuiet(audioReturn);
             });
 
-            const isHomeHub = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(request.targetAddress);
-            if (isHomeHub)
-                console.log('Streaming request is coming from the active HomeHub. Will wait for initial RTCP packet.');
-
-            const videoReturnRtcpReady = !isHomeHub
-                ? undefined
-                : timeoutPromise(1000, once(videoReturn, 'message')).catch(() => {
-                    console.warn('Video RTCP Packet timed out. There may be a network (routing/firewall) issue preventing the Apple device sending UDP packets back to Scrypted.');
-                });
-
             const session: CameraStreamingSession = {
                 aconfig: {
                     keys: {
@@ -106,7 +96,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 audiossrc,
                 videoReturn,
                 audioReturn,
-                videoReturnRtcpReady,
+                videoReturnRtcpReady: undefined,
             };
 
             sessions.set(request.sessionID, session);
@@ -200,6 +190,20 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 isLowBandwidth,
                 isWatch,
             } = await getStreamingConfiguration(device, forceLowBandwidth, storage, request)
+
+            const isHomeHub = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
+            if (isHomeHub)
+                console.log('Streaming request is coming from the active HomeHub. Will wait for initial RTCP packet.');
+            const hasHomeHub = !!homekitPlugin.storageSettings.values.lastKnownHomeHub;
+            if (!hasHomeHub)
+                console.log('HomeHub currently unknown. Will wait for initial RTCP packet.');
+
+            const videoReturnRtcpReady = !isHomeHub && !isLowBandwidth && hasHomeHub
+                ? undefined
+                : timeoutPromise(1000, once(session.videoReturn, 'message')).catch(() => {
+                    console.warn('Video RTCP Packet timed out. There may be a network (routing/firewall) issue preventing the Apple device sending UDP packets back to Scrypted.');
+                });
+            session.videoReturnRtcpReady = videoReturnRtcpReady;
 
             console.log({
                 dynamicBitrate,
