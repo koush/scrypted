@@ -238,13 +238,16 @@ export async function createRTCPeerConnectionSink(
             );
 
             const scaleFilter = `scale='min(${width},iw)':-2`;
-            let filterIndex = ffmpegInput.inputArguments.findIndex(f => f === '-vf');
-            if (filterIndex === -1)
-                filterIndex = ffmpegInput.inputArguments.findIndex(f => f === '-filter_complex');
-            if (filterIndex !== -1)
-                ffmpegInput.inputArguments[filterIndex + 1] = ffmpegInput.inputArguments[filterIndex + 1] + ` [unscaled]; [unscaled] ${scaleFilter}`;
-            else
-                videoArgs.push('-vf', scaleFilter)
+            if (ffmpegInput.h264FilterArguments.length) {
+                const filterIndex = ffmpegInput.h264FilterArguments?.findIndex(f => f === '-filter_complex');
+                if (filterIndex !== undefined && filterIndex !== -1)
+                    ffmpegInput.h264FilterArguments[filterIndex + 1] = ffmpegInput.h264FilterArguments[filterIndex + 1] + `[unscaled] ; [unscaled] ${scaleFilter}`;
+                else
+                    ffmpegInput.h264FilterArguments.push('-filter_complex', scaleFilter);
+            }
+            else {
+                ffmpegInput.h264FilterArguments.push('-filter_complex', scaleFilter);
+            }
 
             if (!sessionSupportsH264High || maximumCompatibilityMode) {
                 // baseline profile must use libx264, not sure other encoders properly support it.

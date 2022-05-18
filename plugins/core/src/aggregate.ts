@@ -25,7 +25,7 @@ aggregators.set(ScryptedInterface.MotionSensor, average);
 aggregators.set(ScryptedInterface.HumiditySensor, average);
 aggregators.set(ScryptedInterface.Thermometer, average);
 aggregators.set(ScryptedInterface.BinarySensor, allFalse);
-aggregators.set(ScryptedInterface.IntrusionSensor, allFalse);
+aggregators.set(ScryptedInterface.TamperSensor, allFalse);
 aggregators.set(ScryptedInterface.PowerSensor, allFalse);
 aggregators.set(ScryptedInterface.MotionSensor, allFalse);
 aggregators.set(ScryptedInterface.AudioSensor, allFalse);
@@ -62,25 +62,25 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             'nullsrc=size=1920x1080 [base];'
         ];
 
-        const filteredInput: FFmpegInput = {
+        const ffmpegInput: FFmpegInput = {
             url: undefined,
             container: 'rawvideo',
             mediaStreamOptions: (await createVideoStreamOptions())?.[0],
             inputArguments: [],
+            h264FilterArguments: [],
         };
 
         for (let i = 0; i < inputs.length; i++) {
-            filteredInput.inputArguments.push(...inputs[i].inputArguments);
+            ffmpegInput.inputArguments.push(...inputs[i].inputArguments);
             filter.push(`[${i}:v] scale=-1:${h},pad=${w}:ih:(ow-iw)/2 [pos${i}];`)
         }
         for (let i = inputs.length; i < dim * dim; i++) {
-            filteredInput.inputArguments.push(
+            ffmpegInput.inputArguments.push(
                 '-f', 'lavfi', '-i', `color=black:s=${w}x${h}`,
             );
             filter.push(`[${i}:v] scale=${w}x${h} [pos${i}];`)
         }
-
-        filteredInput.inputArguments.push(
+        ffmpegInput.inputArguments.push(
             '-f', 'lavfi', '-i', 'anullsrc',
         )
 
@@ -95,15 +95,16 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             curx += w;
         }
 
+
         let i = dim * dim - 1;
         filter.push(`[${prev}][pos${i}] overlay=shortest=1:x=${curx % 1920}:y=${cury % 1080}`);
 
-        filteredInput.inputArguments.push(
+        ffmpegInput.h264FilterArguments.push(
             '-filter_complex',
             filter.join(' '),
         );
 
-        return filteredInput;
+        return ffmpegInput;
     };
 
     const createVideoStreamOptions: () => Promise<ResponseMediaStreamOptions[]> = async () => {

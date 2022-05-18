@@ -1226,6 +1226,20 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       ffmpegInput.h264FilterArguments.push("-bsf:v", "dump_extra");
     }
 
+    if (transcodingEnabled && this.streamSettings.storageSettings.values.videoFilterArguments) {
+      ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
+      if (ffmpegInput.h264FilterArguments.length) {
+        const filterIndex = ffmpegInput.h264FilterArguments?.findIndex(f => f === '-filter_complex');
+        if (filterIndex !== undefined && filterIndex !== -1)
+          ffmpegInput.h264FilterArguments[filterIndex + 1] = ffmpegInput.h264FilterArguments[filterIndex + 1] + `[prefilter] ; [prefilter] ${this.streamSettings.storageSettings.values.videoFilterArguments}`;
+        else
+          ffmpegInput.h264FilterArguments.push('-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments);
+    }
+      else {
+        ffmpegInput.h264FilterArguments.push('-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments);
+      }
+    }
+
     if (transcodingEnabled)
       ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
     return mediaManager.createFFmpegMediaObject(ffmpegInput, {

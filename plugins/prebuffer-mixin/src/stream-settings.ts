@@ -131,6 +131,13 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             combobox: true,
             mapPut: (oldValue, newValue) => getH264DecoderArgs()[newValue]?.join(' ') || newValue,
             hide: true,
+        },
+        videoFilterArguments: {
+            group: 'Transcoding',
+            title: 'Video Filter Arguments',
+            description: 'FFmpeg arguments used to filter input video when transcoding a stream. This can be used to crops, scale, rotates, etc.',
+            placeholder: 'transpose=1',
+            hide: true,
         }
     });
 
@@ -183,6 +190,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                 transcodeStreams: hideTranscode,
                 missingCodecParameters: hideTranscode,
                 videoDecoderArguments: hideTranscode,
+                videoFilterArguments: hideTranscode,
             };
 
             try {
