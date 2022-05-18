@@ -23,7 +23,7 @@ export interface ParserSession<T extends string> {
         width: number,
         height: number,
     },
-    kill(): void;
+    kill(error?: Error): void;
     killed: Promise<void>;
     isActive: boolean;
 
@@ -89,14 +89,15 @@ export async function parseAudioCodec(cp: ChildProcess) {
     return parseInputToken(cp, 'Audio');
 }
 
-export function setupActivityTimer(container: string, kill: () => void, events: {
+export function setupActivityTimer(container: string, kill: (error?: Error) => void, events: {
     once(event: 'killed', callback: () => void): void,
 }, timeout: number) {
     let dataTimeout: NodeJS.Timeout;
 
     function dataKill() {
-        console.error('timeout waiting for data, killing parser session', container);
-        kill();
+        const str = 'timeout waiting for data, killing parser session';
+        console.error(str, container);
+        kill(new Error(str));
     }
 
     let lastTime = Date.now();
@@ -145,10 +146,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         sessionKilled = resolve;
     });
 
-    function kill() {
+    function kill(error?: Error) {
         if (isActive) {
             events.emit('killed');
-            events.emit('error', new Error('killed'));
+            events.emit('error', error || new Error('killed'));
         }
         isActive = false;
         sessionKilled();
@@ -229,7 +230,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
                 }
                 catch (e) {
                     console.error('rebroadcast parse error', e);
-                    kill();
+                    kill(e);
                 }
             })();
         }
@@ -254,7 +255,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         stdio,
     });
     ffmpegLogInitialOutput(console, cp, undefined, options?.storage);
-    cp.on('exit', kill);
+    cp.on('exit', () => kill(new Error('ffmpeg exited')));
 
     let sdp: Promise<Buffer[]>;
     if (needSdp) {
@@ -289,7 +290,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         }
         catch (e) {
             console.error('rebroadcast parse error', e);
-            kill();
+            kill(e);
         }
     });
 
@@ -313,7 +314,9 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
             }
         },
         get isActive() { return isActive },
-        kill,
+        kill(error?: Error) {
+            kill(error);
+        },
         killed,
         negotiateMediaStream: () => {
             const ret: ResponseMediaStreamOptions = cloneDeep(ffmpegInput.mediaStreamOptions) || {
