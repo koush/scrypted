@@ -1473,7 +1473,7 @@ export interface Settings {
 export interface BinarySensor {
   binaryState?: boolean;
 }
-export type TamperState = 'intrusion' | 'motion' | 'magnetic' | 'cover';
+export type TamperState = 'intrusion' | 'motion' | 'magnetic' | 'cover' | true;
 export interface TamperSensor {
   tampered?: TamperState;
 }
