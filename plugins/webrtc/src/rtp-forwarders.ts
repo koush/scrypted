@@ -182,7 +182,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     }
                     else {
                         const newSdp = parseSdp(sdp);
-                        newSdp.msections.filter(msection => msection === audioSection);
+                        newSdp.msections = newSdp.msections.filter(msection => msection === audioSection);
                         const udpPort = Math.floor(Math.random() * 10000 + 30000);
                         pipeSdp = addTrackControls(replaceSectionPort(newSdp.toSdp(), 'audio', udpPort));
 

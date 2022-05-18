@@ -167,7 +167,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         if (interfaces.includes(ScryptedInterface.RTCSignalingChannel)) {
             const ret = [
                 ScryptedInterface.RTCSignalingChannel,
-                // ScryptedInterface.Settings,
+                ScryptedInterface.Settings,
             ];
             if (type === ScryptedDeviceType.Speaker) {
                 ret.push(ScryptedInterface.Intercom);
