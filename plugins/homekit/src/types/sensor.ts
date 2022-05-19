@@ -1,4 +1,4 @@
-import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor, IntrusionSensor } from '@scrypted/sdk';
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor, TamperSensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -34,7 +34,6 @@ const supportedSensors: string[] = [
     ScryptedInterface.PM25Sensor,
     ScryptedInterface.VOCSensor,
     ScryptedInterface.EntrySensor,
-    ScryptedInterface.IntrusionSensor,
 ];
 
 addSupportedType({
@@ -46,7 +45,7 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & IntrusionSensor, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & TamperSensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
@@ -57,10 +56,6 @@ addSupportedType({
             const service = accessory.addService(Service.ContactSensor, device.name);
             bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.ContactSensorState,
                 () => !!device.entryOpen);
-        } else if (device.interfaces.includes(ScryptedInterface.IntrusionSensor)) {
-            const service = accessory.addService(Service.ContactSensor, device.name);
-            bindCharacteristic(device, ScryptedInterface.IntrusionSensor, service, Characteristic.ContactSensorState,
-                () => !!device.intrusionDetected);
         }
 
         if (device.interfaces.includes(ScryptedInterface.OccupancySensor)) {
@@ -116,6 +111,33 @@ addSupportedType({
         }
 
         // todo: more sensors.
+
+        const tamperServices: typeof Service[] = [
+            Service.ContactSensor,
+            Service.AirQualitySensor,
+            Service.CarbonDioxideSensor,
+            Service.CarbonMonoxideSensor,
+            Service.HumiditySensor,
+            Service.LeakSensor,
+            Service.LightSensor,
+            Service.MotionSensor,
+            Service.OccupancySensor,
+            Service.SecuritySystem,
+            Service.SmokeSensor,
+            Service.TemperatureSensor,
+        ];
+
+        if (device.interfaces.includes(ScryptedInterface.TamperSensor)) {
+            for (const service of accessory.services) {
+                for (const tamperEligibleService of tamperServices) {
+                    if (service instanceof tamperEligibleService) {
+                        bindCharacteristic(device, ScryptedInterface.TamperSensor, service, Characteristic.StatusTampered,
+                            () => (device.tampered ? 1 : 0));
+                    }
+                }
+            }
+        }
+
         return accessory;
     }
 });
