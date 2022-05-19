@@ -169,7 +169,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         tool: mso?.tool,
         rtpSender,
     });
-    const h264Info = ffmpegInput.mediaStreamOptions?.video?.h264Info;
+    const h264Info = ffmpegInput.mediaStreamOptions?.video?.h264Info || {};
     const oddity = h264Info.fuab || h264Info.stapb || h264Info.mtap16 || h264Info.mtap32 || h264Info.sei;
     if (rtpSender === 'Default' && oddity) {
         console.warn('H264 oddities are reported in the stream. Using FFmpeg.');
