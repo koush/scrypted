@@ -196,6 +196,18 @@ export function parseHeaders(headers: string[]): Headers {
     return ret;
 }
 
+export function getAuthenticateHeader(type: string, headers: string[]): string {
+    for (const header of headers.slice(1)) {
+        const index = header.indexOf(':');
+        let value = '';
+        if (index !== -1)
+            value = header.substring(index + 1).trim();
+        const key = header.substring(0, index).toLowerCase();
+        if (key === 'www-authenticate' && value.startsWith(`${type} `))
+            return value;
+    }
+}
+
 export function parseSemicolonDelimited(value: string) {
     const dict: { [key: string]: string } = {};
     for (const part of value.split(';')) {
@@ -430,7 +442,7 @@ export class RtspClient extends RtspBase {
         if (!status.includes('200') && !response['www-authenticate'])
             throw new Error(status);
 
-        const wwwAuthenticate = response['www-authenticate']
+        const wwwAuthenticate = getAuthenticateHeader('Digest', message) || response['www-authenticate']
         if (wwwAuthenticate) {
             if (authenticating)
                 throw new Error('auth failed');

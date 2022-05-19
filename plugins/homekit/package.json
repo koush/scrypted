@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/homekit",
-   "version": "1.0.5",
+   "version": "1.0.6",
    "description": "HomeKit Plugin for Scrypted",
    "scripts": {
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
