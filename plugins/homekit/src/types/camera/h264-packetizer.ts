@@ -33,6 +33,33 @@ function depacketizeStapA(data: Buffer) {
     return ret;
 }
 
+function splitBitstream(data: Buffer) {
+    const ret: Buffer[] = [];
+    let previous = 0;
+    let offset = 0;
+    const maybeAddSlice = () => {
+        const slice = data.subarray(previous, offset);
+        if (slice.length)
+            ret.push(slice);
+        offset += 4;
+        previous = offset;
+    }
+
+    while (offset < data.length - 4) {
+        const startCode = data.readUInt32BE(offset);
+        if (startCode === 1) {
+            maybeAddSlice();
+        }
+        else {
+            offset++;
+        }
+    }
+    offset = data.length;
+    maybeAddSlice();
+
+    return ret;
+}
+
 export class H264Repacketizer {
     extraPackets = 0;
     fuaMax: number;
@@ -246,12 +273,42 @@ export class H264Repacketizer {
         originalFragments.unshift(originalNalHeader);
         const defragmented = Buffer.concat(originalFragments);
 
-        const fragments = this.packetizeFuA(defragmented, !hasFuStart, !hasFuEnd);
-        const hadMarker = last.header.marker;
-        this.createRtpPackets(first, fragments, ret, hadMarker);
+        if (originalNalType === NAL_TYPE_SPS) {
+            if (!this.codecInfo)
+                this.codecInfo = {
+                    sps: undefined,
+                    pps: undefined,
+                };
+
+            // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
+            // this probably is not compliant...
+            const splits = splitBitstream(defragmented);
+            while (splits.length) {
+                const split = splits.shift();
+                const splitNaluType = split[0] & 0x1f;
+                if (splitNaluType === NAL_TYPE_SPS) {
+                    this.codecInfo.sps = split;
+                }
+                else if (splitNaluType === NAL_TYPE_PPS) {
+                    this.codecInfo.pps = split;
+                }
+                else {
+                    if (splitNaluType === NAL_TYPE_IDR)
+                        this.maybeSendSpsPps(first, ret);
+
+                    const fragments = this.packetizeFuA(split, !hasFuStart, !hasFuEnd);
+                    const hadMarker = last.header.marker;
+                    this.createRtpPackets(first, fragments, ret, hadMarker);
+                }
+            }
+        }
+        else {
+            const fragments = this.packetizeFuA(defragmented, !hasFuStart, !hasFuEnd);
+            const hadMarker = last.header.marker;
+            this.createRtpPackets(first, fragments, ret, hadMarker);
+        }
 
         this.extraPackets -= this.pendingFuA.length - 1;
-
         this.pendingFuA = undefined;
     }
 
@@ -265,7 +322,7 @@ export class H264Repacketizer {
     }
 
     maybeSendSpsPps(packet: RtpPacket, ret: Buffer[]) {
-        if (!this.codecInfo.sps || !this.codecInfo.pps)
+        if (!this.codecInfo?.sps || !this.codecInfo?.pps)
             return;
 
         const aggregates = this.packetizeStapA([this.codecInfo.sps, this.codecInfo.pps]);
