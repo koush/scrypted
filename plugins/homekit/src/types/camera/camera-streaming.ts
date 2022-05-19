@@ -180,7 +180,12 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
-            const forceLowBandwidth = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
+            const isHomeHub = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
+            // ios is seemingly forcing all connections through the home hub on ios 15.5. this is test code to force low bandwidth.
+            // remote wifi connections request the same audio packet time as local wifi connections.
+            // so there's no way to differentiate between remote and local wifi. with low bandwidth forcing off,
+            // it will always select the local stream. with it on, it always selects the remote stream.
+            let forceLowBandwidth = false && isHomeHub;
             if (forceLowBandwidth)
                 console.log('Streaming request is coming from the active HomeHub. Low bandwidth stream will be selected in case this is a remote wifi connection.');
 
@@ -191,7 +196,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 isWatch,
             } = await getStreamingConfiguration(device, forceLowBandwidth, storage, request)
 
-            const isHomeHub = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
             const hasHomeHub = !!homekitPlugin.storageSettings.values.lastKnownHomeHub;
             const waitRtcp = isHomeHub || isLowBandwidth || !hasHomeHub;
             if (waitRtcp) {

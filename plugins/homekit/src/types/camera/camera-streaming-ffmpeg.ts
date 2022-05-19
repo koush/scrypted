@@ -128,10 +128,10 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
                 session.startRequest.video.rtcp_interval, {
-                    maxPacketSize: session.startRequest.video.mtu,
-                    sps: undefined,
-                    pps: undefined,
-                }
+                maxPacketSize: session.startRequest.video.mtu,
+                sps: undefined,
+                pps: undefined,
+            }
             );
             videoForwarder.server.on('message', data => {
                 const rtp = RtpPacket.deSerialize(data);
@@ -344,6 +344,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             ffmpegLogInitialOutput(console, ap);
             ap.on('exit', () => session.kill());
             audioSdp.msections = [audioSection];
+            audioSdp.header.lines = [
+                'v=0',
+                'o=- 0 0 IN IP4 127.0.0.1',
+                's=Scrypted HomeKit Audio Demuxer',
+                'c=IN IP4 127.0.0.1',
+                't=0 0',
+            ];
             const ffmpegSdp = addTrackControls(replacePorts(audioSdp.toSdp(), udpPort, 0));
             console.log('demuxed audio sdp', ffmpegSdp);
 

@@ -244,7 +244,13 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
 
                     // throttle this in case the device comes back online very quickly.
-                    device.listen(ScryptedInterface.Online, () => setTimeout(updateDeviceAdvertisement, 30000));
+                    device.listen(ScryptedInterface.Online, () => {
+                        const isOnline = !device.interfaces.includes(ScryptedInterface.Online) || device.online;
+                        if (isOnline)
+                            updateDeviceAdvertisement();
+                        else
+                            setTimeout(updateDeviceAdvertisement, 30000);
+                    });
                 }
                 else {
                     if (standalone)
