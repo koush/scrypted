@@ -704,7 +704,7 @@ class PrebufferSession {
         && this.usingScryptedParser
         && h264Oddities
         && !this.stopInactive
-        && sessionMso.tool === 'scrypted') {
+        && sessionMso.tool !== 'scrypted') {
         this.console.warn('H264 oddities were detected in prebuffered video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
         this.usingScryptedParser = false;
         parser = FFMPEG_PARSER_TCP;
