@@ -699,16 +699,16 @@ class PrebufferSession {
       let { parser, isDefault } = this.getParser(rtspMode, sessionMso);
       this.usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
 
-      // if (isDefault && this.usingScryptedParser && h264Oddities) {
-      //   if (sessionMso.tool === 'scrypted') {
-      //     this.console.warn('H264 oddities were detected in video stream, but stream is marked safe by Scrypted. The Default Scrypted RTSP Parser will  be used. This can be overriden by setting the RTSP Parser to Scrypted.');
-      //   }
-      //   else {
-      //     this.console.warn('H264 oddities were detected in video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
-      //     this.usingScryptedParser = false;
-      //     parser = FFMPEG_PARSER_TCP;
-      //   }
-      // }
+      // prefer ffmpeg if this is a prebuffered stream.
+      if (isDefault
+        && this.usingScryptedParser
+        && h264Oddities
+        && !this.stopInactive
+        && sessionMso.tool === 'scrypted') {
+        this.console.warn('H264 oddities were detected in prebuffered video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
+        this.usingScryptedParser = false;
+        parser = FFMPEG_PARSER_TCP;
+      }
 
       if (this.usingScryptedParser) {
         session = await startRtspSession(this.console, ffmpegInput.url, ffmpegInput.mediaStreamOptions, {
@@ -761,14 +761,14 @@ class PrebufferSession {
             return;
           }
 
-          // if (!this.inactivityTimeout) {
-          //   this.console.warn('Oddity in prebuffered stream. Restarting rebroadcast to use FFmpeg instead.');
-          //   session.kill(new Error('restarting due to H264 oddity detection'));
-          //   this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
-          //   removeOddityProbe();
-          //   this.startPrebufferSession();
-          //   return;
-          // }
+          if (!this.stopInactive) {
+            this.console.warn('Oddity in prebuffered stream. Restarting rebroadcast to use FFmpeg instead.');
+            session.kill(new Error('restarting due to H264 oddity detection'));
+            this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
+            removeOddityProbe();
+            this.startPrebufferSession();
+            return;
+          }
 
           // this.console.warn('Oddity in non prebuffered stream. Next restart will use FFmpeg instead.');
         }
@@ -979,7 +979,8 @@ class PrebufferSession {
         // may be worth considering playing with a few other things to avoid this:
         // mpeg-ts as a container (would need to write a muxer)
         // specifying the buffer before the sync frame with probesize.
-        if (container !== 'rtsp' || !options.findSyncFrame) {
+        // If h264 oddities are detected, assume ffmpeg will be used.
+        if (container !== 'rtsp' || !options.findSyncFrame || this.getLastH264Oddities()) {
           for (const chunk of prebufferContainer) {
             if (chunk.time < now - requestedPrebuffer)
               continue;
