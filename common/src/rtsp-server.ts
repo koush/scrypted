@@ -196,14 +196,14 @@ export function parseHeaders(headers: string[]): Headers {
     return ret;
 }
 
-export function getAuthenticateHeader(type: string, headers: string[]): string {
+export function getFirstAuthenticateHeader(headers: string[]): string {
     for (const header of headers.slice(1)) {
         const index = header.indexOf(':');
         let value = '';
         if (index !== -1)
             value = header.substring(index + 1).trim();
         const key = header.substring(0, index).toLowerCase();
-        if (key === 'www-authenticate' && value.startsWith(`${type} `))
+        if (key === 'www-authenticate')
             return value;
     }
 }
@@ -416,7 +416,6 @@ export class RtspClient extends RtspBase {
         const ha2 = crypto.createHash('md5').update(`${method}:${strippedUrl}`).digest('hex');
         const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
 
-
         const params = {
             username,
             realm: wwwAuth.realm,
@@ -442,7 +441,9 @@ export class RtspClient extends RtspBase {
         if (!status.includes('200') && !response['www-authenticate'])
             throw new Error(status);
 
-        const wwwAuthenticate = getAuthenticateHeader('Digest', message) || response['www-authenticate']
+        // it seems that the first www-authenticate header should be used, as latter ones that are
+        // offered are not actually valid? weird issue seen on tp-link that offers both DIGEST and BASIC.
+        const wwwAuthenticate = getFirstAuthenticateHeader(message) || response['www-authenticate']
         if (wwwAuthenticate) {
             if (authenticating)
                 throw new Error('auth failed');
