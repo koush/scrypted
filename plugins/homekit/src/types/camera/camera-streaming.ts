@@ -38,6 +38,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
     const delegate: CameraStreamingDelegate = {
         handleSnapshotRequest: createSnapshotHandler(device, storage, homekitPlugin, console),
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
+            console.log('prepareStream', Object.assign({}, request, { connection: request.connection.remoteAddress }));
 
             const videossrc = CameraController.generateSynchronisationSource();
             const audiossrc = CameraController.generateSynchronisationSource();
@@ -116,7 +117,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
-            console.log('destination address', session.prepareRequest.targetAddress);
+            console.log('destination address', session.prepareRequest.targetAddress, session.prepareRequest.video.port, session.prepareRequest.audio.port);
             // plugin scope or device scope?
             if (addressOverride) {
                 console.log('using address override', addressOverride);
@@ -154,10 +155,13 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
+            console.log('source address', response.addressOverride, videoPort, audioPort);
+            console.log('prepareStream response', response);
+
             callback(null, response);
         },
         async handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback) {
-            console.log('streaming request', request);
+            console.log('handleStreamRequest', request);
             if (request.type === StreamRequestTypes.STOP) {
                 sessions.get(request.sessionID)?.kill();
                 callback();

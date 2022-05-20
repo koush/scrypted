@@ -8,7 +8,7 @@ import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
 import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
-import { createHAPUsernameStorageSettingsDict, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, typeToCategory } from './hap-utils';
+import { createHAPUsernameStorageSettingsDict, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { randomPinCode } from './pincode';
 import './types';
@@ -24,7 +24,6 @@ const includeToken = 4;
 export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, Settings, DeviceProvider {
     bridge = new Bridge('Scrypted', getHAPUUID(this.storage));
     snapshotThrottles = new Map<string, SnapshotThrottle>();
-    homekitConnections = new Set<string>();
     standalones = new Map<string, Accessory>();
     videoClips: VideoClipsMixinProvider;
     videoClipsId: string;
@@ -33,7 +32,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         pincode: {
             group: 'Pairing',
             title: "Manual Pairing Code",
-            defaultValue: randomPinCode(),
+            persistedDefaultValue: randomPinCode(),
         },
         qrCode: {
             group: 'Pairing',
@@ -208,6 +207,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
 
                     let published = false;
+                    let hasPublished = false;
                     const publish = () => {
                         published = true;
                         mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
@@ -219,6 +219,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                             addIdentifyingMaterial: false,
                             advertiser: this.storageSettings.values.advertiserOverride,
                         });
+                        if (!hasPublished) {
+                            hasPublished = true;
+                            logConnections(mixinConsole, accessory);
+                        }
                     }
 
                     const unpublish = () => {
@@ -279,14 +283,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         };
 
         this.bridge.publish(publishInfo, true);
-        const server: EventedHTTPServer = (this.bridge as any)._server.httpServer;
-        server.on('connection-opened', connection => {
-            connection.on('authenticated', () => {
-                this.console.log('HomeKit Connection', connection.remoteAddress);
-                this.homekitConnections.add(connection.remoteAddress);
-            })
-            connection.on('closed', () => this.homekitConnections.delete(connection.remoteAddress));
-        });
+        logConnections(this.console, this.bridge);
 
         qrcode.generate(this.bridge.setupURI(), { small: true }, (code: string) => {
             this.console.log('Pairing QR Code:')

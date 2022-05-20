@@ -53,25 +53,35 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         h264Packetizer = new H264Repacketizer(console, adjustedMtu, videoOptions);
     }
 
+
+    function sendRtcpInternal(now: number) {
+        lastRtcp = now;
+        const sr = new RtcpSrPacket({
+            ssrc,
+            senderInfo: new RtcpSenderInfo({
+                ntpTimestamp: ntpTime(),
+                rtpTimestamp: lastTimestamp,
+                packetCount,
+                octetCount,
+            }),
+        });
+
+        const packet = srtcpSession.encrypt(sr.serialize());
+        sender.send(packet, port, targetAddress);
+    }
+
+    function sendRtcp() {
+        const now = Date.now();
+        return sendRtcpInternal(now);
+    }
+
     function sendPacket(rtp: RtpPacket) {
         const now = Date.now();
 
         // packet count may be less than zero if rollover counting fails due to heavy packet loss or other
         // unforseen edge cases.
         if (now > lastRtcp + rtcpInterval * 1000) {
-            lastRtcp = now;
-            const sr = new RtcpSrPacket({
-                ssrc,
-                senderInfo: new RtcpSenderInfo({
-                    ntpTimestamp: ntpTime(),
-                    rtpTimestamp: lastTimestamp,
-                    packetCount,
-                    octetCount,
-                }),
-            });
-
-            const packet = srtcpSession.encrypt(sr.serialize());
-            sender.send(packet, port, targetAddress);
+            sendRtcpInternal(now);
         }
         lastTimestamp = rtp.header.timestamp;
 
@@ -85,7 +95,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         sender.send(srtp, port, targetAddress);
     }
 
-    return (rtp: RtpPacket) => {
+    function sendRtp(rtp: RtpPacket) {
         if (firstSequenceNumber === undefined) {
             console.log(`sending first ${audioOptions ? 'audio' : 'video'} packet`);
             firstSequenceNumber = rtp.header.sequenceNumber;
@@ -137,4 +147,9 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             sendPacket(RtpPacket.deSerialize(packet));
         }
     }
+
+    return {
+        sendRtp,
+        sendRtcp,
+    };
 }

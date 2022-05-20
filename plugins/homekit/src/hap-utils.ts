@@ -1,6 +1,6 @@
 import { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType } from '@scrypted/sdk';
 import { randomBytes } from 'crypto';
-import { Categories, HAPStorage } from './hap';
+import { Categories, EventedHTTPServer, HAPStorage } from './hap';
 import './types';
 import os from 'os';
 import { StorageSettingsDict } from '@scrypted/common/src/settings';
@@ -107,4 +107,13 @@ export function createHAPUsernameStorageSettingsDict(): StorageSettingsDict<'mac
             persistedDefaultValue: createHAPUsername(),
         },
     }
+}
+
+export function logConnections(console: Console, accessory: any) {
+    const server: EventedHTTPServer = accessory._server.httpServer;
+    server.on('connection-opened', connection => {
+        connection.on('authenticated', () => {
+            console.log('HomeKit Connection', connection.remoteAddress);
+        });
+    });
 }

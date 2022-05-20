@@ -136,7 +136,7 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
 
     let opusFramesPerPacket = session.startRequest.audio.packet_time / 20;
 
-    videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
+    const vs = createCameraStreamSender(console, session.vconfig, session.videoReturn,
         session.videossrc, session.startRequest.video.pt,
         session.prepareRequest.video.port, session.prepareRequest.targetAddress,
         session.startRequest.video.rtcp_interval,
@@ -144,7 +144,9 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
             maxPacketSize: session.startRequest.video.mtu,
             ...getSpsPps(video),
         });
-    audioSender = createCameraStreamSender(console, session.aconfig, session.audioReturn,
+    videoSender = vs.sendRtp;
+    vs.sendRtcp();
+    const as = createCameraStreamSender(console, session.aconfig, session.audioReturn,
         session.audiossrc, session.startRequest.audio.pt,
         session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
         session.startRequest.audio.rtcp_interval,
@@ -155,6 +157,8 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
             framesPerPacket: opusFramesPerPacket,
         }
     );
+    audioSender = as.sendRtp;
+    as.sendRtcp();
 
     const audioPayloadTypes = parsedSdp.msections.find(msection => msection.type === 'audio')?.payloadTypes;
     const videoPayloadTypes = video?.payloadTypes;

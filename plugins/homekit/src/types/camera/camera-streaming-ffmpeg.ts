@@ -127,17 +127,19 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             const videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
-                session.startRequest.video.rtcp_interval, {
-                maxPacketSize: session.startRequest.video.mtu,
-                sps: undefined,
-                pps: undefined,
-            }
+                session.startRequest.video.rtcp_interval,
+                {
+                    maxPacketSize: session.startRequest.video.mtu,
+                    sps: undefined,
+                    pps: undefined,
+                }
             );
+            videoSender.sendRtcp();
             videoForwarder.server.on('message', data => {
                 const rtp = RtpPacket.deSerialize(data);
                 if (rtp.header.payloadType !== session.startRequest.video.pt)
                     return;
-                videoSender(rtp);
+                videoSender.sendRtp(rtp);
             });
             videoOutput = `rtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
         }
@@ -264,9 +266,10 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                         framesPerPacket: opusFramesPerPacket,
                     }
                 );
+                audioSender.sendRtcp();
                 audioForwarder.server.on('message', data => {
                     const packet = RtpPacket.deSerialize(data);
-                    audioSender(packet);
+                    audioSender.sendRtp(packet);
                 });
                 audioArgs.push(
                     `rtp://127.0.0.1:${audioForwarder.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
