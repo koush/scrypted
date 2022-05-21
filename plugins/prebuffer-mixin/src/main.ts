@@ -924,8 +924,7 @@ class PrebufferSession {
     filter?: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk,
   }) {
     const { isActiveClient, container, session, socketPromise, requestedPrebuffer } = options;
-    if (requestedPrebuffer)
-      this.console.log('sending prebuffer', requestedPrebuffer);
+    this.console.log('sending prebuffer', requestedPrebuffer);
 
     // in case the client never connects, do an inactivity check.
     socketPromise.catch(() => this.inactivityCheck(session, false));
@@ -1015,7 +1014,7 @@ class PrebufferSession {
     const session = await this.parserSessionPromise;
 
     let requestedPrebuffer = options?.prebuffer;
-    if (requestedPrebuffer == null) {
+    if (requestedPrebuffer == null && options?.destination !== 'remote') {
       // try to gaurantee a sync frame, but don't send too much prebuffer.
       requestedPrebuffer = Math.max(4000, this.getDetectedIdrInterval() || 4000);;
     }
