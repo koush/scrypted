@@ -7,7 +7,7 @@ import packageJson from "../package.json";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
-import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
+import { Category, Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import { createHAPUsernameStorageSettingsDict, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { randomPinCode } from './pincode';
@@ -15,6 +15,7 @@ import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
 import crypto from 'crypto';
+import { access } from 'fs';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -218,14 +219,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     const publish = () => {
                         published = true;
                         mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
-                        accessory.publish({
-                            username: storageSettings.values.mac,
-                            port: 0,
-                            pincode: this.storageSettings.values.pincode,
-                            category: standaloneCategory,
-                            addIdentifyingMaterial: false,
-                            advertiser: this.storageSettings.values.advertiserOverride,
-                        });
+                        this.publishAccessory(accessory, storageSettings.values.mac, standaloneCategory);
                         if (!hasPublished) {
                             hasPublished = true;
                             logConnections(mixinConsole, accessory);
@@ -350,6 +344,17 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         return ret;
     }
 
+    publishAccessory(accessory: Accessory, username: string, category: Categories) {
+        accessory.publish({
+            username,
+            port: 0,
+            pincode: this.storageSettings.values.pincode,
+            category,
+            addIdentifyingMaterial: false,
+            advertiser: this.storageSettings.values.advertiserOverride,
+        });
+    }
+
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
         const options: SettingsMixinDeviceOptions<any> = {
             mixinProviderNativeId: this.nativeId,
@@ -362,17 +367,23 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
         if (canCameraMixin(mixinDeviceState.type, mixinDeviceInterfaces)) {
             ret = new CameraMixin(options);
-            const accessory = this.standalones.get(mixinDeviceState.id);
-            ret.storageSettings.settings.qrCode.onPut = () => {
-                qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
-                    ret.console.log('Pairing QR Code:')
-                    ret.console.log('\n' + code);
-                });
-            }
             this.cameraMixins.set(ret.id, ret as any);
         }
         else {
             ret = new HomekitMixin(options);
+        }
+
+        const accessory = this.standalones.get(mixinDeviceState.id);
+        ret.storageSettings.settings.qrCode.onPut = () => {
+            if (!accessory._setupID) {
+                ret.console.warn('This accessory is currently unpublished since it is offline. The accessory will be published now to generate the QR Code and allow pairing. The device may not respond to commands.');
+                const standaloneCategory = typeToCategory(ret.type);
+                this.publishAccessory(accessory, ret.storageSettings.values.mac, standaloneCategory);
+            }
+            qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
+                ret.console.log('Pairing QR Code:')
+                ret.console.log('\n' + code);
+            });
         }
 
         return ret;
