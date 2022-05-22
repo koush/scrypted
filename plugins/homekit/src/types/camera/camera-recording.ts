@@ -10,7 +10,7 @@ import mkdirp from 'mkdirp';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
 import {  } from '../../common';
-import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
+import { DataStreamConnection, AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
 import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
@@ -87,10 +87,12 @@ async function checkMp4StartsWithKeyFrame(console: Console, mp4: Buffer) {
     }
 }
 
-export async function* handleFragmentsRequests(device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
+export async function* handleFragmentsRequests(connection: DataStreamConnection, device: ScryptedDevice & VideoCamera & MotionSensor & AudioSensor,
     configuration: CameraRecordingConfiguration, console: Console, homekitPlugin: HomeKitPlugin): AsyncGenerator<Buffer, void, unknown> {
 
-    console.log(device.name, 'recording session starting', configuration);
+    homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
+
+    console.log(device.name, 'recording session starting', connection.remoteAddress, configuration);
 
     const storage = deviceManager.getMixinStorage(device.id, undefined);
     const saveRecordings = device.mixins.includes(homekitPlugin.videoClipsId);

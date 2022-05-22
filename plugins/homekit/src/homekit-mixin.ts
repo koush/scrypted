@@ -1,5 +1,5 @@
 import { StorageSettings } from "@scrypted/common/src/settings";
-import { SettingsMixinDeviceBase } from "@scrypted/common/src/settings-mixin";
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { ScryptedInterface, SettingValue } from "@scrypted/sdk";
 import crypto from 'crypto';
 import { createHAPUsernameStorageSettingsDict } from "./hap-utils";
@@ -21,14 +21,10 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             persistedDefaultValue: false,
         },
         qrCode: {
-            title: "QR Code",
+            title: "Print QR Code",
+            type: 'button',
             readonly: true,
-            defaultValue: "The Pairing QR Code can be viewed in the 'Console'",
-            onGet: async() => {
-                return {
-                    hide: !this.storageSettings.values.standalone,
-                }
-            },
+            description: "Print the Pairing QR Code to the 'Console'",
         },
         resetAccessory: {
             title: 'Reset Pairing',
@@ -47,6 +43,14 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
         },
         ...createHAPUsernameStorageSettingsDict(),
     });
+
+    constructor(options: SettingsMixinDeviceOptions<T>) {
+        super(options);
+
+        // this may only change on reload of plugin.
+        this.storageSettings.settings.qrCode.hide = !this.storageSettings.values.standalone;
+    }
+
 
     alertReload() {
         log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);

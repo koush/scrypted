@@ -36,10 +36,16 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             readonly: true,
         },
         qrCode: {
-            group: 'Pairing',
-            title: "QR Code",
+            title: "Print QR Code",
+            type: 'button',
             readonly: true,
-            defaultValue: "The Pairing QR Code can be viewed in the 'Console'",
+            description: "Print the Pairing QR Code to the 'Console'",
+            onPut: () => {
+                qrcode.generate(this.bridge.setupURI(), { small: true }, (code: string) => {
+                    this.console.log('Pairing QR Code:')
+                    this.console.log('\n' + code);
+                });
+            },
         },
         resetAccessory: {
             title: 'Reset Pairing',
@@ -98,7 +104,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             await deviceManager.onDevicesChanged({
                 devices: [
                     {
-                        name: 'Save HomeKit Video Clips',
+                        name: 'HomeKit Secure Video Local Copy',
                         nativeId: VIDEO_CLIPS_NATIVE_ID,
                         type: ScryptedDeviceType.DataSource,
                         interfaces: [
@@ -223,6 +229,11 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         if (!hasPublished) {
                             hasPublished = true;
                             logConnections(mixinConsole, accessory);
+
+                            qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
+                                mixinConsole.log('Pairing QR Code:')
+                                mixinConsole.log('\n' + code);
+                            });
                         }
                     }
 
@@ -351,20 +362,17 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
         if (canCameraMixin(mixinDeviceState.type, mixinDeviceInterfaces)) {
             ret = new CameraMixin(options);
-            this.cameraMixins.set(ret.id, ret as any);
-        }
-        else {
-            ret = new HomekitMixin(options);
-        }
-
-        if (ret.storageSettings.values.standalone) {
-            setTimeout(() => {
-                const accessory = this.standalones.get(mixinDeviceState.id);
+            const accessory = this.standalones.get(mixinDeviceState.id);
+            ret.storageSettings.settings.qrCode.onPut = () => {
                 qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
                     ret.console.log('Pairing QR Code:')
                     ret.console.log('\n' + code);
                 });
-            }, 500);
+            }
+            this.cameraMixins.set(ret.id, ret as any);
+        }
+        else {
+            ret = new HomekitMixin(options);
         }
 
         return ret;

@@ -104,9 +104,8 @@ addSupportedType({
         if (linkedMotionSensor || device.interfaces.includes(ScryptedInterface.MotionSensor) || needAudioMotionService) {
             recordingDelegate = {
                 handleFragmentsRequests(connection: DataStreamConnection): AsyncGenerator<Buffer, void, unknown> {
-                    homekitPlugin.storageSettings.values.lastKnownHomeHub = connection.remoteAddress;
                     const configuration = RecordingManagement.parseSelectedConfiguration(storage.getItem(storageKeySelectedRecordingConfiguration))
-                    return handleFragmentsRequests(device, configuration, console, homekitPlugin)
+                    return handleFragmentsRequests(connection, device, configuration, console, homekitPlugin)
                 }
             };
 
