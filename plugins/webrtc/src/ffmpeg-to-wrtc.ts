@@ -11,7 +11,7 @@ import { WeriftOutputSignalingSession } from "./output-signaling-session";
 import { waitConnected } from "./peerconnection-util";
 import { getFFmpegRtpAudioOutputArguments, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
-import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
+import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager } = sdk;
@@ -98,7 +98,7 @@ export async function createRTCPeerConnectionSink(
         // the cameras and alexa targets will also provide externally reachable addresses.
         codecs: {
             audio: [
-                requiredAudioCodec,
+                ...requiredAudioCodecs,
             ],
             video: videoCodecs,
         }

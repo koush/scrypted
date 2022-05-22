@@ -9,7 +9,7 @@ import { ChildProcess } from "child_process";
 import dgram from 'dgram';
 import { Socket } from "net";
 import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
-import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
+import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { createRawResponse, isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager } = sdk;
@@ -60,24 +60,7 @@ export async function createRTCPeerConnectionSource(options: {
         const pc = new RTCPeerConnection({
             codecs: {
                 audio: [
-                    requiredAudioCodec,
-                    // these are some other option templates that may be worth considering
-                    // for fast path.
-                    // new RTCRtpCodecParameters({
-                    //     mimeType: "audio/opus",
-                    //     clockRate: 8000,
-                    //     channels: 1,
-                    // }),
-                    // new RTCRtpCodecParameters({
-                    //     mimeType: "audio/PCMU",
-                    //     clockRate: 8000,
-                    //     channels: 1,
-                    // }),
-                    // new RTCRtpCodecParameters({
-                    //     mimeType: "audio/PCMA",
-                    //     clockRate: 8000,
-                    //     channels: 1,
-                    // }),
+                    ...requiredAudioCodecs,
                 ],
                 video: [
                     requiredVideoCodec,
@@ -478,7 +461,6 @@ export function getRTCMediaStreamOptions(id: string, name: string, useSdp: boole
             codec: 'h264',
         },
         audio: {
-            codec: 'opus',
         },
     };
 }
