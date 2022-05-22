@@ -18,3 +18,5 @@ The problem again may compound itself if the HomePod is creating a recording at 
 After extensive testing, I've found that the same Scrypted cameras in Accessory Mode retain their original behavior: the iOS Home app will connect to them directly, providing snappy and stable streams. Users are encouraged to migrate to Accessory Mode ASAP. This will become the new default soon.
 
 Another benefit of running cameras in Accessory Mode is that the Rebroadcast plugin and Home app will send you notifications if the camera stream goes offline.
+
+![image](https://user-images.githubusercontent.com/73924/169710579-3412dfe9-70d7-491f-be80-704e24233dc5.png)
