@@ -32,7 +32,7 @@ from .logging import logger
 
 class EventStream:
     """This class provides a queue-based EventStream object."""
-    def __init__(self, arlo, expire=15):
+    def __init__(self, arlo, expire=30):
         self.event_stream = None
         self.initializing = True
         self.connected = False
