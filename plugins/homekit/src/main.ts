@@ -33,6 +33,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             group: 'Pairing',
             title: "Manual Pairing Code",
             persistedDefaultValue: randomPinCode(),
+            readonly: true,
         },
         qrCode: {
             group: 'Pairing',
@@ -297,9 +298,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             if (!eventDetails.changed)
                 return;
 
-            if (!eventDetails.property)
-                return;
-
             if (eventDetails.property === ScryptedInterfaceProperty.id)
                 return;
 
@@ -335,6 +333,9 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             HOMEKIT_MIXIN,
         ];
 
+        if (type === ScryptedDeviceType.Doorbell || type === ScryptedDeviceType.Camera)
+            ret.push(ScryptedInterface.Readme);
+
         return ret;
     }
 
@@ -350,7 +351,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
         if (canCameraMixin(mixinDeviceState.type, mixinDeviceInterfaces)) {
             ret = new CameraMixin(options);
-            this.cameraMixins.set(ret.id, ret);
+            this.cameraMixins.set(ret.id, ret as any);
         }
         else {
             ret = new HomekitMixin(options);

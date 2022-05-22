@@ -52,7 +52,7 @@ export const ntpTime = () => {
     return buf.readBigUInt64BE();
 };
 
-export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, isLowBandwidth: boolean, storage: Storage, request: StartStreamRequest) {
+export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, isHomeHub: boolean, storage: Storage, request: StartStreamRequest) {
     let adaptiveBitrate: string[] = [];
     try {
         adaptiveBitrate = JSON.parse(storage.getItem('adaptiveBitrate'));
@@ -65,8 +65,7 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     // Opus (Remote): 60
     // AAC-ELD (Local): 30
     // AAC-ELD (Remote): 60
-    if (!isLowBandwidth)
-        isLowBandwidth = request.audio.packet_time >= 60;
+    const isLowBandwidth = request.audio.packet_time >= 60;
 
     // watch is 448x368 and requests 320x240, everything else is > ~1280...
     // future proof-ish for higher resolution watch.
@@ -76,7 +75,9 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
         ? 'low-resolution'
         : isLowBandwidth
             ? 'remote'
-            : 'local';
+            : isHomeHub
+                ? 'medium-resolution'
+                : 'local';
 
     const canDynamicBitrate = device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration);
 
@@ -126,8 +127,8 @@ export function checkCompatibleCodec(console: Console, device: ScryptedDevice, v
     }
     const isDefinitelyNotH264 = videoCodec && videoCodec.toLowerCase().indexOf('h264') === -1;
     if (isDefinitelyNotH264) {
-        const str = 
-        console.error('=============================================================================');
+        const str =
+            console.error('=============================================================================');
         console.error(`${device.name} video codec must be h264 but is ${videoCodec}.`);
         console.error('This stream may fail. Read the instructions in the HomeKit Plugin');
         console.error('to properly configure your camera codec.');

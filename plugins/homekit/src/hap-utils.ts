@@ -5,6 +5,8 @@ import './types';
 import os from 'os';
 import { StorageSettingsDict } from '@scrypted/common/src/settings';
 import crypto from 'crypto';
+import { closeQuiet, createBindZero } from '@scrypted/common/src/listen-cluster';
+import { once } from 'events';
 
 class HAPLocalStorage {
     initSync() {
@@ -116,4 +118,12 @@ export function logConnections(console: Console, accessory: any) {
             console.log('HomeKit Connection', connection.remoteAddress);
         });
     });
+}
+
+export async function pickPort() {
+    const { port, server: tempSocket } = await createBindZero();
+    const closePromise = once(tempSocket, 'close');
+    closeQuiet(tempSocket);
+    await closePromise;
+    return port;
 }

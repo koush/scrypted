@@ -10,13 +10,25 @@ export const HOMEKIT_MIXIN = 'mixin:@scrypted/homekit';
 export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     storageSettings = new StorageSettings(this, {
         standalone: {
-            title: 'Standalone Accessory',
-            description: 'Experimental: Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge, and the accessory will then need to be re-paired to HomeKit.'
+            title: 'Standalone Accessory Mode',
+            description: 'Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge, and the accessory will then need to be re-paired to HomeKit.'
                 + (this.interfaces.includes(ScryptedInterface.VideoCamera)
                     ? ' Cameras running in accessory mode with Rebroadcast Prebuffers will send a notification when the stream becomes unavailable.'
                     : ''),
             type: 'boolean',
             onPut: () => this.alertReload(),
+            // todo: change this at some point.
+            persistedDefaultValue: false,
+        },
+        qrCode: {
+            title: "QR Code",
+            readonly: true,
+            defaultValue: "The Pairing QR Code can be viewed in the 'Console'",
+            onGet: async() => {
+                return {
+                    hide: !this.storageSettings.values.standalone,
+                }
+            },
         },
         resetAccessory: {
             title: 'Reset Pairing',

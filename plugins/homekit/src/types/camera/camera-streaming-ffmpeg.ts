@@ -7,6 +7,7 @@ import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera }
 import child_process from 'child_process';
 import { Writable } from 'stream';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
+import { pickPort } from '../../hap-utils';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
@@ -324,7 +325,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     if (videoIsSrtpSenderCompatible && requestedOpus) {
         console.log('camera has perfect codecs (demuxed audio), using srtp fast path.');
 
-        const udpPort = Math.floor(Math.random() * 10000 + 30000);
+        const udpPort = await pickPort();
 
         const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session);
 

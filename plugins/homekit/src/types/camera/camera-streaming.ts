@@ -38,7 +38,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
     const delegate: CameraStreamingDelegate = {
         handleSnapshotRequest: createSnapshotHandler(device, storage, homekitPlugin, console),
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
-            console.log('prepareStream', Object.assign({}, request, { connection: request.connection.remoteAddress }));
+            // console.log('prepareStream', Object.assign({}, request, { connection: request.connection.remoteAddress }));
 
             const videossrc = CameraController.generateSynchronisationSource();
             const audiossrc = CameraController.generateSynchronisationSource();
@@ -46,6 +46,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             const { sessionID } = request;
             let killResolve: any;
+            const streamingSessionStartTime = Date.now();
             const killPromise = new Promise<void>(resolve => {
                 killResolve = () => {
                     resolve();
@@ -55,7 +56,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                         return;
                     sessions.delete(sessionID);
 
-                    console.log('streaming session killed');
+                    console.log(`streaming session killed, duration: ${Math.round((Date.now() - streamingSessionStartTime) / 1000)}s`);
                     session.killed = true;
                 }
             });
@@ -156,7 +157,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             }
 
             console.log('source address', response.addressOverride, videoPort, audioPort);
-            console.log('prepareStream response', response);
+            // console.log('prepareStream response', response);
 
             callback(null, response);
         },
@@ -189,16 +190,15 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             // remote wifi connections request the same audio packet time as local wifi connections.
             // so there's no way to differentiate between remote and local wifi. with low bandwidth forcing off,
             // it will always select the local stream. with it on, it always selects the remote stream.
-            let forceLowBandwidth = false && isHomeHub;
-            if (forceLowBandwidth)
-                console.log('Streaming request is coming from the active HomeHub. Low bandwidth stream will be selected in case this is a remote wifi connection.');
+            if (isHomeHub)
+                console.log('Streaming request is coming from the active HomeHub. Medium resolution stream will be selected in case this is a remote wifi connection or a wireless HomeHub. Using Accessory Mode is recommended.');
 
             const {
                 destination,
                 dynamicBitrate,
                 isLowBandwidth,
                 isWatch,
-            } = await getStreamingConfiguration(device, forceLowBandwidth, storage, request)
+            } = await getStreamingConfiguration(device, isHomeHub, storage, request)
 
             const hasHomeHub = !!homekitPlugin.storageSettings.values.lastKnownHomeHub;
             const waitRtcp = isHomeHub || isLowBandwidth || !hasHomeHub;

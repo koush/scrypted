@@ -3,10 +3,7 @@ import { FFmpegInput } from "@scrypted/sdk";
 import { Socket, SocketType } from "dgram";
 import { createServer, Server } from "net";
 import { AudioStreamingCodecType, AudioInfo, AudioStreamingSamplerate } from "../hap";
-
-function pickPort() {
-    return Math.round(Math.abs(Math.random()) * 40000 + 10000);
-}
+import { pickPort } from "../hap-utils";
 
 export class HomeKitRtpSink {
     heartbeatTimer: NodeJS.Timeout;
@@ -39,7 +36,7 @@ export class HomeKitRtpSink {
 
 export async function startRtpSink(socketType: SocketType, address: string, srtp: Buffer, audioInfo: AudioInfo, console: Console) {
     const sdpIpVersion = socketType === "udp6" ? "IP6 " : "IP4";
-    const rtpPort = pickPort();
+    const rtpPort = await pickPort();
 
     const isOpus = audioInfo.codec === AudioStreamingCodecType.OPUS;
     const { sample_rate } = audioInfo;

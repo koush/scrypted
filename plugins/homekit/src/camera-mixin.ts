@@ -1,8 +1,9 @@
-import sdk, { ObjectDetector, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import { StorageSettings } from "@scrypted/common/src/settings";
 import { SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
+import sdk, { ObjectDetector, Readme, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { HomekitMixin } from "./homekit-mixin";
 
-const { systemManager, deviceManager } = sdk;
+const { systemManager, deviceManager, log } = sdk;
 
 export const defaultObjectDetectionContactSensorTimeout = 60;
 
@@ -11,9 +12,44 @@ export function canCameraMixin(type: ScryptedDeviceType, interfaces: string[]) {
         && interfaces.includes(ScryptedInterface.VideoCamera);
 }
 
-export class CameraMixin extends HomekitMixin<any> {
-    constructor(options: SettingsMixinDeviceOptions<VideoCamera>) {
+export class CameraMixin extends HomekitMixin<Readme & VideoCamera> implements Readme {
+    cameraStorageSettings = new StorageSettings(this, {
+        hasWarnedBridgedCamera: {
+            description: 'Setting to warn user that bridged cameras are bad.',
+            type: 'boolean',
+            hide: true,
+        },
+    });
+
+    constructor(options: SettingsMixinDeviceOptions<Readme & VideoCamera>) {
         super(options);
+
+        if (!this.cameraStorageSettings.values.hasWarnedBridgedCamera) {
+            this.cameraStorageSettings.values.hasWarnedBridgedCamera = true;
+            log.a(`${this.name} is paired in Bridge Mode. Using Accessory Mode is recommended for cameras for optimal performance.`)
+        }
+    }
+
+    async getReadmeMarkdown(): Promise<string> {
+        let readme = this.mixinDeviceInterfaces.includes(ScryptedInterface.Readme) ? await this.mixinDevice.getReadmeMarkdown() + '\n\n' : '';
+
+        if (!this.storageSettings.values.standalone) {
+            readme += `
+## <span style="color:red">HomeKit Performance Warning</span>
+
+HomeKit Cameras should be paired to HomeKit in Accessory Mode for optimal performance. iOS 15.5+ will always route bridged camera video through the active HomeHub, which may result in severe performance degradation.
+
+Enable Standalone Accessory Mode in the HomeKit settings for this camera and reload the HomeKit plugin. This camera can then be individually paired with the Home app. The pairing QR code can be seen in this camera\'s console.
+`;
+        }
+
+        const id = deviceManager.getDeviceState(this.mixinProviderNativeId).id;
+        readme += `
+## HomeKit Codec Settings
+
+The recommended codec settings for cameras in HomeKit can be viewed in the [HomeKit plugin](#/device/${id}).`
+
+        return readme;
     }
 
     async getMixinSettings(): Promise<Setting[]> {
