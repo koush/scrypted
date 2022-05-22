@@ -11,7 +11,7 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     storageSettings = new StorageSettings(this, {
         standalone: {
             title: 'Standalone Accessory Mode',
-            description: 'Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge, and the accessory will then need to be re-paired to HomeKit.'
+            description: 'Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge, and the accessory will then need to be re-paired to HomeKit. The pairing code will be available after the HomeKit plugin has been reloaded.'
                 + (this.interfaces.includes(ScryptedInterface.VideoCamera)
                     ? ' Cameras running in accessory mode with Rebroadcast Prebuffers will send a notification when the stream becomes unavailable.'
                     : ''),
