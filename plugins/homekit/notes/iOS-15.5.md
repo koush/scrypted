@@ -19,4 +19,4 @@ After extensive testing, I've found that the same Scrypted cameras in Accessory 
 
 Another benefit of running cameras in Accessory Mode is that the Rebroadcast plugin and Home app will send you notifications if the camera stream goes offline.
 
-![image](https://user-images.githubusercontent.com/73924/169710579-3412dfe9-70d7-491f-be80-704e24233dc5.png)
+<img src="https://user-images.githubusercontent.com/73924/169710579-3412dfe9-70d7-491f-be80-704e24233dc5.png" width="480">
