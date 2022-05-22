@@ -1,6 +1,6 @@
 # iOS 15.5 Home App Camera Bug
 
-A new minor #homekit plugin was just released to address severe performance bugs in the newly released iOS 15.5. TL;DR: **Apple broke things. To work around it, update your Scrypted camera's HomeKit settings to use "Accessory Mode", and pair the camera with HomeKit.**
+A Scrypted HomeKit plugin was released to address severe performance bugs in the newly released iOS 15.5. TL;DR: **Apple broke things. To work around it, update your Scrypted camera's HomeKit settings to use "Accessory Mode", and pair the camera with HomeKit.**
 
 **Details**:
 
