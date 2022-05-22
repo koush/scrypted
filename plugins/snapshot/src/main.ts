@@ -1,17 +1,14 @@
-import sdk, { Camera, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
-import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin"
-import { StorageSettings } from "@scrypted/common/src/settings"
 import AxiosDigestAuth from '@koush/axios-digest-auth';
-import https from 'https';
-import axios, { Axios } from "axios";
-import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
+import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { StorageSettings } from "@scrypted/common/src/settings";
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
+import sdk, { Camera, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import axios, { Axios } from "axios";
+import https from 'https';
 import jimp from 'jimp';
 
 const { mediaManager, systemManager } = sdk;
-
-// lol
-const FOREVER = 24 * 60 * 60 * 1000;
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
@@ -116,6 +113,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     progressPicture: RefreshPromise<Buffer>;
     prebufferUnavailablePicture: RefreshPromise<Buffer>;
     currentPicture: Buffer;
+    lastErrorImagesClear = 0;
+    static lastGeneratedErrorImageTime = 0;
     lastAvailablePicture: Buffer;
 
     constructor(options: SettingsMixinDeviceOptions<Camera>) {
@@ -307,41 +306,62 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         return cropped;
     }
 
-    clearCachedPictures() {
-        this.currentPicture = undefined;
+    clearErrorImages() {
         this.errorPicture = undefined;
         this.timeoutPicture = undefined;
         this.progressPicture = undefined;
         this.prebufferUnavailablePicture = undefined;
     }
 
+    clearCachedPictures() {
+        // if previous error pictures were generated with the black background,
+        // clear it out to force a real blurred image.
+        if (!this.lastAvailablePicture)
+            this.clearErrorImages();
+        this.currentPicture = undefined;
+    }
+
+    maybeClearErrorImages() {
+        const now = Date.now();
+
+        // only clear the error images if they are at least an hour old
+        if (now - this.lastErrorImagesClear > 1 * 60 * 60 * 1000)
+            return;
+
+        // only clear error images generated once a per minute across all cameras
+        if (now - SnapshotMixin.lastGeneratedErrorImageTime < 60 * 1000)
+            return;
+
+        SnapshotMixin.lastGeneratedErrorImageTime = now;
+        this.lastErrorImagesClear = now;
+        this.clearErrorImages();
+    }
+
     async createErrorImage(e: any) {
+        this.maybeClearErrorImages();
+
         if (e instanceof TimeoutError) {
             if (!this.timeoutPicture)
                 this.console.log('creating timeout snapshot');
             this.timeoutPicture = singletonPromise(this.timeoutPicture,
-                () => this.createTextErrorImage('Snapshot Timed Out'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot Timed Out'));
             return this.timeoutPicture.promise;
         }
         else if (e instanceof PrebufferUnavailableError) {
             this.prebufferUnavailablePicture = singletonPromise(this.prebufferUnavailablePicture,
-                () => this.createTextErrorImage('Snapshot Unavailable'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot Unavailable'));
             return this.prebufferUnavailablePicture.promise;
         }
         else if (e instanceof NeverWaitError) {
             this.progressPicture = singletonPromise(this.progressPicture,
-                () => this.createTextErrorImage('Snapshot In Progress'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot In Progress'));
             return this.progressPicture.promise;
         }
         else {
             if (!this.errorPicture)
                 this.console.log('creating error snapshot', e);
             this.errorPicture = singletonPromise(this.errorPicture,
-                () => this.createTextErrorImage('Snapshot Failed'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot Failed'));
             return this.errorPicture.promise;
         }
     }
