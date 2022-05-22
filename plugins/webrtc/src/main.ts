@@ -195,7 +195,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         else if (supportedTypes.includes(type) && interfaces.includes(ScryptedInterface.VideoCamera)) {
             return [
                 ScryptedInterface.RTCSignalingChannel,
-                ScryptedInterface.Settings,
+                // ScryptedInterface.Settings,
             ];
         }
     }
