@@ -94,6 +94,7 @@ class Arlo(object):
     def UseExistingAuth(self, user_id, headers):
         self.user_id = user_id
         self.request.session.headers.update(headers)
+        self.BASE_URL = 'myapi.arlo.com'
 
     def LoginMFA(self):
         self.request = Request()
@@ -1580,7 +1581,7 @@ class Arlo(object):
         return await self.TriggerAndHandleEvent(basestation, resource, ["is"], trigger, callback)
 
     def StopStream(self, basestation, camera):
-        return self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/stopStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.         get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"stopUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId": camera.get('xCloudId')})
+        return self.request.post(f'https://{self.BASE_URL}/hmsweb/users/devices/stopStream', {"to":camera.get('parentId'),"from":self.user_id+"_web","resource":"cameras/"+camera.get('deviceId'),"action":"set","responseUrl":"", "publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"stopUserStream","cameraId":camera.get('deviceId')}}, headers={"xcloudId": camera.get('xCloudId')})
 
         # nonlocal variable hack for Python 2.x.
         class nl:
@@ -1630,15 +1631,19 @@ class Arlo(object):
         resource = f"cameras/{camera.get('deviceId')}"
 
         def trigger(self):
-            self.request.post("https://my.arlo.com/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
+            self.request.post(f"https://{self.BASE_URL}/hmsweb/users/devices/fullFrameSnapshot", {"to":camera.get("parentId"),"from":self.user_id+"_web","resource":"cameras/"+camera.get("deviceId"),"action":"set","publishResponse":True,"transId":self.genTransId(),"properties":{"activityState":"fullFrameSnapshot"}}, headers={"xcloudId":camera.get("xCloudId")})
 
         def callback(self, event):
-            url = event.get("properties", {}).get("presignedFullFrameSnapshotUrl")
+            properties = event.get("properties", {})
+            url = properties.get("presignedFullFrameSnapshotUrl")
+            if url:
+                return url
+            url = properties.get("presignedLastImageUrl")
             if url:
                 return url
             return None
 
-        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "is"], trigger, callback)
+        return await self.TriggerAndHandleEvent(basestation, resource, ["fullFrameSnapshotAvailable", "lastImageSnapshotAvailable", "is"], trigger, callback)
 
 #    def StartRecording(self, basestation, camera):
 #        """
