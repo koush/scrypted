@@ -7,14 +7,13 @@ import sdk, { Camera, MediaObject, MixinProvider, RequestMediaStreamOptions, Req
 import axios, { Axios } from "axios";
 import https from 'https';
 import jimp from 'jimp';
+import { newThread } from '../../../server/src/threading';
 
 const { mediaManager, systemManager } = sdk;
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
-
-const fontPromise = jimp.loadFont(jimp.FONT_SANS_64_WHITE);
 
 class NeverWaitError extends Error {
 
@@ -292,18 +291,29 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
         this.console.log(xmin, ymin, xmax, ymax);
-        const img = await jimp.read(buffer);
-        let pw = xmax - xmin;
-        let ph = pw / (16 / 9);
-
-        const x = Math.round(xmin * img.getWidth());
-        const w = Math.round(xmax * img.getWidth()) - x;
-        const ymid = (ymin + ymax) / 2;
-        let y = Math.round((ymid - ph / 2) * img.getHeight());
-        let h = Math.round((ymid + ph / 2) * img.getHeight()) - y;
-        img.crop(x, y, w, h);
-        const cropped = await img.getBufferAsync('image/jpeg');
-        return cropped;
+        return newThread({ jimp }, {
+            buffer,
+            xmin, xmax,
+            ymin, ymax,
+        }, async ({
+            jimp,
+            buffer,
+            xmin, xmax,
+            ymin, ymax,
+        }) => {
+            const img = await jimp.read(buffer);
+            let pw = xmax - xmin;
+            let ph = pw / (16 / 9);
+    
+            const x = Math.round(xmin * img.getWidth());
+            const w = Math.round(xmax * img.getWidth()) - x;
+            const ymid = (ymin + ymax) / 2;
+            let y = Math.round((ymid - ph / 2) * img.getHeight());
+            let h = Math.round((ymid + ph / 2) * img.getHeight()) - y;
+            img.crop(x, y, w, h);
+            const cropped = await img.getBufferAsync('image/jpeg');
+            return cropped;
+        });
     }
 
     clearErrorImages() {
@@ -341,8 +351,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         this.maybeClearErrorImages();
 
         if (e instanceof TimeoutError) {
-            if (!this.timeoutPicture)
-                this.console.log('creating timeout snapshot');
             this.timeoutPicture = singletonPromise(this.timeoutPicture,
                 () => this.createTextErrorImage('Snapshot Timed Out'));
             return this.timeoutPicture.promise;
@@ -358,8 +366,6 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return this.progressPicture.promise;
         }
         else {
-            if (!this.errorPicture)
-                this.console.log('creating error snapshot', e);
             this.errorPicture = singletonPromise(this.errorPicture,
                 () => this.createTextErrorImage('Snapshot Failed'));
             return this.errorPicture.promise;
@@ -368,30 +374,37 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
     async createTextErrorImage(text: string) {
         const errorBackground = this.currentPicture || this.lastAvailablePicture;
+        this.console.log('creating error image with background', text, !!errorBackground);
+        return newThread({ jimp }, {
+            errorBackground,
+            text,
+        }, async ({ errorBackground, text, jimp }) => {
+            const fontPromise = jimp.loadFont(jimp.FONT_SANS_64_WHITE);
 
-        if (!errorBackground) {
-            const img = await jimp.create(1920 / 2, 1080 / 2);
-            const font = await fontPromise;
-            img.print(font, 0, 0, {
-                text,
-                alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-            }, img.getWidth(), img.getHeight());
-            return img.getBufferAsync('image/jpeg');
-        }
-        else {
-            const img = await jimp.read(errorBackground);
-            img.resize(1920 / 2, jimp.AUTO);
-            img.blur(8);
-            img.brightness(-.2);
-            const font = await fontPromise;
-            img.print(font, 0, 0, {
-                text,
-                alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-            }, img.getWidth(), img.getHeight());
-            return img.getBufferAsync('image/jpeg');
-        }
+            if (!errorBackground) {
+                const img = await jimp.create(1920 / 2, 1080 / 2);
+                const font = await fontPromise;
+                img.print(font, 0, 0, {
+                    text,
+                    alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
+                    alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
+                }, img.getWidth(), img.getHeight());
+                return img.getBufferAsync('image/jpeg');
+            }
+            else {
+                const img = await jimp.read(errorBackground);
+                img.resize(1920 / 2, jimp.AUTO);
+                img.blur(8);
+                img.brightness(-.2);
+                const font = await fontPromise;
+                img.print(font, 0, 0, {
+                    text,
+                    alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
+                    alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
+                }, img.getWidth(), img.getHeight());
+                return img.getBufferAsync('image/jpeg');
+            }
+        })
     }
 
     async getPictureOptions() {
