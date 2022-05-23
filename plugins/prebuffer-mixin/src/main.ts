@@ -1484,7 +1484,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       title: 'H264 Encoder Arguments',
       description: 'FFmpeg arguments used to encode h264 video. This is not camera specific and is used to setup the hardware accelerated encoder on your Scrypted server. This setting will only be used when transcoding is enabled on a camera.',
       choices: Object.keys(getH264EncoderArgs()),
-      defaultValue: getH264EncoderArgs()[LIBX264_ENCODER_TITLE].join(' '),
+      defaultValue: getH264EncoderArgs()[LIBX264_ENCODER_TITLE]?.join(' '),
       combobox: true,
       mapPut: (oldValue, newValue) => getH264EncoderArgs()[newValue]?.join(' ') || newValue || getH264EncoderArgs()[LIBX264_ENCODER_TITLE]?.join(' '),
     }
