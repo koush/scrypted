@@ -123,6 +123,10 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             if (addressOverride) {
                 console.log('using address override', addressOverride);
                 response.addressOverride = addressOverride;
+
+                const infos = Object.values(os.networkInterfaces()).flat().map(i => i.address);
+                if (!infos.find(address => address === addressOverride))
+                    homekitPlugin.log.a('The provided Scrypted Server Address was not found in the list of network addresses and may be invalid: ' + addressOverride);
             }
             else {
                 // HAP-NodeJS has weird default address determination behavior. Ideally it should use
