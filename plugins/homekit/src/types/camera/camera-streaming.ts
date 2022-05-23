@@ -58,12 +58,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
 
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-            const addressOverride = homekitPlugin.storageSettings.values.addressOverride || undefined;
+            let addressOverride = homekitPlugin.storageSettings.values.addressOverride || undefined;
 
             if (addressOverride) {
                 const infos = Object.values(os.networkInterfaces()).flat().map(i => i?.address);
-                if (!infos.find(address => address === addressOverride))
-                    homekitPlugin.log.a('The provided Scrypted Server Address was not found in the list of network addresses and may be invalid: ' + addressOverride);
+                if (!infos.find(address => address === addressOverride)) {
+                    console.error('The provided Scrypted Server Address was not found in the list of network addresses and may be invalid and will not be used (DHCP assignment change?): ' + addressOverride);
+                    addressOverride = undefined;
+                }
             }
 
             const { socket: videoReturn, port: videoPort } = await getPort(socketType, addressOverride);
