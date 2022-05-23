@@ -51,6 +51,7 @@ export interface DeviceState {
     securitySystemState?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
+    co2ppm?: number;
     airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
@@ -107,6 +108,7 @@ export declare class DeviceBase implements DeviceState {
     securitySystemState?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
+    co2ppm?: number;
     airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
@@ -163,6 +165,7 @@ export declare enum ScryptedInterfaceProperty {
     securitySystemState = "securitySystemState",
     pm25Density = "pm25Density",
     vocDensity = "vocDensity",
+    co2ppm = "co2ppm",
     airQuality = "airQuality",
     humiditySetting = "humiditySetting",
     fan = "fan"
@@ -887,6 +890,9 @@ export interface PM25Sensor {
 export interface VOCSensor {
     vocDensity?: number;
 }
+export interface CO2Sensor {
+    co2ppm?: number;
+}
 export declare enum AirQuality {
     Unknown = "Unknown",
     Excellent = "Excellent",
@@ -1477,6 +1483,7 @@ export declare enum ScryptedInterface {
     SecuritySystem = "SecuritySystem",
     PM25Sensor = "PM25Sensor",
     VOCSensor = "VOCSensor",
+    CO2Sensor = "CO2Sensor",
     AirQualitySensor = "AirQualitySensor",
     Readme = "Readme",
     OauthClient = "OauthClient",

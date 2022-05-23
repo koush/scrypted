@@ -52,6 +52,7 @@ export interface DeviceState {
   securitySystemState?: SecuritySystemState
   pm25Density?: number
   vocDensity?: number
+  co2ppm?: number
   airQuality?: AirQuality
   humiditySetting?: HumiditySettingStatus
   fan?: FanStatus
@@ -109,6 +110,7 @@ export class DeviceBase implements DeviceState {
   securitySystemState?: SecuritySystemState
   pm25Density?: number
   vocDensity?: number
+  co2ppm?: number
   airQuality?: AirQuality
   humiditySetting?: HumiditySettingStatus
   fan?: FanStatus
@@ -167,6 +169,7 @@ export enum ScryptedInterfaceProperty {
   securitySystemState = "securitySystemState",
   pm25Density = "pm25Density",
   vocDensity = "vocDensity",
+  co2ppm = "co2ppm",
   airQuality = "airQuality",
   humiditySetting = "humiditySetting",
   fan = "fan",
@@ -622,6 +625,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     methods: [],
     properties: [
       'vocDensity'
+    ]
+  },
+  CO2Sensor: {
+    name: 'CO2Sensor',
+    methods: [],
+    properties: [
+      'co2ppm'
     ]
   },
   AirQualitySensor: {
@@ -1530,6 +1540,9 @@ export interface PM25Sensor {
 export interface VOCSensor {
   vocDensity?: number;
 }
+export interface CO2Sensor {
+  co2ppm?: number;
+}
 export enum AirQuality {
   Unknown = "Unknown",
   Excellent = "Excellent",
@@ -2182,6 +2195,7 @@ export enum ScryptedInterface {
   SecuritySystem = 'SecuritySystem',
   PM25Sensor = "PM25Sensor",
   VOCSensor = "VOCSensor",
+  CO2Sensor = "CO2Sensor",
   AirQualitySensor = "AirQualitySensor",
   Readme = "Readme",
   OauthClient = "OauthClient",

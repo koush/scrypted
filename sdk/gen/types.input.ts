@@ -786,6 +786,9 @@ export interface PM25Sensor {
 export interface VOCSensor {
   vocDensity?: number;
 }
+export interface CO2Sensor {
+  co2ppm?: number;
+}
 export enum AirQuality {
   Unknown = "Unknown",
   Excellent = "Excellent",
@@ -1438,6 +1441,7 @@ export enum ScryptedInterface {
   SecuritySystem = 'SecuritySystem',
   PM25Sensor = "PM25Sensor",
   VOCSensor = "VOCSensor",
+  CO2Sensor = "CO2Sensor",
   AirQualitySensor = "AirQualitySensor",
   Readme = "Readme",
   OauthClient = "OauthClient",

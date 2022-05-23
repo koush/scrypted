@@ -57,6 +57,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["securitySystemState"] = "securitySystemState";
     ScryptedInterfaceProperty["pm25Density"] = "pm25Density";
     ScryptedInterfaceProperty["vocDensity"] = "vocDensity";
+    ScryptedInterfaceProperty["co2ppm"] = "co2ppm";
     ScryptedInterfaceProperty["airQuality"] = "airQuality";
     ScryptedInterfaceProperty["humiditySetting"] = "humiditySetting";
     ScryptedInterfaceProperty["fan"] = "fan";
@@ -511,6 +512,13 @@ exports.ScryptedInterfaceDescriptors = {
             'vocDensity'
         ]
     },
+    CO2Sensor: {
+        name: 'CO2Sensor',
+        methods: [],
+        properties: [
+            'co2ppm'
+        ]
+    },
     AirQualitySensor: {
         name: 'AirQualitySensor',
         methods: [],
@@ -791,6 +799,7 @@ var ScryptedInterface;
     ScryptedInterface["SecuritySystem"] = "SecuritySystem";
     ScryptedInterface["PM25Sensor"] = "PM25Sensor";
     ScryptedInterface["VOCSensor"] = "VOCSensor";
+    ScryptedInterface["CO2Sensor"] = "CO2Sensor";
     ScryptedInterface["AirQualitySensor"] = "AirQualitySensor";
     ScryptedInterface["Readme"] = "Readme";
     ScryptedInterface["OauthClient"] = "OauthClient";

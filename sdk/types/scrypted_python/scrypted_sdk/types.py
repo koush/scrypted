@@ -78,6 +78,7 @@ class ScryptedInterface(Enum):
     BinarySensor = "BinarySensor"
     Brightness = "Brightness"
     BufferConverter = "BufferConverter"
+    CO2Sensor = "CO2Sensor"
     Camera = "Camera"
     ColorSettingHsv = "ColorSettingHsv"
     ColorSettingRgb = "ColorSettingRgb"
@@ -573,6 +574,10 @@ class BufferConverter:
     toMimeType: str
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: BufferConvertorOptions = None) -> Any:
         pass
+    pass
+
+class CO2Sensor:
+    co2ppm: float
     pass
 
 class Camera:
@@ -1138,6 +1143,7 @@ class ScryptedInterfaceProperty(Enum):
     securitySystemState = "securitySystemState"
     pm25Density = "pm25Density"
     vocDensity = "vocDensity"
+    co2ppm = "co2ppm"
     airQuality = "airQuality"
     humiditySetting = "humiditySetting"
     fan = "fan"
@@ -1504,6 +1510,13 @@ class DeviceState:
     @vocDensity.setter
     def vocDensity(self, value: float):
         self.setScryptedProperty("vocDensity", value)
+
+    @property
+    def co2ppm(self) -> float:
+        return self.getScryptedProperty("co2ppm")
+    @co2ppm.setter
+    def co2ppm(self, value: float):
+        self.setScryptedProperty("co2ppm", value)
 
     @property
     def airQuality(self) -> AirQuality:
@@ -1974,6 +1987,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "vocDensity"
+    ]
+  },
+  "CO2Sensor": {
+    "name": "CO2Sensor",
+    "methods": [],
+    "properties": [
+      "co2ppm"
     ]
   },
   "AirQualitySensor": {
