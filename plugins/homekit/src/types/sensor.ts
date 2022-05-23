@@ -1,4 +1,4 @@
-import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor, TamperSensor } from '@scrypted/sdk';
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor, TamperSensor, CO2Sensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -45,7 +45,7 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & TamperSensor, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & TamperSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
@@ -113,6 +113,15 @@ addSupportedType({
                 bindCharacteristic(device, ScryptedInterface.VOCSensor, service, Characteristic.VOCDensity,
                     () => device.vocDensity || 0);
             }
+        }
+
+
+        if (device.interfaces.includes(ScryptedInterface.CO2Sensor)) {
+            const service = accessory.addService(Service.CarbonDioxideSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.CO2Sensor, service, Characteristic.CarbonDioxideLevel,
+                () => device.co2ppm || 0);
+            bindCharacteristic(device, ScryptedInterface.CO2Sensor, service, Characteristic.CarbonDioxideDetected,
+                () => ((device.co2ppm || 0) > 5000))
         }
 
         // todo: more sensors.

@@ -1,4 +1,4 @@
-import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM25Sensor, VOCSensor } from '@scrypted/sdk';
+import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM25Sensor, VOCSensor, CO2Sensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -11,7 +11,7 @@ addSupportedType({
             return false;
         return true;
     },
-    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting & AirQualitySensor & PM25Sensor & VOCSensor, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting & AirQualitySensor & PM25Sensor & VOCSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
         const service = accessory.addService(Service.Thermostat, device.name);
         service.setPrimaryService();
@@ -278,6 +278,14 @@ addSupportedType({
                 bindCharacteristic(device, ScryptedInterface.VOCSensor, airQualityService, Characteristic.VOCDensity,
                     () => device.vocDensity || 0);
             }
+        }
+
+        if (device.interfaces.includes(ScryptedInterface.CO2Sensor)) {
+            const co2Service = accessory.addService(Service.CarbonDioxideSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.CO2Sensor, co2Service, Characteristic.CarbonDioxideLevel,
+                () => device.co2ppm || 0);
+            bindCharacteristic(device, ScryptedInterface.CO2Sensor, co2Service, Characteristic.CarbonDioxideDetected,
+                () => ((device.co2ppm || 0) > 5000))
         }
 
         return accessory;
