@@ -40,10 +40,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
             // console.log('prepareStream', Object.assign({}, request, { connection: request.connection.remoteAddress }));
 
-            const videossrc = CameraController.generateSynchronisationSource();
-            const audiossrc = CameraController.generateSynchronisationSource();
-            const addressOverride = homekitPlugin.storageSettings.values.addressOverride || undefined;
-
             const { sessionID } = request;
             let killResolve: any;
             const streamingSessionStartTime = Date.now();
@@ -62,6 +58,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
 
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
+            const addressOverride = homekitPlugin.storageSettings.values.addressOverride || undefined;
+
+            if (addressOverride) {
+                const infos = Object.values(os.networkInterfaces()).flat().map(i => i?.address);
+                if (!infos.find(address => address === addressOverride))
+                    homekitPlugin.log.a('The provided Scrypted Server Address was not found in the list of network addresses and may be invalid: ' + addressOverride);
+            }
+
             const { socket: videoReturn, port: videoPort } = await getPort(socketType, addressOverride);
             const { socket: audioReturn, port: audioPort } = await getPort(socketType, addressOverride);
 
@@ -69,6 +73,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 closeQuiet(videoReturn);
                 closeQuiet(audioReturn);
             });
+
+            const videossrc = CameraController.generateSynchronisationSource();
+            const audiossrc = CameraController.generateSynchronisationSource();
 
             const session: CameraStreamingSession = {
                 aconfig: {
@@ -123,10 +130,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             if (addressOverride) {
                 console.log('using address override', addressOverride);
                 response.addressOverride = addressOverride;
-
-                const infos = Object.values(os.networkInterfaces()).flat().map(i => i.address);
-                if (!infos.find(address => address === addressOverride))
-                    homekitPlugin.log.a('The provided Scrypted Server Address was not found in the list of network addresses and may be invalid: ' + addressOverride);
             }
             else {
                 // HAP-NodeJS has weird default address determination behavior. Ideally it should use
