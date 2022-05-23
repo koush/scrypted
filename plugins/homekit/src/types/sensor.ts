@@ -104,10 +104,15 @@ addSupportedType({
             const service = accessory.addService(Service.AirQualitySensor, device.name);
             bindCharacteristic(device, ScryptedInterface.AirQualitySensor, service, Characteristic.AirQuality,
                 () => airQualityToHomekit(device.airQuality));
-            bindCharacteristic(device, ScryptedInterface.PM25Sensor, service, Characteristic.PM2_5Density,
-                () => device.pm25Density || 0);
-            bindCharacteristic(device, ScryptedInterface.VOCSensor, service, Characteristic.VOCDensity,
-                () => device.vocDensity || 0);
+            
+            if (device.interfaces.includes(ScryptedInterface.PM25Sensor)) {
+                bindCharacteristic(device, ScryptedInterface.PM25Sensor, service, Characteristic.PM2_5Density,
+                    () => device.pm25Density || 0);
+            }
+            if (device.interfaces.includes(ScryptedInterface.VOCSensor)) {
+                bindCharacteristic(device, ScryptedInterface.VOCSensor, service, Characteristic.VOCDensity,
+                    () => device.vocDensity || 0);
+            }
         }
 
         // todo: more sensors.
