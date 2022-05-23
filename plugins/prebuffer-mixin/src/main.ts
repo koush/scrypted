@@ -1,6 +1,6 @@
 
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
-import { getH264EncoderArgs, LIBX264_ENCODER_TITLE } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
+import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
@@ -1484,9 +1484,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       title: 'H264 Encoder Arguments',
       description: 'FFmpeg arguments used to encode h264 video. This is not camera specific and is used to setup the hardware accelerated encoder on your Scrypted server. This setting will only be used when transcoding is enabled on a camera.',
       choices: Object.keys(getH264EncoderArgs()),
-      defaultValue: getH264EncoderArgs()[LIBX264_ENCODER_TITLE].join(' '),
+      defaultValue: getDebugModeH264EncoderArgs().join(' '),
       combobox: true,
-      mapPut: (oldValue, newValue) => getH264EncoderArgs()[newValue]?.join(' ') || newValue || getH264EncoderArgs()[LIBX264_ENCODER_TITLE]?.join(' '),
+      mapPut: (oldValue, newValue) => getH264EncoderArgs()[newValue]?.join(' ') || newValue || getDebugModeH264EncoderArgs().join(' '),
     }
   });
   rtspServer: net.Server;
