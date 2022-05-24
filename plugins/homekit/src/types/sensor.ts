@@ -34,6 +34,7 @@ const supportedSensors: string[] = [
     ScryptedInterface.PM25Sensor,
     ScryptedInterface.VOCSensor,
     ScryptedInterface.EntrySensor,
+    ScryptedInterface.CO2Sensor,
 ];
 
 addSupportedType({
