@@ -1,5 +1,5 @@
 import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
-const { systemManager, mediaManager } = sdk;
+const { systemManager, mediaManager, deviceManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
     computeInterfaces(): string[];
@@ -31,6 +31,8 @@ aggregators.set(ScryptedInterface.MotionSensor, allFalse);
 aggregators.set(ScryptedInterface.AudioSensor, allFalse);
 aggregators.set(ScryptedInterface.LuminanceSensor, average);
 aggregators.set(ScryptedInterface.UltravioletSensor, average);
+aggregators.set(ScryptedInterface.CO2Sensor, average);
+aggregators.set(ScryptedInterface.PM25Sensor, average);
 aggregators.set(ScryptedInterface.FloodSensor, allFalse);
 aggregators.set(ScryptedInterface.Lock,
     values => values.reduce((prev, cur) => cur === LockState.Unlocked ? cur : prev, LockState.Locked));
@@ -145,10 +147,22 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
 
         makeListener(iface: string, devices: ScryptedDevice[]) {
             const aggregator = aggregators.get(iface);
-            if (!aggregator)
+            if (!aggregator) {
+                // if this device can't be aggregated for whatever reason, pass property through.
+                for (const device of devices) {
+                    const register = device.listen({
+                        event: iface,
+                        watch: true,
+                    }, (source, details, data) => {
+                        if (details.property)
+                            deviceManager.getDeviceState(this.nativeId)[details.property] = data;
+                    });
+                    this.listeners.push(register);
+                }
                 return;
+            }
 
-            const property = ScryptedInterfaceDescriptors[iface].properties[0];
+            const property = ScryptedInterfaceDescriptors[iface]?.properties?.[0];
             if (!property) {
                 this.console.warn('aggregating interface with no property?', iface);
                 return;
@@ -198,6 +212,10 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
                 for (const [iface, ids] of interfaces.entries()) {
                     const devices = ids.map(id => systemManager.getDeviceById(id));
                     const descriptor = ScryptedInterfaceDescriptors[iface];
+                    if (!descriptor) {
+                        this.console.warn(`descriptor not found for ${iface}, skipping method generation`);
+                        continue;
+                    }
 
                     if (iface === ScryptedInterface.VideoCamera) {
                         const camera = createVideoCamera(devices as any, this.console);
