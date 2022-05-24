@@ -9,7 +9,7 @@ import fs from 'fs';
 import mkdirp from 'mkdirp';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
-import {  } from '../../common';
+import { } from '../../common';
 import { DataStreamConnection, AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
@@ -122,14 +122,19 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
     const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
     const transcodeRecording = !!ffmpegInput.h264EncoderArguments?.length;
-    const incompatibleStream = noAudio || transcodeRecording || isDefinitelyNotAAC;
+    const needsFFmpeg = transcodingDebugMode
+        || !ffmpegInput.url.startsWith('tcp://')
+        || !!ffmpegInput.h264EncoderArguments?.length
+        || !!ffmpegInput.h264FilterArguments?.length
+        || ffmpegInput.container !== 'mp4'
+        || noAudio;
 
     if (transcodingDebugMode)
         transcodingDebugModeWarning();
 
     let session: FFmpegFragmentedMP4Session & { socket?: Duplex };
 
-    if (ffmpegInput.container === 'mp4' && ffmpegInput.url.startsWith('tcp://') && !incompatibleStream) {
+    if (!needsFFmpeg) {
         console.log('prebuffer is tcp/mp4/h264/aac compatible. using direct tcp.');
         const socketUrl = new URL(ffmpegInput.url);
         const socket = net.connect(parseInt(socketUrl.port), socketUrl.hostname);
@@ -216,6 +221,10 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
             videoArgs = [
                 '-vcodec', 'copy',
             ];
+        }
+
+        if (ffmpegInput.h264FilterArguments?.length) {
+            videoArgs.push(...ffmpegInput.h264FilterArguments);
         }
 
         console.log(`motion recording starting`);

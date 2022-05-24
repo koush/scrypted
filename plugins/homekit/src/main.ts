@@ -1,21 +1,19 @@
 import qrcode from '@koush/qrcode-terminal';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import { sleep } from '@scrypted/common/src/sleep';
 import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
+import crypto from 'crypto';
 import packageJson from "../package.json";
 import { maybeAddBatteryService } from './battery';
 import { CameraMixin, canCameraMixin } from './camera-mixin';
 import { SnapshotThrottle, supportedTypes } from './common';
-import { Category, Accessory, Bridge, Categories, Characteristic, ControllerStorage, EventedHTTPServer, MDNSAdvertiser, PublishInfo, Service } from './hap';
+import { Accessory, Bridge, Categories, Characteristic, ControllerStorage, MDNSAdvertiser, PublishInfo, Service } from './hap';
 import { createHAPUsernameStorageSettingsDict, getAddresses, getHAPUUID, getRandomPort as createRandomPort, initializeHapStorage, logConnections, typeToCategory } from './hap-utils';
 import { HomekitMixin, HOMEKIT_MIXIN } from './homekit-mixin';
 import { randomPinCode } from './pincode';
 import './types';
 import { VIDEO_CLIPS_NATIVE_ID } from './types/camera/camera-recording-files';
 import { VideoClipsMixinProvider } from './video-clips-provider';
-import crypto from 'crypto';
-import { access } from 'fs';
 
 const { systemManager, deviceManager } = sdk;
 
@@ -23,6 +21,7 @@ initializeHapStorage();
 const includeToken = 4;
 
 export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, Settings, DeviceProvider {
+    seenConnections = new Set<string>();
     bridge = new Bridge('Scrypted', getHAPUUID(this.storage));
     snapshotThrottles = new Map<string, SnapshotThrottle>();
     standalones = new Map<string, Accessory>();
@@ -91,10 +90,23 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             choices: [MDNSAdvertiser.BONJOUR, MDNSAdvertiser.CIAO],
             defaultValue: MDNSAdvertiser.CIAO,
         },
+        slowConnections: {
+            group: 'Network',
+            title: 'Slow Mode Addresses',
+            description: 'The addressesses of Home Hubs and iOS clients that will always be served remote/medium streams.',
+            type: 'string',
+            multiple: true,
+            combobox: true,
+            onGet: async () => {
+                return {
+                    choices: [...this.seenConnections],
+                }
+            }
+        },
         lastKnownHomeHub: {
             hide: true,
             description: 'The last home hub to request a recording. Internally used to determine if a streaming request is coming from remote wifi.',
-        }
+        },
     });
 
     constructor() {
@@ -222,7 +234,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         this.publishAccessory(accessory, storageSettings.values.mac, standaloneCategory);
                         if (!hasPublished) {
                             hasPublished = true;
-                            logConnections(mixinConsole, accessory);
+                            logConnections(mixinConsole, accessory, this.seenConnections);
 
                             qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
                                 mixinConsole.log('Pairing QR Code:')
@@ -256,7 +268,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         updateDeviceAdvertisement();
                         if (!published)
                             mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
-    
+
                         // throttle this in case the device comes back online very quickly.
                         device.listen(ScryptedInterface.Online, () => {
                             const isOnline = !device.interfaces.includes(ScryptedInterface.Online) || device.online;
@@ -294,7 +306,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         };
 
         this.bridge.publish(publishInfo, true);
-        logConnections(this.console, this.bridge);
+        logConnections(this.console, this.bridge, this.seenConnections);
 
         qrcode.generate(this.bridge.setupURI(), { small: true }, (code: string) => {
             this.console.log('Pairing QR Code:')
@@ -378,8 +390,12 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             ret = new HomekitMixin(options);
         }
 
-        const accessory = this.standalones.get(mixinDeviceState.id);
         ret.storageSettings.settings.qrCode.onPut = () => {
+            const accessory = this.standalones.get(mixinDeviceState.id);
+            if (!accessory) {
+                ret.console.error('Accessory not found. Try reloading the HomeKit plugin?');
+                return;
+            }
             if (!accessory._setupID) {
                 ret.console.warn('This accessory is currently unpublished since it is offline. The accessory will be published now to generate the QR Code and allow pairing. The device may not respond to commands.');
                 const standaloneCategory = typeToCategory(ret.type);

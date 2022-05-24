@@ -194,26 +194,40 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
-            const isHomeHub = homekitPlugin.storageSettings.values.lastKnownHomeHub?.includes(session.prepareRequest.targetAddress);
-            // ios is seemingly forcing all connections through the home hub on ios 15.5. this is test code to force low bandwidth.
-            // remote wifi connections request the same audio packet time as local wifi connections.
-            // so there's no way to differentiate between remote and local wifi. with low bandwidth forcing off,
-            // it will always select the local stream. with it on, it always selects the remote stream.
-            if (isHomeHub)
-                console.log('Streaming request is coming from the active HomeHub. Medium resolution stream will be selected in case this is a remote wifi connection or a wireless HomeHub. Using Accessory Mode is recommended.');
+            let forceSlowConnection = false;
+            try {
+                for (const address of homekitPlugin.storageSettings.values.slowConnections) {
+                    if (address.includes(session.prepareRequest.targetAddress))
+                        forceSlowConnection = true;
+                }
+            }
+            catch (e) {
+            }
+            if (forceSlowConnection) {
+                console.log('Streaming request is coming from a device in the slow mode connection list. Medium resolution stream will be selected.');
+            }
+            else {
+                // ios is seemingly forcing all connections through the home hub on ios 15.5. this is test code to force low bandwidth.
+                // remote wifi connections request the same audio packet time as local wifi connections.
+                // so there's no way to differentiate between remote and local wifi. with low bandwidth forcing off,
+                // it will always select the local stream. with it on, it always selects the remote stream.
+                forceSlowConnection = homekitPlugin.storageSettings.values.slowConnections?.includes(session.prepareRequest.targetAddress);
+                if (forceSlowConnection)
+                    console.log('Streaming request is coming from the active HomeHub. Medium resolution stream will be selected in case this is a remote wifi connection or a wireless HomeHub. Using Accessory Mode is recommended if not already in use.');
+            }
 
             const {
                 destination,
                 dynamicBitrate,
                 isLowBandwidth,
                 isWatch,
-            } = await getStreamingConfiguration(device, isHomeHub, storage, request)
+            } = await getStreamingConfiguration(device, forceSlowConnection, storage, request)
 
             const hasHomeHub = !!homekitPlugin.storageSettings.values.lastKnownHomeHub;
-            const waitRtcp = isHomeHub || isLowBandwidth || !hasHomeHub;
+            const waitRtcp = forceSlowConnection || isLowBandwidth || !hasHomeHub;
             if (waitRtcp) {
                 console.log('Will wait for initial RTCP packet.', {
-                    isHomeHub,
+                    isHomeHub: forceSlowConnection,
                     isLowBandwidth,
                     hasHomeHub,
                 });
