@@ -250,7 +250,9 @@ export async function createRTCPeerConnectionSource(options: {
                         resolve(undefined);
                 }));
                 pc.onicecandidate = ev => {
-                    sendIceCandidate?.(ev.candidate as any);
+                    sendIceCandidate?.({
+                        ...ev.candidate,
+                    });
                 };
 
                 const handleRawResponse = async (response: RTCSessionDescription): Promise<RTCSessionDescriptionInit> => {

@@ -24,6 +24,7 @@ export const requiredAudioCodecs = [
         mimeType: "audio/PCMU",
         clockRate: 8000,
         channels: 1,
+        payloadType: 0,
     }),
     new RTCRtpCodecParameters({
         mimeType: "audio/PCMA",
