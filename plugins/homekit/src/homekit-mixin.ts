@@ -11,7 +11,7 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     storageSettings = new StorageSettings(this, {
         standalone: {
             title: 'Standalone Accessory Mode',
-            description: 'Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge, and the accessory will then need to be re-paired to HomeKit. The pairing code will be available after the HomeKit plugin has been reloaded.'
+            description: 'Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge. The accessory will then need to be re-paired to HomeKit. The pairing code will be available after the HomeKit plugin has been reloaded.'
                 + (this.interfaces.includes(ScryptedInterface.VideoCamera)
                     ? ' Cameras running in accessory mode with Rebroadcast Prebuffers will send a notification when the stream becomes unavailable.'
                     : ''),
@@ -20,12 +20,7 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             // todo: change this at some point.
             persistedDefaultValue: false,
         },
-        qrCode: {
-            title: "Print QR Code",
-            type: 'button',
-            readonly: true,
-            description: "Print the Pairing QR Code to the 'Console'",
-        },
+        ...createHAPUsernameStorageSettingsDict(),
         resetAccessory: {
             title: 'Reset Pairing',
             description: 'Resetting the pairing will resync it to HomeKit as a new device. Bridged devices will automatically relink as a new device. Accessory devices must be manually removed from the Home app and re-paired. Enter RESET to reset the pairing.',
@@ -41,7 +36,6 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             },
             mapGet: () => '',
         },
-        ...createHAPUsernameStorageSettingsDict(),
     });
 
     constructor(options: SettingsMixinDeviceOptions<T>) {

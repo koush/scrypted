@@ -1,4 +1,3 @@
-import qrcode from '@koush/qrcode-terminal';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
@@ -29,23 +28,11 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     videoClipsId: string;
     cameraMixins = new Map<string, CameraMixin>();
     storageSettings = new StorageSettings(this, {
+        ...createHAPUsernameStorageSettingsDict(),
         pincode: {
-            group: 'Pairing',
             title: "Manual Pairing Code",
             persistedDefaultValue: randomPinCode(),
             readonly: true,
-        },
-        qrCode: {
-            title: "Print QR Code",
-            type: 'button',
-            readonly: true,
-            description: "Print the Pairing QR Code to the 'Console'",
-            onPut: () => {
-                qrcode.generate(this.bridge.setupURI(), { small: true }, (code: string) => {
-                    this.console.log('Pairing QR Code:')
-                    this.console.log('\n' + code);
-                });
-            },
         },
         resetAccessory: {
             title: 'Reset Pairing',
@@ -62,7 +49,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             },
             mapGet: () => '',
         },
-        ...createHAPUsernameStorageSettingsDict(),
         addressOverride: {
             group: 'Network',
             title: 'Scrypted Server Address',
@@ -235,11 +221,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         if (!hasPublished) {
                             hasPublished = true;
                             logConnections(mixinConsole, accessory, this.seenConnections);
-
-                            qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
-                                mixinConsole.log('Pairing QR Code:')
-                                mixinConsole.log('\n' + code);
-                            });
+                            storageSettings.values.qrCode = accessory.setupURI();
                         }
                     }
 
@@ -261,22 +243,27 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         }
                     }
 
-                    if (true) {
-                        publish();
-                    }
-                    else {
-                        updateDeviceAdvertisement();
-                        if (!published)
-                            mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
+                    try {
+                        if (true) {
+                            publish();
+                        }
+                        else {
+                            updateDeviceAdvertisement();
+                            if (!published)
+                                mixinConsole.warn('Device is in accessory mode and was offline during HomeKit startup. Device will not be started until it comes back online. Disable accessory mode if this is in error.');
 
-                        // throttle this in case the device comes back online very quickly.
-                        device.listen(ScryptedInterface.Online, () => {
-                            const isOnline = !device.interfaces.includes(ScryptedInterface.Online) || device.online;
-                            if (isOnline)
-                                updateDeviceAdvertisement();
-                            else
-                                setTimeout(updateDeviceAdvertisement, 30000);
-                        });
+                            // throttle this in case the device comes back online very quickly.
+                            device.listen(ScryptedInterface.Online, () => {
+                                const isOnline = !device.interfaces.includes(ScryptedInterface.Online) || device.online;
+                                if (isOnline)
+                                    updateDeviceAdvertisement();
+                                else
+                                    setTimeout(updateDeviceAdvertisement, 30000);
+                            });
+                        }
+                    }
+                    catch (e) {
+                        mixinConsole.error('There was an error publishing the standalone accessory', e);
                     }
                 }
                 else {
@@ -306,12 +293,8 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         };
 
         this.bridge.publish(publishInfo, true);
+        this.storageSettings.values.qrCode = this.bridge.setupURI();
         logConnections(this.console, this.bridge, this.seenConnections);
-
-        qrcode.generate(this.bridge.setupURI(), { small: true }, (code: string) => {
-            this.console.log('Pairing QR Code:')
-            this.console.log('\n' + code);
-        });
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
             if (eventDetails.eventInterface !== ScryptedInterface.ScryptedDevice)
@@ -388,23 +371,6 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         }
         else {
             ret = new HomekitMixin(options);
-        }
-
-        ret.storageSettings.settings.qrCode.onPut = () => {
-            const accessory = this.standalones.get(mixinDeviceState.id);
-            if (!accessory) {
-                ret.console.error('Accessory not found. Try reloading the HomeKit plugin?');
-                return;
-            }
-            if (!accessory._setupID) {
-                ret.console.warn('This accessory is currently unpublished since it is offline. The accessory will be published now to generate the QR Code and allow pairing. The device may not respond to commands.');
-                const standaloneCategory = typeToCategory(ret.type);
-                this.publishAccessory(accessory, ret.storageSettings.values.mac, standaloneCategory);
-            }
-            qrcode.generate(accessory.setupURI(), { small: true }, (code: string) => {
-                ret.console.log('Pairing QR Code:')
-                ret.console.log('\n' + code);
-            });
         }
 
         return ret;
