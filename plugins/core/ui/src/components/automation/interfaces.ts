@@ -39,7 +39,7 @@ export const actionableEvents = [
     ScryptedInterface.Thermometer,
     ScryptedInterface.HumiditySensor,
     ScryptedInterface.BinarySensor,
-    ScryptedInterface.IntrusionSensor,
+    ScryptedInterface.TamperSensor,
     ScryptedInterface.PowerSensor,
     ScryptedInterface.AudioSensor,
     ScryptedInterface.MotionSensor,

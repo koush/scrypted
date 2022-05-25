@@ -148,6 +148,7 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
         makeListener(iface: string, devices: ScryptedDevice[]) {
             const aggregator = aggregators.get(iface);
             if (!aggregator) {
+                const ds = deviceManager.getDeviceState(this.nativeId);
                 // if this device can't be aggregated for whatever reason, pass property through.
                 for (const device of devices) {
                     const register = device.listen({
@@ -155,7 +156,7 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
                         watch: true,
                     }, (source, details, data) => {
                         if (details.property)
-                            deviceManager.getDeviceState(this.nativeId)[details.property] = data;
+                            ds[details.property] = data;
                     });
                     this.listeners.push(register);
                 }
