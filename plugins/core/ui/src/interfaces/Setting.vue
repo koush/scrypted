@@ -1,7 +1,7 @@
 <template>
   <div>
     <v-checkbox
-      v-if="lazyValue.type && lazyValue.type.toLowerCase() === 'boolean'"
+      v-if="lazyValue.type === 'boolean'"
       dense
       :readonly="lazyValue.readonly"
       v-model="booleanValue"
@@ -12,6 +12,10 @@
       @change="save"
       :class="lazyValue.description ? 'mb-2' : ''"
     ></v-checkbox>
+    <div v-else-if="lazyValue.type === 'qrcode'">
+      <div class="subtitle-2"> {{ lazyValue.title }}</div>
+      <v-img :src="qrcode"></v-img>
+    </div>
     <div v-else-if="lazyValue.type === 'button'" @click="save">
       <v-btn small block> {{ lazyValue.title }} </v-btn>
       <span v-if="lazyValue.description" class="caption pl-1">{{
@@ -154,6 +158,7 @@ import DevicePicker from "../common/DevicePicker.vue";
 import Grower from "../common/Grower.vue";
 import cloneDeep from "lodash/cloneDeep";
 import Camera from "./Camera.vue";
+import qrcode from "qrcode";
 
 export default {
   mixins: [RPCInterface],
@@ -171,6 +176,36 @@ export default {
     dirty() {
       if (this.device) return;
       this.onInput();
+    },
+  },
+  asyncComputed: {
+    qrcode: {
+      async get() {
+        if (this.lazyValue.type !== "qrcode") return;
+
+        let color;
+        if (this.$vuetify.theme.dark) {
+          color = {
+            dark: "#FFFFFFFF",
+            light: "#FF000000",
+          };
+        } else {
+          color = {
+            light: "#FFFFFFFF",
+            dark: "#404040FF",
+          };
+        }
+
+        return qrcode.toDataURL(this.lazyValue.value, {
+          margin: 0.5,
+          color,
+          width: 320,
+          rendererOpts: {
+            type: "image/jpeg",
+          },
+        });
+      },
+      default: "https://poops.com/farts.jpg",
     },
   },
   computed: {
@@ -241,26 +276,28 @@ export default {
       }
       var ret = this.$store.state.scrypted.devices
         .map((id) => {
-          const device = this.$scrypted.systemManager.getDeviceById(id)
-          return device.interfaces.map(iface => ({
+          const device = this.$scrypted.systemManager.getDeviceById(id);
+          return device.interfaces.map((iface) => ({
             device,
             deviceInterface: iface,
-          }))
+          }));
         })
         .flat()
-        .filter(({device, deviceInterface}) => {
+        .filter(({ device, deviceInterface }) => {
           try {
             return eval(
               `(function() { var interfaces = ${JSON.stringify(
                 device.interfaces
-              )}; var deviceInterface = '${deviceInterface}'}; var type='${device.type}'; return ${expression} })`
+              )}; var deviceInterface = '${deviceInterface}'}; var type='${
+                device.type
+              }'; return ${expression} })`
             )();
           } catch (e) {
             return true;
           }
         })
-        .map(({device, deviceInterface}) => ({
-          id: device.id + '#' + deviceInterface,
+        .map(({ device, deviceInterface }) => ({
+          id: device.id + "#" + deviceInterface,
           text: device.name + ` (${deviceInterface})`,
         }));
       if (!this.lazyValue.multiple) {
@@ -293,8 +330,7 @@ export default {
       var ret = cloneDeep(this.value);
       try {
         ret.value = JSON.parse(ret.value);
-      }
-      catch (e) {
+      } catch (e) {
         ret.value = [];
       }
       return ret;
