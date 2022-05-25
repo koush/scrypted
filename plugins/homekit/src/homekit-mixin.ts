@@ -10,6 +10,7 @@ export const HOMEKIT_MIXIN = 'mixin:@scrypted/homekit';
 export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
     storageSettings = new StorageSettings(this, {
         standalone: {
+            group: 'HomeKit Pairing',
             title: 'Standalone Accessory Mode',
             description: 'Advertise this to HomeKit as a standalone accessory rather than through the Scrypted HomeKit bridge. Enabling this option will remove it from the bridge. The accessory will then need to be re-paired to HomeKit. The pairing code will be available after the HomeKit plugin has been reloaded.'
                 + (this.interfaces.includes(ScryptedInterface.VideoCamera)
@@ -20,8 +21,9 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             // todo: change this at some point.
             persistedDefaultValue: false,
         },
-        ...createHAPUsernameStorageSettingsDict(),
+        ...createHAPUsernameStorageSettingsDict('HomeKit Pairing'),
         resetAccessory: {
+            group: 'HomeKit Pairing',
             title: 'Reset Pairing',
             description: 'Resetting the pairing will resync it to HomeKit as a new device. Bridged devices will automatically relink as a new device. Accessory devices must be manually removed from the Home app and re-paired. Enter RESET to reset the pairing.',
             placeholder: 'RESET',
@@ -44,7 +46,6 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
         // this may only change on reload of plugin.
         this.storageSettings.settings.qrCode.hide = !this.storageSettings.values.standalone;
     }
-
 
     alertReload() {
         log.a(`You must reload the HomeKit plugin for the changes to ${this.name} to take effect.`);

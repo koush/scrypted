@@ -100,15 +100,17 @@ export function getRandomPort() {
     return Math.round(30000 + Math.random() * 20000);
 }
 
-export function createHAPUsernameStorageSettingsDict(): StorageSettingsDict<'mac' | 'qrCode'> {
+export function createHAPUsernameStorageSettingsDict(group?: string): StorageSettingsDict<'mac' | 'qrCode'> {
     return {
         qrCode: {
+            group,
             title: "Pairing QR Code",
             type: 'qrcode',
             readonly: true,
             description: "Scan with your iOS camera to pair this Scrypted with HomeKit.",
         },
         mac: {
+            group,
             hide: true,
             title: "Username Override",
             persistedDefaultValue: createHAPUsername(),
