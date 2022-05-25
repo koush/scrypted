@@ -11,7 +11,7 @@ export function createWebRTCStorageSettings(device: MixinDeviceBase<any> | Scryp
             description: 'Experimental',
             type: 'boolean',
             defaultValue: true,
-            hide: true,
+            // hide: true,
         },
     });
 }

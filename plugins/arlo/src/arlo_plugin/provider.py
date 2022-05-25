@@ -93,13 +93,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             headers = self.arlo_auth_headers
             if headers:
                 self._arlo.UseExistingAuth(self.arlo_user_id, json.loads(headers))
-                self.logger.info(f"Initialized Arlo client for {self.arlo_username}, reusing stored auth headers")
+                self.logger.info(f"Initialized Arlo client, reusing stored auth headers")
 
                 asyncio.get_event_loop().create_task(self.do_arlo_setup())
                 return self._arlo
             else:
                 self._arlo_mfa_complete_auth = self._arlo.LoginMFA()
-                self.logger.info(f"Initialized Arlo client for {self.arlo_username}, waiting for MFA code")
+                self.logger.info(f"Initialized Arlo client, waiting for MFA code")
                 return None
         except Exception as e:
             self.logger.error(f"Error initializing Arlo client: {type(e)} with message {str(e)}")
@@ -219,7 +219,6 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     ScryptedInterface.VideoCamera.value,
                     ScryptedInterface.Camera.value,
                     ScryptedInterface.MotionSensor.value,
-                    ScryptedInterface.Refresh.value,
                 ],
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,

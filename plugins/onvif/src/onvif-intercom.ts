@@ -46,16 +46,18 @@ interface CodecMatch {
     payloadType: string;
     sdpName: string;
     sampleRate: string;
+    channels: string;
 }
 
 const codecRegex = /a=rtpmap:(\d+) (.*?)\/(\d+)/g
 function* parseCodecs(audioSection: string): Generator<CodecMatch> {
     for (const match of audioSection.matchAll(codecRegex)) {
-        const [_, payloadType, sdpName, sampleRate] = match;
+        const [_, payloadType, sdpName, sampleRate, _skip, channels] = match;
         yield {
             payloadType,
             sdpName,
             sampleRate,
+            channels,
         }
     }
 }
@@ -113,7 +115,7 @@ export class OnvifIntercom implements Intercom {
         let match: CodecMatch;
         let codec: SupportedCodec;
         for (const supported of availableCodecs) {
-            codec = supportedCodecs.find(check => check.sdpName === supported.sdpName);
+            codec = supportedCodecs.find(check => check.sdpName?.toLowerCase() === supported.sdpName.toLowerCase());
             if (codec) {
                 match = supported;
                 break;
@@ -123,17 +125,19 @@ export class OnvifIntercom implements Intercom {
         if (!match)
             throw new Error('no supported codec was found for back channel');
 
+        const ssrcBuffer = Buffer.from(transportDict.ssrc, 'hex');
+        // ffmpeg expects ssrc as signed int32.
+        const ssrc = ssrcBuffer.readInt32BE(0);
+
         const args = [
             '-hide_banner',
             ...ffmpegInput.inputArguments,
             '-vn',
             '-acodec', codec.ffmpegCodec,
             '-ar', match.sampleRate,
-            // ought to fix this, i think there's a slash that follows the sample rate to indicate number of
-            // channels, but no way of testing at the moment.
-            '-ac', '1',
+            '-ac', match.channels || '1',
             "-payload_type", match.payloadType,
-            "-ssrc", parseInt(transportDict.ssrc, 16).toString(),
+            "-ssrc", ssrc.toString(),
             '-f', 'rtp',
             `rtp://${this.camera.getIPAddress()}:${serverRtp}?localrtpport=${rtp}&localrtcpport=${rtcp}`,
         ];

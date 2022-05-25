@@ -1,7 +1,7 @@
 import sdk, { AudioSensor, Camera, Intercom, Logger, MotionSensor, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import throttle from 'lodash/throttle';
-import { HomeKitSession } from '../../common';
 import { SnapshotRequest, SnapshotRequestCallback } from "../../hap";
+import type { HomeKitPlugin } from "../../main";
 
 const { systemManager, mediaManager } = sdk;
 
@@ -12,7 +12,7 @@ function recommendSnapshotPlugin(console: Console, log: Logger, message: string)
     log.a(message);
 }
 
-export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitSession: HomeKitSession, console: Console) {
+export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitPlugin: HomeKitPlugin, console: Console) {
     let pendingPicture: Promise<Buffer>;
 
     const takePicture = async (request: SnapshotRequest) => {
@@ -38,7 +38,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
             const timeout = setTimeout(() => {
                 timedOut = true;
                 pendingPicture = undefined;
-                recommendSnapshotPlugin(console, homekitSession.log, `${device.name} is offline or has slow snapshots. This will cause HomeKit to hang. Consider installing the Snapshot Plugin to keep HomeKit responsive. origin:/#/component/plugin/install/@scrypted/snapshot}`);
+                recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} is offline or has slow snapshots. This will cause HomeKit to hang. Consider installing the Snapshot Plugin to keep HomeKit responsive. origin:/#/component/plugin/install/@scrypted/snapshot}`);
                 reject(new Error('snapshot timed out'));
             }, 3000);
 
@@ -67,12 +67,12 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
     });
 
     function snapshotAll(request: SnapshotRequest) {
-        for (const snapshotThrottle of homekitSession.snapshotThrottles.values()) {
+        for (const snapshotThrottle of homekitPlugin.snapshotThrottles.values()) {
             snapshotThrottle(request);
         }
     }
 
-    homekitSession.snapshotThrottles.set(device.id, throttledTakePicture);
+    homekitPlugin.snapshotThrottles.set(device.id, throttledTakePicture);
 
     async function handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback) {
         try {
@@ -99,7 +99,7 @@ export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Cam
         }
         catch (e) {
             console.error('snapshot error', e);
-            recommendSnapshotPlugin(console, homekitSession.log, `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`);
+            recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} encountered an error while retrieving a new snapshot. Consider installing the Snapshot Plugin to show the most recent snapshot. origin:/#/component/plugin/install/@scrypted/snapshot}`);
             callback(e);
         }
     }

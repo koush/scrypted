@@ -38,7 +38,7 @@ export interface DeviceState {
     fromMimeType?: string;
     toMimeType?: string;
     binaryState?: boolean;
-    intrusionDetected?: boolean;
+    tampered?: TamperState;
     powerDetected?: boolean;
     audioDetected?: boolean;
     motionDetected?: boolean;
@@ -48,8 +48,10 @@ export interface DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
+    securitySystemState?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
+    co2ppm?: number;
     airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
@@ -93,7 +95,7 @@ export declare class DeviceBase implements DeviceState {
     fromMimeType?: string;
     toMimeType?: string;
     binaryState?: boolean;
-    intrusionDetected?: boolean;
+    tampered?: TamperState;
     powerDetected?: boolean;
     audioDetected?: boolean;
     motionDetected?: boolean;
@@ -103,8 +105,10 @@ export declare class DeviceBase implements DeviceState {
     ultraviolet?: number;
     luminance?: number;
     position?: Position;
+    securitySystemState?: SecuritySystemState;
     pm25Density?: number;
     vocDensity?: number;
+    co2ppm?: number;
     airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
@@ -148,7 +152,7 @@ export declare enum ScryptedInterfaceProperty {
     fromMimeType = "fromMimeType",
     toMimeType = "toMimeType",
     binaryState = "binaryState",
-    intrusionDetected = "intrusionDetected",
+    tampered = "tampered",
     powerDetected = "powerDetected",
     audioDetected = "audioDetected",
     motionDetected = "motionDetected",
@@ -158,8 +162,10 @@ export declare enum ScryptedInterfaceProperty {
     ultraviolet = "ultraviolet",
     luminance = "luminance",
     position = "position",
+    securitySystemState = "securitySystemState",
     pm25Density = "pm25Density",
     vocDensity = "vocDensity",
+    co2ppm = "co2ppm",
     airQuality = "airQuality",
     humiditySetting = "humiditySetting",
     fan = "fan"
@@ -266,6 +272,7 @@ export declare enum ScryptedDeviceType {
     Irrigation = "Irrigation",
     Valve = "Valve",
     Person = "Person",
+    SecuritySystem = "SecuritySystem",
     Unknown = "Unknown"
 }
 /**
@@ -494,8 +501,16 @@ export interface Camera {
     takePicture(options?: RequestPictureOptions): Promise<MediaObject>;
     getPictureOptions(): Promise<ResponsePictureOptions[]>;
 }
+export interface H264Info {
+    sei?: boolean;
+    stapb?: boolean;
+    mtap16?: boolean;
+    mtap32?: boolean;
+    fuab?: boolean;
+}
 export interface VideoStreamOptions {
     codec?: string;
+    profile?: string;
     width?: number;
     height?: number;
     bitrate?: number;
@@ -510,6 +525,7 @@ export interface VideoStreamOptions {
      * Key Frame interval in frames.
      */
     keyframeInterval?: number;
+    h264Info?: H264Info;
 }
 export interface AudioStreamOptions {
     codec?: string;
@@ -518,6 +534,7 @@ export interface AudioStreamOptions {
     bitrate?: number;
 }
 export declare type MediaStreamSource = "local" | "cloud";
+export declare type MediaStreamTool = 'ffmpeg' | 'scrypted' | 'gstreamer';
 /**
  * Options passed to VideoCamera.getVideoStream to
  * request specific media formats.
@@ -542,10 +559,10 @@ export interface MediaStreamOptions {
     */
     metadata?: any;
     /**
-     * The tool used to generate the container. Ie, scrypted,
+     * The tool was used to write the container or will be used to read teh container. Ie, scrypted,
      * the ffmpeg tools, gstreamer.
      */
-    tool?: string;
+    tool?: MediaStreamTool;
     video?: VideoStreamOptions;
     audio?: AudioStreamOptions;
 }
@@ -825,8 +842,9 @@ export interface Settings {
 export interface BinarySensor {
     binaryState?: boolean;
 }
-export interface IntrusionSensor {
-    intrusionDetected?: boolean;
+export declare type TamperState = 'intrusion' | 'motion' | 'magnetic' | 'cover' | true | false;
+export interface TamperSensor {
+    tampered?: TamperState;
 }
 export interface PowerSensor {
     powerDetected?: boolean;
@@ -855,6 +873,14 @@ export interface UltravioletSensor {
 export interface LuminanceSensor {
     luminance?: number;
 }
+export interface Position {
+    /**
+     * The accuracy radius of this position in meters.
+     */
+    accuracyRadius?: number;
+    latitude?: number;
+    longitude?: number;
+}
 export interface PositionSensor {
     position?: Position;
 }
@@ -863,6 +889,9 @@ export interface PM25Sensor {
 }
 export interface VOCSensor {
     vocDensity?: number;
+}
+export interface CO2Sensor {
+    co2ppm?: number;
 }
 export declare enum AirQuality {
     Unknown = "Unknown",
@@ -875,13 +904,28 @@ export declare enum AirQuality {
 export interface AirQualitySensor {
     airQuality?: AirQuality;
 }
-export interface Position {
-    /**
-     * The accuracy radius of this position in meters.
-     */
-    accuracyRadius?: number;
-    latitude?: number;
-    longitude?: number;
+export declare enum SecuritySystemMode {
+    Disarmed = "Disarmed",
+    HomeArmed = "HomeArmed",
+    AwayArmed = "AwayArmed",
+    NightArmed = "NightArmed"
+}
+export declare enum SecuritySystemObstruction {
+    Sensor = "Sensor",
+    Occupied = "Occupied",
+    Time = "Time",
+    Error = "Error"
+}
+export interface SecuritySystemState {
+    mode: SecuritySystemMode;
+    triggered?: boolean;
+    supportedModes?: SecuritySystemMode[];
+    obstruction?: SecuritySystemObstruction;
+}
+export interface SecuritySystem {
+    securitySystemState?: SecuritySystemState;
+    armSecuritySystem(mode: SecuritySystemMode): Promise<void>;
+    disarmSecuritySystem(): Promise<void>;
 }
 export interface ZoneHistory {
     firstEntry: number;
@@ -1426,7 +1470,7 @@ export declare enum ScryptedInterface {
     BufferConverter = "BufferConverter",
     Settings = "Settings",
     BinarySensor = "BinarySensor",
-    IntrusionSensor = "IntrusionSensor",
+    TamperSensor = "TamperSensor",
     PowerSensor = "PowerSensor",
     AudioSensor = "AudioSensor",
     MotionSensor = "MotionSensor",
@@ -1436,8 +1480,10 @@ export declare enum ScryptedInterface {
     UltravioletSensor = "UltravioletSensor",
     LuminanceSensor = "LuminanceSensor",
     PositionSensor = "PositionSensor",
+    SecuritySystem = "SecuritySystem",
     PM25Sensor = "PM25Sensor",
     VOCSensor = "VOCSensor",
+    CO2Sensor = "CO2Sensor",
     AirQualitySensor = "AirQualitySensor",
     Readme = "Readme",
     OauthClient = "OauthClient",

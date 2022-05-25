@@ -23,7 +23,7 @@ export interface ParserSession<T extends string> {
         width: number,
         height: number,
     },
-    kill(): void;
+    kill(error?: Error): void;
     killed: Promise<void>;
     isActive: boolean;
 
@@ -41,7 +41,8 @@ export interface ParserOptions<T extends string> {
 }
 
 export async function parseResolution(cp: ChildProcess) {
-    return new Promise<string[]>(resolve => {
+    return new Promise<string[]>((resolve, reject) => {
+        cp.on('exit', () => reject(new Error('ffmpeg exited while waiting to parse stream resolution')));
         const parser = (data: Buffer) => {
             const stdout = data.toString();
             const res = /(([0-9]{2,5})x([0-9]{2,5}))/.exec(stdout);
@@ -56,11 +57,12 @@ export async function parseResolution(cp: ChildProcess) {
     });
 }
 
-async function parseToken(cp: ChildProcess, token: string) {
-    return new Promise<string>(resolve => {
+async function parseInputToken(cp: ChildProcess, token: string) {
+    return new Promise<string>((resolve, reject) => {
+        cp.on('exit', () => reject(new Error('ffmpeg exited while waiting to parse stream information: ' + token)));
         const parser = (data: Buffer) => {
-            const stdout: string = data.toString();
-            const idx = stdout.indexOf(`${token}: `);
+            const stdout: string = data.toString().split('Output ')[0];
+            const idx = stdout.lastIndexOf(`${token}: `);
             if (idx !== -1) {
                 const check = stdout.substring(idx + token.length + 1).trim();
                 let next = check.indexOf(' ');
@@ -80,21 +82,22 @@ async function parseToken(cp: ChildProcess, token: string) {
 }
 
 export async function parseVideoCodec(cp: ChildProcess) {
-    return parseToken(cp, 'Video');
+    return parseInputToken(cp, 'Video');
 }
 
 export async function parseAudioCodec(cp: ChildProcess) {
-    return parseToken(cp, 'Audio');
+    return parseInputToken(cp, 'Audio');
 }
 
-export function setupActivityTimer(container: string, kill: () => void, events: {
+export function setupActivityTimer(container: string, kill: (error?: Error) => void, events: {
     once(event: 'killed', callback: () => void): void,
 }, timeout: number) {
     let dataTimeout: NodeJS.Timeout;
 
     function dataKill() {
-        console.error('timeout waiting for data, killing parser session', container);
-        kill();
+        const str = 'timeout waiting for data, killing parser session';
+        console.error(str, container);
+        kill(new Error(str));
     }
 
     let lastTime = Date.now();
@@ -103,7 +106,7 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
     }
 
     function clearActivityTimer() {
-        clearTimeout(dataTimeout);
+        clearInterval(dataTimeout);
     }
 
     if (timeout) {
@@ -116,7 +119,7 @@ export function setupActivityTimer(container: string, kill: () => void, events: 
         }, timeout);
     }
 
-    events.once('killed', () => clearTimeout(dataTimeout));
+    events.once('killed', () => clearInterval(dataTimeout));
 
     resetActivityTimer();
     return {
@@ -143,10 +146,10 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         sessionKilled = resolve;
     });
 
-    function kill() {
+    function kill(error?: Error) {
         if (isActive) {
             events.emit('killed');
-            events.emit('error', new Error('killed'));
+            events.emit('error', error || new Error('killed'));
         }
         isActive = false;
         sessionKilled();
@@ -227,7 +230,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
                 }
                 catch (e) {
                     console.error('rebroadcast parse error', e);
-                    kill();
+                    kill(e);
                 }
             })();
         }
@@ -252,7 +255,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         stdio,
     });
     ffmpegLogInitialOutput(console, cp, undefined, options?.storage);
-    cp.on('exit', kill);
+    cp.on('exit', () => kill(new Error('ffmpeg exited')));
 
     let sdp: Promise<Buffer[]>;
     if (needSdp) {
@@ -287,14 +290,14 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         }
         catch (e) {
             console.error('rebroadcast parse error', e);
-            kill();
+            kill(e);
         }
     });
 
     // tbh parsing stdout is super sketchy way of doing this.
     parseAudioCodec(cp).then(result => inputAudioCodec = result);
-    await parseVideoCodec(cp).then(result => inputVideoCodec = result);
     parseResolution(cp).then(result => inputVideoResolution = result);
+    await parseVideoCodec(cp).then(result => inputVideoCodec = result);
 
     return {
         sdp,
@@ -306,12 +309,14 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
         },
         get inputVideoResolution() {
             return {
-                width: parseInt(inputVideoResolution?.[1]),
-                height: parseInt(inputVideoResolution?.[2]),
+                width: parseInt(inputVideoResolution?.[2]),
+                height: parseInt(inputVideoResolution?.[3]),
             }
         },
         get isActive() { return isActive },
-        kill,
+        kill(error?: Error) {
+            kill(error);
+        },
         killed,
         negotiateMediaStream: () => {
             const ret: ResponseMediaStreamOptions = cloneDeep(ffmpegInput.mediaStreamOptions) || {

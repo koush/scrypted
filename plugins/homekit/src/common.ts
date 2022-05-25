@@ -1,7 +1,7 @@
 
-import { EventDetails, EventListenerRegister, Logger, Refresh, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { CameraMixin } from './camera-mixin';
-import { Accessory, Service, SnapshotRequest, Characteristic, CharacteristicEventTypes, WithUUID } from './hap';
+import { EventDetails, EventListenerRegister, Refresh, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { Accessory, Characteristic, CharacteristicEventTypes, Service, SnapshotRequest, WithUUID } from './hap';
+import type { HomeKitPlugin } from "./main";
 
 export interface DummyDevice {
     interfaces?: string[];
@@ -12,19 +12,10 @@ export interface SnapshotThrottle {
     (request: SnapshotRequest): Promise<Buffer>;
 }
 
-export interface HomeKitSession {
-    nativeId?: string;
-    storage: Storage;
-    snapshotThrottles: Map<string, SnapshotThrottle>;
-    log: Logger;
-    videoClipsId: string;
-    cameraMixins: Map<string, CameraMixin>;
-}
-
 interface SupportedType {
     type: ScryptedDeviceType;
     probe(device: DummyDevice): boolean;
-    getAccessory: (device: ScryptedDevice & any, homekitSession: HomeKitSession) => Promise<Accessory>;
+    getAccessory: (device: ScryptedDevice & any, homekitPlugin: HomeKitPlugin) => Promise<Accessory>;
 }
 
 export const supportedTypes: { [type: string]: SupportedType } = {};

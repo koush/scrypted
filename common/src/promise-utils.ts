@@ -22,14 +22,14 @@ export function singletonPromise<T>(rp: RefreshPromise<T>, method: () => Promise
 }
 
 export class TimeoutError extends Error {
-    constructor() {
+    constructor(public promise: Promise<any>) {
         super('Operation Timed Out');
     }
 }
 
 export function timeoutPromise<T>(timeout: number, promise: Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-        setTimeout(() => reject(new TimeoutError()), timeout);
+        setTimeout(() => reject(new TimeoutError(promise)), timeout);
         promise.then(resolve);
         promise.catch(reject);
     })

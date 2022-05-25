@@ -4,12 +4,20 @@ import v8 from 'v8';
 
 export async function newThread<T>(thread: () => Promise<T>): Promise<T>;
 export async function newThread<V, T>(params: V, thread: (params: V) => Promise<T>): Promise<T>;
+export async function newThread<M, V, T>(modules: M, params: V, thread: (params: M & V) => Promise<T>): Promise<T>;
 
 export async function newThread<T>(...args: any[]): Promise<T> {
-    let thread: () => Promise<T> = args[1];
     let params: { [key: string]: any } = {};
-    if (thread) {
+    let modules: { [key: string]: any } = {};
+    let thread: () => Promise<T>;
+    if (args[2]) {
+        modules = args[0]
+        params = args[1];
+        thread = args[2];
+    }
+    else if (args[1]) {
         params = args[0];
+        thread = args[1];
     }
     else {
         thread = args[0];
@@ -31,13 +39,17 @@ export async function newThread<T>(...args: any[]): Promise<T> {
                 reject?.(e);
             }
         });
+        mainPeer.transportSafeArgumentTypes.add(Buffer.name);
         worker_threads.parentPort.on('message', (message: any) => mainPeer.handleMessage(v8.deserialize(message)));
 
-        mainPeer.params.eval = async (script: string, paramNames: string[], ...paramValues: any[]) => {
+        mainPeer.params.eval = async (script: string, moduleNames: string[], paramNames: string[], ...paramValues: any[]) => {
             const f = vm.compileFunction(`return (${script})`, paramNames, {
                 filename: 'script.js',
             });
             const params: any = {};
+            for (const module of moduleNames) {
+                params[module] = global.require(module);
+            }
             for (let i = 0; i < paramNames.length; i++) {
                 params[paramNames[i]] = paramValues[i];
             }
@@ -66,13 +78,15 @@ export async function newThread<T>(...args: any[]): Promise<T> {
             reject?.(e);
         }
     });
+    threadPeer.transportSafeArgumentTypes.add(Buffer.name);
     worker.on('message', (message: any) => threadPeer.handleMessage(v8.deserialize(message)));
 
     const e = await threadPeer.getParam('eval');
+    const moduleNames = Object.keys(modules);
     const paramNames = Object.keys(params);
     const paramValues = Object.values(params);
     try {
-        return await e(thread.toString(), paramNames, ...paramValues);
+        return await e(thread.toString(), moduleNames, paramNames, ...paramValues);
     }
     finally {
         worker.terminate();

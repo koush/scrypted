@@ -1,15 +1,14 @@
-import { readLength, readLine } from './read-stream';
-import { Duplex, PassThrough, Readable } from 'stream';
-import { randomBytes } from 'crypto';
-import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
-import { parseSdp } from './sdp-utils';
+import crypto, { randomBytes } from 'crypto';
 import dgram from 'dgram';
-import net from 'net';
-import tls from 'tls';
 import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
-import crypto from 'crypto';
+import net from 'net';
+import { Duplex, Readable } from 'stream';
+import tls from 'tls';
 import { timeoutPromise } from './promise-utils';
+import { readLength, readLine } from './read-stream';
+import { parseSdp } from './sdp-utils';
 import { sleep } from './sleep';
+import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -39,8 +38,13 @@ export const H264_NAL_TYPE_SEI = 6;
 export const H264_NAL_TYPE_SPS = 7;
 // aggregate NAL Unit
 export const H264_NAL_TYPE_STAP_A = 24;
+export const H264_NAL_TYPE_STAP_B = 25;
 // fragmented NAL Unit (need to match against first)
 export const H264_NAL_TYPE_FU_A = 28;
+export const H264_NAL_TYPE_FU_B = 29;
+
+export const H264_NAL_TYPE_MTAP16 = 26;
+export const H264_NAL_TYPE_MTAP32 = 27;
 
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
@@ -72,6 +76,34 @@ export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     return;
 }
 
+export function getNaluTypes(streamChunk: StreamChunk) {
+    const ret = new Set<number>();
+    if (streamChunk.type !== 'h264')
+        return ret;
+
+    const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
+    const naluType = nalu[0] & 0x1f;
+    if (naluType === H264_NAL_TYPE_STAP_A) {
+        let pos = 1;
+        while (pos < nalu.length) {
+            const naluLength = nalu.readUInt16BE(pos);
+            pos += 2;
+            const stapaType = nalu[pos] & 0x1f;
+            ret.add(stapaType);
+            pos += naluLength;
+        }
+    }
+    else if (naluType === H264_NAL_TYPE_FU_A) {
+        const fuaType = nalu[1] & 0x1f;
+        ret.add(fuaType);
+    }
+    else {
+        ret.add(naluType);
+    }
+
+    return ret;
+}
+
 export function createRtspParser(options?: StreamParserOptions): RtspStreamParser {
     let resolve: any;
 
@@ -91,25 +123,46 @@ export function createRtspParser(options?: StreamParserOptions): RtspStreamParse
         ],
         findSyncFrame(streamChunks: StreamChunk[]) {
             let foundIndex: number;
+            let nonVideo: {
+                [codec: string]: StreamChunk,
+            } = {};
+
+            const createSyncFrame = () => {
+                const ret = streamChunks.slice(foundIndex);
+                // for (const nv of Object.values(nonVideo)) {
+                //     ret.unshift(nv);
+                // }
+                return ret;
+            }
 
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
+                if (streamChunk.type !== 'h264') {
+                    nonVideo[streamChunk.type] = streamChunk;
+                    continue;
+                }
+
                 if (findH264NaluType(streamChunk, H264_NAL_TYPE_SPS))
                     foundIndex = prebufferIndex;
             }
 
             if (foundIndex !== undefined)
-                return streamChunks.slice(foundIndex);
+                return createSyncFrame();
 
+            nonVideo = {};
             // some streams don't contain codec info, so find an idr frame instead.
             for (let prebufferIndex = 0; prebufferIndex < streamChunks.length; prebufferIndex++) {
                 const streamChunk = streamChunks[prebufferIndex];
+                if (streamChunk.type !== 'h264') {
+                    nonVideo[streamChunk.type] = streamChunk;
+                    continue;
+                }
                 if (findH264NaluType(streamChunk, H264_NAL_TYPE_IDR))
                     foundIndex = prebufferIndex;
             }
 
             if (foundIndex !== undefined)
-                return streamChunks.slice(foundIndex);
+                return createSyncFrame();
 
             // oh well!
         },
@@ -141,6 +194,18 @@ export function parseHeaders(headers: string[]): Headers {
         ret[key] = value;
     }
     return ret;
+}
+
+export function getFirstAuthenticateHeader(headers: string[]): string {
+    for (const header of headers.slice(1)) {
+        const index = header.indexOf(':');
+        let value = '';
+        if (index !== -1)
+            value = header.substring(index + 1).trim();
+        const key = header.substring(0, index).toLowerCase();
+        if (key === 'www-authenticate')
+            return value;
+    }
 }
 
 export function parseSemicolonDelimited(value: string) {
@@ -184,14 +249,30 @@ export class RtspBase {
 
 const quote = (str: string): string => `"${str.replace(/"/g, '\\"')}"`;
 
+export interface RtspClientSetupOptions {
+    type: 'tcp' | 'udp';
+    port: number;
+    path?: string;
+}
+
+export interface RtspClientTcpSetupOptions extends RtspClientSetupOptions {
+    type: 'tcp';
+    onRtp: (rtspHeader: Buffer, rtp: Buffer) => void;
+}
+
+export interface RtspClientUdpSetupOptions extends RtspClientSetupOptions {
+    type: 'udp';
+}
+
 // probably only works with scrypted rtsp server.
 export class RtspClient extends RtspBase {
     cseq = 0;
     session: string;
     wwwAuthenticate: string;
     requestTimeout: number;
-    rfc4571 = new PassThrough();
     needKeepAlive = false;
+    setupOptions = new Map<number, RtspClientTcpSetupOptions>();
+    issuedTeardown = false;
 
     constructor(public url: string, console?: Console) {
         super(console);
@@ -206,6 +287,23 @@ export class RtspClient extends RtspBase {
         }
         else {
             this.client = net.connect(port, u.hostname);
+        }
+    }
+
+    async safeTeardown() {
+        // issue a teardown to upstream to close gracefully
+        if (this.issuedTeardown)
+            return;
+        this.issuedTeardown = true;
+        try {
+            this.writeTeardown();
+            await sleep(500);
+        }
+        catch (e) {
+        }
+        finally {
+            // will trigger after teardown returns
+            this.client.destroy();
         }
     }
 
@@ -247,13 +345,14 @@ export class RtspClient extends RtspBase {
     async handleDataPayload(header: Buffer) {
         // todo: fix this, because calling teardown outside of the read loop causes this.
         if (header[0] !== RTSP_FRAME_MAGIC)
-            throw new Error('RTSP Client expected frame magic but received: ' + header.toString());
+            throw new Error('RTSP Client received invalid frame magic. This may be a bug in your camera firmware. If this error persists, switch your RTSP Parser to FFmpeg or Scrypted (UDP): ' + header.toString());
 
+        const channel = header.readUInt8(1);
         const length = header.readUInt16BE(2);
         const data = await readLength(this.client, length);
 
-        this.rfc4571.push(header);
-        this.rfc4571.push(data);
+        const options = this.setupOptions.get(channel);
+        options?.onRtp?.(header, data);
     }
 
     async readDataPayload() {
@@ -273,7 +372,6 @@ export class RtspClient extends RtspBase {
         }
         catch (e) {
             this.client.destroy(e);
-            this.rfc4571.destroy(e);
             throw e;
         }
     }
@@ -318,7 +416,6 @@ export class RtspClient extends RtspBase {
         const ha2 = crypto.createHash('md5').update(`${method}:${strippedUrl}`).digest('hex');
         const hash = crypto.createHash('md5').update(`${ha1}:${wwwAuth.nonce}:${ha2}`).digest('hex');
 
-
         const params = {
             username,
             realm: wwwAuth.realm,
@@ -344,7 +441,9 @@ export class RtspClient extends RtspBase {
         if (!status.includes('200') && !response['www-authenticate'])
             throw new Error(status);
 
-        const wwwAuthenticate = response['www-authenticate']
+        // it seems that the first www-authenticate header should be used, as latter ones that are
+        // offered are not actually valid? weird issue seen on tp-link that offers both DIGEST and BASIC.
+        const wwwAuthenticate = getFirstAuthenticateHeader(message) || response['www-authenticate']
         if (wwwAuthenticate) {
             if (authenticating)
                 throw new Error('auth failed');
@@ -379,13 +478,13 @@ export class RtspClient extends RtspBase {
         });
     }
 
-    async setup(channelOrPort: number, path?: string, udp?: boolean) {
-        const protocol = udp ? 'UDP' : 'TCP';
-        const client = udp ? 'client_port' : 'interleaved';
+    async setup(options: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions) {
+        const protocol = options.type === 'udp' ? 'UDP' : 'TCP';
+        const client = options.type === 'udp' ? 'client_port' : 'interleaved';
         const headers: any = {
-            Transport: `RTP/AVP/${protocol};unicast;${client}=${channelOrPort}-${channelOrPort + 1}`,
+            Transport: `RTP/AVP/${protocol};unicast;${client}=${options.port}-${options.port + 1}`,
         };
-        const response = await this.request('SETUP', headers, path);
+        const response = await this.request('SETUP', headers, options.path);
         let interleaved: {
             begin: number;
             end: number;
@@ -416,6 +515,8 @@ export class RtspClient extends RtspBase {
                 }
             }
         }
+        if (options.type === 'tcp')
+            this.setupOptions.set(interleaved.begin, options);
         return Object.assign({ interleaved }, response);
     }
 

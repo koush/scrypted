@@ -58,6 +58,7 @@ class ScryptedDeviceType(Enum):
     Person = "Person"
     Program = "Program"
     Scene = "Scene"
+    SecuritySystem = "SecuritySystem"
     Sensor = "Sensor"
     SmartDisplay = "SmartDisplay"
     SmartSpeaker = "SmartSpeaker"
@@ -77,6 +78,7 @@ class ScryptedInterface(Enum):
     BinarySensor = "BinarySensor"
     Brightness = "Brightness"
     BufferConverter = "BufferConverter"
+    CO2Sensor = "CO2Sensor"
     Camera = "Camera"
     ColorSettingHsv = "ColorSettingHsv"
     ColorSettingRgb = "ColorSettingRgb"
@@ -95,7 +97,6 @@ class ScryptedInterface(Enum):
     HumiditySensor = "HumiditySensor"
     HumiditySetting = "HumiditySetting"
     Intercom = "Intercom"
-    IntrusionSensor = "IntrusionSensor"
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
     MediaPlayer = "MediaPlayer"
@@ -124,9 +125,11 @@ class ScryptedInterface(Enum):
     Scriptable = "Scriptable"
     ScryptedDevice = "ScryptedDevice"
     ScryptedPlugin = "ScryptedPlugin"
+    SecuritySystem = "SecuritySystem"
     Settings = "Settings"
     SoftwareUpdate = "SoftwareUpdate"
     StartStop = "StartStop"
+    TamperSensor = "TamperSensor"
     TemperatureSetting = "TemperatureSetting"
     Thermometer = "Thermometer"
     UltravioletSensor = "UltravioletSensor"
@@ -147,6 +150,18 @@ class ScryptedMimeTypes(Enum):
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     Url = "text/x-uri"
 
+class SecuritySystemMode(Enum):
+    AwayArmed = "AwayArmed"
+    Disarmed = "Disarmed"
+    HomeArmed = "HomeArmed"
+    NightArmed = "NightArmed"
+
+class SecuritySystemObstruction(Enum):
+    Error = "Error"
+    Occupied = "Occupied"
+    Sensor = "Sensor"
+    Time = "Time"
+
 class TemperatureUnit(Enum):
     C = "C"
     F = "F"
@@ -163,6 +178,14 @@ class ThermostatMode(Enum):
     On = "On"
     Purifier = "Purifier"
 
+
+class H264Info(TypedDict):
+    fuab: bool
+    mtap16: bool
+    mtap32: bool
+    sei: bool
+    stapb: bool
+    pass
 
 class AudioStreamOptions(TypedDict):
     bitrate: float
@@ -189,11 +212,13 @@ class VideoStreamOptions(TypedDict):
     bitrate: float
     codec: str
     fps: float
+    h264Info: H264Info
     height: float
     idrIntervalMillis: float
     keyframeInterval: float
     maxBitrate: float
     minBitrate: float
+    profile: str
     width: float
     pass
 
@@ -201,6 +226,9 @@ class MediaStreamDestination(TypedDict):
     pass
 
 class MediaStreamSource(TypedDict):
+    pass
+
+class MediaStreamTool(TypedDict):
     pass
 
 class BufferConverter(TypedDict):
@@ -347,7 +375,7 @@ class MediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
-    tool: str
+    tool: MediaStreamTool
     video: VideoStreamOptions
     pass
 
@@ -399,7 +427,7 @@ class RequestMediaStreamOptions(TypedDict):
     name: str
     prebuffer: float
     refresh: bool
-    tool: str
+    tool: MediaStreamTool
     video: VideoStreamOptions
     pass
 
@@ -419,7 +447,7 @@ class RequestRecordingStreamOptions(TypedDict):
     name: str
     prebuffer: float
     startTime: float
-    tool: str
+    tool: MediaStreamTool
     video: VideoStreamOptions
     pass
 
@@ -433,7 +461,7 @@ class ResponseMediaStreamOptions(TypedDict):
     refreshAt: float
     sdp: str
     source: MediaStreamSource
-    tool: str
+    tool: MediaStreamTool
     userConfigurable: bool
     video: VideoStreamOptions
     pass
@@ -468,6 +496,13 @@ class ScryptedDevice(TypedDict):
     type: ScryptedDeviceType
     pass
 
+class SecuritySystemState(TypedDict):
+    mode: SecuritySystemMode
+    obstruction: SecuritySystemObstruction
+    supportedModes: list[SecuritySystemMode]
+    triggered: bool
+    pass
+
 class Setting(TypedDict):
     choices: list[str]
     combobox: bool
@@ -498,6 +533,9 @@ class VideoClipOptions(TypedDict):
     reverseOrder: bool
     startId: str
     startTime: float
+    pass
+
+class TamperState(TypedDict):
     pass
 
 class AirQualitySensor:
@@ -536,6 +574,10 @@ class BufferConverter:
     toMimeType: str
     async def convert(self, data: Any, fromMimeType: str, toMimeType: str, options: BufferConvertorOptions = None) -> Any:
         pass
+    pass
+
+class CO2Sensor:
+    co2ppm: float
     pass
 
 class Camera:
@@ -643,10 +685,6 @@ class Intercom:
         pass
     async def stopIntercom(self) -> None:
         pass
-    pass
-
-class IntrusionSensor:
-    intrusionDetected: bool
     pass
 
 class Lock:
@@ -844,6 +882,14 @@ class ScryptedPlugin:
         pass
     pass
 
+class SecuritySystem:
+    securitySystemState: SecuritySystemState
+    async def armSecuritySystem(self, mode: SecuritySystemMode) -> None:
+        pass
+    async def disarmSecuritySystem(self) -> None:
+        pass
+    pass
+
 class Settings:
     async def getSettings(self) -> list[Setting]:
         pass
@@ -865,6 +911,10 @@ class StartStop:
         pass
     async def stop(self) -> None:
         pass
+    pass
+
+class TamperSensor:
+    tampered: TamperState
     pass
 
 class TemperatureSetting:
@@ -1080,7 +1130,7 @@ class ScryptedInterfaceProperty(Enum):
     fromMimeType = "fromMimeType"
     toMimeType = "toMimeType"
     binaryState = "binaryState"
-    intrusionDetected = "intrusionDetected"
+    tampered = "tampered"
     powerDetected = "powerDetected"
     audioDetected = "audioDetected"
     motionDetected = "motionDetected"
@@ -1090,8 +1140,10 @@ class ScryptedInterfaceProperty(Enum):
     ultraviolet = "ultraviolet"
     luminance = "luminance"
     position = "position"
+    securitySystemState = "securitySystemState"
     pm25Density = "pm25Density"
     vocDensity = "vocDensity"
+    co2ppm = "co2ppm"
     airQuality = "airQuality"
     humiditySetting = "humiditySetting"
     fan = "fan"
@@ -1369,11 +1421,11 @@ class DeviceState:
         self.setScryptedProperty("binaryState", value)
 
     @property
-    def intrusionDetected(self) -> bool:
-        return self.getScryptedProperty("intrusionDetected")
-    @intrusionDetected.setter
-    def intrusionDetected(self, value: bool):
-        self.setScryptedProperty("intrusionDetected", value)
+    def tampered(self) -> TamperState:
+        return self.getScryptedProperty("tampered")
+    @tampered.setter
+    def tampered(self, value: TamperState):
+        self.setScryptedProperty("tampered", value)
 
     @property
     def powerDetected(self) -> bool:
@@ -1439,6 +1491,13 @@ class DeviceState:
         self.setScryptedProperty("position", value)
 
     @property
+    def securitySystemState(self) -> SecuritySystemState:
+        return self.getScryptedProperty("securitySystemState")
+    @securitySystemState.setter
+    def securitySystemState(self, value: SecuritySystemState):
+        self.setScryptedProperty("securitySystemState", value)
+
+    @property
     def pm25Density(self) -> float:
         return self.getScryptedProperty("pm25Density")
     @pm25Density.setter
@@ -1451,6 +1510,13 @@ class DeviceState:
     @vocDensity.setter
     def vocDensity(self, value: float):
         self.setScryptedProperty("vocDensity", value)
+
+    @property
+    def co2ppm(self) -> float:
+        return self.getScryptedProperty("co2ppm")
+    @co2ppm.setter
+    def co2ppm(self, value: float):
+        self.setScryptedProperty("co2ppm", value)
 
     @property
     def airQuality(self) -> AirQuality:
@@ -1829,11 +1895,11 @@ ScryptedInterfaceDescriptors = {
       "binaryState"
     ]
   },
-  "IntrusionSensor": {
-    "name": "IntrusionSensor",
+  "TamperSensor": {
+    "name": "TamperSensor",
     "methods": [],
     "properties": [
-      "intrusionDetected"
+      "tampered"
     ]
   },
   "PowerSensor": {
@@ -1899,6 +1965,16 @@ ScryptedInterfaceDescriptors = {
       "position"
     ]
   },
+  "SecuritySystem": {
+    "name": "SecuritySystem",
+    "methods": [
+      "armSecuritySystem",
+      "disarmSecuritySystem"
+    ],
+    "properties": [
+      "securitySystemState"
+    ]
+  },
   "PM25Sensor": {
     "name": "PM25Sensor",
     "methods": [],
@@ -1911,6 +1987,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "vocDensity"
+    ]
+  },
+  "CO2Sensor": {
+    "name": "CO2Sensor",
+    "methods": [],
+    "properties": [
+      "co2ppm"
     ]
   },
   "AirQualitySensor": {

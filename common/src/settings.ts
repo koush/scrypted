@@ -1,9 +1,8 @@
-import sdk, { MixinDeviceBase, ScryptedDeviceBase, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 
 const { systemManager } = sdk;
 
-function parseValue(value: string, setting: StorageSetting) {
-    const { defaultValue } = setting;
+function parseValue(value: string, setting: StorageSetting, readDefaultValue: () => any) {
     const type = setting.multiple ? 'array' : setting.type;
 
     if (type === 'boolean') {
@@ -11,20 +10,20 @@ function parseValue(value: string, setting: StorageSetting) {
             return true;
         if (value === 'false')
             return false;
-        return defaultValue || false;
+        return readDefaultValue() || false;
     }
     if (type === 'number') {
-        return parseFloat(value) || defaultValue || 0;
+        return parseFloat(value) || readDefaultValue() || 0;
     }
     if (type === 'integer') {
-        return parseInt(value) || defaultValue || 0;
+        return parseInt(value) || readDefaultValue() || 0;
     }
     if (type === 'array') {
         try {
             return JSON.parse(value);
         }
         catch (e) {
-            return defaultValue || [];
+            return readDefaultValue() || [];
         }
     }
     if (type === 'device') {
@@ -37,17 +36,18 @@ function parseValue(value: string, setting: StorageSetting) {
             return JSON.parse(value)
         }
         catch (e) {
-            return defaultValue;
+            return readDefaultValue();
         }
     }
 
-    return value || defaultValue;
+    return value || readDefaultValue();
 }
 
 export type HideFunction = (device: any) => boolean;
 
 export interface StorageSetting extends Setting {
     defaultValue?: any;
+    persistedDefaultValue?: any;
     onPut?: (oldValue: any, newValue: any) => void;
     onGet?: () => Promise<StorageSetting>;
     mapPut?: (oldValue: any, newValue: any) => any;
@@ -59,6 +59,11 @@ export interface StorageSetting extends Setting {
 
 export type StorageSettingsDict<T extends string> = { [key in T]: StorageSetting };
 
+export interface StorageSettingsDevice {
+    storage: Storage;
+    onDeviceEvent(eventInterface: string, eventData: any): Promise<void>;
+}
+
 export class StorageSettings<T extends string> implements Settings {
     public values: { [key in T]: any } = {} as any;
     public hasValue: { [key in T]: boolean } = {} as any;
@@ -69,7 +74,7 @@ export class StorageSettings<T extends string> implements Settings {
         onGet?: () => Promise<Partial<StorageSettingsDict<T>>>,
     };
 
-    constructor(public device: ScryptedDeviceBase | MixinDeviceBase<any>, public settings: StorageSettingsDict<T>) {
+    constructor(public device: StorageSettingsDevice, public settings: StorageSettingsDict<T>) {
         for (const key of Object.keys(settings)) {
             const setting = settings[key as T];
             const rawGet = () => this.getItem(key as T);
@@ -133,6 +138,10 @@ export class StorageSettings<T extends string> implements Settings {
         let oldValue: any;
         if (setting)
             oldValue = this.getItemInternal(key as T, setting);
+        return this.putSettingInternal(setting, oldValue, key, value);
+    }
+
+    putSettingInternal(setting: StorageSetting, oldValue: any, key: string, value: SettingValue) {
         if (!setting?.noStore) {
             if (setting.mapPut)
                 value = setting.mapPut(oldValue, value);
@@ -148,7 +157,14 @@ export class StorageSettings<T extends string> implements Settings {
     private getItemInternal(key: T, setting: StorageSetting): any {
         if (!setting)
             return this.device.storage.getItem(key);
-        const ret = parseValue(this.device.storage.getItem(key), setting);
+        const readDefaultValue = () => {
+            if (setting.persistedDefaultValue) {
+                this.putSettingInternal(setting, undefined, key, setting.persistedDefaultValue);
+                return setting.persistedDefaultValue;
+            }
+            return setting.defaultValue;
+        };
+        const ret = parseValue(this.device.storage.getItem(key), setting, readDefaultValue);
         return setting.mapGet ? setting.mapGet(ret) : ret;
     }
 

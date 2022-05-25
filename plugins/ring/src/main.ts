@@ -1,6 +1,6 @@
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { RefreshPromise } from "@scrypted/common/src/promise-utils";
-import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-connect';
+import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
@@ -160,6 +160,10 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         }
     }
 
+    get useRtsp() {
+        return this.storageSettings.values.captureMode !== CaptureModes.FFmpeg;
+    }
+
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
 
         if (options?.metadata?.refreshAt) {
@@ -180,7 +184,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
 
         const { clientPromise: playbackPromise, port: playbackPort, url: clientUrl } = await listenZeroSingleClient();
 
-        const useRtsp = this.storageSettings.values.captureMode !== CaptureModes.FFmpeg;
+        const useRtsp = this.useRtsp;
 
         const playbackUrl = useRtsp ? `rtsp://127.0.0.1:${playbackPort}` : clientUrl;
 
@@ -364,7 +368,8 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         }
 
         const ffmpegInput: FFmpegInput = {
-            url: playbackUrl,
+            url: undefined,
+            container: 'sdp',
             mediaStreamOptions,
             inputArguments: [
                 '-f', 'sdp',
@@ -378,17 +383,23 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
     }
 
     getSipMediaStreamOptions(): ResponseMediaStreamOptions {
-        const useRtsp = this.storageSettings.values.captureMode !== CaptureModes.FFmpeg;
+        const useRtsp = this.useRtsp;
 
         return {
             id: 'sip',
             name: 'SIP',
-            // note that the rtsp stream comes from scrypted,
-            // can bypass ffmpeg parsing.
+            // this stream is NOT scrypted blessed due to wackiness in the h264 stream.
             // tool: "scrypted",
             container: useRtsp ? 'rtsp' : 'sdp',
             video: {
                 codec: 'h264',
+                h264Info: {
+                    sei: true,
+                    stapb: true,
+                    mtap16: true,
+                    mtap32: true,
+                    fuab: true,
+                }
             },
             audio: {
                 // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.

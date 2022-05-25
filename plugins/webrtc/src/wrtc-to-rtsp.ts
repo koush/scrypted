@@ -9,7 +9,7 @@ import { ChildProcess } from "child_process";
 import dgram from 'dgram';
 import { Socket } from "net";
 import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
-import { requiredAudioCodec, requiredVideoCodec } from "./webrtc-required-codecs";
+import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { createRawResponse, isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager } = sdk;
@@ -60,24 +60,7 @@ export async function createRTCPeerConnectionSource(options: {
         const pc = new RTCPeerConnection({
             codecs: {
                 audio: [
-                    requiredAudioCodec,
-                    // these are some other option templates that may be worth considering
-                    // for fast path.
-                    // new RTCRtpCodecParameters({
-                    //     mimeType: "audio/opus",
-                    //     clockRate: 8000,
-                    //     channels: 1,
-                    // }),
-                    // new RTCRtpCodecParameters({
-                    //     mimeType: "audio/PCMU",
-                    //     clockRate: 8000,
-                    //     channels: 1,
-                    // }),
-                    // new RTCRtpCodecParameters({
-                    //     mimeType: "audio/PCMA",
-                    //     clockRate: 8000,
-                    //     channels: 1,
-                    // }),
+                    ...requiredAudioCodecs,
                 ],
                 video: [
                     requiredVideoCodec,
@@ -110,13 +93,16 @@ export async function createRTCPeerConnectionSource(options: {
         let audioTrack: string;
         let videoTrack: string;
         let audioTransceiver: RTCRtpTransceiver;
+
+        const useRtspJitterBuffer = false;
+
         const doSetup = async (setup: RTCAVSignalingSetup) => {
             let gotAudio = false;
             let gotVideo = false;
 
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.onTrack.subscribe((track) => {
-                if (useUdp) {
+                if (useUdp || !useRtspJitterBuffer) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotAudio) {
                             gotAudio = true;
@@ -147,13 +133,13 @@ export async function createRTCPeerConnectionSource(options: {
                             }
                         }
                     }
-                    jitter.pipe(new RtspOutput())
+                    jitter.pipe(new RtspOutput());
                 }
             });
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
             videoTransceiver.onTrack.subscribe((track) => {
-                if (useUdp) {
+                if (useUdp || !useRtspJitterBuffer) {
                     track.onReceiveRtp.subscribe(rtp => {
                         if (!gotVideo) {
                             gotVideo = true;
@@ -184,7 +170,7 @@ export async function createRTCPeerConnectionSource(options: {
                             }
                         }
                     }
-                    jitter.pipe(new RtspOutput())
+                    jitter.pipe(new RtspOutput());
                 }
 
                 track.onReceiveRtp.once(() => {
@@ -326,7 +312,7 @@ export async function createRTCPeerConnectionSource(options: {
 
             const audioTransceiver = pc.transceivers.find(t => t.kind === 'audio');
 
-            let talkbackProcess: ChildProcess;
+            let destroyProcess: () => void;
 
             const track = audioTransceiver.sender.sendRtp;
 
@@ -340,20 +326,19 @@ export async function createRTCPeerConnectionSource(options: {
 
                     const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
-                    const { cp } = await startRtpForwarderProcess(console, ffmpegInput.inputArguments, {
+                    const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
                         audio: {
                             outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
-                            transceiver: audioTransceiver,
+                            onRtp: (buffer: Buffer) => audioTransceiver.sender.sendRtp(buffer),
                         },
                     });
 
                     ret.stopIntercom();
 
-                    talkbackProcess = cp;
+                    destroyProcess = destroy;
                 },
                 async stopIntercom() {
-                    safeKillFFmpeg(talkbackProcess);
-                    talkbackProcess = undefined;
+                    destroyProcess();
                 },
             };
 
@@ -398,7 +383,7 @@ export async function createRTCPeerConnectionSource(options: {
     }
     else {
         const url = `rtsp://127.0.0.1:${port}`;
-        const mediaStreamUrl : MediaStreamUrl = {
+        const mediaStreamUrl: MediaStreamUrl = {
             url,
             mediaStreamOptions,
         };
@@ -476,7 +461,6 @@ export function getRTCMediaStreamOptions(id: string, name: string, useSdp: boole
             codec: 'h264',
         },
         audio: {
-            codec: 'opus',
         },
     };
 }

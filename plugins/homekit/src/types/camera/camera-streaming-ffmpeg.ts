@@ -1,20 +1,21 @@
+import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
-import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
+import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
 import child_process from 'child_process';
 import { Writable } from 'stream';
-import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
-import { CameraStreamingSession, KillCameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
+import { pickPort } from '../../hap-utils';
+import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { startCameraStreamSrtp } from './camera-streaming-srtp';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
 
 const { mediaManager, log } = sdk;
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, destination: MediaStreamDestination, ffmpegInput: FFmpegInput, session: CameraStreamingSession, killSession: KillCameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, destination: MediaStreamDestination, ffmpegInput: FFmpegInput, session: CameraStreamingSession) {
     const request = session.startRequest;
 
     const videomtu = session.startRequest.video.mtu;
@@ -127,17 +128,19 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             const videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
-                session.startRequest.video.rtcp_interval, {
+                session.startRequest.video.rtcp_interval,
+                {
                     maxPacketSize: session.startRequest.video.mtu,
                     sps: undefined,
                     pps: undefined,
                 }
             );
+            videoSender.sendRtcp();
             videoForwarder.server.on('message', data => {
                 const rtp = RtpPacket.deSerialize(data);
                 if (rtp.header.payloadType !== session.startRequest.video.pt)
                     return;
-                videoSender(rtp);
+                videoSender.sendRtp(rtp);
             });
             videoOutput = `rtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
         }
@@ -169,6 +172,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         tool: mso?.tool,
         rtpSender,
     });
+    const h264Info = ffmpegInput.mediaStreamOptions?.video?.h264Info || {};
+    const oddity = h264Info.fuab || h264Info.stapb || h264Info.mtap16 || h264Info.mtap32 || h264Info.sei;
+    if (rtpSender === 'Default' && oddity) {
+        console.warn('H264 oddities are reported in the stream. Using FFmpeg.');
+        rtpSender = 'FFmpeg';
+    }
+
     if (rtpSender === 'Default')
         rtpSender = 'Scrypted';
 
@@ -183,7 +193,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     if (noAudio) {
         if (videoIsSrtpSenderCompatible) {
             console.log('camera has perfect codecs (no audio), using srtp only fast path.');
-            await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session, killSession);
+            await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session);
             return;
         }
     }
@@ -205,7 +215,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
         if (videoIsSrtpSenderCompatible && perfectOpus) {
             console.log('camera has perfect codecs, using srtp only fast path.');
-            await startCameraStreamSrtp(ffmpegInput, console, { mute: false }, session, killSession);
+            await startCameraStreamSrtp(ffmpegInput, console, { mute: false }, session);
             return;
         }
         else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
@@ -257,9 +267,10 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                         framesPerPacket: opusFramesPerPacket,
                     }
                 );
+                audioSender.sendRtcp();
                 audioForwarder.server.on('message', data => {
                     const packet = RtpPacket.deSerialize(data);
-                    audioSender(packet);
+                    audioSender.sendRtp(packet);
                 });
                 audioArgs.push(
                     `rtp://127.0.0.1:${audioForwarder.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
@@ -281,7 +292,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
             if (videoIsSrtpSenderCompatible) {
                 console.log('camera has perfect codecs (unknown audio), using srtp only fast path.');
-                await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session, killSession);
+                await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session);
                 return;
             }
         }
@@ -314,9 +325,9 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     if (videoIsSrtpSenderCompatible && requestedOpus) {
         console.log('camera has perfect codecs (demuxed audio), using srtp fast path.');
 
-        const udpPort = Math.floor(Math.random() * 10000 + 30000);
+        const udpPort = await pickPort();
 
-        const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session, killSession);
+        const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session);
 
         const audioSdp = parseSdp(fullSdp);
         const audioSection = audioSdp.msections.find(msection => msection.type === 'audio');
@@ -332,11 +343,18 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             const ap = child_process.spawn(ffmpegPath, ffmpegAudioTranscodeArguments, {
                 stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
             });
+            session.killPromise.finally(() => safeKillFFmpeg(ap));
 
-            session.audioProcess = ap;
             ffmpegLogInitialOutput(console, ap);
-            ap.on('exit', killSession);
+            ap.on('exit', () => session.kill());
             audioSdp.msections = [audioSection];
+            audioSdp.header.lines = [
+                'v=0',
+                'o=- 0 0 IN IP4 127.0.0.1',
+                's=Scrypted HomeKit Audio Demuxer',
+                'c=IN IP4 127.0.0.1',
+                't=0 0',
+            ];
             const ffmpegSdp = addTrackControls(replacePorts(audioSdp.toSdp(), udpPort, 0));
             console.log('demuxed audio sdp', ffmpegSdp);
 
@@ -363,9 +381,9 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             ...ffmpegInput.inputArguments,
             ...videoArgs,
         ]);
-        session.videoProcess = vp;
+        session.killPromise.finally(() => safeKillFFmpeg(vp));
         ffmpegLogInitialOutput(console, vp);
-        vp.on('exit', killSession);
+        vp.on('exit', () => session.kill());
 
         const ap = child_process.spawn(ffmpegPath, [
             ...hideBanner,
@@ -373,9 +391,9 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             ...nullAudioInput,
             ...audioArgs,
         ]);
-        session.audioProcess = ap;
+        session.killPromise.finally(() => safeKillFFmpeg(ap));
         ffmpegLogInitialOutput(console, ap);
-        ap.on('exit', killSession);
+        ap.on('exit', () => session.kill());
     }
     else {
         const args = [
@@ -389,8 +407,8 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         safePrintFFmpegArguments(console, args);
 
         const cp = child_process.spawn(ffmpegPath, args);
-        session.videoProcess = cp;
+        session.killPromise.finally(() => safeKillFFmpeg(cp));
         ffmpegLogInitialOutput(console, cp);
-        cp.on('exit', killSession);
+        cp.on('exit', () => session.kill());
     }
 }

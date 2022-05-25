@@ -87,7 +87,7 @@ export function getH264DecoderArgs(): CodecArgs {
     return ret;
 }
 
-export const LIBX264_ENCODER_TITLE = 'libx264 (Software)';
+const LIBX264_ENCODER_TITLE = 'libx264 (Software)';
 
 export function getH264EncoderArgs() {
     const encoders: { [type: string]: string } = {};
@@ -114,9 +114,6 @@ export function getH264EncoderArgs() {
         encoders['VAAPI'] = 'h264_vaapi';
         encoders['Nvidia'] = 'nvenc_h264';
     }
-    else {
-        return {};
-    }
 
     const encoderArgs: CodecArgs = {};
     for (const [name, encoder] of Object.entries(encoders)) {
@@ -140,6 +137,7 @@ export function getH264EncoderArgs() {
 export function getDebugModeH264EncoderArgs() {
     return [
         "-c:v", "libx264",
+        '-pix_fmt', 'yuvj420p',
         '-preset', 'ultrafast',
         "-bf", "0",
         '-force_key_frames', 'expr:gte(t,n_forced*4)',

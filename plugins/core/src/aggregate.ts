@@ -1,8 +1,5 @@
-import { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaObject, MediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
-import sdk from "@scrypted/sdk";
-import { startParserSession, ParserSession, createParserRebroadcaster, Rebroadcaster, createRebroadcaster } from "@scrypted/common/src/ffmpeg-rebroadcast";
-import { createMpegTsParser, StreamParser } from "@scrypted/common/src/stream-parser";
-const { systemManager, mediaManager } = sdk;
+import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+const { systemManager, mediaManager, deviceManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
     computeInterfaces(): string[];
@@ -28,31 +25,21 @@ aggregators.set(ScryptedInterface.MotionSensor, average);
 aggregators.set(ScryptedInterface.HumiditySensor, average);
 aggregators.set(ScryptedInterface.Thermometer, average);
 aggregators.set(ScryptedInterface.BinarySensor, allFalse);
-aggregators.set(ScryptedInterface.IntrusionSensor, allFalse);
+aggregators.set(ScryptedInterface.TamperSensor, allFalse);
 aggregators.set(ScryptedInterface.PowerSensor, allFalse);
 aggregators.set(ScryptedInterface.MotionSensor, allFalse);
 aggregators.set(ScryptedInterface.AudioSensor, allFalse);
 aggregators.set(ScryptedInterface.LuminanceSensor, average);
 aggregators.set(ScryptedInterface.UltravioletSensor, average);
+aggregators.set(ScryptedInterface.CO2Sensor, average);
+aggregators.set(ScryptedInterface.PM25Sensor, average);
 aggregators.set(ScryptedInterface.FloodSensor, allFalse);
 aggregators.set(ScryptedInterface.Lock,
     values => values.reduce((prev, cur) => cur === LockState.Unlocked ? cur : prev, LockState.Locked));
 
 
-type AggregateCameraParsers = "mpegts";
-
 function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamera {
-    let sessionPromise: Promise<{
-        session: ParserSession<"mpegts">;
-        rebroadcaster: Rebroadcaster;
-        parsers: { mpegts: StreamParser };
-    }>;
-
-    async function getVideoStreamWrapped(options: MediaStreamOptions) {
-        if (sessionPromise) {
-            console.error('session already active?');
-        }
-
+    async function getVideoStreamWrapped(options: RequestMediaStreamOptions) {
         const args = await Promise.allSettled(devices.map(async (device) => {
             const mo = await device.getVideoStream();
             const buffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
@@ -77,23 +64,25 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             'nullsrc=size=1920x1080 [base];'
         ];
 
-        const filteredInput: FFmpegInput = {
+        const ffmpegInput: FFmpegInput = {
             url: undefined,
+            container: 'rawvideo',
+            mediaStreamOptions: (await createVideoStreamOptions())?.[0],
             inputArguments: [],
+            h264FilterArguments: [],
         };
 
         for (let i = 0; i < inputs.length; i++) {
-            filteredInput.inputArguments.push(...inputs[i].inputArguments);
-            filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
+            ffmpegInput.inputArguments.push(...inputs[i].inputArguments);
+            filter.push(`[${i}:v] scale=-1:${h},pad=${w}:ih:(ow-iw)/2 [pos${i}];`)
         }
         for (let i = inputs.length; i < dim * dim; i++) {
-            filteredInput.inputArguments.push(
+            ffmpegInput.inputArguments.push(
                 '-f', 'lavfi', '-i', `color=black:s=${w}x${h}`,
             );
-            filter.push(`[${i}:v] setpts=PTS-STARTPTS, scale=${w}x${h} [pos${i}];`)
+            filter.push(`[${i}:v] scale=${w}x${h} [pos${i}];`)
         }
-
-        filteredInput.inputArguments.push(
+        ffmpegInput.inputArguments.push(
             '-f', 'lavfi', '-i', 'anullsrc',
         )
 
@@ -108,73 +97,41 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             curx += w;
         }
 
+
         let i = dim * dim - 1;
         filter.push(`[${prev}][pos${i}] overlay=shortest=1:x=${curx % 1920}:y=${cury % 1080}`);
 
-        filteredInput.inputArguments.push(
+        ffmpegInput.h264FilterArguments.push(
             '-filter_complex',
             filter.join(' '),
         );
 
-        const parsers ={
-            mpegts: createMpegTsParser({
-                vcodec: ['-vcodec', 'libx264'],
-            })
-        };
-        const ret = await startParserSession(filteredInput, {
-            console,
-            parsers,
-            timeout: 30000,
-        });
-        
-        let rebroadcaster = await createParserRebroadcaster(ret, 'mpegts',{
-            idle: {
-                timeout: 30000,
-                callback: () => ret.kill(),
-            }
-        })
-
-        return {
-            session: ret,
-            rebroadcaster,
-            parsers,
-        };
+        return ffmpegInput;
     };
+
+    const createVideoStreamOptions: () => Promise<ResponseMediaStreamOptions[]> = async () => {
+        if (devices.length === 1)
+            return devices[0].getVideoStreamOptions();
+        return [{
+            id: 'default',
+            name: 'Default',
+            container: 'ffmpeg',
+            video: {},
+            audio: null,
+        }]
+    }
 
     return {
         async getVideoStreamOptions() {
-            if (devices.length === 1)
-                return devices[0].getVideoStreamOptions();
-            return [{
-                id: 'default',
-                name: 'Default',
-                video: {},
-                audio: null,
-            }]
+            return createVideoStreamOptions();
         },
 
         async getVideoStream(options) {
             if (devices.length === 1)
                 return devices[0].getVideoStream(options);
 
-            if (!sessionPromise) {
-                sessionPromise = getVideoStreamWrapped(options);
-                const ret = await sessionPromise;
-                ret.session.on('killed', () => sessionPromise = undefined);
-            }
+            const ffmpegInput = await getVideoStreamWrapped(options);
 
-            const ret = await sessionPromise;
-            const {url} = ret.rebroadcaster;
-            const ffmpegInput: FFmpegInput = {
-                url,
-                container: 'mpegts',
-                inputArguments: [
-                  ...(ret.parsers.mpegts.inputArguments || []),
-                  '-f', ret.parsers.mpegts.container,
-                  '-i', url,
-                ],
-              }
-              
             return mediaManager.createFFmpegMediaObject(ffmpegInput);
         }
     }
@@ -190,10 +147,22 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
 
         makeListener(iface: string, devices: ScryptedDevice[]) {
             const aggregator = aggregators.get(iface);
-            if (!aggregator)
+            if (!aggregator) {
+                // if this device can't be aggregated for whatever reason, pass property through.
+                for (const device of devices) {
+                    const register = device.listen({
+                        event: iface,
+                        watch: true,
+                    }, (source, details, data) => {
+                        if (details.property)
+                            deviceManager.getDeviceState(this.nativeId)[details.property] = data;
+                    });
+                    this.listeners.push(register);
+                }
                 return;
+            }
 
-            const property = ScryptedInterfaceDescriptors[iface].properties[0];
+            const property = ScryptedInterfaceDescriptors[iface]?.properties?.[0];
             if (!property) {
                 this.console.warn('aggregating interface with no property?', iface);
                 return;
@@ -243,6 +212,10 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
                 for (const [iface, ids] of interfaces.entries()) {
                     const devices = ids.map(id => systemManager.getDeviceById(id));
                     const descriptor = ScryptedInterfaceDescriptors[iface];
+                    if (!descriptor) {
+                        this.console.warn(`descriptor not found for ${iface}, skipping method generation`);
+                        continue;
+                    }
 
                     if (iface === ScryptedInterface.VideoCamera) {
                         const camera = createVideoCamera(devices as any, this.console);

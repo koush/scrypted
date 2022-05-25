@@ -1,17 +1,16 @@
-import { bindUdp } from '@scrypted/common/src/listen-cluster';
-import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import type { RtcpRrPacket } from '@koush/werift-src/packages/rtp/src/rtcp/rr';
+import { RtcpPacketConverter } from '@koush/werift-src/packages/rtp/src/rtcp/rtcp';
+import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
+import { ProtectionProfileAes128CmHmacSha1_80 } from '@koush/werift-src/packages/rtp/src/srtp/const';
+import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
+import { bindUdp, closeQuiet } from '@scrypted/common/src/listen-cluster';
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
 import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
-import { RtcpRrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/rr';
-import { RtcpPacketConverter } from '../../../../../external/werift/packages/rtp/src/rtcp/rtcp';
-import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../../../external/werift/packages/rtp/src/srtp/const';
-import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { HomeKitSession } from '../../common';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
+import type { HomeKitPlugin } from "../../main";
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
 import { DynamicBitrateSession } from './camera-dynamic-bitrate';
@@ -32,39 +31,53 @@ async function getPort(socketType: SocketType, address: string): Promise<{ socke
 export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCamera & VideoCameraConfiguration & Camera & Intercom,
     console: Console,
     storage: Storage,
-    homekitSession: HomeKitSession) {
+    homekitPlugin: HomeKitPlugin) {
     const sessions = new Map<string, CameraStreamingSession>();
     const twoWayAudio = device.interfaces?.includes(ScryptedInterface.Intercom);
-    let idleTimeout: NodeJS.Timeout;
-
-    function killSession(sessionID: string) {
-        const session = sessions.get(sessionID);
-
-        if (!session)
-            return;
-
-        console.log('streaming session killed');
-        clearTimeout(idleTimeout);
-        sessions.delete(sessionID);
-        session.killed = true;
-        safeKillFFmpeg(session.videoProcess);
-        safeKillFFmpeg(session.audioProcess);
-        session.videoReturn?.close();
-        session.audioReturn?.close();
-        session.rtpSink?.destroy();
-    }
 
     const delegate: CameraStreamingDelegate = {
-        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitSession, console),
+        handleSnapshotRequest: createSnapshotHandler(device, storage, homekitPlugin, console),
         async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback) {
+            // console.log('prepareStream', Object.assign({}, request, { connection: request.connection.remoteAddress }));
+
+            const { sessionID } = request;
+            let killResolve: any;
+            const streamingSessionStartTime = Date.now();
+            const killPromise = new Promise<void>(resolve => {
+                killResolve = () => {
+                    resolve();
+
+                    const session = sessions.get(sessionID);
+                    if (!session)
+                        return;
+                    sessions.delete(sessionID);
+
+                    console.log(`streaming session killed, duration: ${Math.round((Date.now() - streamingSessionStartTime) / 1000)}s`);
+                    session.killed = true;
+                }
+            });
+
+            const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
+            let addressOverride = homekitPlugin.storageSettings.values.addressOverride || undefined;
+
+            if (addressOverride) {
+                const infos = Object.values(os.networkInterfaces()).flat().map(i => i?.address);
+                if (!infos.find(address => address === addressOverride)) {
+                    console.error('The provided Scrypted Server Address was not found in the list of network addresses and may be invalid and will not be used (DHCP assignment change?): ' + addressOverride);
+                    addressOverride = undefined;
+                }
+            }
+
+            const { socket: videoReturn, port: videoPort } = await getPort(socketType, addressOverride);
+            const { socket: audioReturn, port: audioPort } = await getPort(socketType, addressOverride);
+
+            killPromise.finally(() => {
+                closeQuiet(videoReturn);
+                closeQuiet(audioReturn);
+            });
 
             const videossrc = CameraController.generateSynchronisationSource();
             const audiossrc = CameraController.generateSynchronisationSource();
-            const addressOverride = homekitSession.storage.getItem('addressOverride') || undefined;
-
-            const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-            const { socket: videoReturn, port: videoPort } = await getPort(socketType, addressOverride);
-            const { socket: audioReturn, port: audioPort } = await getPort(socketType, addressOverride);
 
             const session: CameraStreamingSession = {
                 aconfig: {
@@ -85,19 +98,17 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     },
                     profile: ProtectionProfileAes128CmHmacSha1_80,
                 },
+                kill: killResolve,
+                killPromise,
                 killed: false,
                 prepareRequest: request,
                 startRequest: null,
                 videossrc,
                 audiossrc,
-                videoProcess: null,
-                audioProcess: null,
                 videoReturn,
                 audioReturn,
-                videoReturnRtcpReady: timeoutPromise(1000, once(videoReturn, 'message')).catch(() => {
-                    console.warn('Video RTCP Packet timed out. This may be a firewall issue preventing the iOS device from sending UDP packets back to Scrypted.');
-                }),
-            }
+                videoReturnRtcpReady: undefined,
+            };
 
             sessions.set(request.sessionID, session);
 
@@ -116,7 +127,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
-            console.log('destination address', session.prepareRequest.targetAddress);
+            console.log('destination address', session.prepareRequest.targetAddress, session.prepareRequest.video.port, session.prepareRequest.audio.port);
             // plugin scope or device scope?
             if (addressOverride) {
                 console.log('using address override', addressOverride);
@@ -154,12 +165,15 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
+            console.log('source address', response.addressOverride, videoPort, audioPort);
+            // console.log('prepareStream response', response);
+
             callback(null, response);
         },
         async handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback) {
-            console.log('streaming request', request);
+            console.log('handleStreamRequest', request);
             if (request.type === StreamRequestTypes.STOP) {
-                killSession(request.sessionID);
+                sessions.get(request.sessionID)?.kill();
                 callback();
                 return;
             }
@@ -180,12 +194,51 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.startRequest = request as StartStreamRequest;
 
+            let forceSlowConnection = false;
+            try {
+                for (const address of homekitPlugin.storageSettings.values.slowConnections) {
+                    if (address.includes(session.prepareRequest.targetAddress))
+                        forceSlowConnection = true;
+                }
+            }
+            catch (e) {
+            }
+            if (forceSlowConnection) {
+                console.log('Streaming request is coming from a device in the slow mode connection list. Medium resolution stream will be selected.');
+            }
+            else {
+                // ios is seemingly forcing all connections through the home hub on ios 15.5. this is test code to force low bandwidth.
+                // remote wifi connections request the same audio packet time as local wifi connections.
+                // so there's no way to differentiate between remote and local wifi. with low bandwidth forcing off,
+                // it will always select the local stream. with it on, it always selects the remote stream.
+                forceSlowConnection = homekitPlugin.storageSettings.values.slowConnections?.includes(session.prepareRequest.targetAddress);
+                if (forceSlowConnection)
+                    console.log('Streaming request is coming from the active HomeHub. Medium resolution stream will be selected in case this is a remote wifi connection or a wireless HomeHub. Using Accessory Mode is recommended if not already in use.');
+            }
+
             const {
                 destination,
                 dynamicBitrate,
                 isLowBandwidth,
                 isWatch,
-            } = await getStreamingConfiguration(device, storage, request)
+            } = await getStreamingConfiguration(device, forceSlowConnection, storage, request)
+
+            const hasHomeHub = !!homekitPlugin.storageSettings.values.lastKnownHomeHub;
+            const waitRtcp = forceSlowConnection || isLowBandwidth || !hasHomeHub;
+            if (waitRtcp) {
+                console.log('Will wait for initial RTCP packet.', {
+                    isHomeHub: forceSlowConnection,
+                    isLowBandwidth,
+                    hasHomeHub,
+                });
+            }
+
+            const videoReturnRtcpReady = waitRtcp
+                ? timeoutPromise(1000, once(session.videoReturn, 'message')).catch(() => {
+                    console.warn('Video RTCP Packet timed out. There may be a network (routing/firewall) issue preventing the Apple device sending UDP packets back to Scrypted.');
+                })
+                : undefined;
+            session.videoReturnRtcpReady = videoReturnRtcpReady;
 
             console.log({
                 dynamicBitrate,
@@ -197,14 +250,16 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             session.startRequest = request as StartStreamRequest;
             const vrtcp = new SrtcpSession(session.vconfig);
 
+            let idleTimeout: NodeJS.Timeout;
             // watch for data to verify other side is alive.
             const resetIdleTimeout = () => {
                 clearTimeout(idleTimeout);
                 idleTimeout = setTimeout(() => {
                     console.log('HomeKit Streaming RTCP timed out. Terminating Streaming.');
-                    killSession(request.sessionID);
+                    session.kill();
                 }, 30000);
             }
+            session.killPromise.finally(() => clearTimeout(idleTimeout));
 
             // There are two modes for sending rtp audio/video to homekit: ffmpeg and scrypted's custom implementation.
             // When using FFmpeg, the video and audio return rtcp and return packets are received on the correct ports.
@@ -225,6 +280,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 }
             }
 
+            const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
             const mediaOptions: RequestMediaStreamOptions = {
                 destination,
                 video: {
@@ -236,6 +292,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     // pcm/g711 the second best option for aac-eld, since it's raw audio.
                     codec: request.audio.codec === AudioStreamingCodecType.OPUS ? 'opus' : 'pcm',
                 },
+                tool: transcodingDebugMode ? 'ffmpeg' : 'scrypted',
             };
 
             const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(await device.getVideoStream(mediaOptions), ScryptedMimeTypes.FFmpegInput);
@@ -299,11 +356,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     storage,
                     destination,
                     videoInput,
-                    session,
-                    () => killSession(request.sessionID));
+                    session);
             }
             catch (e) {
                 console.error('streaming error', e);
+                return;
             }
 
             // audio talkback
@@ -314,8 +371,9 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 // this is a bit hacky, as it picks random ports and spams audio at it.
                 // the resultant port is returned as an ffmpeg input to the device intercom,
                 // if it has one. which, i guess works.
-                session.rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
+                const rtpSink = await startRtpSink(socketType, session.prepareRequest.targetAddress,
                     audioKey, session.startRequest.audio, console);
+                session.killPromise.finally(() => rtpSink.destroy());
 
                 // demux the audio return socket to distinguish between rtp audio return
                 // packets and rtcp.
@@ -327,7 +385,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                         if (!startedIntercom) {
                             console.log('Received first two way audio packet, starting intercom.');
                             startedIntercom = true;
-                            mediaManager.createFFmpegMediaObject(session.rtpSink.ffmpegInput)
+                            mediaManager.createFFmpegMediaObject(rtpSink.ffmpegInput)
                                 .then(mo => {
                                     device.startIntercom(mo);
                                     session.audioReturn.once('close', () => {
@@ -336,10 +394,10 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                                     });
                                 });
                         }
-                        session.audioReturn.send(buffer, session.rtpSink.rtpPort);
+                        session.audioReturn.send(buffer, rtpSink.rtpPort);
                     }
                     else {
-                        session.rtpSink.heartbeat(session.audioReturn, buffer);
+                        rtpSink.heartbeat(session.audioReturn, buffer);
                     }
                 });
             }

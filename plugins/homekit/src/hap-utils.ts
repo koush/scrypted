@@ -1,6 +1,12 @@
-import { ScryptedDeviceType } from '@scrypted/sdk';
-import { Categories, HAPStorage } from './hap';
+import { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType } from '@scrypted/sdk';
+import { randomBytes } from 'crypto';
+import { Categories, EventedHTTPServer, HAPStorage } from './hap';
 import './types';
+import os from 'os';
+import { StorageSettingsDict } from '@scrypted/common/src/settings';
+import crypto from 'crypto';
+import { closeQuiet, createBindZero } from '@scrypted/common/src/listen-cluster';
+import { once } from 'events';
 
 class HAPLocalStorage {
     initSync() {
@@ -75,4 +81,50 @@ export function typeToCategory(type: ScryptedDeviceType): Categories {
         case ScryptedDeviceType.Vacuum:
             return Categories.OUTLET;
     }
+}
+
+export function createHAPUsername() {
+    const buffers = [];
+    for (let i = 0; i < 6; i++) {
+        buffers.push(randomBytes(1).toString('hex'));
+    }
+    return buffers.join(':');
+}
+
+export function getAddresses() {
+    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
+    return addresses;
+}
+
+export function getRandomPort() {
+    return Math.round(30000 + Math.random() * 20000);
+}
+
+export function createHAPUsernameStorageSettingsDict(): StorageSettingsDict<'mac'> {
+    return {
+        mac: {
+            hide: true,
+            group: 'Pairing',
+            title: "Username Override",
+            persistedDefaultValue: createHAPUsername(),
+        },
+    }
+}
+
+export function logConnections(console: Console, accessory: any, seenConnections: Set<string>) {
+    const server: EventedHTTPServer = accessory._server.httpServer;
+    server.on('connection-opened', connection => {
+        connection.on('authenticated', () => {
+            console.log('HomeKit Connection', connection.remoteAddress);
+            seenConnections.add(connection.remoteAddress);
+        });
+    });
+}
+
+export async function pickPort() {
+    const { port, server: tempSocket } = await createBindZero();
+    const closePromise = once(tempSocket, 'close');
+    closeQuiet(tempSocket);
+    await closePromise;
+    return port;
 }

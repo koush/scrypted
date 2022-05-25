@@ -6,6 +6,7 @@ import './irrigation';
 import './light';
 import './lock';
 import './mediaplayer';
+import './security';
 import './sensor';
 import './switch';
 import './thermostat';

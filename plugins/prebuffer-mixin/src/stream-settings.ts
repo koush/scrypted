@@ -1,6 +1,6 @@
 import { getH264DecoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { StorageSetting, StorageSettings } from "@scrypted/common/src/settings";
-import sdk, { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
+import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
 import { getTranscodeMixinProviderId } from "./transcode-settings";
 
 
@@ -8,8 +8,8 @@ export function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[])
     if (!msos)
         return;
 
-    // do not enable rebroadcast on cloud streams by default.
-    const firstNonCloudStream = msos.find(mso => mso.source !== 'cloud');
+    // do not enable rebroadcast on cloud streams or rawvideo by default.
+    const firstNonCloudStream = msos.find(mso => mso.source !== 'cloud' && mso.container !== 'rawvideo');
     return firstNonCloudStream ? [firstNonCloudStream] : [];
 }
 
@@ -131,6 +131,13 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             combobox: true,
             mapPut: (oldValue, newValue) => getH264DecoderArgs()[newValue]?.join(' ') || newValue,
             hide: true,
+        },
+        videoFilterArguments: {
+            group: 'Transcoding',
+            title: 'Video Filter Arguments',
+            description: 'FFmpeg arguments used to filter input video when transcoding a stream. This can be used to crops, scale, rotates, etc.',
+            placeholder: 'transpose=1',
+            hide: true,
         }
     });
 
@@ -183,6 +190,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
                 transcodeStreams: hideTranscode,
                 missingCodecParameters: hideTranscode,
                 videoDecoderArguments: hideTranscode,
+                videoFilterArguments: hideTranscode,
             };
 
             try {

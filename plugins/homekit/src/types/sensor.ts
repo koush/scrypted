@@ -1,7 +1,8 @@
-import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, DummyDevice, HomeKitSession } from '../common';
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor, TamperSensor, CO2Sensor } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
+import type { HomeKitPlugin } from "../main";
 
 function airQualityToHomekit(airQuality: AirQuality) {
     switch (airQuality) {
@@ -32,6 +33,8 @@ const supportedSensors: string[] = [
     ScryptedInterface.AirQualitySensor,
     ScryptedInterface.PM25Sensor,
     ScryptedInterface.VOCSensor,
+    ScryptedInterface.EntrySensor,
+    ScryptedInterface.CO2Sensor,
 ];
 
 addSupportedType({
@@ -43,13 +46,17 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor, homekitSession: HomeKitSession) => {
-        const accessory = makeAccessory(device, homekitSession);
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & TamperSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
+        const accessory = makeAccessory(device, homekitPlugin);
 
         if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name);
             bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ContactSensorState,
                 () => !!device.binaryState);
+        } else if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
+            const service = accessory.addService(Service.ContactSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.ContactSensorState,
+                () => !!device.entryOpen);
         }
 
         if (device.interfaces.includes(ScryptedInterface.OccupancySensor)) {
@@ -98,13 +105,54 @@ addSupportedType({
             const service = accessory.addService(Service.AirQualitySensor, device.name);
             bindCharacteristic(device, ScryptedInterface.AirQualitySensor, service, Characteristic.AirQuality,
                 () => airQualityToHomekit(device.airQuality));
-            bindCharacteristic(device, ScryptedInterface.PM25Sensor, service, Characteristic.PM2_5Density,
-                () => device.pm25Density || 0);
-            bindCharacteristic(device, ScryptedInterface.VOCSensor, service, Characteristic.VOCDensity,
-                () => device.vocDensity || 0);
+            
+            if (device.interfaces.includes(ScryptedInterface.PM25Sensor)) {
+                bindCharacteristic(device, ScryptedInterface.PM25Sensor, service, Characteristic.PM2_5Density,
+                    () => device.pm25Density || 0);
+            }
+            if (device.interfaces.includes(ScryptedInterface.VOCSensor)) {
+                bindCharacteristic(device, ScryptedInterface.VOCSensor, service, Characteristic.VOCDensity,
+                    () => device.vocDensity || 0);
+            }
+        }
+
+
+        if (device.interfaces.includes(ScryptedInterface.CO2Sensor)) {
+            const service = accessory.addService(Service.CarbonDioxideSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.CO2Sensor, service, Characteristic.CarbonDioxideLevel,
+                () => device.co2ppm || 0);
+            bindCharacteristic(device, ScryptedInterface.CO2Sensor, service, Characteristic.CarbonDioxideDetected,
+                () => ((device.co2ppm || 0) > 5000))
         }
 
         // todo: more sensors.
+
+        const tamperServices: typeof Service[] = [
+            Service.ContactSensor,
+            Service.AirQualitySensor,
+            Service.CarbonDioxideSensor,
+            Service.CarbonMonoxideSensor,
+            Service.HumiditySensor,
+            Service.LeakSensor,
+            Service.LightSensor,
+            Service.MotionSensor,
+            Service.OccupancySensor,
+            Service.SecuritySystem,
+            Service.SmokeSensor,
+            Service.TemperatureSensor,
+        ];
+
+        if (device.interfaces.includes(ScryptedInterface.TamperSensor)) {
+            for (const service of accessory.services) {
+                for (const tamperEligibleService of tamperServices) {
+                    if (service instanceof tamperEligibleService) {
+                        bindCharacteristic(device, ScryptedInterface.TamperSensor, service, Characteristic.StatusTampered,
+                            () => (device.tampered ? 1 : 0));
+                    }
+                }
+            }
+        }
+
         return accessory;
     }
 });

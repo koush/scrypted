@@ -1,5 +1,5 @@
 import { RTCRtpCodecParameters } from "@koush/werift";
-import sdk, {  } from "@scrypted/sdk";
+import sdk, { } from "@scrypted/sdk";
 
 export const requiredVideoCodec = new RTCRtpCodecParameters({
     mimeType: "video/H264",
@@ -14,8 +14,20 @@ export const requiredVideoCodec = new RTCRtpCodecParameters({
     parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f'
 });
 
-export const requiredAudioCodec = new RTCRtpCodecParameters({
-    mimeType: "audio/opus",
-    clockRate: 48000,
-    channels: 2,
-});
+export const requiredAudioCodecs = [
+    new RTCRtpCodecParameters({
+        mimeType: "audio/opus",
+        clockRate: 48000,
+        channels: 2,
+    }),
+    new RTCRtpCodecParameters({
+        mimeType: "audio/PCMU",
+        clockRate: 8000,
+        channels: 1,
+    }),
+    new RTCRtpCodecParameters({
+        mimeType: "audio/PCMA",
+        clockRate: 8000,
+        channels: 1,
+    }),
+];

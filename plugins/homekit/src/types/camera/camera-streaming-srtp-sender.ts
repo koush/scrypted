@@ -1,9 +1,9 @@
+import { RtcpSenderInfo, RtcpSrPacket } from '@koush/werift-src/packages/rtp/src/rtcp/sr';
+import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
+import type { Config } from '@koush/werift-src/packages/rtp/src/srtp/session';
+import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
+import { SrtpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtp';
 import dgram from 'dgram';
-import { RtcpSenderInfo, RtcpSrPacket } from '../../../../../external/werift/packages/rtp/src/rtcp/sr';
-import { RtpPacket } from '../../../../../external/werift/packages/rtp/src/rtp/rtp';
-import { Config } from '../../../../../external/werift/packages/rtp/src/srtp/session';
-import { SrtcpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { SrtpSession } from '../../../../../external/werift/packages/rtp/src/srtp/srtp';
 import { AudioStreamingSamplerate } from '../../hap';
 import { ntpTime } from './camera-utils';
 import { H264Repacketizer } from './h264-packetizer';
@@ -48,10 +48,31 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         opusPacketizer = new OpusRepacketizer(audioOptions.framesPerPacket);
     }
     else {
-        // adjust for rtp header size for the rtp packet header (12) and 16 for... whatever else
-        // may not be accomodated.
+        // adjust packet size for the rtp packet header (12).
         const adjustedMtu = videoOptions.maxPacketSize - 12;
         h264Packetizer = new H264Repacketizer(console, adjustedMtu, videoOptions);
+        sender.setSendBufferSize(1024 * 1024);
+    }
+
+    function sendRtcpInternal(now: number) {
+        lastRtcp = now;
+        const sr = new RtcpSrPacket({
+            ssrc,
+            senderInfo: new RtcpSenderInfo({
+                ntpTimestamp: ntpTime(),
+                rtpTimestamp: lastTimestamp,
+                packetCount,
+                octetCount,
+            }),
+        });
+
+        const packet = srtcpSession.encrypt(sr.serialize());
+        sender.send(packet, port, targetAddress);
+    }
+
+    function sendRtcp() {
+        const now = Date.now();
+        return sendRtcpInternal(now);
     }
 
     function sendPacket(rtp: RtpPacket) {
@@ -60,19 +81,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         // packet count may be less than zero if rollover counting fails due to heavy packet loss or other
         // unforseen edge cases.
         if (now > lastRtcp + rtcpInterval * 1000) {
-            lastRtcp = now;
-            const sr = new RtcpSrPacket({
-                ssrc,
-                senderInfo: new RtcpSenderInfo({
-                    ntpTimestamp: ntpTime(),
-                    rtpTimestamp: lastTimestamp,
-                    packetCount,
-                    octetCount,
-                }),
-            });
-
-            const packet = srtcpSession.encrypt(sr.serialize());
-            sender.send(packet, port, targetAddress);
+            sendRtcpInternal(now);
         }
         lastTimestamp = rtp.header.timestamp;
 
@@ -86,7 +95,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         sender.send(srtp, port, targetAddress);
     }
 
-    return (rtp: RtpPacket) => {
+    function sendRtp(rtp: RtpPacket) {
         if (firstSequenceNumber === undefined) {
             console.log(`sending first ${audioOptions ? 'audio' : 'video'} packet`);
             firstSequenceNumber = rtp.header.sequenceNumber;
@@ -138,4 +147,9 @@ export function createCameraStreamSender(console: Console, config: Config, sende
             sendPacket(RtpPacket.deSerialize(packet));
         }
     }
+
+    return {
+        sendRtp,
+        sendRtcp,
+    };
 }

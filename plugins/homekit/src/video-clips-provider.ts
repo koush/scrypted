@@ -82,7 +82,7 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
     }
 
     async getReadmeMarkdown(): Promise<string> {
-        return "# Save HomeKit Video Clips\n\nThis extension will save your HomeKit Secure Video Clips for local review in Scrypted.";
+        return "# HomeKit Secure Video Local Copy\n\nThis extension will save your HomeKit Secure Video Clips for local review in Scrypted.";
     }
 
     getSettings(): Promise<Setting[]> {

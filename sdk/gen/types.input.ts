@@ -106,6 +106,7 @@ export enum ScryptedDeviceType {
   Irrigation = "Irrigation",
   Valve = "Valve",
   Person = "Person",
+  SecuritySystem = "SecuritySystem",
   Unknown = "Unknown",
 }
 /**
@@ -352,8 +353,17 @@ export interface Camera {
   getPictureOptions(): Promise<ResponsePictureOptions[]>;
 }
 
+export interface H264Info {
+  sei?: boolean;
+  stapb?: boolean;
+  mtap16?: boolean;
+  mtap32?: boolean;
+  fuab?: boolean;
+}
+
 export interface VideoStreamOptions {
   codec?: string;
+  profile?: string;
   width?: number;
   height?: number;
   bitrate?: number;
@@ -368,6 +378,7 @@ export interface VideoStreamOptions {
    * Key Frame interval in frames.
    */
   keyframeInterval?: number;
+  h264Info?: H264Info;
 }
 export interface AudioStreamOptions {
   codec?: string;
@@ -377,6 +388,7 @@ export interface AudioStreamOptions {
 }
 
 export type MediaStreamSource = "local" | "cloud";
+export type MediaStreamTool = 'ffmpeg' | 'scrypted' | 'gstreamer';
 
 /**
  * Options passed to VideoCamera.getVideoStream to
@@ -404,11 +416,10 @@ export interface MediaStreamOptions {
   metadata?: any;
 
   /**
-   * The tool used to generate the container. Ie, scrypted,
+   * The tool was used to write the container or will be used to read teh container. Ie, scrypted,
    * the ffmpeg tools, gstreamer.
    */
-  // should this be in the request too as a hint for the preferred tool to use?
-  tool?: string;
+  tool?: MediaStreamTool;
 
   video?: VideoStreamOptions;
   audio?: AudioStreamOptions;
@@ -727,8 +738,9 @@ export interface Settings {
 export interface BinarySensor {
   binaryState?: boolean;
 }
-export interface IntrusionSensor {
-  intrusionDetected?: boolean;
+export type TamperState = 'intrusion' | 'motion' | 'magnetic' | 'cover' | true | false;
+export interface TamperSensor {
+  tampered?: TamperState;
 }
 export interface PowerSensor {
   powerDetected?: boolean;
@@ -757,6 +769,14 @@ export interface UltravioletSensor {
 export interface LuminanceSensor {
   luminance?: number;
 }
+export interface Position {
+  /**
+   * The accuracy radius of this position in meters.
+   */
+  accuracyRadius?: number;
+  latitude?: number;
+  longitude?: number;
+}
 export interface PositionSensor {
   position?: Position;
 }
@@ -765,6 +785,9 @@ export interface PM25Sensor {
 }
 export interface VOCSensor {
   vocDensity?: number;
+}
+export interface CO2Sensor {
+  co2ppm?: number;
 }
 export enum AirQuality {
   Unknown = "Unknown",
@@ -777,14 +800,34 @@ export enum AirQuality {
 export interface AirQualitySensor {
   airQuality?: AirQuality;
 }
-export interface Position {
-  /**
-   * The accuracy radius of this position in meters.
-   */
-  accuracyRadius?: number;
-  latitude?: number;
-  longitude?: number;
+
+export enum SecuritySystemMode {
+  Disarmed = 'Disarmed',
+  HomeArmed = 'HomeArmed',
+  AwayArmed = 'AwayArmed',
+  NightArmed = 'NightArmed',
 }
+
+export enum SecuritySystemObstruction {
+  Sensor = 'Sensor',
+  Occupied = 'Occupied',
+  Time = 'Time',
+  Error = 'Error',
+}
+
+export interface SecuritySystemState {
+  mode: SecuritySystemMode;
+  triggered?: boolean;
+  supportedModes?: SecuritySystemMode[];
+  obstruction?: SecuritySystemObstruction;
+}
+
+export interface SecuritySystem {
+  securitySystemState?: SecuritySystemState;
+  armSecuritySystem(mode: SecuritySystemMode): Promise<void>;
+  disarmSecuritySystem(): Promise<void>;
+}
+
 export interface ZoneHistory {
   firstEntry: number;
   lastEntry: number;
@@ -1385,7 +1428,7 @@ export enum ScryptedInterface {
   BufferConverter = "BufferConverter",
   Settings = "Settings",
   BinarySensor = "BinarySensor",
-  IntrusionSensor = "IntrusionSensor",
+  TamperSensor = "TamperSensor",
   PowerSensor = "PowerSensor",
   AudioSensor = "AudioSensor",
   MotionSensor = "MotionSensor",
@@ -1395,8 +1438,10 @@ export enum ScryptedInterface {
   UltravioletSensor = "UltravioletSensor",
   LuminanceSensor = "LuminanceSensor",
   PositionSensor = "PositionSensor",
+  SecuritySystem = 'SecuritySystem',
   PM25Sensor = "PM25Sensor",
   VOCSensor = "VOCSensor",
+  CO2Sensor = "CO2Sensor",
   AirQualitySensor = "AirQualitySensor",
   Readme = "Readme",
   OauthClient = "OauthClient",

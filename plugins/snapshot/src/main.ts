@@ -1,23 +1,19 @@
-import sdk, { Camera, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
-import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin"
-import { StorageSettings } from "@scrypted/common/src/settings"
 import AxiosDigestAuth from '@koush/axios-digest-auth';
-import https from 'https';
-import axios, { Axios } from "axios";
-import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
+import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { StorageSettings } from "@scrypted/common/src/settings";
+import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
+import sdk, { Camera, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import axios, { Axios } from "axios";
+import https from 'https';
 import jimp from 'jimp';
+import { newThread } from '../../../server/src/threading';
 
 const { mediaManager, systemManager } = sdk;
-
-// lol
-const FOREVER = 24 * 60 * 60 * 1000;
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false
 });
-
-const fontPromise = jimp.loadFont(jimp.FONT_SANS_64_WHITE);
 
 class NeverWaitError extends Error {
 
@@ -116,6 +112,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     progressPicture: RefreshPromise<Buffer>;
     prebufferUnavailablePicture: RefreshPromise<Buffer>;
     currentPicture: Buffer;
+    lastErrorImagesClear = 0;
+    static lastGeneratedErrorImageTime = 0;
     lastAvailablePicture: Buffer;
 
     constructor(options: SettingsMixinDeviceOptions<Camera>) {
@@ -293,85 +291,120 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
         this.console.log(xmin, ymin, xmax, ymax);
-        const img = await jimp.read(buffer);
-        let pw = xmax - xmin;
-        let ph = pw / (16 / 9);
-
-        const x = Math.round(xmin * img.getWidth());
-        const w = Math.round(xmax * img.getWidth()) - x;
-        const ymid = (ymin + ymax) / 2;
-        let y = Math.round((ymid - ph / 2) * img.getHeight());
-        let h = Math.round((ymid + ph / 2) * img.getHeight()) - y;
-        img.crop(x, y, w, h);
-        const cropped = await img.getBufferAsync('image/jpeg');
-        return cropped;
+        return newThread({ jimp }, {
+            buffer,
+            xmin, xmax,
+            ymin, ymax,
+        }, async ({
+            jimp,
+            buffer,
+            xmin, xmax,
+            ymin, ymax,
+        }) => {
+            const img = await jimp.read(buffer);
+            let pw = xmax - xmin;
+            let ph = pw / (16 / 9);
+    
+            const x = Math.round(xmin * img.getWidth());
+            const w = Math.round(xmax * img.getWidth()) - x;
+            const ymid = (ymin + ymax) / 2;
+            let y = Math.round((ymid - ph / 2) * img.getHeight());
+            let h = Math.round((ymid + ph / 2) * img.getHeight()) - y;
+            img.crop(x, y, w, h);
+            const cropped = await img.getBufferAsync('image/jpeg');
+            return cropped;
+        });
     }
 
-    clearCachedPictures() {
-        this.currentPicture = undefined;
+    clearErrorImages() {
         this.errorPicture = undefined;
         this.timeoutPicture = undefined;
         this.progressPicture = undefined;
         this.prebufferUnavailablePicture = undefined;
     }
 
+    clearCachedPictures() {
+        // if previous error pictures were generated with the black background,
+        // clear it out to force a real blurred image.
+        if (!this.lastAvailablePicture)
+            this.clearErrorImages();
+        this.currentPicture = undefined;
+    }
+
+    maybeClearErrorImages() {
+        const now = Date.now();
+
+        // only clear the error images if they are at least an hour old
+        if (now - this.lastErrorImagesClear > 1 * 60 * 60 * 1000)
+            return;
+
+        // only clear error images generated once a per minute across all cameras
+        if (now - SnapshotMixin.lastGeneratedErrorImageTime < 60 * 1000)
+            return;
+
+        SnapshotMixin.lastGeneratedErrorImageTime = now;
+        this.lastErrorImagesClear = now;
+        this.clearErrorImages();
+    }
+
     async createErrorImage(e: any) {
+        this.maybeClearErrorImages();
+
         if (e instanceof TimeoutError) {
-            if (!this.timeoutPicture)
-                this.console.log('creating timeout snapshot');
             this.timeoutPicture = singletonPromise(this.timeoutPicture,
-                () => this.createTextErrorImage('Snapshot Timed Out'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot Timed Out'));
             return this.timeoutPicture.promise;
         }
         else if (e instanceof PrebufferUnavailableError) {
             this.prebufferUnavailablePicture = singletonPromise(this.prebufferUnavailablePicture,
-                () => this.createTextErrorImage('Snapshot Unavailable'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot Unavailable'));
             return this.prebufferUnavailablePicture.promise;
         }
         else if (e instanceof NeverWaitError) {
             this.progressPicture = singletonPromise(this.progressPicture,
-                () => this.createTextErrorImage('Snapshot In Progress'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot In Progress'));
             return this.progressPicture.promise;
         }
         else {
-            if (!this.errorPicture)
-                this.console.log('creating error snapshot', e);
             this.errorPicture = singletonPromise(this.errorPicture,
-                () => this.createTextErrorImage('Snapshot Failed'),
-                FOREVER);
+                () => this.createTextErrorImage('Snapshot Failed'));
             return this.errorPicture.promise;
         }
     }
 
     async createTextErrorImage(text: string) {
         const errorBackground = this.currentPicture || this.lastAvailablePicture;
+        this.console.log('creating error image with background', text, !!errorBackground);
+        return newThread({ jimp }, {
+            errorBackground,
+            text,
+        }, async ({ errorBackground, text, jimp }) => {
+            const fontPromise = jimp.loadFont(jimp.FONT_SANS_64_WHITE);
 
-        if (!errorBackground) {
-            const img = await jimp.create(1920 / 2, 1080 / 2);
-            const font = await fontPromise;
-            img.print(font, 0, 0, {
-                text,
-                alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-            }, img.getWidth(), img.getHeight());
-            return img.getBufferAsync('image/jpeg');
-        }
-        else {
-            const img = await jimp.read(errorBackground);
-            img.resize(1920 / 2, jimp.AUTO);
-            img.blur(8);
-            img.brightness(-.2);
-            const font = await fontPromise;
-            img.print(font, 0, 0, {
-                text,
-                alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-            }, img.getWidth(), img.getHeight());
-            return img.getBufferAsync('image/jpeg');
-        }
+            if (!errorBackground) {
+                const img = await jimp.create(1920 / 2, 1080 / 2);
+                const font = await fontPromise;
+                img.print(font, 0, 0, {
+                    text,
+                    alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
+                    alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
+                }, img.getWidth(), img.getHeight());
+                return img.getBufferAsync('image/jpeg');
+            }
+            else {
+                const img = await jimp.read(errorBackground);
+                img.resize(1920 / 2, jimp.AUTO);
+                img.blur(8);
+                img.brightness(-.2);
+                const font = await fontPromise;
+                img.print(font, 0, 0, {
+                    text,
+                    alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
+                    alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
+                }, img.getWidth(), img.getHeight());
+                return img.getBufferAsync('image/jpeg');
+            }
+        })
     }
 
     async getPictureOptions() {

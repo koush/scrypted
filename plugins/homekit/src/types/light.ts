@@ -1,13 +1,14 @@
 import { Brightness, ColorSettingHsv, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic, HomeKitSession } from '../common';
+import { addSupportedType, bindCharacteristic,  } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { getAccessory, probe } from './onoff-base';
+import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
     type: ScryptedDeviceType.Light,
     probe,
-    getAccessory: async (device: ScryptedDevice & OnOff & Brightness & ColorSettingHsv, homekitSession: HomeKitSession) => {
-        const { accessory, service } = getAccessory(device, homekitSession, Service.Lightbulb);
+    getAccessory: async (device: ScryptedDevice & OnOff & Brightness & ColorSettingHsv, homekitPlugin: HomeKitPlugin) => {
+        const { accessory, service } = getAccessory(device, homekitPlugin, Service.Lightbulb);
 
         if (device.interfaces.includes(ScryptedInterface.Brightness)) {
             service.addCharacteristic(Characteristic.Brightness)

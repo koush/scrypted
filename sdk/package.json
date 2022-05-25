@@ -1,10 +1,10 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.0.195",
+  "version": "0.0.198",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && cd types && npm version patch && npm publish",
     "prebuild": "typedoc && ts-node gen/build && cd types && npm run build",
     "build": "tsc",
     "webpack": "webpack-cli --config webpack.config.js",

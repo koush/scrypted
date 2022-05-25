@@ -1,6 +1,7 @@
 import { MediaStreamDestination, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import { H264Level, H264Profile, StartStreamRequest } from '../../hap';
 import sdk from '@scrypted/sdk';
+import { HomeKitPlugin } from "../../main";
 
 const { log } = sdk;
 
@@ -51,7 +52,7 @@ export const ntpTime = () => {
     return buf.readBigUInt64BE();
 };
 
-export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, storage: Storage, request: StartStreamRequest) {
+export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, isHomeHub: boolean, storage: Storage, request: StartStreamRequest) {
     let adaptiveBitrate: string[] = [];
     try {
         adaptiveBitrate = JSON.parse(storage.getItem('adaptiveBitrate'));
@@ -74,7 +75,9 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
         ? 'low-resolution'
         : isLowBandwidth
             ? 'remote'
-            : 'local';
+            : isHomeHub
+                ? 'medium-resolution'
+                : 'local';
 
     const canDynamicBitrate = device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration);
 
@@ -124,8 +127,8 @@ export function checkCompatibleCodec(console: Console, device: ScryptedDevice, v
     }
     const isDefinitelyNotH264 = videoCodec && videoCodec.toLowerCase().indexOf('h264') === -1;
     if (isDefinitelyNotH264) {
-        const str = 
-        console.error('=============================================================================');
+        const str =
+            console.error('=============================================================================');
         console.error(`${device.name} video codec must be h264 but is ${videoCodec}.`);
         console.error('This stream may fail. Read the instructions in the HomeKit Plugin');
         console.error('to properly configure your camera codec.');

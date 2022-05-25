@@ -1,13 +1,14 @@
-import { RtpHeader, RtpPacket } from "../../../../../external/werift/packages/rtp/src/rtp/rtp";
+import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
-const NAL_TYPE_STAP_A = 24;
-const NAL_TYPE_FU_A = 28;
-const NAL_TYPE_NON_IDR = 1;
-const NAL_TYPE_IDR = 5;
-const NAL_TYPE_SEI = 6;
-const NAL_TYPE_SPS = 7;
-const NAL_TYPE_PPS = 8;
+export const NAL_TYPE_STAP_A = 24;
+export const NAL_TYPE_FU_A = 28;
+export const NAL_TYPE_NON_IDR = 1;
+export const NAL_TYPE_IDR = 5;
+export const NAL_TYPE_SEI = 6;
+export const NAL_TYPE_SPS = 7;
+export const NAL_TYPE_PPS = 8;
+export const NAL_TYPE_DELIMITER = 9;
 
 const NAL_HEADER_SIZE = 1;
 const FU_A_HEADER_SIZE = 2;
@@ -29,6 +30,33 @@ function depacketizeStapA(data: Buffer) {
         pos += naluSize;
     }
     ret.push(data.subarray(lastPos));
+    return ret;
+}
+
+function splitBitstream(data: Buffer) {
+    const ret: Buffer[] = [];
+    let previous = 0;
+    let offset = 0;
+    const maybeAddSlice = () => {
+        const slice = data.subarray(previous, offset);
+        if (slice.length)
+            ret.push(slice);
+        offset += 4;
+        previous = offset;
+    }
+
+    while (offset < data.length - 4) {
+        const startCode = data.readUInt32BE(offset);
+        if (startCode === 1) {
+            maybeAddSlice();
+        }
+        else {
+            offset++;
+        }
+    }
+    offset = data.length;
+    maybeAddSlice();
+
     return ret;
 }
 
@@ -245,12 +273,42 @@ export class H264Repacketizer {
         originalFragments.unshift(originalNalHeader);
         const defragmented = Buffer.concat(originalFragments);
 
-        const fragments = this.packetizeFuA(defragmented, !hasFuStart, !hasFuEnd);
-        const hadMarker = last.header.marker;
-        this.createRtpPackets(first, fragments, ret, hadMarker);
+        if (originalNalType === NAL_TYPE_SPS) {
+            if (!this.codecInfo)
+                this.codecInfo = {
+                    sps: undefined,
+                    pps: undefined,
+                };
+
+            // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
+            // this probably is not compliant...
+            const splits = splitBitstream(defragmented);
+            while (splits.length) {
+                const split = splits.shift();
+                const splitNaluType = split[0] & 0x1f;
+                if (splitNaluType === NAL_TYPE_SPS) {
+                    this.codecInfo.sps = split;
+                }
+                else if (splitNaluType === NAL_TYPE_PPS) {
+                    this.codecInfo.pps = split;
+                }
+                else {
+                    if (splitNaluType === NAL_TYPE_IDR)
+                        this.maybeSendSpsPps(first, ret);
+
+                    const fragments = this.packetizeFuA(split, !hasFuStart, !hasFuEnd);
+                    const hadMarker = last.header.marker;
+                    this.createRtpPackets(first, fragments, ret, hadMarker);
+                }
+            }
+        }
+        else {
+            const fragments = this.packetizeFuA(defragmented, !hasFuStart, !hasFuEnd);
+            const hadMarker = last.header.marker;
+            this.createRtpPackets(first, fragments, ret, hadMarker);
+        }
 
         this.extraPackets -= this.pendingFuA.length - 1;
-
         this.pendingFuA = undefined;
     }
 
@@ -264,7 +322,7 @@ export class H264Repacketizer {
     }
 
     maybeSendSpsPps(packet: RtpPacket, ret: Buffer[]) {
-        if (!this.codecInfo.sps || !this.codecInfo.pps)
+        if (!this.codecInfo?.sps || !this.codecInfo?.pps)
             return;
 
         const aggregates = this.packetizeStapA([this.codecInfo.sps, this.codecInfo.pps]);
@@ -278,6 +336,13 @@ export class H264Repacketizer {
 
     repacketize(packet: RtpPacket): Buffer[] {
         const ret: Buffer[] = [];
+
+        // empty packets are apparently valid from webrtc. filter those out.
+        if (!packet.payload.length) {
+            this.extraPackets--;
+            return ret;
+        }
+
         const nalType = packet.payload[0] & 0x1F;
 
         // fragmented packets must share a timestamp

@@ -7,6 +7,14 @@ export function replacePorts(sdp: string, audioPort: number, videoPort: number) 
     return outputSdp;
 }
 
+export function replaceSectionPort(sdp: string, section: string, port: number) {
+    const regex = new RegExp(`m=${section} \\d+`)
+    let outputSdp = sdp
+        .replace(/c=IN .*/, `c=IN IP4 127.0.0.1`)
+        .replace(regex, `m=${section} ${port}`);
+    return outputSdp;
+}
+
 export function addTrackControls(sdp: string) {
     let lines = sdp.split('\n').map(line => line.trim());
     lines = lines.filter(line => !line.includes('a=control:'));
@@ -163,6 +171,7 @@ const artpmap = 'a=rtpmap:';
 export function parseMSection(msection: string[]) {
     const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
     const rtpmap = msection.find(line => line.startsWith(artpmap))?.toLowerCase();
+    const mline = parseMLine(msection[0]);
 
     let codec: string;
     if (rtpmap?.includes('mpeg4')) {
@@ -170,6 +179,12 @@ export function parseMSection(msection: string[]) {
     }
     else if (rtpmap?.includes('opus')) {
         codec = 'opus';
+    }
+    else if (rtpmap?.includes('pcma')) {
+        codec = 'pcm_alaw';
+    }
+    else if (rtpmap?.includes('pcmu')) {
+        codec = 'pcm_ulaw';
     }
     else if (rtpmap?.includes('pcm')) {
         codec = 'pcm';
@@ -180,8 +195,13 @@ export function parseMSection(msection: string[]) {
     else if (rtpmap?.includes('h265')) {
         codec = 'h265';
     }
+    else if (!rtpmap && mline.type === 'audio') {
+        // ffmpeg seems to omit the rtpmap type for pcm alaw when creating sdp?
+        // is this the default?
+        codec = 'pcm_alaw';
+    }
 
-    let direction: string;
+        let direction: string;
     for (const checkDirection of ['sendonly', 'sendrecv', 'recvonly', 'inactive']) {
         const found = msection.find(line => line === 'a=' + checkDirection);
         if (found) {
@@ -191,7 +211,7 @@ export function parseMSection(msection: string[]) {
     }
 
     return {
-        ...parseMLine(msection[0]),
+        ...mline,
         fmtp: parseFmtp(msection),
         lines: msection,
         contents: msection.join('\r\n'),
