@@ -57,7 +57,6 @@ export default {
   data() {
     return {
       pc: null,
-      control: null,
       video: false,
       src: "images/cameraloading.jpg",
       overlay: false,
@@ -70,21 +69,18 @@ export default {
       if (!val) {
         return;
       }
-      const { pc, control } = await streamCamera(
+      const pc = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video
       );
       this.pc = pc;
-      this.control = control;
     },
   },
   methods: {
     cleanupConnection() {
       this.pc?.close();
-      this.control?.endSession();
       this.pc = undefined;
-      this.control = undefined;
     },
     async fetchCamera() {
       let picture;

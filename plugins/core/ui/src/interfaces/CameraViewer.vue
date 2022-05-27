@@ -215,20 +215,17 @@ export default {
     },
     cleanupConnection() {
       this.pc?.close();
-      this.control?.endSession();
       this.pc = undefined;
-      this.control = undefined;
     },
     async streamCamera() {
       this.cleanupConnection();
       this.startTime = null;
-      const { pc, control } = await streamCamera(
+      const pc = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video
       );
       this.pc = pc;
-      this.control = control;
     },
     async streamRecorder(startTime) {
       this.cleanupConnection();

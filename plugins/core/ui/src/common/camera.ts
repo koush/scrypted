@@ -17,8 +17,27 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
 
 export async function streamMedia(device: RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
   const session = new BrowserSignalingSession();
-  const pc = new Promise(resolve => {
+  const pc = new Promise<RTCPeerConnection>(resolve => {
     session.peerConnectionCreated = async (pc) => {
+      pc.addEventListener('connectionstatechange', () => {
+        if (pc.connectionState === 'connected') {
+          control.startSession();
+        }
+        if (pc.iceConnectionState === 'disconnected'
+          || pc.iceConnectionState === 'failed'
+          || pc.iceConnectionState === 'closed') {
+          control.endSession();
+        }
+      });
+      pc.addEventListener('iceconnectionstatechange', () => {
+        console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
+        if (pc.iceConnectionState === 'disconnected'
+          || pc.iceConnectionState === 'failed'
+          || pc.iceConnectionState === 'closed') {
+          control.endSession();
+        }
+      });
+
       pc.ontrack = ev => {
         const mediaStream = new MediaStream(
           pc.getReceivers().map((receiver) => receiver.track)
@@ -31,10 +50,7 @@ export async function streamMedia(device: RTCSignalingChannel, getVideo: () => H
   })
 
   const control: RTCSessionControl = await device.startRTCSignalingSession(session);
-  return {
-    control,
-    pc: await pc,
-  }
+  return pc;
 }
 
 export async function createBlobUrl(mediaManager: MediaManager, mediaObject: MediaObject): Promise<string> {
