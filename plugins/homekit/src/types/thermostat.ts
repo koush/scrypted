@@ -16,6 +16,36 @@ addSupportedType({
         const service = accessory.addService(Service.Thermostat, device.name);
         service.setPrimaryService();
 
+        const minStep = 0.1;
+        const minSetTemp = 10 // 50F
+        const maxSetTemp = 32.222 // 90F
+        const minGetTemp = -17.7778 // 0F
+        const maxGetTemp = 71.1111 // 160F
+
+        service.getCharacteristic(Characteristic.CurrentTemperature).setProps({
+            minStep: minStep,
+            minValue: minGetTemp, // default = -270, change to -20C or 0F (-17.7778C)
+            maxValue: maxGetTemp // default = 100, change to 60C or 160F (71.1111C)
+        });
+
+        service.getCharacteristic(Characteristic.TargetTemperature).setProps({
+            minStep: minStep, // 0.1
+            minValue: minSetTemp, // default = 10, change to 9C or 50F (10C)
+            maxValue: maxSetTemp // default = 38, change to 32C or 90F (32.2222C)
+        });
+
+        service.getCharacteristic(Characteristic.CoolingThresholdTemperature).setProps({
+            minStep: minStep, // 0.1
+            minValue: minSetTemp, // default = 10, change to 9C or 50F (10C)
+            maxValue: maxSetTemp // default = 35, change to 32C or 90F (32.2222C)
+        });
+        
+        service.getCharacteristic(Characteristic.HeatingThresholdTemperature).setProps({
+            minStep: minStep, // 0.1
+            minValue: minSetTemp, // default = 0, change to 9C or 50F (10C)
+            maxValue: maxSetTemp // default = 25, change to 32C or 90F (32.2222C)
+        });
+
         function toCurrentMode(mode: ThermostatMode) {
             switch (mode) {
                 case ThermostatMode.Off:
