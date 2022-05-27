@@ -5,7 +5,6 @@ import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
-import crypto from 'crypto';
 import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
 import { waitConnected } from "./peerconnection-util";
@@ -46,8 +45,7 @@ export async function createRTCPeerConnectionSink(
     maximumCompatibilityMode: boolean,
     getFFmpegInput: (tool: MediaStreamTool, destination: MediaStreamDestination) => Promise<FFmpegInput>,
 ) {
-    const token = 'connection log =================================' + crypto.randomBytes(8).toString('hex');
-    console.time(token);
+    const timeStart = Date.now();
 
     const options = await clientSignalingSession.getOptions();
     const hasIntercom = !!intercom;
@@ -170,7 +168,7 @@ export async function createRTCPeerConnectionSink(
     const forwarderPromise = (async () => {
         await waitConnected(pc);
 
-        console.timeLog(token, 'connected');
+        console.log('connected', Date.now() - timeStart);
 
         let isPrivate = true;
         for (const ice of pc.iceTransports) {
@@ -290,7 +288,7 @@ export async function createRTCPeerConnectionSink(
                 '-an', '-sn', '-dn',
                 ...videoArgs,
             ],
-            firstPacket: () => console.timeEnd(token),
+            firstPacket: () => console.log('first video packet', Date.now() - timeStart),
         };
 
         let tracks: RtpTracks;

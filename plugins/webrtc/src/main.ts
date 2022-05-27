@@ -5,7 +5,6 @@ import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCrea
 import crypto from 'crypto';
 import { createRTCPeerConnectionSink } from "./ffmpeg-to-wrtc";
 import { WebRTCCamera } from "./webrtc-camera";
-import { createWebRTCStorageSettings } from "./webrtc-storage-settings";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
@@ -16,20 +15,10 @@ const supportedTypes = [
 ];
 
 class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
-    storageSettings = createWebRTCStorageSettings(this);
+    storageSettings = new StorageSettings(this, {});
 
     constructor(public plugin: WebRTCPlugin, options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
         super(options);
-        // this.storageSettings.options = {
-        //     hide: {
-        //         decoderArguments: async () => {
-        //             return this.storageSettings.values.transcode === 'Disabled';
-        //         },
-        //         encoderArguments: async () => {
-        //             return this.storageSettings.values.transcode === 'Disabled';
-        //         }
-        //     }
-        // };
     }
 
     startIntercom(media: MediaObject): Promise<void> {
@@ -88,7 +77,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
     }
 
     createVideoStreamOptions() {
-        const ret = getRTCMediaStreamOptions('webrtc', 'WebRTC', this.storageSettings.values.useSdp);
+        const ret = getRTCMediaStreamOptions('webrtc', 'WebRTC');
         ret.source = 'cloud';
         return ret;
     }
@@ -103,7 +92,6 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
             maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
-            useUdp: this.storageSettings.values.useSdp,
         });
 
         return mediaObject;
