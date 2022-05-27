@@ -11,4 +11,6 @@ export class ScryptedSessionControl implements RTCSessionControl {
     async endSession() {
         await this.cleanup();
     }
+    async startSession() {
+    }
 }
