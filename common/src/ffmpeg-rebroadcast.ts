@@ -381,57 +381,6 @@ export interface RebroadcasterOptions {
     },
 }
 
-export async function createRebroadcaster(options?: RebroadcasterOptions): Promise<Rebroadcaster> {
-    let clientCount = 0;
-    let timeout: NodeJS.Timeout;
-    const resetTimeout = () => {
-        if (!options?.idle)
-            return;
-
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-            if (clientCount === 0) {
-                options.idle.callback();
-                return;
-            }
-            resetTimeout();
-        }, options.idle.timeout);
-    }
-    resetTimeout();
-
-    const server = createServer(socket => {
-        handleRebroadcasterClient(socket, options);
-        socket.once('close', () => {
-            resetTimeout();
-            clientCount--;
-        });
-        resetTimeout();
-        clientCount++;
-    });
-    const port = await listenZero(server);
-    return {
-        server,
-        port,
-        url: `tcp://127.0.0.1:${port}`,
-        get clients() {
-            return clientCount;
-        }
-    }
-}
-
-export async function createParserRebroadcaster<T extends string>(parserSession: ParserSession<T>, container: T, options?: RebroadcasterOptions) {
-    const ret = await createRebroadcaster(Object.assign({}, options, {
-        connect: (writeData, destroy) => {
-            parserSession.on(container, writeData);
-            return () => {
-                destroy();
-            }
-        }
-    } as RebroadcasterOptions));
-
-    return ret;
-}
-
 export async function handleRebroadcasterClient(duplex: Promise<Duplex> | Duplex, options?: RebroadcasterOptions) {
     const socket = await duplex;
     let first = true;
@@ -450,10 +399,9 @@ export async function handleRebroadcasterClient(duplex: Promise<Duplex> | Duplex
     };
 
     const destroy = () => {
-        socket.removeAllListeners();
-        socket.destroy();
         const cb = cleanupCallback;
         cleanupCallback = undefined;
+        socket.destroy();
         cb?.();
     }
     let cleanupCallback = options?.connect(writeData, destroy);
