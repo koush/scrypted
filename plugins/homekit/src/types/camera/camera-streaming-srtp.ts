@@ -1,4 +1,5 @@
 import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
+import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { FFmpegInput } from '@scrypted/sdk';
@@ -63,6 +64,7 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                 });
                 channel += 2;
             }
+
             await rtspClient.setup({
                 type: 'tcp',
                 port: channel,

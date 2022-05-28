@@ -173,13 +173,20 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
         // sdp may contain multiple audio/video sections. take only the first video section.
         sdp = [...parsedSdp.header.lines, ...parsedSdp.msections.map(msection => msection.lines).flat()].join('\r\n');
 
-        await rtspClient.play();
-
         // don't start parsing until next tick when this function returns to allow
         // event handlers to be set prior to parsing.
-        process.nextTick(() => rtspClient.readLoop()
-            .catch(e => kill(e))
-            .finally(() => kill(new Error('rtsp read loop exited'))));
+        process.nextTick(async () => {
+            try {
+                await rtspClient.play();
+                await rtspClient.readLoop();
+            }
+            catch (e) {
+                kill(e);
+            }
+            finally {
+                kill(new Error('rtsp read loop exited'));
+            }
+        });
 
         // this return block is intentional, to ensure that the remaining code happens sync.
         return (() => {

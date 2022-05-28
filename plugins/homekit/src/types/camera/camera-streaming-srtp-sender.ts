@@ -88,8 +88,10 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         packetCount++;
         octetCount += rtp.payload.length;
 
+        rtp.header.padding = false;
         rtp.header.ssrc = ssrc;
         rtp.header.payloadType = payloadType;
+
 
         const srtp = srtpSession.encrypt(rtp.payload, rtp.header);
         sender.send(srtp, port, targetAddress);
@@ -144,7 +146,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         if (!packets)
             return;
         for (const packet of packets) {
-            sendPacket(RtpPacket.deSerialize(packet));
+            sendPacket(packet);
         }
     }
 

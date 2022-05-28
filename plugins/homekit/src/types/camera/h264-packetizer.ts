@@ -65,6 +65,7 @@ export class H264Repacketizer {
     fuaMax: number;
     pendingStapA: RtpPacket[];
     pendingFuA: RtpPacket[];
+    pendingFuASeenStart = false;
     seenSps = false;
 
     constructor(public console: Console, public maxPacketSize: number, public codecInfo: {
@@ -146,6 +147,10 @@ export class H264Repacketizer {
             fuHeader = fuHeaderMiddle;
         }
 
+        if (packages.length === 1 && !noStart && !noEnd) {
+            return [data];
+        }
+
         return packages;
     }
 
@@ -194,26 +199,17 @@ export class H264Repacketizer {
     }
 
     createPacket(rtp: RtpPacket, data: Buffer, marker: boolean) {
-        const originalSequenceNumber = rtp.header.sequenceNumber;
-        const originalMarker = rtp.header.marker;
-        // homekit chokes on padding.
-        const hadPadding = rtp.header.padding;
-        const originalPayload = rtp.payload;
-        rtp.header.sequenceNumber = (rtp.header.sequenceNumber + this.extraPackets + 0x10000) % 0x10000;
-        rtp.header.marker = marker;
-        rtp.header.padding = false;
-        rtp.payload = data;
-        const ret = rtp.serialize();
-        rtp.header.sequenceNumber = originalSequenceNumber;
-        rtp.header.marker = originalMarker;
-        rtp.header.padding = hadPadding;
-        rtp.payload = originalPayload;
+        const ret = rtp.clone();
+        ret.header.sequenceNumber = (rtp.header.sequenceNumber + this.extraPackets + 0x10000) % 0x10000;
+        ret.header.marker = marker;
+        ret.header.padding = false;
+        ret.payload = data;
         if (data.length > this.maxPacketSize)
             this.console.warn('packet exceeded max packet size. this may a bug.');
         return ret;
     }
 
-    flushPendingStapA(ret: Buffer[]) {
+    flushPendingStapA(ret: RtpPacket[]) {
         if (!this.pendingStapA)
             return;
         const first = this.pendingStapA[0];
@@ -235,7 +231,7 @@ export class H264Repacketizer {
         this.pendingStapA = undefined;
     }
 
-    flushPendingFuA(ret: Buffer[]) {
+    flushPendingFuA(ret: RtpPacket[], allowRecoverableErrors?: boolean) {
         if (!this.pendingFuA)
             return;
 
@@ -243,23 +239,41 @@ export class H264Repacketizer {
         // and are all available, which is guaranteed over rtsp/tcp, but not over rtp/udp.
         const first = this.pendingFuA[0];
         const last = this.pendingFuA[this.pendingFuA.length - 1];
+        let originalNalType = first.payload[1] & 0x1f;
 
         const hasFuStart = !!(first.payload[1] & 0x80);
         const hasFuEnd = !!(last.payload[1] & 0x40);
 
-        let originalNalType = first.payload[1] & 0x1f;
+        this.pendingFuASeenStart ||= hasFuStart;
+
+        if (!this.pendingFuASeenStart) {
+            if (allowRecoverableErrors) {
+                this.console.error('fua packet missing start. waiting for more packets.', originalNalType);
+            }
+            else {
+                this.console.error('fua packet missing start. skipping refragmentation.', originalNalType);
+                this.pendingFuA = undefined;
+            }
+            return;
+        }
+
         let lastSequenceNumber: number;
         for (const packet of this.pendingFuA) {
             const nalType = packet.payload[1] & 0x1f;
             if (nalType !== originalNalType) {
-                this.console.error('nal type mismatch');
+                this.console.error('unexpected nal type mismatch. skipping refragmentation.', originalNalType, nalType);
                 this.pendingFuA = undefined;
                 return;
             }
             if (lastSequenceNumber !== undefined) {
                 if (packet.header.sequenceNumber !== (lastSequenceNumber + 1) % 0x10000) {
-                    this.console.error('fua packet is missing. skipping refragmentation.');
-                    this.pendingFuA = undefined;
+                    if (allowRecoverableErrors) {
+                        this.console.error('fua packet is missing. waiting for more packets.', originalNalType);
+                    }
+                    else {
+                        this.console.error('fua packet is missing. skipping refragmentation.', originalNalType);
+                        this.pendingFuA = undefined;
+                    }
                     return;
                 }
             }
@@ -312,7 +326,7 @@ export class H264Repacketizer {
         this.pendingFuA = undefined;
     }
 
-    createRtpPackets(packet: RtpPacket, nalus: Buffer[], ret: Buffer[], hadMarker = packet.header.marker) {
+    createRtpPackets(packet: RtpPacket, nalus: Buffer[], ret: RtpPacket[], hadMarker = packet.header.marker) {
         nalus.forEach((packetized, index) => {
             if (index !== 0)
                 this.extraPackets++;
@@ -321,7 +335,7 @@ export class H264Repacketizer {
         });
     }
 
-    maybeSendSpsPps(packet: RtpPacket, ret: Buffer[]) {
+    maybeSendSpsPps(packet: RtpPacket, ret: RtpPacket[]) {
         if (!this.codecInfo?.sps || !this.codecInfo?.pps)
             return;
 
@@ -334,11 +348,13 @@ export class H264Repacketizer {
         this.extraPackets++;
     }
 
-    repacketize(packet: RtpPacket): Buffer[] {
-        const ret: Buffer[] = [];
+    repacketize(packet: RtpPacket): RtpPacket[] {
+        const ret: RtpPacket[] = [];
 
         // empty packets are apparently valid from webrtc. filter those out.
         if (!packet.payload.length) {
+            this.flushPendingFuA(ret);
+            this.flushPendingStapA(ret);
             this.extraPackets--;
             return ret;
         }
@@ -368,6 +384,7 @@ export class H264Repacketizer {
             }
 
             const isFuStart = !!(data[1] & 0x80);
+            const isFuEnd = !!(packet.payload[1] & 0x40);
             // if this is an idr frame, but no sps has been sent, dummy one up.
             // the stream may not contain sps.
             if (originalNalType === NAL_TYPE_IDR && isFuStart && !this.seenSps) {
@@ -378,7 +395,6 @@ export class H264Repacketizer {
                 // the fua packet may already fit, in which case we could just send it.
                 // but for some reason that doesn't work??
                 if (false && packet.payload.length <= this.maxPacketSize) {
-                    const isFuEnd = !!(data[1] & 0x40);
                     ret.push(this.createPacket(packet, packet.payload, packet.header.marker && isFuEnd));
                 }
                 else if (packet.payload.length >= this.maxPacketSize * 2) {
@@ -390,6 +406,7 @@ export class H264Repacketizer {
                 else {
                     // the fua packet is an unsuitable size and needs to be defragmented
                     // and refragmented.
+                    this.pendingFuASeenStart = false;
                     this.pendingFuA = [];
                 }
             }
@@ -397,9 +414,27 @@ export class H264Repacketizer {
             if (this.pendingFuA) {
                 this.pendingFuA.push(packet);
 
-                const isFuEnd = !!(packet.payload[1] & 0x40);
-                if (isFuEnd)
+                this.pendingFuA = this.pendingFuA.sort((a, b) => a.header.sequenceNumber - b.header.sequenceNumber);
+
+                if (isFuEnd) {
                     this.flushPendingFuA(ret);
+                }
+                else if (this.pendingFuA.length > 1) {
+                    const last = this.pendingFuA[this.pendingFuA.length - 1].clone();
+                    const l = this.pendingFuA.length;
+                    const partial: RtpPacket[] = [];
+                    this.flushPendingFuA(partial, true);
+                    if (partial.length) {
+                        const newl = partial.length;
+                        // this.console.log('l newl', l, newl);
+                        const retain = partial.pop();
+                        last.payload = retain.payload;
+                        if (this.pendingFuA)
+                            this.console.error('pending fua still found?');
+                        this.pendingFuA = [last];
+                        ret.push(...partial);
+                    }
+                }
             }
         }
         else if (nalType === NAL_TYPE_STAP_A) {
