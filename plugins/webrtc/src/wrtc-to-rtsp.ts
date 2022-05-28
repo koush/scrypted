@@ -1,7 +1,7 @@
 import { BundlePolicy, Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RTCSessionDescription, RtpPacket, uint16Add } from "@koush/werift";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
-import { RtspServer } from "@scrypted/common/src/rtsp-server";
+import { findH264NaluType, findH264NaluTypeInNalu, getNaluTypesInNalu, H264_NAL_TYPE_IDR, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import dgram from 'dgram';
@@ -108,8 +108,6 @@ export async function createRTCPeerConnectionSource(options: {
         let videoTrack: string;
         let audioTransceiver: RTCRtpTransceiver;
 
-        const useRtspJitterBuffer = false;
-
         const doSetup = async (setup: RTCAVSignalingSetup) => {
             ensurePeerConnection(setup);
 
@@ -118,76 +116,28 @@ export async function createRTCPeerConnectionSource(options: {
 
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.onTrack.subscribe((track) => {
-                if (!useRtspJitterBuffer) {
-                    track.onReceiveRtp.subscribe(rtp => {
-                        if (!gotAudio) {
-                            gotAudio = true;
-                            console.log('first audio packet', Date.now() - timeStart);
-                        }
-                        rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
-                    });
-                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(audioTrack, rtp.serialize(), true));
-                }
-                else {
-                    const jitter = new JitterBuffer({
-                        rtpStream: track.onReceiveRtp,
-                        rtcpStream: track.onReceiveRtcp,
-                    });
-                    class RtspOutput extends Output {
-                        pushRtcpPackets(packets: RtcpPacket[]): void {
-                            for (const rtcp of packets) {
-                                rtspServer.sendTrack(audioTrack, rtcp.serialize(), true)
-                            }
-                        }
-                        pushRtpPackets(packets: RtpPacket[]): void {
-                            if (!gotAudio) {
-                                gotAudio = true;
-                                console.log('first audio packet', Date.now() - timeStart);
-                            }
-                            for (const rtp of packets) {
-                                rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
-                            }
-                        }
+                track.onReceiveRtp.subscribe(rtp => {
+                    if (!gotAudio) {
+                        gotAudio = true;
+                        console.log('first audio packet', Date.now() - timeStart);
                     }
-                    jitter.pipe(new RtspOutput());
-                }
+                    rtspServer.sendTrack(audioTrack, rtp.serialize(), false);
+                });
+                track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(audioTrack, rtp.serialize(), true));
             });
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
             videoTransceiver.onTrack.subscribe((track) => {
-                if (!useRtspJitterBuffer) {
-                    track.onReceiveRtp.subscribe(rtp => {
-                        if (!gotVideo) {
-                            gotVideo = true;
-                            console.log('first video packet', Date.now() - timeStart);
-                        }
-                        rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
-                    });
-                    track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
-                }
-                else {
-                    const jitter = new JitterBuffer({
-                        rtpStream: track.onReceiveRtp,
-                        rtcpStream: track.onReceiveRtcp,
-                    });
-                    class RtspOutput extends Output {
-                        pushRtcpPackets(packets: RtcpPacket[]): void {
-                            for (const rtcp of packets) {
-                                rtspServer.sendTrack(videoTrack, rtcp.serialize(), true)
-                            }
-                        }
-                        pushRtpPackets(packets: RtpPacket[]): void {
-                            if (!gotVideo) {
-                                gotVideo = true;
-                                console.log('first video packet', Date.now() - timeStart);
-                            }
-                            for (const rtp of packets) {
-                                rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
-                            }
-                        }
+                track.onReceiveRtp.subscribe(rtp => {
+                    if (!gotVideo) {
+                        gotVideo = true;
+                        console.log('first video packet', Date.now() - timeStart);
+                        const naluTypes = getNaluTypesInNalu(rtp.payload);
+                        console.log('video packet types', ...[...naluTypes]);
                     }
-                    jitter.pipe(new RtspOutput());
-                }
+                    rtspServer.sendTrack(videoTrack, rtp.serialize(), false);
+                });
+                track.onReceiveRtcp.subscribe(rtp => rtspServer.sendTrack(videoTrack, rtp.serialize(), true));
 
                 track.onReceiveRtp.once(() => {
                     let firSequenceNumber = 0;
@@ -328,7 +278,7 @@ export async function createRTCPeerConnectionSource(options: {
                     const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
                         audio: {
                             outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
-                            onRtp: (buffer: Buffer) => audioTransceiver.sender.sendRtp(buffer),
+                            onRtp: (rtp) => audioTransceiver.sender.sendRtp(rtp),
                         },
                     });
 

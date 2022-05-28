@@ -27,14 +27,13 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
     }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', useSdp);
+        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC');
 
         const { mediaObject, intercom } = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions,
             channel: this,
             maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
-            useUdp: useSdp,
         });
 
         this.intercom?.then(intercom => intercom.stopIntercom());
@@ -44,7 +43,7 @@ export class WebRTCCamera extends ScryptedDeviceBase implements VideoCamera, RTC
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
-        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC', useSdp);
+        const mediaStreamOptions = getRTCMediaStreamOptions('webrtc', 'WebRTC');
         return [
             mediaStreamOptions,
         ];

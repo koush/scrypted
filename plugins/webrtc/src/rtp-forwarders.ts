@@ -40,7 +40,7 @@ export interface RtpTrack {
     ffmpegDestination?: string;
     packetSize?: number;
     outputArguments: string[];
-    onRtp(buffer: Buffer): void;
+    onRtp(rtp: RtpPacket): void;
     firstPacket?: () => void;
     payloadType?: number;
     rtcpPort?: number;
@@ -93,7 +93,7 @@ export async function createTrackForwarders(console: Console, rtpTracks: RtpTrac
         url = `${url}?${params}`;
         outputArguments.push(url);
 
-        server.on('message', data => track.onRtp(data));
+        server.on('message', data => track.onRtp(RtpPacket.deSerialize(data)));
     }
 
     return {
@@ -174,7 +174,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         port: channel,
                         path: audioSection.control,
                         onRtp: (rtspHeader, rtp) => {
-                            audio.onRtp(rtp);
+                            audio.onRtp(RtpPacket.deSerialize(rtp));
                         },
                     });
                 }
