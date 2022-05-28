@@ -3,6 +3,7 @@ import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import type { Config } from '@koush/werift-src/packages/rtp/src/srtp/session';
 import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
 import { SrtpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtp';
+import { getNaluTypesInNalu, H264_NAL_TYPE_IDR } from '@scrypted/common/src/rtsp-server';
 import dgram from 'dgram';
 import { AudioStreamingSamplerate } from '../../hap';
 import { ntpTime } from './camera-utils';
@@ -33,6 +34,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
     let rolloverCount = 0;
     let opusPacketizer: OpusRepacketizer;
     let h264Packetizer: H264Repacketizer;
+    let analyzeVideo = true;
 
     let audioIntervalScale = 1;
     if (audioOptions) {
@@ -99,7 +101,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
 
     function sendRtp(rtp: RtpPacket) {
         if (firstSequenceNumber === undefined) {
-            console.log(`sending first ${audioOptions ? 'audio' : 'video'} packet`);
+            console.log(`received first ${audioOptions ? 'audio' : 'video'} packet`);
             firstSequenceNumber = rtp.header.sequenceNumber;
         }
 
@@ -146,6 +148,11 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         if (!packets)
             return;
         for (const packet of packets) {
+            if (analyzeVideo) {
+                const naluTypes = getNaluTypesInNalu(packet.payload, true);
+                console.log('scanning for idr start found:', ...[...naluTypes]);
+                analyzeVideo = !naluTypes.has(H264_NAL_TYPE_IDR);
+            }
             sendPacket(packet);
         }
     }

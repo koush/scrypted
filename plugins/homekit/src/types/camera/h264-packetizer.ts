@@ -117,8 +117,6 @@ export class H264Repacketizer {
             }
         }
 
-        const payloadSize = data.length - NAL_HEADER_SIZE;
-
         const fnri = data[0] & (0x80 | 0x60);
         const nalType = data[0] & 0x1F;
 
@@ -145,10 +143,6 @@ export class H264Repacketizer {
             packages.push(Buffer.concat([fuHeader, payload]));
 
             fuHeader = fuHeaderMiddle;
-        }
-
-        if (packages.length === 1 && !noStart && !noEnd) {
-            return [data];
         }
 
         return packages;
@@ -248,7 +242,7 @@ export class H264Repacketizer {
 
         if (!this.pendingFuASeenStart) {
             if (allowRecoverableErrors) {
-                this.console.error('fua packet missing start. waiting for more packets.', originalNalType);
+                // this.console.error('fua packet missing start. waiting for more packets.', originalNalType);
             }
             else {
                 this.console.error('fua packet missing start. skipping refragmentation.', originalNalType);
@@ -268,7 +262,7 @@ export class H264Repacketizer {
             if (lastSequenceNumber !== undefined) {
                 if (packet.header.sequenceNumber !== (lastSequenceNumber + 1) % 0x10000) {
                     if (allowRecoverableErrors) {
-                        this.console.error('fua packet is missing. waiting for more packets.', originalNalType);
+                        // this.console.error('fua packet is missing. waiting for more packets.', originalNalType);
                     }
                     else {
                         this.console.error('fua packet is missing. skipping refragmentation.', originalNalType);
@@ -288,11 +282,12 @@ export class H264Repacketizer {
         const defragmented = Buffer.concat(originalFragments);
 
         if (originalNalType === NAL_TYPE_SPS) {
-            if (!this.codecInfo)
+            if (!this.codecInfo) {
                 this.codecInfo = {
                     sps: undefined,
                     pps: undefined,
                 };
+            }
 
             // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
             // this probably is not compliant...
@@ -310,16 +305,22 @@ export class H264Repacketizer {
                     if (splitNaluType === NAL_TYPE_IDR)
                         this.maybeSendSpsPps(first, ret);
 
-                    const fragments = this.packetizeFuA(split, !hasFuStart, !hasFuEnd);
-                    const hadMarker = last.header.marker;
-                    this.createRtpPackets(first, fragments, ret, hadMarker);
+                    this.fragment(first, ret, {
+                        payload: split,
+                        noStart: !hasFuStart,
+                        noEnd: !hasFuEnd,
+                        marker: last.header.marker,
+                    });
                 }
             }
         }
         else {
-            const fragments = this.packetizeFuA(defragmented, !hasFuStart, !hasFuEnd);
-            const hadMarker = last.header.marker;
-            this.createRtpPackets(first, fragments, ret, hadMarker);
+            this.fragment(first, ret, {
+                payload: defragmented,
+                noStart: !hasFuStart,
+                noEnd: !hasFuEnd,
+                marker: last.header.marker
+            });
         }
 
         this.extraPackets -= this.pendingFuA.length - 1;
@@ -346,6 +347,30 @@ export class H264Repacketizer {
         }
         this.createRtpPackets(packet, aggregates, ret);
         this.extraPackets++;
+    }
+
+    // given the packet, fragment it into multiple packets as needed.
+    // a fragment of a payload may be provided via fuaOptions.
+    fragment(packet: RtpPacket, ret: RtpPacket[], fuaOptions: {
+        payload: Buffer;
+        noStart: boolean;
+        noEnd: boolean;
+        marker: boolean;
+    } = {
+            payload: packet.payload,
+            noStart: false,
+            noEnd: false,
+            marker: packet.header.marker
+        }) {
+        const { payload, noStart, noEnd, marker } = fuaOptions;
+        if (payload.length > this.maxPacketSize || noStart || noEnd) {
+            const fragments = this.packetizeFuA(payload, noStart, noEnd);
+            this.createRtpPackets(packet, fragments, ret, marker);
+        }
+        else {
+            // can send this packet as is!
+            ret.push(this.createPacket(packet, payload, marker));
+        }
     }
 
     repacketize(packet: RtpPacket): RtpPacket[] {
@@ -392,12 +417,7 @@ export class H264Repacketizer {
             }
 
             if (!this.pendingFuA) {
-                // the fua packet may already fit, in which case we could just send it.
-                // but for some reason that doesn't work??
-                if (false && packet.payload.length <= this.maxPacketSize) {
-                    ret.push(this.createPacket(packet, packet.payload, packet.header.marker && isFuEnd));
-                }
-                else if (packet.payload.length >= this.maxPacketSize * 2) {
+                if (packet.payload.length >= this.maxPacketSize * 2) {
                     // most rtsp implementations send fat fua packets ~64k. can just repacketize those
                     // with minimal extra packet overhead.
                     const fragments = this.packetizeFuA(packet.payload);
@@ -420,6 +440,7 @@ export class H264Repacketizer {
                     this.flushPendingFuA(ret);
                 }
                 else if (this.pendingFuA.length > 1) {
+                    // this code path will defragment fua packets optimistically.
                     const last = this.pendingFuA[this.pendingFuA.length - 1].clone();
                     const l = this.pendingFuA.length;
                     const partial: RtpPacket[] = [];
@@ -488,14 +509,7 @@ export class H264Repacketizer {
                 this.maybeSendSpsPps(packet, ret);
             }
 
-            if (packet.payload.length > this.maxPacketSize) {
-                const fragments = this.packetizeFuA(packet.payload);
-                this.createRtpPackets(packet, fragments, ret);
-            }
-            else {
-                // can send this packet as is!
-                ret.push(this.createPacket(packet, packet.payload, packet.header.marker));
-            }
+            this.fragment(packet, ret);
         }
         else {
             this.console.error('unknown nal unit type ' + nalType);
