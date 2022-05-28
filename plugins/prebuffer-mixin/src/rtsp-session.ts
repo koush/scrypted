@@ -1,6 +1,6 @@
 import { ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
-import { parseSemicolonDelimited, RtspClient, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { parseSemicolonDelimited, RtspClient, RtspClientUdpSetupOptions, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
@@ -63,7 +63,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
         const sdpResponse = await rtspClient.describe();
         const contentBase = sdpResponse.headers['content-base'];
         if (contentBase) {
-            const url = new URL(contentBase);
+            const url = new URL(contentBase, rtspClient.url);
             const existing = new URL(rtspClient.url);
             url.username = existing.username;
             url.password = existing.password;
@@ -85,32 +85,28 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
         }
 
         const doSetup = async (control: string, codec: string) => {
-            let setupChannel = channel;
             let udp: dgram.Socket;
             if (useUdp) {
                 const rtspChannel = channel;
-                const { port, server } = await createBindZero();
-                udp = server;
-                servers.push(server);
-                setupChannel = port;
-                server.on('message', data => {
-                    const prefix = Buffer.alloc(4);
-                    prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
-                    prefix.writeUInt8(rtspChannel, 1);
-                    prefix.writeUInt16BE(data.length, 2);
-                    const chunk: StreamChunk = {
-                        chunks: [prefix, data],
-                        type: codec,
-                    };
-                    events.emit('rtsp', chunk);
-                    resetActivityTimer?.();
-                });
 
-                const setupResult = await rtspClient.setup({
+                const setup: RtspClientUdpSetupOptions = {
                     path: control,
                     type: 'udp',
-                    port: setupChannel,
-                });
+                    onRtp: (header, data) => {
+                        const prefix = Buffer.alloc(4);
+                        prefix.writeUInt8(RTSP_FRAME_MAGIC, 0);
+                        prefix.writeUInt8(rtspChannel, 1);
+                        prefix.writeUInt16BE(data.length, 2);
+                        const chunk: StreamChunk = {
+                            chunks: [prefix, data],
+                            type: codec,
+                        };
+                        events.emit('rtsp', chunk);
+                        resetActivityTimer?.();
+                    },
+                };
+                const setupResult = await rtspClient.setup(setup);
+                udp = setup.dgram;
                 checkUdpSessionTimeout(setupResult.headers);
 
                 const punch = Buffer.alloc(1);
@@ -126,7 +122,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                 const setupResult = await rtspClient.setup({
                     path: control,
                     type: 'tcp',
-                    port: setupChannel,
+                    port: channel,
                     onRtp: (header, data) => {
                         const chunk: StreamChunk = {
                             chunks: [header, data],
@@ -175,7 +171,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
 
         // don't start parsing until next tick when this function returns to allow
         // event handlers to be set prior to parsing.
-        process.nextTick(async () => {
+        const start = async () => {
             try {
                 await rtspClient.play();
                 await rtspClient.readLoop();
@@ -186,7 +182,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
             finally {
                 kill(new Error('rtsp read loop exited'));
             }
-        });
+        };
 
         // this return block is intentional, to ensure that the remaining code happens sync.
         return (() => {
@@ -219,6 +215,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
             }
 
             return {
+                start,
                 sdp: Promise.resolve([Buffer.from(sdp)]),
                 inputAudioCodec,
                 inputVideoCodec,

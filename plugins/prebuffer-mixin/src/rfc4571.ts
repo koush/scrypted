@@ -125,11 +125,9 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
         }
     }
 
-    (async () => {
+    const start = () => {
         // don't start parsing until next tick, to prevent missed packets.
-        await sleep(0);
-
-        await read16BELengthLoop(socket, {
+        read16BELengthLoop(socket, {
             headerLength: 2,
             skipHeader: undefined,
             callback: (header, data) => {
@@ -178,17 +176,19 @@ export function startRFC4571Parser(console: Console, socket: Readable, sdp: stri
                 events.emit('rtsp', chunk);
                 resetActivityTimer();
             }
-        });
-    })()
-        .catch(e => {
-            throw e;
         })
-        .finally(() => {
-            kill(new Error('parser exited'));
-        });
+            .catch(e => {
+                throw e;
+            })
+            .finally(() => {
+                kill(new Error('parser exited'));
+            });
+    };
+
 
 
     return {
+        start,
         sdp: Promise.resolve([Buffer.from(sdp)]),
         inputAudioCodec,
         inputVideoCodec,

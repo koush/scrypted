@@ -23,6 +23,7 @@ export interface ParserSession<T extends string> {
         width: number,
         height: number,
     },
+    start(): void;
     kill(error?: Error): void;
     killed: Promise<void>;
     isActive: boolean;
@@ -172,42 +173,11 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     // first see how many pipes are needed, and prep them for the child process
     const stdio: StdioOptions = ['pipe', 'pipe', 'pipe']
     let pipeCount = 3;
+    const startParsers: (() => void)[] = [];
     for (const container of Object.keys(options.parsers)) {
         const parser: StreamParser = options.parsers[container as T];
 
-        if (parser.parseDatagram) {
-            needSdp = true;
-            const socket = dgram.createSocket('udp4');
-            const udp = await bindZero(socket);
-            const rtcp = dgram.createSocket('udp4');
-            await bind(rtcp, udp.port + 1);
-            ensureActive(() => {
-                socket.close();
-                rtcp.close();
-            });
-            args.push(
-                ...parser.outputArguments,
-                // using rtp instead of udp gives us the rtcp messages too.
-                udp.url.replace('udp://', 'rtp://'),
-            );
-
-            const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
-
-            (async () => {
-                for await (const chunk of parser.parseDatagram(socket, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
-                    events.emit(container, chunk);
-                    resetActivityTimer();
-                }
-            })();
-
-            (async () => {
-                for await (const chunk of parser.parseDatagram(rtcp, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]), 'rtcp')) {
-                    events.emit(container, chunk);
-                    resetActivityTimer();
-                }
-            })();
-        }
-        else if (parser.tcpProtocol) {
+        if (parser.tcpProtocol) {
             const tcp = await listenZeroSingleClient();
             const url = new URL(parser.tcpProtocol);
             url.port = tcp.port.toString();
@@ -218,7 +188,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
 
             const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
 
-            (async () => {
+            startParsers.push(async () => {
                 const socket = await tcp.clientPromise;
                 try {
                     ensureActive(() => socket.destroy());
@@ -232,7 +202,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
                     console.error('rebroadcast parse error', e);
                     kill(e);
                 }
-            })();
+            });
         }
         else {
             args.push(
@@ -272,27 +242,33 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     }
 
     // now parse the created pipes
-    let pipeIndex = 0;
-    Object.keys(options.parsers).forEach(async (container) => {
-        const parser: StreamParser = options.parsers[container as T];
-        if (!parser.parse || parser.tcpProtocol)
-            return;
-        const pipe = cp.stdio[3 + pipeIndex];
-        pipeIndex++;
+    const start = () => {
+        for (const p of startParsers) {
+            p();
+        }
 
-        try {
-            const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
+        let pipeIndex = 0;
+        Object.keys(options.parsers).forEach(async (container) => {
+            const parser: StreamParser = options.parsers[container as T];
+            if (!parser.parse || parser.tcpProtocol)
+                return;
+            const pipe = cp.stdio[3 + pipeIndex];
+            pipeIndex++;
 
-            for await (const chunk of parser.parse(pipe as any, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
-                events.emit(container, chunk);
-                resetActivityTimer();
+            try {
+                const { resetActivityTimer } = setupActivityTimer(container, kill, events, options?.timeout);
+
+                for await (const chunk of parser.parse(pipe as any, parseInt(inputVideoResolution?.[2]), parseInt(inputVideoResolution?.[3]))) {
+                    events.emit(container, chunk);
+                    resetActivityTimer();
+                }
             }
-        }
-        catch (e) {
-            console.error('rebroadcast parse error', e);
-            kill(e);
-        }
-    });
+            catch (e) {
+                console.error('rebroadcast parse error', e);
+                kill(e);
+            }
+        });
+    };
 
     // tbh parsing stdout is super sketchy way of doing this.
     parseAudioCodec(cp).then(result => inputAudioCodec = result);
@@ -300,6 +276,7 @@ export async function startParserSession<T extends string>(ffmpegInput: FFmpegIn
     await parseVideoCodec(cp).then(result => inputVideoCodec = result);
 
     return {
+        start,
         sdp,
         get inputAudioCodec() {
             return inputAudioCodec;

@@ -2,9 +2,9 @@
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
@@ -780,7 +780,6 @@ class PrebufferSession {
         removeOddityProbe();
         this.storage.setItem(this.lastH264ProbeKey, JSON.stringify(h264Probe));
       }, h264Oddities ? 60000 : 10000);
-
     }
 
     // complain to the user about the codec if necessary. upstream may send a audio
@@ -878,6 +877,7 @@ class PrebufferSession {
       });
     }
 
+    session.start();
     return session;
   }
 
@@ -995,6 +995,9 @@ class PrebufferSession {
             this.console.warn('Unable to find sync frame in rtsp prebuffer.');
             availablePrebuffers = filtered;
           }
+          else {
+            this.console.log('Found sync frame in rtsp prebuffer.');
+          }
           for (const prebuffer of availablePrebuffers) {
             safeWriteData(prebuffer, true);
           }
@@ -1033,6 +1036,8 @@ class PrebufferSession {
     let url: string;
     let filter: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk;
     const codecMap = new Map<string, number>();
+    const udpMap = new Map<string, RtspTrack>();
+    let server: RtspServer;
 
     if (container === 'rtsp') {
       const parsedSdp = parseSdp(sdp);
@@ -1046,8 +1051,12 @@ class PrebufferSession {
       sdp = parsedSdp.toSdp();
       filter = (chunk, prebuffer) => {
         const channel = codecMap.get(chunk.type);
-        if (channel == undefined)
+        if (channel == undefined) {
+          const udp = udpMap.get(chunk.type);
+          if (udp)
+            server.sendTrack(udp.control, chunk.chunks[1], chunk.type.startsWith('rtcp-'));
           return;
+        }
         // if no prebuffer is explicitly requested, don't send prebuffer audio
         if (prebuffer && filterPrebufferAudio && chunk.type !== videoCodec)
           return;
@@ -1064,10 +1073,17 @@ class PrebufferSession {
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
-        const server = new RtspServer(socket, sdp);
+        const {server: udp} = await createBindZero();
+        socket.on('close', () => closeQuiet(udp));
+        server = new RtspServer(socket, sdp, udp);
         // server.console = this.console;
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
+          if (track.protocol === 'udp') {
+            udpMap.set(track.codec, track);
+            udpMap.set(`rtcp-${track.codec}`, track);
+            continue;
+          }
           codecMap.set(track.codec, track.destination);
           codecMap.set(`rtcp-${track.codec}`, track.destination + 1);
         }

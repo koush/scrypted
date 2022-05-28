@@ -10,7 +10,6 @@ export interface StreamParser {
     outputArguments: string[];
     tcpProtocol?: string;
     parse?: (duplex: Duplex, width: number, height: number) => AsyncGenerator<StreamChunk>;
-    parseDatagram?: (socket: DatagramSocket, width: number, height: number, type?: string) => AsyncGenerator<StreamChunk>;
     findSyncFrame(streamChunks: StreamChunk[]): StreamChunk[];
 }
 
@@ -90,23 +89,6 @@ export function createDgramParser() {
         }
     };
     return parse;
-}
-
-export function createRtpParser(...codec: string[]): StreamParser {
-    return {
-        container: 'rtsp',
-        inputArguments: [
-            '-v', 'verbose',
-            '-rtsp_transport',
-            'tcp',
-        ],
-        outputArguments: [
-            ...codec,
-            '-f', 'rtp',
-        ],
-        parseDatagram: createDgramParser(),
-        findSyncFrame,
-    }
 }
 
 export function createMpegTsParser(options?: StreamParserOptions): StreamParser {

@@ -4,6 +4,7 @@ import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
 import net from 'net';
 import { Duplex, Readable } from 'stream';
 import tls from 'tls';
+import { closeQuiet, createBindZero } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
 import { parseSdp } from './sdp-utils';
@@ -251,17 +252,18 @@ const quote = (str: string): string => `"${str.replace(/"/g, '\\"')}"`;
 
 export interface RtspClientSetupOptions {
     type: 'tcp' | 'udp';
-    port: number;
     path?: string;
+    onRtp: (rtspHeader: Buffer, rtp: Buffer) => void;
 }
 
 export interface RtspClientTcpSetupOptions extends RtspClientSetupOptions {
     type: 'tcp';
-    onRtp: (rtspHeader: Buffer, rtp: Buffer) => void;
+    port: number;
 }
 
 export interface RtspClientUdpSetupOptions extends RtspClientSetupOptions {
     type: 'udp';
+    dgram?: dgram.Socket;
 }
 
 // probably only works with scrypted rtsp server.
@@ -481,8 +483,21 @@ export class RtspClient extends RtspBase {
     async setup(options: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions) {
         const protocol = options.type === 'udp' ? 'UDP' : 'TCP';
         const client = options.type === 'udp' ? 'client_port' : 'interleaved';
+        let port: number;
+        if (options.type === 'tcp') {
+            port = options.port;
+        }
+        else {
+            if (!options.dgram) {
+                const udp = await createBindZero();
+                options.dgram = udp.server;
+                this.client.on('close', () => closeQuiet(udp.server));
+            }
+            port = options.dgram.address().port;
+            options.dgram.on('message', data => options.onRtp(undefined, data));
+        }
         const headers: any = {
-            Transport: `RTP/AVP/${protocol};unicast;${client}=${options.port}-${options.port + 1}`,
+            Transport: `RTP/AVP/${protocol};unicast;${client}=${port}-${port + 1}`,
         };
         const response = await this.request('SETUP', headers, options.path);
         let interleaved: {
@@ -517,7 +532,7 @@ export class RtspClient extends RtspBase {
         }
         if (options.type === 'tcp')
             this.setupOptions.set(interleaved.begin, options);
-        return Object.assign({ interleaved }, response);
+        return Object.assign({ interleaved, options }, response);
     }
 
     async play(start: string = '0.000') {
