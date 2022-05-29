@@ -233,10 +233,24 @@ export class H264Repacketizer {
         // and are all available, which is guaranteed over rtsp/tcp, but not over rtp/udp.
         const first = this.pendingFuA[0];
         const last = this.pendingFuA[this.pendingFuA.length - 1];
-        let originalNalType = first.payload[1] & 0x1f;
-
+        const originalNalType = first.payload[1] & 0x1f;
         const hasFuStart = !!(first.payload[1] & 0x80);
         const hasFuEnd = !!(last.payload[1] & 0x40);
+
+        // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
+        // this probably is not compliant...
+        if (originalNalType === NAL_TYPE_SPS) {
+            if (!hasFuStart || !hasFuEnd) {
+                if (allowRecoverableErrors) {
+                    // wait for all the packets to come in.
+                    return;
+                }
+                this.console.error('encountered sps in fua packet. skipping refragmentation.');
+                this.pendingFuA = undefined;
+                return;
+            }
+        }
+
 
         this.pendingFuASeenStart ||= hasFuStart;
 
@@ -289,8 +303,6 @@ export class H264Repacketizer {
                 };
             }
 
-            // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
-            // this probably is not compliant...
             const splits = splitBitstream(defragmented);
             while (splits.length) {
                 const split = splits.shift();
