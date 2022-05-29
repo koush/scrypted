@@ -30,14 +30,14 @@
       ]
    },
    "dependencies": {
+      "@koush/ring-client-api": "file:../../external/ring-client-api",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "@koush/ring-client-api": "file:../../external/ring-client-api",
       "@types/node": "^16.6.1",
       "axios": "^0.24.0"
    },
    "optionalDependencies": {
       "got": "11.8.2"
    },
-   "version": "0.0.76"
+   "version": "0.0.80"
 }

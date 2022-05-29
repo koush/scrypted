@@ -11,21 +11,15 @@ import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/package
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { CameraData, clientApi, generateUuid, isStunMessage, LiveCallNegotiation, RingApi, RingCamera, RingRestClient, RtpDescription, SipSession } from './ring-client-api';
+import { isStunMessage,  RtpDescription, SipSession,BasicPeerConnection, CameraData, clientApi, generateUuid, RingBaseApi, RingCamera, RingRestClient, rxjs, SimpleWebRtcSession, StreamingSession } from './ring-client-api';
 import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 
-enum CaptureModes {
-    Default = 'Default',
-    RTSP = 'RTSP',
-    FFmpeg = 'FFmpeg Direct Capture',
-}
 
 const STREAM_TIMEOUT = 120000;
-
 const { deviceManager, mediaManager, systemManager } = sdk;
 
 class RingWebSocketRTCSessionControl implements RTCSessionControl {
-    constructor(public liveCallNegtation: LiveCallNegotiation) {
+    constructor(public streamingSession: StreamingSession, public onConnectionState: rxjs.Subject<RTCPeerConnectionState>) {
     }
 
     async getRefreshAt() {
@@ -35,12 +29,15 @@ class RingWebSocketRTCSessionControl implements RTCSessionControl {
     }
 
     async endSession() {
-        this.liveCallNegtation.endCall();
+        this.streamingSession.stop();
+    }
+    async startSession() {
+        this.onConnectionState.next('connected');
     }
 }
 
 class RingBrowserRTCSessionControl implements RTCSessionControl {
-    constructor(public ringCamera: RingCameraDevice, public sessionId: string) {
+    constructor(public ringCamera: RingCameraDevice, public simpleSession: SimpleWebRtcSession) {
     }
 
     async getRefreshAt() {
@@ -50,7 +47,10 @@ class RingBrowserRTCSessionControl implements RTCSessionControl {
     }
 
     async endSession() {
-        this.ringCamera.findCamera().endWebRtcSession(this.sessionId);
+        await this.simpleSession.end();
+    }
+
+    async startSession() {
     }
 }
 
@@ -66,22 +66,13 @@ class RingCameraLight extends ScryptedDeviceBase implements OnOff {
     }
 }
 
-class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings, DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel, VideoCamera {
-    storageSettings = new StorageSettings(this, {
-        captureMode: {
-            title: 'SIP Gateway',
-            description: 'Experimental: The gateway used to import the stream.',
-            choices: Object.values(CaptureModes),
-            defaultValue: CaptureModes.Default,
-        }
-    });
+class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Camera, MotionSensor, BinarySensor, RTCSignalingChannel {
     buttonTimeout: NodeJS.Timeout;
-
     session: SipSession;
     rtpDescription: RtpDescription;
     audioOutForwarder: dgram.Socket;
     audioOutProcess: ChildProcess;
-    currentMedia: FFmpegInput|MediaStreamUrl;
+    currentMedia: FFmpegInput | MediaStreamUrl;
     currentMediaMimeType: string;
     refreshTimeout: NodeJS.Timeout;
     picturePromise: RefreshPromise<Buffer>;
@@ -93,6 +84,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         if (this.interfaces.includes(ScryptedInterface.Battery))
             this.batteryLevel = this.findCamera()?.batteryLevel;
     }
+
 
     async startIntercom(media: MediaObject): Promise<void> {
         if (!this.session)
@@ -161,7 +153,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
     }
 
     get useRtsp() {
-        return this.storageSettings.values.captureMode !== CaptureModes.FFmpeg;
+        return true;
     }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
@@ -416,13 +408,6 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         ]
     }
 
-    getSettings(): Promise<Setting[]> {
-        return this.storageSettings.getSettings();
-    }
-    putSetting(key: string, value: SettingValue): Promise<void> {
-        return this.storageSettings.putSetting(key, value);
-    }
-
     async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
         const options = await session.getOptions();
 
@@ -436,10 +421,12 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         // if any video capabilities are offered, use the browser endpoint for safety.
         // this should be improved further in the future by inspecting the capabilities
         // since this currently defaults to using the baseline profile on Chrome when high is supported.
-        if (options?.capabilities?.video) {
+        if (options?.capabilities?.video
+            // this endpoint does not work on ring edge.
+            && !camera.isRingEdgeEnabled) {
             // the browser path will automatically activate the speaker on the ring.
             let answerSdp: string;
-            const sessionId = generateUuid();
+            const simple = camera.createSimpleWebRtcSession();
 
             await connectRTCSignalingClients(this.console, session, {
                 type: 'offer',
@@ -462,8 +449,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                 setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
                     if (description.type !== 'offer')
                         throw new Error('Ring Camera default endpoint only supports RTC answer');
-                    const answer = await camera.startWebRtcSession(sessionId, description.sdp);
-                    answerSdp = answer;
+                    answerSdp = await simple.start(description.sdp);
                 },
                 addIceCandidate: async (candidate: RTCIceCandidateInit) => {
                     throw new Error("Ring Camera default endpoint does not support trickle ICE");
@@ -473,68 +459,43 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                         requiresOffer: true,
                         disableTrickle: true,
                     };
-                }
+                },
             }, {});
 
-            sessionControl = new RingBrowserRTCSessionControl(this, sessionId);
+            sessionControl = new RingBrowserRTCSessionControl(this, simple);
         }
         else {
-            const callSignaling = new LiveCallNegotiation(await camera.startLiveCallNegotiation(), camera);
-            sessionControl = new RingWebSocketRTCSessionControl(callSignaling);
-            let iceCandidates: RTCIceCandidateInit[] = [];
-            let _sendIceCandidate: RTCSignalingSendIceCandidate
+            const onIceCandidate = new rxjs.ReplaySubject<RTCIceCandidateInit>();
+            const onConnectionState = new rxjs.Subject<RTCPeerConnectionState>();
 
-            const offerSdp = new Promise<string>((resolve, reject) => {
-                callSignaling.onMessage.subscribe(async (message) => {
-                    // this.console.log('call signaling', message);
-                    if (message.method === 'sdp') {
-                        resolve(message.sdp);
+            const configuration: RTCConfiguration = {
+                iceServers: [
+                    {
+                        urls: [
+                            'stun:stun.kinesisvideo.us-east-1.amazonaws.com:443',
+                            'stun:stun.kinesisvideo.us-east-2.amazonaws.com:443',
+                            'stun:stun.kinesisvideo.us-west-2.amazonaws.com:443',
+                            'stun:stun.l.google.com:19302',
+                            'stun:stun1.l.google.com:19302',
+                            'stun:stun2.l.google.com:19302',
+                            'stun:stun3.l.google.com:19302',
+                            'stun:stun4.l.google.com:19302',
+                        ]
                     }
-                    else if (message.method === 'close') {
-                        reject(new Error(message.reason.text));
-                    }
-                });
-            });
+                ]
+            }
 
-            callSignaling.onMessage.subscribe(async (message) => {
-                if (message.method === 'ice') {
-                    const candidate = {
-                        candidate: message.ice,
-                        sdpMLineIndex: message.mlineindex,
-                    };
-                    if (_sendIceCandidate) {
-                        _sendIceCandidate(candidate)
-                    }
-                    else {
-                        iceCandidates.push(candidate);
-                    }
-                }
-            });
-
-            await connectRTCSignalingClients(this.console, {
-                createLocalDescription: async (type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate) => {
-                    const offer = await offerSdp;
-                    _sendIceCandidate = sendIceCandidate;
-                    for (const candidate of iceCandidates) {
-                        sendIceCandidate?.(candidate);
-                    }
-                    return {
-                        type: 'offer',
-                        sdp: offer,
-                    }
+            const offerSetup: RTCAVSignalingSetup = {
+                type: 'offer',
+                audio: {
+                    direction: 'sendrecv',
                 },
-                setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) => {
-                    callSignaling.sendAnswer(description);
+                video: {
+                    direction: 'recvonly',
                 },
-                addIceCandidate: async (candidate: RTCIceCandidateInit) => {
-                    // seemingly answer trickle is not supported, because its server initiated anyways.
-                },
-                getOptions: async () => {
-                    return {
-                    };
-                }
-            }, {},
-                session, {
+                configuration,
+            };
+            const answerSetup: RTCAVSignalingSetup = {
                 type: 'answer',
                 audio: {
                     direction: 'sendrecv',
@@ -542,9 +503,56 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
                 video: {
                     direction: 'recvonly',
                 },
-            })
+                configuration,
+            };
 
-            await callSignaling.activate();
+            const basicPc: BasicPeerConnection = {
+                createOffer: async () => {
+                    const local = await session.createLocalDescription('offer', offerSetup, async (candidate) => {
+                        onIceCandidate.next(candidate)
+                    });
+
+                    return {
+                        sdp: local.sdp,
+                    }
+                },
+                createAnswer: async (offer: RTCSessionDescriptionInit) => {
+                    await session.setRemoteDescription(offer, answerSetup);
+                    const local = await session.createLocalDescription('answer', answerSetup, async (candidate) => {
+                        onIceCandidate.next(candidate)
+                    });
+
+                    return {
+                        type: 'answer',
+                        sdp: local.sdp,
+                    }
+                },
+                acceptAnswer: async (answer: RTCSessionDescriptionInit) => {
+                    await session.setRemoteDescription(answer, offerSetup);
+                },
+                addIceCandidate: async (candidate: RTCIceCandidateInit) => {
+                    await session.addIceCandidate(candidate);
+                },
+                close: () => {
+                    sessionControl.endSession();
+                },
+                onIceCandidate,
+                onConnectionState,
+            };
+
+            const ringSession = await camera.startLiveCall({
+                createPeerConnection: () => basicPc,
+            });
+            ringSession.connection.onMessage.subscribe(message => this.console.log('incoming message', message));
+            ringSession.onCallEnded.subscribe(() => this.console.error('call ended', ringSession.sessionId));
+
+            sessionControl = new RingWebSocketRTCSessionControl(ringSession, onConnectionState);
+
+            // todo: fix this in sdk
+            // setTimeout(() => {
+            //     this.console.log('activating connected');
+            //     onConnectionState.next('connected');
+            // }, 5000);
         }
 
         return sessionControl;
@@ -558,11 +566,13 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         // if this stream is prebuffered, its safe to use the prebuffer to generate an image
         const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
         try {
-            const msos = await realDevice.getVideoStreamOptions();
-            const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
-            if (prebuffered) {
-                prebuffered.refresh = false;
-                return realDevice.getVideoStream(prebuffered);
+            if (realDevice.interfaces.includes(ScryptedInterface.VideoCamera)) {
+                const msos = await realDevice.getVideoStreamOptions();
+                const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
+                if (prebuffered) {
+                    prebuffered.refresh = false;
+                    return realDevice.getVideoStream(prebuffered);
+                }
             }
         }
         catch (e) {
@@ -577,7 +587,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
         // watch for snapshot being blocked due to live stream
         if (!camera.snapshotsAreBlocked) {
             try {
-                buffer = await this.plugin.api.restClient.request<Buffer>({
+                buffer = await this.plugin.api.restClient.request({
                     url: `https://app-snaps.ring.com/snapshots/next/${camera.id}`,
                     responseType: 'buffer',
                     searchParams: {
@@ -594,7 +604,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
             }
         }
         if (!buffer) {
-            buffer = await this.plugin.api.restClient.request<Buffer>({
+            buffer = await this.plugin.api.restClient.request({
                 url: clientApi(`snapshots/image/${camera.id}`),
                 responseType: 'buffer',
                 allowNoResponse: true,
@@ -628,7 +638,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements Intercom, Settings,
 
 class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
     loginClient: RingRestClient;
-    api: RingApi;
+    api: RingBaseApi;
     devices = new Map<string, RingCameraDevice>();
     cameras: RingCamera[];
 
@@ -691,17 +701,19 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
 
     async tryLogin(code?: string) {
         const locationIds = this.settingsStorage.values.locationIds ? [this.settingsStorage.values.locationIds] : undefined;
-        const cameraDingsPollingSeconds = this.settingsStorage.values.cameraDingsPollingSeconds;
         const cameraStatusPollingSeconds = 20;
 
         const createRingApi = async () => {
-            this.api = new RingApi({
+            this.api = new RingBaseApi({
                 refreshToken: this.settingsStorage.values.refreshToken,
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
-                cameraDingsPollingSeconds,
                 cameraStatusPollingSeconds,
                 systemId: this.settingsStorage.values.systemId,
+            }, {
+                createPeerConnection: () => {
+                    throw new Error('unreachable');
+                },
             });
 
             this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) => {
@@ -766,6 +778,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         this.cameras = cameras;
         const devices: Device[] = [];
         for (const camera of cameras) {
+            camera.onNewNotification.subscribe(n => this.console.log(n));
             const nativeId = camera.id.toString();
             const interfaces = [
                 ScryptedInterface.VideoCamera,
@@ -773,7 +786,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 ScryptedInterface.MotionSensor,
                 ScryptedInterface.Intercom,
                 ScryptedInterface.RTCSignalingChannel,
-                ScryptedInterface.Settings,
             ];
             if (camera.operatingOnBattery)
                 interfaces.push(ScryptedInterface.Battery);
@@ -795,9 +807,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
             };
             devices.push(device);
 
-            camera.onNewDing.subscribe(e => {
-                this.console.log(camera.name, 'onNewDing', e);
-            });
             camera.onDoorbellPressed?.subscribe(e => {
                 this.console.log(camera.name, 'onDoorbellPressed', e);
                 const scryptedDevice = this.devices.get(nativeId);
