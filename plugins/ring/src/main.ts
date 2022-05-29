@@ -778,15 +778,18 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         this.cameras = cameras;
         const devices: Device[] = [];
         for (const camera of cameras) {
-            camera.onNewNotification.subscribe(n => this.console.log(n));
             const nativeId = camera.id.toString();
             const interfaces = [
-                ScryptedInterface.VideoCamera,
                 ScryptedInterface.Camera,
                 ScryptedInterface.MotionSensor,
-                ScryptedInterface.Intercom,
                 ScryptedInterface.RTCSignalingChannel,
             ];
+            if (!camera.isRingEdgeEnabled) {
+                interfaces.push(
+                    ScryptedInterface.VideoCamera,
+                    ScryptedInterface.Intercom,
+                );
+            }
             if (camera.operatingOnBattery)
                 interfaces.push(ScryptedInterface.Battery);
             if (camera.isDoorbot)
