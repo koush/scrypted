@@ -50,8 +50,10 @@ export const H264_NAL_TYPE_MTAP32 = 27;
 export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
     if (streamChunk.type !== 'h264')
         return;
+    return findH264NaluTypeInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12), naluType);
+}
 
-    const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
+export function findH264NaluTypeInNalu(nalu: Buffer, naluType: number) {
     const checkNaluType = nalu[0] & 0x1f;
     if (checkNaluType === H264_NAL_TYPE_STAP_A) {
         let pos = 1;
@@ -78,11 +80,13 @@ export function findH264NaluType(streamChunk: StreamChunk, naluType: number) {
 }
 
 export function getNaluTypes(streamChunk: StreamChunk) {
-    const ret = new Set<number>();
     if (streamChunk.type !== 'h264')
-        return ret;
+        return new Set<number>();
+    return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
+}   
 
-    const nalu = streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12);
+export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false) {
+    const ret = new Set<number>();
     const naluType = nalu[0] & 0x1f;
     if (naluType === H264_NAL_TYPE_STAP_A) {
         let pos = 1;
@@ -96,7 +100,8 @@ export function getNaluTypes(streamChunk: StreamChunk) {
     }
     else if (naluType === H264_NAL_TYPE_FU_A) {
         const fuaType = nalu[1] & 0x1f;
-        ret.add(fuaType);
+        if (fuaRequireStart && !!(nalu[1] & 0x80))
+            ret.add(fuaType);
     }
     else {
         ret.add(naluType);

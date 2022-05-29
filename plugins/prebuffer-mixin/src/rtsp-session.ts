@@ -1,6 +1,6 @@
 import { ParserSession, setupActivityTimer } from "@scrypted/common/src/ffmpeg-rebroadcast";
 import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
-import { parseSemicolonDelimited, RtspClient, RtspClientUdpSetupOptions, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
+import { findH264NaluType, H264_NAL_TYPE_SPS, parseSemicolonDelimited, RtspClient, RtspClientUdpSetupOptions, RTSP_FRAME_MAGIC } from "@scrypted/common/src/rtsp-server";
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { StreamChunk } from "@scrypted/common/src/stream-parser";
 import { ResponseMediaStreamOptions } from "@scrypted/sdk";
@@ -192,10 +192,37 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
             const inputAudioCodec = audioSection?.codec;
             const inputVideoCodec = videoSection.codec;
 
+
             let inputVideoResolution: {
                 width: number;
                 height: number;
             };
+
+            const probeStart = Date.now();
+            const probe = (chunk: StreamChunk) => {
+                if (Date.now() - probeStart > 6000)
+                    events.removeListener('rtsp', probe);
+                const sps = findH264NaluType(chunk, H264_NAL_TYPE_SPS);
+                if (sps) {
+                    try {
+                        const parsedSps = spsParse(sps);
+                        inputVideoResolution = getSpsResolution(parsedSps);
+                        console.log(inputVideoResolution);
+                        console.log('parsed bitstream sps', parsedSps);
+                    }
+                    catch (e) {
+                        console.warn('sps parsing failed');
+                        inputVideoResolution = {
+                            width: NaN,
+                            height: NaN,
+                        }
+                    }
+                    events.removeListener('rtsp', probe);
+                }
+            }
+
+            if (!inputVideoResolution)
+                events.on('rtsp', probe);
 
             const sprop = videoSection
                 ?.fmtp?.[0]?.parameters?.['sprop-parameter-sets'];
