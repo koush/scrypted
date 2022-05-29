@@ -96,15 +96,16 @@ export abstract class MediaManagerBase implements MediaManager {
                     '-i', mediaUrl.url,
                 ];
 
+                const ret: FFmpegInput = Object.assign({
+                    inputArguments,
+                }, mediaUrl);
+
                 if (mediaUrl.url.startsWith('rtsp')) {
+                    ret.container = 'rtsp';
                     inputArguments.unshift(
                         "-rtsp_transport", "tcp",
                     );
                 }
-
-                const ret: FFmpegInput = Object.assign({
-                    inputArguments,
-                }, mediaUrl);
 
                 return Buffer.from(JSON.stringify(ret));
             }
