@@ -1,7 +1,7 @@
-import { BundlePolicy, Output, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RTCSessionDescription, RtpPacket, uint16Add } from "@koush/werift";
+import { BundlePolicy, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket, uint16Add } from "@koush/werift";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
-import { findH264NaluType, findH264NaluTypeInNalu, getNaluTypesInNalu, H264_NAL_TYPE_IDR, RtspServer } from "@scrypted/common/src/rtsp-server";
+import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import dgram from 'dgram';
@@ -9,7 +9,7 @@ import { Socket } from "net";
 import { waitConnected } from "./peerconnection-util";
 import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive } from "./werift-util";
+import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive, logIsPrivateIceTransport } from "./werift-util";
 
 const { mediaManager } = sdk;
 
@@ -98,6 +98,7 @@ export async function createRTCPeerConnectionSource(options: {
 
             waitConnected(pc).then(() => {
                 console.log('connected', Date.now() - timeStart);
+                logIsPrivateIceTransport(console, pc);
                 sessionControl.startSession().catch(() => { });
             });
 
@@ -297,6 +298,7 @@ export async function createRTCPeerConnectionSource(options: {
     const url = `rtsp://127.0.0.1:${port}`;
     const mediaStreamUrl: MediaStreamUrl = {
         url,
+        container: 'rtsp',
         mediaStreamOptions,
     };
 

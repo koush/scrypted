@@ -1,4 +1,5 @@
 import { RTCIceServer, RTCPeerConnection, RTCSessionDescription } from "@koush/werift";
+import ip from 'ip';
 
 export function createRawResponse(response: RTCSessionDescription): RTCSessionDescriptionInit {
     return {
@@ -39,4 +40,15 @@ export function getWeriftIceServers(configuration: RTCConfiguration): RTCIceServ
     }
 
     return ret;
+}
+
+export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection) {
+    let isPrivate = true;
+    for (const ice of pc.iceTransports) {
+        const [address, port] = ice.connection.remoteAddr;
+        isPrivate = isPrivate && ip.isPrivate(address);
+        console.log('ice transport ip', address);
+    }
+    console.log('Connection is local network:', isPrivate);
+    return isPrivate;
 }

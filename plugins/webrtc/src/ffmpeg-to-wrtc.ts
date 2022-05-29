@@ -5,13 +5,12 @@ import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
-import ip from 'ip';
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
 import { waitConnected } from "./peerconnection-util";
 import { getFFmpegRtpAudioOutputArguments, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { isPeerConnectionAlive } from "./werift-util";
+import { isPeerConnectionAlive, logIsPrivateIceTransport } from "./werift-util";
 
 const { mediaManager } = sdk;
 
@@ -169,15 +168,7 @@ export async function createRTCPeerConnectionSink(
         await waitConnected(pc);
 
         console.log('connected', Date.now() - timeStart);
-
-        let isPrivate = true;
-        for (const ice of pc.iceTransports) {
-            const [address, port] = ice.connection.remoteAddr;
-            isPrivate = isPrivate && ip.isPrivate(address);
-            console.log('ice transport ip', address);
-        }
-
-        console.log('Connection is local network:', isPrivate);
+        const isPrivate = logIsPrivateIceTransport(console, pc);
 
         // should really inspect the session description here.
 
