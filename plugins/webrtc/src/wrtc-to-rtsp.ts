@@ -1,21 +1,22 @@
-import { BundlePolicy, Pipeline, RTCPeerConnection, RtcpPacket, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket, uint16Add } from "@koush/werift";
+import { BundlePolicy, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
-import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
+import { Deferred } from "@scrypted/common/src/deferred";
+import { closeQuiet, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import dgram from 'dgram';
-import { Socket } from "net";
-import { waitConnected } from "./peerconnection-util";
+import { waitClosed, waitConnected } from "./peerconnection-util";
 import { getFFmpegRtpAudioOutputArguments, startRtpForwarderProcess } from "./rtp-forwarders";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
-import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive, logIsPrivateIceTransport } from "./werift-util";
+import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive } from "./werift-util";
 
 const { mediaManager } = sdk;
 
 export interface RTCPeerConnectionPipe {
     mediaObject: MediaObject;
     intercom: Promise<Intercom>;
+    pcClose: Promise<unknown>;
 }
 
 export async function createRTCPeerConnectionSource(options: {
@@ -30,41 +31,31 @@ export async function createRTCPeerConnectionSource(options: {
 
     const timeStart = Date.now();
 
-    let pictureLossInterval: NodeJS.Timeout;
-    let socket: Socket;
-    // rtsp server must operate in udp forwarding mode to accomodate packet reordering.
-    let udp = dgram.createSocket('udp4');
-    let sessionControl: RTCSessionControl;
+    const sessionControl = new Deferred<RTCSessionControl>();
+    const peerConnection = new Deferred<RTCPeerConnection>();
+    const intercom = new Deferred<Intercom>();
 
     const cleanup = () => {
         console.log('webrtc/rtsp cleaning up');
-        pcPromise.then(pc => pc.close());
-        socket?.destroy();
-        clearInterval(pictureLossInterval);
-        try {
-            udp.close();
-        }
-        catch (e) {
-        }
-        sessionControl?.endSession().catch(() => { });
+        clientPromise.then(client => client.destroy());
+        sessionControl.promise.then(sc => sc.endSession());
+        peerConnection.promise.then(pc => pc.close());
+        intercom.promise.then(intercom => intercom.stopIntercom());
     };
 
-    clientPromise.then(socket => {
-        socket.on('close', cleanup);
-        socket.on('error', cleanup);
-    });
+    clientPromise.then(socket => socket.on('close', cleanup));
 
-    const pcPromise = new Promise<RTCPeerConnection>(async (resolve, reject) => {
-        socket = await clientPromise;
-        const rtspServer = new RtspServer(socket, undefined, udp);
+    const start = (async () => {
+        const client = await clientPromise;
+        const udp = dgram.createSocket('udp4');
+        client.on('close', () => closeQuiet(udp));
+        const rtspServer = new RtspServer(client, undefined, udp);
         // rtspServer.console = console;
 
-        let pc: RTCPeerConnection;
-
         const ensurePeerConnection = (setup: RTCAVSignalingSetup) => {
-            if (pc)
+            if (peerConnection.finished)
                 return;
-            pc = new RTCPeerConnection({
+            peerConnection.resolve(new RTCPeerConnection({
                 bundlePolicy: setup.configuration?.bundlePolicy as BundlePolicy,
                 codecs: {
                     audio: [
@@ -75,34 +66,7 @@ export async function createRTCPeerConnectionSource(options: {
                     ],
                 },
                 iceServers: getWeriftIceServers(setup.configuration),
-            });
-            pc.iceGatheringStateChange.subscribe(() => {
-                console.log('iceGatheringStateChange', pc.iceGatheringState);
-            });
-            pc.iceConnectionStateChange.subscribe(() => {
-                console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
-                if (pc.iceConnectionState === 'disconnected'
-                    || pc.iceConnectionState === 'failed'
-                    || pc.iceConnectionState === 'closed') {
-                    cleanup();
-                }
-            });
-            pc.connectionStateChange.subscribe(() => {
-                console.log('connectionStateChange', pc.connectionState, pc.iceConnectionState);
-                if (pc.connectionState === 'closed'
-                    || pc.connectionState === 'disconnected'
-                    || pc.connectionState === 'failed') {
-                    cleanup();
-                }
-            });
-
-            waitConnected(pc).then(() => {
-                console.log('connected', Date.now() - timeStart);
-                logIsPrivateIceTransport(console, pc);
-                sessionControl.startSession().catch(() => { });
-            });
-
-            resolve(pc);
+            }));
         }
 
         let audioTrack: string;
@@ -115,6 +79,7 @@ export async function createRTCPeerConnectionSource(options: {
             let gotAudio = false;
             let gotVideo = false;
 
+            const pc = await peerConnection.promise;
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.onTrack.subscribe((track) => {
                 track.onReceiveRtp.subscribe(rtp => {
@@ -142,7 +107,7 @@ export async function createRTCPeerConnectionSource(options: {
 
                 track.onReceiveRtp.once(() => {
                     let firSequenceNumber = 0;
-                    pictureLossInterval = setInterval(() => {
+                    const pictureLossInterval = setInterval(() => {
                         // i think this is necessary for older clients like ring
                         // which is really a sip gateway?
                         const fir = new FullIntraRequest({
@@ -164,6 +129,7 @@ export async function createRTCPeerConnectionSource(options: {
                         // triggers a i-frame to be sent, and not the prior FIR request.
                         videoTransceiver.receiver.sendRtcpPLI(track.ssrc!);
                     }, 4000);
+                    waitClosed(pc).then(() => clearInterval(pictureLossInterval));
                 });
             });
         }
@@ -190,6 +156,7 @@ export async function createRTCPeerConnectionSource(options: {
             async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
                 if (type === 'offer')
                     doSetup(setup);
+                const pc = await peerConnection.promise;
                 if (setup.datachannel)
                     pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
 
@@ -238,62 +205,81 @@ export async function createRTCPeerConnectionSource(options: {
                     doSetup(setup);
                 else
                     await handleRtspSetup(description);
+                const pc = await peerConnection.promise;
                 await pc.setRemoteDescription(description as any);
             }
             async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
                 console.log('addIceCandidate', candidate.sdpMLineIndex, candidate.candidate)
+                const pc = await peerConnection.promise;
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
             }
-
         }
 
-        sessionControl = await channel.startRTCSignalingSession(new SignalingSession());
-        console.log('session setup complete');
+        const session = new SignalingSession();
+        const sc = await channel.startRTCSignalingSession(session);
+        sessionControl.resolve(sc);
+        const pc = await peerConnection.promise;
+        await waitConnected(pc);
+
+        let destroyProcess: () => void;
+
+        const track = audioTransceiver.sender.sendRtp;
+
+        const ic: Intercom = {
+            async startIntercom(media: MediaObject) {
+                if (!isPeerConnectionAlive(pc))
+                    throw new Error('peer connection is closed');
+
+                if (!track)
+                    throw new Error('peer connection does not support two way audio');
+
+
+                const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
+
+                const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
+                    audio: {
+                        outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
+                        onRtp: (rtp) => audioTransceiver.sender.sendRtp(rtp),
+                    },
+                });
+
+                ic.stopIntercom();
+
+                destroyProcess = destroy;
+
+                const sc = await sessionControl.promise;
+                sc.setPlayback({
+                    audio: true,
+                    video: false,
+                });
+            },
+            async stopIntercom() {
+                destroyProcess?.();
+
+                sc.setPlayback({
+                    audio: false,
+                    video: false,
+                });
+            },
+        };
+
+        intercom.resolve(ic);
+    })();
+
+    start.catch(e => {
+        console.error('session start failed', e);
+        sessionControl.reject(e);
+        peerConnection.reject(e);
+        intercom.reject(e);
     });
 
-    pcPromise.catch(e => {
+    const pcClose = peerConnection.promise.then(pc => waitClosed(pc));
+    pcClose.finally(cleanup);
+
+    peerConnection.promise.catch(e => {
         console.error('failed to create webrtc signaling session', e);
         cleanup();
     });
-
-    const intercom = pcPromise
-        .then(async (pc) => {
-            await waitConnected(pc);
-
-            const audioTransceiver = pc.transceivers.find(t => t.kind === 'audio');
-
-            let destroyProcess: () => void;
-
-            const track = audioTransceiver.sender.sendRtp;
-
-            const ret: Intercom = {
-                async startIntercom(media: MediaObject) {
-                    if (!isPeerConnectionAlive(pc))
-                        throw new Error('peer connection is closed');
-
-                    if (!track)
-                        throw new Error('peer connection does not support two way audio');
-
-                    const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
-
-                    const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
-                        audio: {
-                            outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
-                            onRtp: (rtp) => audioTransceiver.sender.sendRtp(rtp),
-                        },
-                    });
-
-                    ret.stopIntercom();
-
-                    destroyProcess = destroy;
-                },
-                async stopIntercom() {
-                    destroyProcess();
-                },
-            };
-
-            return ret;
-        });
 
     const url = `rtsp://127.0.0.1:${port}`;
     const mediaStreamUrl: MediaStreamUrl = {
@@ -304,61 +290,13 @@ export async function createRTCPeerConnectionSource(options: {
 
     return {
         mediaObject: await mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl),
-        intercom,
+        intercom: intercom.promise,
+        pcClose,
     };
 }
 
 interface ReceivedRtpPacket extends RtpPacket {
     uptime?: number;
-}
-
-export class JitterBuffer extends Pipeline {
-    private buffer: ReceivedRtpPacket[] = [];
-
-    // the number of packets to wait before giving up on a packet.
-    // 1/10th of a second.
-    maxDelay = .1
-
-    pushRtpPackets(packets: RtpPacket[]) {
-        packets.forEach(this.onRtp);
-    }
-
-    pushRtcpPackets(packets: RtcpPacket[]) {
-        this.children?.pushRtcpPackets?.(packets);
-    }
-
-    private onRtp = (p: RtpPacket) => {
-        const now = process.uptime();
-        const received = p as ReceivedRtpPacket;
-        received.uptime = now;
-
-        this.buffer.push(received);
-        this.buffer.sort((a, b) => a.header.timestamp - b.header.timestamp);
-
-        // find sequenced packets
-        let send = 0;
-        while (this.buffer.length > send + 1 && uint16Add(this.buffer[send].header.sequenceNumber, 1) === this.buffer[send + 1].header.sequenceNumber) {
-            send++;
-        }
-
-        // send sequenced packets
-        if (send) {
-            const packets = this.buffer.splice(0, send);
-            this.children?.pushRtpPackets?.(packets);
-        }
-
-        // find dated packets
-        send = 0;
-        while (this.buffer.length > send && this.buffer[send].uptime + this.maxDelay < now) {
-            send++;
-        }
-
-        // send dated packets
-        if (send) {
-            const packets = this.buffer.splice(0, send);
-            this.children?.pushRtpPackets?.(packets);
-        }
-    };
 }
 
 export function getRTCMediaStreamOptions(id: string, name: string): ResponseMediaStreamOptions {

@@ -16,21 +16,31 @@ const supportedTypes = [
 
 class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = new StorageSettings(this, {});
+    webrtcIntercom: Promise<Intercom>;
 
     constructor(public plugin: WebRTCPlugin, options: SettingsMixinDeviceOptions<RTCSignalingChannel & Settings & VideoCamera & Intercom>) {
         super(options);
     }
 
-    startIntercom(media: MediaObject): Promise<void> {
+    async startIntercom(media: MediaObject): Promise<void> {
+        if (this.webrtcIntercom) {
+            const intercom = await this.webrtcIntercom;
+            return intercom.startIntercom(media);
+        }
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom))
             return this.mixinDevice.startIntercom(media);
-        throw new Error("Method not implemented.");
+        throw new Error("webrtc session not connected.");
     }
 
-    stopIntercom(): Promise<void> {
+    async stopIntercom(): Promise<void> {
+        if (this.webrtcIntercom) {
+            const intercom = await this.webrtcIntercom;
+            return intercom.stopIntercom();
+        }
+
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom))
             return this.mixinDevice.stopIntercom();
-        throw new Error("Method not implemented.");
+        throw new Error("webrtc session not connected.");
     }
 
     async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
@@ -87,12 +97,15 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             return this.mixinDevice.getVideoStream(options);
         }
 
-        const { mediaObject } = await createRTCPeerConnectionSource({
+        const { intercom, mediaObject, pcClose } = await createRTCPeerConnectionSource({
             console: this.console,
             mediaStreamOptions: this.createVideoStreamOptions(),
             channel: this.mixinDevice,
             maximumCompatibilityMode: this.plugin.storageSettings.values.maximumCompatibilityMode,
         });
+
+        this.webrtcIntercom = intercom;
+        pcClose.finally(() => this.webrtcIntercom = undefined);
 
         return mediaObject;
     }
