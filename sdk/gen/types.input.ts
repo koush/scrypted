@@ -1494,7 +1494,10 @@ export interface RTCSessionControl {
   getRefreshAt(): Promise<number | void>;
   extendSession(): Promise<void>;
   endSession(): Promise<void>;
-  startSession(): Promise<void>;
+  setPlayback(options: {
+    audio: boolean,
+    video: boolean,
+  }): Promise<void>;
 }
 
 /**

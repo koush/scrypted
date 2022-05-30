@@ -1532,7 +1532,10 @@ export interface RTCSessionControl {
     getRefreshAt(): Promise<number | void>;
     extendSession(): Promise<void>;
     endSession(): Promise<void>;
-    startSession(): Promise<void>;
+    setPlayback(options: {
+        audio: boolean;
+        video: boolean;
+    }): Promise<void>;
 }
 /**
  * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer.
