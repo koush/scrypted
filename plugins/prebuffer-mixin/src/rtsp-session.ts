@@ -208,7 +208,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                         const parsedSps = spsParse(sps);
                         inputVideoResolution = getSpsResolution(parsedSps);
                         console.log(inputVideoResolution);
-                        console.log('parsed bitstream sps', parsedSps);
+                        //console.log('parsed bitstream sps', parsedSps);
                     }
                     catch (e) {
                         console.warn('sps parsing failed');
@@ -234,7 +234,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                     const sps = Buffer.from(sdpSps, 'base64');
                     const parsedSps = spsParse(sps);
                     inputVideoResolution = getSpsResolution(parsedSps);
-                    console.log('parsed sdp sps', parsedSps);
+                    //console.log('parsed sdp sps', parsedSps);
                 }
                 catch (e) {
                     console.warn('sdp sps parsing failed');
