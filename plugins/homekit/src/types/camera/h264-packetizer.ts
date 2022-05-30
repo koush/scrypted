@@ -1,4 +1,5 @@
 import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
+import { isNextSequenceNumber } from "./jitter-buffer";
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 export const NAL_TYPE_STAP_A = 24;
@@ -63,10 +64,9 @@ function splitBitstream(data: Buffer) {
 export class H264Repacketizer {
     extraPackets = 0;
     fuaMax: number;
-    pendingStapA: RtpPacket[];
     pendingFuA: RtpPacket[];
     pendingFuASeenStart = false;
-    seenSps = false;
+    seenStapASps = false;
 
     constructor(public console: Console, public maxPacketSize: number, public codecInfo: {
         sps: Buffer,
@@ -74,6 +74,25 @@ export class H264Repacketizer {
     }) {
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;;
+    }
+
+    ensureCodecInfo() {
+        if (!this.codecInfo) {
+            this.codecInfo = {
+                sps: undefined,
+                pps: undefined,
+            };
+        }
+    }
+    
+    updateSps(sps: Buffer) {
+        this.ensureCodecInfo();
+        this.codecInfo.sps = sps;
+    }
+    
+    updatePps(pps: Buffer) {
+        this.ensureCodecInfo();
+        this.codecInfo.pps = pps;
     }
 
     shouldFilter(nalType: number) {
@@ -203,28 +222,6 @@ export class H264Repacketizer {
         return ret;
     }
 
-    flushPendingStapA(ret: RtpPacket[]) {
-        if (!this.pendingStapA)
-            return;
-        const first = this.pendingStapA[0];
-        const hadMarker = first.header.marker;
-
-        const aggregates = this.packetizeStapA(this.pendingStapA.map(packet => packet.payload));
-        if (aggregates.length !== 1) {
-            this.console.error('expected only 1 packet for sps/pps stapa');
-            this.pendingStapA = undefined;
-            return;
-        }
-
-        aggregates.forEach((packetized, index) => {
-            const marker = hadMarker && index === aggregates.length - 1;
-            ret.push(this.createPacket(first, packetized, marker));
-        });
-
-        this.extraPackets -= this.pendingStapA.length - 1;
-        this.pendingStapA = undefined;
-    }
-
     flushPendingFuA(ret: RtpPacket[], allowRecoverableErrors?: boolean) {
         if (!this.pendingFuA)
             return;
@@ -267,6 +264,10 @@ export class H264Repacketizer {
 
         let lastSequenceNumber: number;
         for (const packet of this.pendingFuA) {
+            if (lastSequenceNumber !== undefined && !isNextSequenceNumber(lastSequenceNumber, packet.header.sequenceNumber)) {
+
+            }
+
             const nalType = packet.payload[1] & 0x1f;
             if (nalType !== originalNalType) {
                 this.console.error('unexpected nal type mismatch. skipping refragmentation.', originalNalType, nalType);
@@ -296,22 +297,15 @@ export class H264Repacketizer {
         const defragmented = Buffer.concat(originalFragments);
 
         if (originalNalType === NAL_TYPE_SPS) {
-            if (!this.codecInfo) {
-                this.codecInfo = {
-                    sps: undefined,
-                    pps: undefined,
-                };
-            }
-
             const splits = splitBitstream(defragmented);
             while (splits.length) {
                 const split = splits.shift();
                 const splitNaluType = split[0] & 0x1f;
                 if (splitNaluType === NAL_TYPE_SPS) {
-                    this.codecInfo.sps = split;
+                    this.updateSps(split);
                 }
                 else if (splitNaluType === NAL_TYPE_PPS) {
-                    this.codecInfo.pps = split;
+                    this.updatePps(split);
                 }
                 else {
                     if (splitNaluType === NAL_TYPE_IDR)
@@ -391,7 +385,6 @@ export class H264Repacketizer {
         // empty packets are apparently valid from webrtc. filter those out.
         if (!packet.payload.length) {
             this.flushPendingFuA(ret);
-            this.flushPendingStapA(ret);
             this.extraPackets--;
             return ret;
         }
@@ -403,15 +396,7 @@ export class H264Repacketizer {
             this.flushPendingFuA(ret);
         }
 
-        // stapa packets must share the same timestamp
-        if (this.pendingStapA && this.pendingStapA[0].header.timestamp !== packet.header.timestamp) {
-            this.flushPendingStapA(ret);
-        }
-
         if (nalType === NAL_TYPE_FU_A) {
-            // fua may share a timestamp as stapa, but don't aggregated with stapa
-            this.flushPendingStapA(ret);
-
             const data = packet.payload;
             const originalNalType = data[1] & 0x1f;
 
@@ -424,7 +409,7 @@ export class H264Repacketizer {
             const isFuEnd = !!(packet.payload[1] & 0x40);
             // if this is an idr frame, but no sps has been sent, dummy one up.
             // the stream may not contain sps.
-            if (originalNalType === NAL_TYPE_IDR && isFuStart && !this.seenSps) {
+            if (originalNalType === NAL_TYPE_IDR && isFuStart && !this.seenStapASps) {
                 this.maybeSendSpsPps(packet, ret);
             }
 
@@ -445,8 +430,6 @@ export class H264Repacketizer {
 
             if (this.pendingFuA) {
                 this.pendingFuA.push(packet);
-
-                this.pendingFuA = this.pendingFuA.sort((a, b) => a.header.sequenceNumber - b.header.sequenceNumber);
 
                 if (isFuEnd) {
                     this.flushPendingFuA(ret);
@@ -477,7 +460,7 @@ export class H264Repacketizer {
             const depacketized = depacketizeStapA(packet.payload)
                 .filter(payload => {
                     const nalType = payload[0] & 0x1F;
-                    this.seenSps = this.seenSps || (nalType === NAL_TYPE_SPS);
+                    this.seenStapASps = this.seenStapASps || (nalType === NAL_TYPE_SPS);
                     if (this.shouldFilter(nalType)) {
                         return false;
                     }
@@ -494,28 +477,26 @@ export class H264Repacketizer {
             this.flushPendingFuA(ret);
 
             if (this.shouldFilter(nalType)) {
-                this.flushPendingStapA(ret);
                 this.extraPackets--;
                 return ret;
             }
 
-            // codec information should be aggregated. usually around 50 bytes total.
-            if (nalType === NAL_TYPE_SPS || nalType === NAL_TYPE_PPS) {
-                this.seenSps = this.seenSps || (nalType === NAL_TYPE_SPS);
-                if (!this.pendingStapA)
-                    this.pendingStapA = [];
-                this.pendingStapA.push(packet);
+            // codec information should be aggregated into a stapa. usually around 50 bytes total.
+            if (nalType === NAL_TYPE_SPS) {
+                this.updateSps(packet.payload);
                 return ret;
             }
-
-            this.flushPendingStapA(ret);
+            else if (nalType === NAL_TYPE_PPS) {
+                this.updatePps(packet.payload);
+                return ret;
+            }
 
             if (this.shouldFilter(nalType)) {
                 this.extraPackets--;
                 return ret;
             }
 
-            if (nalType === NAL_TYPE_IDR && !this.seenSps) {
+            if (nalType === NAL_TYPE_IDR && !this.seenStapASps) {
                 // if this is an idr frame, but no sps has been sent, dummy one up.
                 // the stream may not contain sps.
                 this.maybeSendSpsPps(packet, ret);
