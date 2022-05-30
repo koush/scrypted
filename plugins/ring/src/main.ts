@@ -11,7 +11,7 @@ import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/package
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
 import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
 import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
-import { isStunMessage,  RtpDescription, SipSession,BasicPeerConnection, CameraData, clientApi, generateUuid, RingBaseApi, RingCamera, RingRestClient, rxjs, SimpleWebRtcSession, StreamingSession } from './ring-client-api';
+import { isStunMessage, RtpDescription, SipSession, BasicPeerConnection, CameraData, clientApi, generateUuid, RingBaseApi, RingCamera, RingRestClient, rxjs, SimpleWebRtcSession, StreamingSession } from './ring-client-api';
 import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 
 
@@ -20,6 +20,11 @@ const { deviceManager, mediaManager, systemManager } = sdk;
 
 class RingWebSocketRTCSessionControl implements RTCSessionControl {
     constructor(public streamingSession: StreamingSession, public onConnectionState: rxjs.Subject<RTCPeerConnectionState>) {
+    }
+
+    async setPlayback(options: { audio: boolean; video: boolean; }) {
+        if (this.streamingSession.cameraSpeakerActivated !== options.audio)
+            this.streamingSession.setCameraSpeaker(options.audio);
     }
 
     async getRefreshAt() {
@@ -31,13 +36,13 @@ class RingWebSocketRTCSessionControl implements RTCSessionControl {
     async endSession() {
         this.streamingSession.stop();
     }
-    async startSession() {
-        this.onConnectionState.next('connected');
-    }
 }
 
 class RingBrowserRTCSessionControl implements RTCSessionControl {
     constructor(public ringCamera: RingCameraDevice, public simpleSession: SimpleWebRtcSession) {
+    }
+
+    async setPlayback(options: { audio: boolean; video: boolean; }) {
     }
 
     async getRefreshAt() {
@@ -48,9 +53,6 @@ class RingBrowserRTCSessionControl implements RTCSessionControl {
 
     async endSession() {
         await this.simpleSession.end();
-    }
-
-    async startSession() {
     }
 }
 
