@@ -84,12 +84,12 @@ export class H264Repacketizer {
             };
         }
     }
-    
+
     updateSps(sps: Buffer) {
         this.ensureCodecInfo();
         this.codecInfo.sps = sps;
     }
-    
+
     updatePps(pps: Buffer) {
         this.ensureCodecInfo();
         this.codecInfo.pps = pps;
@@ -222,7 +222,7 @@ export class H264Repacketizer {
         return ret;
     }
 
-    flushPendingFuA(ret: RtpPacket[], allowRecoverableErrors?: boolean) {
+    flushPendingFuA(ret: RtpPacket[]) {
         if (!this.pendingFuA)
             return;
 
@@ -234,61 +234,6 @@ export class H264Repacketizer {
         const hasFuStart = !!(first.payload[1] & 0x80);
         const hasFuEnd = !!(last.payload[1] & 0x40);
 
-        // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
-        // this probably is not compliant...
-        if (originalNalType === NAL_TYPE_SPS) {
-            if (!hasFuStart || !hasFuEnd) {
-                if (allowRecoverableErrors) {
-                    // wait for all the packets to come in.
-                    return;
-                }
-                this.console.error('encountered sps in fua packet. skipping refragmentation.');
-                this.pendingFuA = undefined;
-                return;
-            }
-        }
-
-
-        this.pendingFuASeenStart ||= hasFuStart;
-
-        if (!this.pendingFuASeenStart) {
-            if (allowRecoverableErrors) {
-                // this.console.error('fua packet missing start. waiting for more packets.', originalNalType);
-            }
-            else {
-                this.console.error('fua packet missing start. skipping refragmentation.', originalNalType);
-                this.pendingFuA = undefined;
-            }
-            return;
-        }
-
-        let lastSequenceNumber: number;
-        for (const packet of this.pendingFuA) {
-            if (lastSequenceNumber !== undefined && !isNextSequenceNumber(lastSequenceNumber, packet.header.sequenceNumber)) {
-
-            }
-
-            const nalType = packet.payload[1] & 0x1f;
-            if (nalType !== originalNalType) {
-                this.console.error('unexpected nal type mismatch. skipping refragmentation.', originalNalType, nalType);
-                this.pendingFuA = undefined;
-                return;
-            }
-            if (lastSequenceNumber !== undefined) {
-                if (packet.header.sequenceNumber !== (lastSequenceNumber + 1) % 0x10000) {
-                    if (allowRecoverableErrors) {
-                        // this.console.error('fua packet is missing. waiting for more packets.', originalNalType);
-                    }
-                    else {
-                        this.console.error('fua packet is missing. skipping refragmentation.', originalNalType);
-                        this.pendingFuA = undefined;
-                    }
-                    return;
-                }
-            }
-            lastSequenceNumber = packet.header.sequenceNumber;
-        }
-
         const fnri = first.payload[0] & (0x80 | 0x60);
         const originalNalHeader = Buffer.from([fnri | originalNalType]);
 
@@ -296,6 +241,10 @@ export class H264Repacketizer {
         originalFragments.unshift(originalNalHeader);
         const defragmented = Buffer.concat(originalFragments);
 
+        // have seen cameras that toss sps/pps/idr into a fua, delimited by start codes?
+        // this probably is not compliant...
+        // so the fua packet looks like:
+        // sps | start code | pps | start code | idr
         if (originalNalType === NAL_TYPE_SPS) {
             const splits = splitBitstream(defragmented);
             while (splits.length) {
@@ -407,50 +356,49 @@ export class H264Repacketizer {
 
             const isFuStart = !!(data[1] & 0x80);
             const isFuEnd = !!(packet.payload[1] & 0x40);
-            // if this is an idr frame, but no sps has been sent, dummy one up.
-            // the stream may not contain sps.
-            if (originalNalType === NAL_TYPE_IDR && isFuStart && !this.seenStapASps) {
-                this.maybeSendSpsPps(packet, ret);
-            }
 
-            if (!this.pendingFuA) {
-                if (packet.payload.length >= this.maxPacketSize * 2) {
-                    // most rtsp implementations send fat fua packets ~64k. can just repacketize those
-                    // with minimal extra packet overhead.
-                    const fragments = this.packetizeFuA(packet.payload);
-                    this.createRtpPackets(packet, fragments, ret);
-                }
-                else {
-                    // the fua packet is an unsuitable size and needs to be defragmented
-                    // and refragmented.
+            if (isFuStart) {
+                if (this.pendingFuA)
+                    this.console.error('fua restarted. skipping refragmentation of previous fua.', originalNalType);
+
+                this.pendingFuA = [];
+                this.pendingFuASeenStart = true;
+
+                // if this is an idr frame, but no sps has been sent via a stapa, dummy one up.
+                // the stream may not contain codec information in stapa or may be sending it
+                // in separate sps/pps packets which is not supported by homekit.
+                if (originalNalType === NAL_TYPE_IDR && !this.seenStapASps)
+                    this.maybeSendSpsPps(packet, ret);
+            }
+            else {
+                if (!this.pendingFuA)
+                    return ret;
+
+                const last = this.pendingFuA[this.pendingFuA.length - 1];
+                if (!isNextSequenceNumber(last.header.sequenceNumber, packet.header.sequenceNumber)) {
+                    this.console.error('fua packet missing. skipping refragmentation.', originalNalType);
+                    this.pendingFuA = undefined;
                     this.pendingFuASeenStart = false;
-                    this.pendingFuA = [];
+                    return ret;
                 }
             }
 
-            if (this.pendingFuA) {
-                this.pendingFuA.push(packet);
+            this.pendingFuA.push(packet);
 
-                if (isFuEnd) {
-                    this.flushPendingFuA(ret);
-                }
-                else if (this.pendingFuA.length > 1) {
-                    // this code path will defragment fua packets optimistically.
-                    const last = this.pendingFuA[this.pendingFuA.length - 1].clone();
-                    const l = this.pendingFuA.length;
-                    const partial: RtpPacket[] = [];
-                    this.flushPendingFuA(partial, true);
-                    if (partial.length) {
-                        const newl = partial.length;
-                        // this.console.log('l newl', l, newl);
-                        const retain = partial.pop();
-                        last.payload = retain.payload;
-                        if (this.pendingFuA)
-                            this.console.error('pending fua still found?');
-                        this.pendingFuA = [last];
-                        ret.push(...partial);
-                    }
-                }
+            if (isFuEnd) {
+                this.flushPendingFuA(ret);
+                this.pendingFuASeenStart = undefined;
+            }
+            else if (this.pendingFuA.reduce((p, c) => p + c.payload.length - FU_A_HEADER_SIZE, NAL_HEADER_SIZE) > this.maxPacketSize) {
+                // refragment fua packets as they are received, saving the last undersized packet for
+                // the next fua packet.
+                const last = this.pendingFuA[this.pendingFuA.length - 1].clone();
+                const partial: RtpPacket[] = [];
+                this.flushPendingFuA(partial);
+                const retain = partial.pop();
+                last.payload = retain.payload;
+                this.pendingFuA = [last];
+                ret.push(...partial);
             }
         }
         else if (nalType === NAL_TYPE_STAP_A) {
@@ -483,10 +431,12 @@ export class H264Repacketizer {
 
             // codec information should be aggregated into a stapa. usually around 50 bytes total.
             if (nalType === NAL_TYPE_SPS) {
+                this.extraPackets--;
                 this.updateSps(packet.payload);
                 return ret;
             }
             else if (nalType === NAL_TYPE_PPS) {
+                this.extraPackets--;
                 this.updatePps(packet.payload);
                 return ret;
             }
