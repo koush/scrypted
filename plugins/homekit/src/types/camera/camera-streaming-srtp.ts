@@ -80,6 +80,9 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
             await waitForFirstVideoRtcp(console, session);
             await rtspClient.play();
             rtspClient.readLoop().catch(() => { }).finally(cleanup);
+
+            if (session.killed)
+                throw new Error('killed');
         }
         catch (e) {
             cleanup();
