@@ -102,6 +102,15 @@
         @click="streamCamera"
         >Live</v-btn
       >
+
+      <v-btn small v-if="isLive" @click="toggleMute" color="white" outlined>
+        <v-icon v-if="muted" small color="white" :outlined="isLive"
+          >fa fa-microphone-slash
+        </v-icon>
+        <v-icon v-else small color="white" :outlined="isLive"
+          >fa fa-microphone
+        </v-icon>
+      </v-btn>
     </div>
   </div>
 </template>
@@ -130,7 +139,9 @@ export default {
           this.lastDetection = e || {};
         }
       ),
+      muted: true,
       pc: undefined,
+      control: undefined,
       clipPath: this.clipPathValue ? cloneDeep(this.clipPathValue) : undefined,
     };
   },
@@ -214,28 +225,38 @@ export default {
       }, 2500);
     },
     cleanupConnection() {
-      this.pc?.close();
+      this.pc?.then((pc) => pc.close());
       this.pc = undefined;
+    },
+    async toggleMute() {
+      this.muted = !this.muted;
+      if (!this.control) return;
+      this.control.setPlayback({
+        audio: !this.muted,
+        video: true,
+      });
     },
     async streamCamera() {
       this.cleanupConnection();
       this.startTime = null;
-      const pc = await streamCamera(
+      const { pc, control } = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video
       );
       this.pc = pc;
+      this.control = control;
     },
     async streamRecorder(startTime) {
       this.cleanupConnection();
       this.startTime = startTime;
-      this.pc = await streamRecorder(
+      const { pc } = await streamRecorder(
         this.$scrypted.mediaManager,
         this.device,
         startTime,
         () => this.$refs.video
       );
+      this.pc = pc;
     },
   },
   watch: {

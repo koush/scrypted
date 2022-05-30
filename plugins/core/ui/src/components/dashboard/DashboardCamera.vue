@@ -69,7 +69,7 @@ export default {
       if (!val) {
         return;
       }
-      const pc = await streamCamera(
+      const { pc } = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video
@@ -79,7 +79,7 @@ export default {
   },
   methods: {
     cleanupConnection() {
-      this.pc?.close();
+      this.pc?.then(pc => pc.close());
       this.pc = undefined;
     },
     async fetchCamera() {

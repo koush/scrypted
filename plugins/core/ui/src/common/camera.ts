@@ -1,6 +1,5 @@
 import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
-import { RTCSessionControl } from "@scrypted/types";
-import { MediaManager, MediaObject, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoRecorder } from "@scrypted/types";
+import { MediaManager, MediaObject, RTCSessionControl, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoRecorder } from "@scrypted/types";
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
   return streamMedia(device, getVideo);
@@ -20,9 +19,6 @@ export async function streamMedia(device: RTCSignalingChannel, getVideo: () => H
   const pc = new Promise<RTCPeerConnection>(resolve => {
     session.peerConnectionCreated = async (pc) => {
       pc.addEventListener('connectionstatechange', () => {
-        if (pc.connectionState === 'connected') {
-          control.startSession();
-        }
         if (pc.iceConnectionState === 'disconnected'
           || pc.iceConnectionState === 'failed'
           || pc.iceConnectionState === 'closed') {
@@ -50,7 +46,7 @@ export async function streamMedia(device: RTCSignalingChannel, getVideo: () => H
   })
 
   const control: RTCSessionControl = await device.startRTCSignalingSession(session);
-  return pc;
+  return { control, pc };
 }
 
 export async function createBlobUrl(mediaManager: MediaManager, mediaObject: MediaObject): Promise<string> {
