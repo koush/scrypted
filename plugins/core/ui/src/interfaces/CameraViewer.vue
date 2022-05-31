@@ -102,7 +102,7 @@
         >Live</v-btn
       >
 
-      <v-btn small v-if="isLive" @click="toggleMute" color="white" outlined>
+      <v-btn small v-if="isLive && hasIntercom" @click="toggleMute" color="white" outlined>
         <v-icon v-if="muted" small color="white" :outlined="isLive"
           >fa fa-microphone-slash
         </v-icon>
@@ -145,6 +145,9 @@ export default {
     };
   },
   computed: {
+    hasIntercom() {
+      return this.device.interfaces.includes(ScryptedInterface.Intercom) || this.device.providedInterfaces.includes(ScryptedInterface.RTCSignalingChannel);
+    },
     isLive() {
       return !this.startTime;
     },
