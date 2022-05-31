@@ -53,11 +53,8 @@
       <v-icon small>fa fa-times</v-icon></v-btn
     >
 
-    <div
-      v-if="showNvr"
-      style="position: absolute; bottom: 10px; right: 10px; z-index: 3"
-    >
-      <v-dialog width="unset" v-model="dateDialog">
+    <div style="position: absolute; bottom: 10px; right: 10px; z-index: 3">
+      <v-dialog width="unset" v-model="dateDialog" v-if="showNvr">
         <template v-slot:activator="{ on }">
           <v-btn
             :dark="!isLive"
@@ -75,6 +72,7 @@
       </v-dialog>
 
       <v-btn
+        v-if="showNvr"
         :dark="!isLive"
         small
         :color="isLive ? 'white' : adjustingTime ? 'green' : 'blue'"
@@ -95,6 +93,7 @@
       >
 
       <v-btn
+        v-if="showNvr"
         :dark="!isLive"
         small
         color="red"
