@@ -1,5 +1,5 @@
 import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
-import { isNextSequenceNumber } from "./jitter-buffer";
+import { isNextSequenceNumber, JitterBuffer } from "./jitter-buffer";
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 export const NAL_TYPE_STAP_A = 24;
@@ -65,13 +65,12 @@ export class H264Repacketizer {
     extraPackets = 0;
     fuaMax: number;
     pendingFuA: RtpPacket[];
-    pendingFuASeenStart = false;
     seenStapASps = false;
 
     constructor(public console: Console, public maxPacketSize: number, public codecInfo: {
         sps: Buffer,
         pps: Buffer,
-    }) {
+    }, public jitterBuffer = new JitterBuffer(console, 4)) {
         // 12 is the rtp/srtp header size.
         this.fuaMax = maxPacketSize - FU_A_HEADER_SIZE;;
     }
@@ -330,12 +329,19 @@ export class H264Repacketizer {
 
     repacketize(packet: RtpPacket): RtpPacket[] {
         const ret: RtpPacket[] = [];
+        for (const dejittered of this.jitterBuffer.queue(packet)) {
+            this.repacketizeOne(dejittered, ret);
+        }
+        return ret;
+    }
+
+    repacketizeOne(packet: RtpPacket, ret: RtpPacket[]) {
 
         // empty packets are apparently valid from webrtc. filter those out.
         if (!packet.payload.length) {
             this.flushPendingFuA(ret);
             this.extraPackets--;
-            return ret;
+            return;
         }
 
         const nalType = packet.payload[0] & 0x1F;
@@ -351,7 +357,7 @@ export class H264Repacketizer {
 
             if (this.shouldFilter(originalNalType)) {
                 this.extraPackets--;
-                return ret;
+                return;
             }
 
             const isFuStart = !!(data[1] & 0x80);
@@ -362,7 +368,6 @@ export class H264Repacketizer {
                     this.console.error('fua restarted. skipping refragmentation of previous fua.', originalNalType);
 
                 this.pendingFuA = [];
-                this.pendingFuASeenStart = true;
 
                 // if this is an idr frame, but no sps has been sent via a stapa, dummy one up.
                 // the stream may not contain codec information in stapa or may be sending it
@@ -371,15 +376,15 @@ export class H264Repacketizer {
                     this.maybeSendSpsPps(packet, ret);
             }
             else {
+                // packet was missing earlier in fua packets, so this packet has to be dropped.
                 if (!this.pendingFuA)
-                    return ret;
+                    return;
 
                 const last = this.pendingFuA[this.pendingFuA.length - 1];
                 if (!isNextSequenceNumber(last.header.sequenceNumber, packet.header.sequenceNumber)) {
                     this.console.error('fua packet missing. skipping refragmentation.', originalNalType);
                     this.pendingFuA = undefined;
-                    this.pendingFuASeenStart = false;
-                    return ret;
+                    return;
                 }
             }
 
@@ -387,7 +392,6 @@ export class H264Repacketizer {
 
             if (isFuEnd) {
                 this.flushPendingFuA(ret);
-                this.pendingFuASeenStart = undefined;
             }
             else if (this.pendingFuA.reduce((p, c) => p + c.payload.length - FU_A_HEADER_SIZE, NAL_HEADER_SIZE) > this.maxPacketSize) {
                 // refragment fua packets as they are received, saving the last undersized packet for
@@ -416,7 +420,7 @@ export class H264Repacketizer {
                 });
             if (depacketized.length === 0) {
                 this.extraPackets--;
-                return ret;
+                return;
             }
             const aggregates = this.packetizeStapA(depacketized);
             this.createRtpPackets(packet, aggregates, ret);
@@ -426,24 +430,24 @@ export class H264Repacketizer {
 
             if (this.shouldFilter(nalType)) {
                 this.extraPackets--;
-                return ret;
+                return;
             }
 
             // codec information should be aggregated into a stapa. usually around 50 bytes total.
             if (nalType === NAL_TYPE_SPS) {
                 this.extraPackets--;
                 this.updateSps(packet.payload);
-                return ret;
+                return;
             }
             else if (nalType === NAL_TYPE_PPS) {
                 this.extraPackets--;
                 this.updatePps(packet.payload);
-                return ret;
+                return;
             }
 
             if (this.shouldFilter(nalType)) {
                 this.extraPackets--;
-                return ret;
+                return;
             }
 
             if (nalType === NAL_TYPE_IDR && !this.seenStapASps) {
@@ -459,6 +463,6 @@ export class H264Repacketizer {
             this.extraPackets--;
         }
 
-        return ret;
+        return;
     }
 }

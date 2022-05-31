@@ -113,57 +113,6 @@ export async function createRTCPeerConnectionSink(
         direction: cameraAudioDirection,
     });
 
-    const audioOutput = await createBindZero();
-    const rtspTcpServer = hasIntercom ? await listenZeroSingleClient() : undefined;
-
-    if (hasIntercom) {
-        const sdpReturnAudio = [
-            "v=0",
-            "o=- 0 0 IN IP4 127.0.0.1",
-            "s=" + "WebRTC Audio Talkback",
-            "c=IN IP4 127.0.0.1",
-            "t=0 0",
-            "m=audio 0 RTP/AVP 110",
-            "b=AS:24",
-            "a=rtpmap:110 opus/48000/2",
-            "a=fmtp:101 minptime=10;useinbandfec=1",
-        ];
-        let sdp = sdpReturnAudio.join('\r\n');
-        sdp = createSdpInput(audioOutput.port, 0, sdp);
-
-        audioTransceiver.onTrack.subscribe(async (track) => {
-            try {
-                const url = rtspTcpServer.url.replace('tcp:', 'rtsp:');
-                const ffmpegInput: FFmpegInput = {
-                    url,
-                    inputArguments: [
-                        '-rtsp_transport', 'udp',
-                        '-i', url,
-                    ],
-                };
-                const mo = await mediaManager.createFFmpegMediaObject(ffmpegInput);
-                await intercom.startIntercom(mo);
-
-                const client = await rtspTcpServer.clientPromise;
-
-                const rtspServer = new RtspServer(client, sdp, audioOutput.server);
-                // rtspServer.console = console;
-                await rtspServer.handlePlayback();
-                const parsedSdp = parseSdp(rtspServer.sdp);
-                const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
-
-
-                track.onReceiveRtp.subscribe(rtpPacket => {
-                    rtpPacket.header.payloadType = 110;
-                    rtspServer.sendTrack(audioTrack, rtpPacket.serialize(), false);
-                })
-            }
-            catch (e) {
-                console.log('webrtc talkback failed', e);
-            }
-        })
-    }
-
     const forwarderPromise = (async () => {
         await waitConnected(pc);
 
@@ -303,10 +252,7 @@ export async function createRTCPeerConnectionSink(
     const cleanup = async () => {
         // no need to explicitly stop intercom as the server closing will terminate it.
         // do this to prevent shared intercom clobbering.
-        closeQuiet(audioOutput.server);
-        closeQuiet(rtspTcpServer?.server);
         await Promise.allSettled([
-            rtspTcpServer?.clientPromise.then(client => client.destroy()),
             pc?.close(),
             forwarderPromise?.then(f => f.kill()),
         ]);
@@ -333,5 +279,5 @@ export async function createRTCPeerConnectionSink(
         clientSignalingSession, createSetup(clientAudioDirection, 'recvonly'),
         cameraSignalingSession, createSetup(cameraAudioDirection, 'sendonly'));
 
-    return new ScryptedSessionControl(cleanup);
+    return new ScryptedSessionControl(cleanup, intercom, audioTransceiver);
 }

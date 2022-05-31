@@ -12,3 +12,27 @@ export function waitConnected(pc: RTCPeerConnection) {
         })
     });
 }
+
+export function waitClosed(pc: RTCPeerConnection) {
+    return new Promise(resolve => {
+        pc.iceGatheringStateChange.subscribe(() => {
+            console.log('iceGatheringStateChange', pc.iceGatheringState);
+        });
+        pc.iceConnectionStateChange.subscribe(() => {
+            console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
+            if (pc.iceConnectionState === 'disconnected'
+                || pc.iceConnectionState === 'failed'
+                || pc.iceConnectionState === 'closed') {
+                resolve(undefined);
+            }
+        });
+        pc.connectionStateChange.subscribe(() => {
+            console.log('connectionStateChange', pc.connectionState, pc.iceConnectionState);
+            if (pc.connectionState === 'closed'
+                || pc.connectionState === 'disconnected'
+                || pc.connectionState === 'failed') {
+                resolve(undefined);
+            }
+        });
+    });
+}

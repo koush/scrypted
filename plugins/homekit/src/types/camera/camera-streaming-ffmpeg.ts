@@ -46,15 +46,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     const videoArgs: string[] = [];
     const audioArgs: string[] = [];
 
-    const nullAudioInput: string[] = [];
-    if (!noAudio) {
-        // create a dummy audio track if none actually exists.
-        // this track will only be used if no audio track is available.
-        // this prevents homekit erroring out if the audio track is actually missing.
-        // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-        nullAudioInput.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
-    }
-
     const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
     if (transcodingDebugMode)
         transcodingDebugModeWarning();
@@ -336,7 +327,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 ...hideBanner,
                 '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
                 '-f', 'sdp', '-i', 'pipe:3',
-                ...nullAudioInput,
                 ...audioArgs,
             ];
             safePrintFFmpegArguments(console, ffmpegAudioTranscodeArguments);
@@ -388,7 +378,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         const ap = child_process.spawn(ffmpegPath, [
             ...hideBanner,
             ...audioInput.inputArguments,
-            ...nullAudioInput,
             ...audioArgs,
         ]);
         session.killPromise.finally(() => safeKillFFmpeg(ap));
@@ -400,7 +389,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
             ...hideBanner,
             ...videoDecoderArguments,
             ...ffmpegInput.inputArguments,
-            ...nullAudioInput,
             ...videoArgs,
             ...audioArgs,
         ];

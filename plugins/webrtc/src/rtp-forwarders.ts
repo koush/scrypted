@@ -180,14 +180,16 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                 }
                 else {
                     console.log('audio codec transcoding:', audio.codecCopy);
+
+                    const newSdp = parseSdp(sdp);
+                    audioSection = newSdp.msections.find(msection => msection.type === 'audio' && msection.codec === audioCodec)
                     if (!audioSection)
-                        audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
+                        audioSection = newSdp.msections.find(msection => msection.type === 'audio');
 
                     if (!audioSection) {
                         console.warn(`audio section not found in sdp.`);
                     }
                     else {
-                        const newSdp = Object.assign({}, parsedSdp);
                         newSdp.msections = newSdp.msections.filter(msection => msection === audioSection);
                         const udpPort = Math.floor(Math.random() * 10000 + 30000);
                         pipeSdp = addTrackControls(replaceSectionPort(newSdp.toSdp(), 'audio', udpPort));

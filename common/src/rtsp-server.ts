@@ -766,6 +766,7 @@ export class RtspServer {
         const headers: Headers = {};
         headers['Session'] = this.session;
         this.respond(200, 'OK', requestHeaders, headers);
+        this.client.destroy();
     }
 
     async headers(headers: string[]) {
