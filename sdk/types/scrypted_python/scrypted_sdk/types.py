@@ -457,6 +457,7 @@ class ResponseMediaStreamOptions(TypedDict):
     id: str
     metadata: Any
     name: str
+    oobCodecParameters: bool
     prebuffer: float
     refreshAt: float
     sdp: str

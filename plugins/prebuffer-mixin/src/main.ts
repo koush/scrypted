@@ -1073,7 +1073,7 @@ class PrebufferSession {
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
-        const {server: udp} = await createBindZero();
+        const { server: udp } = await createBindZero();
         socket.on('close', () => closeQuiet(udp));
         server = new RtspServer(socket, sdp, udp);
         // server.console = this.console;
@@ -1187,6 +1187,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     let id = options?.id;
     let h264EncoderArguments: string[];
+    let videoFilterArguments: string[];
     let destinationVideoBitrate: number;
 
     const transcodingEnabled = this.mixins?.includes(getTranscodeMixinProviderId());
@@ -1233,6 +1234,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       // even if h264 is requested, to force a visible failure.
       if (transcodingEnabled && this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
         h264EncoderArguments = this.plugin.transcodeStorageSettings.values.h264EncoderArguments?.split(' ');
+        if (this.streamSettings.storageSettings.values.videoFilterArguments)
+          videoFilterArguments = ['-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments];
       }
     }
 
@@ -1264,23 +1267,12 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     ffmpegInput.destinationVideoBitrate = destinationVideoBitrate;
 
     if (transcodingEnabled && this.streamSettings.storageSettings.values.missingCodecParameters) {
-      ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
-      ffmpegInput.h264FilterArguments.push("-bsf:v", "dump_extra");
+      if (!ffmpegInput.mediaStreamOptions)
+        ffmpegInput.mediaStreamOptions = { id };
+      ffmpegInput.mediaStreamOptions.oobCodecParameters = true;
     }
 
-    if (transcodingEnabled && this.streamSettings.storageSettings.values.videoFilterArguments) {
-      ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
-      if (ffmpegInput.h264FilterArguments.length) {
-        const filterIndex = ffmpegInput.h264FilterArguments?.findIndex(f => f === '-filter_complex');
-        if (filterIndex !== undefined && filterIndex !== -1)
-          ffmpegInput.h264FilterArguments[filterIndex + 1] = ffmpegInput.h264FilterArguments[filterIndex + 1] + `[prefilter] ; [prefilter] ${this.streamSettings.storageSettings.values.videoFilterArguments}`;
-        else
-          ffmpegInput.h264FilterArguments.push('-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments);
-      }
-      else {
-        ffmpegInput.h264FilterArguments.push('-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments);
-      }
-    }
+    ffmpegInput.h264FilterArguments = videoFilterArguments;
 
     if (transcodingEnabled)
       ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
