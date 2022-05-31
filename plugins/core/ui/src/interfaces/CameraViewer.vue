@@ -146,7 +146,7 @@ export default {
   },
   computed: {
     hasIntercom() {
-      return this.device.interfaces.includes(ScryptedInterface.Intercom);
+      return this.device.interfaces.includes(ScryptedInterface.Intercom) || this.device.providedInterfaces.includes(ScryptedInterface.RTCSignalingChannel);
     },
     isLive() {
       return !this.startTime;
