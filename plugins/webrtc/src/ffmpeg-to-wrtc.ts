@@ -1,9 +1,7 @@
 import { MediaStreamTrack, RTCPeerConnection } from "@koush/werift";
 import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
-import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
+import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
-import { RtspServer } from "@scrypted/common/src/rtsp-server";
-import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
 import { waitConnected } from "./peerconnection-util";
@@ -160,12 +158,17 @@ export async function createRTCPeerConnectionSink(
         const videoArgs: string[] = [];
         const transcode = willTranscode
             || mediaStreamOptions?.video?.codec !== 'h264'
-            || ffmpegInput.h264EncoderArguments?.length;
+            || ffmpegInput.h264EncoderArguments?.length
+            || ffmpegInput.h264FilterArguments?.length;
+
+
+        if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
+            videoArgs.push("-bsf:v", "dump_extra");
+        videoArgs.push(...(ffmpegInput.h264FilterArguments || []));
 
         if (transcode) {
             const conservativeDefaultBitrate = 500000;
             const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
-            const width = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
             videoArgs.push(
                 // this seems to cause issues with presets i think.
                 // '-level:v', '4.0',
@@ -175,18 +178,9 @@ export async function createRTCPeerConnectionSink(
                 '-r', '15',
             );
 
+            const width = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
             const scaleFilter = `scale='min(${width},iw)':-2`;
-            if (ffmpegInput.h264FilterArguments?.length) {
-                const filterIndex = ffmpegInput.h264FilterArguments?.findIndex(f => f === '-filter_complex');
-                if (filterIndex !== undefined && filterIndex !== -1)
-                    ffmpegInput.h264FilterArguments[filterIndex + 1] = ffmpegInput.h264FilterArguments[filterIndex + 1] + `[unscaled] ; [unscaled] ${scaleFilter}`;
-                else
-                    ffmpegInput.h264FilterArguments.push('-filter_complex', scaleFilter);
-            }
-            else {
-                ffmpegInput.h264FilterArguments = ffmpegInput.h264FilterArguments || [];
-                ffmpegInput.h264FilterArguments.push('-filter_complex', scaleFilter);
-            }
+            addH264VideoFilterArguments(videoArgs, scaleFilter);
 
             if (!sessionSupportsH264High || maximumCompatibilityMode) {
                 // baseline profile must use libx264, not sure other encoders properly support it.
@@ -208,9 +202,6 @@ export async function createRTCPeerConnectionSink(
         else {
             videoArgs.push('-vcodec', 'copy')
         }
-
-        if (ffmpegInput.h264FilterArguments)
-            videoArgs.push(...ffmpegInput.h264FilterArguments);
 
         const audioRtpTrack: RtpTrack = {
             codecCopy: maximumCompatibilityMode ? undefined : 'opus',
