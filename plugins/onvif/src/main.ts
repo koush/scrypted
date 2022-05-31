@@ -348,19 +348,22 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
                         this.console.error('discovery error', err);
                         return;
                     }
-                    let urn = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['EndpointReference'][0]['Address'][0].payload;
-                    let xaddrs = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['XAddrs'][0].payload;
-                    let scopes = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['Scopes'][0].payload;
-                    scopes = scopes.split(" ");
+                    const urn = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['EndpointReference'][0]['Address'][0].payload;
+                    const xaddrs = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['XAddrs'][0].payload;
+                    let name: string;
 
-                    let hardware = "";
-                    let name = "";
-                    for (let i = 0; i < scopes.length; i++) {
-                        if (scopes[i].includes('onvif://www.onvif.org/name')) { name = decodeURI(scopes[i].substring(27)); }
-                        if (scopes[i].includes('onvif://www.onvif.org/hardware')) { hardware = decodeURI(scopes[i].substring(31)); }
+                    try {
+                        let scopes = result['Envelope']['Body'][0]['ProbeMatches'][0]['ProbeMatch'][0]['Scopes'][0].payload;
+                        scopes = scopes.split(" ");
+    
+                        for (let i = 0; i < scopes.length; i++) {
+                            if (scopes[i].includes('onvif://www.onvif.org/name')) { name = decodeURI(scopes[i].substring(27)); }
+                        }
                     }
-                    let msg = 'Discovery Reply from ' + rinfo.address + ' (' + name + ') (' + hardware + ') (' + xaddrs + ') (' + urn + ')';
-                    this.console.log(msg);
+                    catch (e) {
+                    }
+
+                    this.console.log('Discovery Reply from ' + rinfo.address + ' (' + name + ') (' + xaddrs + ') (' + urn + ')');
 
                     const isNew = !deviceManager.getNativeIds().includes(urn);
                     if (!isNew)
