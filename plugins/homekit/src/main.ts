@@ -373,6 +373,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             ret = new HomekitMixin(options);
         }
 
+        ret.storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
         return ret;
     }
 

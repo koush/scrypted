@@ -22,6 +22,10 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             persistedDefaultValue: false,
         },
         ...createHAPUsernameStorageSettingsDict('HomeKit Pairing'),
+        pincode: {
+            title: "Manual Pairing Code",
+            readonly: true,
+        },
         resetAccessory: {
             group: 'HomeKit Pairing',
             title: 'Reset Pairing',
@@ -45,6 +49,7 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
 
         // this may only change on reload of plugin.
         this.storageSettings.settings.qrCode.hide = !this.storageSettings.values.standalone;
+        this.storageSettings.settings.pincode.hide = !this.storageSettings.values.standalone;
     }
 
     alertReload() {
