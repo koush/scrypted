@@ -140,6 +140,5 @@ export function getDebugModeH264EncoderArgs() {
         '-pix_fmt', 'yuvj420p',
         '-preset', 'ultrafast',
         "-bf", "0",
-        '-force_key_frames', 'expr:gte(t,n_forced*4)',
     ];
 }
