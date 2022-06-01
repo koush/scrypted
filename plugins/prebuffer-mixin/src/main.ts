@@ -1,6 +1,7 @@
 
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
+import { addH264VideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
@@ -1187,7 +1188,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
     let id = options?.id;
     let h264EncoderArguments: string[];
-    let videoFilterArguments: string[];
+    let videoFilterArguments: string;
     let destinationVideoBitrate: number;
 
     const transcodingEnabled = this.mixins?.includes(getTranscodeMixinProviderId());
@@ -1235,7 +1236,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       if (transcodingEnabled && this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
         h264EncoderArguments = this.plugin.transcodeStorageSettings.values.h264EncoderArguments?.split(' ');
         if (this.streamSettings.storageSettings.values.videoFilterArguments)
-          videoFilterArguments = ['-filter_complex', this.streamSettings.storageSettings.values.videoFilterArguments];
+          videoFilterArguments = this.streamSettings.storageSettings.values.videoFilterArguments;
       }
     }
 
@@ -1272,7 +1273,10 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       ffmpegInput.mediaStreamOptions.oobCodecParameters = true;
     }
 
-    ffmpegInput.h264FilterArguments = videoFilterArguments;
+    if (ffmpegInput.h264FilterArguments && videoFilterArguments)
+      addH264VideoFilterArguments(ffmpegInput.h264FilterArguments, videoFilterArguments)
+    else if (videoFilterArguments)
+      ffmpegInput.h264FilterArguments = ['-filter_complex', videoFilterArguments];
 
     if (transcodingEnabled)
       ffmpegInput.videoDecoderArguments = this.streamSettings.storageSettings.values.videoDecoderArguments?.split(' ');
