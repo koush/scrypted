@@ -108,20 +108,6 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             choices: Object.values(streamTypes).map(st => st.title),
             hide: true,
         },
-        // 3/6/2022
-        // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
-        // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
-        // unless this flag is used.
-        // 3/7/2022
-        // This flag was enabled by default, but I believe this is causing issues with some users.
-        // Make it a setting.
-        missingCodecParameters: {
-            group: 'Transcoding',
-            title: 'Add H264 Extra Data',
-            description: 'Some cameras do not include H264 extra data in the stream and this causes live streaming to always fail (but recordings may be working). This is a inexpensive video filter and does not perform a transcode. Enable this setting only as necessary.',
-            type: 'boolean',
-            hide: true,
-        },
         videoDecoderArguments: {
             group: 'Transcoding',
             title: 'Video Decoder Arguments',
@@ -138,7 +124,21 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             description: 'FFmpeg arguments used to filter input video when transcoding a stream. This can be used to crops, scale, rotates, etc.',
             placeholder: 'transpose=1',
             hide: true,
-        }
+        },
+        // 3/6/2022
+        // Ran into an issue where the RTSP source had SPS/PPS in the SDP,
+        // and none in the bitstream. Codec copy will not add SPS/PPS before IDR frames
+        // unless this flag is used.
+        // 3/7/2022
+        // This flag was enabled by default, but I believe this is causing issues with some users.
+        // Make it a setting.
+        missingCodecParameters: {
+            group: 'Transcoding',
+            title: 'Out of Band Codec Parameters',
+            description: 'Some cameras do not include H264 codec parameters in the stream and this causes live streaming to always fail (but recordings may be working). This is a inexpensive video filter and does not perform a transcode. Enable this setting only as necessary.',
+            type: 'boolean',
+            hide: true,
+        },
     });
 
     function getDefaultMediaStream(v: StreamStorageSetting, msos: ResponseMediaStreamOptions[]) {

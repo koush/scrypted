@@ -576,6 +576,11 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
     source?: MediaStreamSource;
     userConfigurable?: boolean;
     sdp?: string;
+    /**
+     * The stream's codec parameters are not contained in the stream
+     * and are available out of band via another mechanism such as the SDP.
+     */
+    oobCodecParameters?: boolean;
 }
 export declare type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";
 export interface RequestMediaStreamOptions extends MediaStreamOptions {

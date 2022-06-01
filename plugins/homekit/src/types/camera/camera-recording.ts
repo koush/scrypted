@@ -1,5 +1,6 @@
 
 import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
+import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { FFmpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { timeoutPromise } from "@scrypted/common/src/promise-utils";
@@ -10,11 +11,11 @@ import mkdirp from 'mkdirp';
 import net from 'net';
 import { Duplex, Readable, Writable } from 'stream';
 import { } from '../../common';
-import { DataStreamConnection, AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration } from '../../hap';
+import { AudioRecordingCodecType, AudioRecordingSamplerateValues, CameraRecordingConfiguration, DataStreamConnection } from '../../hap';
+import type { HomeKitPlugin } from "../../main";
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
 import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
-import type { HomeKitPlugin } from "../../main";
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -121,11 +122,10 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
     const isDefinitelyNotAAC = !audioCodec || audioCodec.toLowerCase().indexOf('aac') === -1;
     const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
-    const transcodeRecording = !!ffmpegInput.h264EncoderArguments?.length;
+    const transcodeRecording = !!ffmpegInput.h264EncoderArguments?.length || !!ffmpegInput.h264FilterArguments?.length;
     const needsFFmpeg = transcodingDebugMode
         || !ffmpegInput.url.startsWith('tcp://')
-        || !!ffmpegInput.h264EncoderArguments?.length
-        || !!ffmpegInput.h264FilterArguments?.length
+        || transcodeRecording
         || ffmpegInput.container !== 'mp4'
         || noAudio;
 
@@ -155,10 +155,8 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
             }
         }
 
-        // decoder arguments
-        if (transcodeRecording && ffmpegInput.videoDecoderArguments?.length) {
+        if (ffmpegInput.videoDecoderArguments?.length)
             inputArguments.push(...ffmpegInput.videoDecoderArguments);
-        }
 
         inputArguments.push(...ffmpegInput.inputArguments);
 
@@ -201,30 +199,31 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
             ];
         }
 
-        let videoArgs: string[];
-        if (transcodingDebugMode) {
-            videoArgs = getDebugModeH264EncoderArgs();
-        }
-        else if (transcodeRecording) {
-            videoArgs = [
+        const videoArgs = ffmpegInput.h264FilterArguments?.slice() || [];
+        if (transcodingDebugMode || transcodeRecording) {
+            if (transcodingDebugMode || !ffmpegInput.h264EncoderArguments) {
+                videoArgs.push(...getDebugModeH264EncoderArgs());
+            }
+            else {
+                videoArgs.push(...ffmpegInput.h264EncoderArguments);
+            }
+            const videoRecordingFilter = `scale=w='min(${configuration.videoCodec.resolution[0]},iw)':h=-2`;
+            addH264VideoFilterArguments(videoArgs, videoRecordingFilter);
+            videoArgs.push(
                 '-b:v', `${configuration.videoCodec.bitrate}k`,
                 "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
                 "-maxrate", request.video.max_bit_rate.toString() + "k",
-                "-filter:v", `fps=${request.video.fps},scale=w=${configuration.videoCodec.resolution[0]}:h=${configuration.videoCodec.resolution[1]}:force_original_aspect_ratio=1,pad=${configuration.videoCodec.resolution[0]}:${configuration.videoCodec.resolution[1]}:(ow-iw)/2:(oh-ih)/2`,
-                '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
-
-                ...ffmpegInput.h264EncoderArguments,
-            ];
+                // used to use this but switched to group of picture (gop) instead.
+                // '-force_key_frames', `expr:gte(t,n_forced*${iframeIntervalSeconds})`,
+                '-g', `${iframeIntervalSeconds * request.video.fps}`,
+                '-r', `${request.video.fps}`,
+            );
         }
         else {
             checkCompatibleCodec(console, device, videoCodec)
-            videoArgs = [
+            videoArgs.push(
                 '-vcodec', 'copy',
-            ];
-        }
-
-        if (ffmpegInput.h264FilterArguments?.length) {
-            videoArgs.push(...ffmpegInput.h264FilterArguments);
+            );
         }
 
         console.log(`motion recording starting`);

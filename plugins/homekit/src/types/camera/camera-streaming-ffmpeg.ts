@@ -1,5 +1,6 @@
 import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
+import { addH264VideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
@@ -43,7 +44,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     const hideBanner = [
         '-hide_banner',
     ];
-    const videoArgs: string[] = [];
+    const videoArgs = ffmpegInput.h264FilterArguments?.slice() || [];
     const audioArgs: string[] = [];
 
     const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
@@ -51,46 +52,38 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         transcodingDebugModeWarning();
 
     const videoCodec = ffmpegInput.mediaStreamOptions?.video?.codec;
+    const transcodeStreaming = !!ffmpegInput.h264EncoderArguments?.length
+        || !!ffmpegInput.h264FilterArguments?.length;
     const needsFFmpeg = transcodingDebugMode
-        || !!ffmpegInput.h264EncoderArguments?.length
-        || !!ffmpegInput.h264FilterArguments?.length
+        || transcodeStreaming
         || ffmpegInput.container !== 'rtsp';
 
     videoArgs.push(
         "-an", '-sn', '-dn',
     );
 
+    if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
+        videoArgs.push("-bsf:v", "dump_extra");
+
     // encoder args
-    if (transcodingDebugMode) {
-        const videoCodec =
-            [
-                "-b:v", request.video.max_bit_rate.toString() + "k",
-                "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
-                "-maxrate", request.video.max_bit_rate.toString() + "k",
-                "-r", request.video.fps.toString(),
+    if (transcodingDebugMode || transcodeStreaming) {
+        if (transcodingDebugMode || !ffmpegInput.h264EncoderArguments) {
+            videoArgs.push(...getDebugModeH264EncoderArgs());
+        }
+        else {
+            videoArgs.push(...ffmpegInput.h264EncoderArguments);
+        }
+        const videoRecordingFilter = `scale=w='min(${request.video.width},iw)':h=-2`;
+        addH264VideoFilterArguments(videoArgs, videoRecordingFilter);
 
-                ...getDebugModeH264EncoderArgs(),
-            ];
-
-        videoArgs.push(
-            ...videoCodec,
-        )
-    }
-    else if (ffmpegInput.h264EncoderArguments?.length) {
         const bitrate = ffmpegInput.destinationVideoBitrate || (request.video.max_bit_rate * 1000);
-        const videoCodec: string[] =
-            [
-                "-b:v", bitrate.toString(),
-                "-bufsize", (2 * bitrate).toString(),
-                "-maxrate", bitrate.toString(),
-                "-r", request.video.fps.toString(),
-
-                ...ffmpegInput.h264EncoderArguments,
-            ];
-
         videoArgs.push(
-            ...videoCodec,
-        )
+            "-b:v", bitrate.toString(),
+            "-bufsize", (2 * bitrate).toString(),
+            "-maxrate", bitrate.toString(),
+            '-g', `${4 * request.video.fps}`,
+            "-r", request.video.fps.toString(),
+        );
     }
     else {
         checkCompatibleCodec(console, device, videoCodec)
@@ -98,10 +91,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         videoArgs.push(
             "-vcodec", "copy",
         );
-    }
-
-    if (ffmpegInput.h264FilterArguments?.length) {
-        videoArgs.push(...ffmpegInput.h264FilterArguments);
     }
 
     let videoOutput = `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`;

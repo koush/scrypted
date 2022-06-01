@@ -34,3 +34,6 @@
 [submodule "plugins/roborock/homebridge-xiaomi-roborock-vacuum"]
 	path = plugins/roborock/homebridge-xiaomi-roborock-vacuum
 	url = https://github.com/homebridge-xiaomi-roborock-vacuum/homebridge-xiaomi-roborock-vacuum.git
+[submodule "external/onvif"]
+	path = external/onvif
+	url = git@github.com:koush/onvif.git
