@@ -105,7 +105,7 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         const endpoints = this.getDiscoveryEndpoints();
 
         if (!endpoints.length)
-            return;
+            return [];
 
         const accessToken = await this.getAccessToken();
         await this.postEvent(accessToken, {
