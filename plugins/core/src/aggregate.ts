@@ -82,9 +82,6 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
             );
             filter.push(`[${i}:v] scale=${w}x${h} [pos${i}];`)
         }
-        ffmpegInput.inputArguments.push(
-            '-f', 'lavfi', '-i', 'anullsrc',
-        )
 
         let prev = 'base';
         let curx = 0;
