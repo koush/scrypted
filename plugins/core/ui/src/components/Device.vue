@@ -212,6 +212,15 @@
 
               <v-btn color="info" text @click="openConsole">Console</v-btn>
 
+              <v-tooltip bottom v-if="device.info.managementUrl">
+                <template v-slot:activator="{ on }">
+                  <v-btn x-small v-on="on" color="info" text @click="openManagementUrl"
+                    ><v-icon x-small>fa-wrench</v-icon></v-btn
+                  >
+                </template>
+                <span>Open Device Management Url</span>
+              </v-tooltip>
+
               <v-tooltip bottom>
                 <template v-slot:activator="{ on }">
                   <v-btn x-small v-on="on" color="info" text @click="openRepl"
@@ -649,6 +658,9 @@ export default {
         await Vue.nextTick();
         this.$vuetify.goTo(this.$refs.consoleEl);
       }
+    },
+    openManagementUrl() {
+      window.open(this.device.info.managementUrl);
     },
     async openRepl() {
       this.showRepl = !this.showRepl;
