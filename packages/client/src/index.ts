@@ -1,9 +1,10 @@
 import { ScryptedStatic } from "../../../sdk/types/index";
 export * from "../../../sdk/types/index";
 import { SocketOptions } from 'engine.io-client';
-import eio from 'engine.io-client';
+import * as eio from 'engine.io-client';
 import { attachPluginRemote } from  '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
+import { IOSocket } from '../../../server/src/io';
 import axios, { AxiosRequestConfig } from 'axios';
 import https from 'https';
 
@@ -45,13 +46,6 @@ export async function getLoginCookie(baseUrl: string, username: string, password
     return response.headers["set-cookie"][0];
 }
 
-/**
- * 
- * @param baseUrl The base url of the webserver, or undefined to use current url (browser only).
- * @param pluginId The plugin id to connect to.
- * @param clientName Any string representing your web client, used for error logging.
- * @returns 
- */
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
     let { baseUrl, pluginId, clientName, username, password } = options;
     const rootLocation = baseUrl || `${window.location.protocol}//${window.location.host}`;
@@ -64,12 +58,12 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
 
     return new Promise((resolve, reject) => {
-        const options: SocketOptions = {
+        const options: Partial<SocketOptions> = {
             path: `${endpointPath}/engine.io/api/`,
             extraHeaders,
             rejectUnauthorized: false,
         };
-        const socket = eio(rootLocation, options);
+        const socket: IOSocket & eio.Socket = new eio.Socket(rootLocation, options);
 
         socket.on('error', reject);
 
