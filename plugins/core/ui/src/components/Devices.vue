@@ -1,8 +1,13 @@
 <template>
   <v-layout>
-    <v-flex xs12 md8 lg6>
+    <v-flex xs12 md10 lg8>
       <v-card raised>
-        <v-toolbar dark :color="$vuetify.theme.dark ? undefined : 'light-blue darken-2'">
+        <v-toolbar
+          dark
+          :color="
+            color || ($vuetify.theme.dark ? undefined : colors.indigo.darken2)
+          "
+        >
           All Devices
           <v-spacer></v-spacer>
           <v-text-field
@@ -45,25 +50,27 @@ export default {
     getProvider(device) {
       if (device.providerId === device.id)
         return {
-          name: this.$scrypted.systemManager.getDeviceById(device.providerId).name,
+          name: this.$scrypted.systemManager.getDeviceById(device.providerId)
+            .name,
           link: `#/device/${device.id}`,
-        }
+        };
       return {
-        name: this.$scrypted.systemManager.getDeviceById(device.providerId).name,
+        name: this.$scrypted.systemManager.getDeviceById(device.providerId)
+          .name,
         link: `#/device/${device.id}`,
-      }
+      };
     },
     typeToIcon,
     getMetadata(device, prop) {
       const metadata = device.metadata;
       return metadata && metadata[prop];
-    }
+    },
   },
   computed: {
     devices() {
       return this.$store.state.scrypted.devices
-        .map(id => this.$scrypted.systemManager.getDeviceById(id))
-        .map(device => ({
+        .map((id) => this.$scrypted.systemManager.getDeviceById(id))
+        .map((device) => ({
           id: device.id,
           name: device.name,
           type: device.type,
@@ -71,10 +78,10 @@ export default {
         }));
     },
     tableDevices() {
-      return this.devices.map(device =>
+      return this.devices.map((device) =>
         Object.assign(
           {
-            plugin: device.owner || device.component
+            plugin: device.owner || device.component,
           },
           device
         )
@@ -88,7 +95,7 @@ export default {
           text: "",
           align: "left",
           sortable: false,
-          value: "icon"
+          value: "icon",
         });
       }
 
@@ -96,7 +103,7 @@ export default {
         text: "Name",
         align: "left",
         sortable: true,
-        value: "name"
+        value: "name",
       });
 
       if (this.$vuetify.breakpoint.smAndUp) {
@@ -104,7 +111,7 @@ export default {
           text: "Type",
           align: "left",
           sortable: true,
-          value: "type"
+          value: "type",
         });
       }
       if (this.$vuetify.breakpoint.mdAndUp) {
@@ -112,17 +119,17 @@ export default {
           text: "Source",
           align: "left",
           sortable: true,
-          value: "plugin"
+          value: "plugin",
         });
       }
       return ret;
-    }
+    },
   },
-  data: function() {
+  data: function () {
     return {
       search: "",
-      colors
+      colors,
     };
-  }
+  },
 };
 </script>

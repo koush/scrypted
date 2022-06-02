@@ -22,9 +22,13 @@ let router = new VueRouter({
       //   path: "/",
       //   component: Devices
       // },
+      // {
+      //   path: "/",
+      //   component: Dashboard
+      // },
       {
         path: "/",
-        component: Dashboard
+        component: PluginComponent
       },
       {
         path: "/component/automation",

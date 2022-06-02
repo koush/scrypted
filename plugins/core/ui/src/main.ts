@@ -12,7 +12,7 @@ import './registerServiceWorker'
 
 // STYLES
 // Main Theme SCSS
-import './assets/scss/theme.scss'
+// import './assets/scss/theme.scss'
 
 Vue.directive('linkified', require('vue-linkify'))
 

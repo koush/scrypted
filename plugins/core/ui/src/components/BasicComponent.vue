@@ -20,7 +20,7 @@
           <v-card-actions>
             <v-btn
               text
-              color="orange"
+              color="info"
               v-for="(cardButton, buttonIndex) in card.buttons"
               :key="buttonIndex"
               @click="cardButton.click && cardButton.click(card.value)"

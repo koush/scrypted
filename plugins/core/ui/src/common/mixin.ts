@@ -63,8 +63,3 @@ export async function getMixinProviderAvailableDevices(systemManager: SystemMana
         enabled: device.mixins?.includes(mixinProvider.id),
     }));
 }
-
-export async function getDeviceMixins(systemManager: SystemManager, device: ScryptedDevice) {
-    const mixins = (device.mixins || []).slice();
-    return mixins;
-}

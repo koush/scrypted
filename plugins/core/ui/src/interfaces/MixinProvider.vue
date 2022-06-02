@@ -16,7 +16,7 @@
       >
         <v-list-item-action>
           <v-checkbox
-          dense
+            dense
             @click.stop
             @change="toggleMixin(mixin)"
             v-model="mixin.enabled"
@@ -27,14 +27,12 @@
         <v-list-item-content>
           <v-list-item-subtitle>{{ mixin.name }}</v-list-item-subtitle>
         </v-list-item-content>
-        
-        <v-list-item-icon><v-icon x-small color="grey">{{ typeToIcon(mixin.type) }}</v-icon></v-list-item-icon>
-        
-     
-        <v-list-item-icon>
-          <v-list-item-action><v-btn small @click.stop="openMixin(mixin)"><v-icon x-small>fa-external-link-alt</v-icon></v-btn></v-list-item-action>
-        </v-list-item-icon>
-        
+
+        <v-list-item-action
+          ><v-btn x-small @click.stop="openMixin(mixin)"
+            ><v-icon x-small>{{ typeToIcon(mixin.type) }}</v-icon></v-btn
+          ></v-list-item-action
+        >
       </v-list-item>
     </v-list-item-group>
   </div>
@@ -42,7 +40,7 @@
 <script>
 import RPCInterface from "./RPCInterface.vue";
 import DeviceGroup from "../common/DeviceTable.vue";
-import { getMixinProviderAvailableDevices, setMixin } from '../common/mixin';
+import { getMixinProviderAvailableDevices, setMixin } from "../common/mixin";
 import { typeToIcon, getDeviceViewPath } from "../components/helpers";
 
 export default {
@@ -62,8 +60,8 @@ export default {
       );
     },
     openMixin(mixin) {
-        this.$router.push(getDeviceViewPath(mixin.id));
-    }
+      this.$router.push(getDeviceViewPath(mixin.id));
+    },
   },
   computed: {
     currentMixins() {
@@ -87,7 +85,10 @@ export default {
         return this.currentMixins;
       },
       async get() {
-        return getMixinProviderAvailableDevices(this.$scrypted.systemManager, this.device);
+        return getMixinProviderAvailableDevices(
+          this.$scrypted.systemManager,
+          this.device
+        );
       },
     },
   },

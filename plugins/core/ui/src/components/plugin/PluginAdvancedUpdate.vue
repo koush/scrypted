@@ -52,9 +52,9 @@ export default {
   },
   methods: {
     releaseColor(tag) {
-      if (tag === "latest") return "green";
+      if (tag === "latest") return "success";
       if (tag === "beta") return "red";
-      if (tag === "installed") return "purple";
+      if (tag === "installed") return "info";
     },
     openNpm() {
       window.open(getNpmPath(this.pluginData.packageJson.name), "npm");

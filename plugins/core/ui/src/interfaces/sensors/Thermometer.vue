@@ -1,6 +1,11 @@
 <template>
   <span>
-    <font-awesome-icon class="white--text mr-1 mr-1" size="sm" icon="thermometer-three-quarters" color="#a9afbb" />
+    <font-awesome-icon
+      class="mr-1 mr-1"
+      size="sm"
+      icon="thermometer-three-quarters"
+      color="#a9afbb"
+    />
     <span class="caption mr-1">{{ Math.round(lazyValue.temperature) }}°</span>
   </span>
 </template>

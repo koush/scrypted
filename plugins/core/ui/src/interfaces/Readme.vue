@@ -1,11 +1,10 @@
 <template>
-  <v-card>
-    <CardTitle >Readme</CardTitle>
+  <div>
     <v-flex v-if="readme">
       <VueMarkdown :source="readme"></VueMarkdown>
     </v-flex>
     <v-card-text v-else> Loading... </v-card-text>
-  </v-card>
+  </div>
 </template>
 <script>
 import CardTitle from './../components/CardTitle.vue';

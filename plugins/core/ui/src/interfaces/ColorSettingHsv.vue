@@ -1,7 +1,14 @@
 <template>
-  <v-layout align-center justify-center>
-    <ColorPicker style="margin-bottom: 16px;" variant="persistent" v-bind="color" @input="onInputValue" />
-  </v-layout>
+  <v-flex xs12>
+    <v-layout align-center justify-center>
+      <ColorPicker
+        style="margin-bottom: 16px"
+        variant="persistent"
+        v-bind="color"
+        @input="onInputValue"
+      />
+    </v-layout>
+  </v-flex>
 </template>
 
 <script>
@@ -13,7 +20,7 @@ import ColorPicker from "@radial-color-picker/vue-color-picker";
 export default {
   mixins: [RPCInterface],
   components: {
-    ColorPicker
+    ColorPicker,
   },
   methods: {
     createLazyValue() {
@@ -22,7 +29,7 @@ export default {
         {
           h: 360,
           s: 1,
-          v: 1
+          v: 1,
         },
         {
           h: this.value.hsv && this.value.hsv.h,
@@ -30,7 +37,7 @@ export default {
       );
       return ret;
     },
-    debounceSetHsv: throttle(function() {
+    debounceSetHsv: throttle(function () {
       const { h, s, v } = this.lazyValue.hsv;
       this.rpc().setHsv(h, s, v);
     }, 500),
@@ -47,7 +54,7 @@ export default {
       this.lazyValue.hsv.h = h;
 
       this.onChange();
-    }
+    },
   },
   computed: {
     color() {
@@ -55,9 +62,9 @@ export default {
         hue: this.lazyValue.hsv.h,
         // saturation: 100,
         // luminosity: 100,
-      }
-    }
-  }
+      };
+    },
+  },
 };
 </script>
 <style>

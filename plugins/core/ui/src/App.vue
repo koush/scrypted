@@ -14,12 +14,12 @@
           <v-btn v-on="on" text>{{ $store.state.username }}</v-btn>
         </template>
         <v-list>
-          <v-list-item  @click="reload">
+          <v-list-item @click="reload">
             <v-list-item-content>
               <v-list-item-title>Reload</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
-          <v-list-item  @click="logout">
+          <v-list-item @click="logout">
             <v-list-item-content>
               <v-list-item-title>Logout</v-list-item-title>
             </v-list-item-content>
@@ -27,7 +27,9 @@
         </v-list>
       </v-menu>
 
-      <v-btn icon small @click="toggleDarkMode"><v-icon small>fa fa-sun</v-icon></v-btn>
+      <v-btn icon small @click="toggleDarkMode"
+        ><v-icon small>fa fa-sun</v-icon></v-btn
+      >
 
       <v-menu left bottom>
         <template v-slot:activator="{ on }">
@@ -47,7 +49,6 @@
 
         <v-list>
           <v-list-item
-            
             v-for="alert in $store.state.scrypted.alerts"
             :key="alert.id"
             @click="doAlert(alert)"
@@ -70,17 +71,14 @@
             </v-list-item-content>
           </v-list-item>
           <v-divider v-if="$store.state.scrypted.alerts.length"></v-divider>
-          <v-list-item
-            v-if="!$store.state.scrypted.alerts.length"
-            
-          >
+          <v-list-item v-if="!$store.state.scrypted.alerts.length">
             <v-list-item-content>
               <v-list-item-title class="caption"
                 >No notifications.</v-list-item-title
               >
             </v-list-item-content>
           </v-list-item>
-          <v-list-item v-else  @click="clearAlerts">
+          <v-list-item v-else @click="clearAlerts">
             <v-list-item-icon>
               <v-icon x-small style="color: #a9afbb">fa-trash</v-icon>
             </v-list-item-icon>
@@ -102,7 +100,6 @@
 
         <v-list>
           <v-list-item
-            
             v-for="(menuItem, index) in $store.state.menu"
             :key="index"
             @click="menuItem.click"
@@ -126,71 +123,65 @@
     </v-app-bar>
 
     <v-dialog
-      v-if="$store.state.isLoggedIntoCloud === false"
-      :value="true"
-      persistent
-      max-width="600px"
-    >
-      <v-card dark color="purple">
-        <v-card-title>
-          <span class="headline">Scrypted Management Console</span>
-        </v-card-title>
-        <v-card-text></v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn text @click="doCloudLogin">Log Into Scrypted Cloud</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-    <v-dialog
-      v-else-if="$store.state.isLoggedIn === false"
+      v-if="$store.state.isLoggedIn === false"
       :value="true"
       persistent
       max-width="600px"
     >
       <v-form @submit.prevent="doLogin">
-        <v-card dark color="purple">
-          <v-card-title>
+        <v-card>
+          <v-toolbar dark dense color="deep-purple accent-4">
             <span class="headline">Scrypted Management Console</span>
-          </v-card-title>
+          </v-toolbar>
           <v-card-text>
             <v-container grid-list-md>
               <v-layout wrap>
                 <v-flex xs12>
                   <v-text-field
+                    dense
+                    outlined
                     v-model="username"
-                    color="white"
                     label="User Name"
                   ></v-text-field>
                   <v-text-field
+                    dense
+                    outlined
                     v-model="password"
-                    color="white"
                     type="password"
                     label="Password"
                   ></v-text-field>
                   <v-checkbox
+                    dense
                     v-if="$store.state.hasLogin === true"
                     v-model="changePassword"
                     label="Change Password"
                   ></v-checkbox>
                   <v-text-field
+                    dense
                     v-model="newPassword"
                     v-if="changePassword"
-                    color="white"
                     type="password"
                     label="New Password"
                   ></v-text-field>
                   <v-text-field
+                    dense
                     v-model="confirmPassword"
                     v-if="changePassword || $store.state.hasLogin === false"
-                    color="white"
                     type="password"
                     label="Confirm Password"
-                    :rules="[(changePassword ? confirmPassword !== newPassword : confirmPassword !== password) ? 'Passwords do not match.' : true]"
+                    :rules="[
+                      (
+                        changePassword
+                          ? confirmPassword !== newPassword
+                          : confirmPassword !== password
+                      )
+                        ? 'Passwords do not match.'
+                        : true,
+                    ]"
                   ></v-text-field>
                 </v-flex>
               </v-layout>
-              <div>{{ loginResult }}</div>
+              <div v-if="loginResult">{{ loginResult }}</div>
             </v-container>
           </v-card-text>
           <v-card-actions>
@@ -253,8 +244,7 @@ export default {
     Drawer,
   },
   mounted() {
-    if (this.darkMode)
-      this.$vuetify.theme.dark = true;
+    if (this.darkMode) this.$vuetify.theme.dark = true;
     this._timer = setInterval(
       function () {
         this.$data.now = Date.now();
@@ -269,7 +259,7 @@ export default {
     toggleDarkMode() {
       this.darkMode = !this.darkMode;
       this.$vuetify.theme.dark = this.darkMode;
-      localStorage.setItem('darkMode', this.darkMode.toString());
+      localStorage.setItem("darkMode", this.darkMode.toString());
     },
     reconnect() {
       this.$connectScrypted().catch((e) => (this.loginResult = e.toString()));
@@ -280,25 +270,23 @@ export default {
     logout() {
       axios.get("/logout").then(() => window.location.reload());
     },
-    doCloudLogin() {
-      var encode = qs.stringify({
-        redirect_uri: "/endpoint/@scrypted/core/public/",
-      });
-
-      window.location = `https://home.scrypted.app/_punch/login?${encode}`;
-    },
     doLogin() {
       const body = {
         username: this.username,
         password: this.password,
       };
       if (this.changePassword || this.$store.state.hasLogin === false) {
-        if (this.$store.state.hasLogin === false && this.password !== this.confirmPassword) {
-          this.loginResult = 'Passwords do not match.';
+        if (
+          this.$store.state.hasLogin === false &&
+          this.password !== this.confirmPassword
+        ) {
+          this.loginResult = "Passwords do not match.";
           return;
-        }
-        else if (this.changePassword && this.newPassword !== this.confirmPassword) {
-          this.loginResult = 'Passwords do not match.';
+        } else if (
+          this.changePassword &&
+          this.newPassword !== this.confirmPassword
+        ) {
+          this.loginResult = "Passwords do not match.";
           return;
         }
         body.change_password = this.confirmPassword;
@@ -322,8 +310,11 @@ export default {
           this.loginResult = e.toString();
           // cert may need to be reaccepted? Server is down? Go to the
           // server root to force the network error to bypass the PWA cache.
-          if (e.toString().includes('Network Error') && window.location.href.startsWith('https:')) {
-            window.location = '/';
+          if (
+            e.toString().includes("Network Error") &&
+            window.location.href.startsWith("https:")
+          ) {
+            window.location = "/";
           }
         });
     },
@@ -379,7 +370,7 @@ export default {
   data() {
     const self = this;
     return {
-      darkMode: localStorage.getItem('darkMode') !== 'false',
+      darkMode: localStorage.getItem("darkMode") !== "false",
       now: 0,
       title: "Scrypted",
       drawer: this.$vuetify.breakpoint.lgAndUp,

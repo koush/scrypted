@@ -40,19 +40,19 @@ export default {
           body: null,
           buttons: [
             {
-              title: "Install Plugin",
+              title: "Install",
               click() {
                 self.$router.push(`${self.componentViewPath}/install`);
               },
             },
             {
-              title: "Setup Auto Updates",
+              title: "Auto Updates",
               click() {
                 self.openAutoupdater();
               },
             },
             {
-              title: "Snapshot Current Plugins",
+              title: "Snapshot Plugins",
               click() {
                 self.snapshotCurrentPlugins();
               },
@@ -60,7 +60,7 @@ export default {
           ],
           description:
             "Integrate your existing smart home devices and services.",
-          title: "Install Plugin",
+          title: "Plugin Management",
         },
       ],
       resettable: true,

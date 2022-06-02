@@ -2,6 +2,7 @@
   <v-flex>
     <v-label>Temperature</v-label>
     <v-range-slider
+      dense
       color="purple"
       thumb-color="purple"
       thumb-label="always"
@@ -12,6 +13,7 @@
       @change="setThermostatSetpointRange"
     ></v-range-slider>
     <v-slider
+      dense
       color="purple"
       thumb-color="purple"
       v-else
@@ -22,6 +24,7 @@
       @change="setThermostatSetpoint"
     ></v-slider>
     <v-select
+      dense
       outlined
       v-model="lazyValue.thermostatMode"
       :items="lazyValue.thermostatAvailableModes"
@@ -40,7 +43,7 @@ export default {
   mixins: [RPCInterface],
   data() {
     return {
-      HeatCool: ThermostatMode.HeatCool
+      HeatCool: ThermostatMode.HeatCool,
     };
   },
   methods: {
@@ -51,7 +54,7 @@ export default {
       }
       this.onChange();
     },
-    debounceSetThermostatSetpoint: throttle(function() {
+    debounceSetThermostatSetpoint: throttle(function () {
       this.rpc().setThermostatSetpoint(this.lazyValue.thermostatSetpoint);
     }, 500),
     setThermostatSetpointRange() {
@@ -61,7 +64,7 @@ export default {
       }
       this.onChange();
     },
-    debounceSetThermostatSetpointRange: throttle(function() {
+    debounceSetThermostatSetpointRange: throttle(function () {
       this.rpc().setThermostatSetpointLow(this.lazyValue.thermostatSetpointLow);
       this.rpc().setThermostatSetpointHigh(
         this.lazyValue.thermostatSetpointHigh
@@ -90,26 +93,26 @@ export default {
       ret = Object.assign(
         {
           thermostatMode: "Off",
-          thermostatSetpoint: 22.2
+          thermostatSetpoint: 22.2,
         },
         ret
       );
       return ret;
-    }
+    },
   },
   computed: {
     range: {
       get() {
         return [
           this.lazyValue.thermostatSetpointLow,
-          this.lazyValue.thermostatSetpointHigh
+          this.lazyValue.thermostatSetpointHigh,
         ];
       },
       set(val) {
         this.lazyValue.thermostatSetpointLow = val[0];
         this.lazyValue.thermostatSetpointHigh = val[1];
-      }
-    }
-  }
+      },
+    },
+  },
 };
 </script>

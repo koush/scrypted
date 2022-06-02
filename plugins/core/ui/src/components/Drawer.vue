@@ -110,12 +110,6 @@ export default {
       default() {
         return [
           {
-            id: "plugin",
-            name: "Plugins",
-            icon: "fa-puzzle-piece",
-            category: "Components",
-          },
-          {
             id: "automation",
             name: "Automations",
             icon: "fa-bolt",
@@ -190,13 +184,19 @@ export default {
       actives: {},
       // components: [],
       builtinComponents: [
-        {
-          id: "dashboard",
-          name: "Dashboard",
-          icon: "fa-tachometer-alt",
-          path: "/",
-          active: false,
+              {
+            id: "plugin",
+            name: "Plugins",
+            icon: "fa-puzzle-piece",
+            path: '/',
         },
+        // {
+        //   id: "dashboard",
+        //   name: "Dashboard",
+        //   icon: "fa-tachometer-alt",
+        //   path: "/",
+        //   active: false,
+        // },
         {
           id: "devices",
           name: "Devices",

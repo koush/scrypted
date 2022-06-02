@@ -1,36 +1,47 @@
 <template>
   <v-layout wrap>
-    <v-flex xs12>
-      <div v-if="deviceAlerts.length" class="pb-5">
-        <v-alert
-          dark
-          dismissible
-          @input="removeAlert(alert)"
-          v-for="alert in deviceAlerts"
-          :key="alert.id"
-          xs12
-          md6
-          lg6
-          color="primary"
-          icon="mdi-vuetify"
-          border="left"
-        >
-          <template v-slot:prepend>
-            <v-icon class="white--text mr-3" size="sm" color="#a9afbb">{{
-              getAlertIcon(alert)
-            }}</v-icon>
-          </template>
-          <div class="caption">{{ alert.title }}</div>
-          <div
-            v-linkified:options="{ className: 'alert-link' }"
-            v-html="alert.message.replace('origin:', origin)"
-          ></div>
-        </v-alert>
-      </div>
+    <v-flex xs12 v-if="deviceAlerts.length">
+      <v-alert
+        dark
+        dismissible
+        @input="removeAlert(alert)"
+        v-for="alert in deviceAlerts"
+        :key="alert.id"
+        xs12
+        md6
+        lg6
+        color="primary"
+        icon="mdi-vuetify"
+        border="left"
+      >
+        <template v-slot:prepend>
+          <v-icon class="white--text mr-3" size="sm" color="#a9afbb">{{
+            getAlertIcon(alert)
+          }}</v-icon>
+        </template>
+        <div class="caption">{{ alert.title }}</div>
+        <div
+          v-linkified:options="{ className: 'alert-link' }"
+          v-html="alert.message.replace('origin:', origin)"
+        ></div>
+      </v-alert>
     </v-flex>
 
-    <v-flex v-for="iface in noCardAboveInterfaces" :key="iface" xs12>
-      <component :value="deviceState" :device="device" :is="iface"></component>
+    <v-flex v-for="iface in aboveInterfaces" :key="iface" xs12>
+      <component
+        v-if="noCardInterfaces.includes(iface)"
+        :value="deviceState"
+        :device="device"
+        :is="iface"
+      ></component>
+      <v-card v-else>
+        <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
+        <component
+          :value="deviceState"
+          :device="device"
+          :is="iface"
+        ></component>
+      </v-card>
     </v-flex>
 
     <v-flex xs12 v-if="showConsole" ref="consoleEl">
@@ -42,9 +53,30 @@
     </v-flex>
     <v-flex xs12 md7>
       <v-layout row wrap>
-        <v-flex xs12>
+        <v-flex
+          xs12
+          v-for="iface in leftAboveInterfaces"
+          :key="iface"
+          class="pb-0"
+        >
+          <component
+            v-if="noCardInterfaces.includes(iface)"
+            :value="deviceState"
+            :device="device"
+            :is="iface"
+          ></component>
+          <v-card v-else>
+            <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
+            <component
+              :value="deviceState"
+              :device="device"
+              :is="iface"
+            ></component>
+          </v-card>
+        </v-flex>
+        <v-flex xs12 class="pb-0">
           <v-card raised>
-            <v-toolbar dark :color="colors.indigo.darken2" dense>
+            <v-card-title>
               {{ name || "No Device Name" }}
               <v-layout
                 mr-1
@@ -61,7 +93,7 @@
                   :key="iface"
                 ></component>
               </v-layout>
-            </v-toolbar>
+            </v-card-title>
 
             <v-card-subtitle v-if="ownerDevice && pluginData">
               <a @click="openDevice(ownerDevice.id)">{{ ownerDevice.name }}</a>
@@ -81,10 +113,11 @@
               </v-layout>
             </v-flex>
 
-            <v-container>
+            <v-container v-if="!isPlugin">
               <v-layout>
                 <v-flex xs12>
                   <v-text-field
+                    v-if="!isPlugin"
                     dense
                     v-model="name"
                     label="Name"
@@ -267,9 +300,68 @@
           ></component>
         </v-flex>
 
+        <v-flex xs12 v-for="iface in leftInterfaces" :key="iface" class="pb-0">
+          <component
+            v-if="noCardInterfaces.includes(iface)"
+            :value="deviceState"
+            :device="device"
+            :is="iface"
+          ></component>
+          <v-card v-else>
+            <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
+            <component
+              :value="deviceState"
+              :device="device"
+              :is="iface"
+            ></component>
+          </v-card>
+        </v-flex>
+
+        <v-flex xs12 v-if="showStorage">
+          <v-card raised>
+            <CardTitle>Storage</CardTitle>
+            <v-container>
+              <v-layout>
+                <v-flex xs12>
+                  <Storage
+                    v-model="pluginData.storage"
+                    @input="onChange"
+                    @save="saveStorage"
+                  ></Storage>
+                </v-flex>
+              </v-layout>
+            </v-container>
+          </v-card>
+        </v-flex>
+      </v-layout>
+    </v-flex>
+
+    <v-flex xs12 md5>
+      <v-layout row wrap>
+        <v-flex xs12 v-for="iface in rightInterfaces" :key="iface" class="pb-0">
+          <component
+            v-if="noCardInterfaces.includes(iface)"
+            :value="deviceState"
+            :device="device"
+            :is="iface"
+          ></component>
+          <v-card v-else>
+            <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
+            <component
+              :value="deviceState"
+              :device="device"
+              :is="iface"
+            ></component>
+          </v-card>
+        </v-flex>
+
+        <v-flex v-if="showLogs" ref="logsEl">
+          <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
+        </v-flex>
+
         <v-flex xs12 v-if="availableMixins.length">
           <v-card raised>
-            <CardTitle icon='fa-puzzle-piece'>
+            <CardTitle icon="fa-puzzle-piece">
               Integrations and Extensions
             </CardTitle>
 
@@ -294,76 +386,17 @@
                 </v-list-item-action>
 
                 <v-list-item-content>
-                  <v-list-item-title>{{ mixin.name }}</v-list-item-title>
+                  <v-list-item-subtitle>{{ mixin.name }}</v-list-item-subtitle>
                 </v-list-item-content>
 
-                <v-list-item-icon>
-                  <v-list-item-action
-                    ><v-btn small @click.stop="openMixin(mixin)"
-                      ><v-icon x-small>fa-external-link-alt</v-icon></v-btn
-                    ></v-list-item-action
-                  >
-                </v-list-item-icon>
+                <v-list-item-action
+                  ><v-btn small @click.stop="openMixin(mixin)"
+                    ><v-icon x-small>fa-external-link-alt</v-icon></v-btn
+                  ></v-list-item-action
+                >
               </v-list-item>
             </v-list-item-group>
           </v-card>
-        </v-flex>
-
-        <v-flex xs12 v-if="showStorage">
-          <v-card raised>
-            <CardTitle>Storage</CardTitle>
-            <v-container>
-              <v-layout>
-                <v-flex xs12>
-                  <Storage
-                    v-model="pluginData.storage"
-                    @input="onChange"
-                    @save="saveStorage"
-                  ></Storage>
-                </v-flex>
-              </v-layout>
-            </v-container>
-          </v-card>
-        </v-flex>
-
-        <v-flex xs12 v-for="iface in cardUnderInterfaces" :key="iface">
-          <v-card raised>
-            <CardTitle>
-              {{ getInterfaceFriendlyName(iface) }}
-            </CardTitle>
-            <component
-              :value="deviceState"
-              :device="device"
-              :is="iface"
-            ></component>
-          </v-card>
-        </v-flex>
-      </v-layout>
-    </v-flex>
-
-    <v-flex xs12 md5 lg5>
-      <v-layout row wrap>
-        <v-flex xs12 v-for="iface in cardInterfaces" :key="iface">
-          <v-card>
-            <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
-            <component
-              :value="deviceState"
-              :device="device"
-              :is="iface"
-            ></component>
-          </v-card>
-        </v-flex>
-
-        <v-flex xs12 v-for="iface in noCardInterfaces" :key="iface">
-          <component
-            :value="deviceState"
-            :device="device"
-            :is="iface"
-          ></component>
-        </v-flex>
-
-        <v-flex v-if="showLogs" ref="logsEl">
-          <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
       </v-layout>
     </v-flex>
@@ -426,11 +459,7 @@ import AggregateDevice from "./aggregate/AggregateDevice.vue";
 import Automation from "./automation/Automation.vue";
 import PluginAdvancedUpdate from "./plugin/PluginAdvancedUpdate.vue";
 import Vue from "vue";
-import {
-  getDeviceAvailableMixins,
-  setMixin,
-  getDeviceMixins,
-} from "../common/mixin";
+import { getDeviceAvailableMixins, setMixin } from "../common/mixin";
 import CardTitle from "../components/CardTitle.vue";
 import colors from "vuetify/es5/util/colors";
 
@@ -447,28 +476,32 @@ const cardHeaderInterfaces = [
   ScryptedInterface.OnOff,
 ];
 
-const cardUnderInterfaces = [
-  ScryptedInterface.DeviceProvider,
-  ScryptedInterface.MixinProvider,
-];
-
-const noCardInterfaces = [ScryptedInterface.Settings, ScryptedInterface.Readme];
-const noCardAboveInterfaces = [ScryptedInterface.Scriptable];
-
-const cardInterfaces = [
+const rightInterfaces = [
   ScryptedInterface.Brightness,
   ScryptedInterface.ColorSettingTemperature,
   ScryptedInterface.RTCSignalingClient,
   ScryptedInterface.Notifier,
   ScryptedInterface.ColorSettingHsv,
   ScryptedInterface.ColorSettingRgb,
-  ScryptedInterface.Camera,
   ScryptedInterface.VideoClips,
   ScryptedInterface.TemperatureSetting,
   ScryptedInterface.PasswordStore,
   ScryptedInterface.PositionSensor,
   ScryptedInterface.Program,
+  ScryptedInterface.Settings,
+  ScryptedInterface.DeviceProvider,
+  ScryptedInterface.MixinProvider,
 ];
+
+const leftInterfaces = [ScryptedInterface.Readme];
+const leftAboveInterfaces = [ScryptedInterface.Camera];
+
+const noCardInterfaces = [
+  ScryptedInterface.Settings,
+  ScryptedInterface.Scriptable,
+];
+
+const aboveInterfaces = [];
 
 const cardActionInterfaces = [
   ScryptedInterface.OauthClient,
@@ -738,10 +771,7 @@ export default {
   asyncComputed: {
     availableMixins: {
       async get() {
-        const mixins = await getDeviceMixins(
-          this.$scrypted.systemManager,
-          this.device
-        );
+        const mixins = this.device.mixins || [];
         const availableMixins = (
           await getDeviceAvailableMixins(
             this.$scrypted.systemManager,
@@ -769,6 +799,9 @@ export default {
     },
   },
   computed: {
+    isPlugin() {
+      return this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin);
+    },
     origin() {
       return window.location.origin;
     },
@@ -785,11 +818,12 @@ export default {
     },
     cardButtonInterfaces: filterInterfaces(cardButtonInterfaces),
     cardActionInterfaces: filterInterfaces(cardActionInterfaces),
-    cardInterfaces: filterInterfaces(cardInterfaces),
+    leftInterfaces: filterInterfaces(leftInterfaces),
+    leftAboveInterfaces: filterInterfaces(leftAboveInterfaces),
     noCardInterfaces: filterInterfaces(noCardInterfaces),
-    cardUnderInterfaces: filterInterfaces(cardUnderInterfaces),
+    rightInterfaces: filterInterfaces(rightInterfaces),
     cardHeaderInterfaces: filterInterfaces(cardHeaderInterfaces),
-    noCardAboveInterfaces: filterInterfaces(noCardAboveInterfaces),
+    aboveInterfaces: filterInterfaces(aboveInterfaces),
     inferredTypes() {
       return inferTypesFromInterfaces(
         this.device.type,

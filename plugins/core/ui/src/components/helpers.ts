@@ -29,9 +29,10 @@ export function typeToIcon(type) {
         case ScryptedDeviceType.Valve: return "fa-faucet";
         case ScryptedDeviceType.Irrigation: return "fa-faucet";
         case ScryptedDeviceType.Person: return "fa-user";
+        case ScryptedDeviceType.SecuritySystem: return "fa-shield-alt";
 
     }
-    return "toggle-on";
+    return "fa-toggle-on";
 }
 
 export function getComponentName(id: string) {
