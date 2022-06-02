@@ -188,7 +188,7 @@ export default {
             id: "plugin",
             name: "Plugins",
             icon: "fa-puzzle-piece",
-            path: '/',
+            path: '/component/plugin',
         },
         // {
         //   id: "dashboard",

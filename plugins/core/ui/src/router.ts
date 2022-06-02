@@ -28,7 +28,7 @@ let router = new VueRouter({
       // },
       {
         path: "/",
-        component: PluginComponent
+        redirect: '/component/plugin',
       },
       {
         path: "/component/automation",
