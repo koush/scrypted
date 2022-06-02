@@ -212,7 +212,7 @@
 
               <v-btn color="info" text @click="openConsole">Console</v-btn>
 
-              <v-tooltip bottom v-if="device.info.managementUrl">
+              <v-tooltip bottom v-if="device.info && device.info.managementUrl">
                 <template v-slot:activator="{ on }">
                   <v-btn x-small v-on="on" color="info" text @click="openManagementUrl"
                     ><v-icon x-small>fa-wrench</v-icon></v-btn
