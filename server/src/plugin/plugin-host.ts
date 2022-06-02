@@ -1,13 +1,14 @@
 import { Device, EngineIOHandler } from '@scrypted/types';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
-import io, { Socket } from 'engine.io';
+import * as io from 'engine.io';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import path from 'path';
 import rimraf from 'rimraf';
 import WebSocket from 'ws';
 import { Plugin } from '../db-types';
+import { IOServer, IOSocket } from '../io';
 import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
 import { ScryptedRuntime } from '../runtime';
@@ -34,8 +35,15 @@ export class PluginHost {
     module: Promise<any>;
     scrypted: ScryptedRuntime;
     remote: PluginRemote;
-    io = io(undefined, {
+    io: IOServer<io.Socket> = new io.Server({
         pingTimeout: 120000,
+        cors: (req, callback) => {
+            const header = this.scrypted.getAccessControlAllowOrigin(req.headers);
+            callback(undefined, {
+                origin: header,
+                credentials: true,
+            })
+        },
     });
     ws: { [id: string]: WebSocket } = {};
     api: PluginHostAPI;
@@ -140,13 +148,13 @@ export class PluginHost {
                 const handler = this.scrypted.getDevice<EngineIOHandler>(pluginDevice._id);
 
                 socket.on('message', message => {
-                    this.remote.ioEvent(socket.id, 'message', message)
+                    this.remote.ioEvent(socket.transport.sid, 'message', message)
                 });
                 socket.on('close', reason => {
-                    this.remote.ioEvent(socket.id, 'close');
+                    this.remote.ioEvent(socket.transport.sid, 'close');
                 });
 
-                await handler.onConnection(endpointRequest, `io://${socket.id}`);
+                await handler.onConnection(endpointRequest, `io://${socket.transport.sid}`);
             }
             catch (e) {
                 console.error('engine.io plugin error', e);
@@ -318,7 +326,7 @@ export class PluginHost {
         };
     }
 
-    async createRpcIoPeer(socket: Socket) {
+    async createRpcIoPeer(socket: IOSocket) {
         let connected = true;
         const rpcPeer = new RpcPeer(`api/${this.pluginId}`, 'web', (message, reject) => {
             if (!connected)

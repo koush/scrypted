@@ -6,7 +6,7 @@ import { Plugin, PluginDevice, ScryptedAlert } from './db-types';
 import { getState, ScryptedStateManager, setState } from './state';
 import { Request, Response } from 'express';
 import { createResponseInterface } from './http-interfaces';
-import http, { ServerResponse } from 'http';
+import http, { ServerResponse, IncomingHttpHeaders } from 'http';
 import https from 'https';
 import express from 'express';
 import { LogEntry, Logger, makeAlertId } from './logger';
@@ -25,13 +25,15 @@ import semver from 'semver';
 import { ServiceControl } from './services/service-control';
 import { Alerts } from './services/alerts';
 import { Info } from './services/info';
-import io from 'engine.io';
+import * as io from 'engine.io';
 import { spawn as ptySpawn } from 'node-pty';
 import rimraf from 'rimraf';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { PluginHttp } from './plugin/plugin-http';
 import AdmZip from 'adm-zip';
 import path from 'path';
+import { CORSControl, CORSServer } from './services/cors';
+import { IOServer } from './io';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -56,9 +58,17 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     devicesLogger = this.logger.getLogger('device', 'Devices');
     wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
-    shellio = io(undefined, {
+    shellio: IOServer<io.Socket> = new io.Server({
         pingTimeout: 120000,
+        cors: (req, callback) => {
+            const header = this.getAccessControlAllowOrigin(req.headers);
+            callback(undefined, {
+                origin: header,
+                credentials: true,
+            })
+        },
     });
+    cors: CORSServer[] = [];
 
     constructor(datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
         super(app);
@@ -66,6 +76,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.app = app;
 
         app.disable('x-powered-by');
+
+        this.addMiddleware();
 
         app.get('/web/oauth/callback', (req, res) => {
             this.oauthCallback(req, res);
@@ -120,6 +132,27 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         setInterval(() => {
             this.logger.purge(Date.now() - 48 * 60 * 60 * 1000);
         }, 60 * 60 * 1000);
+    }
+
+    getAccessControlAllowOrigin(headers: IncomingHttpHeaders) {
+        let { origin, referer } = headers;
+        if (!origin && referer) {
+            try {
+                const u = new URL(headers.referer)
+                origin = u.origin;
+            }
+            catch (e) {
+                return;
+            }
+        }
+        if (!origin)
+            return;
+        const servers: string[] = process.env.SCRYPTED_ACCESS_CONTROL_ALLOW_ORIGINS?.split(',') || [];
+        servers.push(...Object.values(this.cors).map(entry => entry.server));
+        if (!servers.includes(origin))
+            return;
+
+        return origin;
     }
 
     getDeviceLogger(device: PluginDevice): Logger {
@@ -311,6 +344,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 return this.logger;
             case 'alerts':
                 return new Alerts(this);
+            case 'cors':
+                return new CORSControl(this);
         }
     }
 
