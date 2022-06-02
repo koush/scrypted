@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/core",
-   "version": "0.0.258",
+   "version": "0.0.259",
    "description": "Scrypted Core plugin. Provides the UI, websocket, and engine.io APIs.",
    "author": "Scrypted",
    "license": "Apache-2.0",
