@@ -103,11 +103,13 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     }
 
     async ioClose(id: string) {
+        // @ts-ignore
         this.pluginHost.io.clients[id]?.close();
         this.pluginHost.ws[id]?.close();
     }
 
     async ioSend(id: string, message: string) {
+        // @ts-ignore
         this.pluginHost.io.clients[id]?.send(message);
         this.pluginHost.ws[id]?.send(message);
     }

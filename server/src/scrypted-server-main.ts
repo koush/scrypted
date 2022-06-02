@@ -360,6 +360,19 @@ async function start() {
 
     let hasLogin = await db.getCount(ScryptedUser) > 0;
 
+    app.options('/login', (req, res) => {
+        res.setHeader('Vary', 'Origin,Referer');
+        res.set('Access-Control-Allow-Credentials', 'true');
+
+        const header = scrypted.getAccessControlAllowOrigin(req.headers);
+        if (header)
+            res.setHeader('Access-Control-Allow-Origin', header);
+
+        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+        res.set('Access-Control-Allow-Credentials', 'true');
+        res.send(200);
+    });
     app.post('/login', async (req, res) => {
         const { username, password, change_password } = req.body;
         const timestamp = Date.now();
@@ -393,6 +406,7 @@ async function start() {
                 secure: true,
                 signed: true,
                 httpOnly: true,
+                sameSite: 'none',
             });
 
             if (change_password) {
@@ -432,6 +446,7 @@ async function start() {
             secure: true,
             signed: true,
             httpOnly: true,
+            sameSite: 'none',
         });
 
         res.send({
@@ -442,6 +457,13 @@ async function start() {
 
 
     app.get('/login', async (req, res) => {
+        res.setHeader('Vary', 'Origin,Referer');
+        res.set('Access-Control-Allow-Credentials', 'true');
+
+        const header = scrypted.getAccessControlAllowOrigin(req.headers);
+        if (header)
+            res.setHeader('Access-Control-Allow-Origin', header);
+
         if (req.protocol === 'https' && req.headers.authorization) {
             const username = await new Promise(resolve => {
                 const basicChecker = basicAuth.check((req) => {
