@@ -510,7 +510,7 @@ const noCardInterfaces = [
   ScryptedInterface.Scriptable,
 ];
 
-const aboveInterfaces = [];
+const aboveInterfaces = [ScryptedInterface.Scriptable];
 
 const cardActionInterfaces = [
   ScryptedInterface.OauthClient,
