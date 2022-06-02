@@ -40,6 +40,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         super(nativeId);
 
         this.startup = this.discoverDevices(0)
+
+        this.updateManagementUrl();
     }
 
     handleUpdatePacket(packet: any) {
@@ -536,6 +538,19 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
         return ret;
     }
+
+    updateManagementUrl() {
+        const ip = this.storage.getItem('ip');
+        if (!ip)
+            return;
+        const info = this.info || {};
+        const managementUrl = `https://${ip}/protect/dashboard`;
+        if (info.managementUrl !== managementUrl) {
+            info.managementUrl = managementUrl;
+            this.info = info;
+        }
+    }
+
     async putSetting(key: string, value: string | number) {
         if (key === 'instance-mode') {
             if (value === 'MIGRATE') {
@@ -543,8 +558,11 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             }
             return;
         }
+
         this.storage.setItem(key, value.toString());
         this.discoverDevices(0);
+
+        this.updateManagementUrl();
     }
 }
 

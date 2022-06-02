@@ -3,8 +3,6 @@ import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCamera
 import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
-import { listenZero } from "@scrypted/common/src/listen-cluster";
-import net from 'net';
 import WS from 'ws';
 import { once } from "events";
 import { FeatureFlagsShim } from "./shim";
@@ -57,6 +55,13 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         }
 
         this.updateState(protectCamera);
+
+        const info = this.info || {};
+        const managementUrl = `https://192.168.2.1/protect/devices/${protectCamera.id}`;
+        if (info?.managementUrl !== managementUrl) {
+            info.managementUrl = managementUrl;
+            this.info = info;
+        }
     }
 
     async setStatusLight(on: boolean) {
