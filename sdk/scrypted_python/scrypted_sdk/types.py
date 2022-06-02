@@ -267,6 +267,7 @@ class DeviceCreatorSettings(TypedDict):
 
 class DeviceInformation(TypedDict):
     firmware: str
+    managementUrl: str
     manufacturer: str
     metadata: Any
     model: str
