@@ -80,6 +80,7 @@ import {
   faHistory,
   faCalendarAlt,
   faShieldAlt,
+  faWrench,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -166,6 +167,7 @@ const icons =[
   faTimes,
   faCalendarAlt,
   faShieldAlt,
+  faWrench,
 ];
 
 for (var icon in icons) {
