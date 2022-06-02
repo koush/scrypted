@@ -2,7 +2,7 @@ import { ScryptedStatic } from "../../../sdk/types/index";
 export * from "../../../sdk/types/index";
 import { SocketOptions } from 'engine.io-client';
 import * as eio from 'engine.io-client';
-import { attachPluginRemote } from  '../../../server/src/plugin/plugin-remote';
+import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { IOSocket } from '../../../server/src/io';
 import axios, { AxiosRequestConfig } from 'axios';
@@ -15,35 +15,64 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     version: string;
 }
 
-export interface ScryptedClientOptions {
-    baseUrl?: string;
-    pluginId: string;
-    clientName?: string;
-    username?: string;
+export interface ScryptedConnectionOptions {
+    baseUrl: string;
+}
+
+export interface ScryptedLoginOptions extends ScryptedConnectionOptions {
+    username: string;
     /**
      * The password, or preferably, login token for logging into Scrypted.
      * The login token can be retrieved with "npx scrypted login".
      */
-    password?: string;
+    password: string;
+    change_password: string,
+}
+
+export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
+    pluginId: string;
+    clientName?: string;
 }
 
 const axiosConfig: AxiosRequestConfig = {
     httpsAgent: new https.Agent({
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
     })
 }
 
-export async function getLoginCookie(baseUrl: string, username: string, password: string) {
-    const url = `${baseUrl}/login`;
+export async function loginScryptedClient(options: ScryptedLoginOptions) {
+    let { baseUrl, username, password, change_password } = options;
+    const url = `${baseUrl || ''}/login`;
     const response = await axios.post(url, {
         username,
         password,
-    }, axiosConfig);
+        change_password,
+    }, {
+        withCredentials: true,
+        ...axiosConfig,
+    });
 
     if (response.status !== 200)
         throw new Error('status ' + response.status);
 
-    return response.headers["set-cookie"][0];
+    return {
+        cookie: response.headers["set-cookie"]?.[0],
+        error: response.data.error as string,
+    };
+}
+
+export async function checkScryptedClientLogin(options: ScryptedConnectionOptions) {
+    let { baseUrl } = options;
+    const url = `${baseUrl || ''}/login`;
+    const response = await axios.get(url, {
+        withCredentials: true,
+        ...axiosConfig,
+    });
+    return {
+        username: response.data.username as string,
+        expiration: response.data.expiration as number,
+        hasLogin: !!response.data.hasLogin,
+    };
 }
 
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
@@ -54,7 +83,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const extraHeaders: { [header: string]: string } = {};
 
     if (username && password) {
-        extraHeaders['Cookie'] = await getLoginCookie(baseUrl, username, password);
+        const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);;
+        extraHeaders['Cookie'] = loginResult.cookie;
     }
 
     return new Promise((resolve, reject) => {
@@ -62,6 +92,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             path: `${endpointPath}/engine.io/api/`,
             extraHeaders,
             rejectUnauthorized: false,
+            withCredentials: true,
         };
         const socket: IOSocket & eio.Socket = new eio.Socket(rootLocation, options);
 
