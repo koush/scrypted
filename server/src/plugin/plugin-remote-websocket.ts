@@ -10,7 +10,6 @@ interface WebSocketEventListener {
     (evt: WebSocketEvent): void;
 }
 
-// @ts-ignore
 class WebSocketEventTarget {
     events: { [type: string]: WebSocketEventListener[] } = {};
 
@@ -71,7 +70,6 @@ export interface WebSocketMethods {
 
 export function createWebSocketClass(__websocketConnect: WebSocketConnect): any {
 
-    // @ts-ignore
     class WebSocket extends WebSocketEventTarget {
         _url: string;
         _protocols: string[];

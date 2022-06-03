@@ -4,7 +4,7 @@ export type IOServer = {
     on(ev: 'connection' | 'drain', fn: (socket: IOServerSocket & IOServerSocket) => void): IOServer;
 } & Server;
 
-export type IOServerSocket = IOSocket & ServerSocket;
+export type IOServerSocket = ServerSocket & IOSocket;
 
 export interface IOSocket {
     send(data: any, options?: any, callback?: any): this;

@@ -147,14 +147,17 @@ export class PluginHost {
 
                 const handler = this.scrypted.getDevice<EngineIOHandler>(pluginDevice._id);
 
+                // @ts-expect-error
+                const id = socket.id;
+
                 socket.on('message', message => {
-                    this.remote.ioEvent(socket.transport.sid, 'message', message)
+                    this.remote.ioEvent(id, 'message', message)
                 });
                 socket.on('close', reason => {
-                    this.remote.ioEvent(socket.transport.sid, 'close');
+                    this.remote.ioEvent(id, 'close');
                 });
 
-                await handler.onConnection(endpointRequest, `io://${socket.transport.sid}`);
+                await handler.onConnection(endpointRequest, `io://${id}`);
             }
             catch (e) {
                 console.error('engine.io plugin error', e);
