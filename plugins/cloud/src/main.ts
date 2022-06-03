@@ -11,8 +11,9 @@ import { once } from 'events';
 import path from 'path';
 import bpmux from 'bpmux';
 import { PushManager } from './push';
+import type { CORSControl } from '../../../server/src/services/cors';
 
-const { deviceManager, endpointManager } = sdk;
+const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
 const SCRYPTED_SERVER = 'home.scrypted.app';
@@ -97,6 +98,48 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             // if ever adding clockwork push, uncomment this.
             // this.sendRegistrationId();
         });
+
+        this.updateCors();
+    }
+
+    async updateCors() {
+        try {
+            const corsControl = await systemManager.getComponent('cors') as CORSControl;
+            let cors = await corsControl.getCORS();
+            cors = cors.filter(entry => entry.tag !== '@scrypted/cloud');
+            cors.push(
+                {
+                    tag: '@scrypted/cloud',
+                    server: 'https://home.scrypted.app',
+                },
+                {
+                    tag: '@scrypted/cloud',
+                    server: 'http://home.scrypted.app',
+                },
+                // test
+                // {
+                //     tag: '@scrypted/cloud',
+                //     server: 'https://localhost:8081',
+                // },
+            );
+            const hostname = this.storage.getItem('hostname')
+            if (hostname) {
+                cors.push(
+                    {
+                        tag: '@scrypted/cloud',
+                        server: `https://${hostname}`,
+                    },
+                    {
+                        tag: '@scrypted/cloud',
+                        server: `http://${hostname}`,
+                    },
+                );
+            }
+            await corsControl.setCORS(cors);
+        }
+        catch (e) {
+            this.console.error('error updating cors, is your scrypted server up to date?', e);
+        }
     }
 
     async sendRegistrationId(registrationId: string) {
@@ -165,6 +208,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async putSetting(key: string, value: string | number | boolean) {
         this.storage.setItem(key, value.toString());
+        this.updateCors();
     }
 
     async getCloudMessagePath() {

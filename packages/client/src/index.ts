@@ -4,7 +4,7 @@ import { SocketOptions } from 'engine.io-client';
 import * as eio from 'engine.io-client';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
-import { IOSocket } from '../../../server/src/io';
+import type { IOSocket } from '../../../server/src/io';
 import axios, { AxiosRequestConfig } from 'axios';
 import https from 'https';
 
@@ -61,8 +61,8 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     };
 }
 
-export async function checkScryptedClientLogin(options: ScryptedConnectionOptions) {
-    let { baseUrl } = options;
+export async function checkScryptedClientLogin(options?: ScryptedConnectionOptions) {
+    let { baseUrl } = options || {};
     const url = `${baseUrl || ''}/login`;
     const response = await axios.get(url, {
         withCredentials: true,
