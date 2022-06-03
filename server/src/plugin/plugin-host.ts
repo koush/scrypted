@@ -35,7 +35,7 @@ export class PluginHost {
     module: Promise<any>;
     scrypted: ScryptedRuntime;
     remote: PluginRemote;
-    io: IOServer<io.Socket> = new io.Server({
+    io: IOServer = new io.Server({
         pingTimeout: 120000,
         cors: (req, callback) => {
             const header = this.scrypted.getAccessControlAllowOrigin(req.headers);

@@ -8,7 +8,7 @@ import net from 'net';
 import { ScryptedRuntime } from './runtime';
 import level from './level';
 import { Plugin, ScryptedUser, Settings } from './db-types';
-import { SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import axios from 'axios';
@@ -20,7 +20,6 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import httpAuth from 'http-auth';
 import semver from 'semver';
 import { Info } from './services/info';
-import { getAddresses } from './addresses';
 import { sleep } from './sleep';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { PluginError } from './plugin/plugin-error';
@@ -226,7 +225,7 @@ async function start() {
 
     console.log('#######################################################');
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
-    for (const address of getAddresses()) {
+    for (const address of getHostAddresses(true, true)) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
     }
     console.log(`Version:       : ${await new Info().getVersion()}`);
@@ -363,7 +362,6 @@ async function start() {
     app.options('/login', (req, res) => {
         res.setHeader('Vary', 'Origin,Referer');
         res.set('Access-Control-Allow-Credentials', 'true');
-
         const header = scrypted.getAccessControlAllowOrigin(req.headers);
         if (header)
             res.setHeader('Access-Control-Allow-Origin', header);
@@ -374,9 +372,16 @@ async function start() {
         res.send(200);
     });
     app.post('/login', async (req, res) => {
+        res.setHeader('Vary', 'Origin,Referer');
+        res.set('Access-Control-Allow-Credentials', 'true');
+        const header = scrypted.getAccessControlAllowOrigin(req.headers);
+        if (header)
+            res.setHeader('Access-Control-Allow-Origin', header);
+
         const { username, password, change_password } = req.body;
         const timestamp = Date.now();
         const maxAge = 86400000;
+        const addresses = getHostAddresses(true, true).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
 
         if (hasLogin) {
             const user = await db.tryGet(ScryptedUser, username);
@@ -419,6 +424,7 @@ async function start() {
             res.send({
                 username,
                 expiration: maxAge,
+                addresses,
             });
 
             return;
@@ -452,6 +458,7 @@ async function start() {
         res.send({
             username,
             expiration: maxAge,
+            addresses,
         });
     });
 
@@ -464,6 +471,7 @@ async function start() {
         if (header)
             res.setHeader('Access-Control-Allow-Origin', header);
 
+        const addresses = getHostAddresses(true, true).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
         if (req.protocol === 'https' && req.headers.authorization) {
             const username = await new Promise(resolve => {
                 const basicChecker = basicAuth.check((req) => {
@@ -482,6 +490,7 @@ async function start() {
             res.send({
                 username,
                 token: user.token,
+                addresses,
             });
             return;
         }
@@ -506,31 +515,10 @@ async function start() {
             return;
         }
 
-        // this database lookup on every web request is not necessary, the cookie
-        // itself is the auth, and is signed. furthermore, this is currently
-        // a single user setup anywyas. revisit this at some point when
-        // multiple users are implemented.
-
-        // const user = await db.tryGet(ScryptedUser, username);
-        // if (!user) {
-        //     res.send({
-        //         error: 'User not found.',
-        //         hasLogin,
-        //     })
-        //     return;
-        // }
-
-        // if (timestamp < user.passwordDate) {
-        //     res.send({
-        //         error: 'Login invalid. Password has changed.',
-        //         hasLogin,
-        //     })
-        //     return;
-        // }
-
         res.send({
             expiration: 86400000 - (Date.now() - timestamp),
             username,
+            addresses,
         })
     });
 

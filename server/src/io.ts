@@ -1,7 +1,7 @@
-import { Server } from "engine.io";
+import type { Server, Socket } from "engine.io";
 
-export type IOServer<T> = {
-    on(ev: 'connection' | 'drain', fn: (socket: IOSocket & T) => void): IOServer<T>;
+export type IOServer = {
+    on(ev: 'connection' | 'drain', fn: (socket: IOSocket & IOSocket) => void): IOServer;
 } & Server;
 
 export type IOSocket = {
@@ -20,4 +20,4 @@ export type IOSocket = {
      * Called when the write buffer is drained
      */
     on(ev: "drain", fn: () => void): IOSocket;
-};
+} & Socket;

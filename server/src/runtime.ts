@@ -58,7 +58,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     devicesLogger = this.logger.getLogger('device', 'Devices');
     wss = new WebSocketServer({ noServer: true });
     wsAtomic = 0;
-    shellio: IOServer<io.Socket> = new io.Server({
+    shellio: IOServer = new io.Server({
         pingTimeout: 120000,
         cors: (req, callback) => {
             const header = this.getAccessControlAllowOrigin(req.headers);
