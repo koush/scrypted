@@ -11,7 +11,7 @@ import { once } from 'events';
 import path from 'path';
 import bpmux from 'bpmux';
 import { PushManager } from './push';
-import type { CORSServer } from '../../../server/src/services/cors';
+import type { CORSControl } from '../../../server/src/services/cors';
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -104,8 +104,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async updateCors() {
         try {
-            const corsControl = await systemManager.getComponent('cors');
-            let cors: CORSServer[] = await corsControl.getCORS();
+            const corsControl = await systemManager.getComponent('cors') as CORSControl;
+            let cors = await corsControl.getCORS();
             cors = cors.filter(entry => entry.tag !== '@scrypted/cloud');
             cors.push(
                 {
