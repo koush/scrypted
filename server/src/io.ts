@@ -1,4 +1,4 @@
-import { Server, Socket } from "engine.io";
+import { Server } from "engine.io";
 
 export type IOServer<T> = {
     on(ev: 'connection' | 'drain', fn: (socket: IOSocket & T) => void): IOServer<T>;
