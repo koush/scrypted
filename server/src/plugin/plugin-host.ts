@@ -8,7 +8,7 @@ import path from 'path';
 import rimraf from 'rimraf';
 import WebSocket from 'ws';
 import { Plugin } from '../db-types';
-import { IOServer, IOSocket } from '../io';
+import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
 import { ScryptedRuntime } from '../runtime';
@@ -326,7 +326,7 @@ export class PluginHost {
         };
     }
 
-    async createRpcIoPeer(socket: IOSocket) {
+    async createRpcIoPeer(socket: IOServerSocket) {
         let connected = true;
         const rpcPeer = new RpcPeer(`api/${this.pluginId}`, 'web', (message, reject) => {
             if (!connected)
