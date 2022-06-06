@@ -366,12 +366,12 @@ export class PluginHost {
         });
         let pendingSerializationContext: any = {};
         socket.on('message', data => {
-            if (data instanceof Buffer) {
+            if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
                 pendingSerializationContext = pendingSerializationContext || {
                     buffers: [],
                 };
                 const buffers: Buffer[] = pendingSerializationContext.buffers;
-                buffers.push(data);
+                buffers.push(Buffer.from(data));
                 return;
             }
             const messageSerializationContext = pendingSerializationContext;
