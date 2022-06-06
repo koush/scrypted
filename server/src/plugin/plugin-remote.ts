@@ -356,7 +356,8 @@ export interface PluginRemoteAttachOptions {
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
     const { createMediaManager, getServicePort, getDeviceConsole, getMixinConsole, getPluginConsole } = options || {};
 
-    peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
+    if (!peer.constructorSerializerMap.get(Buffer))
+        peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
 
     let done: (scrypted: ScryptedStatic) => void;
     const retPromise = new Promise<ScryptedStatic>(resolve => done = resolve);
