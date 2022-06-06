@@ -1,12 +1,16 @@
-import { ScryptedStatic } from "../../../sdk/types/index";
-export * from "../../../sdk/types/index";
-import { SocketOptions } from 'engine.io-client';
+import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
+import { SocketOptions } from 'engine.io-client';
+import { once } from "events";
+import https from 'https';
+import { ScryptedStatic } from "../../../sdk/types/index";
+import type { IOSocket } from '../../../server/src/io';
+import { SidebandBufferSerializer } from '../../../server/src/plugin/buffer-serializer';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
-import type { IOSocket } from '../../../server/src/io';
-import axios, { AxiosRequestConfig } from 'axios';
-import https from 'https';
+export * from "../../../sdk/types/index";
+
+type IOClientSocket = eio.Socket & IOSocket;
 
 export interface ScryptedClientStatic extends ScryptedStatic {
     disconnect(): void;
@@ -48,16 +52,19 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         password,
         change_password,
     }, {
-        withCredentials: true,
         ...axiosConfig,
     });
 
     if (response.status !== 200)
         throw new Error('status ' + response.status);
 
+    const addresses = response.data.addresses as string[] || [];
+
     return {
         cookie: response.headers["set-cookie"]?.[0],
         error: response.data.error as string,
+        token: response.data.token as string,
+        addresses,
     };
 }
 
@@ -65,82 +72,144 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     let { baseUrl } = options || {};
     const url = `${baseUrl || ''}/login`;
     const response = await axios.get(url, {
-        withCredentials: true,
         ...axiosConfig,
     });
     return {
         username: response.data.username as string,
         expiration: response.data.expiration as number,
         hasLogin: !!response.data.hasLogin,
+        addresses: response.data.addresses as string[],
     };
 }
 
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
     let { baseUrl, pluginId, clientName, username, password } = options;
-    const rootLocation = baseUrl || `${window.location.protocol}//${window.location.host}`;
-    const endpointPath = `/endpoint/${pluginId}`;
 
     const extraHeaders: { [header: string]: string } = {};
+    let addresses: string[];
 
     if (username && password) {
         const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);;
         extraHeaders['Cookie'] = loginResult.cookie;
+        addresses = loginResult.addresses;
+    }
+    else {
+        const loginCheck = await checkScryptedClientLogin({
+            baseUrl,
+        });
+        addresses = loginCheck.addresses;
     }
 
-    return new Promise((resolve, reject) => {
-        const options: Partial<SocketOptions> = {
-            path: `${endpointPath}/engine.io/api/`,
+    let socket: IOClientSocket;
+    const endpointPath = `/endpoint/${pluginId}`;
+    const eioOptions: Partial<SocketOptions> = {
+        transports: ["websocket", "polling"],
+        path: `${endpointPath}/engine.io/api`,
+        extraHeaders,
+        rejectUnauthorized: false,
+    };
+
+    const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
+    if (addresses && !addresses.includes(explicitBaseUrl)) {
+        const publicEioOptions: Partial<SocketOptions> = {
+            transports: ["websocket", "polling"],
+            path: `${endpointPath}/public/engine.io/api`,
             extraHeaders,
             rejectUnauthorized: false,
-            withCredentials: true,
         };
-        const socket: IOSocket & eio.Socket = new eio.Socket(rootLocation, options);
 
-        socket.on('error', reject);
+        let sockets: IOClientSocket[] = [];
+        const promises: Promise<IOClientSocket>[] = [];
 
-        socket.on('open', async function () {
-            try {
-                const rpcPeer = new RpcPeer(clientName || 'engine.io-client', "core", message => socket.send(JSON.stringify(message)));
-                socket.on('message', data => rpcPeer.handleMessage(JSON.parse(data as string)));
+        promises.push(new Promise((_, rj) => setTimeout(() => rj(new Error('timeout')), 1000)));
 
-                const scrypted = await attachPluginRemote(rpcPeer, undefined);
-                const {
-                    systemManager,
-                    deviceManager,
-                    endpointManager,
-                    mediaManager,
-                } = scrypted;
-
-                const userStorage = await rpcPeer.getParam('userStorage');
-
-                const info = await systemManager.getComponent('info');
-                let version = 'unknown';
-                try {
-                    version = await info.getVersion();
-                }
-                catch (e) {
-                }
-
-                const ret: ScryptedClientStatic = {
-                    version,
-                    systemManager,
-                    deviceManager,
-                    endpointManager,
-                    mediaManager,
-                    userStorage,
-                    disconnect() {
-                        socket.close();
-                    }
-                }
-
-                socket.on('close', () => ret.onClose?.());
-
-                resolve(ret);
+        console.log('checking local addresses', addresses);
+        try {
+            for (const address of addresses) {
+                const check = new eio.Socket(address, publicEioOptions);
+                sockets.push(check);
+                promises.push(once(check, 'open').then(() => check));
             }
-            catch (e) {
-                socket.close();
-                reject(e);
+            socket = await Promise.race(promises);
+            console.log('using local address');
+            const [json] = await once(socket, 'message');
+            const { id } = JSON.parse(json);
+
+            const url = `${eioOptions.path}/activate`;
+            await axios.post(url, {
+                id,
+            }, {
+                ...axiosConfig,
+            });
+
+            socket.send('/api/start');
+            sockets = sockets.filter(s => s !== socket);
+        }
+        catch (e) {
+        }
+        sockets.forEach(s => s.close());
+    }
+
+    if (!socket) {
+        const rootLocation = explicitBaseUrl;
+        socket = new eio.Socket(rootLocation, eioOptions);
+        await once(socket, 'open');
+    }
+
+    try {
+        const rpcPeer = new RpcPeer(clientName || 'engine.io-client', "core", message => socket.send(JSON.stringify(message)));
+        let pendingSerializationContext: any = {};
+        socket.on('message', data => {
+            if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
+                pendingSerializationContext = pendingSerializationContext || {
+                    buffers: [],
+                };
+                const buffers: Buffer[] = pendingSerializationContext.buffers;
+                buffers.push(Buffer.from(data));
+                return;
             }
+            const messageSerializationContext = pendingSerializationContext;
+            pendingSerializationContext = undefined;
+            rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext);
         });
-    });
+        rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
+
+        const scrypted = await attachPluginRemote(rpcPeer, undefined);
+        const {
+            systemManager,
+            deviceManager,
+            endpointManager,
+            mediaManager,
+        } = scrypted;
+
+        const userStorage = await rpcPeer.getParam('userStorage');
+
+        const info = await systemManager.getComponent('info');
+        let version = 'unknown';
+        try {
+            version = await info.getVersion();
+        }
+        catch (e) {
+        }
+
+        const ret: ScryptedClientStatic = {
+            version,
+            systemManager,
+            deviceManager,
+            endpointManager,
+            mediaManager,
+            userStorage,
+            disconnect() {
+                socket.close();
+            }
+        }
+
+        socket.on('close', () => ret.onClose?.());
+
+        return ret;
+    }
+    catch (e) {
+        socket.close();
+        throw e;
+    }
 }
