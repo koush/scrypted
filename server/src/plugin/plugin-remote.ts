@@ -300,7 +300,8 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         // core plugin to web (node to browser).
         // always add the BufferSerializer, so serialization is gauranteed to work.
         // but in plugin-host, mark Buffer as transport safe.
-        peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
+        if (!peer.constructorSerializerMap.get(Buffer))
+            peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
         const getRemote = await peer.getParam('getRemote');
         const remote = await getRemote(api, pluginId);
 

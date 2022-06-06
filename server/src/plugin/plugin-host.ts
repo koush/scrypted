@@ -13,6 +13,7 @@ import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
 import { ScryptedRuntime } from '../runtime';
 import { sleep } from '../sleep';
+import { SidebandBufferSerializer } from './buffer-serializer';
 import { MediaManagerHostImpl } from './media';
 import { PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
@@ -350,13 +351,33 @@ export class PluginHost {
 
     async createRpcIoPeer(socket: IOServerSocket) {
         let connected = true;
-        const rpcPeer = new RpcPeer(`api/${this.pluginId}`, 'web', (message, reject) => {
-            if (!connected)
+        const rpcPeer = new RpcPeer(`api/${this.pluginId}`, 'web', (message, reject, serializationContext) => {
+            if (!connected) {
                 reject?.(new Error('peer disconnected'));
-            else
-                socket.send(JSON.stringify(message))
+                return;
+            }
+            const buffers = serializationContext?.buffers;
+            if (buffers) {
+                for (const buffer of buffers) {
+                    socket.send(buffer);
+                }
+            }
+            socket.send(JSON.stringify(message))
         });
-        socket.on('message', data => rpcPeer.handleMessage(JSON.parse(data as string)));
+        let pendingSerializationContext: any = {};
+        socket.on('message', data => {
+            if (data instanceof Buffer) {
+                pendingSerializationContext = pendingSerializationContext || {
+                    buffers: [],
+                };
+                const buffers: Buffer[] = pendingSerializationContext.buffers;
+                buffers.push(data);
+                return;
+            }
+            const messageSerializationContext = pendingSerializationContext;
+            pendingSerializationContext = undefined;
+            rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext)
+        });
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const api = new PluginAPIProxy(this.api, await this.peer.getParam('mediaManager'));
         const kill = () => {
@@ -366,6 +387,8 @@ export class PluginHost {
         }
         socket.on('close', kill);
         socket.on('error', kill);
+
+        rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
         return setupPluginRemote(rpcPeer, api, null, () => this.scrypted.stateManager.getSystemState());
     }
 }

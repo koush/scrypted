@@ -189,8 +189,8 @@ catch (e) {
 }
 
 export interface RpcSerializer {
-    serialize(value: any): any;
-    deserialize(serialized: any): any;
+    serialize(value: any, serializationContext?: any): any;
+    deserialize(serialized: any, serializationContext?: any): any;
 }
 
 interface LocalProxiedEntry {
@@ -208,7 +208,7 @@ export class RpcPeer {
     remoteWeakProxies: { [id: string]: WeakRef<any> } = {};
     finalizers = new FinalizationRegistry(entry => this.finalize(entry as LocalProxiedEntry));
     nameDeserializerMap = new Map<string, RpcSerializer>();
-    constructorSerializerMap = new Map<string, string>();
+    constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
 
     static readonly finalizerIdSymbol = Symbol('rpcFinalizerId');
@@ -246,7 +246,7 @@ export class RpcPeer {
     static readonly PROPERTY_PROXY_PROPERTIES = '__proxy_props';
     static readonly PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children';
 
-    constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void) => void) {
+    constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
     }
 
     createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
@@ -327,7 +327,7 @@ export class RpcPeer {
         result.message = (e as Error).message || 'no message';
     }
 
-    deserialize(value: any): any {
+    deserialize(value: any, serializationContext?: any): any {
         if (!value)
             return value;
 
@@ -335,7 +335,7 @@ export class RpcPeer {
         if (copySerializeChildren) {
             const ret: any = {};
             for (const [key, val] of Object.entries(value)) {
-                ret[key] = this.deserialize(val);
+                ret[key] = this.deserialize(val, serializationContext);
             }
             return ret;
         }
@@ -358,17 +358,17 @@ export class RpcPeer {
 
         const deserializer = this.nameDeserializerMap.get(__remote_constructor_name);
         if (deserializer) {
-            return deserializer.deserialize(__serialized_value);
+            return deserializer.deserialize(__serialized_value, serializationContext);
         }
 
         return value;
     }
 
-    serialize(value: any): any {
+    serialize(value: any, serializationContext?: any): any {
         if (value?.[RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] === true) {
             const ret: any = {};
             for (const [key, val] of Object.entries(value)) {
-                ret[key] = this.serialize(val);
+                ret[key] = this.serialize(val, serializationContext);
             }
             return ret;
         }
@@ -407,7 +407,7 @@ export class RpcPeer {
             const serializer = this.nameDeserializerMap.get(serializerMapName);
             if (!serializer)
                 throw new Error('serializer not found for ' + serializerMapName);
-            const serialized = serializer.serialize(value);
+            const serialized = serializer.serialize(value, serializationContext);
             const ret: RpcRemoteProxyValue = {
                 __remote_proxy_id: undefined,
                 __remote_proxy_finalizer_id: undefined,
@@ -452,7 +452,7 @@ export class RpcPeer {
         return proxy;
     }
 
-    async handleMessage(message: RpcMessage) {
+    async handleMessage(message: RpcMessage, serializationContext?: any) {
         try {
             switch (message.type) {
                 case 'param': {
@@ -471,6 +471,7 @@ export class RpcPeer {
                         type: 'result',
                         id: rpcApply.id || '',
                     };
+                    const serializationContext: any = {};
 
                     try {
                         const target = this.localProxyMap[rpcApply.proxyId];
@@ -493,7 +494,7 @@ export class RpcPeer {
                             value = await target(...args);
                         }
 
-                        result.result = this.serialize(value);
+                        result.result = this.serialize(value, serializationContext);
                     }
                     catch (e) {
                         // console.error('failure', rpcApply.method, e);
@@ -501,7 +502,7 @@ export class RpcPeer {
                     }
 
                     if (!rpcApply.oneway)
-                        this.send(result);
+                        this.send(result, undefined, serializationContext);
                     break;
                 }
                 case 'result': {
