@@ -13,7 +13,7 @@ export default {
   socket: null,
   mounted() {
     const term = new Terminal({
-      theme: this.$vuetify.theme.isDark
+      theme: this.$vuetify.theme.dark
         ? undefined
         : {
             foreground: "black",

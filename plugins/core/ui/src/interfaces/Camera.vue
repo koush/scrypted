@@ -6,14 +6,20 @@
     :fullscreen="$isMobile()"
   >
     <template v-slot:activator="{ on }">
-      <a v-on="on" v-if="!hidePreview"><v-img :src="src"></v-img></a>
+      <a v-on="on" v-if="!hidePreview">
+        <img
+          :src="src"
+          style="max-width: 100%; max-height: 100%; width: 100%;"
+          @load="imageReady = true"
+        />
+      </a>
     </template>
     <CameraViewer
-  v-if="dialog"
-    @clipPath="clipPath"
-    @exitFullscreen="dialog = false"
-    :clipPathValue="clipPathValue"
-    :device="device"
+      v-if="dialog"
+      @clipPath="clipPath"
+      @exitFullscreen="dialog = false"
+      :clipPathValue="clipPathValue"
+      :device="device"
     >
     </CameraViewer>
   </v-dialog>
@@ -34,20 +40,24 @@ export default {
   props: ["clipPathValue", "hidePreview", "showDialog"],
   data() {
     return {
+      imageReady: false,
       src: "images/cameraloading.jpg",
       dialog: false,
-      disabled: !this.device.interfaces.includes(ScryptedInterface.RTCSignalingChannel),
+      disabled: !this.device.interfaces.includes(
+        ScryptedInterface.RTCSignalingChannel
+      ),
     };
   },
   methods: {
     async refresh() {
+      this.imageReady = false;
       const picture = await this.device.takePicture();
       this.src = await createBlobUrl(this.$scrypted.mediaManager, picture);
     },
     clipPath(value) {
       this.$emit("clipPath", cloneDeep(value));
     },
-      },
+  },
   watch: {
     showDialog() {
       this.dialog = this.showDialog;

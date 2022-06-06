@@ -131,7 +131,7 @@
       <v-form @submit.prevent="doLogin">
         <v-card>
           <v-toolbar dark dense color="deep-purple accent-4">
-            <span class="headline">Scrypted Management Console</span>
+            Scrypted Management Console
           </v-toolbar>
           <v-card-text>
             <v-container grid-list-md>
@@ -237,6 +237,7 @@ import router from "./router";
 import Vue from "vue";
 import store from "./store";
 import "./client";
+import { loginScrypted } from './client';
 
 export default {
   name: "App",
@@ -293,15 +294,10 @@ export default {
       }
 
       this.loginResult = "";
-      axios
-        .post("/login", qs.stringify(body), {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        })
+      loginScrypted(this.username, this.password, this.confirmPassword || undefined)
         .then((response) => {
-          if (response.data.error) {
-            this.loginResult = response.data.error;
+          if (response.error) {
+            this.loginResult = response.error;
             return;
           }
           window.location.reload();

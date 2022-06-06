@@ -32,7 +32,32 @@
     </v-card-actions>
 
     <v-card-text>These things were created by {{ device.name }}.</v-card-text>
-    <DeviceGroup :deviceGroup="managedDevices"></DeviceGroup>
+    <v-text-field
+      v-if="managedDevices.devices.length > 10"
+      v-model="search"
+      append-icon="search"
+      label="Search"
+      single-line
+      hide-details
+    ></v-text-field>
+    <v-data-table
+      v-if="managedDevices.devices.length > 10"
+      :headers="headers"
+      :items="managedDevices.devices"
+      :items-per-page="10"
+      :search="search"
+    >
+      <template v-slot:[`item.icon`]="{ item }">
+        <v-icon x-small color="grey">
+          {{ typeToIcon(item.type) }}
+        </v-icon>
+      </template>
+      <template v-slot:[`item.name`]="{ item }">
+        <a link :href="'#' + getDeviceViewPath(item.id)">{{ item.name }}</a>
+      </template>
+    </v-data-table>
+
+    <DeviceGroup v-else :deviceGroup="managedDevices"></DeviceGroup>
   </v-flex>
 </template>
 <script>
@@ -48,6 +73,7 @@ export default {
       showCreateDeviceSettings: false,
       showCreateDevice: false,
       createDeviceSettings: null,
+      search: "",
     };
   },
   components: {
@@ -55,6 +81,9 @@ export default {
     DeviceGroup,
   },
   methods: {
+    typeToIcon,
+    getDeviceViewPath,
+
     async createDevice() {
       const settings = {};
       for (const setting of this.createDeviceSettings.settings) {
@@ -78,6 +107,31 @@ export default {
     },
   },
   computed: {
+    headers() {
+      var ret = [];
+      ret.push({
+        width: 40,
+        text: "",
+        align: "left",
+        sortable: false,
+        value: "icon",
+      });
+
+      ret.push({
+        text: "Name",
+        align: "left",
+        sortable: true,
+        value: "name",
+      });
+
+      ret.push({
+        text: "Type",
+        align: "left",
+        sortable: true,
+        value: "type",
+      });
+      return ret;
+    },
     managedDevices() {
       const devices = this.$store.state.scrypted.devices
         .filter(

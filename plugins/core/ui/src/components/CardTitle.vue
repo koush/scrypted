@@ -1,7 +1,6 @@
 <template>
   <v-system-bar
-    dark
-    :color="color || ($vuetify.theme.dark ? undefined : colors.indigo.darken2)"
+    :color="color || ($vuetify.theme.dark ? undefined : 'white')"
     ><v-icon x-small v-if="icon">{{ icon }}</v-icon
     ><span class="caption" style="text-transform: uppercase; font-weight: bold">
       <slot></slot>

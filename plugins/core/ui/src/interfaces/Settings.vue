@@ -1,33 +1,36 @@
 <template>
   <v-card>
-    <CardTitle v-if="!noTitle" 
-      >Settings</CardTitle
-    >
+    <CardTitle v-if="!noTitle">Settings</CardTitle>
     <v-flex xs12 v-if="showChips" class="pt-0">
       <v-chip-group
         mandatory
         active-class="deep-purple accent-4 white--text"
         column
-        v-model="settingsIndex"
+        v-model="settingsGroup"
       >
         <v-chip
           small
-          v-for="([key], index) of Object.entries(settingsGroups)"
-          :key="index"
+          :value="value"
+          v-for="[key, value] of Object.entries(settingsGroups)"
+          :key="key"
         >
           {{ key.replace("Settings", "") || "General" }}
+        </v-chip>
+        <v-chip small value="extensions" v-if="availableMixins.length">
+          Integrations and Extensions
         </v-chip>
       </v-chip-group>
     </v-flex>
 
     <v-divider v-if="showChips"></v-divider>
 
-    <v-flex xs12>
+    <v-flex xs12 v-if="settingsGroup !== 'extensions'">
       <div v-for="setting in settingsGroup" :key="setting.key">
         <Setting
           v-if="
             setting.value.choices ||
-            setting.value.type === 'device' || setting.value.type === 'interface' ||
+            setting.value.type === 'device' ||
+            setting.value.type === 'interface' ||
             !setting.value.multiple
           "
           :device="device"
@@ -38,6 +41,7 @@
         </SettingMultiple>
       </div>
     </v-flex>
+    <AvailableMixins v-else :device="device"></AvailableMixins>
 
     <slot name="append"></slot>
   </v-card>
@@ -47,18 +51,22 @@ import RPCInterface from "./RPCInterface.vue";
 import Setting from "./Setting.vue";
 import SettingMultiple from "./SettingMultiple.vue";
 import CardTitle from "../components/CardTitle.vue";
+import AvailableMixins from "../components/AvailableMixins.vue";
+import Mixin from "../components/Mixin.vue";
+import { ScryptedInterface } from "@scrypted/types";
 
 export default {
   components: {
     CardTitle,
     Setting,
     SettingMultiple,
+    AvailableMixins,
   },
-  mixins: [RPCInterface],
+  mixins: [RPCInterface, Mixin],
   props: ["noTitle"],
   data() {
     return {
-      settingsIndex: 0,
+      settingsGroup: undefined,
       settings: [],
     };
   },
@@ -66,18 +74,22 @@ export default {
     device() {
       this.refresh();
     },
+    settingsGroups() {
+      if (this.settingsGroup === "extensions") return;
+      this.settingsGroup = Object.entries(this.settingsGroups)?.[0]?.[1];
+    },
   },
   mounted() {
     this.refresh();
   },
   computed: {
-    showChips() {
-      return Object.keys(this.settingsGroups).length > 1;
+    ScryptedInterface() {
+      return ScryptedInterface;
     },
-    settingsGroup() {
-      const check = Object.entries(this.settingsGroups)[this.settingsIndex];
-      if (!check) return [];
-      return check[1];
+    showChips() {
+      let requiredChips = 1;
+      if (this.availableMixins.length) requiredChips--;
+      return Object.keys(this.settingsGroups).length > requiredChips;
     },
     settingsGroups() {
       const ret = {};
@@ -92,11 +104,10 @@ export default {
     },
   },
   methods: {
-    onChange() {
-    },
+    onChange() {},
     createInputValue(v) {
       return {
-        settings: this.settings.map(setting => setting.value),
+        settings: this.settings.map((setting) => setting.value),
       };
     },
     async refresh() {

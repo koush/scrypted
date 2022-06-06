@@ -32,7 +32,7 @@ export default {
         },
         stroke: {
           show: true,
-          colors: [this.$vuetify.theme.isDark ? "#333" : "#fff"],
+          colors: [this.$vuetify.theme.dark ? "#333" : "#fff"],
           width: 1,
           dashArray: 0,
         },

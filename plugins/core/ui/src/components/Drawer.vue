@@ -1,5 +1,5 @@
 <template>
-  <v-navigation-drawer fixed app v-model="value.drawer" clipped>
+  <v-navigation-drawer fixed app v-model="value.drawer" clipped :color="$vuetify.theme.dark ? undefined : '#F0F0F0'">
     <v-list dense nav>
       <v-subheader></v-subheader>
 

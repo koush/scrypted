@@ -4,9 +4,7 @@
       <v-card raised>
         <v-toolbar
           dark
-          :color="
-            color || ($vuetify.theme.dark ? undefined : colors.indigo.darken2)
-          "
+          :color="$vuetify.theme.dark ? undefined : colors.indigo.darken2"
         >
           All Devices
           <v-spacer></v-spacer>

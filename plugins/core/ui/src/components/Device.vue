@@ -214,7 +214,12 @@
 
               <v-tooltip bottom v-if="device.info && device.info.managementUrl">
                 <template v-slot:activator="{ on }">
-                  <v-btn x-small v-on="on" color="info" text @click="openManagementUrl"
+                  <v-btn
+                    x-small
+                    v-on="on"
+                    color="info"
+                    text
+                    @click="openManagementUrl"
                     ><v-icon x-small>fa-wrench</v-icon></v-btn
                   >
                 </template>
@@ -368,43 +373,19 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex xs12 v-if="availableMixins.length">
+        <v-flex
+          xs12
+          v-if="
+            availableMixins.length &&
+            !device.interfaces.includes(ScryptedInterface.Settings)
+          "
+        >
           <v-card raised>
             <CardTitle icon="fa-puzzle-piece">
               Integrations and Extensions
             </CardTitle>
 
-            <v-list-item-group>
-              <v-list-item
-                @click="
-                  mixin.enabled = !mixin.enabled;
-                  toggleMixin(mixin);
-                "
-                v-for="mixin in availableMixins"
-                :key="mixin.id"
-                inactive
-              >
-                <v-list-item-action>
-                  <v-checkbox
-                    dense
-                    @click.stop
-                    @change="toggleMixin(mixin)"
-                    v-model="mixin.enabled"
-                    color="primary"
-                  ></v-checkbox>
-                </v-list-item-action>
-
-                <v-list-item-content>
-                  <v-list-item-subtitle>{{ mixin.name }}</v-list-item-subtitle>
-                </v-list-item-content>
-
-                <v-list-item-action
-                  ><v-btn small @click.stop="openMixin(mixin)"
-                    ><v-icon x-small>fa-external-link-alt</v-icon></v-btn
-                  ></v-list-item-action
-                >
-              </v-list-item>
-            </v-list-item-group>
+            <AvailableMixins :device="device"></AvailableMixins>
           </v-card>
         </v-flex>
       </v-layout>
@@ -468,9 +449,10 @@ import AggregateDevice from "./aggregate/AggregateDevice.vue";
 import Automation from "./automation/Automation.vue";
 import PluginAdvancedUpdate from "./plugin/PluginAdvancedUpdate.vue";
 import Vue from "vue";
-import { getDeviceAvailableMixins, setMixin } from "../common/mixin";
 import CardTitle from "../components/CardTitle.vue";
 import colors from "vuetify/es5/util/colors";
+import AvailableMixins from "./AvailableMixins.vue";
+import Mixin from "./Mixin.vue";
 
 const cardHeaderInterfaces = [
   ScryptedInterface.OccupancySensor,
@@ -498,14 +480,17 @@ const rightInterfaces = [
   ScryptedInterface.PositionSensor,
   ScryptedInterface.Program,
   ScryptedInterface.Settings,
-  ScryptedInterface.DeviceProvider,
   ScryptedInterface.MixinProvider,
 ];
 
-const leftInterfaces = [ScryptedInterface.Readme];
+const leftInterfaces = [
+  ScryptedInterface.DeviceProvider,
+  ScryptedInterface.Readme,
+];
 const leftAboveInterfaces = [ScryptedInterface.Camera];
 
 const noCardInterfaces = [
+  ScryptedInterface.Camera,
   ScryptedInterface.Settings,
   ScryptedInterface.Scriptable,
 ];
@@ -545,6 +530,7 @@ function filterInterfaces(interfaces) {
 export default {
   components: {
     CardTitle,
+    AvailableMixins,
 
     DeviceProvider,
     MixinProvider,
@@ -596,6 +582,7 @@ export default {
     Program,
     Scriptable,
   },
+  mixins: [Mixin],
   data() {
     return this.initialState();
   },
@@ -765,52 +752,14 @@ export default {
       }
       await plugins.setStorage(this.device.id, this.pluginData.storage);
     },
-    openMixin(mixin) {
-      this.openDevice(mixin.id);
-    },
     openDevice(id) {
       this.$router.push(getDeviceViewPath(id));
     },
-    async toggleMixin(mixin) {
-      await setMixin(
-        this.$scrypted.systemManager,
-        this.device,
-        mixin.id,
-        mixin.enabled
-      );
-    },
-  },
-  asyncComputed: {
-    availableMixins: {
-      async get() {
-        const mixins = this.device.mixins || [];
-        const availableMixins = (
-          await getDeviceAvailableMixins(
-            this.$scrypted.systemManager,
-            this.device
-          )
-        ).filter((device) => !mixins.includes(device.id));
-
-        const allMixins = [
-          ...mixins
-            .map((id) => this.$scrypted.systemManager.getDeviceById(id))
-            .filter((device) => !!device),
-          ...availableMixins,
-        ];
-
-        const ret = allMixins.map((provider) => ({
-          id: provider.id,
-          name: provider.name,
-          enabled: mixins.includes(provider.id),
-        }));
-
-        return ret;
-      },
-      watch: ["id"],
-      default: [],
-    },
   },
   computed: {
+    ScryptedInterface() {
+      return ScryptedInterface;
+    },
     isPlugin() {
       return this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin);
     },

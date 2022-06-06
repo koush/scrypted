@@ -50,6 +50,7 @@
     "vue2-google-maps": "^0.10.7",
     "vuetify": "^2.5.8",
     "vuex": "^3.6.2",
+    "webpack-dev-server": "^4.9.1",
     "xterm": "^4.13.0",
     "xterm-addon-fit": "^0.5.0"
   },

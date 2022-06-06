@@ -1,6 +1,5 @@
 import Vue from "vue";
-import {connectScryptedClient} from '../../../../packages/client/src/index';
-import axios from 'axios';
+import { checkScryptedClientLogin, connectScryptedClient, loginScryptedClient } from '../../../../packages/client/src/index';
 import store from './store';
 
 function hasValue(state: any, property: string) {
@@ -21,46 +20,46 @@ function isValidDevice(id: string) {
     return true;
 }
 
+export function loginScrypted(username: string, password: string, change_password: string) {
+    return loginScryptedClient({
+        baseUrl: undefined,
+        username,
+        password,
+        change_password,
+    });
+}
+
 Vue.use(Vue => {
     Vue.prototype.$connectScrypted = () => {
         const clientPromise = connectScryptedClient({
             pluginId: '@scrypted/core',
         })
-        .then(async (scrypted) => {
-            // todo: fix this.
-            // since moving the connection out of the @scrypted/core and
-            // directly onto the server, userStorage no longer exists.
-            if (!scrypted.userStorage)
-                scrypted.userStorage = localStorage;
-            return scrypted;
-        });
+            .then(async (scrypted) => {
+                // todo: fix this.
+                // since moving the connection out of the @scrypted/core and
+                // directly onto the server, userStorage no longer exists.
+                if (!scrypted.userStorage)
+                    scrypted.userStorage = localStorage;
+                return scrypted;
+            });
 
         store.commit("setHasLogin", undefined);
         store.commit("setIsLoggedIn", undefined);
         store.commit("setUsername", undefined);
         store.commit("setIsConnected", undefined);
-        store.commit("setIsLoggedIntoCloud", undefined);
 
-        return axios
-            .get("/login", {
-                headers: {
-                    Accept: "application/json"
-                }
-            })
+        return checkScryptedClientLogin()
             .then(response => {
-                if (!response.data.expiration) {
-                    if (response.data.redirect) {
-                        store.commit("setIsLoggedIntoCloud", false);
-                    }
-                    store.commit("setHasLogin", response.data.hasLogin);
+                if (!response.expiration) {
+                    store.commit("setHasLogin", response.hasLogin);
                     throw new Error("Login failed.");
                 }
                 store.commit("setHasLogin", true);
                 store.commit("setIsLoggedIn", true);
-                store.commit("setUsername", response.data.username);
+                store.commit("setUsername", response.username);
                 setTimeout(() => {
                     store.commit("setIsLoggedIn", false);
-                }, response.data.expiration);
+                }, response.expiration);
                 return clientPromise;
             })
             .catch(e => {

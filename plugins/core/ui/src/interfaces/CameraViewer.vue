@@ -102,7 +102,13 @@
         >Live</v-btn
       >
 
-      <v-btn small v-if="isLive && hasIntercom" @click="toggleMute" color="white" outlined>
+      <v-btn
+        small
+        v-if="isLive && hasIntercom"
+        @click="toggleMute"
+        color="white"
+        outlined
+      >
         <v-icon v-if="muted" small color="white" :outlined="isLive"
           >fa fa-microphone-slash
         </v-icon>
@@ -146,7 +152,12 @@ export default {
   },
   computed: {
     hasIntercom() {
-      return this.device.interfaces.includes(ScryptedInterface.Intercom) || this.device.providedInterfaces.includes(ScryptedInterface.RTCSignalingChannel);
+      return (
+        this.device.interfaces.includes(ScryptedInterface.Intercom) ||
+        this.device.providedInterfaces.includes(
+          ScryptedInterface.RTCSignalingChannel
+        )
+      );
     },
     isLive() {
       return !this.startTime;
@@ -227,8 +238,15 @@ export default {
       }, 2500);
     },
     cleanupConnection() {
-      this.pc?.then((pc) => pc.close());
+      this.pc?.then((pc) => {
+        pc.close();
+        console.log("pc cleanup");
+      });
       this.pc = undefined;
+
+      console.log("control cleanup");
+      this.control?.endSession();
+      this.control = undefined;
     },
     async toggleMute() {
       this.muted = !this.muted;

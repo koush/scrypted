@@ -27,7 +27,6 @@ export async function getDeviceAvailableMixins(systemManager: SystemManager, dev
             }
         }
         catch (e) {
-            console.error("mixin check error", check.id, e);
         }
     }));
 
