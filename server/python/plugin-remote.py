@@ -361,25 +361,30 @@ async def async_main(loop: AbstractEventLoop):
     peer.params['getRemote'] = lambda api, pluginId: PluginRemote(
         api, pluginId, loop)
 
-    def oob_runner():
-        ptime = round(time.process_time() * 1000000)
-        heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        oob = {
-            'type': 'stats',
-            'cpuUsage': {
-                'user': ptime,
-                'system': 0,
-            },
-            'memoryUsage': {
-                'heapTotal': heapTotal,
-            },
-        }
-        peer.sendOob(oob)
-        loop.call_later(10, oob_runner)
-    oob_runner()
+    async def get_update_stats():
+        update_stats = await peer.getParam('updateStats')
+
+        def stats_runner():
+            ptime = round(time.process_time() * 1000000)
+            heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            stats = {
+                'type': 'stats',
+                'cpuUsage': {
+                    'user': ptime,
+                    'system': 0,
+                },
+                'memoryUsage': {
+                    'heapTotal': heapTotal,
+                },
+            }
+            asyncio.run_coroutine_threadsafe(update_stats(stats), loop)
+            loop.call_later(10, stats_runner)
+
+        stats_runner()
+
+    asyncio.run_coroutine_threadsafe(get_update_stats(), loop)
 
     await readLoop(loop, peer, reader)
-
 
 def main():
     loop = asyncio.new_event_loop()

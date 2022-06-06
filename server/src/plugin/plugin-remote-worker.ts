@@ -149,16 +149,18 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         }, getDeviceConsole(nativeId), `[${systemManager.getDeviceById(mixinId)?.name}]`);
     }
 
-    let lastCpuUsage: NodeJS.CpuUsage;
-    setInterval(() => {
-        const cpuUsage = process.cpuUsage(lastCpuUsage);
-        lastCpuUsage = cpuUsage;
-        peer.sendOob({
-            type: 'stats',
-            cpu: cpuUsage,
-            memoryUsage: process.memoryUsage(),
-        });
-    }, 10000);
+    peer.getParam('updateStats').then((updateStats: (stats: any) => void) => {
+        let lastCpuUsage: NodeJS.CpuUsage;
+        setInterval(() => {
+            const cpuUsage = process.cpuUsage(lastCpuUsage);
+            lastCpuUsage = cpuUsage;
+            updateStats({
+                type: 'stats',
+                cpu: cpuUsage,
+                memoryUsage: process.memoryUsage(),
+            });
+        }, 10000);
+    });
 
     let replPort: Promise<number>;
 

@@ -122,7 +122,6 @@ async function start() {
         certSetting = await db.upsert(certSetting);
     }
 
-
     const basicAuth = httpAuth.basic({
         realm: 'Scrypted',
     }, async (username, password, callback) => {
@@ -183,6 +182,7 @@ async function start() {
             // }
 
             res.locals.username = username;
+            (req as any).username = username;
         }
         next();
     });
@@ -192,6 +192,7 @@ async function start() {
         if (req.protocol === 'https' && req.headers.authorization && req.headers.authorization.toLowerCase()?.indexOf('basic') !== -1) {
             const basicChecker = basicAuth.check((req) => {
                 res.locals.username = req.user;
+                (req as any).username = req.user;
                 next();
             });
 
@@ -360,23 +361,14 @@ async function start() {
     let hasLogin = await db.getCount(ScryptedUser) > 0;
 
     app.options('/login', (req, res) => {
-        res.setHeader('Vary', 'Origin,Referer');
-        res.set('Access-Control-Allow-Credentials', 'true');
-        const header = scrypted.getAccessControlAllowOrigin(req.headers);
-        if (header)
-            res.setHeader('Access-Control-Allow-Origin', header);
-
-        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-        res.set('Access-Control-Allow-Credentials', 'true');
+        scrypted.addAccessControlHeaders(req, res);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
         res.send(200);
     });
+
     app.post('/login', async (req, res) => {
-        res.setHeader('Vary', 'Origin,Referer');
-        res.set('Access-Control-Allow-Credentials', 'true');
-        const header = scrypted.getAccessControlAllowOrigin(req.headers);
-        if (header)
-            res.setHeader('Access-Control-Allow-Origin', header);
+        scrypted.addAccessControlHeaders(req, res);
 
         const { username, password, change_password } = req.body;
         const timestamp = Date.now();
@@ -443,6 +435,7 @@ async function start() {
         user.salt = crypto.randomBytes(64).toString('base64');
         user.passwordHash = crypto.createHash('sha256').update(user.salt + password).digest().toString('hex');
         user.passwordDate = timestamp;
+        user.token = crypto.randomBytes(16).toString('hex');
         await db.upsert(user);
         hasLogin = true;
 
@@ -457,19 +450,14 @@ async function start() {
 
         res.send({
             username,
+            token: user.token,
             expiration: maxAge,
             addresses,
         });
     });
 
-
     app.get('/login', async (req, res) => {
-        res.setHeader('Vary', 'Origin,Referer');
-        res.set('Access-Control-Allow-Credentials', 'true');
-
-        const header = scrypted.getAccessControlAllowOrigin(req.headers);
-        if (header)
-            res.setHeader('Access-Control-Allow-Origin', header);
+        scrypted.addAccessControlHeaders(req, res);
 
         const addresses = getHostAddresses(true, true).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
         if (req.protocol === 'https' && req.headers.authorization) {
@@ -490,7 +478,6 @@ async function start() {
             res.send({
                 username,
                 token: user.token,
-                addresses,
             });
             return;
         }

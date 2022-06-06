@@ -33,7 +33,7 @@ import { PluginHttp } from './plugin/plugin-http';
 import AdmZip from 'adm-zip';
 import path from 'path';
 import { CORSControl, CORSServer } from './services/cors';
-import { IOServer } from './io';
+import { IOServer, IOServerSocket } from './io';
 
 interface DeviceProxyPair {
     handler: PluginDeviceProxyHandler;
@@ -60,6 +60,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     wsAtomic = 0;
     shellio: IOServer = new io.Server({
         pingTimeout: 120000,
+        perMessageDeflate: true,
         cors: (req, callback) => {
             const header = this.getAccessControlAllowOrigin(req.headers);
             callback(undefined, {
@@ -76,6 +77,46 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.app = app;
 
         app.disable('x-powered-by');
+
+        this.app.options(['/endpoint/@:owner/:pkg/engine.io/api/activate', '/endpoint/@:owner/:pkg/engine.io/api/activate'], (req, res) => {
+            this.addAccessControlHeaders(req, res);
+            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+            res.send(200);
+        });
+
+        this.app.post(['/endpoint/@:owner/:pkg/engine.io/api/activate', '/endpoint/@:owner/:pkg/engine.io/api/activate'], (req, res) => {
+            const { username } = (req as any);
+            if (!username) {
+                res.status(401);
+                res.send('Not Authorized');
+                return;
+            }
+
+            const { owner, pkg } = req.params;
+            let endpoint = pkg;
+            if (owner)
+                endpoint = `@${owner}/${endpoint}`;
+
+            const { id } = req.body;
+            try {
+                const host = this.plugins?.[endpoint];
+                if (!host)
+                    throw new Error('invalid plugin');
+                // @ts-expect-error
+                const socket: IOServerSocket = host.io.clients[id];
+                if (!socket)
+                    throw new Error('invalid socket');
+                socket.emit('/api/activate');
+                res.send({
+                    id,
+                })
+            }
+            catch (e) {
+                res.status(500);
+                res.end();
+            }
+        });
 
         this.addMiddleware();
 
@@ -134,7 +175,14 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         }, 60 * 60 * 1000);
     }
 
-    getAccessControlAllowOrigin(headers: IncomingHttpHeaders) {
+    addAccessControlHeaders(req: http.IncomingMessage, res: http.ServerResponse) {
+        res.setHeader('Vary', 'Origin,Referer');
+        const header = this.getAccessControlAllowOrigin(req.headers);
+        if (header)
+            res.setHeader('Access-Control-Allow-Origin', header);
+    }
+
+    getAccessControlAllowOrigin(headers: http.IncomingHttpHeaders) {
         let { origin, referer } = headers;
         if (!origin && referer) {
             try {

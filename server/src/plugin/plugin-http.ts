@@ -1,8 +1,8 @@
-import { Request, Response, Router } from 'express';
-import bodyParser from 'body-parser';
 import { HttpRequest } from '@scrypted/types';
-import WebSocket, { Server as WebSocketServer } from "ws";
+import bodyParser from 'body-parser';
+import { Request, Response, Router } from 'express';
 import { ServerResponse } from 'http';
+import WebSocket, { Server as WebSocketServer } from "ws";
 
 export abstract class PluginHttp<T> {
     wss = new WebSocketServer({ noServer: true });

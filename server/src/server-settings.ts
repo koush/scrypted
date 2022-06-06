@@ -13,11 +13,19 @@ function nodeIpAddress(family: string): string[] {
     // https://chromium.googlesource.com/external/webrtc/+/master/rtc_base/network.cc#236
     const costlyNetworks = ["ipsec", "tun", "utun", "tap"];
 
+    const ignoreNetworks = [
+        // seen these on macos
+        'llw',
+        'awdl',
+
+        ...costlyNetworks,
+    ];
+
     const interfaces = os.networkInterfaces();
 
     const all = Object.keys(interfaces)
         .map((nic) => {
-            for (const costly of costlyNetworks) {
+            for (const costly of ignoreNetworks) {
                 if (nic.startsWith(costly)) {
                     return {
                         nic,
@@ -27,8 +35,8 @@ function nodeIpAddress(family: string): string[] {
             }
             const addresses = interfaces[nic]!.filter(
                 (details) =>
-                    details.family.toLowerCase() === family &&
-                    !nodeIp.isLoopback(details.address)
+                    details.family.toLowerCase() === family
+                    && !nodeIp.isLoopback(details.address)
             );
             return {
                 nic,

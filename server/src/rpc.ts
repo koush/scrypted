@@ -43,10 +43,6 @@ interface RpcResult extends RpcMessage {
     result?: any;
 }
 
-interface RpcOob extends RpcMessage {
-    oob: any;
-}
-
 interface RpcRemoteProxyValue {
     __remote_proxy_id: string | undefined;
     __remote_proxy_finalizer_id: string | undefined;
@@ -204,7 +200,6 @@ interface LocalProxiedEntry {
 
 export class RpcPeer {
     idCounter = 1;
-    onOob?: (oob: any) => void;
     params: { [name: string]: any } = {};
     pendingResults: { [id: string]: Deferred } = {};
     proxyCounter = 1;
@@ -308,13 +303,6 @@ export class RpcPeer {
 
             this.send(paramMessage, reject);
         });
-    }
-
-    sendOob(oob: any) {
-        this.send({
-            type: 'oob',
-            oob,
-        } as RpcOob)
     }
 
     evalLocal<T>(script: string, filename?: string, coercedParams?: { [name: string]: any }): T {
@@ -545,11 +533,6 @@ export class RpcPeer {
                         delete this.localProxyMap[rpcFinalize.__local_proxy_id];
                         this.localProxied.delete(local);
                     }
-                    break;
-                }
-                case 'oob': {
-                    const rpcOob = message as RpcOob;
-                    this.onOob?.(rpcOob.oob);
                     break;
                 }
                 default:

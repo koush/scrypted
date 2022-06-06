@@ -6,7 +6,7 @@ import fs from 'fs';
 import mkdirp from 'mkdirp';
 import path from 'path';
 import rimraf from 'rimraf';
-import WebSocket from 'ws';
+import WebSocket, { once } from 'ws';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
@@ -37,6 +37,7 @@ export class PluginHost {
     remote: PluginRemote;
     io: IOServer = new io.Server({
         pingTimeout: 120000,
+        perMessageDeflate: true,
         cors: (req, callback) => {
             const header = this.scrypted.getAccessControlAllowOrigin(req.headers);
             callback(undefined, {
@@ -131,6 +132,26 @@ export class PluginHost {
             try {
                 try {
                     if (socket.request.url.indexOf('/api') !== -1) {
+                        if (socket.request.url.indexOf('/public') !== -1) {
+                            socket.send(JSON.stringify({
+                                // @ts-expect-error
+                                id: socket.id,
+                            }));
+                            const timeout = new Promise((_, rj) => setTimeout(() => rj(new Error('timeout')), 10000));
+                            try {
+                                await Promise.race([
+                                    once(socket, '/api/activate'),
+                                    timeout,
+                                ]);
+                                // client will send a start request when it's ready to process events.
+                                await once(socket, 'message');
+                            }
+                            catch (e) {
+                                socket.close();
+                                return;
+                            }
+                        }
+
                         await this.createRpcIoPeer(socket);
                         return;
                     }
@@ -322,11 +343,9 @@ export class PluginHost {
             disconnect();
         });
 
-        this.peer.onOob = (oob: any) => {
-            if (oob.type === 'stats') {
-                this.stats = oob;
-            }
-        };
+        this.peer.params.updateStats = (stats: any) => {
+            this.stats = stats;
+        }
     }
 
     async createRpcIoPeer(socket: IOServerSocket) {
