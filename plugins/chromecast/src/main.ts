@@ -3,7 +3,7 @@ import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, MediaObject,
 import { EventEmitter } from 'events';
 import mdns from 'multicast-dns';
 import mime from 'mime';
-import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
+import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
 
 const { mediaManager, endpointManager, deviceManager } = sdk;
 
