@@ -185,6 +185,29 @@ function logSendCandidate(console: Console, type: string, session: RTCSignalingS
     }
 }
 
+function createCandidateQueue(console: Console, type: string, session: RTCSignalingSession) {
+    let ready = false;
+    let candidateQueue: RTCIceCandidateInit[] = [];
+    const ls = logSendCandidate(console, type, session);
+    const queueSendCandidate: RTCSignalingSendIceCandidate = async (candidate: RTCIceCandidateInit) => {
+        if (!ready)
+            candidateQueue.push(candidate)
+        else
+            ls(candidate);
+    }
+
+    return {
+        flush() {
+            ready = true;
+            for (const candidate of candidateQueue) {
+                ls(candidate);
+            }
+            candidateQueue = [];
+        },
+        queueSendCandidate,
+    }
+}
+
 export async function connectRTCSignalingClients(
     console: Console,
     offerClient: RTCSignalingSession,
@@ -205,12 +228,17 @@ export async function connectRTCSignalingClients(
     offerSetup.type = 'offer';
     answerSetup.type = 'answer';
 
+    const answerQueue = createCandidateQueue(console, 'offer', answerClient);
+    const offerQueue = createCandidateQueue(console, 'answer', offerClient);
+
     const offer = await offerClient.createLocalDescription('offer', offerSetup as RTCAVSignalingSetup,
-        disableTrickle ? undefined : logSendCandidate(console, 'offer', answerClient));
+        disableTrickle ? undefined : answerQueue.queueSendCandidate);
     console.log('offer sdp', offer.sdp);
     await answerClient.setRemoteDescription(offer, answerSetup as RTCAVSignalingSetup);
+    answerQueue.flush();
     const answer = await answerClient.createLocalDescription('answer', answerSetup as RTCAVSignalingSetup,
-        disableTrickle ? undefined : logSendCandidate(console, 'answer', offerClient));
+        disableTrickle ? undefined : offerQueue.queueSendCandidate);
     console.log('answer sdp', answer.sdp);
     await offerClient.setRemoteDescription(answer, offerSetup as RTCAVSignalingSetup);
+    offerQueue.flush();
 }
