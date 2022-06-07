@@ -16,6 +16,19 @@ addSupportedType({
         const service = accessory.addService(Service.SecuritySystem, device.name);
         service.setPrimaryService();
 
+        // Set available modes based on plugin
+        function systemStates(supportedModes: Array<SecuritySystemMode>): number[] {
+            let modes = [Characteristic.SecuritySystemTargetState.DISARM]
+
+            if (supportedModes.includes(SecuritySystemMode.HomeArmed)) modes.push(Characteristic.SecuritySystemTargetState.STAY_ARM);
+            if (supportedModes.includes(SecuritySystemMode.AwayArmed)) modes.push(Characteristic.SecuritySystemTargetState.AWAY_ARM);
+            if (supportedModes.includes(SecuritySystemMode.NightArmed)) modes.push(Characteristic.SecuritySystemTargetState.NIGHT_ARM);
+
+            return modes;
+        }
+        service.getCharacteristic(Characteristic.SecuritySystemTargetState)
+        .setProps({validValues: systemStates(device.securitySystemState.supportedModes)});
+
         function toCurrentState(mode: SecuritySystemMode, triggered: boolean) {
             if (!!triggered)
                 return Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED;
