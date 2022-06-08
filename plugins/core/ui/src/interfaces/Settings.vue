@@ -87,9 +87,9 @@ export default {
       return ScryptedInterface;
     },
     showChips() {
-      let requiredChips = 1;
-      if (this.availableMixins.length) requiredChips--;
-      return Object.keys(this.settingsGroups).length > requiredChips;
+      if (this.availableMixins.length)
+        return true;
+      return Object.keys(this.settingsGroups).length > 1;
     },
     settingsGroups() {
       const ret = {};
