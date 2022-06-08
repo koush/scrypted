@@ -3,6 +3,8 @@ import { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate,
 import { createRawResponse } from "./werift-util";
 
 export class WeriftOutputSignalingSession implements RTCSignalingSession {
+    remoteDescription: Promise<any>;
+
     constructor(public pc: RTCPeerConnection) {
     }
 
@@ -33,6 +35,8 @@ export class WeriftOutputSignalingSession implements RTCSignalingSession {
             ret = createRawResponse(offer);
         }
         else {
+            if (!sendIceCandidate)
+                await this.remoteDescription;
             const answer = await this.pc.createAnswer();
             if (!sendIceCandidate)
                 await this.pc.setLocalDescription(answer);
@@ -44,7 +48,7 @@ export class WeriftOutputSignalingSession implements RTCSignalingSession {
     }
 
     async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) {
-        this.pc.setRemoteDescription(description as any)
+        this.remoteDescription = this.pc.setRemoteDescription(description as any);
     }
 
     async addIceCandidate(candidate: RTCIceCandidateInit) {
