@@ -376,7 +376,7 @@ export class PluginHost {
             }
             const messageSerializationContext = pendingSerializationContext;
             pendingSerializationContext = undefined;
-            rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext)
+            rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext);
         });
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const api = new PluginAPIProxy(this.api, await this.peer.getParam('mediaManager'));
