@@ -9,7 +9,17 @@ export function getIpAddress(): string {
     return nodeIp.address();
 }
 
-function nodeIpAddress(family: string): string[] {
+function normalizeFamilyNodeV18(family: string|number) {
+    if (family === 'IPv4')
+        return 4;
+    if (family === 'IPv6')
+        return 6;
+    return family;
+}
+
+function nodeIpAddress(family: string|number): string[] {
+    family = normalizeFamilyNodeV18(family);
+
     // https://chromium.googlesource.com/external/webrtc/+/master/rtc_base/network.cc#236
     const costlyNetworks = ["ipsec", "tun", "utun", "tap"];
 
@@ -35,7 +45,7 @@ function nodeIpAddress(family: string): string[] {
             }
             const addresses = interfaces[nic]!.filter(
                 (details) =>
-                    details.family.toLowerCase() === family
+                    details.family === family
                     && !nodeIp.isLoopback(details.address)
             );
             return {
