@@ -994,7 +994,7 @@ class PrebufferSession {
           let availablePrebuffers = parser.findSyncFrame(filtered);
           if (!availablePrebuffers) {
             this.console.warn('Unable to find sync frame in rtsp prebuffer.');
-            availablePrebuffers = filtered;
+            availablePrebuffers = [];
           }
           else {
             this.console.log('Found sync frame in rtsp prebuffer.');
@@ -1018,9 +1018,11 @@ class PrebufferSession {
     const session = await this.parserSessionPromise;
 
     let requestedPrebuffer = options?.prebuffer;
-    if (requestedPrebuffer == null && options?.destination !== 'remote') {
-      // try to gaurantee a sync frame, but don't send too much prebuffer.
-      requestedPrebuffer = Math.max(4000, this.getDetectedIdrInterval() || 4000);;
+    if (requestedPrebuffer == null) {
+      // prebuffer search for remote streaming should be even more conservative than local network.
+      const defaultPrebuffer = options?.destination === 'remote' ? 2000 : 4000;
+      // try to gaurantee a sync frame, but don't search too much prebuffer to make it happen.
+      requestedPrebuffer = Math.min(defaultPrebuffer, this.getDetectedIdrInterval() || defaultPrebuffer);;
     }
 
     const { rtspMode, muxingMp4 } = this.getRebroadcastContainer();
@@ -1453,6 +1455,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
   }
 
   async release() {
+    super.release();
     this.console.log('prebuffer session releasing if started');
     this.released = true;
     for (const session of this.sessions.values()) {

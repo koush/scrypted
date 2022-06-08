@@ -207,8 +207,8 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                     try {
                         const parsedSps = spsParse(sps);
                         inputVideoResolution = getSpsResolution(parsedSps);
-                        console.log(inputVideoResolution);
-                        //console.log('parsed bitstream sps', parsedSps);
+                        // console.log(inputVideoResolution);
+                        // console.log('parsed bitstream sps', parsedSps);
                     }
                     catch (e) {
                         console.warn('sps parsing failed');
