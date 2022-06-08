@@ -81,7 +81,7 @@ export class ScryptedSessionControl implements RTCSessionControl {
     async extendSession() {
     }
     async endSession() {
-        this.rtspServer.client.destroy();
+        this.rtspServer?.client.destroy();
         await this.cleanup();
     }
 }

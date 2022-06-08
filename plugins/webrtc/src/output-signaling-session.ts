@@ -15,7 +15,7 @@ export class WeriftOutputSignalingSession implements RTCSignalingSession {
         // needs turn.
         // stun candidates will come through here, if connection is slow to establish.
         this.pc.onIceCandidate.subscribe(candidate => {
-            console.log('local candidate', candidate);
+            console.log('local candidate', candidate.candidate);
             sendIceCandidate?.({
                 candidate: candidate.candidate,
                 sdpMid: candidate.sdpMid,
@@ -26,19 +26,25 @@ export class WeriftOutputSignalingSession implements RTCSignalingSession {
         let ret: RTCSessionDescriptionInit;
         if (type === 'offer') {
             const offer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(offer);
+            if (!sendIceCandidate)
+                await this.pc.setLocalDescription(offer);
+            else
+                this.pc.setLocalDescription(offer);
             ret = createRawResponse(offer);
         }
         else {
             const answer = await this.pc.createAnswer();
-            this.pc.setLocalDescription(answer);
+            if (!sendIceCandidate)
+                await this.pc.setLocalDescription(answer);
+            else
+                this.pc.setLocalDescription(answer);
             ret = createRawResponse(answer);
         }
         return ret;
     }
 
     async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) {
-        await this.pc.setRemoteDescription(description as any)
+        this.pc.setRemoteDescription(description as any)
     }
 
     async addIceCandidate(candidate: RTCIceCandidateInit) {
