@@ -10,6 +10,7 @@ import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 export * from "../../../sdk/types/index";
 import ip from 'ip';
+import { timeoutPromise } from "@scrypted/common/src/promise-utils";
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -111,7 +112,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     };
 
     const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
-    if (!ip.isPrivate(window.location.hostname) && addresses && !addresses.includes(explicitBaseUrl)) {
+    if (window.location.hostname !== 'localhost' && !ip.isPrivate(window.location.hostname) && addresses && !addresses.includes(explicitBaseUrl)) {
         const publicEioOptions: Partial<SocketOptions> = {
             transports: ["websocket", "polling"],
             path: `${endpointPath}/public/engine.io/api`,
@@ -120,9 +121,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         };
 
         let sockets: IOClientSocket[] = [];
-        const promises: Promise<{ ready: IOClientSocket, id: string, address: string }>[] = [];
-
-        promises.push(new Promise((_, rj) => setTimeout(() => rj(new Error('timeout')), 1000)));
+        type EIOResult = { ready: IOClientSocket, id: string, address: string };
+        const promises: Promise<EIOResult>[] = [];
 
         // console.log('checking local addresses', addresses);
         try {
@@ -140,7 +140,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     };
                 })());
             }
-            const { ready, id, address } = await Promise.any(promises);
+            const any = Promise.any(promises);
+            const { ready, id, address } = await timeoutPromise(1000, any);
             // console.log('using local address', address);
 
             const url = `${eioOptions.path}/activate`;
