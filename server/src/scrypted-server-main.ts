@@ -54,7 +54,7 @@ let workerInspectPort: number = undefined;
 
 async function doconnect(): Promise<net.Socket> {
     return new Promise((resolve, reject) => {
-        const target = net.connect(workerInspectPort);
+        const target = net.connect(workerInspectPort, '127.0.0.1');
         target.once('error', reject)
         target.once('connect', () => resolve(target))
     })
