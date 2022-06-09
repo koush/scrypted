@@ -9,6 +9,7 @@ import { SidebandBufferSerializer } from '../../../server/src/plugin/buffer-seri
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 export * from "../../../sdk/types/index";
+import ip from 'ip';
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -110,8 +111,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     };
 
     const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
-    const isLocalHost = ['127.0.0.1', 'localhost'].includes(window.location.hostname);
-    if (!isLocalHost && addresses && !addresses.includes(explicitBaseUrl)) {
+    if (!ip.isPrivate(window.location.hostname) && addresses && !addresses.includes(explicitBaseUrl)) {
         const publicEioOptions: Partial<SocketOptions> = {
             transports: ["websocket", "polling"],
             path: `${endpointPath}/public/engine.io/api`,
@@ -120,27 +120,28 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         };
 
         let sockets: IOClientSocket[] = [];
-        const promises: Promise<{ ready: IOClientSocket, id: string }>[] = [];
+        const promises: Promise<{ ready: IOClientSocket, id: string, address: string }>[] = [];
 
         promises.push(new Promise((_, rj) => setTimeout(() => rj(new Error('timeout')), 1000)));
 
-        console.log('checking local addresses', addresses);
+        // console.log('checking local addresses', addresses);
         try {
             for (const address of addresses) {
                 const check = new eio.Socket(address, publicEioOptions);
                 sockets.push(check);
                 promises.push((async () => {
                     await once(check, 'open');
-                    const [json] = await once(socket, 'message');
+                    const [json] = await once(check, 'message');
                     const { id } = JSON.parse(json);
                     return {
                         ready: check,
                         id,
+                        address,
                     };
                 })());
             }
-            const { ready, id } = await Promise.race(promises);
-            console.log('using local address');
+            const { ready, id, address } = await Promise.any(promises);
+            // console.log('using local address', address);
 
             const url = `${eioOptions.path}/activate`;
             await axios.post(url, {
@@ -154,8 +155,15 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             sockets = sockets.filter(s => s !== socket);
         }
         catch (e) {
+            // console.error('local check failed', e);
         }
-        sockets.forEach(s => s.close());
+        sockets.forEach(s => {
+            try {
+                s.close();
+            }
+            catch (e) {
+            }
+        });
     }
 
     if (!socket) {
