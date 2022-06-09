@@ -110,7 +110,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     };
 
     const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
-    if (addresses && !addresses.includes(explicitBaseUrl)) {
+    const isLocalHost = ['127.0.0.1', 'localhost'].includes(window.location.hostname);
+    if (!isLocalHost && addresses && !addresses.includes(explicitBaseUrl)) {
         const publicEioOptions: Partial<SocketOptions> = {
             transports: ["websocket", "polling"],
             path: `${endpointPath}/public/engine.io/api`,
@@ -119,7 +120,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         };
 
         let sockets: IOClientSocket[] = [];
-        const promises: Promise<IOClientSocket>[] = [];
+        const promises: Promise<{ ready: IOClientSocket, id: string }>[] = [];
 
         promises.push(new Promise((_, rj) => setTimeout(() => rj(new Error('timeout')), 1000)));
 
@@ -128,12 +129,18 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             for (const address of addresses) {
                 const check = new eio.Socket(address, publicEioOptions);
                 sockets.push(check);
-                promises.push(once(check, 'open').then(() => check));
+                promises.push((async () => {
+                    await once(check, 'open');
+                    const [json] = await once(socket, 'message');
+                    const { id } = JSON.parse(json);
+                    return {
+                        ready: check,
+                        id,
+                    };
+                })());
             }
-            socket = await Promise.race(promises);
+            const { ready, id } = await Promise.race(promises);
             console.log('using local address');
-            const [json] = await once(socket, 'message');
-            const { id } = JSON.parse(json);
 
             const url = `${eioOptions.path}/activate`;
             await axios.post(url, {
@@ -142,6 +149,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 ...axiosConfig,
             });
 
+            socket = ready;
             socket.send('/api/start');
             sockets = sockets.filter(s => s !== socket);
         }
