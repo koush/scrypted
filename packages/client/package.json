@@ -13,13 +13,15 @@
   "license": "ISC",
   "devDependencies": {
     "@types/adm-zip": "^0.4.34",
+    "@types/ip": "^1.1.0",
     "@types/node": "^17.0.17"
   },
   "dependencies": {
-    "@scrypted/rpc": "^1.0.4",
+    "@scrypted/common": "file:../../common",
     "adm-zip": "^0.5.9",
     "axios": "^0.25.0",
     "engine.io-client": "^6.2.2",
+    "ip": "^1.1.8",
     "linkfs": "^2.1.0",
     "memfs": "^3.4.1",
     "rimraf": "^3.0.2"
