@@ -36,6 +36,9 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
         this.syncDevices();
 
         systemManager.listen(async (eventSource, eventDetails, eventData) => {
+            if (!eventSource)
+                return;
+
             if (!this.storageSettings.values.syncedDevices.includes(eventSource.id))
                 return;
 
