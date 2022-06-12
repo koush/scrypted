@@ -77,8 +77,8 @@ class RpcProxy(object):
         return super().__setattr__(name, value)
 
     def __call__(self, *args, **kwargs):
-        print('call')
-        pass
+        return self.__dict__['__proxy_peer'].__apply__(self.__dict__['__proxy_id'], self.__dict__['__proxy_oneway_methods'], None, args)
+
 
     def __apply__(self, method: str, args: list):
         return self.__dict__['__proxy_peer'].__apply__(self.__dict__['__proxy_id'], self.__dict__['__proxy_oneway_methods'], method, args)

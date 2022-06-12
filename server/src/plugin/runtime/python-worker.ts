@@ -1,13 +1,14 @@
-import { RuntimeWorker, RuntimeWorkerOptions as RuntimeWorkerOptions } from "./runtime-worker";
 import child_process from 'child_process';
+import fs from "fs";
+import os from "os";
 import path from 'path';
-import { EventEmitter } from "ws";
-import { Writable, Readable } from 'stream';
-import { RpcMessage, RpcPeer } from "../../rpc";
 import readline from 'readline';
+import { Readable, Writable } from 'stream';
+import { RpcMessage, RpcPeer } from "../../rpc";
 import { ChildProcessWorker } from "./child-process-worker";
+import { RuntimeWorkerOptions } from "./runtime-worker";
 
-export class PythonRuntimeWorker extends  ChildProcessWorker {
+export class PythonRuntimeWorker extends ChildProcessWorker {
 
     constructor(pluginId: string, options: RuntimeWorkerOptions) {
         super(pluginId, options);
@@ -29,12 +30,27 @@ export class PythonRuntimeWorker extends  ChildProcessWorker {
             path.join(__dirname, '../../../python', 'plugin-remote.py'),
         )
 
+        const gstEnv: NodeJS.ProcessEnv = {};
+        // hack to fix gst plugin search path on mac...
+        if (os.platform() === 'darwin') {
+            const gstPaths = [
+                '/opt/homebrew/lib/gstreamer-1.0',
+                '/usr/local/lib/gstreamer-1.0',
+            ];
+            for (const gstPath of gstPaths) {
+                if (fs.existsSync(path.join(gstPath, 'libgstx264.dylib'))) {
+                    gstEnv['GST_PLUGIN_PATH'] = gstPath;
+                    break;
+                }
+            }
+        }
+
         this.worker = child_process.spawn('python3', args, {
             // stdin, stdout, stderr, peer in, peer out
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
             env: Object.assign({
                 PYTHONPATH: path.join(process.cwd(), 'node_modules/@scrypted/types'),
-            }, process.env, env),
+            }, gstEnv, process.env, env),
         });
 
         this.setupWorker();
@@ -58,8 +74,8 @@ export class PythonRuntimeWorker extends  ChildProcessWorker {
         try {
             if (!this.worker)
                 throw new Error('worked has been killed');
-                (this.worker.stdio[3] as Writable).write(JSON.stringify(message) + '\n', e => e && reject?.(e));
-            }
+            (this.worker.stdio[3] as Writable).write(JSON.stringify(message) + '\n', e => e && reject?.(e));
+        }
         catch (e) {
             reject?.(e);
         }
