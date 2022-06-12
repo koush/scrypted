@@ -27,6 +27,7 @@ RUN_IGNORE() {
 }
 
 echo "Installing Scrypted dependencies..."
+RUN_IGNORE xcode-select --install
 RUN brew update
 RUN_IGNORE brew install node@16
 # needed by scrypted-ffmpeg
