@@ -400,7 +400,8 @@ async function start() {
             const login_user_token = `${username}#${timestamp}`;
             res.cookie('login_user_token', login_user_token, {
                 maxAge,
-                secure: true,
+                // enabling this will disable insecure http login...
+                // secure: true,
                 signed: true,
                 httpOnly: true,
                 sameSite: 'none',
@@ -442,7 +443,8 @@ async function start() {
         const login_user_token = `${username}#${timestamp}`
         res.cookie('login_user_token', login_user_token, {
             maxAge,
-            secure: true,
+            // enabling this will disable insecure http login...
+            // secure: true,
             signed: true,
             httpOnly: true,
             sameSite: 'none',
