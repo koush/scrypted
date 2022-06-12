@@ -1,4 +1,5 @@
 import { BinarySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { getCameraCapabilities } from "./camera";
 import { addSupportedType, EventReport } from "./common";
 
 addSupportedType(ScryptedDeviceType.Doorbell, {
@@ -6,24 +7,19 @@ addSupportedType(ScryptedDeviceType.Doorbell, {
         if (!device.interfaces.includes(ScryptedInterface.RTCSignalingChannel) || !device.interfaces.includes(ScryptedInterface.BinarySensor))
             return;
 
+        const capabilities = getCameraCapabilities(device);
+        capabilities.push(
+            {
+                "type": "AlexaInterface",
+                "interface": "Alexa.DoorbellEventSource",
+                "version": "3",
+                "proactivelyReported": true
+            } as any,
+        );
+
         return {
             displayCategories: ['CAMERA'],
-            capabilities: [
-                {
-                    "type": "AlexaInterface",
-                    "interface": "Alexa.RTCSessionController",
-                    "version": "3",
-                    "configuration": {
-                        isFullDuplexAudioSupported: true,
-                    }
-                },
-                {
-                    "type": "AlexaInterface",
-                    "interface": "Alexa.DoorbellEventSource",
-                    "version": "3",
-                    "proactivelyReported": true
-                }
-            ],
+            capabilities,
         }
     },
     async reportState(eventSource: ScryptedDevice & BinarySensor, eventDetails, eventData): Promise<EventReport> {

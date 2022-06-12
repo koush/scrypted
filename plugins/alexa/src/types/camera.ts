@@ -3,40 +3,46 @@ import { addSupportedType, AlexaCapabilityHandler, capabilityHandlers, EventRepo
 import { createMessageId } from "../message";
 import { Capability } from "alexa-smarthome-ts/lib/skill/Capability";
 
+export function getCameraCapabilities(device: ScryptedDevice): Capability<any>[] {
+    const capabilities: Capability<any>[] = [
+        {
+            "type": "AlexaInterface",
+            "interface": "Alexa.RTCSessionController",
+            "version": "3",
+            "configuration": {
+                isFullDuplexAudioSupported: true,
+            }
+        } as any,
+    ];
+
+    if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
+        capabilities.push(
+            {
+                "type": "AlexaInterface",
+                "interface": "Alexa.MotionSensor",
+                "version": "3",
+                "properties": {
+                    "supported": [
+                        {
+                            "name": "detectionState"
+                        }
+                    ],
+                    "proactivelyReported": true,
+                    "retrievable": true
+                }
+            },
+        )
+    }
+
+    return capabilities;
+}
+
 addSupportedType(ScryptedDeviceType.Camera, {
     probe(device) {
         if (!device.interfaces.includes(ScryptedInterface.RTCSignalingChannel))
             return;
 
-        const capabilities: Capability<any>[] = [
-            {
-                "type": "AlexaInterface",
-                "interface": "Alexa.RTCSessionController",
-                "version": "3",
-                "configuration": {
-                    isFullDuplexAudioSupported: true,
-                }
-            } as any,
-        ];
-
-        if (device.interfaces.includes(ScryptedInterface.MotionSensor)) {
-            capabilities.push(
-                {
-                    "type": "AlexaInterface",
-                    "interface": "Alexa.MotionSensor",
-                    "version": "3",
-                    "properties": {
-                        "supported": [
-                            {
-                                "name": "detectionState"
-                            }
-                        ],
-                        "proactivelyReported": true,
-                        "retrievable": true
-                    }
-                },
-            )
-        }
+        const capabilities = getCameraCapabilities(device);
 
         return {
             displayCategories: ['CAMERA'],
