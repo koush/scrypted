@@ -42,8 +42,7 @@ This is always a issue with the network setup.
   * You may have multiple network interfaces, such as wired and wireless, and HomeKit is preferring the wireless interface. Use the HomeKit Plugin's `Scrypted Server Address` setting, and set it to your wired IP address manually.
   * If your camera/server/iOS are on a separate VLANs, try disabling VLANs to determine if that is the issue.
   * You wifi network is saturated, resulting in heavy packet loss. Enabling Transcode Debug Mode in the HomeKit settings for that camera may fix this for testing purposes, but long term usage is not recommended as it reduces quality and increases CPU load.
-
-This is probably a codec issue. Try enabling Transcoding on both Live and Remote streams.
+  * This is *may* be a codec issue (but as mentioned earlier, is usually a network issue). Try enabling Transcoding on both Live and Remote streams.
 
 ### HomeKit Remote Streaming not Working
 
