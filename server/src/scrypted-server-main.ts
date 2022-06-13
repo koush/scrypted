@@ -2,7 +2,7 @@ import path from 'path';
 import process from 'process';
 import http from 'http';
 import https from 'https';
-import express from 'express';
+import express, { Request } from 'express';
 import bodyParser from 'body-parser';
 import net from 'net';
 import { ScryptedRuntime } from './runtime';
@@ -160,7 +160,7 @@ async function start() {
         // only basic auth will fail with 401. it is up to the endpoints to manage
         // lack of login from cookie auth.
 
-        const { login_user_token } = req.signedCookies;
+        const login_user_token = getSignedLoginUserToken(req);
         if (login_user_token) {
             const userTokenParts = login_user_token.split('#');
             const username = userTokenParts[0];
@@ -353,8 +353,16 @@ async function start() {
         });
     });
 
+    const getLoginUserToken = (reqSecure: boolean) => {
+        return reqSecure ? 'login_user_token' : 'login_user_token_inseucre';
+    };
+
+    const getSignedLoginUserToken = (req: Request<any>): string => {
+        return req.signedCookies[getLoginUserToken(req.secure)];
+    };
+
     app.get('/logout', (req, res) => {
-        res.clearCookie('login_user_token');
+        res.clearCookie(getLoginUserToken(req.secure));
         res.send({});
     });
 
@@ -398,13 +406,12 @@ async function start() {
             }
 
             const login_user_token = `${username}#${timestamp}`;
-            res.cookie('login_user_token', login_user_token, {
+            res.cookie(getLoginUserToken(req.secure), login_user_token, {
                 maxAge,
-                // enabling this will disable insecure http login...
-                // secure: true,
+                secure: req.secure,
                 signed: true,
                 httpOnly: true,
-                sameSite: 'none',
+                sameSite: !req.secure ? true : 'none',
             });
 
             if (change_password) {
@@ -441,13 +448,12 @@ async function start() {
         hasLogin = true;
 
         const login_user_token = `${username}#${timestamp}`
-        res.cookie('login_user_token', login_user_token, {
+        res.cookie(getLoginUserToken(req.secure), login_user_token, {
             maxAge,
-            // enabling this will disable insecure http login...
-            // secure: true,
+            secure: req.secure,
             signed: true,
             httpOnly: true,
-            sameSite: 'none',
+            sameSite: !req.secure ? true : 'none',
         });
 
         res.send({
@@ -484,7 +490,7 @@ async function start() {
             return;
         }
 
-        const { login_user_token } = req.signedCookies;
+        const login_user_token = getSignedLoginUserToken(req);
         if (!login_user_token) {
             res.send({
                 error: 'Not logged in.',
