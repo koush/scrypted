@@ -26,6 +26,10 @@ RUN_IGNORE() {
     fi
 }
 
+echo "Stopping previous Scrypted Service if it is running..."
+# this may fail if its not loaded, do not use RUN
+launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
+
 echo "Installing Scrypted dependencies..."
 RUN_IGNORE xcode-select --install
 RUN brew update
@@ -119,13 +123,6 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
 </plist>
 EOT
 
-# added 1/30/2022 - delete this block at some point:
-# previous script had the wrong domain. clear it.
-launchctl unload ~/Library/LaunchAgents/com.scrypted.server.plist || echo ""
-rm -f ~/Library/LaunchAgents/com.scrypted.server.plist
-
-# this may fail if its not loaded, do not use RUN
-launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
 RUN launchctl load ~/Library/LaunchAgents/app.scrypted.server.plist
 
 set +x
