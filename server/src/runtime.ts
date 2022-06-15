@@ -29,7 +29,7 @@ import * as io from 'engine.io';
 import { spawn as ptySpawn } from 'node-pty';
 import rimraf from 'rimraf';
 import { getPluginVolume } from './plugin/plugin-volume';
-import { PluginHttp } from './plugin/plugin-http';
+import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import AdmZip from 'adm-zip';
 import path from 'path';
 import { CORSControl, CORSServer } from './services/cors';
@@ -297,7 +297,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     }
 
     async shellHandler(req: Request, res: Response) {
-        const isUpgrade = req.headers.connection?.toLowerCase() === 'upgrade';
+        const isUpgrade = isConnectionUpgrade(req.headers);
 
         const end = (code: number, message: string) => {
             if (isUpgrade) {
@@ -432,7 +432,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
     handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: HttpPluginData) {
         const { pluginHost, pluginDevice } = pluginData;
         const handler = this.getDevice<HttpRequestHandler>(pluginDevice._id);
-        if (handler.interfaces.includes(ScryptedInterface.EngineIOHandler) && req.headers.connection === 'upgrade' && req.headers.upgrade?.toLowerCase() === 'websocket') {
+        if (handler.interfaces.includes(ScryptedInterface.EngineIOHandler) && isConnectionUpgrade(req.headers) && req.headers.upgrade?.toLowerCase() === 'websocket') {
             this.wss.handleUpgrade(req, req.socket, null, ws => {
                 console.log(ws);
             });

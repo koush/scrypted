@@ -1,8 +1,13 @@
 import { HttpRequest } from '@scrypted/types';
 import bodyParser from 'body-parser';
 import { Request, Response, Router } from 'express';
-import { ServerResponse } from 'http';
+import { ServerResponse, IncomingHttpHeaders } from 'http';
 import WebSocket, { Server as WebSocketServer } from "ws";
+
+export function isConnectionUpgrade(headers: IncomingHttpHeaders) {
+    // connection:'keep-alive, Upgrade'
+    return headers.connection?.toLowerCase().includes('upgrade');
+}
 
 export abstract class PluginHttp<T> {
     wss = new WebSocketServer({ noServer: true });
@@ -30,7 +35,7 @@ export abstract class PluginHttp<T> {
             this.endpointHandler(req, res, false, false, this.handleRequestEndpoint.bind(this))
         });
     }
-    
+
     abstract handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: T): void;
     abstract handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: T): void;
     abstract getEndpointPluginData(endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<T>;
@@ -39,7 +44,7 @@ export abstract class PluginHttp<T> {
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
         handler: (req: Request, res: Response, endpointRequest: HttpRequest, pluginData: T) => void) {
 
-        const isUpgrade = req.headers.connection?.toLowerCase() === 'upgrade';
+        const isUpgrade = isConnectionUpgrade(req.headers);
 
         const end = (code: number, message: string) => {
             if (isUpgrade) {
