@@ -1,5 +1,4 @@
 import { RTCRtpCodecParameters } from "@koush/werift";
-import sdk, { } from "@scrypted/sdk";
 
 export const requiredVideoCodec = new RTCRtpCodecParameters({
     mimeType: "video/H264",
