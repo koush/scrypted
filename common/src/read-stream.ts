@@ -84,6 +84,12 @@ async function readLengthRaw(readable: Readable, length: number): Promise<Buffer
   });
 }
 
+export class StreamEndError extends Error {
+  constructor() {
+    super()
+  }
+}
+
 export async function readLength(readable: Readable, length: number): Promise<Buffer> {
   if (readable.readableEnded || readable.destroyed)
     throw new Error("stream ended");
@@ -114,7 +120,7 @@ export async function readLength(readable: Readable, length: number): Promise<Bu
 
     const e = () => {
       cleanup();
-      reject(new Error(`stream ended during read for minimum ${length} bytes`))
+      reject(new StreamEndError())
     };
 
     const cleanup = () => {

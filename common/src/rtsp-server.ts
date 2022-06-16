@@ -7,7 +7,7 @@ import tls from 'tls';
 import { closeQuiet, createBindZero } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
-import { parseSdp } from './sdp-utils';
+import { MSection, parseSdp } from './sdp-utils';
 import { sleep } from './sleep';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
 
@@ -83,7 +83,7 @@ export function getNaluTypes(streamChunk: StreamChunk) {
     if (streamChunk.type !== 'h264')
         return new Set<number>();
     return getNaluTypesInNalu(streamChunk.chunks[streamChunk.chunks.length - 1].subarray(12))
-}   
+}
 
 export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false) {
     const ret = new Set<number>();
@@ -652,7 +652,7 @@ export class RtspServer {
         header.writeUInt16BE(rtp.length, 2);
 
         this.client.write(header);
-        this.client.write(Buffer.from(rtp));
+        return this.client.write(Buffer.from(rtp));
     }
 
     sendUdp(port: number, packet: Buffer, rtcp: boolean) {
@@ -664,7 +664,7 @@ export class RtspServer {
         const track = this.setupTracks[trackId];
         if (!track) {
             this.console?.warn('RTSP Server track not found:', trackId);
-            return;
+            return true;
         }
 
         if (track.protocol === 'udp') {
@@ -672,10 +672,10 @@ export class RtspServer {
                 this.console?.warn('RTSP Server UDP socket not available.');
             else
                 this.sendUdp(track.destination, packet, rtcp);
-            return;
+            return true;
         }
 
-        this.send(packet, rtcp ? track.destination + 1 : track.destination);
+        return this.send(packet, rtcp ? track.destination + 1 : track.destination);
     }
 
     options(url: string, requestHeaders: Headers) {
@@ -690,6 +690,15 @@ export class RtspServer {
         headers['Content-Base'] = url;
         headers['Content-Type'] = 'application/sdp';
         this.respond(200, 'OK', requestHeaders, headers, Buffer.from(this.sdp))
+    }
+
+    setupInterleaved(msection: MSection, low: number, high: number) {
+        this.setupTracks[msection.control] = {
+            control: msection.control,
+            protocol: 'tcp',
+            destination: low,
+            codec: msection.codec,
+        }
     }
 
     // todo: use the sdp itself to determine the audio/video track ids so
@@ -725,12 +734,7 @@ export class RtspServer {
             if (match) {
                 const low = parseInt(match[1]);
                 const high = parseInt(match[2]);
-                this.setupTracks[msection.control] = {
-                    control: msection.control,
-                    protocol: 'tcp',
-                    destination: low,
-                    codec: msection.codec,
-                }
+                this.setupInterleaved(msection, low, high);
             }
         }
         this.respond(200, 'OK', requestHeaders, headers)

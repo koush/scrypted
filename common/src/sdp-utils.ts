@@ -128,9 +128,12 @@ export function parseMLinePayloadTypes(mline: string) {
 
 export function parseMLine(mline: string) {
     // 'm=audio 0 RTP/AVP 96'
-    const type = mline.split(' ')[0].substring(2);
+    const split = mline.split(' ');
+    const type = split[0].substring(2);
     return {
         type,
+        port: parseInt(split[1]),
+        protocol: split[2],
         payloadTypes: parseMLinePayloadTypes(mline),
     }
 }
@@ -166,12 +169,15 @@ export function parseFmtp(msection: string[]) {
         .filter(fmtp => !!fmtp);
 }
 
-const acontrol = 'a=control:';
-const artpmap = 'a=rtpmap:';
-export function parseMSection(msection: string[]) {
-    const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
-    const rtpmap = msection.find(line => line.startsWith(artpmap))?.toLowerCase();
-    const mline = parseMLine(msection[0]);
+export type MSection = ReturnType<typeof parseMSection>;
+
+export function parseRtpMap(mlineType: string, rtpmap: string) {
+    if (!rtpmap)
+        return;
+
+    const match = rtpmap.match(/a=rtpmap:([\d]+) (.*?)\/([\d]+)/);
+
+    rtpmap = rtpmap.toLowerCase();
 
     let codec: string;
     if (rtpmap?.includes('mpeg4')) {
@@ -195,13 +201,33 @@ export function parseMSection(msection: string[]) {
     else if (rtpmap?.includes('h265')) {
         codec = 'h265';
     }
-    else if (!rtpmap && mline.type === 'audio') {
+    else if (!rtpmap && mlineType === 'audio') {
         // ffmpeg seems to omit the rtpmap type for pcm alaw when creating sdp?
         // is this the default?
         codec = 'pcm_alaw';
     }
 
-        let direction: string;
+    return {
+        line: rtpmap,
+        codec,
+        rawCodec: match?.[2],
+        clock: parseInt(match?.[3]),
+        payloadType: parseInt(match?.[1]),
+    }
+}
+
+const acontrol = 'a=control:';
+const artpmap = 'a=rtpmap:';
+export function parseMSection(msection: string[]) {
+    const control = msection.find(line => line.startsWith(acontrol))?.substring(acontrol.length);
+    const rtpmapFirst = msection.find(line => line.startsWith(artpmap));
+    const mline = parseMLine(msection[0]);
+
+    let codec = parseRtpMap(mline.type, rtpmapFirst).codec;
+
+    const rtpmaps = msection.filter(line => line.startsWith(artpmap)).map(line => parseRtpMap(mline.type, line));
+
+    let direction: string;
     for (const checkDirection of ['sendonly', 'sendrecv', 'recvonly', 'inactive']) {
         const found = msection.find(line => line === 'a=' + checkDirection);
         if (found) {
@@ -210,16 +236,24 @@ export function parseMSection(msection: string[]) {
         }
     }
 
-    return {
+    const ret = {
         ...mline,
         fmtp: parseFmtp(msection),
         lines: msection,
+        rtpmaps,
         contents: msection.join('\r\n'),
         control,
         codec,
         direction,
+        toSdp: () => {
+            return ret.lines.join('\r\n');
+        }
     }
+
+    return ret;
 }
+
+export type ParsedSdp = ReturnType<typeof parseSdp>;
 
 export function parseSdp(sdp: string) {
     const lines = sdp.split('\n').map(line => line.trim());
