@@ -13,6 +13,7 @@
   "bin": {
     "scrypted-package-json": "bin/scrypted-package-json.js",
     "scrypted-readme": "bin/scrypted-readme.js",
+    "scrypted-setup-project": "bin/scrypted-setup-project.js",
     "scrypted-webpack": "bin/scrypted-webpack.js",
     "scrypted-deploy-debug": "bin/scrypted-deploy-debug.js",
     "scrypted-deploy": "bin/scrypted-deploy.js",

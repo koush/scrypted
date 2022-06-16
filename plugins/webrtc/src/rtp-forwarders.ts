@@ -1,7 +1,8 @@
+import { RTCRtpCodecParameters } from "@koush/werift";
 import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
-import { parseHeaders, RtspClient } from "@scrypted/common/src/rtsp-server";
-import { addTrackControls, getSpsPps, MSection, parseSdp, replacePorts, replaceSectionPort } from "@scrypted/common/src/sdp-utils";
+import { RtspClient } from "@scrypted/common/src/rtsp-server";
+import { addTrackControls, getSpsPps, MSection, parseSdp, replaceSectionPort } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
@@ -10,17 +11,38 @@ import { H264Repacketizer } from '../../homekit/src/types/camera/h264-packetizer
 
 const { mediaManager } = sdk;
 
-export function getFFmpegRtpAudioOutputArguments(inputCodec: string, maximumCompatibilityMode: boolean) {
+export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
+    if (outputCodecParameters.name === 'PCMA') {
+        return {
+            name: 'pcm_alaw',
+            encoder: 'pcm_alaw',
+        };
+    }
+    if (outputCodecParameters.name === 'PCMU') {
+        return {
+            name: 'pcm_ulaw',
+            encoder: 'pcm_ulaw',
+        };
+    }
+    return {
+        name: 'opus',
+        encoder: 'libopus',
+    };
+}
+
+export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodecParameters: RTCRtpCodecParameters, maximumCompatibilityMode: boolean) {
     const ret = [
         '-vn', '-sn', '-dn',
     ];
 
-    if (inputCodec === 'opus' && !maximumCompatibilityMode) {
+    const { encoder, name } = getAudioCodec(outputCodecParameters);
+
+    if (inputCodec === name && !maximumCompatibilityMode) {
         ret.push('-acodec', 'copy');
     }
     else {
         ret.push(
-            '-acodec', 'libopus',
+            '-acodec', encoder,
             '-application', 'lowdelay',
             '-frame_duration', '60',
             '-flags', '+global_header',
@@ -28,7 +50,7 @@ export function getFFmpegRtpAudioOutputArguments(inputCodec: string, maximumComp
             // choose a better birate? this is on the high end recommendation for voice.
             '-b:a', '40k',
             '-bufsize', '96k',
-            '-ac', '2',
+            '-ac', outputCodecParameters.channels.toString(),
         )
     }
     return ret;
@@ -271,6 +293,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         }
         ffmpegLogInitialOutput(console, cp);
         cp.on('exit', () => forwarders.close());
+    }
+    else {
+        console.log('bypassing ffmpeg, perfect codecs');
     }
 
     let killed = false;

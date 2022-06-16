@@ -5,12 +5,10 @@ import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import sdk, { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
 import { WeriftOutputSignalingSession } from "./output-signaling-session";
 import { waitConnected } from "./peerconnection-util";
-import { getFFmpegRtpAudioOutputArguments, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
+import { getAudioCodec, getFFmpegRtpAudioOutputArguments, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { isPeerConnectionAlive, logIsPrivateIceTransport } from "./werift-util";
-
-const { mediaManager } = sdk;
 
 const iceServer = {
     urls: ["turn:turn.scrypted.app:3478"],
@@ -155,6 +153,15 @@ export async function createRTCPeerConnectionSink(
         const ffmpegInput = await getFFmpegInput(willTranscode ? 'ffmpeg' : 'scrypted', isPrivate ? requestDestination : 'remote');
         const { mediaStreamOptions } = ffmpegInput;
 
+        if (mediaStreamOptions.audio?.codec === 'pcm_ulaw') {
+            audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
+        }
+        else if (mediaStreamOptions.audio?.codec === 'pcm_alaw') {
+            audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
+        }
+
+        const { encoder: audioCodecCopy } = getAudioCodec(audioTransceiver.sender.codec);
+
         const videoArgs: string[] = [];
         const transcode = willTranscode
             || mediaStreamOptions?.video?.codec !== 'h264'
@@ -204,10 +211,10 @@ export async function createRTCPeerConnectionSink(
         }
 
         const audioRtpTrack: RtpTrack = {
-            codecCopy: maximumCompatibilityMode ? undefined : 'opus',
+            codecCopy: maximumCompatibilityMode ? undefined : audioCodecCopy,
             onRtp: buffer => audioTransceiver.sender.sendRtp(buffer),
             outputArguments: [
-                ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, maximumCompatibilityMode),
+                ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode),
             ]
         };
 

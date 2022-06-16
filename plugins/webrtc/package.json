@@ -2,6 +2,7 @@
    "name": "@scrypted/webrtc",
    "version": "0.0.47",
    "scripts": {
+      "postinstall": "scrypted-setup-project",
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
       "scrypted-vscode-launch": "scrypted-deploy-debug",
