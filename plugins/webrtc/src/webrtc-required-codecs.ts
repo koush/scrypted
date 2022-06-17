@@ -1,5 +1,7 @@
 import { RTCRtpCodecParameters } from "@koush/werift";
+import sdk from "@scrypted/sdk";
 
+const { mediaManager } = sdk;
 export const requiredVideoCodec = new RTCRtpCodecParameters({
     mimeType: "video/H264",
     clockRate: 90000,
@@ -31,3 +33,52 @@ export const requiredAudioCodecs = [
         channels: 1,
     }),
 ];
+
+
+export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
+    if (outputCodecParameters.name === 'PCMA') {
+        return {
+            name: 'pcm_alaw',
+            encoder: 'pcm_alaw',
+        };
+    }
+    if (outputCodecParameters.name === 'PCMU') {
+        return {
+            name: 'pcm_ulaw',
+            encoder: 'pcm_ulaw',
+        };
+    }
+    return {
+        name: 'opus',
+        encoder: 'libopus',
+    };
+}
+
+export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodecParameters: RTCRtpCodecParameters, maximumCompatibilityMode: boolean) {
+    const ret = [
+        '-vn', '-sn', '-dn',
+    ];
+
+    const { encoder, name } = getAudioCodec(outputCodecParameters);
+
+    if (inputCodec === name && !maximumCompatibilityMode) {
+        ret.push('-acodec', 'copy');
+    }
+    else {
+        // this may not work for anything but opus, but that's probably fine since opus is
+        // the preferred default. webrtc will never try to transcode to a non-pcm format currently
+        // i think? need to investigate ring pcm cameras.
+        ret.push(
+            '-acodec', encoder,
+            '-application', 'lowdelay',
+            '-frame_duration', '60',
+            '-flags', '+global_header',
+            '-ar', '48k',
+            // choose a better birate? this is on the high end recommendation for voice.
+            '-b:a', '40k',
+            '-bufsize', '96k',
+            '-ac', outputCodecParameters.channels.toString(),
+        )
+    }
+    return ret;
+}
