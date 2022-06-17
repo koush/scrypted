@@ -1379,8 +1379,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         this.console.warn('Unable to find Default Stream?');
       }
     }
-
-    deviceManager.onMixinEvent(this.id, this.mixinProviderNativeId, ScryptedInterface.Settings, undefined);
   }
 
   async getMixinSettings(): Promise<Setting[]> {

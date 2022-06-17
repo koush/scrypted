@@ -1,10 +1,11 @@
 {
    "name": "@scrypted/prebuffer-mixin",
-   "version": "0.9.18",
+   "version": "0.9.19",
    "description": "Video Stream Rebroadcast, Prebuffer, and Management Plugin for Scrypted.",
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {
+      "postinstall": "scrypted-setup-project",
       "prepublishOnly": "NODE_ENV=production scrypted-webpack",
       "prescrypted-vscode-launch": "scrypted-webpack",
       "scrypted-vscode-launch": "scrypted-deploy-debug",

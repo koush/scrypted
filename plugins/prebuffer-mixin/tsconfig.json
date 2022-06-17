@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "target": "esnext",
+        "esModuleInterop": true,
+    },
+    "include": [
+        "src/**/*"
+    ]
+}
