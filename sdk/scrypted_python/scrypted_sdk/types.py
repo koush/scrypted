@@ -443,6 +443,7 @@ class RequestPictureOptions(TypedDict):
 class RequestRecordingStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
+    duration: float
     id: str
     metadata: Any
     name: str
@@ -975,7 +976,7 @@ class VideoClips:
     pass
 
 class VideoRecorder:
-    async def getRecordingStream(self, options: RequestRecordingStreamOptions) -> MediaObject:
+    async def getRecordingStream(self, options: RequestRecordingStreamOptions, recordingStream: MediaObject = None) -> MediaObject:
         pass
     async def getRecordingStreamOptions(self) -> list[MediaStreamOptions]:
         pass

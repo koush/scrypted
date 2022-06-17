@@ -634,9 +634,19 @@ export interface VideoCameraConfiguration {
 }
 export interface RequestRecordingStreamOptions extends MediaStreamOptions {
     startTime: number;
+    duration?: number;
 }
 export interface VideoRecorder {
-    getRecordingStream(options: RequestRecordingStreamOptions): Promise<MediaObject>;
+    /**
+     * Returns a MediaObject for a recording stream.
+     * @param options Options that denote where to start the recording stream.
+     * If a duration is specified, a downloadable stream will be returned.
+     * If a duration is not specified, a playback stream will be returned.
+     * @param recordingStream Optionally provide a previously returned recording stream
+     * to seek to a new position within that stream. If the seek is successful, the previous
+     * MediaObject will update its playback position and no MediaObject will be returned.
+     */
+    getRecordingStream(options: RequestRecordingStreamOptions, recordingStream?: MediaObject): Promise<MediaObject>;
     getRecordingStreamOptions(): Promise<MediaStreamOptions[]>;
     getRecordingStreamThumbnail(time: number): Promise<MediaObject>;
 }
