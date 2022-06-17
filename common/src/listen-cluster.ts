@@ -61,6 +61,7 @@ export async function listenZeroSingleClient() {
 
     const clientPromise = new Promise<net.Socket>((resolve, reject) => {
         const timeout = setTimeout(() => {
+            server.close();
             reject(new Error('timeout waiting for client'));
         }, 30000)
         server.on('connection', client => {
