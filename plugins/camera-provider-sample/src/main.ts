@@ -1,4 +1,4 @@
-import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MotionSensor, PictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { StorageSettings } from '../../../common/src/settings';
 
@@ -38,7 +38,7 @@ class SampleCameraDevice extends ScryptedDeviceBase implements Intercom, Camera,
         return mediaManager.createMediaObject(Buffer.from(JSON.stringify(ffmpegInput)), ScryptedMimeTypes.FFmpegInput);
     }
 
-    async getVideoStreamOptions(): Promise<MediaStreamOptions[]> {
+    async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         return;
     }
 
@@ -92,7 +92,7 @@ class SampleCameraPlugin extends ScryptedDeviceBase implements DeviceProvider, D
             },
             noStore: true,
         },
-    }, this.storage);
+    });
 
     constructor() {
         super();
