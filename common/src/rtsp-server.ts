@@ -286,6 +286,7 @@ export class RtspClient extends RtspBase {
     needKeepAlive = false;
     setupOptions = new Map<number, RtspClientTcpSetupOptions>();
     issuedTeardown = false;
+    hasGetParameter = true;
 
     constructor(public url: string, console?: Console) {
         super(console);
@@ -378,7 +379,10 @@ export class RtspClient extends RtspBase {
             while (true) {
                 if (this.needKeepAlive) {
                     this.needKeepAlive = false;
-                    await this.getParameter();
+                    if (this.hasGetParameter)
+                        await this.getParameter();
+                    else
+                        await this.options();
                 }
                 await this.readDataPayload();
             }
@@ -473,7 +477,10 @@ export class RtspClient extends RtspBase {
 
     async options() {
         const headers: Headers = {};
-        return this.request('OPTIONS', headers);
+        const ret = await this.request('OPTIONS', headers);
+        const publicHeader = ret.headers['public'];
+        if (publicHeader)
+            this.hasGetParameter = publicHeader.toLowerCase().includes('get_parameter');
     }
 
     async getParameter() {
