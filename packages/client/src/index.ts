@@ -111,7 +111,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     };
 
     const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
-    console.log('local address connection disabled');
     if (window.location.hostname !== 'localhost' && !ip.isPrivate(window.location.hostname) && addresses && !addresses.includes(explicitBaseUrl)) {
         const publicEioOptions: Partial<SocketOptions> = {
             path: `${endpointPath}/public/engine.io/api`,
