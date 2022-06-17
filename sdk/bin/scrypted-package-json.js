@@ -3,8 +3,6 @@ const fs = require('fs');
 
 const pkg = JSON.parse(fs.readFileSync('package.json'));
 pkg.scripts = {
-    // alias
-    "postinstall": "scrypted-setup-project",
     "scrypted-setup-project": "scrypted-setup-project",
     "prescrypted-setup-project": "scrypted-package-json",
     "build": "scrypted-webpack",

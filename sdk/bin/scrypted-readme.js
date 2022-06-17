@@ -9,7 +9,7 @@ const readme =
 `# ${title}
 
 ## npm commands
- * npm run scrypted-webpack
+ * npm run build
  * npm run scrypted-deploy <ipaddress>
  * npm run scrypted-debug <ipaddress>
 
