@@ -92,15 +92,6 @@
         ></v-btn
       >
 
-      <v-btn
-        v-if="showNvr"
-        :dark="!isLive"
-        small
-        color="red"
-        :outlined="!isLive"
-        @click="streamCamera"
-        >Live</v-btn
-      >
 
       <v-btn
         small
@@ -116,6 +107,17 @@
           >fa fa-microphone
         </v-icon>
       </v-btn>
+
+
+      <v-btn
+        v-if="showNvr"
+        :dark="!isLive"
+        small
+        color="red"
+        :outlined="!isLive"
+        @click="streamCamera"
+        >Live</v-btn
+      >
     </div>
   </div>
 </template>
@@ -225,6 +227,8 @@ export default {
       this.streamRecorder(dt);
     },
     doTimeScroll(e) {
+      if (!this.device.interfaces.includes(ScryptedInterface.VideoRecorder))
+        return;
       if (!this.startTime) {
         this.startTime = Date.now() - 2 * 60 * 1000;
         return;
@@ -270,13 +274,14 @@ export default {
     async streamRecorder(startTime) {
       this.cleanupConnection();
       this.startTime = startTime;
-      const { pc } = await streamRecorder(
+      const { pc, control } = await streamRecorder(
         this.$scrypted.mediaManager,
         this.device,
         startTime,
         () => this.$refs.video
       );
       this.pc = pc;
+      this.control = control;
     },
   },
   watch: {

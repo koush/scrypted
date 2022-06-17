@@ -8,6 +8,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
 export async function streamRecorder(mediaManager: MediaManager, device: ScryptedDevice & VideoRecorder, startTime: number, getVideo: () => HTMLVideoElement) {
   const mo = await device.getRecordingStream({
     startTime,
+    container: 'rtsp',
   });
 
   const channel: RTCSignalingChannel = await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.RTCSignalingChannel);

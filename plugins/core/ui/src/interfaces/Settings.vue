@@ -6,12 +6,12 @@
         mandatory
         active-class="deep-purple accent-4 white--text"
         column
-        v-model="settingsGroup"
+        v-model="settingsGroupName"
       >
         <v-chip
           small
-          :value="value"
-          v-for="[key, value] of Object.entries(settingsGroups)"
+          :value="key"
+          v-for="[key] of Object.entries(settingsGroups)"
           :key="key"
         >
           {{ key.replace("Settings", "") || "General" }}
@@ -24,7 +24,7 @@
 
     <v-divider v-if="showChips"></v-divider>
 
-    <v-flex xs12 v-if="settingsGroup !== 'extensions'">
+    <v-flex xs12 v-if="settingsGroupName !== 'extensions'">
       <div v-for="setting in settingsGroup" :key="setting.key">
         <Setting
           v-if="
@@ -66,17 +66,14 @@ export default {
   props: ["noTitle"],
   data() {
     return {
-      settingsGroup: undefined,
+      usingDefaultSettingsGroupName: true,
+      settingsGroupName: undefined,
       settings: [],
     };
   },
   watch: {
     device() {
       this.refresh();
-    },
-    settingsGroups() {
-      if (this.settingsGroup === "extensions") return;
-      this.settingsGroup = Object.entries(this.settingsGroups)?.[0]?.[1];
     },
   },
   mounted() {
@@ -90,6 +87,9 @@ export default {
       if (this.availableMixins.length)
         return true;
       return Object.keys(this.settingsGroups).length > 1;
+    },
+    settingsGroup() {
+      return Object.entries(this.settingsGroups).find(sg => sg[0] === this.settingsGroupName)?.[1] || [];
     },
     settingsGroups() {
       const ret = {};
@@ -121,6 +121,10 @@ export default {
         key: setting.key,
         value: setting,
       }));
+      if (this.usingDefaultSettingsGroupName) {
+        this.usingDefaultSettingsGroupName = false;
+        this.settingsGroupName = Object.entries(this.settingsGroups)?.[0]?.[0] || 'extensions';
+      }
     },
   },
 };
