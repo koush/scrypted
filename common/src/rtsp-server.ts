@@ -100,8 +100,14 @@ export function getNaluTypesInNalu(nalu: Buffer, fuaRequireStart = false) {
     }
     else if (naluType === H264_NAL_TYPE_FU_A) {
         const fuaType = nalu[1] & 0x1f;
-        if (fuaRequireStart && !!(nalu[1] & 0x80))
+        if (fuaRequireStart) {
+            const isFuStart = !!(nalu[1] & 0x80);
+            if (isFuStart)
+                ret.add(fuaType);
+        }
+        else {
             ret.add(fuaType);
+        }
     }
     else {
         ret.add(naluType);
