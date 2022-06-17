@@ -172,12 +172,9 @@ export function parseFmtp(msection: string[]) {
 export type MSection = ReturnType<typeof parseMSection>;
 
 export function parseRtpMap(mlineType: string, rtpmap: string) {
-    if (!rtpmap)
-        return;
+    const match = rtpmap?.match(/a=rtpmap:([\d]+) (.*?)\/([\d]+)/);
 
-    const match = rtpmap.match(/a=rtpmap:([\d]+) (.*?)\/([\d]+)/);
-
-    rtpmap = rtpmap.toLowerCase();
+    rtpmap = rtpmap?.toLowerCase();
 
     let codec: string;
     if (rtpmap?.includes('mpeg4')) {
