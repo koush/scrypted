@@ -1,4 +1,3 @@
-import { RTCRtpCodecParameters } from "@koush/werift";
 import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import { RtspClient } from "@scrypted/common/src/rtsp-server";
@@ -10,51 +9,6 @@ import { Writable } from "stream";
 import { H264Repacketizer } from '../../homekit/src/types/camera/h264-packetizer';
 
 const { mediaManager } = sdk;
-
-export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
-    if (outputCodecParameters.name === 'PCMA') {
-        return {
-            name: 'pcm_alaw',
-            encoder: 'pcm_alaw',
-        };
-    }
-    if (outputCodecParameters.name === 'PCMU') {
-        return {
-            name: 'pcm_ulaw',
-            encoder: 'pcm_ulaw',
-        };
-    }
-    return {
-        name: 'opus',
-        encoder: 'libopus',
-    };
-}
-
-export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodecParameters: RTCRtpCodecParameters, maximumCompatibilityMode: boolean) {
-    const ret = [
-        '-vn', '-sn', '-dn',
-    ];
-
-    const { encoder, name } = getAudioCodec(outputCodecParameters);
-
-    if (inputCodec === name && !maximumCompatibilityMode) {
-        ret.push('-acodec', 'copy');
-    }
-    else {
-        ret.push(
-            '-acodec', encoder,
-            '-application', 'lowdelay',
-            '-frame_duration', '60',
-            '-flags', '+global_header',
-            '-ar', '48k',
-            // choose a better birate? this is on the high end recommendation for voice.
-            '-b:a', '40k',
-            '-bufsize', '96k',
-            '-ac', outputCodecParameters.channels.toString(),
-        )
-    }
-    return ret;
-}
 
 export interface RtpTrack {
     codecCopy?: string;
