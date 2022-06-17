@@ -3,7 +3,6 @@
    "version": "1.1.25",
    "description": "HomeKit Plugin for Scrypted",
    "scripts": {
-      "postinstall": "scrypted-setup-project",
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",

@@ -2,7 +2,6 @@
    "name": "@scrypted/dummy-switch",
    "description": "Scrypted Dummy Switch plugin. Create virtual switches, locks, and start/stops that run scripts, trigger motion, and press buttons when toggled.",
    "scripts": {
-      "postinstall": "scrypted-setup-project",
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",

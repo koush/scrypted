@@ -5,7 +5,6 @@
    "author": "Scrypted",
    "license": "Apache-2.0",
    "scripts": {
-      "postinstall": "scrypted-setup-project",
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",

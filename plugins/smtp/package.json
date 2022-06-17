@@ -2,7 +2,6 @@
    "name": "@scrypted/smtp",
    "description": "Mail (SMTP) for Scrypted. Turn devices on and off via a mail endpoint. Use in combination with the Dummy Switch plugin to create mail activated motion sensors.",
    "scripts": {
-      "postinstall": "scrypted-setup-project",
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
       "build": "scrypted-webpack",
