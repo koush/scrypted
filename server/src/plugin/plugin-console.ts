@@ -1,5 +1,5 @@
 import { ScryptedNativeId } from '@scrypted/types'
-import { listenZero } from './listen-zero';
+import { listenZero } from '../listen-zero';
 import { Server } from 'net';
 import { once } from 'events';
 import net from 'net'

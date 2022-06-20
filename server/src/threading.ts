@@ -1,6 +1,7 @@
 import worker_threads from 'worker_threads';
 import { getEvalSource, RpcPeer } from './rpc';
 import v8 from 'v8';
+import vm from 'vm';
 
 export async function newThread<T>(thread: () => Promise<T>): Promise<T>;
 export async function newThread<V, T>(params: V, thread: (params: V) => Promise<T>): Promise<T>;
@@ -28,22 +29,22 @@ export async function newThread<T>(...args: any[]): Promise<T> {
             const g = global as any;
             g[customRequire] = g.require;
         }
-        const v8 = global.require('v8');
-        const worker_threads = global.require('worker_threads');
-        const vm = global.require('vm');
-        const mainPeer = new RpcPeer('thread', 'main', (message: any, reject: any) => {
+        const thread_v8: typeof v8 = global.require('v8');
+        const thread_worker_threads: typeof worker_threads = global.require('worker_threads');
+        const thread_vm: typeof vm = global.require('vm');
+        const mainPeer: RpcPeer = new RpcPeer('thread', 'main', (message: any, reject: any) => {
             try {
-                worker_threads.parentPort.postMessage(v8.serialize(message));
+                thread_worker_threads.parentPort.postMessage(thread_v8.serialize(message));
             }
             catch (e) {
                 reject?.(e);
             }
         });
         mainPeer.transportSafeArgumentTypes.add(Buffer.name);
-        worker_threads.parentPort.on('message', (message: any) => mainPeer.handleMessage(v8.deserialize(message)));
+        thread_worker_threads.parentPort.on('message', (message: any) => mainPeer.handleMessage(thread_v8.deserialize(message)));
 
         mainPeer.params.eval = async (script: string, moduleNames: string[], paramNames: string[], ...paramValues: any[]) => {
-            const f = vm.compileFunction(`return (${script})`, paramNames, {
+            const f = thread_vm.compileFunction(`return (${script})`, paramNames, {
                 filename: 'script.js',
             });
             const params: any = {};
@@ -92,31 +93,3 @@ export async function newThread<T>(...args: any[]): Promise<T> {
         worker.terminate();
     }
 }
-
-async function test() {
-    const foo = 5;
-    const bar = 6;
-
-    console.log(await newThread({
-        foo, bar,
-    }, async () => {
-        return foo + bar;
-    }));
-
-
-    console.log(await newThread({
-        foo, bar,
-    }, async ({foo,bar}) => {
-        return foo + bar;
-    }));
-
-    const sayHelloInMainThread = () => console.log('hello! main thread:', worker_threads.isMainThread);
-    await newThread({
-        sayHelloInMainThread,
-    }, async () => {
-        sayHelloInMainThread();
-    })
-}
-
-// if (true)
-//     test();

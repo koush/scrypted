@@ -78,46 +78,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
         app.disable('x-powered-by');
 
-        this.app.options(['/endpoint/@:owner/:pkg/engine.io/api/activate', '/endpoint/@:owner/:pkg/engine.io/api/activate'], (req, res) => {
-            this.addAccessControlHeaders(req, res);
-            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-            res.send(200);
-        });
-
-        this.app.post(['/endpoint/@:owner/:pkg/engine.io/api/activate', '/endpoint/@:owner/:pkg/engine.io/api/activate'], (req, res) => {
-            const { username } = (req as any);
-            if (!username) {
-                res.status(401);
-                res.send('Not Authorized');
-                return;
-            }
-
-            const { owner, pkg } = req.params;
-            let endpoint = pkg;
-            if (owner)
-                endpoint = `@${owner}/${endpoint}`;
-
-            const { id } = req.body;
-            try {
-                const host = this.plugins?.[endpoint];
-                if (!host)
-                    throw new Error('invalid plugin');
-                // @ts-expect-error
-                const socket: IOServerSocket = host.io.clients[id];
-                if (!socket)
-                    throw new Error('invalid socket');
-                socket.emit('/api/activate');
-                res.send({
-                    id,
-                })
-            }
-            catch (e) {
-                res.status(500);
-                res.end();
-            }
-        });
-
         this.addMiddleware();
 
         app.get('/web/oauth/callback', (req, res) => {

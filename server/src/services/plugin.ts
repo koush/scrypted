@@ -51,25 +51,19 @@ export class PluginComponent {
         this.scrypted.getDevice(id);
         await this.scrypted.devices[id]?.handler?.ensureProxy();
     }
-    async getMixins(id: string) {
-        console.warn('legacy use of getMixins, use the mixins property');
-        const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        return getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
-    }
     async getIdForPluginId(pluginId: string) {
         return this.scrypted.findPluginDevice(pluginId)?._id;
     }
     async getIdForNativeId(pluginId: string, nativeId: ScryptedNativeId) {
         return this.scrypted.findPluginDevice(pluginId, nativeId)?._id;
     }
+    /**
+     * @deprecated available as device.pluginId now.
+     * Remove at some point after core/ui rolls out 6/20/2022.
+     */
     async getPluginId(id: string) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
         return pluginDevice.pluginId;
-    }
-    async getPluginProcessId(pluginId: string) {
-        if (this.scrypted.plugins[pluginId]?.worker?.killed)
-            return 'killed';
-        return this.scrypted.plugins[pluginId]?.worker?.pid;
     }
     async reload(pluginId: string) {
         const plugin = await this.scrypted.datastore.tryGet(Plugin, pluginId);

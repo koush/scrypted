@@ -4,13 +4,16 @@ import crypto from 'crypto';
 import * as io from 'engine.io';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
+import net from 'net';
 import path from 'path';
 import rimraf from 'rimraf';
+import { Duplex } from 'stream';
 import WebSocket, { once } from 'ws';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
+import { createDuplexRpcPeer, createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
 import { sleep } from '../sleep';
 import { SidebandBufferSerializer } from './buffer-serializer';
@@ -134,23 +137,8 @@ export class PluginHost {
                 try {
                     if (socket.request.url.indexOf('/api') !== -1) {
                         if (socket.request.url.indexOf('/public') !== -1) {
-                            socket.send(JSON.stringify({
-                                // @ts-expect-error
-                                id: socket.id,
-                            }));
-                            const timeout = new Promise((_, rj) => setTimeout(() => rj(new Error('timeout')), 10000));
-                            try {
-                                await Promise.race([
-                                    once(socket, '/api/activate'),
-                                    timeout,
-                                ]);
-                                // client will send a start request when it's ready to process events.
-                                await once(socket, 'message');
-                            }
-                            catch (e) {
-                                socket.close();
-                                return;
-                            }
+                            socket.close();
+                            return;
                         }
 
                         await this.createRpcIoPeer(socket);
@@ -344,51 +332,61 @@ export class PluginHost {
             disconnect();
         });
 
+        this.worker.on('rpc', (message, sendHandle) => {
+            this.createRpcPeer(sendHandle as net.Socket);
+        });
+
         this.peer.params.updateStats = (stats: any) => {
             this.stats = stats;
         }
     }
 
     async createRpcIoPeer(socket: IOServerSocket) {
-        let connected = true;
-        const rpcPeer = new RpcPeer(`api/${this.pluginId}`, 'web', (message, reject, serializationContext) => {
-            if (!connected) {
-                reject?.(new Error('peer disconnected'));
-                return;
-            }
-            const buffers = serializationContext?.buffers;
-            if (buffers) {
-                for (const buffer of buffers) {
-                    socket.send(buffer);
-                }
-            }
-            socket.send(JSON.stringify(message))
+        const serializer = createRpcSerializer({
+            sendMessageBuffer: buffer => socket.send(buffer),
+            sendMessageFinish: message => socket.send(JSON.stringify(message)),
         });
-        let pendingSerializationContext: any = {};
+
         socket.on('message', data => {
             if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
-                pendingSerializationContext = pendingSerializationContext || {
-                    buffers: [],
-                };
-                const buffers: Buffer[] = pendingSerializationContext.buffers;
-                buffers.push(Buffer.from(data));
-                return;
+                serializer.onMessageBuffer(Buffer.from(data));
             }
-            const messageSerializationContext = pendingSerializationContext;
-            pendingSerializationContext = undefined;
-            rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext);
+            else {
+                serializer.onMessageFinish(JSON.parse(data as string));
+            }
         });
+
+        const rpcPeer = new RpcPeer(`api/${this.pluginId}`, 'engine.io', (message, reject, serializationContext) => {
+            try {
+                serializer.sendMessage(message, reject, serializationContext);
+            }
+            catch (e) {
+                reject?.(e);
+            }
+        });
+        serializer.setupRpcPeer(rpcPeer);
+
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const api = new PluginAPIProxy(this.api, await this.peer.getParam('mediaManager'));
         const kill = () => {
-            connected = false;
-            rpcPeer.kill('engine.io connection closed.')
+            serializer.onDisconnected();
             api.removeListeners();
         }
         socket.on('close', kill);
-        socket.on('error', kill);
 
-        rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
+        return setupPluginRemote(rpcPeer, api, null, () => this.scrypted.stateManager.getSystemState());
+    }
+
+    async createRpcPeer(duplex: Duplex) {
+        const rpcPeer = createDuplexRpcPeer(`api/${this.pluginId}`, 'duplex', duplex, duplex);
+
+        // wrap the host api with a connection specific api that can be torn down on disconnect
+        const api = new PluginAPIProxy(this.api, await this.peer.getParam('mediaManager'));
+        const kill = () => {
+            api.removeListeners();
+        };
+        duplex.on('close', kill);
+
         return setupPluginRemote(rpcPeer, api, null, () => this.scrypted.stateManager.getSystemState());
     }
 }

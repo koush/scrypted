@@ -30,7 +30,14 @@ export class NodeForkWorker extends ChildProcessWorker {
     }
 
     setupRpcPeer(peer: RpcPeer): void {
-        this.worker.on('message', message => peer.handleMessage(message as any));
+        this.worker.on('message', (message, sendHandle) => {
+            if (sendHandle) {
+                this.emit('rpc', message, sendHandle);
+            }
+            else {
+                peer.handleMessage(message as any);
+            }
+        });
         peer.transportSafeArgumentTypes.add(Buffer.name);
     }
 
