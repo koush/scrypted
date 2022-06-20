@@ -30,7 +30,39 @@ export class TimeoutError extends Error {
 export function timeoutPromise<T>(timeout: number, promise: Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
         setTimeout(() => reject(new TimeoutError(promise)), timeout);
-        promise.then(resolve);
-        promise.catch(reject);
+
+        const t = setTimeout(() => reject(new TimeoutError(promise)), timeout);
+
+        promise.then(v => {
+            clearTimeout(t);
+            resolve(v);
+        });
+
+        promise.catch(e => {
+            clearTimeout(t);
+            reject(e);
+        });
+    })
+}
+
+export function timeoutFunction<T>(timeout: number, f: (isTimedOut: () => boolean) => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        let isTimedOut = false;
+        const promise = f(() => isTimedOut);
+
+        const t = setTimeout(() => {
+            isTimedOut = true;
+            reject(new TimeoutError(promise));
+        }, timeout);
+
+        promise.then(v => {
+            clearTimeout(t);
+            resolve(v);
+        });
+
+        promise.catch(e => {
+            clearTimeout(t);
+            reject(e);
+        });
     })
 }

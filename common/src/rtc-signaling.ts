@@ -1,4 +1,5 @@
 import type { RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions } from "@scrypted/sdk/types";
+import { Deferred } from "./deferred";
 
 function getUserAgent() {
     try {
@@ -10,7 +11,7 @@ function getUserAgent() {
 
 export class BrowserSignalingSession implements RTCSignalingSession {
     pc: RTCPeerConnection;
-    peerConnectionCreated?: (pc: RTCPeerConnection) => Promise<void>;
+    pcDeferred = new Deferred<RTCPeerConnection>();
     options: RTCSignalingOptions = {
         userAgent: getUserAgent(),
         capabilities: {
@@ -57,7 +58,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
 
         const pc = this.pc = new RTCPeerConnection(setup.configuration);
-        await this.peerConnectionCreated?.(pc);
+        this.pcDeferred.resolve(pc);
 
         pc.addEventListener('connectionstatechange', checkConn);
         pc.addEventListener('iceconnectionstatechange', checkConn);
@@ -66,45 +67,51 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState))
         pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
 
-        if (setup.datachannel)
+        if (setup.datachannel) {
             this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
-        if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
-            try {
-                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
-                const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-                for (const track of mic.getTracks()) {
-                    this.pc.addTrack(track);
-                }
-            }
-            catch (e) {
-                let silence = () => {
-                    let ctx = new AudioContext(), oscillator = ctx.createOscillator();
-                    const dest = ctx.createMediaStreamDestination();
-                    oscillator.connect(dest);
-                    oscillator.start();
-                    return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
-                }
-                this.pc.addTrack(silence());
-            }
-        }
-        else {
-            this.pc.addTransceiver('audio', setup.audio);
         }
 
-        if (setup.video.direction === 'sendrecv' || setup.video.direction === 'sendonly') {
-            try {
-                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
-                const camera = await navigator.mediaDevices.getUserMedia({ video: true })
-                for (const track of camera.getTracks()) {
-                    this.pc.addTrack(track);
+        if (setup.audio) {
+            if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
+                try {
+                    // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                    const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+                    for (const track of mic.getTracks()) {
+                        this.pc.addTrack(track);
+                    }
+                }
+                catch (e) {
+                    let silence = () => {
+                        let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+                        const dest = ctx.createMediaStreamDestination();
+                        oscillator.connect(dest);
+                        oscillator.start();
+                        return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
+                    }
+                    this.pc.addTrack(silence());
                 }
             }
-            catch (e) {
-                // what now
+            else {
+                this.pc.addTransceiver('audio', setup.audio);
             }
         }
-        else {
-            this.pc.addTransceiver('video', setup.video);
+
+        if (setup.video) {
+            if (setup.video.direction === 'sendrecv' || setup.video.direction === 'sendonly') {
+                try {
+                    // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                    const camera = await navigator.mediaDevices.getUserMedia({ video: true })
+                    for (const track of camera.getTracks()) {
+                        this.pc.addTrack(track);
+                    }
+                }
+                catch (e) {
+                    // what now
+                }
+            }
+            else {
+                this.pc.addTransceiver('video', setup.video);
+            }
         }
     }
 
@@ -165,6 +172,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     }
 
     async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) {
+        await this.createPeerConnection(setup);
         await this.pc.setRemoteDescription(description);
         console.log('remote description', description.sdp);
     }
