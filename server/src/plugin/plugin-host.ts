@@ -373,6 +373,7 @@ export class PluginHost {
             api.removeListeners();
         }
         socket.on('close', kill);
+        socket.on('error', kill);
 
         return setupPluginRemote(rpcPeer, api, null, () => this.scrypted.stateManager.getSystemState());
     }
