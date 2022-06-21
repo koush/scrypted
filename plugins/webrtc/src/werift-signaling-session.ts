@@ -1,11 +1,12 @@
 import { RTCIceCandidate, RTCPeerConnection } from "@koush/werift";
 import { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from '@scrypted/sdk';
-import { createRawResponse } from "./werift-util";
+import { waitConnected } from "./peerconnection-util";
+import { createRawResponse, logIsPrivateIceTransport } from "./werift-util";
 
-export class WeriftOutputSignalingSession implements RTCSignalingSession {
+export class WeriftSignalingSession implements RTCSignalingSession {
     remoteDescription: Promise<any>;
 
-    constructor(public pc: RTCPeerConnection) {
+    constructor(public console: Console, public pc: RTCPeerConnection) {
     }
 
     async getOptions(): Promise<RTCSignalingOptions> {
@@ -17,13 +18,16 @@ export class WeriftOutputSignalingSession implements RTCSignalingSession {
         // needs turn.
         // stun candidates will come through here, if connection is slow to establish.
         this.pc.onIceCandidate.subscribe(candidate => {
-            console.log('local candidate', candidate.candidate);
+            this.console.log('local candidate', candidate.candidate);
             sendIceCandidate?.({
                 candidate: candidate.candidate,
                 sdpMid: candidate.sdpMid,
                 sdpMLineIndex: candidate.sdpMLineIndex,
             });
-        })
+        });
+
+        waitConnected(this.pc)
+        .then(() =>logIsPrivateIceTransport(this.console, this.pc));
 
         let ret: RTCSessionDescriptionInit;
         if (type === 'offer') {

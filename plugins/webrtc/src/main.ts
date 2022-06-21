@@ -1,10 +1,19 @@
+import { RTCPeerConnection } from '@koush/werift';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
+import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
+import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, Intercom, MediaObject, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import crypto from 'crypto';
+import net from 'net';
+import { DataChannelDebouncer } from './datachannel-debouncer';
 import { createRTCPeerConnectionSink } from "./ffmpeg-to-wrtc";
+import { stunIceServers } from './ice-servers';
+import { waitConnected } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
+import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
@@ -248,6 +257,60 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
     getDevice(nativeId: string) {
         return new WebRTCCamera(this, nativeId);
+    }
+
+    async onConnection(request: HttpRequest, webSocketUrl: string) {
+        const ws = new WebSocket(webSocketUrl);
+
+        if (request.isPublicEndpoint) {
+            ws.close();
+            return;
+        }
+
+        try {
+            const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
+            const pc = new RTCPeerConnection();
+            // const dc = pc.createDataChannel('dc');
+
+            const dcPromise = pc.onDataChannel.asPromise();
+
+            const start = Date.now();
+
+            const setup: Partial<RTCAVSignalingSetup> = {
+                configuration: {
+                    iceServers: stunIceServers,
+                },
+                datachannel: {
+                    label: 'dc',
+                    dict: {
+                        ordered: true,
+                    },
+                },
+            }
+
+            const weriftSession = new WeriftSignalingSession(this.console, pc);
+            await connectRTCSignalingClients(this.console,  session, setup, weriftSession, setup,);
+            await waitConnected(pc);
+
+            const client = await listenZeroSingleClient();
+            const socket = net.connect(client.port, client.host);
+
+            const [dc] = await dcPromise;
+            dc.message.subscribe(message => {
+                socket.write(message);
+            });
+
+            const cp = await client.clientPromise;
+            process.send('rpc', cp);
+
+            const debouncer = new DataChannelDebouncer(dc);
+            socket.on('data', data => debouncer.send(data));
+        }
+        catch (e) {
+            console.error("error negotiating browser RTCC signaling", e);
+            ws.close();
+            throw e;
+        }
     }
 }
 

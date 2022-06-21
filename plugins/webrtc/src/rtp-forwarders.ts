@@ -16,6 +16,7 @@ export interface RtpTrack {
     packetSize?: number;
     outputArguments: string[];
     onRtp(rtp: Buffer): void;
+    onMSection?: (msection: MSection) => void;
     firstPacket?: () => void;
     payloadType?: number;
     rtcpPort?: number;
@@ -126,20 +127,15 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             if (!videoSection)
                 throw new Error(`advertised video codec ${videoCodec} not found in sdp.`);
 
+            video.onMSection?.(videoSection);
+
             let channel = 0;
-            const h264Repacketizer = new H264Repacketizer(console, (video.packetSize - 12) || 1340, {
-                ...getSpsPps(videoSection),
-            });
             await rtspClient.setup({
                 type: 'tcp',
                 port: channel,
                 path: videoSection.control,
                 onRtp: (rtspHeader, rtp) => {
                     video.onRtp(rtp);
-                    // const repacketized = h264Repacketizer.repacketize(RtpPacket.deSerialize(rtp));
-                    // for (const packet of repacketized) {
-                    //     video.onRtp(packet);
-                    // }
                 },
             })
             channel += 2;
@@ -153,6 +149,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     console.log('audio codec matched:', audio.codecCopy);
 
                     delete rtpTracks.audio;
+
+                    audio.onMSection?.(audioSection);
 
                     await rtspClient.setup({
                         type: 'tcp',
@@ -190,6 +188,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
                         const audioSender = await createBindZero();
                         sockets.push(audioSender.server);
+
+                        audio.onMSection?.(audioSection);
 
                         await rtspClient.setup({
                             type: 'tcp',

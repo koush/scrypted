@@ -1,28 +1,24 @@
-import { MediaStreamTrack, RTCPeerConnection } from "@koush/werift";
+import { H264RtpPayload, MediaStreamTrack, RTCPeerConnection, RtpPacket } from "@koush/werift";
 import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
 import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
+import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
-import { WeriftOutputSignalingSession } from "./output-signaling-session";
+import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
+import { turnIceServers, turnServer } from "./ice-servers";
+import { WeriftSignalingSession } from "./werift-signaling-session";
 import { waitConnected } from "./peerconnection-util";
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { isPeerConnectionAlive, logIsPrivateIceTransport } from "./werift-util";
 
-const iceServer = {
-    urls: ["turn:turn.scrypted.app:3478"],
-    username: "foo",
-    credential: "bar",
-};
-const iceServers = [
-    iceServer,
-];
-
 function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
     return {
         configuration: {
-            iceServers,
+            iceServers: [
+                turnServer,
+            ],
         },
         audio: {
             direction: audioDirection,
@@ -160,7 +156,7 @@ export async function createRTCPeerConnectionSink(
             audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
         }
 
-        const { encoder: audioCodecCopy } = getAudioCodec(audioTransceiver.sender.codec);
+        const { name: audioCodecCopy } = getAudioCodec(audioTransceiver.sender.codec);
 
         const videoArgs: string[] = [];
         const transcode = willTranscode
@@ -218,10 +214,25 @@ export async function createRTCPeerConnectionSink(
             ]
         };
 
+        const videoPacketSize = 1300;
+        let h264Repacketizer: H264Repacketizer;
+        let spsPps: ReturnType<typeof getSpsPps>;
+
         const videoRtpTrack: RtpTrack = {
             codecCopy: transcode ? undefined : 'h264',
-            packetSize: 1300,
-            onRtp: buffer => videoTransceiver.sender.sendRtp(buffer),
+            packetSize: videoPacketSize,
+            onMSection: (videoSection) => spsPps = getSpsPps(videoSection),
+            onRtp: (buffer) => {
+                if (!h264Repacketizer) {
+                    h264Repacketizer = new H264Repacketizer(console, videoPacketSize, {
+                        ...spsPps,
+                    });
+                }
+                const repacketized = h264Repacketizer.repacketize(RtpPacket.deSerialize(buffer));
+                for (const packet of repacketized) {
+                    videoTransceiver.sender.sendRtp(packet);
+                }
+            },
             outputArguments: [
                 '-an', '-sn', '-dn',
                 ...videoArgs,
@@ -267,7 +278,7 @@ export async function createRTCPeerConnectionSink(
             cleanup();
     });
 
-    const cameraSignalingSession = new WeriftOutputSignalingSession(pc);
+    const cameraSignalingSession = new WeriftSignalingSession(console, pc);
 
     const clientAudioDirection = hasIntercom
         ? 'sendrecv'
