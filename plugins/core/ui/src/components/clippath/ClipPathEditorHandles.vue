@@ -18,7 +18,7 @@
 <script type="text/babel">
 import Draggabilly from "draggabilly";
 import CustomValue from "../../common/CustomValue.vue";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import Vue from 'vue';
 
 export default {

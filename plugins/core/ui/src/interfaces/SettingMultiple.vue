@@ -14,7 +14,7 @@
 import Grower from "../common/Grower.vue";
 import CustomValue from "../common/CustomValue.vue";
 import Setting from "./Setting.vue";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 
 export default {
   props: ["value", "device"],

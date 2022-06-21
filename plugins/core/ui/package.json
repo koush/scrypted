@@ -21,6 +21,7 @@
     "@scrypted/types": "file:../../../sdk/types",
     "apexcharts": "^3.28.3",
     "axios": "^0.19.2",
+    "bn.js": "^5.2.1",
     "core-js": "^2.6.12",
     "draggabilly": "^2.3.0",
     "engine.io-client": "^5.2.0",

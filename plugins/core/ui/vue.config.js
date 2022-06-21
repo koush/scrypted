@@ -15,6 +15,12 @@ const proxyOpts = {
 };
 
 module.exports = {
+  // pluginOptions: {
+  //   webpackBundleAnalyzer: {
+  //     openAnalyzer: true
+  //   }
+  // },
+
   productionSourceMap: false,
   transpileDependencies: [
     'vue-echarts',
@@ -54,6 +60,11 @@ module.exports = {
 
 
   configureWebpack: {
+    resolve: {
+      alias: {
+        'bn.js': path.join(__dirname, 'node_modules/bn.js/lib/bn.js'),
+      }
+    },
     output: {
       crossOriginLoading: 'anonymous',
     },

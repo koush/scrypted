@@ -91,7 +91,7 @@ export default {
           const device = this.$scrypted.systemManager.getDeviceById(id);
           if (device.id !== device.providerId) return;
           const { name, type } = device;
-          const pluginId = await plugins.getPluginId(device.id);
+          const pluginId = device.pluginId;
           const pluginInfo = await plugins.getPluginInfo(pluginId);
           const { packageJson, pid, stats, rpcObjects } = pluginInfo;
           const npmPackageVersion = packageJson.version;

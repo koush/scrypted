@@ -72,8 +72,7 @@ export default {
         const promises = ids.map(async (id) => {
           const device = this.$scrypted.systemManager.getDeviceById(id);
           const { name, type } = device;
-          const pluginId = await plugins.getPluginId(device.id);
-          if (pluginId !== "@scrypted/core") return;
+          if (device.pluginId !== "@scrypted/core") return;
           const nativeId = await plugins.getNativeId(id);
           devices.push({
             id,

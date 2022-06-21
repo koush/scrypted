@@ -18,7 +18,7 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
 export async function streamMedia(device: RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
   const session = new BrowserSignalingSession();
   const pc = new Promise<RTCPeerConnection>(resolve => {
-    session.peerConnectionCreated = async (pc) => {
+    session.pcDeferred.promise.then(pc => {
       pc.addEventListener('connectionstatechange', () => {
         if (pc.iceConnectionState === 'disconnected'
           || pc.iceConnectionState === 'failed'
@@ -43,7 +43,7 @@ export async function streamMedia(device: RTCSignalingChannel, getVideo: () => H
         console.log('received track', ev.track);
       };
       resolve(pc);
-    };
+    });
   })
 
   const control: RTCSessionControl = await device.startRTCSignalingSession(session);

@@ -10,7 +10,7 @@ delete snapshot['@scrypted/core'];
 
 for (const pluginId of Object.keys(snapshot)) {
     try {
-        const id = await plugins.getIdForPluginId(pluginId);
+        const id = systemManager.getDeviceByName(pluginId).id;
         const pluginVersion = `${pluginId}@${snapshot[pluginId]}`;
         if (id) {
             const plugin = systemManager.getDeviceById<ScryptedPlugin>(id);

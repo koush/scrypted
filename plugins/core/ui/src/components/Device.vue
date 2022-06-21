@@ -702,19 +702,17 @@ export default {
         updateAvailable: false,
         versions: null,
       };
+      const device = this.device;
       pluginData.nativeId = await plugins.getNativeId(this.id);
-      pluginData.pluginId = await plugins.getPluginId(this.id);
       pluginData.storage = await plugins.getStorage(this.id);
-      pluginData.packageJson = await plugins.getPackageJson(
-        pluginData.pluginId
-      );
+      pluginData.pluginId = this.device.pluginId;
+      pluginData.packageJson = await plugins.getPackageJson(this.device.pluginId);
       this.pluginData = pluginData;
-      checkUpdate(pluginData.pluginId, pluginData.packageJson.version).then(
+      checkUpdate(this.device.pluginId, pluginData.packageJson.version).then(
         (result) => Object.assign(pluginData, result)
       );
 
-      const device = this.device;
-      if (pluginData.pluginId === "@scrypted/core") {
+      if (this.device.pluginId === "@scrypted/core") {
         const storage = await plugins.getStorage(device.id);
         this.deviceData = storage["data"];
         if (pluginData.nativeId?.startsWith("automation:")) {
