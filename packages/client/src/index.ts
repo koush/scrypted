@@ -206,24 +206,24 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     upgradingPeer.handleMessage(JSON.parse(data.toString()));
                 });
 
+                const readyClose = new Promise<RpcPeer>((resolve, reject) => {
+                    ready.on('close', () => reject(new Error('closed')))
+                })
+
                 upgradingPeer.params['session'] = session;
 
-                rpcPeer = await timeoutFunction(20000, async (isTimedOut) => {
+                rpcPeer = await Promise.race([readyClose, timeoutFunction(2000, async (isTimedOut) => {
                     const readable = new PassThrough();
                     const writable = new PassThrough();
                     const ret = createDuplexRpcPeer('webrtc-client', "api", readable, writable);
 
                     const pc = await pcPromise;
-                    // const dcPromise = new Promise<RTCDataChannel>(async (resolve, reject) => {
-                    //     pc.addEventListener('datachannel', e => resolve(e.channel));
-                    // });
 
                     await waitPeerConnectionIceConnected(pc);
 
                     const dc = await session.dcDeferred.promise;
                     console.log('got dc', dc);
                     dc.onmessage = message => {
-                        // console.log(Buffer.from(message.data).toString());
                         readable.write(Buffer.from(message.data));
                     };
 
@@ -241,7 +241,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                         console.log('peer connection api connected', Date.now() - start);
                     }
                     return ret;
-                });
+                })]);
             }
 
             socket = ready;
