@@ -1,5 +1,4 @@
 import type { Readable, Writable } from "stream";
-import zlib from "zlib";
 import { SidebandBufferSerializer } from "./plugin/buffer-serializer";
 import { RpcPeer } from "./rpc";
 
@@ -80,24 +79,12 @@ export function createRpcSerializer(options: {
 }
 
 export function createRpcDuplexSerializer(readable: Readable, writable: Writable) {
-    const gzip = zlib.createGzip();
-    const gunzip = zlib.createGunzip();
-
-    gzip.pipe(writable);
-    gzip.on('error', () => writable.destroy());
-    writable = gzip;
-    readable.pipe(gunzip);
-    gunzip.on('error', () => readable.destroy());
-    readable = gunzip;
-
     const socketSend = (type: number, data: Buffer) => {
         const header = Buffer.alloc(5);
         header.writeUInt32BE(data.length + 1, 0);
         header.writeUInt8(type, 4);
 
         writable.write(Buffer.concat([header, data]));
-
-        gzip.flush();
     }
 
     const createSocketSend = (type: number) => {
