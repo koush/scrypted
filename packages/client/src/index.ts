@@ -1,16 +1,21 @@
+import { timeoutFunction, timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
 import { once } from "events";
 import https from 'https';
+import ip from 'ip';
+import { PassThrough } from 'stream';
 import { ScryptedStatic } from "../../../sdk/types/index";
 import type { IOSocket } from '../../../server/src/io';
 import { SidebandBufferSerializer } from '../../../server/src/plugin/buffer-serializer';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
+import { createDuplexRpcPeer } from '../../../server/src/rpc-serializer';
+import { waitPeerIceConnectionClosed, waitPeerConnectionIceConnected } from "./peerconnection-util";
 export * from "../../../sdk/types/index";
-import ip from 'ip';
-import { timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { DataChannelDebouncer} from "../../../plugins/webrtc/src/datachannel-debouncer";
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -110,8 +115,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         rejectUnauthorized: false,
     };
 
+    const start = Date.now();
+
     const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
-    if (window.location.hostname !== 'localhost' && !ip.isPrivate(window.location.hostname) && addresses && !addresses.includes(explicitBaseUrl)) {
+    const trySideband = window.location.hostname !== 'localhost' && !ip.isPrivate(window.location.hostname);
+
+    let rpcPeer: RpcPeer;
+    if (trySideband) {
         const publicEioOptions: Partial<SocketOptions> = {
             path: `${endpointPath}/public/engine.io/api`,
             extraHeaders,
@@ -119,11 +129,19 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         };
 
         let sockets: IOClientSocket[] = [];
-        type EIOResult = { ready: IOClientSocket, id: string, address: string };
+        type EIOResult = { ready: IOClientSocket, id?: string, webrtc?: boolean, address?: string };
         const promises: Promise<EIOResult>[] = [];
 
-        // console.log('checking local addresses', addresses);
         try {
+            // creating a LAN API connection is supported, but does not wok for a few reasons:
+            //  * the self signed cert hasn't been accepted.
+            //  * safari doesn't support cross domain cookies by default anymore,
+            //    so it requires that the engine.io API socket is authenticated
+            //    via a reachable authenticated channel. this is a janky process.
+            // It is probably better to simply prompt and redirect to the LAN address
+            // if it is reacahble.
+            addresses = [];
+
             for (const address of addresses) {
                 const check = new eio.Socket(address, publicEioOptions);
                 sockets.push(check);
@@ -138,19 +156,95 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     };
                 })());
             }
-            const any = Promise.any(promises);
-            const { ready, id, address } = await timeoutPromise(1000, any);
-            // console.log('using local address', address);
 
-            const url = `${eioOptions.path}/activate`;
-            await axios.post(url, {
-                id,
-            }, {
-                ...axiosConfig,
-            });
+            if (global.RTCPeerConnection) {
+                promises.push((async () => {
+                    const webrtcEioOptions: Partial<SocketOptions> = {
+                        path: '/endpoint/@scrypted/webrtc/engine.io/',
+                        extraHeaders,
+                        rejectUnauthorized: false,
+                    };
+                    const check = new eio.Socket(explicitBaseUrl, webrtcEioOptions);
+                    sockets.push(check);
+
+                    await once(check, 'open');
+                    return {
+                        ready: check,
+                        webrtc: true,
+                    };
+                })());
+            }
+
+            const any = Promise.any(promises);
+            const { ready, id, webrtc, address } = await timeoutPromise(1000, any);
+
+            if (!webrtc) {
+                console.log('using local address', address);
+                const url = `${eioOptions.path}/activate`;
+                await axios.post(url, {
+                    id,
+                }, {
+                    ...axiosConfig,
+                });
+
+                ready.send('/api/start');
+            }
+            else {
+                const session = new BrowserSignalingSession();
+                const pcPromise = session.pcDeferred.promise;
+
+                const upgradingPeer = new RpcPeer(clientName || 'webrtc-upgrade', "api", (message, reject) => {
+                    try {
+                        ready.send(JSON.stringify(message));
+                    }
+                    catch (e) {
+                        reject?.(e);
+                    }
+                });
+
+                ready.on('message', data => {
+                    upgradingPeer.handleMessage(JSON.parse(data.toString()));
+                });
+
+                upgradingPeer.params['session'] = session;
+
+                rpcPeer = await timeoutFunction(20000, async (isTimedOut) => {
+                    const readable = new PassThrough();
+                    const writable = new PassThrough();
+                    const ret = createDuplexRpcPeer('webrtc-client', "api", readable, writable);
+
+                    const pc = await pcPromise;
+                    // const dcPromise = new Promise<RTCDataChannel>(async (resolve, reject) => {
+                    //     pc.addEventListener('datachannel', e => resolve(e.channel));
+                    // });
+
+                    await waitPeerConnectionIceConnected(pc);
+
+                    const dc = await session.dcDeferred.promise;
+                    console.log('got dc', dc);
+                    dc.onmessage = message => {
+                        // console.log(Buffer.from(message.data).toString());
+                        readable.write(Buffer.from(message.data));
+                    };
+
+                    const debouncer = new DataChannelDebouncer(dc);
+                    writable.on('data', data => debouncer.send(data));
+
+                    waitPeerIceConnectionClosed(pc).then(() => ready.close());
+                    ready.on('close', () => pc.close());
+
+                    if (isTimedOut()) {
+                        console.log('peer connection established too late. closing.');
+                        ready.close();
+                    }
+                    else {
+                        console.log('peer connection api connected', Date.now() - start);
+                    }
+                    return ret;
+                });
+            }
 
             socket = ready;
-            socket.send('/api/start');
             sockets = sockets.filter(s => s !== socket);
         }
         catch (e) {
@@ -166,28 +260,29 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
 
     if (!socket) {
-        const rootLocation = explicitBaseUrl;
-        socket = new eio.Socket(rootLocation, eioOptions);
+        socket = new eio.Socket(explicitBaseUrl, eioOptions);
         await once(socket, 'open');
     }
 
     try {
-        const rpcPeer = new RpcPeer(clientName || 'engine.io-client', "core", message => socket.send(JSON.stringify(message)));
-        let pendingSerializationContext: any = {};
-        socket.on('message', data => {
-            if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
-                pendingSerializationContext = pendingSerializationContext || {
-                    buffers: [],
-                };
-                const buffers: Buffer[] = pendingSerializationContext.buffers;
-                buffers.push(Buffer.from(data));
-                return;
-            }
-            const messageSerializationContext = pendingSerializationContext;
-            pendingSerializationContext = undefined;
-            rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext);
-        });
-        rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
+        if (!rpcPeer) {
+            rpcPeer = new RpcPeer(clientName || 'engine.io-client', "api", message => socket.send(JSON.stringify(message)));
+            let pendingSerializationContext: any = {};
+            socket.on('message', data => {
+                if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
+                    pendingSerializationContext = pendingSerializationContext || {
+                        buffers: [],
+                    };
+                    const buffers: Buffer[] = pendingSerializationContext.buffers;
+                    buffers.push(Buffer.from(data));
+                    return;
+                }
+                const messageSerializationContext = pendingSerializationContext;
+                pendingSerializationContext = undefined;
+                rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext);
+            });
+            rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
+        }
 
         const scrypted = await attachPluginRemote(rpcPeer, undefined);
         const {
