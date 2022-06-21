@@ -12,6 +12,7 @@ function getUserAgent() {
 export class BrowserSignalingSession implements RTCSignalingSession {
     pc: RTCPeerConnection;
     pcDeferred = new Deferred<RTCPeerConnection>();
+    dcDeferred = new Deferred<RTCDataChannel>();
     options: RTCSignalingOptions = {
         userAgent: getUserAgent(),
         capabilities: {
@@ -48,11 +49,13 @@ export class BrowserSignalingSession implements RTCSignalingSession {
             if (pc.iceConnectionState === 'disconnected'
                 || pc.iceConnectionState === 'failed'
                 || pc.iceConnectionState === 'closed') {
+                this.pcDeferred.reject(new Error('iceConnectionState ' + pc.iceConnectionState));
                 this.cleanup?.();
             }
             if (pc.connectionState === 'closed'
                 || pc.connectionState === 'disconnected'
                 || pc.connectionState === 'failed') {
+                this.pcDeferred.reject(new Error('connectionState ' + pc.connectionState));
                 this.cleanup?.();
             }
         }
@@ -68,7 +71,9 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
 
         if (setup.datachannel) {
-            this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
+            const dc = this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
+            dc.binaryType = 'arraybuffer';
+            this.dcDeferred.resolve(dc);
         }
 
         if (setup.audio) {
@@ -145,8 +150,8 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
         if (type === 'offer') {
             let offer = await this.pc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
+                offerToReceiveAudio: !!setup.audio,
+                offerToReceiveVideo: !!setup.video,
             });
             const set = this.pc.setLocalDescription(offer);
             if (sendIceCandidate)
@@ -154,8 +159,8 @@ export class BrowserSignalingSession implements RTCSignalingSession {
             await set;
             await gatheringPromise;
             offer = await this.pc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
+                offerToReceiveAudio: !!setup.audio,
+                offerToReceiveVideo: !!setup.video,
             });
             return toDescription(offer);
         }
