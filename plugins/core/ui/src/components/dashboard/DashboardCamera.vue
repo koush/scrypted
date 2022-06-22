@@ -56,7 +56,7 @@ export default {
   mixins: [DashboardBase],
   data() {
     return {
-      pc: null,
+      sessionControl: null,
       video: false,
       src: "images/cameraloading.jpg",
       overlay: false,
@@ -69,18 +69,17 @@ export default {
       if (!val) {
         return;
       }
-      const { pc } = await streamCamera(
+      this.sessionControl = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video
       );
-      this.pc = pc;
     },
   },
   methods: {
     cleanupConnection() {
-      this.pc?.then(pc => pc.close());
-      this.pc = undefined;
+      this.sessionControl.close();
+      this.sessionControl = undefined;
     },
     async fetchCamera() {
       let picture;

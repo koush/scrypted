@@ -29,7 +29,8 @@ export default {
       this.cleanupPeerConnection();
 
       await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      const localSession = new BrowserSignalingSession((pc) => {
+      const localSession = new BrowserSignalingSession();
+      localSession.pcDeferred.promise.then(pc => {
         this.pc = pc;
         pc.ontrack = (ev) => {
           if (ev.track.kind === "audio") {
@@ -52,7 +53,6 @@ export default {
           video: {
             direction: "sendrecv",
           },
-          type: "offer",
         },
         remoteSession,
         {
@@ -62,7 +62,6 @@ export default {
           video: {
             direction: "sendrecv",
           },
-          type: "answer",
         }
       );
     },

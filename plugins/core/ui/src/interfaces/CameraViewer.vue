@@ -92,7 +92,6 @@
         ></v-btn
       >
 
-
       <v-btn
         small
         v-if="isLive && hasIntercom"
@@ -107,7 +106,6 @@
           >fa fa-microphone
         </v-icon>
       </v-btn>
-
 
       <v-btn
         v-if="showNvr"
@@ -147,7 +145,7 @@ export default {
         }
       ),
       muted: true,
-      pc: undefined,
+      sessionControl: undefined,
       control: undefined,
       clipPath: this.clipPathValue ? cloneDeep(this.clipPathValue) : undefined,
     };
@@ -242,15 +240,9 @@ export default {
       }, 2500);
     },
     cleanupConnection() {
-      this.pc?.then((pc) => {
-        pc.close();
-        console.log("pc cleanup");
-      });
-      this.pc = undefined;
-
       console.log("control cleanup");
-      this.control?.endSession();
-      this.control = undefined;
+      this.sessionControl?.close();
+      this.sessionControl = undefined;
     },
     async toggleMute() {
       this.muted = !this.muted;
@@ -263,25 +255,25 @@ export default {
     async streamCamera() {
       this.cleanupConnection();
       this.startTime = null;
-      const { pc, control } = await streamCamera(
+      this.sessionControl = await streamCamera(
         this.$scrypted.mediaManager,
         this.device,
         () => this.$refs.video
       );
-      this.pc = pc;
-      this.control = control;
     },
     async streamRecorder(startTime) {
-      this.cleanupConnection();
       this.startTime = startTime;
-      const { pc, control } = await streamRecorder(
+      const control = await streamRecorder(
         this.$scrypted.mediaManager,
         this.device,
         startTime,
+        this.sessionControl?.recordingStream,
         () => this.$refs.video
       );
-      this.pc = pc;
-      this.control = control;
+      if (control) {
+        this.cleanupConnection();
+        this.sessionControl = control;
+      }
     },
   },
   watch: {

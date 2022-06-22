@@ -5,14 +5,19 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   return streamMedia(device, getVideo);
 }
 
-export async function streamRecorder(mediaManager: MediaManager, device: ScryptedDevice & VideoRecorder, startTime: number, getVideo: () => HTMLVideoElement) {
-  const mo = await device.getRecordingStream({
+export async function streamRecorder(mediaManager: MediaManager, device: ScryptedDevice & VideoRecorder, startTime: number, recordingStream: MediaObject, getVideo: () => HTMLVideoElement) {
+  recordingStream = await device.getRecordingStream({
     startTime,
     container: 'rtsp',
-  });
+  }, recordingStream);
 
-  const channel: RTCSignalingChannel = await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.RTCSignalingChannel);
-  return streamMedia(channel, getVideo);
+  if (!recordingStream)
+    return;
+  const channel: RTCSignalingChannel = await mediaManager.convertMediaObject(recordingStream, ScryptedMimeTypes.RTCSignalingChannel);
+  return {
+    recordingStream,
+    ...await streamMedia(channel, getVideo),
+  };
 }
 
 export async function streamMedia(device: RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
@@ -47,7 +52,11 @@ export async function streamMedia(device: RTCSignalingChannel, getVideo: () => H
   })
 
   const control: RTCSessionControl = await device.startRTCSignalingSession(session);
-  return { control, pc };
+  const close = () => {
+    control.endSession();
+    session.close();
+  };
+  return { control, session, close };
 }
 
 export async function createBlobUrl(mediaManager: MediaManager, mediaObject: MediaObject): Promise<string> {
