@@ -11,8 +11,8 @@ export function sequenceNumberDistance(s1: number, s2: number): number {
     return rolloverDistance;
 }
 
-export function nextSequenceNumber(current: number) {
-    return (current + 1) % 0x10000;
+export function nextSequenceNumber(current: number, increment = 1) {
+    return (current + increment + 0x10000) % 0x10000;
 }
 
 export function isNextSequenceNumber(current: number, next: number) {
