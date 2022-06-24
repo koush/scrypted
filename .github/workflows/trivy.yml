@@ -25,7 +25,7 @@ jobs:
          build-args: BASE=${{ matrix.node }}
          context: .
          file: docker/Dockerfile
-         platforms: linux/amd64,linux/arm64,linux/armhf
+         platforms: linux/amd64
          push: false
          load: true
          tags: |
