@@ -26,7 +26,8 @@ jobs:
          context: .
          file: docker/Dockerfile
          platforms: linux/amd64,linux/arm64,linux/armhf
-         push: true
+         push: false
+         load: true
          tags: |
            koush/scrypted:${{ matrix.node }}
          cache-from: type=gha
