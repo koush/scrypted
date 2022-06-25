@@ -42,7 +42,18 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         }
     }
 
-    async postRunScript() {
+    async postRunScript(defaultExport: any) {
+        if (defaultExport) {
+            let deviceInstance = defaultExport;
+            // support exporting a plugin class, plugin main function,
+            // or a plugin instance
+            if (deviceInstance.toString().startsWith('class '))
+                deviceInstance = new deviceInstance(this.nativeId);
+            if (typeof deviceInstance === 'function')
+                deviceInstance = await deviceInstance();
+            this.handle(deviceInstance);
+        }
+
         const allInterfaces = this.mergeHandler(this);
         if (allInterfaces.length !== 2) {
             await deviceManager.onDeviceDiscovered({
@@ -60,7 +71,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
             ScryptedInterface.Scriptable,
             ScryptedInterface.Program,
         ]));
-        }
+    }
 
     async run(variables?: { [name: string]: any; }): Promise<any> {
         this.prepareScript();
@@ -68,12 +79,12 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         try {
             const data = JSON.parse(this.storage.getItem('data'));
 
-            const ret = await scryptedEval(this, data['script.ts'], Object.assign({
+            const { value, defaultExport } = await scryptedEval(this, data['script.ts'], Object.assign({
                 device: this,
             }, variables));
 
-            await this.postRunScript();
-            return ret;
+            await this.postRunScript(defaultExport);
+            return value;
         }
         catch (e) {
             this.console.error('error loading script', e);
@@ -84,12 +95,12 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
     async eval(source: ScriptSource, variables: { [name: string]: any }) {
         this.prepareScript();
 
-        const ret = await scryptedEval(this, source.script, Object.assign({
+        const { value, defaultExport } = await scryptedEval(this, source.script, Object.assign({
             device: this,
         }, variables));
 
-        await this.postRunScript();
-        return ret;
+        await this.postRunScript(defaultExport);
+        return value;
     }
 
     // will be done at runtime

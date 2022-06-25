@@ -237,7 +237,7 @@ export default {
       this.adjustingTime = setTimeout(() => {
         this.adjustingTime = null;
         this.streamRecorder(this.startTime);
-      }, 2500);
+      }, 10);
     },
     cleanupConnection() {
       console.log("control cleanup");

@@ -15,8 +15,9 @@ class WebhookExample implements HttpRequestHandler {
     }
 }
 
-device.handle(new WebhookExample());
 device.handleTypes(ScryptedInterface.MotionSensor);
 
 endpointManager.getInsecurePublicLocalEndpoint(device.nativeId)
     .then(endpoint => console.log('motion webhook:', endpoint));
+
+export default WebhookExample;

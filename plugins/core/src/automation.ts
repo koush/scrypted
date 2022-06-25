@@ -55,7 +55,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
     }
 
     async eval(script: string, variables: { [name: string]: any }) {
-        return scryptedEval(this, script, variables);
+        return (await scryptedEval(this, script, variables)).value;
     }
 
     async turnOff() {
