@@ -411,7 +411,6 @@ async function start() {
                 secure: req.secure,
                 signed: true,
                 httpOnly: true,
-                sameSite: !req.secure ? true : 'none',
             });
 
             if (change_password) {
@@ -453,7 +452,6 @@ async function start() {
             secure: req.secure,
             signed: true,
             httpOnly: true,
-            sameSite: !req.secure ? true : 'none',
         });
 
         res.send({

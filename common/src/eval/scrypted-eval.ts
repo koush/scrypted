@@ -82,7 +82,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         console: device.console,
         localStorage: device.storage,
         device,
-        exports: {},
+        exports: {} as any,
         ScryptedInterface,
         ScryptedDeviceType,
     });
@@ -102,7 +102,12 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
     }
 
     try {
-        return await asyncFunction();
+        const value = await asyncFunction();
+        const defaultExport = allParams.exports.default;
+        return {
+            value,
+            defaultExport,
+        };
     }
     catch (e) {
         device.log.e('Error running script.');

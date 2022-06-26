@@ -1,5 +1,5 @@
 import { timeoutFunction, timeoutPromise } from "@scrypted/common/src/promise-utils";
-import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
+import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "@scrypted/common/src/rtc-signaling";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
@@ -13,7 +13,6 @@ import { SidebandBufferSerializer } from '../../../server/src/plugin/buffer-seri
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createDuplexRpcPeer } from '../../../server/src/rpc-serializer';
-import { waitPeerIceConnectionClosed, waitPeerConnectionIceConnected } from "./peerconnection-util";
 export * from "../../../sdk/types/index";
 import { DataChannelDebouncer} from "../../../plugins/webrtc/src/datachannel-debouncer";
 

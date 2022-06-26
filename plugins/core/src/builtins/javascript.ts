@@ -15,10 +15,10 @@ export class AutomationJavascript {
     }
 
     async run(script: string) {
-        return scryptedEval(this.automation, script, {
+        return (await scryptedEval(this.automation, script, {
             eventDetails: this.eventDetails,
             eventData: this.eventData,
             eventSource: this.eventSource,
-        })
+        })).value;
     }
 }

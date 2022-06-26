@@ -9,8 +9,40 @@ function getUserAgent() {
     }
 }
 
+// connectionState is not implemented in firefox? so watch iceConnectionState instead...
+export function waitPeerConnectionIceConnected(pc: RTCPeerConnection) {
+    return new Promise((resolve, reject) => {
+        if (pc.iceConnectionState === 'connected') {
+            resolve(undefined);
+            return;
+        }
+        pc.addEventListener('iceconnectionstatechange', () => {
+            if (pc.iceConnectionState === 'connected')
+                resolve(undefined);
+        });
+
+        waitPeerIceConnectionClosed(pc).then(reason => reject(new Error(reason)));
+    });
+}
+
+export function waitPeerIceConnectionClosed(pc: RTCPeerConnection): Promise<string> {
+    return new Promise(resolve => {
+        pc.addEventListener('iceconnectionstatechange', () => {
+            if (isPeerConnectionClosed(pc)) {
+                resolve(pc.iceConnectionState);
+            }
+        });
+    });
+}
+
+export function isPeerConnectionClosed(pc: RTCPeerConnection) {
+    return pc.iceConnectionState === 'disconnected'
+        || pc.iceConnectionState === 'failed'
+        || pc.iceConnectionState === 'closed';
+}
+
 export class BrowserSignalingSession implements RTCSignalingSession {
-    pc: RTCPeerConnection;
+    private pc: RTCPeerConnection;
     pcDeferred = new Deferred<RTCPeerConnection>();
     dcDeferred = new Deferred<RTCDataChannel>();
     options: RTCSignalingOptions = {
@@ -31,12 +63,26 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         },
     };
 
-    constructor(public cleanup?: () => void) {
-
+    constructor() {
     }
 
     async getOptions(): Promise<RTCSignalingOptions> {
         return this.options;
+    }
+
+    close() {
+        this.pcDeferred.promise.then(pc => {
+            for (const t of pc.getTransceivers() || []) {
+                try {
+                    t.sender?.track?.stop?.();
+                }
+                catch (e) {
+                }
+            }
+            pc.close();
+        })
+        .catch(() => {});
+        this.pcDeferred.reject(new Error('iceConnectionState ' + this.pc?.iceConnectionState));
     }
 
     async createPeerConnection(setup: RTCAVSignalingSetup) {
@@ -46,18 +92,8 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         const checkConn = () => {
             console.log('iceConnectionState', pc.iceConnectionState);
             console.log('connectionState', pc.connectionState);
-            if (pc.iceConnectionState === 'disconnected'
-                || pc.iceConnectionState === 'failed'
-                || pc.iceConnectionState === 'closed') {
-                this.pcDeferred.reject(new Error('iceConnectionState ' + pc.iceConnectionState));
-                this.cleanup?.();
-            }
-            if (pc.connectionState === 'closed'
-                || pc.connectionState === 'disconnected'
-                || pc.connectionState === 'failed') {
-                this.pcDeferred.reject(new Error('connectionState ' + pc.connectionState));
-                this.cleanup?.();
-            }
+            if (isPeerConnectionClosed(pc))
+                this.close();
         }
 
         const pc = this.pc = new RTCPeerConnection(setup.configuration);
@@ -71,7 +107,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
 
         if (setup.datachannel) {
-            const dc = this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
+            const dc = pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
             dc.binaryType = 'arraybuffer';
             this.dcDeferred.resolve(dc);
         }
@@ -82,7 +118,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                     // doing sendrecv on safari requires a mic be attached, or it fails to connect.
                     const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
                     for (const track of mic.getTracks()) {
-                        this.pc.addTrack(track);
+                        pc.addTrack(track);
                     }
                 }
                 catch (e) {
@@ -93,11 +129,11 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                         oscillator.start();
                         return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
                     }
-                    this.pc.addTrack(silence());
+                    pc.addTrack(silence());
                 }
             }
             else {
-                this.pc.addTransceiver('audio', setup.audio);
+                pc.addTransceiver('audio', setup.audio);
             }
         }
 
@@ -107,7 +143,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                     // doing sendrecv on safari requires a mic be attached, or it fails to connect.
                     const camera = await navigator.mediaDevices.getUserMedia({ video: true })
                     for (const track of camera.getTracks()) {
-                        this.pc.addTrack(track);
+                        pc.addTrack(track);
                     }
                 }
                 catch (e) {
@@ -115,7 +151,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
                 }
             }
             else {
-                this.pc.addTransceiver('video', setup.video);
+                pc.addTransceiver('video', setup.video);
             }
         }
     }

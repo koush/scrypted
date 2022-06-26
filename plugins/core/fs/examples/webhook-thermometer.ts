@@ -9,11 +9,10 @@ class WebhookExample implements HttpRequestHandler {
     async onRequest(request: HttpRequest, response: HttpResponse) {
         response.send('OK');
         // scrpyted uses metric for all units, so this must be celsius
-        device.temperature = parseFloat(request.body);
+        device.temperature = parseFloat(request.body!);
     }
 }
 
-device.handle(new WebhookExample());
 device.handleTypes(ScryptedInterface.Thermometer);
 
 endpointManager.getInsecurePublicLocalEndpoint(device.nativeId)
@@ -22,3 +21,5 @@ endpointManager.getInsecurePublicLocalEndpoint(device.nativeId)
         console.log('example:');
         console.log('   curl -H "Content-Type: text/plain" --data 25 ', endpoint);
     });
+
+export default WebhookExample;

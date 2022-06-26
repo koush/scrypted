@@ -17,4 +17,4 @@ class SwitchWebhookExample implements OnOff {
     }
 }
 
-device.handle(new SwitchWebhookExample());
+export default SwitchWebhookExample;

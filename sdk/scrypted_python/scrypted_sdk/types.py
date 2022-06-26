@@ -148,6 +148,8 @@ class ScryptedMimeTypes(Enum):
     PushEndpoint = "text/x-push-endpoint"
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
+    ScryptedDevice = "x-scrypted/x-scrypted-device"
+    ScryptedDeviceInterface = "x-scrypted/x-scrypted-device-interface"
     Url = "text/x-uri"
 
 class SecuritySystemMode(Enum):
@@ -902,7 +904,7 @@ class Settings:
 
 class SoftwareUpdate:
     updateAvailable: bool
-    async def checkForUpdate(self) -> None:
+    async def checkForUpdate(self) -> bool:
         pass
     async def installUpdate(self) -> None:
         pass

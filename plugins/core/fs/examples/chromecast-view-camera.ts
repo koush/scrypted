@@ -33,4 +33,4 @@ class ChromecastViewCameraExample implements StartStop {
     }
 }
 
-device.handle(new ChromecastViewCameraExample());
+export default ChromecastViewCameraExample;

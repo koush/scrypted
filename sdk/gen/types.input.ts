@@ -722,7 +722,7 @@ export interface Scriptable {
  * SoftwareUpdate provides a way to check for updates and install them. This may be a Scrypted Plugin or device firmware.
  */
 export interface SoftwareUpdate {
-  checkForUpdate(): Promise<void>;
+  checkForUpdate(): Promise<boolean>;
 
   installUpdate(): Promise<void>;
 
@@ -1559,6 +1559,13 @@ export enum ScryptedMimeTypes {
   RTCSignalingChannel = 'x-scrypted/x-scrypted-rtc-signaling-channel',
   SchemePrefix = 'x-scrypted/x-scrypted-scheme-',
   MediaObject = 'x-scrypted/x-scrypted-media-object',
+  ScryptedDevice = 'x-scrypted/x-scrypted-device',
+  ScryptedDeviceInterface = 'x-scrypted/x-scrypted-device-interface',
+}
+
+export interface ScryptedDeviceInterface {
+  id: string;
+  interface: ScryptedInterface;
 }
 
 export interface ScryptedStatic {
@@ -1567,12 +1574,12 @@ export interface ScryptedStatic {
    */
   log?: Logger,
 
-  deviceManager?: DeviceManager,
-  endpointManager?: EndpointManager,
-  mediaManager?: MediaManager,
+  deviceManager: DeviceManager,
+  endpointManager: EndpointManager,
+  mediaManager: MediaManager,
   systemManager: SystemManager,
 
-  pluginHostAPI?: any;
+  pluginHostAPI: any;
 }
 
 export declare interface DeviceState {
