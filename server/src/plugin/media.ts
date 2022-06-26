@@ -251,7 +251,7 @@ export abstract class MediaManagerBase implements MediaManager {
         if (mimeType === ScryptedMimeTypes.MediaObject)
             return data;
 
-        if (data.constructor.name === Object.name)
+        if (data.constructor?.name === Object.name)
             data = Buffer.from(JSON.stringify(data));
 
         const sourceId = typeof options?.sourceId === 'string' ? options?.sourceId : this.getPluginDeviceId();
