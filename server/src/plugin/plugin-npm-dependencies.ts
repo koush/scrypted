@@ -5,10 +5,12 @@ import path from 'path';
 import { once } from 'events';
 import process from 'process';
 import mkdirp from "mkdirp";
+import semver from 'semver';
 
 export function getPluginNodePath(name: string) {
     const pluginVolume = ensurePluginVolume(name);
-    const nodePrefix = path.join(pluginVolume, `${process.platform}-${process.arch}`);
+    const nodeMajorVersion = semver.parse(process.version).major;
+    const nodePrefix = path.join(pluginVolume, `${process.platform}-${process.arch}-${nodeMajorVersion}`);
     return nodePrefix;
 }
 
