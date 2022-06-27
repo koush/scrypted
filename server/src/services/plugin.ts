@@ -98,6 +98,7 @@ export class PluginComponent {
             stats: host?.stats,
             rpcObjects,
             packageJson,
+            pendingResults,
             id: this.scrypted.findPluginDevice(pluginId)._id,
         }
     }
