@@ -1,22 +1,45 @@
 import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
-import { MediaManager, MediaObject, RTCSessionControl, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoRecorder } from "@scrypted/types";
+import { MediaManager, MediaObject, RequestMediaStream, RequestRecordingStreamOptions, RTCSessionControl, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoRecorder } from "@scrypted/types";
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
   return streamMedia(device, getVideo);
 }
 
 export async function streamRecorder(mediaManager: MediaManager, device: ScryptedDevice & VideoRecorder, startTime: number, recordingStream: MediaObject, getVideo: () => HTMLVideoElement) {
-  recordingStream = await device.getRecordingStream({
-    startTime,
-    container: 'rtsp',
-  }, recordingStream);
+  if (recordingStream) {
+    const newStream = await device.getRecordingStream({
+      startTime,
+      container: 'rtsp',
+    }, recordingStream);
+    if (newStream) {
+      if (newStream === recordingStream)
+        return;
+      console.warn('Received different stream from initial stream. Implementation is incorrect and should return null or undefined.');
+    }
+  }
 
-  if (!recordingStream)
-    return;
-  const channel: RTCSignalingChannel = await mediaManager.convertMediaObject(recordingStream, ScryptedMimeTypes.RTCSignalingChannel);
+  let requestMediaStream: RequestMediaStream;
+  const rp = new Promise<MediaObject>(async (resolve) => {
+    requestMediaStream = async (options) => {
+      const ro: RequestRecordingStreamOptions = Object.assign({
+        startTime,
+        container: 'rtsp',
+      } as RequestRecordingStreamOptions, options);
+      recordingStream = await device.getRecordingStream(ro, recordingStream);
+      resolve(recordingStream);
+      return recordingStream;
+    };
+  });
+
+  const mo = await mediaManager.createMediaObject(requestMediaStream, ScryptedMimeTypes.RequestMediaStream);
+  const channel: RTCSignalingChannel = await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.RTCSignalingChannel);
+
+  const value = await streamMedia(channel, getVideo)
+  recordingStream = await rp;
+
   return {
     recordingStream,
-    ...await streamMedia(channel, getVideo),
+    ...value,
   };
 }
 
