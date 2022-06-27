@@ -95,7 +95,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         return fetch(url, options);
     }
 
-    listener = (event: Buffer) => {
+    listener(event: Buffer) {
         const updatePacket = ProtectApiUpdates.decodeUpdatePacket(this.console, event);
         if (!updatePacket)
             return;
@@ -249,6 +249,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
         }
 
         this.api?.eventsWs?.removeAllListeners();
+        this.api?.eventsWs?.close();
         if (!this.api) {
             this.api = new ProtectApi(ip, username, password, {
                 debug() { },
@@ -268,7 +269,23 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 return;
             }
 
-            this.api.eventsWs?.on('message', this.listener);
+            const onWsTimeout = () => {
+                this.console.log('Event Listener timeout. Restarting listener.');
+                this.api?.eventsWs?.removeAllListeners();
+                this.api?.eventsWs?.close();
+                this.discoverDevices(0);
+            };
+            let wsTimeout: NodeJS.Timeout;
+            const resetWsTimeout = () => {
+                clearTimeout(wsTimeout);
+                wsTimeout = setTimeout(onWsTimeout, 5 * 60 * 1000);
+            };
+            resetWsTimeout();
+
+            this.api.eventsWs?.on('message', (data) => {
+                resetWsTimeout();
+                this.listener(data as Buffer);
+            });
             this.api.eventsWs?.on('close', async () => {
                 this.console.error('Event Listener closed. Reconnecting in 10 seconds.');
                 await sleep(10000);
