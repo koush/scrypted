@@ -6,6 +6,7 @@ import rimraf from 'rimraf';
 import path from 'path';
 import os from 'os';
 import mkdirp from 'mkdirp';
+import semver from 'semver';
 
 async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -63,11 +64,21 @@ export async function installServe() {
     // apparently corrupted or old version of package-lock.json prevents upgrades, so
     // nuke it before installing.
     rimraf.sync(packageLockJson);
-    // something about low memory environments is causing npm install of node-pty to fail?
-    // maybe too many concurrent post install things happening and node-gyp is failing to build?
-    // not entirely sure i need this anymore, since I fixed various other install related
-    // low memory issues.
-    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', 'node-pty');
+
+    const installJson = path.join(installDir, 'install.json');
+    try {
+        const { version } = JSON.parse(fs.readFileSync(installJson).toString());
+        if (semver.parse(process.version).major !== semver.parse(version).major)
+            throw new Error('mismatch');
+    }
+    catch (e) {
+        const nodeModules = path.join(installDir, 'node_modules');
+        console.log('Node version mismatch, missing, or corrupt. Clearing node_modules.');
+        rimraf.sync(nodeModules);
+    }
+    fs.writeFileSync(installJson, JSON.stringify({
+        version: process.version,
+    }));
 
     await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
     return installDir;

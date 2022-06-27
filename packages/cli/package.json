@@ -1,6 +1,6 @@
 {
   "name": "scrypted",
-  "version": "1.0.42",
+  "version": "1.0.43",
   "description": "",
   "main": "./dist/packages/cli/src/main.js",
   "bin": {
@@ -20,6 +20,7 @@
     "adm-zip": "^0.5.9",
     "axios": "^0.21.4",
     "engine.io-client": "^5.2.0",
+    "ip": "^1.1.8",
     "linkfs": "^2.1.0",
     "memfs": "^3.4.1",
     "mkdirp": "^1.0.4",

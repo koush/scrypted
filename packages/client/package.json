@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/client",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "",
   "main": "dist/packages/client/src/index.js",
   "scripts": {
@@ -17,7 +17,6 @@
     "@types/node": "^17.0.17"
   },
   "dependencies": {
-    "@scrypted/common": "file:../../common",
     "adm-zip": "^0.5.9",
     "axios": "^0.25.0",
     "engine.io-client": "^6.2.2",

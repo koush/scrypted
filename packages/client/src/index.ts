@@ -1,5 +1,5 @@
-import { timeoutFunction, timeoutPromise } from "@scrypted/common/src/promise-utils";
-import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "@scrypted/common/src/rtc-signaling";
+import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-utils";
+import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
