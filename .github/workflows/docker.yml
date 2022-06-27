@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ["16", "16-bullseye"]
+        node: ["16-bullseye", "18-bullseye"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
