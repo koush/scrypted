@@ -11,7 +11,7 @@ import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
 import { createRTCPeerConnectionSink } from "./ffmpeg-to-wrtc";
 import { stunIceServers } from './ice-servers';
-import { waitConnected } from './peerconnection-util';
+import { waitClosed, waitConnected } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
@@ -271,9 +271,22 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             return;
         }
 
+        const pc = new RTCPeerConnection();
+        const client = await listenZeroSingleClient();
+        const socket = net.connect(client.port, client.host);
+
+        const cleanup = () => {
+            socket.destroy();
+            client.clientPromise.then(cp => cp.destroy());
+            pc.close();
+            ws.close();
+        }
+
+        waitClosed(pc).then(cleanup);
+        ws.addEventListener('close', cleanup);
+
         try {
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
-            const pc = new RTCPeerConnection();
             // const dc = pc.createDataChannel('dc');
 
             const dcPromise = pc.onDataChannel.asPromise();
@@ -296,23 +309,22 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             await connectRTCSignalingClients(this.console, session, setup, weriftSession, setup,);
             await waitConnected(pc);
 
-            const client = await listenZeroSingleClient();
-            const socket = net.connect(client.port, client.host);
-
             const [dc] = await dcPromise;
             dc.message.subscribe(message => {
                 socket.write(message);
             });
 
             const cp = await client.clientPromise;
+            cp.on('close', cleanup);
             process.send('rpc', cp);
 
             const debouncer = new DataChannelDebouncer(dc);
             socket.on('data', data => debouncer.send(data));
+            socket.on('close', cleanup);
         }
         catch (e) {
             console.error("error negotiating browser RTCC signaling", e);
-            ws.close();
+            cleanup();
             throw e;
         }
     }
