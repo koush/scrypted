@@ -189,6 +189,9 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
             const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
             const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
 
+            if (!videoSection)
+                throw new Error('SDP does not contain a video section!');
+
             const inputAudioCodec = audioSection?.codec;
             const inputVideoCodec = videoSection.codec;
 
