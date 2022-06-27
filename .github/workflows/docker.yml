@@ -61,7 +61,7 @@ jobs:
             ${{ matrix.node == '16-bullseye' && matrix.variant == '.lite' && 'koush/scrypted:lite' || '' }}
             ghcr.io/koush/scrypted:${{ matrix.node }}${{ matrix.variant }}
             ${{ format('ghcr.io/koush/scrypted:v{0}{1}', steps.package-version.outputs.current-version, matrix.variant) || '' }}
-            ${{ matrix.node == '16-bullseye'  && matrix.variant == '' && 'ghcr.io/koush/scrypted:latest' || '' }}
-            ${{ matrix.node == '16-bullseye'  && matrix.variant == '.lite' && 'ghcr.io/koush/scrypted:lite' || '' }}
+            ${{ matrix.node == '16-bullseye' && matrix.variant == '' && 'ghcr.io/koush/scrypted:latest' || '' }}
+            ${{ matrix.node == '16-bullseye' && matrix.variant == '.lite' && 'ghcr.io/koush/scrypted:lite' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
