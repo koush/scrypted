@@ -310,7 +310,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             userStorage,
             disconnect() {
                 socket.close();
-            }
+            },
+            pluginHostAPI: undefined,
         }
 
         socket.on('close', () => ret.onClose?.());
