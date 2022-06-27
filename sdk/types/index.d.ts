@@ -632,7 +632,7 @@ export interface VideoCamera {
 export interface VideoCameraConfiguration {
     setVideoStreamOptions(options: MediaStreamOptions): Promise<void>;
 }
-export interface RequestRecordingStreamOptions extends MediaStreamOptions {
+export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions {
     startTime: number;
     duration?: number;
 }
@@ -647,7 +647,7 @@ export interface VideoRecorder {
      * MediaObject will update its playback position and no MediaObject will be returned.
      */
     getRecordingStream(options: RequestRecordingStreamOptions, recordingStream?: MediaObject): Promise<MediaObject>;
-    getRecordingStreamOptions(): Promise<MediaStreamOptions[]>;
+    getRecordingStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
     getRecordingStreamThumbnail(time: number): Promise<MediaObject>;
 }
 export interface VideoClip {
@@ -1591,13 +1591,9 @@ export declare enum ScryptedMimeTypes {
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel",
     SchemePrefix = "x-scrypted/x-scrypted-scheme-",
     MediaObject = "x-scrypted/x-scrypted-media-object",
-    ScryptedDevice = "x-scrypted/x-scrypted-device",
-    ScryptedDeviceInterface = "x-scrypted/x-scrypted-device-interface"
+    RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
 }
-export interface ScryptedDeviceInterface {
-    id: string;
-    interface: ScryptedInterface;
-}
+export declare type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
 export interface ScryptedStatic {
     /**
      * @deprecated

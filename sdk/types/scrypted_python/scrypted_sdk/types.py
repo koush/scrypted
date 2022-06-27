@@ -147,9 +147,8 @@ class ScryptedMimeTypes(Enum):
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
+    RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
-    ScryptedDevice = "x-scrypted/x-scrypted-device"
-    ScryptedDeviceInterface = "x-scrypted/x-scrypted-device-interface"
     Url = "text/x-uri"
 
 class SecuritySystemMode(Enum):
@@ -445,11 +444,14 @@ class RequestPictureOptions(TypedDict):
 class RequestRecordingStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
+    destination: MediaStreamDestination
+    directMediaStream: bool
     duration: float
     id: str
     metadata: Any
     name: str
     prebuffer: float
+    refresh: bool
     startTime: float
     tool: MediaStreamTool
     video: VideoStreamOptions
@@ -980,7 +982,7 @@ class VideoClips:
 class VideoRecorder:
     async def getRecordingStream(self, options: RequestRecordingStreamOptions, recordingStream: MediaObject = None) -> MediaObject:
         pass
-    async def getRecordingStreamOptions(self) -> list[MediaStreamOptions]:
+    async def getRecordingStreamOptions(self) -> list[ResponseMediaStreamOptions]:
         pass
     async def getRecordingStreamThumbnail(self, time: float) -> MediaObject:
         pass

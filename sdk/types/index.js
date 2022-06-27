@@ -827,7 +827,6 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["RTCSignalingChannel"] = "x-scrypted/x-scrypted-rtc-signaling-channel";
     ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
     ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
-    ScryptedMimeTypes["ScryptedDevice"] = "x-scrypted/x-scrypted-device";
-    ScryptedMimeTypes["ScryptedDeviceInterface"] = "x-scrypted/x-scrypted-device-interface";
+    ScryptedMimeTypes["RequestMediaStream"] = "x-scrypted/x-scrypted-request-stream";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));
 //# sourceMappingURL=index.js.map
