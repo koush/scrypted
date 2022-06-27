@@ -3,7 +3,7 @@ import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardwar
 import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
-import { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RTCAVSignalingSetup, RTCSignalingSession } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RequestMediaStream, RTCAVSignalingSetup, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
 import { turnIceServers, turnServer } from "./ice-servers";
 import { WeriftSignalingSession } from "./werift-signaling-session";
@@ -34,7 +34,7 @@ export async function createRTCPeerConnectionSink(
     console: Console,
     intercom: Intercom,
     maximumCompatibilityMode: boolean,
-    getFFmpegInput: (tool: MediaStreamTool, destination: MediaStreamDestination) => Promise<FFmpegInput>,
+    requestMediaStream: RequestMediaStream,
 ) {
     const timeStart = Date.now();
 
@@ -146,7 +146,17 @@ export async function createRTCPeerConnectionSink(
             });
         }
         const requestDestination: MediaStreamDestination = willTranscode ? 'medium-resolution' : 'local';
-        const ffmpegInput = await getFFmpegInput(willTranscode ? 'ffmpeg' : 'scrypted', isPrivate ? requestDestination : 'remote');
+        const mo = await requestMediaStream({
+            video: {
+                codec: 'h264',
+            },
+            audio: {
+                codec: 'opus',
+            },
+            destination: isPrivate ? requestDestination : 'remote',
+            tool: willTranscode ? 'ffmpeg' : 'scrypted',
+        });
+        const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
         const { mediaStreamOptions } = ffmpegInput;
 
         if (mediaStreamOptions.audio?.codec === 'pcm_ulaw') {

@@ -5,7 +5,7 @@ import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect"
 import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import crypto from 'crypto';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
@@ -70,20 +70,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             this.console,
             hasIntercom ? this.mixinDevice : undefined,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
-            async (tool, destination) => {
-                const mo = await device.getVideoStream({
-                    video: {
-                        codec: 'h264',
-                    },
-                    audio: {
-                        codec: 'opus',
-                    },
-                    destination,
-                    tool,
-                });
-                const ffInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
-                return ffInput;
-            },
+            options => device.getVideoStream(options),
         );
     }
 
@@ -143,7 +130,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         super();
         this.unshiftMixin = true;
 
-        this.fromMimeType = ScryptedMimeTypes.FFmpegInput;
+        this.fromMimeType = '*/*';
         this.toMimeType = ScryptedMimeTypes.RTCSignalingChannel;
     }
 
@@ -155,20 +142,37 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return this.storageSettings.putSetting(key, value);
     }
 
-    async convert(data: Buffer, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<RTCSignalingChannel> {
-        const ffmpegInput: FFmpegInput = JSON.parse(data.toString());
-
-        const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
-
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<RTCSignalingChannel> {
         const plugin = this;
 
-        class OnDemandSignalingChannel implements RTCSignalingChannel {
-            async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
-                return createRTCPeerConnectionSink(session, console, undefined, plugin.storageSettings.values.maximumCompatibilityMode, async () => ffmpegInput);
-            }
-        }
+        if (fromMimeType === ScryptedMimeTypes.FFmpegInput) {
+            const ffmpegInput: FFmpegInput = JSON.parse(data.toString());
+            const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
 
-        return new OnDemandSignalingChannel();
+            const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
+
+
+            class OnDemandSignalingChannel implements RTCSignalingChannel {
+                async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
+                    return createRTCPeerConnectionSink(session, console, undefined, plugin.storageSettings.values.maximumCompatibilityMode, async () => mo);
+                }
+            }
+
+            return new OnDemandSignalingChannel();
+        }
+        else if (fromMimeType === ScryptedMimeTypes.RequestMediaStream) {
+            const rms = data as RequestMediaStream;
+            class OnDemandSignalingChannel implements RTCSignalingChannel {
+                async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
+                    return createRTCPeerConnectionSink(session, console, undefined, plugin.storageSettings.values.maximumCompatibilityMode, rms);
+                }
+            }
+
+            return new OnDemandSignalingChannel();
+        }
+        else {
+            throw new Error(`@scrypted/webrtc is unable to convert ${fromMimeType} to ${ScryptedMimeTypes.RTCSignalingChannel}`);
+        }
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
@@ -289,7 +293,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
 
             const weriftSession = new WeriftSignalingSession(this.console, pc);
-            await connectRTCSignalingClients(this.console,  session, setup, weriftSession, setup,);
+            await connectRTCSignalingClients(this.console, session, setup, weriftSession, setup,);
             await waitConnected(pc);
 
             const client = await listenZeroSingleClient();
