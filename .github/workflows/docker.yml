@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         node: ["16-bullseye", "18-bullseye"]
+        variant: ["", ".lite"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -50,15 +51,15 @@ jobs:
         with:
           build-args: BASE=${{ matrix.node }}
           context: .
-          file: docker/Dockerfile
+          file: docker/Dockerfile${{ matrix.variant }}
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            koush/scrypted:${{ matrix.node }}
-            ${{ matrix.node == '16-bullseye' && format('koush/scrypted:v{0}', steps.package-version.outputs.current-version) || '' }}
-            ${{ matrix.node == '16-bullseye' && 'koush/scrypted:latest' || '' }}
-            ghcr.io/koush/scrypted:${{ matrix.node }}
-            ${{ matrix.node == '16-bullseye' && format('ghcr.io/koush/scrypted:v{0}', steps.package-version.outputs.current-version) || '' }}
-            ${{ matrix.node == '16-bullseye' && 'ghcr.io/koush/scrypted:latest' || '' }}
+            koush/scrypted:${{ matrix.node }}${{ matrix.variant }}
+            ${{ format('koush/scrypted:v{0}{1}', steps.package-version.outputs.current-version, matrix.variant) || '' }}
+            ${{ matrix.node == '16-bullseye' && matrix.variant == '' && 'koush/scrypted:latest' || '' }}
+            ghcr.io/koush/scrypted:${{ matrix.node }}${{ matrix.variant }}
+            ${{ format('ghcr.io/koush/scrypted:v{0}{1}', steps.package-version.outputs.current-version, matrix.variant) || '' }}
+            ${{ matrix.node == '16-bullseye'  && matrix.variant == '' && 'ghcr.io/koush/scrypted:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
