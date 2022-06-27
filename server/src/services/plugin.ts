@@ -88,8 +88,10 @@ export class PluginComponent {
         const packageJson = await this.getPackageJson(pluginId);
         const host = this.scrypted.plugins[pluginId];
         let rpcObjects = 0;
+        let pendingResults = 0;
         if (host.peer) {
             rpcObjects = host.peer.localProxied.size + Object.keys(host.peer.remoteWeakProxies).length;
+            pendingResults = Object.keys(host.peer.pendingResults).length;
         }
         return {
             pid: host?.worker?.pid,
