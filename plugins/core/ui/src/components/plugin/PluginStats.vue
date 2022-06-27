@@ -30,11 +30,21 @@
         @dataPointSelection="dataPointSelection($event, objectInteresting)"
       />
     </v-flex>
+    <v-flex xs12 md6>
+      <Stats
+        v-if="pendingInteresting.length"
+        :interesting="pendingInteresting"
+        label="Pending Results"
+        :labels="pendingLabels"
+        :series="pendingSeries"
+        @dataPointSelection="dataPointSelection($event, pendingInteresting)"
+      />
+    </v-flex>
   </v-layout>
 </template>
 
 <script>
-import { getDeviceViewPath } from '../helpers';
+import { getDeviceViewPath } from "../helpers";
 import Stats from "./Stats.vue";
 export default {
   components: {
@@ -43,15 +53,15 @@ export default {
   props: ["value"],
   methods: {
     dataPointSelection(e, series) {
-      const {id} = series[e.dataPointIndex];
+      const { id } = series[e.dataPointIndex];
       this.$router.push(getDeviceViewPath(id));
-    }
+    },
   },
   computed: {
     cpuInteresting() {
       const cpu = this.value
         .slice()
-        .filter(d => !!d.stats?.cpu)
+        .filter((d) => !!d.stats?.cpu)
         .sort(
           (d1, d2) =>
             d1.stats.cpu.system +
@@ -66,18 +76,15 @@ export default {
       return this.cpuInteresting.map((device) => device.name);
     },
     cpuSeries() {
-      const series = this.cpuInteresting
-        .map((device) =>
-          Math.round(
-            (device.stats.cpu.system + device.stats.cpu.user) / 1000000
-          )
-        );
+      const series = this.cpuInteresting.map((device) =>
+        Math.round((device.stats.cpu.system + device.stats.cpu.user) / 1000000)
+      );
       return series;
     },
     memoryInteresting() {
       const memory = this.value
         .slice()
-        .filter(d => !!d.stats?.memoryUsage)
+        .filter((d) => !!d.stats?.memoryUsage)
         .sort(
           (d1, d2) =>
             d1.stats.memoryUsage.heapTotal - d2.stats.memoryUsage.heapTotal
@@ -90,14 +97,33 @@ export default {
       return this.memoryInteresting.map((device) => device.name);
     },
     memorySeries() {
-      const series = this.memoryInteresting
-        .map((device) => Math.round(device.stats.memoryUsage.heapTotal / 1000000));
+      const series = this.memoryInteresting.map((device) =>
+        Math.round(device.stats.memoryUsage.heapTotal / 1000000)
+      );
+      return series;
+    },
+    pendingInteresting() {
+      const pending = this.value
+        .slice()
+        .filter((d) => !!d.pendingResults)
+        .sort((d1, d2) => d1.pendingResults - d2.pendingResults)
+        .reverse()
+        .slice(0, 10);
+      return pending;
+    },
+    pendingLabels() {
+      return this.pendingInteresting.map((device) => device.name);
+    },
+    pendingSeries() {
+      const series = this.pendingInteresting
+        .slice()
+        .map((device) => device.pendingResults);
       return series;
     },
     objectInteresting() {
       const objects = this.value
         .slice()
-        .filter(d => !!d.rpcObjects)
+        .filter((d) => !!d.rpcObjects)
         .sort((d1, d2) => d1.rpcObjects - d2.rpcObjects)
         .reverse()
         .slice(0, 10);
@@ -107,7 +133,8 @@ export default {
       return this.objectInteresting.map((device) => device.name);
     },
     objectSeries() {
-      const series = this.objectInteresting.slice()
+      const series = this.objectInteresting
+        .slice()
         .map((device) => device.rpcObjects);
       return series;
     },
