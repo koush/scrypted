@@ -1,6 +1,6 @@
 from __future__ import annotations
-from typing import AbstractSet, Any, TypedDict
-from typing import Callable
+from typing import AbstractSet, Any, Callable
+from typing_extensions import TypedDict
 
 SettingValue = str
 EventListener = Callable[[Any, Any, Any], None]
