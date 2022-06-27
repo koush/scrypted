@@ -33,7 +33,7 @@ launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist || echo ""
 echo "Installing Scrypted dependencies..."
 RUN_IGNORE xcode-select --install
 RUN brew update
-RUN_IGNORE brew install node@16
+RUN_IGNORE brew install node@18
 # needed by scrypted-ffmpeg
 RUN_IGNORE brew install sdl2
 # gstreamer plugins
@@ -51,32 +51,20 @@ echo "Installing Scrypted Launch Agent..."
 
 RUN mkdir -p ~/Library/LaunchAgents
 
-NODE_16_PATH=$(brew --prefix node@16)
-if [ ! -d "$NODE_16_PATH" ]
+NODE_PATH=$(brew --prefix node@18)
+if [ ! -d "$NODE_PATH" ]
 then
-    echo "Unable to determine node@16 path."
+    echo "Unable to determine node@18 path."
     exit 1
 fi
 
-NODE_16_BIN_PATH=$NODE_16_PATH/bin
-if [ ! -d "$NODE_16_BIN_PATH" ]
+NODE_BIN_PATH=$NODE_PATH/bin
+if [ ! -d "$NODE_BIN_PATH" ]
 then
-    echo "Unable to determine node@16 bin path."
-    echo "$NODE_16_BIN_PATH does not exist."
+    echo "Unable to determine node@18 bin path."
+    echo "$NODE_BIN_PATH does not exist."
     exit 1
 fi
-
-export PATH=$NODE_16_BIN_PATH:$PATH
-
-NPX_PATH=$NODE_16_BIN_PATH/npx
-if [ ! -f "$NPX_PATH" ]
-then
-    echo "Unable to find npx."
-    exit 1
-fi
-
-echo "Installing Scrypted..."
-RUN $NPX_PATH -y scrypted install-server
 
 BREW_PREFIX=$(brew --prefix)
 if [ -z "$BREW_PREFIX" ]
@@ -85,6 +73,25 @@ then
     exit 1
 fi
 
+BREW_BIN_PATH=$BREW_PREFIX/bin
+if [ ! -d "$BREW_BIN_PATH" ]
+then
+    echo "Unable to determine brew bin path."
+    echo "$BREW_BIN_PATH does not exist."
+    exit 1
+fi
+
+export PATH=$NODE_BIN_PATH:$BREW_BIN_PATH:$PATH
+
+NPX_PATH=$(which npx)
+if [ ! -f "$NPX_PATH" ]
+then
+    echo "Unable to find npx."
+    exit 1
+fi
+
+echo "Installing Scrypted..."
+RUN $NPX_PATH -y scrypted install-server
 
 cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
 <?xml version="1.0" encoding="UTF-8"?>
@@ -115,7 +122,7 @@ cat > ~/Library/LaunchAgents/app.scrypted.server.plist <<EOT
     <key>EnvironmentVariables</key>
         <dict>
             <key>PATH</key>
-                <string>$NODE_16_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+                <string>$NODE_BIN_PATH:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
             <key>HOME</key>
                 <string>/Users/$USER</string>
         </dict>
@@ -131,8 +138,10 @@ echo
 echo
 echo
 echo "Scrypted Service has been installed. You can start, stop, enable, or disable Scrypted with:"
-echo "  launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist"
 echo "  launchctl load ~/Library/LaunchAgents/app.scrypted.server.plist"
+echo "  launchctl unload ~/Library/LaunchAgents/app.scrypted.server.plist"
+echo "  launchctl enable ~/Library/LaunchAgents/app.scrypted.server.plist"
+echo "  launchctl disable ~/Library/LaunchAgents/app.scrypted.server.plist"
 echo
 echo "Scrypted is now running at: https://localhost:10443/"
 echo "Note that it is https and that you'll be asked to approve/ignore the website certificate."
