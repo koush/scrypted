@@ -333,7 +333,14 @@ export class PluginHost {
         });
 
         this.worker.on('rpc', (message, sendHandle) => {
-            this.createRpcPeer(sendHandle as net.Socket);
+            const socket  = sendHandle as net.Socket;
+            const { pluginId } = message;
+            const host = this.scrypted.plugins[pluginId];
+            if (!host) {
+                socket.destroy();
+                return;
+            }
+            host.createRpcPeer(socket);
         });
 
         this.peer.params.updateStats = (stats: any) => {
