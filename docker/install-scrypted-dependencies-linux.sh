@@ -6,6 +6,9 @@ then
     exit 1
 fi
 
+echo "Stopping existing service if it is running..."
+systemctl stop scrypted.service
+
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
@@ -20,7 +23,7 @@ RUN() {
 
 FROM() {
     echo 'Installing nodejs repo'
-    RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
     RUN apt-get update
     RUN apt-get install -y nodejs
 }
