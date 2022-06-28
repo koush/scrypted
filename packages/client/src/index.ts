@@ -65,12 +65,14 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         throw new Error('status ' + response.status);
 
     const addresses = response.data.addresses as string[] || [];
+    const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
 
     return {
         cookie: response.headers["set-cookie"]?.[0],
         error: response.data.error as string,
         token: response.data.token as string,
         addresses,
+        scryptedCloud,
     };
 }
 
@@ -80,11 +82,14 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     const response = await axios.get(url, {
         ...axiosConfig,
     });
+    const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
+
     return {
         username: response.data.username as string,
         expiration: response.data.expiration as number,
         hasLogin: !!response.data.hasLogin,
         addresses: response.data.addresses as string[],
+        scryptedCloud,
     };
 }
 
@@ -93,17 +98,20 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     const extraHeaders: { [header: string]: string } = {};
     let addresses: string[];
+    let trySideband: boolean;
 
     if (username && password) {
         const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);;
         extraHeaders['Cookie'] = loginResult.cookie;
         addresses = loginResult.addresses;
+        trySideband = loginResult.scryptedCloud;
     }
     else {
         const loginCheck = await checkScryptedClientLogin({
             baseUrl,
         });
         addresses = loginCheck.addresses;
+        trySideband = loginCheck.scryptedCloud;
     }
 
     let socket: IOClientSocket;
@@ -117,7 +125,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const start = Date.now();
 
     const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
-    const trySideband = window.location.hostname !== 'localhost' && !ip.isPrivate(window.location.hostname);
 
     let rpcPeer: RpcPeer;
     if (trySideband) {
