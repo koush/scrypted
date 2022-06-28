@@ -9,6 +9,7 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
+var _a, _b, _c;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MixinDeviceBase = exports.ScryptedDeviceBase = void 0;
 __exportStar(require("./types/index"), exports);
@@ -153,6 +154,11 @@ try {
         systemManager,
         pluginHostAPI,
     });
+    try {
+        (_c = (_b = (_a = systemManager).setScryptedInterfaceDescriptors) === null || _b === void 0 ? void 0 : _b.call(_a, index_1.TYPES_VERSION, index_1.ScryptedInterfaceDescriptors)) === null || _c === void 0 ? void 0 : _c.catch(() => { });
+    }
+    catch (e) {
+    }
 }
 catch (e) {
     console.error('sdk initialization error, import @scrypted/types or use @scrypted/web-sdk instead', e);

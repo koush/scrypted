@@ -1,9 +1,10 @@
 import stringifyObject from 'stringify-object';
 import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 import path from 'path';
-import fs, { mkdir } from "fs";
+import fs from "fs";
 
 const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schema.json')).toString());
+const typesVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../types/package.json')).toString()).version;
 const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {};
 
 const allProperties: { [property: string]: any } = {};
@@ -48,6 +49,8 @@ ${properties.map(property => '  ' + property + ' = \"' + property + '",\n').join
 `;
 
 const contents = `
+export const TYPES_VERSION = "${typesVersion}";
+
 ${deviceStateContents}
 ${propertyContents}
 

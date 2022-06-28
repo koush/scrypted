@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.SecuritySystemObstruction = exports.SecuritySystemMode = exports.AirQuality = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = void 0;
+exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.SecuritySystemObstruction = exports.SecuritySystemMode = exports.AirQuality = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = exports.TYPES_VERSION = void 0;
+exports.TYPES_VERSION = "0.0.47";
 class DeviceBase {
 }
 exports.DeviceBase = DeviceBase;
@@ -250,6 +251,13 @@ exports.ScryptedInterfaceDescriptors = {
             'getRecordingStream',
             'getRecordingStreamOptions',
             'getRecordingStreamThumbnail'
+        ],
+        properties: []
+    },
+    EventRecorder: {
+        name: 'EventRecorder',
+        methods: [
+            'getRecordedEvents'
         ],
         properties: []
     },
@@ -766,6 +774,7 @@ var ScryptedInterface;
     ScryptedInterface["Display"] = "Display";
     ScryptedInterface["VideoCamera"] = "VideoCamera";
     ScryptedInterface["VideoRecorder"] = "VideoRecorder";
+    ScryptedInterface["EventRecorder"] = "EventRecorder";
     ScryptedInterface["VideoClips"] = "VideoClips";
     ScryptedInterface["VideoCameraConfiguration"] = "VideoCameraConfiguration";
     ScryptedInterface["Intercom"] = "Intercom";
