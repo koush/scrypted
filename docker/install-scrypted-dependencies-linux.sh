@@ -53,7 +53,7 @@ echo "Setting permissions on /home/$SERVICE_USER/.scrypted"
 chown -R $SERVICE_USER /home/$SERVICE_USER/.scrypted
 
 echo "Installing Scrypted..."
-RUN sudo -u $SERVICE_USER npx -y scrypted install-server
+RUN sudo -u $SERVICE_USER npx -y scrypted@latest install-server
 
 cat > /etc/systemd/system/scrypted.service <<EOT
 
