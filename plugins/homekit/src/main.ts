@@ -73,7 +73,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             group: 'Network',
             title: 'mDNS Advertiser',
             description: 'Optional: Override the mDNS advertiser used to locate the Scrypted bridge',
-            choices: [MDNSAdvertiser.BONJOUR, MDNSAdvertiser.CIAO],
+            choices: [MDNSAdvertiser.CIAO, MDNSAdvertiser.BONJOUR, MDNSAdvertiser.AVAHI],
             defaultValue: MDNSAdvertiser.CIAO,
         },
         slowConnections: {
