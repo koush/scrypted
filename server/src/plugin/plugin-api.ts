@@ -1,4 +1,4 @@
-import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaObject, SystemDeviceState, MediaManager, HttpRequest } from '@scrypted/types'
+import type { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaObject, SystemDeviceState, MediaManager, HttpRequest, ScryptedInterfaceDescriptor } from '@scrypted/types'
 
 export interface PluginLogger {
     log(level: string, message: string): Promise<void>;
@@ -34,6 +34,8 @@ export interface PluginAPI {
     getMediaManager(): Promise<MediaManager>;
 
     requestRestart(): Promise<void>;
+
+    setScryptedInterfaceDescriptors(typesVersion: string, descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }): Promise<void>;
 }
 
 class EventListenerRegisterProxy implements EventListenerRegister {
@@ -69,6 +71,10 @@ export class PluginAPIManagedListeners {
 export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginAPI {
     constructor(public api: PluginAPI, public mediaManager?: MediaManager) {
         super();
+    }
+
+    setScryptedInterfaceDescriptors(typesVersion: string, descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }): Promise<void> {
+        return this.api.setScryptedInterfaceDescriptors(typesVersion, descriptors);
     }
 
     setState(nativeId: ScryptedNativeId, key: string, value: any): Promise<void> {

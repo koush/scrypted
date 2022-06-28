@@ -1,6 +1,6 @@
-import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger, EventListener } from "@scrypted/types";
+import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger, EventListener, ScryptedInterfaceDescriptor } from "@scrypted/types";
 import { PluginAPI } from "./plugin-api";
-import {  PrimitiveProxyHandler, RpcPeer } from '../rpc';
+import { PrimitiveProxyHandler, RpcPeer } from '../rpc';
 import { EventRegistry } from "../event-registry";
 import { allInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
 
@@ -41,7 +41,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         return new Proxy(() => p, this);
     }
 
-     ensureDevice() {
+    ensureDevice() {
         if (!this.device)
             this.device = this.systemManager.api.getDeviceById(this.id);
         return this.device;
@@ -101,15 +101,17 @@ function makeOneWayCallback<T>(input: T): T {
 
 export class SystemManagerImpl implements SystemManager {
     api: PluginAPI;
-    state: {[id: string]: {[property: string]: SystemDeviceState}};
-    deviceProxies: {[id: string]: ScryptedDevice} = {};
+    state: { [id: string]: { [property: string]: SystemDeviceState } };
+    deviceProxies: { [id: string]: ScryptedDevice } = {};
     log: Logger;
     events = new EventRegistry();
+    typesVersion: string;
+    descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
 
     getDeviceState(id: string) {
         return this.state[id];
     }
-    getSystemState(): {[id: string]: {[property: string]: SystemDeviceState}} {
+    getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } } {
         return this.state;
     }
 
@@ -154,5 +156,11 @@ export class SystemManagerImpl implements SystemManager {
 
     getComponent(id: string): Promise<any> {
         return this.api.getComponent(id);
+    }
+
+    setScryptedInterfaceDescriptors(typesVersion: string, descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }): Promise<void> {
+        this.typesVersion = typesVersion;
+        this.descriptors = descriptors;
+        return this.api.setScryptedInterfaceDescriptors(typesVersion, descriptors);
     }
 }

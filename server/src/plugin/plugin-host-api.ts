@@ -1,17 +1,18 @@
-import { ScryptedNativeId, ScryptedDevice, Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterfaceProperty, MediaManager, HttpRequest, ScryptedInterface } from '@scrypted/types'
-import { ScryptedRuntime } from '../runtime';
-import { Plugin } from '../db-types';
-import { PluginAPI, PluginAPIManagedListeners } from './plugin-api';
-import { Logger } from '../logger';
-import { getState } from '../state';
-import { PluginHost } from './plugin-host';
+import { Device, DeviceManifest, EventDetails, EventListenerOptions, EventListenerRegister, HttpRequest, MediaManager, ScryptedDevice, ScryptedInterfaceDescriptor, ScryptedInterfaceProperty, ScryptedNativeId } from '@scrypted/types';
 import debounce from 'lodash/debounce';
+import { Plugin } from '../db-types';
+import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
-import { propertyInterfaces } from './descriptor';
+import { ScryptedRuntime } from '../runtime';
+import { getState } from '../state';
+import { PluginAPI, PluginAPIManagedListeners } from './plugin-api';
+import { PluginHost } from './plugin-host';
 import { checkProperty } from './plugin-state-check';
 
 export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAPI {
     pluginId: string;
+    typesVersion: string;
+    descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
 
     [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
         'onMixinEvent',
@@ -178,5 +179,10 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
         const logger = await this.getLogger(undefined);
         logger.log('i', 'plugin restart was requested');
         return this.restartDebounced();
+    }
+
+    async setScryptedInterfaceDescriptors(typesVersion: string, descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }): Promise<void> {
+        this.typesVersion = typesVersion;
+        this.descriptors = descriptors;
     }
 }
