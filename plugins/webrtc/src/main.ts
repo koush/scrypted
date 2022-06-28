@@ -283,7 +283,17 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
 
         waitClosed(pc).then(cleanup);
-        ws.addEventListener('close', cleanup);
+
+        const message = await new Promise((resolve, reject) => {
+            ws.addEventListener('close', () => {
+                reject(new Error('Connection closed'));
+                cleanup();
+            });
+
+            ws.onmessage = message => {
+                resolve(JSON.parse(message.data));
+            }
+        });
 
         try {
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
@@ -306,7 +316,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
 
             const weriftSession = new WeriftSignalingSession(this.console, pc);
-            await connectRTCSignalingClients(this.console, session, setup, weriftSession, setup,);
+            await connectRTCSignalingClients(this.console, session, setup, weriftSession, setup);
             await waitConnected(pc);
 
             const [dc] = await dcPromise;
@@ -316,7 +326,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             const cp = await client.clientPromise;
             cp.on('close', cleanup);
-            process.send('rpc', cp);
+            process.send(message, cp);
 
             const debouncer = new DataChannelDebouncer(dc);
             socket.on('data', data => debouncer.send(data));
