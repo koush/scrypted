@@ -1,4 +1,3 @@
-import Debug from 'debug';
 import { EventEmitter } from 'events';
 const { register, listen } = require('push-receiver');
 

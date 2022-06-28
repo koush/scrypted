@@ -294,6 +294,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             secure: false,
         });
         this.proxy.on('error', () => { });
+        this.proxy.on('proxyRes', (res, req) => {
+            res.headers['X-Scrypted-Cloud'] = 'true';
+        });
 
         this.manager.on('message', async (message) => {
             if (message.type === 'cloudmessage') {
