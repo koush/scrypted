@@ -146,7 +146,9 @@ export abstract class MediaManagerBase implements MediaManager {
                         console.log('ffmpeg stream to image convesion timed out.');
                         cp.kill('SIGKILL');
                     }, 10000);
-                    await once(cp, 'exit');
+                    const [exitCode] = await once(cp, 'exit');
+                    if (exitCode)
+                        throw new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`);
                     clearTimeout(to);
                     return fs.readFileSync(tmpfile.name);
                 }
