@@ -189,6 +189,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 ready.send('/api/start');
             }
             else {
+                ready.send(JSON.stringify({
+                    pluginId,
+                }));
                 const session = new BrowserSignalingSession();
                 const pcPromise = session.pcDeferred.promise;
 
@@ -222,15 +225,33 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
                     const dc = await session.dcDeferred.promise;
                     console.log('got dc', dc);
-                    dc.onmessage = message => {
-                        readable.write(Buffer.from(message.data));
-                    };
 
                     const debouncer = new DataChannelDebouncer(dc);
                     writable.on('data', data => debouncer.send(data));
 
                     waitPeerIceConnectionClosed(pc).then(() => ready.close());
-                    ready.on('close', () => pc.close());
+                    ready.on('close', () => {
+                        console.log('datachannel upgrade cancelled/closed');
+                        pc.close()
+                    });
+
+                    await new Promise(resolve => {
+                        let buffers: Buffer[] = [];
+                        dc.onmessage = message => {
+                            buffers.push(Buffer.from(message.data));
+                            resolve(undefined);
+
+                            process.nextTick(() => {
+                                if (buffers) {
+                                    for (const buffer of buffers) {
+                                        readable.write(buffer);
+                                    }
+                                    buffers = undefined;
+                                }
+                                dc.onmessage = message => readable.write(Buffer.from(message.data));
+                            });
+                        };
+                    });
 
                     if (isTimedOut()) {
                         console.log('peer connection established too late. closing.');
