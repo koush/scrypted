@@ -6,6 +6,9 @@ then
     exit 1
 fi
 
+echo "Stopping existing service if it is running..."
+systemctl stop scrypted.service
+
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
