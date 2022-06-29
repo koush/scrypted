@@ -16,10 +16,11 @@ import { NotificationType } from './Notification';
 import { EntrySensorToAccessControl } from './EntrySensorToAccessControl';
 import { FloodSensorToWaterAlarm } from './FloodSensorToWaterAlarm';
 import { PasswordStoreToUserCode } from './PasswordStoreToUserCode';
-import { IntrusionSensorToHomeSecurity } from './IntrusionSensorToHomeSecurity';
+import { TamperSensorToHomeSecurity } from './TamperSensorToHomeSecurity';
 import { PowerSensorToPowerManagement } from './PowerSensorToPowerManagement';
 import { ZWaveNode } from 'zwave-js';
 import {CommandClasses, ValueID} from '@zwave-js/core'
+import { ScryptedInterface } from '@scrypted/sdk';
 
 var CommandClassMap: {[ccId: string]: CommandClassInfo} = {};
 
@@ -85,7 +86,7 @@ addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Ultraviolet', Ultravi
 
 addCommandClassIndex(CommandClasses['Notification'], 'Access Control', EntrySensorToAccessControl, 'EntrySensor');
 addCommandClassIndex(CommandClasses['Notification'], 'Water Alarm', FloodSensorToWaterAlarm, 'FloodSensor');
-addCommandClassIndex(CommandClasses['Notification'], 'Home Security', IntrusionSensorToHomeSecurity, 'IntrusionSensor');
+addCommandClassIndex(CommandClasses['Notification'], 'Home Security', TamperSensorToHomeSecurity, ScryptedInterface.TamperSensor);
 addCommandClassIndex(CommandClasses['Notification'], 'Power Management', PowerSensorToPowerManagement, 'PowerSensor');
 
 addCommandClassIndex(CommandClasses['Barrier Operator'], 'currentState', EntryToBarrierOperator, 'Entry');

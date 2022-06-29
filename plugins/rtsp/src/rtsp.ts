@@ -153,8 +153,8 @@ export abstract class RtspSmartCamera extends RtspCamera {
             this.motionDetected = false;
         if (this.interfaces.includes(ScryptedInterface.AudioSensor))
             this.audioDetected = false;
-        if (this.interfaces.includes(ScryptedInterface.IntrusionSensor))
-            this.intrusionDetected = false;
+        if (this.interfaces.includes(ScryptedInterface.TamperSensor))
+            this.tampered = false;
         if (this.interfaces.includes(ScryptedInterface.BinarySensor))
             this.binaryState = false;
     }
