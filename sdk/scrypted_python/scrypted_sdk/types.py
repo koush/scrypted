@@ -91,6 +91,7 @@ class ScryptedInterface(Enum):
     EngineIOHandler = "EngineIOHandler"
     Entry = "Entry"
     EntrySensor = "EntrySensor"
+    EventRecorder = "EventRecorder"
     Fan = "Fan"
     FloodSensor = "FloodSensor"
     HttpRequestHandler = "HttpRequestHandler"
@@ -419,6 +420,20 @@ class RTCSessionControl(TypedDict):
 class RTCSignalingSession(TypedDict):
     pass
 
+class RecordedEvent(TypedDict):
+    data: Any
+    details: EventDetails
+    id: str
+    pass
+
+class RecordedEventOptions(TypedDict):
+    count: float
+    endTime: float
+    reverseOrder: bool
+    startId: str
+    startTime: float
+    pass
+
 class RequestMediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
@@ -660,6 +675,11 @@ class Entry:
 
 class EntrySensor:
     entryOpen: bool
+    pass
+
+class EventRecorder:
+    async def getRecordedEvents(self, options: RecordedEventOptions) -> list[RecordedEvent]:
+        pass
     pass
 
 class Fan:
@@ -1734,6 +1754,13 @@ ScryptedInterfaceDescriptors = {
       "getRecordingStream",
       "getRecordingStreamOptions",
       "getRecordingStreamThumbnail"
+    ],
+    "properties": []
+  },
+  "EventRecorder": {
+    "name": "EventRecorder",
+    "methods": [
+      "getRecordedEvents"
     ],
     "properties": []
   },

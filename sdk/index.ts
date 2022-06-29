@@ -1,5 +1,5 @@
 export * from './types/index'
-import { ScryptedInterfaceProperty, DeviceBase, MediaObject } from './types/index';
+import { ScryptedInterfaceProperty, DeviceBase, MediaObject, ScryptedInterfaceDescriptors, TYPES_VERSION } from './types/index';
 import type { ScryptedNativeId, DeviceManager, SystemManager, MediaManager, EndpointManager, EventListenerRegister } from './types/index';
 import type { ScryptedInterface, ScryptedStatic, Logger, DeviceState } from './types/index';
 
@@ -191,7 +191,13 @@ try {
     mediaManager,
     systemManager,
     pluginHostAPI,
-  });
+  }); 
+
+  try {
+    (systemManager as any).setScryptedInterfaceDescriptors?.(TYPES_VERSION, ScryptedInterfaceDescriptors)?.catch(() => {});
+  }
+  catch (e) {
+  }
 }
 catch (e) {
   console.error('sdk initialization error, import @scrypted/types or use @scrypted/web-sdk instead', e);

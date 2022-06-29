@@ -1,4 +1,6 @@
 
+export const TYPES_VERSION = "0.0.47";
+
 
 export interface DeviceState {
   id?: string
@@ -365,6 +367,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       'getRecordingStream',
       'getRecordingStreamOptions',
       'getRecordingStreamThumbnail'
+    ],
+    properties: []
+  },
+  EventRecorder: {
+    name: 'EventRecorder',
+    methods: [
+      'getRecordedEvents'
     ],
     properties: []
   },
@@ -1276,6 +1285,24 @@ export interface VideoRecorder {
   getRecordingStreamThumbnail(time: number): Promise<MediaObject>;
 }
 
+export interface RecordedEvent {
+  id: string;
+  details: EventDetails;
+  data: any;
+}
+
+export interface RecordedEventOptions {
+  startTime?: number;
+  endTime?: number;
+  startId?: string;
+  count?: number;
+  reverseOrder?: boolean;
+}
+
+export interface EventRecorder {
+  getRecordedEvents(options: RecordedEventOptions): Promise<RecordedEvent[]>;
+}
+
 export interface VideoClip {
   id: string;
   startTime: number;
@@ -2180,6 +2207,7 @@ export enum ScryptedInterface {
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
+  EventRecorder = "EventRecorder",
   VideoClips = "VideoClips",
   VideoCameraConfiguration = "VideoCameraConfiguration",
   Intercom = "Intercom",
