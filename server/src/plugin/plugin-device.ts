@@ -1,15 +1,14 @@
-import { DeviceProvider, EventDetails, EventListener, EventListenerOptions, EventListenerRegister, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty } from "@scrypted/types";
-import { ScryptedRuntime } from "../runtime";
-import { PluginDevice } from "../db-types";
-import { MixinProvider } from "@scrypted/types";
-import { RpcPeer, PrimitiveProxyHandler } from "../rpc";
-import { getState } from "../state";
-import { getDisplayType } from "../infer-defaults";
-import { allInterfaceProperties, getInterfaceMethods, isValidInterfaceMethod } from "./descriptor";
-import { PluginError } from "./plugin-error";
-import { sleep } from "../sleep";
-import path from 'path';
+import { DeviceProvider, EventListener, EventListenerOptions, EventListenerRegister, MixinProvider, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty } from "@scrypted/types";
 import fs from 'fs';
+import path from 'path';
+import { PluginDevice } from "../db-types";
+import { getDisplayType } from "../infer-defaults";
+import { PrimitiveProxyHandler, RpcPeer } from "../rpc";
+import { ScryptedRuntime } from "../runtime";
+import { sleep } from "../sleep";
+import { getState } from "../state";
+import { allInterfaceProperties, getInterfaceMethods } from "./descriptor";
+import { PluginError } from "./plugin-error";
 
 interface MixinTable {
     mixinProviderId: string;

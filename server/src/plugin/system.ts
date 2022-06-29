@@ -1,15 +1,13 @@
-import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevice, ScryptedInterface, ScryptedInterfaceDescriptors, SystemDeviceState, SystemManager, ScryptedInterfaceProperty, ScryptedDeviceType, Logger, EventListener, ScryptedInterfaceDescriptor } from "@scrypted/types";
-import { PluginAPI } from "./plugin-api";
-import { PrimitiveProxyHandler, RpcPeer } from '../rpc';
+import { EventListener, EventListenerOptions, EventListenerRegister, Logger, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptor, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, SystemDeviceState, SystemManager } from "@scrypted/types";
 import { EventRegistry } from "../event-registry";
+import { PrimitiveProxyHandler, RpcPeer } from '../rpc';
 import { allInterfaceProperties, getInterfaceMethods, getInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
-
+import { PluginAPI } from "./plugin-api";
 
 function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
     const handler = new DeviceProxyHandler(id, systemManager);
     return new Proxy(handler, handler);
 }
-
 
 class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
     device: Promise<ScryptedDevice>;

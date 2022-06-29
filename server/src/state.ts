@@ -1,11 +1,11 @@
-import { ScryptedRuntime } from "./runtime";
-import { ScryptedNativeId, EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceProperty, SystemDeviceState } from "@scrypted/types";
-import { RefreshSymbol } from "./plugin/plugin-device";
+import { EventDetails, EventListenerOptions, EventListenerRegister, Refresh, ScryptedInterface, ScryptedInterfaceProperty, ScryptedNativeId, SystemDeviceState } from "@scrypted/types";
 import throttle from 'lodash/throttle';
-import { sleep } from "./sleep";
-import { EventListenerRegisterImpl, EventRegistry } from "./event-registry";
 import { PluginDevice } from "./db-types";
+import { EventListenerRegisterImpl, EventRegistry } from "./event-registry";
 import { allInterfaceProperties, propertyInterfaces } from "./plugin/descriptor";
+import { RefreshSymbol } from "./plugin/plugin-device";
+import { ScryptedRuntime } from "./runtime";
+import { sleep } from "./sleep";
 
 export class ScryptedStateManager extends EventRegistry {
     scrypted: ScryptedRuntime;
@@ -42,9 +42,6 @@ export class ScryptedStateManager extends EventRegistry {
     }
 
     setPluginDeviceState(device: PluginDevice, property: string, value: any) {
-        if (!allInterfaceProperties.includes(property))
-            throw new Error(`invalid property ${property}`);
-
         // this currently doesn't work because inherited properties are not detected.
         // ie, MediaPlayer implements StartStop and Pause
         // if (!isValidInterfaceProperty(device.state.interfaces.value, property))
