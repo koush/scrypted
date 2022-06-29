@@ -7,7 +7,7 @@ import { PrimitiveProxyHandler, RpcPeer } from "../rpc";
 import { ScryptedRuntime } from "../runtime";
 import { sleep } from "../sleep";
 import { getState } from "../state";
-import { allInterfaceProperties, getInterfaceMethods } from "./descriptor";
+import { allInterfaceProperties, getInterfaceMethods, getPropertyInterfaces } from "./descriptor";
 import { PluginError } from "./plugin-error";
 
 interface MixinTable {
@@ -244,9 +244,10 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
 
             const implementer = await (mixinProvider as any)[QueryInterfaceSymbol](ScryptedInterface.MixinProvider);
             const host = this.scrypted.getPluginHostForDeviceId(implementer);
+            const propertyInterfaces = getPropertyInterfaces(host.api.descriptors || ScryptedInterfaceDescriptors);
             // todo: remove this and pass the setter directly.
             const deviceState = await host.remote.createDeviceState(this.id,
-                async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value));
+                async (property, value) => this.scrypted.stateManager.setPluginDeviceState(pluginDevice, property, value, propertyInterfaces[property]));
             const mixinProxy = await mixinProvider.getMixin(wrappedProxy, previousInterfaces as ScryptedInterface[], deviceState);
             if (!mixinProxy)
                 throw new PluginError(`mixin provider ${mixinId} did not return mixin for ${this.id}`);

@@ -1,7 +1,7 @@
 import { EventListener, EventListenerOptions, EventListenerRegister, Logger, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceDescriptor, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, SystemDeviceState, SystemManager } from "@scrypted/types";
 import { EventRegistry } from "../event-registry";
 import { PrimitiveProxyHandler, RpcPeer } from '../rpc';
-import { allInterfaceProperties, getInterfaceMethods, getInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
+import { getInterfaceMethods, getInterfaceProperties, getPropertyInterfaces, isValidInterfaceMethod, propertyInterfaces } from "./descriptor";
 import { PluginAPI } from "./plugin-api";
 
 function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
@@ -51,10 +51,13 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         if (handled)
             return handled;
 
-        const interfaces = this.systemManager.state[this.id].interfaces.value;
+        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces.value);
         const prop = p.toString();
+        const isValidProperty = this.systemManager.propertyInterfaces?.[prop] || propertyInterfaces[prop];
 
-        if (allInterfaceProperties.includes(prop))
+        // this will also return old properties that should not exist on a device. ie, a disabled mixin provider.
+        // should this change?
+        if (isValidProperty)
             return (this.systemManager.state[this.id] as any)?.[p]?.value;
 
         if (!isValidInterfaceMethod(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces, prop))
@@ -132,6 +135,7 @@ export class SystemManagerImpl implements SystemManager {
     events = new EventRegistry();
     typesVersion: string;
     descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
+    propertyInterfaces: ReturnType<typeof getPropertyInterfaces>;
 
     getDeviceState(id: string) {
         return this.state[id];
@@ -186,6 +190,7 @@ export class SystemManagerImpl implements SystemManager {
     setScryptedInterfaceDescriptors(typesVersion: string, descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }): Promise<void> {
         this.typesVersion = typesVersion;
         this.descriptors = descriptors;
+        this.propertyInterfaces = getPropertyInterfaces(descriptors);
         return this.api.setScryptedInterfaceDescriptors(typesVersion, descriptors);
     }
 }

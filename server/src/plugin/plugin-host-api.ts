@@ -5,6 +5,7 @@ import { Logger } from '../logger';
 import { RpcPeer } from '../rpc';
 import { ScryptedRuntime } from '../runtime';
 import { getState } from '../state';
+import { getPropertyInterfaces } from './descriptor';
 import { PluginAPI, PluginAPIManagedListeners } from './plugin-api';
 import { PluginHost } from './plugin-host';
 import { checkProperty } from './plugin-state-check';
@@ -13,6 +14,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     pluginId: string;
     typesVersion: string;
     descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor };
+    propertyInterfaces: ReturnType<typeof getPropertyInterfaces>;
 
     [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
         'onMixinEvent',
@@ -117,7 +119,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
     async setState(nativeId: ScryptedNativeId, key: string, value: any) {
         checkProperty(key, value);
-        this.scrypted.stateManager.setPluginState(this.pluginId, nativeId, key, value);
+        this.scrypted.stateManager.setPluginState(this.pluginId, nativeId, this.propertyInterfaces?.[key], key, value);
     }
 
     async setStorage(nativeId: ScryptedNativeId, storage: { [key: string]: string }) {
@@ -184,5 +186,6 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
     async setScryptedInterfaceDescriptors(typesVersion: string, descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }): Promise<void> {
         this.typesVersion = typesVersion;
         this.descriptors = descriptors;
+        this.propertyInterfaces = getPropertyInterfaces(descriptors);
     }
 }

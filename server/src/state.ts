@@ -34,38 +34,30 @@ export class ScryptedStateManager extends EventRegistry {
         this.scrypted = scrypted;
     }
 
-    setPluginState(pluginId: string, nativeId: ScryptedNativeId, property: string, value: any) {
+    setPluginState(pluginId: string, nativeId: ScryptedNativeId, eventInterface: ScryptedInterface, property: string, value: any) {
         const device = this.scrypted.findPluginDevice(pluginId, nativeId);
         if (!device)
             throw new Error(`device not found for plugin id ${pluginId} native id ${nativeId}`);
-        this.setPluginDeviceState(device, property, value);
+        this.setPluginDeviceState(device, property, value, eventInterface);
     }
 
-    setPluginDeviceState(device: PluginDevice, property: string, value: any) {
-        // this currently doesn't work because inherited properties are not detected.
-        // ie, MediaPlayer implements StartStop and Pause
-        // if (!isValidInterfaceProperty(device.state.interfaces.value, property))
-        //     throw new Error(`interface for property ${property} not implemented`);
-        if (!allInterfaceProperties.includes(property))
+    setPluginDeviceState(device: PluginDevice, property: string, value: any, eventInterface?: ScryptedInterface) {
+        eventInterface = eventInterface || propertyInterfaces[property];
+        if (!eventInterface)
             throw new Error(`${property} is not a valid property`);
 
         const changed = setState(device, property, value);
 
-        this.notifyPropertyEvent(device, property, value, changed);
+        const eventTime = device?.state?.[property]?.lastEventTime;
+
+        if (this.notify(device?._id, eventTime, eventInterface, property, value, changed) && device) {
+            this.scrypted.getDeviceLogger(device).log('i', `state change: ${property} ${value}`);
+        }
 
         this.upserts.add(device._id);
         this.upsertThrottle();
 
         return changed;
-    }
-
-    notifyPropertyEvent(device: PluginDevice, property: string, value: any, changed?: boolean) {
-        const eventTime = device?.state?.[property]?.lastEventTime;
-        const eventInterface = propertyInterfaces[property];
-
-        if (this.notify(device?._id, eventTime, eventInterface, property, value, changed) && device) {
-            this.scrypted.getDeviceLogger(device).log('i', `state change: ${property} ${value}`);
-        }
     }
 
     updateDescriptor(device: PluginDevice) {
