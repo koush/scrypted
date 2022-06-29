@@ -2,7 +2,7 @@ import { EventListenerOptions, EventDetails, EventListenerRegister, ScryptedDevi
 import { PluginAPI } from "./plugin-api";
 import { PrimitiveProxyHandler, RpcPeer } from '../rpc';
 import { EventRegistry } from "../event-registry";
-import { allInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
+import { allInterfaceProperties, getInterfaceMethods, getInterfaceProperties, isValidInterfaceMethod } from "./descriptor";
 
 
 function newDeviceProxy(id: string, systemManager: SystemManagerImpl) {
@@ -20,6 +20,31 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         return `ScryptedDevice-${this.id}`
     }
 
+    ownKeys(target: any): ArrayLike<string | symbol> {
+        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces.value);
+        const methods = getInterfaceMethods(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
+        const properties = getInterfaceProperties(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
+        return [...methods, ...properties];
+    }
+
+    getOwnPropertyDescriptor(target: any, p: string | symbol): PropertyDescriptor {
+        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces.value);
+        const methods = getInterfaceMethods(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
+        const prop = p.toString();
+        if (methods.includes(prop)) {
+            return {
+                configurable: true,
+            };
+        }
+        const properties = getInterfaceProperties(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces);
+        if (properties.includes(prop)) {
+            return {
+                configurable: true,
+                value: this.systemManager.state[this.id][prop]?.value
+            }
+        }
+    }
+
     get(target: any, p: PropertyKey, receiver: any): any {
         if (p === 'id')
             return this.id;
@@ -28,11 +53,13 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         if (handled)
             return handled;
 
-        if (allInterfaceProperties.includes(p.toString()))
+        const interfaces = this.systemManager.state[this.id].interfaces.value;
+        const prop = p.toString();
+
+        if (allInterfaceProperties.includes(prop))
             return (this.systemManager.state[this.id] as any)?.[p]?.value;
 
-        const prop = p.toString();
-        if (!isValidInterfaceMethod(this.systemManager.state[this.id].interfaces.value, prop))
+        if (!isValidInterfaceMethod(this.systemManager.descriptors || ScryptedInterfaceDescriptors, interfaces, prop))
             return;
 
         if (ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice].methods.includes(prop))

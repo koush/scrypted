@@ -1,15 +1,6 @@
-import { ScryptedInterface, ScryptedInterfaceDescriptors } from "@scrypted/types";
+import { ScryptedInterface, ScryptedInterfaceDescriptor, ScryptedInterfaceDescriptors  } from "@scrypted/types";
 
-export const allInterfaceMethods: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.methods));
-export const allInterfaceProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map((type: any) => type.properties));
-export const deviceMethods: string[] = ['listen', 'setName', 'setRoom', 'setType'];
-
-export const methodInterfaces: { [method: string]: string } = {};
-for (const desc of Object.values(ScryptedInterfaceDescriptors)) {
-    for (const method of desc.methods) {
-        methodInterfaces[method] = desc.name;
-    }
-}
+export const allInterfaceProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).map(type => type.properties));
 
 export const propertyInterfaces: { [property: string]: ScryptedInterface } = {};
 for (const descriptor of Object.values(ScryptedInterfaceDescriptors)) {
@@ -18,12 +9,20 @@ for (const descriptor of Object.values(ScryptedInterfaceDescriptors)) {
     }
 }
 
-export function isValidInterfaceMethod(interfaces: string[], method: string) {
-    const availableMethods: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).filter((e: any) => interfaces.includes(e.name)).map((type: any) => type.methods));
-    return availableMethods.includes(method) || ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice].methods.includes(method);
+export function getInterfaceMethods(descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }, interfaces: Set<string>) {
+    return Object.values(descriptors).filter(e => interfaces.has(e.name)).map(type => type.methods).flat();
 }
 
-export function isValidInterfaceProperty(interfaces: string[], property: string): boolean {
-    const availableProperties: string[] = [].concat(...Object.values(ScryptedInterfaceDescriptors).filter((e: any) => interfaces.includes(e.name)).map((type: any) => type.properties));
+export function getInterfaceProperties(descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }, interfaces: Set<string>) {
+     return Object.values(descriptors).filter(e => interfaces.has(e.name)).map(type => type.properties).flat();
+}
+
+export function isValidInterfaceMethod(descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }, interfaces: string[], method: string) {
+    const availableMethods = getInterfaceMethods(descriptors, new Set(interfaces));
+    return availableMethods.includes(method) || descriptors[ScryptedInterface.ScryptedDevice].methods.includes(method);
+}
+
+export function isValidInterfaceProperty(descriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor }, interfaces: string[], property: string): boolean {
+    const availableProperties = getInterfaceProperties(descriptors, new Set(interfaces));
     return availableProperties.includes(property);
 }

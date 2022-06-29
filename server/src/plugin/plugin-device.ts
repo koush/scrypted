@@ -5,7 +5,7 @@ import { MixinProvider } from "@scrypted/types";
 import { RpcPeer, PrimitiveProxyHandler } from "../rpc";
 import { getState } from "../state";
 import { getDisplayType } from "../infer-defaults";
-import { allInterfaceProperties, isValidInterfaceMethod, methodInterfaces } from "./descriptor";
+import { allInterfaceProperties, getInterfaceMethods, isValidInterfaceMethod } from "./descriptor";
 import { PluginError } from "./plugin-error";
 import { sleep } from "../sleep";
 import path from 'path';
@@ -17,7 +17,8 @@ interface MixinTable {
 }
 
 interface MixinTableEntry {
-    interfaces: Set<string>
+    interfaces: Set<string>;
+    methods?: Set<string>;
     allInterfaces: string[];
     proxy: any;
     error?: Error;
@@ -283,7 +284,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {
-        if (p === 'constructor')
+        if (RpcPeer.PROBED_PROPERTIES.has(p))
             return;
         const handled = RpcPeer.handleFunctionInvocations(this, target, p, receiver);
         if (handled)
@@ -299,9 +300,6 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
 
         if (p === RefreshSymbol || p === QueryInterfaceSymbol)
             return new Proxy(() => p, this);
-
-        if (!isValidInterfaceMethod(pluginDevice.state.interfaces.value, prop))
-            return;
 
         if (ScryptedInterfaceDescriptors[ScryptedInterface.ScryptedDevice].methods.includes(prop))
             return (this as any)[p].bind(this);
@@ -339,11 +337,7 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
     }
 
     async applyMixin(method: string, argArray?: any): Promise<any> {
-        const iface = methodInterfaces[method];
-        if (!iface)
-            throw new PluginError(`unknown method ${method}`);
-
-        const found = await this.findMixin(iface);
+        const found = await this.findMethod(method);
         if (found) {
             const { mixin, entry } = found;
             const { proxy } = entry;
@@ -353,6 +347,23 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         }
 
         throw new PluginError(`${method} not implemented`)
+    }
+
+    async findMethod(method: string) {
+        for (const mixin of this.mixinTable) {
+            const entry = await mixin.entry;
+            if (!entry.methods) {
+                const pluginDevice = this.scrypted.findPluginDeviceById(mixin.mixinProviderId || this.id);
+                const plugin = this.scrypted.plugins[pluginDevice.pluginId];
+                let methods = new Set<string>(getInterfaceMethods(ScryptedInterfaceDescriptors, entry.interfaces))
+                if (plugin.api.descriptors)
+                    methods = new Set<string>([...methods, ...getInterfaceMethods(plugin.api.descriptors, entry.interfaces)]);
+                entry.methods = methods;
+            }
+            if (entry.methods.has(method)) {
+                return { mixin, entry };
+            }
+        }
     }
 
     async findMixin(iface: string) {
@@ -406,9 +417,6 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
             && getState(pluginDevice, ScryptedInterfaceProperty.providedInterfaces)?.includes(ScryptedInterface.ScryptedPlugin)) {
             return this.scrypted.getPackageJson(pluginDevice.pluginId);
         }
-
-        if (!isValidInterfaceMethod(pluginDevice.state.interfaces.value, method))
-            throw new PluginError(`device ${this.id} does not support method ${method}`);
 
         if (method === 'refresh') {
             const refreshInterface = argArray[0];

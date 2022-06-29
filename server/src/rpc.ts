@@ -246,6 +246,17 @@ export class RpcPeer {
     static readonly PROPERTY_JSON_DISABLE_SERIALIZATION = '__json_disable_serialization';
     static readonly PROPERTY_PROXY_PROPERTIES = '__proxy_props';
     static readonly PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children';
+    static readonly PROBED_PROPERTIES = new Set<any>([
+        'then',
+        'constructor',
+        '__proxy_id',
+        '__proxy_constructor',
+        '__proxy_peer',
+        RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS,
+        RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION,
+        RpcPeer.PROPERTY_PROXY_PROPERTIES,
+        RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN,
+    ]);
 
     constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
     }
