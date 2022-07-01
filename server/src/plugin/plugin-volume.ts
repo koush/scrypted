@@ -1,8 +1,9 @@
+import os from 'os';
 import path from 'path';
 import mkdirp from 'mkdirp';
 
 export function getScryptedVolume() {
-    const volumeDir = process.env.SCRYPTED_VOLUME || path.join(process.cwd(), 'volume');
+    const volumeDir = process.env.SCRYPTED_VOLUME || path.join(os.homedir(), '.scrypted', 'volume');
     return volumeDir;
 }
 

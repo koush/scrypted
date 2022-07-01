@@ -1,4 +1,4 @@
-import { getInstalledFfmpeg } from '@scrypted/ffmpeg';
+import pathToFfmpeg from 'ffmpeg-static';
 import { BufferConverter, BufferConvertorOptions, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
 import child_process from 'child_process';
@@ -188,7 +188,7 @@ export abstract class MediaManagerBase implements MediaManager {
             return f;
 
         const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-        return getInstalledFfmpeg() || defaultPath;
+        return pathToFfmpeg || defaultPath;
     }
 
     async getFilesPath(): Promise<string> {

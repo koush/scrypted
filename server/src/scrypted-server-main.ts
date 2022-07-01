@@ -225,6 +225,7 @@ async function start() {
     });
 
     console.log('#######################################################');
+    console.log(`Scrypted Volume           : ${volumeDir}`);
     console.log(`Scrypted Server (Local)   : https://localhost:${SCRYPTED_SECURE_PORT}/`);
     for (const address of getHostAddresses(true, true)) {
         console.log(`Scrypted Server (Remote)  : https://${address}:${SCRYPTED_SECURE_PORT}/`);
