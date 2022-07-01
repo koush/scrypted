@@ -21,6 +21,7 @@ Select the appropriate guide. After installation is finished, remember to visit 
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Mac)
 <!--    * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop). -->
  * Windows
+   * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Windows)
    * [WSL2 Installation](https://github.com/koush/scrypted/wiki/Installation:-WSL2-Windows)
 <!--    * Docker Desktop is [not supported](https://github.com/koush/scrypted/wiki/Installation:-Docker-Desktop). -->
  * [ReadyNAS: Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-ReadyNAS)
