@@ -26,7 +26,7 @@ $INSTALL_SERVICE_JS = @"
 var Service = require('node-windows').Service;
 
 var svc = new Service({
-  name:'Scrypted',
+  name: 'Scrypted',
   description: 'Scrypted Home Automation',
   script: '$($SERVICE_JS_ESCAPED_PATH)',
   env: [
