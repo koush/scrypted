@@ -1,6 +1,9 @@
 winget install -h OpenJS.NodeJS
 winget install -h Python.Python.3
 
+py -m pip install --upgrade pip
+py -m pip install aiofiles debugpy typing_extensions typing opencv-python
+
 npx -y scrypted@latest install-server
 
 $USER_HOME_ESCAPED = $env:HOME.replace('\', '\\')
