@@ -1,6 +1,7 @@
 import { Readable } from 'stream';
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { EventEmitter } from "stream";
+import { IncomingMessage } from 'http';
 
 function getChannel(channel: string) {
     return channel || '101';
@@ -117,7 +118,8 @@ export class HikVisionCameraAPI {
                     url,
                     responseType: 'stream',
                 });
-                const stream = response.data as Readable;
+                const stream = response.data as IncomingMessage;
+                stream.socket.setKeepAlive(true);
 
                 stream.on('data', (buffer: Buffer) => {
                     const data = buffer.toString();

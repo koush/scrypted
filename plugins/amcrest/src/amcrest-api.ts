@@ -21,7 +21,7 @@ export enum AmcrestEvent {
 }
 
 export const amcrestHttpsAgent = new https.Agent({
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
 });
 
 export class AmcrestCameraClient {
@@ -57,6 +57,7 @@ export class AmcrestCameraClient {
             url,
         });
         const stream = response.data as IncomingMessage;
+        stream.socket.setKeepAlive(true);
         let activityTimeout: NodeJS.Timeout;
         const resetActivityTimeout = () => {
             clearTimeout(activityTimeout);

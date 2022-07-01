@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/hikvision",
-   "version": "0.0.93",
+   "version": "0.0.94",
    "description": "HikVision Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",

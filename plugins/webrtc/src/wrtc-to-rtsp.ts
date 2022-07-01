@@ -81,6 +81,7 @@ export async function createRTCPeerConnectionSource(options: {
 
             const pc = await peerConnection.promise;
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
+            audioTransceiver.mid = '0';
             audioTransceiver.onTrack.subscribe((track) => {
                 track.onReceiveRtp.subscribe(rtp => {
                     if (!gotAudio) {
@@ -93,6 +94,7 @@ export async function createRTCPeerConnectionSource(options: {
             });
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
+            videoTransceiver.mid = '1';
             videoTransceiver.onTrack.subscribe((track) => {
                 track.onReceiveRtp.subscribe(rtp => {
                     if (!gotVideo) {
@@ -157,8 +159,10 @@ export async function createRTCPeerConnectionSource(options: {
                 if (type === 'offer')
                     doSetup(setup);
                 const pc = await peerConnection.promise;
-                if (setup.datachannel)
+                if (setup.datachannel) {
                     pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
+                    pc.sctpTransport.mid = '2';
+                }
 
                 const gatheringPromise = pc.iceGatheringState === 'complete' ? Promise.resolve(undefined) : new Promise(resolve => pc.iceGatheringStateChange.subscribe(state => {
                     if (state === 'complete')
