@@ -6,7 +6,6 @@ import gc
 import json
 import os
 import platform
-import resource
 import shutil
 import subprocess
 import threading
@@ -21,7 +20,6 @@ from os import sys
 from typing import Any, Optional, Set, Tuple
 
 import aiofiles
-import gi
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
                                                 MediaManager,
@@ -30,12 +28,6 @@ from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
 from typing_extensions import TypedDict
 
 import rpc
-
-gi.require_version('Gst', '1.0')
-
-from gi.repository import GLib, Gst
-
-Gst.init(None)
 
 class SystemDeviceState(TypedDict):
     lastEventTime: int
@@ -227,9 +219,9 @@ class PluginRemote:
         if not os.path.exists(python_prefix):
             os.makedirs(python_prefix)
 
-        python = 'python%s' % str(
+        python_version = 'python%s' % str(
             sys.version_info[0])+"."+str(sys.version_info[1])
-        print('python:', python)
+        print('python version:', python_version)
 
         if 'requirements.txt' in zip.namelist():
             requirements = zip.open('requirements.txt').read()
@@ -254,7 +246,7 @@ class PluginRemote:
                 f.write(requirements)
                 f.close()
 
-                p = subprocess.Popen([python, '-m', 'pip', 'install', '-r', requirementstxt,
+                p = subprocess.Popen([sys.executable, '-m', 'pip', 'install', '-r', requirementstxt,
                                      '--prefix', python_prefix], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 while True:
                     line = p.stdout.readline()
@@ -275,8 +267,13 @@ class PluginRemote:
                 print(str_requirements)
 
         sys.path.insert(0, zipPath)
-        site_packages = os.path.join(
-            python_prefix, 'lib/%s/site-packages' % python)
+        if platform.system() != 'Windows':
+            site_packages = os.path.join(
+                python_prefix, 'lib', python_version, 'site-packages')
+        else:
+            site_packages = os.path.join(
+                python_prefix, 'Lib', 'site-packages')
+        print('site-packages: %s' % site_packages)
         sys.path.insert(0, site_packages)
         from scrypted_sdk import sdk_init  # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)
@@ -366,7 +363,11 @@ async def async_main(loop: AbstractEventLoop):
 
         def stats_runner():
             ptime = round(time.process_time() * 1000000)
-            heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            try:
+                import resource
+                heapTotal = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            except:
+                heapTotal = 0
             stats = {
                 'type': 'stats',
                 'cpuUsage': {
@@ -399,8 +400,16 @@ def main():
 
 
 if __name__ == "__main__":
-    worker = threading.Thread(target=main)
-    worker.start()
+    try:
+        import gi
+        gi.require_version('Gst', '1.0')
+        from gi.repository import GLib, Gst
+        Gst.init(None)
 
-    loop = GLib.MainLoop()
-    loop.run()
+        worker = threading.Thread(target=main)
+        worker.start()
+
+        loop = GLib.MainLoop()
+        loop.run()
+    except:
+        main()

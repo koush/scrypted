@@ -6,6 +6,7 @@ import { once } from 'events';
 import process from 'process';
 import mkdirp from "mkdirp";
 import semver from 'semver';
+import os from 'os';
 
 export function getPluginNodePath(name: string) {
     const pluginVolume = ensurePluginVolume(name);
@@ -48,7 +49,10 @@ export async function installOptionalDependencies(console: Console, packageJson:
     mkdirp.sync(nodePrefix);
     fs.writeFileSync(packageJsonPath, JSON.stringify(reduced));
 
-    const cp = child_process.spawn('npm', ['--prefix', nodePrefix, 'install'], {
+    let npm = 'npm';
+    if (os.platform() === 'win32')
+        npm += '.cmd';
+    const cp = child_process.spawn(npm, ['--prefix', nodePrefix, 'install'], {
         cwd: nodePrefix,
         stdio: 'inherit',
     });
