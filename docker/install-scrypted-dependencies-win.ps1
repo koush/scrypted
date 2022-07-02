@@ -6,8 +6,8 @@ py -m pip install aiofiles debugpy typing_extensions typing opencv-python
 
 npx -y scrypted@latest install-server
 
-$USER_HOME_ESCAPED = $env:HOME.replace('\', '\\')
-$SCRYPTED_HOME = $env:HOME + '\.scrypted'
+$USER_HOME_ESCAPED = $env:USERPROFILE.replace('\', '\\')
+$SCRYPTED_HOME = $env:USERPROFILE + '\.scrypted'
 $SCRYPTED_HOME_ESCAPED_PATH = $SCRYPTED_HOME.replace('\', '\\')
 npm install --prefix $SCRYPTED_HOME node-windows@1.0.0-beta.6 --save
 
