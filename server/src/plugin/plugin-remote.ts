@@ -9,7 +9,6 @@ import { BufferSerializer } from './buffer-serializer';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
 import fs from 'fs';
 import { checkProperty } from './plugin-state-check';
-import _ from 'lodash';
 const { link } = require('linkfs');
 
 class DeviceLogger implements Logger {

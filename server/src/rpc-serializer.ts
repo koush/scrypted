@@ -3,7 +3,7 @@ import { SidebandBufferSerializer } from "./plugin/buffer-serializer";
 import { RpcPeer } from "./rpc";
 
 export function createDuplexRpcPeer(selfName: string, peerName: string, readable: Readable, writable: Writable) {
-    const serializer = createRpcDuplexSerializer(readable, writable);
+    const serializer = createRpcDuplexSerializer(writable);
 
     const rpcPeer = new RpcPeer(selfName, peerName, (message, reject, serializationContext) => {
         try {
@@ -16,6 +16,7 @@ export function createDuplexRpcPeer(selfName: string, peerName: string, readable
     });
 
     serializer.setupRpcPeer(rpcPeer);
+    readable.on('data', data => serializer.onData(data));
     readable.on('close', serializer.onDisconnected);
     readable.on('error', serializer.onDisconnected);
     return rpcPeer;
@@ -34,7 +35,7 @@ export function createRpcSerializer(options: {
         rpcPeer.kill('connection closed.');
     }
 
-    const sendMessage = (message: any, reject: (e: Error) => void, serializationContext: any, ) => {
+    const sendMessage = (message: any, reject: (e: Error) => void, serializationContext: any,) => {
         if (!connected) {
             reject?.(new Error('peer disconnected'));
             return;
@@ -78,7 +79,9 @@ export function createRpcSerializer(options: {
     };
 }
 
-export function createRpcDuplexSerializer(readable: Readable, writable: Writable) {
+export function createRpcDuplexSerializer(writable: {
+    write: (data: Buffer) => void;
+}) {
     const socketSend = (type: number, data: Buffer) => {
         const header = Buffer.alloc(5);
         header.writeUInt32BE(data.length + 1, 0);
@@ -102,38 +105,52 @@ export function createRpcDuplexSerializer(readable: Readable, writable: Writable
     });
 
     let header: Buffer;
-    const readMessages = () => {
+    let pending: Buffer;
+
+    const readPending = (length: number) => {
+        if (!pending || pending.length < length)
+            return;
+
+        const ret = pending.slice(0, length);
+        pending = pending.slice(length);
+        if (!pending.length)
+            pending = undefined;
+        return ret;
+    }
+
+    const onData = (data: Buffer) => {
+        if (!pending)
+            pending = data;
+        else
+            pending = Buffer.concat([pending, data]);
+
         while (true) {
             if (!header) {
-                header = readable.read(5);
+                header = readPending(5);
                 if (!header)
                     return;
             }
 
             const length = header.readUInt32BE(0);
             const type = header.readUInt8(4);
-            const payload: Buffer = readable.read(length - 1);
+            const payload: Buffer = readPending(length - 1);
             if (!payload)
                 return;
 
             header = undefined;
 
-            const data = payload;
-
             if (type === 0) {
-                const message = JSON.parse(data.toString());
+                const message = JSON.parse(payload.toString());
                 serializer.onMessageFinish(message);
             }
             else {
-                serializer.onMessageBuffer(data);
+                serializer.onMessageBuffer(payload);
             }
         }
     }
 
-    readable.on('readable', readMessages);
-    readMessages();
-
     return {
+        onData,
         setupRpcPeer: serializer.setupRpcPeer,
         sendMessage: serializer.sendMessage,
         onDisconnected: serializer.onDisconnected,
