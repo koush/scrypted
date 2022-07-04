@@ -1,4 +1,4 @@
 
 {
-    "scrypted.debugHost": "192.168.2.54",
+    "scrypted.debugHost": "127.0.0.1",
 }

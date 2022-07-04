@@ -328,7 +328,9 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             cp.on('close', cleanup);
             process.send(message, cp);
 
-            const debouncer = new DataChannelDebouncer(dc);
+            const debouncer = new DataChannelDebouncer({
+                send: u8 => dc.send(Buffer.from(u8)),
+            });
             socket.on('data', data => debouncer.send(data));
             socket.on('close', cleanup);
         }

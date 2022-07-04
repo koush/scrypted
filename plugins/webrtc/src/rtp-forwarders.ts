@@ -144,7 +144,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
             if (audio) {
                 if (audioSection
-                    && isCodecCopy(audioCodec, ffmpegInput.mediaStreamOptions?.audio?.codec)) {
+                    && isCodecCopy(audioCodec, audioSection?.codec)) {
 
                     console.log('audio codec matched:', audio.codecCopy);
 
