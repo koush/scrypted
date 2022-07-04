@@ -1,22 +1,37 @@
-import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-utils";
-import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
+import { ScryptedStatic } from "@scrypted/types";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
-import { once } from "events";
-import https from 'https';
-import ip from 'ip';
-import { PassThrough } from 'stream';
-import { ScryptedStatic } from "../../../sdk/types/index";
+import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-utils";
+import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
+import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
 import type { IOSocket } from '../../../server/src/io';
 import { SidebandBufferSerializer } from '../../../server/src/plugin/buffer-serializer';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
-import { createDuplexRpcPeer } from '../../../server/src/rpc-serializer';
-export * from "../../../sdk/types/index";
-import { DataChannelDebouncer} from "../../../plugins/webrtc/src/datachannel-debouncer";
+import { createRpcDuplexSerializer } from '../../../server/src/rpc-serializer';
+export * from "@scrypted/types";
 
 type IOClientSocket = eio.Socket & IOSocket;
+
+function once(socket: IOClientSocket, event: 'open' | 'message') {
+    return new Promise<any[]>((resolve, reject) => {
+        const err = (e: any) => {
+            cleanup();
+            reject(e);
+        };
+        const e = (...args: any[]) => {
+            cleanup();
+            resolve(args);
+        };
+        const cleanup = () => {
+            socket.removeListener('error', err);
+            socket.removeListener(event, e);
+        };
+        socket.once('error', err);
+        socket.once(event, e);
+    });
+}
 
 export interface ScryptedClientStatic extends ScryptedStatic {
     disconnect(): void;
@@ -27,6 +42,7 @@ export interface ScryptedClientStatic extends ScryptedStatic {
 
 export interface ScryptedConnectionOptions {
     baseUrl: string;
+    axiosConfig?: AxiosRequestConfig;
 }
 
 export interface ScryptedLoginOptions extends ScryptedConnectionOptions {
@@ -44,12 +60,6 @@ export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
     clientName?: string;
 }
 
-const axiosConfig: AxiosRequestConfig = {
-    httpsAgent: new https.Agent({
-        rejectUnauthorized: false,
-    })
-}
-
 export async function loginScryptedClient(options: ScryptedLoginOptions) {
     let { baseUrl, username, password, change_password } = options;
     const url = `${baseUrl || ''}/login`;
@@ -58,7 +68,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         password,
         change_password,
     }, {
-        ...axiosConfig,
+        ...options.axiosConfig,
     });
 
     if (response.status !== 200)
@@ -80,7 +90,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     let { baseUrl } = options || {};
     const url = `${baseUrl || ''}/login`;
     const response = await axios.get(url, {
-        ...axiosConfig,
+        ...options?.axiosConfig,
     });
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
 
@@ -101,8 +111,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let trySideband: boolean;
 
     if (username && password) {
-        const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);;
-        extraHeaders['Cookie'] = loginResult.cookie;
+        const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);
+        if (loginResult.cookie)
+            extraHeaders['Cookie'] = loginResult.cookie;
         addresses = loginResult.addresses;
         trySideband = loginResult.scryptedCloud;
     }
@@ -111,7 +122,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             baseUrl,
         });
         addresses = loginCheck.addresses;
-        trySideband = loginCheck.scryptedCloud;
+        trySideband = loginCheck.scryptedCloud || true;
     }
 
     let socket: IOClientSocket;
@@ -190,7 +201,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 await axios.post(url, {
                     id,
                 }, {
-                    ...axiosConfig,
+                    ...options.axiosConfig,
                 });
 
                 ready.send('/api/start');
@@ -222,10 +233,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 upgradingPeer.params['session'] = session;
 
                 rpcPeer = await Promise.race([readyClose, timeoutFunction(2000, async (isTimedOut) => {
-                    const readable = new PassThrough();
-                    const writable = new PassThrough();
-                    const ret = createDuplexRpcPeer('webrtc-client', "api", readable, writable);
-
                     const pc = await pcPromise;
 
                     await waitPeerConnectionIceConnected(pc);
@@ -234,7 +241,21 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     console.log('got dc', dc);
 
                     const debouncer = new DataChannelDebouncer(dc);
-                    writable.on('data', data => debouncer.send(data));
+                    const serializer = createRpcDuplexSerializer({
+                        write: (data) => debouncer.send(data),
+                    });
+
+                    const ret = new RpcPeer('webrtc-client', "api", (message, reject, serializationContext) => {
+                        try {
+                            serializer.sendMessage(message, reject, serializationContext);
+                        }
+                        catch (e) {
+                            reject?.(e);
+                            pc.close();
+                        }
+                    });
+                    serializer.setupRpcPeer(ret);
+
 
                     waitPeerIceConnectionClosed(pc).then(() => ready.close());
                     ready.on('close', () => {
@@ -251,11 +272,11 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             process.nextTick(() => {
                                 if (buffers) {
                                     for (const buffer of buffers) {
-                                        readable.write(buffer);
+                                        serializer.onData(Buffer.from(buffer));
                                     }
                                     buffers = undefined;
                                 }
-                                dc.onmessage = message => readable.write(Buffer.from(message.data));
+                                dc.onmessage = message => serializer.onData(Buffer.from(message.data));
                             });
                         };
                     });
