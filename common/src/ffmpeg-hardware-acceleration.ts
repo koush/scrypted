@@ -63,10 +63,10 @@ export function getH264DecoderArgs(): CodecArgs {
 
     const ret: CodecArgs = {
         'Nvidia CUDA': [
-            '-vsync', '0', '–hwaccel', 'cuda', '-hwaccel_output_format', 'cuda',
+            '-vsync', '0', '-hwaccel', 'cuda', '-hwaccel_output_format', 'nv12',
         ],
         'Nvidia CUVID': [
-            '-vsync', '0', '–hwaccel', 'cuvid', '-c:v', 'h264_cuvid',
+            '-vsync', '0', '-hwaccel', 'cuvid', '-c:v', 'h264_cuvid', '-hwaccel_output_format', 'nv12',
         ],
     };
 
@@ -112,7 +112,7 @@ export function getH264EncoderArgs() {
         // h264_v4l2m2m h264_vaapi nvenc_h264
         encoders['V4L2'] = 'h264_v4l2m2m';
         encoders['VAAPI'] = 'h264_vaapi';
-        encoders['Nvidia'] = 'nvenc_h264';
+        encoders['Nvidia'] = 'h264_nvenc';
     }
 
     const encoderArgs: CodecArgs = {};
