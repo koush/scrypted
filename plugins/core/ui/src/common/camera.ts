@@ -2,7 +2,10 @@ import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
 import { MediaManager, MediaObject, RequestMediaStream, RequestRecordingStreamOptions, RTCSessionControl, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoRecorder } from "@scrypted/types";
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
-  return streamMedia(device, getVideo);
+  const ret = await streamMedia(device);
+  ret.mediaStream.then(mediaStream => {
+    getVideo().srcObject = mediaStream;
+  });
 }
 
 export async function streamRecorder(mediaManager: MediaManager, device: ScryptedDevice & VideoRecorder, startTime: number, recordingStream: MediaObject, getVideo: () => HTMLVideoElement) {
@@ -34,52 +37,54 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
   const mo = await mediaManager.createMediaObject(requestMediaStream, ScryptedMimeTypes.RequestMediaStream);
   const channel: RTCSignalingChannel = await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.RTCSignalingChannel);
 
-  const value = await streamMedia(channel, getVideo)
+  const ret = await streamMedia(channel);
+  ret.mediaStream.then(mediaStream => {
+    getVideo().srcObject = mediaStream;
+  });
   recordingStream = await rp;
 
   return {
     recordingStream,
-    ...value,
+    ...ret,
   };
 }
 
-export async function streamMedia(device: RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
+export async function streamMedia(device: RTCSignalingChannel) {
   const session = new BrowserSignalingSession();
-  const pc = new Promise<RTCPeerConnection>(resolve => {
-    session.pcDeferred.promise.then(pc => {
-      pc.addEventListener('connectionstatechange', () => {
-        if (pc.iceConnectionState === 'disconnected'
-          || pc.iceConnectionState === 'failed'
-          || pc.iceConnectionState === 'closed') {
-          control.endSession();
-        }
-      });
-      pc.addEventListener('iceconnectionstatechange', () => {
-        console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
-        if (pc.iceConnectionState === 'disconnected'
-          || pc.iceConnectionState === 'failed'
-          || pc.iceConnectionState === 'closed') {
-          control.endSession();
-        }
-      });
+  const control: RTCSessionControl = await device.startRTCSignalingSession(session);
+  const mediaStream = session.pcDeferred.promise.then(pc => {
+    pc.addEventListener('connectionstatechange', () => {
+      if (pc.iceConnectionState === 'disconnected'
+        || pc.iceConnectionState === 'failed'
+        || pc.iceConnectionState === 'closed') {
+        control.endSession();
+      }
+    });
+    pc.addEventListener('iceconnectionstatechange', () => {
+      console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
+      if (pc.iceConnectionState === 'disconnected'
+        || pc.iceConnectionState === 'failed'
+        || pc.iceConnectionState === 'closed') {
+        control.endSession();
+      }
+    });
 
+    return new Promise<MediaStream>(resolve => {
       pc.ontrack = ev => {
         const mediaStream = new MediaStream(
           pc.getReceivers().map((receiver) => receiver.track)
         );
-        getVideo().srcObject = mediaStream;
         console.log('received track', ev.track);
+        resolve(mediaStream);
       };
-      resolve(pc);
-    });
-  })
+    })
+  });
 
-  const control: RTCSessionControl = await device.startRTCSignalingSession(session);
   const close = () => {
     control.endSession();
     session.close();
   };
-  return { control, session, close };
+  return { control, session, close, mediaStream };
 }
 
 export async function createBlobUrl(mediaManager: MediaManager, mediaObject: MediaObject): Promise<string> {
