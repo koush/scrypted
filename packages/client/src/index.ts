@@ -122,7 +122,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             baseUrl,
         });
         addresses = loginCheck.addresses;
-        trySideband = loginCheck.scryptedCloud || true;
+        trySideband = loginCheck.scryptedCloud;
     }
 
     let socket: IOClientSocket;
