@@ -22,10 +22,6 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
             persistedDefaultValue: false,
         },
         ...createHAPUsernameStorageSettingsDict('HomeKit Pairing'),
-        pincode: {
-            title: "Manual Pairing Code",
-            readonly: true,
-        },
         resetAccessory: {
             group: 'HomeKit Pairing',
             title: 'Reset Pairing',

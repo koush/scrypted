@@ -217,7 +217,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     const publish = () => {
                         published = true;
                         mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
-                        this.publishAccessory(accessory, storageSettings.values.mac, standaloneCategory);
+                        this.publishAccessory(accessory, storageSettings.values.mac, this.storageSettings.values.pincode, standaloneCategory);
                         if (!hasPublished) {
                             hasPublished = true;
                             logConnections(mixinConsole, accessory, this.seenConnections);
@@ -344,11 +344,11 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         return ret;
     }
 
-    publishAccessory(accessory: Accessory, username: string, category: Categories) {
+    publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories) {
         accessory.publish({
             username,
             port: 0,
-            pincode: this.storageSettings.values.pincode,
+            pincode,
             category,
             addIdentifyingMaterial: false,
             advertiser: this.storageSettings.values.advertiserOverride,
