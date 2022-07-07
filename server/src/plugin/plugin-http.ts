@@ -38,7 +38,7 @@ export abstract class PluginHttp<T> {
 
     abstract handleEngineIOEndpoint(req: Request, res: ServerResponse, endpointRequest: HttpRequest, pluginData: T): void;
     abstract handleRequestEndpoint(req: Request, res: Response, endpointRequest: HttpRequest, pluginData: T): void;
-    abstract getEndpointPluginData(endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<T>;
+    abstract getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<T>;
     abstract handleWebSocket(endpoint: string, httpRequest: HttpRequest, ws: WebSocket, pluginData: T): Promise<void>;
 
     async endpointHandler(req: Request, res: Response, isPublicEndpoint: boolean, isEngineIOEndpoint: boolean,
@@ -75,7 +75,7 @@ export abstract class PluginHttp<T> {
             return;
         }
 
-        const pluginData = await this.getEndpointPluginData(endpoint, isUpgrade, isEngineIOEndpoint);
+        const pluginData = await this.getEndpointPluginData(req, endpoint, isUpgrade, isEngineIOEndpoint);
         if (!pluginData) {
             end(404, 'Not Found');
             return;

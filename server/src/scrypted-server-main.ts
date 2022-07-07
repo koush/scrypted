@@ -355,7 +355,7 @@ async function start() {
     });
 
     const getLoginUserToken = (reqSecure: boolean) => {
-        return reqSecure ? 'login_user_token' : 'login_user_token_inseucre';
+        return reqSecure ? 'login_user_token' : 'login_user_token_insecure';
     };
 
     const getSignedLoginUserToken = (req: Request<any>): string => {

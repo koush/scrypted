@@ -135,7 +135,7 @@ export class PluginHost {
         this.io.on('connection', async (socket) => {
             try {
                 try {
-                    if (socket.request.url.indexOf('/api') !== -1) {
+                    if (socket.request.url.indexOf('/engine.io/api') !== -1) {
                         if (socket.request.url.indexOf('/public') !== -1) {
                             socket.close();
                             return;

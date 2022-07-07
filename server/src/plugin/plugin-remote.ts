@@ -382,6 +382,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             endpointManager,
             mediaManager,
             log,
+            pluginHostAPI: api,
         }
 
         delete peer.params.getRemote;

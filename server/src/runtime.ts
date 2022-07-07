@@ -282,8 +282,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             this.shellio.handleRequest(req, res);
     }
 
-    async getEndpointPluginData(endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<HttpPluginData> {
+    async getEndpointPluginData(req: Request, endpoint: string, isUpgrade: boolean, isEngineIOEndpoint: boolean): Promise<HttpPluginData> {
         const ret = await this.getPluginForEndpoint(endpoint);
+        if (req.url.indexOf('/engine.io/api') !== -1)
+            return ret;
+
         const { pluginDevice } = ret;
 
         // check if upgrade requests can be handled. must be websocket.
