@@ -1002,6 +1002,8 @@ class VideoClips:
 class VideoRecorder:
     async def getRecordingStream(self, options: RequestRecordingStreamOptions, recordingStream: MediaObject = None) -> MediaObject:
         pass
+    async def getRecordingStreamCurrentTime(self, recordingStream: MediaObject) -> float:
+        pass
     async def getRecordingStreamOptions(self) -> list[ResponseMediaStreamOptions]:
         pass
     async def getRecordingStreamThumbnail(self, time: float) -> MediaObject:
@@ -1752,6 +1754,7 @@ ScryptedInterfaceDescriptors = {
     "name": "VideoRecorder",
     "methods": [
       "getRecordingStream",
+      "getRecordingStreamCurrentTime",
       "getRecordingStreamOptions",
       "getRecordingStreamThumbnail"
     ],

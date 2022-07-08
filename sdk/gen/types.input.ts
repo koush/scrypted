@@ -518,6 +518,7 @@ export interface VideoRecorder {
    * MediaObject will update its playback position and no MediaObject will be returned.
    */
   getRecordingStream(options: RequestRecordingStreamOptions, recordingStream?: MediaObject): Promise<MediaObject>;
+  getRecordingStreamCurrentTime(recordingStream: MediaObject): Promise<number>;
   getRecordingStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
   getRecordingStreamThumbnail(time: number): Promise<MediaObject>;
 }
