@@ -1,7 +1,7 @@
 import { listenZero } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
-import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, RequestRecordingStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
+import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import net from 'net';
 import { EventEmitter, PassThrough, Stream } from "stream";
@@ -54,6 +54,10 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         }
     }
 
+    getRecordingStreamCurrentTime(recordingStream: MediaObject): Promise<number> {
+        throw new Error("Method not implemented.");
+    }
+
     getRecordingStreamThumbnail(time: number): Promise<MediaObject> {
         throw new Error("Method not implemented.");
     }
@@ -73,7 +77,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         return this.createMediaStreamUrl(authedUrl, undefined);
     }
 
-    getRecordingStreamOptions(): Promise<MediaStreamOptions[]> {
+    getRecordingStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         return this.getVideoStreamOptions();
     }
 
@@ -490,7 +494,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         args.push(
             "-vn",
-            '-acodec', 'libfdk_aac',
+            '-acodec', 'aac',
             '-f', 'adts',
             `tcp://127.0.0.1:${port}`,
         );
