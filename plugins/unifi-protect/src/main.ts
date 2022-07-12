@@ -270,10 +270,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             }
 
             const onWsTimeout = () => {
-                this.console.log('Event Listener timeout. Restarting listener.');
-                this.api?.eventsWs?.removeAllListeners();
-                this.api?.eventsWs?.close();
-                this.discoverDevices(0);
+                this.console.log('Event Listener timeout. Restarting plugin.');
+                sdk.deviceManager.requestRestart();
             };
             let wsTimeout: NodeJS.Timeout;
             const resetWsTimeout = () => {
