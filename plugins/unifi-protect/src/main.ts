@@ -7,7 +7,7 @@ import { FeatureFlagsShim, LastSeenShim } from "./shim";
 import { UnifiSensor } from "./sensor";
 import { UnifiLight } from "./light";
 import { UnifiLock } from "./lock";
-import {sleep} from "@scrypted/common/src/sleep";
+import { sleep } from "@scrypted/common/src/sleep";
 
 const { deviceManager } = sdk;
 
@@ -261,22 +261,35 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
             });
         }
 
-        try {
-            if (!await this.api.refreshDevices()) {
-                this.console.log('Refresh failed. Trying again in 10 seconds.');
+        let reconnecting = false;
+        const reconnect = (reason: string) => {
+            return async () => {
+                if (reconnecting)
+                    return;
+                reconnecting = true;
+                this.api?.eventsWs?.close();
+                this.api?.eventsWs?.emit('close');
+                this.api?.eventsWs?.removeAllListeners();
+                if (this.api.eventsWs) {
+                    this.console.warn('Event Listener failed to close. Requesting plugin restart.');
+                    deviceManager.requestRestart();
+                }
+                this.console.error('Event Listener reconnecting in 10 seconds:', reason);
                 await sleep(10000);
                 this.discoverDevices(0);
+            }
+        }
+
+        try {
+            if (!await this.api.refreshDevices()) {
+                reconnect('refresh failed')();
                 return;
             }
 
-            const onWsTimeout = () => {
-                this.console.log('Event Listener timeout. Restarting plugin.');
-                sdk.deviceManager.requestRestart();
-            };
             let wsTimeout: NodeJS.Timeout;
             const resetWsTimeout = () => {
                 clearTimeout(wsTimeout);
-                wsTimeout = setTimeout(onWsTimeout, 5 * 60 * 1000);
+                wsTimeout = setTimeout(reconnect('timeout'), 5 * 60 * 1000);
             };
             resetWsTimeout();
 
@@ -284,16 +297,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                 resetWsTimeout();
                 this.listener(data as Buffer);
             });
-            this.api.eventsWs?.on('close', async () => {
-                this.console.error('Event Listener closed. Reconnecting in 10 seconds.');
-                await sleep(10000);
-                this.discoverDevices(0);
-            });
-            this.api.eventsWs?.on('error', async () => {
-                this.console.error('Event Listener error. Reconnecting in 10 seconds.');
-                await sleep(10000);
-                this.discoverDevices(0);
-            });
+            this.api.eventsWs?.on('close', reconnect('close'));
+            this.api.eventsWs?.on('error', reconnect('error'));
 
             const devices: Device[] = [];
 
