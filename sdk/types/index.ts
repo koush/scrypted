@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.48";
+export const TYPES_VERSION = "0.0.50";
 
 
 export interface DeviceState {
@@ -1269,6 +1269,7 @@ export interface VideoCameraConfiguration {
 export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions {
   startTime: number;
   duration?: number;
+  loop?: boolean;
 }
 
 export interface VideoRecorder {
@@ -2130,6 +2131,7 @@ export interface HttpResponse {
 
   sendFile(path: string, options: HttpResponseOptions): void;
 
+  sendSocket(socket: any, options: HttpResponseOptions): void;
 }
 export interface HttpResponseOptions {
   code?: number;

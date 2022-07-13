@@ -463,6 +463,7 @@ class RequestRecordingStreamOptions(TypedDict):
     directMediaStream: bool
     duration: float
     id: str
+    loop: bool
     metadata: Any
     name: str
     prebuffer: float

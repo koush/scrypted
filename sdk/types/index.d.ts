@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.48";
+export declare const TYPES_VERSION = "0.0.50";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -636,6 +636,7 @@ export interface VideoCameraConfiguration {
 export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions {
     startTime: number;
     duration?: number;
+    loop?: boolean;
 }
 export interface VideoRecorder {
     /**
@@ -1407,6 +1408,7 @@ export interface HttpResponse {
     send(body: Buffer, options: HttpResponseOptions): void;
     sendFile(path: string): void;
     sendFile(path: string, options: HttpResponseOptions): void;
+    sendSocket(socket: any, options: HttpResponseOptions): void;
 }
 export interface HttpResponseOptions {
     code?: number;
