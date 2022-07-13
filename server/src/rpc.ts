@@ -138,7 +138,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
 
         if (this.proxyOneWayMethods?.includes?.(method)) {
             rpcApply.oneway = true;
-            this.peer.send(rpcApply);
+            this.peer.send(rpcApply, undefined, serializationContext);
             return Promise.resolve();
         }
 

@@ -3,6 +3,7 @@ import { Response } from "express";
 import { RpcPeer } from "./rpc";
 import { join as pathJoin } from 'path';
 import fs from 'fs';
+import net from 'net';
 
 const mime = require('mime/lite');
 
@@ -11,6 +12,7 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
         [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = [
             'send',
             'sendFile',
+            'sendSocket',
         ];
 
         send(body: string): void;
@@ -60,6 +62,17 @@ export function createResponseInterface(res: Response, unzippedDir: string, file
                 }
             }
             res.sendFile(filePath);
+        }
+
+        sendSocket(socket: net.Socket, options: HttpResponseOptions) {
+            if (options?.code)
+                res.status(options.code);
+            if (options?.headers) {
+                for (const header of Object.keys(options.headers)) {
+                    res.setHeader(header, (options.headers as any)[header]);
+                }
+            }
+            socket.pipe(res);
         }
     }
 

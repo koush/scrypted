@@ -4,6 +4,8 @@ import path from 'path';
 import { RpcMessage, RpcPeer } from "../../rpc";
 import { ChildProcessWorker } from "./child-process-worker";
 import { getPluginNodePath } from "../plugin-npm-dependencies";
+import { SidebandSocketSerializer } from "../socket-serializer";
+import net from "net";
 
 export class NodeForkWorker extends ChildProcessWorker {
 
@@ -31,7 +33,12 @@ export class NodeForkWorker extends ChildProcessWorker {
 
     setupRpcPeer(peer: RpcPeer): void {
         this.worker.on('message', (message, sendHandle) => {
-            if (sendHandle) {
+            if ((message as any).type && sendHandle) {
+                peer.handleMessage(message as any, {
+                    sendHandle,
+                });
+            }
+            else if (sendHandle) {
                 this.emit('rpc', message, sendHandle);
             }
             else {
@@ -39,13 +46,14 @@ export class NodeForkWorker extends ChildProcessWorker {
             }
         });
         peer.transportSafeArgumentTypes.add(Buffer.name);
+        peer.addSerializer(net.Socket, net.Socket.name, new SidebandSocketSerializer());
     }
 
-    send(message: RpcMessage, reject?: (e: Error) => void): void {
+    send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {
         try {
             if (!this.worker)
                 throw new Error('worked has been killed');
-            this.worker.send(message, undefined, e => {
+            this.worker.send(message, serializationContext?.sendHandle, e => {
                 if (e && reject)
                     reject(e);
             });

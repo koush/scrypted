@@ -10,7 +10,7 @@ import { installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, PluginReader } from './plugin-remote';
 import { createREPLServer } from './plugin-repl';
 
-export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void) => void) {
+export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     let systemManager: SystemManager;
