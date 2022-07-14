@@ -145,12 +145,11 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
     async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<RTCSignalingChannel> {
         const plugin = this;
 
+        const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
+
         if (fromMimeType === ScryptedMimeTypes.FFmpegInput) {
             const ffmpegInput: FFmpegInput = JSON.parse(data.toString());
             const mo = mediaManager.createFFmpegMediaObject(ffmpegInput);
-
-            const console = deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
-
 
             class OnDemandSignalingChannel implements RTCSignalingChannel {
                 async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
