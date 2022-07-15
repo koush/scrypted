@@ -177,7 +177,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         });
 
         const toDescription = (init: RTCSessionDescriptionInit) => {
-            console.log('local description', init.sdp);
+            // console.log('local description', init.sdp);
             return {
                 type: init.type,
                 sdp: init.sdp,
@@ -215,12 +215,12 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup) {
         await this.createPeerConnection(setup);
         await this.pc.setRemoteDescription(description);
-        console.log('remote description', description.sdp);
+        // console.log('remote description', description.sdp);
     }
 
     async addIceCandidate(candidate: RTCIceCandidateInit) {
         await this.pc.addIceCandidate(candidate);
-        console.log("remote candidate", candidate);
+        // console.log("remote candidate", candidate);
     }
 
     async endSession() {
@@ -229,7 +229,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
 function logSendCandidate(console: Console, type: string, session: RTCSignalingSession): RTCSignalingSendIceCandidate {
     return async (candidate) => {
-        console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
+        // console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
         return session.addIceCandidate(candidate);
     }
 }
@@ -282,12 +282,12 @@ export async function connectRTCSignalingClients(
 
     const offer = await offerClient.createLocalDescription('offer', offerSetup as RTCAVSignalingSetup,
         disableTrickle ? undefined : answerQueue.queueSendCandidate);
-    console.log('offer sdp', offer.sdp);
+    // console.log('offer sdp', offer.sdp);
     await answerClient.setRemoteDescription(offer, answerSetup as RTCAVSignalingSetup);
     answerQueue.flush();
     const answer = await answerClient.createLocalDescription('answer', answerSetup as RTCAVSignalingSetup,
         disableTrickle ? undefined : offerQueue.queueSendCandidate);
-    console.log('answer sdp', answer.sdp);
+    // console.log('answer sdp', answer.sdp);
     await offerClient.setRemoteDescription(answer, offerSetup as RTCAVSignalingSetup);
     offerQueue.flush();
 }
