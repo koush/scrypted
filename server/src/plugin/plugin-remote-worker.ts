@@ -5,10 +5,15 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import { PassThrough } from 'stream';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { MediaManagerImpl } from './media';
-import { PluginAPI } from './plugin-api';
+import { PluginAPI, PluginRemoteLoadZipOptions } from './plugin-api';
 import { installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, PluginReader } from './plugin-remote';
 import { createREPLServer } from './plugin-repl';
+import path from 'path';
+import AdmZip from 'adm-zip';
+import { Volume } from 'memfs';
+import fs from 'fs';
+const { link } = require('linkfs');
 
 export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
@@ -183,10 +188,6 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             api = _api;
             peer.selfName = pluginId;
         },
-        onPluginReady: async (scrypted, params, plugin) => {
-            replPort = createREPLServer(scrypted, params, plugin);
-            postInstallSourceMapSupport(scrypted);
-        },
         getPluginConsole,
         getDeviceConsole,
         getMixinConsole,
@@ -198,7 +199,59 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             }
             throw new Error(`unknown service ${name}`);
         },
-        async onLoadZip(pluginReader: PluginReader, packageJson: any) {
+        async onLoadZip(scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
+            let volume: any;
+            let pluginReader: PluginReader;
+            if (zipOptions?.unzippedPath && fs.existsSync(zipOptions?.unzippedPath)) {
+                volume = link(fs, ['', path.join(zipOptions.unzippedPath, 'fs')]);
+                pluginReader = name => {
+                    const filename = path.join(zipOptions.unzippedPath, name);
+                    if (!fs.existsSync(filename))
+                        return;
+                    return fs.readFileSync(filename);
+                };
+            }
+            else {
+                const admZip = new AdmZip(zipData);
+                volume = new Volume();
+                for (const entry of admZip.getEntries()) {
+                    if (entry.isDirectory)
+                        continue;
+                    if (!entry.entryName.startsWith('fs/'))
+                        continue;
+                    const name = entry.entryName.substring('fs/'.length);
+                    volume.mkdirpSync(path.dirname(name));
+                    const data = entry.getData();
+                    volume.writeFileSync(name, data);
+                }
+
+                pluginReader = name => {
+                    const entry = admZip.getEntry(name);
+                    if (!entry)
+                        return;
+                    return entry.getData();
+                }
+            }
+            zipData = undefined;
+
+            const pluginConsole = getPluginConsole?.();
+            params.console = pluginConsole;
+            params.require = (name: string) => {
+                if (name === 'fakefs' || (name === 'fs' && !packageJson.scrypted.realfs)) {
+                    return volume;
+                }
+                if (name === 'realfs') {
+                    return require('fs');
+                }
+                const module = require(name);
+                return module;
+            };
+            const window: any = {};
+            const exports: any = window;
+            window.exports = exports;
+            params.window = window;
+            params.exports = exports;
+
             const entry = pluginReader('main.nodejs.js.map')
             const map = entry?.toString();
 
@@ -234,6 +287,32 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             };
 
             await installOptionalDependencies(getPluginConsole(), packageJson);
+
+            const main = pluginReader('main.nodejs.js');
+            pluginReader = undefined;
+            const script = main.toString();
+
+            try {
+                peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
+                pluginConsole?.log('plugin successfully loaded');
+
+                let pluginInstance = exports.default;
+                // support exporting a plugin class, plugin main function,
+                // or a plugin instance
+                if (pluginInstance.toString().startsWith('class '))
+                    pluginInstance = new pluginInstance();
+                if (typeof pluginInstance === 'function')
+                    pluginInstance = await pluginInstance();
+
+                replPort = createREPLServer(scrypted, params, pluginInstance);
+                postInstallSourceMapSupport(scrypted);
+
+                return pluginInstance;
+            }
+            catch (e) {
+                pluginConsole?.error('plugin failed to start', e);
+                throw e;
+            }
         }
     }).then(scrypted => {
         systemManager = scrypted.systemManager;

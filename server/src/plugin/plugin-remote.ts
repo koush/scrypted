@@ -1,15 +1,10 @@
-import AdmZip from 'adm-zip';
-import { Volume } from 'memfs';
-import path from 'path';
-import { ScryptedNativeId, DeviceManager, Logger, Device, DeviceManifest, DeviceState, EndpointManager, SystemDeviceState, ScryptedStatic, SystemManager, MediaManager, ScryptedMimeTypes, ScryptedInterface, ScryptedInterfaceProperty, HttpRequest } from '@scrypted/types'
-import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
-import { SystemManagerImpl } from './system';
+import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, HttpRequest, Logger, MediaManager, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, ScryptedStatic, SystemDeviceState, SystemManager } from '@scrypted/types';
 import { RpcPeer, RPCResultError } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
+import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
-import fs from 'fs';
 import { checkProperty } from './plugin-state-check';
-const { link } = require('linkfs');
+import { SystemManagerImpl } from './system';
 
 class DeviceLogger implements Logger {
     nativeId: ScryptedNativeId;
@@ -347,13 +342,12 @@ export interface PluginRemoteAttachOptions {
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
     getMixinConsole?: (id: string, nativeId?: ScryptedNativeId) => Console;
-    onLoadZip?: (pluginReader: PluginReader, packageJson: any) => Promise<void>;
+    onLoadZip?: (scrypted: ScryptedStatic, params: any, packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) => Promise<any>;
     onGetRemote?: (api: PluginAPI, pluginId: string) => Promise<void>;
-    onPluginReady?: (scrypted: ScryptedStatic, params: any, plugin: any) => Promise<void>;
 }
 
 export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOptions): Promise<ScryptedStatic> {
-    const { createMediaManager, getServicePort, getDeviceConsole, getMixinConsole, getPluginConsole } = options || {};
+    const { createMediaManager, getServicePort, getDeviceConsole, getMixinConsole } = options || {};
 
     if (!peer.constructorSerializerMap.get(Buffer))
         peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
@@ -473,50 +467,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             },
 
             async loadZip(packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
-                const pluginConsole = getPluginConsole?.();
-
-                let volume: any;
-                let pluginReader: PluginReader;
-                if (zipOptions?.unzippedPath && fs.existsSync(zipOptions?.unzippedPath)) {
-                    volume = link(fs, ['', path.join(zipOptions.unzippedPath, 'fs')]);
-                    pluginReader = name => {
-                        const filename = path.join(zipOptions.unzippedPath, name);
-                        if (!fs.existsSync(filename))
-                            return;
-                        return fs.readFileSync(filename);
-                    };
-                }
-                else {
-                    const admZip = new AdmZip(zipData);
-                    volume = new Volume();
-                    for (const entry of admZip.getEntries()) {
-                        if (entry.isDirectory)
-                            continue;
-                        if (!entry.entryName.startsWith('fs/'))
-                            continue;
-                        const name = entry.entryName.substring('fs/'.length);
-                        volume.mkdirpSync(path.dirname(name));
-                        const data = entry.getData();
-                        volume.writeFileSync(name, data);
-                    }
-
-                    pluginReader = name => {
-                        const entry = admZip.getEntry(name);
-                        if (!entry)
-                            return;
-                        return entry.getData();
-                    }
-                }
-                zipData = undefined;
-
-                await options?.onLoadZip?.(pluginReader, packageJson);
-                const main = pluginReader('main.nodejs.js');
-                pluginReader = undefined;
-                const script = main.toString();
-                const window: any = {};
-                const exports: any = window;
-                window.exports = exports;
-
 
                 function websocketConnect(url: string, protocols: any, callbacks: WebSocketConnectCallbacks) {
                     if (url.startsWith('io://') || url.startsWith('ws://')) {
@@ -536,18 +486,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
 
                 const params: any = {
                     __filename: undefined,
-                    exports,
-                    window,
-                    require: (name: string) => {
-                        if (name === 'fakefs' || (name === 'fs' && !packageJson.scrypted.realfs)) {
-                            return volume;
-                        }
-                        if (name === 'realfs') {
-                            return require('fs');
-                        }
-                        const module = require(name);
-                        return module;
-                    },
                     deviceManager,
                     systemManager,
                     mediaManager,
@@ -558,27 +496,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     WebSocket: createWebSocketClass(websocketConnect),
                 };
 
-                params.console = pluginConsole;
-
-                try {
-                    peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
-                    pluginConsole?.log('plugin successfully loaded');
-
-                    let pluginInstance = exports.default;
-                    // support exporting a plugin class, plugin main function,
-                    // or a plugin instance
-                    if (pluginInstance.toString().startsWith('class '))
-                        pluginInstance = new pluginInstance();
-                    if (typeof pluginInstance === 'function')
-                        pluginInstance = await pluginInstance();
-
-                    await options?.onPluginReady?.(ret, params, pluginInstance);
-                    return pluginInstance;
-                }
-                catch (e) {
-                    pluginConsole?.error('plugin failed to start', e);
-                    throw e;
-                }
+                return options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
             },
         }
 
