@@ -506,7 +506,7 @@ export class RtspClient extends RtspBase {
     }
 
     async setup(options: RtspClientTcpSetupOptions | RtspClientUdpSetupOptions) {
-        const protocol = options.type === 'udp' ? 'UDP' : 'TCP';
+        const protocol = options.type === 'udp' ? '' : '/TCP';
         const client = options.type === 'udp' ? 'client_port' : 'interleaved';
         let port: number;
         if (options.type === 'tcp') {
@@ -522,7 +522,7 @@ export class RtspClient extends RtspBase {
             options.dgram.on('message', data => options.onRtp(undefined, data));
         }
         const headers: any = {
-            Transport: `RTP/AVP/${protocol};unicast;${client}=${port}-${port + 1}`,
+            Transport: `RTP/AVP${protocol};unicast;${client}=${port}-${port + 1}`,
         };
         const response = await this.request('SETUP', headers, options.path);
         let interleaved: {
@@ -725,8 +725,7 @@ export class RtspServer {
     // rewriting is not necessary.
     setup(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
-        const transport = requestHeaders['transport'];
-        headers['Transport'] = transport;
+        let transport = requestHeaders['transport'];
         headers['Session'] = this.session;
         const parsedSdp = parseSdp(this.sdp);
         const msection = parsedSdp.msections.find(msection => url.endsWith(msection.control));
@@ -735,7 +734,15 @@ export class RtspServer {
             return;
         }
 
-        if (transport.includes('UDP')) {
+        if (transport.includes('TCP')) {
+            const match = transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
+            if (match) {
+                const low = parseInt(match[1]);
+                const high = parseInt(match[2]);
+                this.setupInterleaved(msection, low, high);
+            }
+        }
+        else  {
             if (!this.udp) {
                 this.respond(461, 'Unsupported Transport', requestHeaders, {});
                 return;
@@ -748,22 +755,19 @@ export class RtspServer {
                 destination: parseInt(rtp),
                 codec: msection.codec,
             }
+            const port = this.udp.address().port;
+            transport = transport.replace('RTP/AVP/UDP', 'RTP/AVP').replace('RTP/AVP', 'RTP/AVP/UDP');
+            transport += `;server_port=${port}-${port + 1}`;
         }
-        else if (transport.includes('TCP')) {
-            const match = transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
-            if (match) {
-                const low = parseInt(match[1]);
-                const high = parseInt(match[2]);
-                this.setupInterleaved(msection, low, high);
-            }
-        }
+        headers['Transport'] = transport;
         this.respond(200, 'OK', requestHeaders, headers)
     }
 
     play(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
         const rtpInfos = Object.values(this.setupTracks).map(track => `url=${url}/${track.control}`);
-        const rtpInfo = rtpInfos.join(',') + ';seq=0;rtptime=0';
+        // seq/rtptime was causing issues with gstreamer. commented out.
+        const rtpInfo = rtpInfos.join(','); // + ';seq=0;rtptime=0';
         headers['RTP-Info'] = rtpInfo;
         headers['Range'] = 'npt=now-';
         headers['Session'] = this.session;
