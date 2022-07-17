@@ -4,7 +4,7 @@ import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
 import net from 'net';
 import { Duplex, Readable } from 'stream';
 import tls from 'tls';
-import { closeQuiet, createBindZero } from './listen-cluster';
+import { closeQuiet, createBindUdp, createBindZero } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
@@ -598,6 +598,8 @@ export interface RtspTrack {
     destination: number;
     codec: string;
     control: string;
+    rtp?: dgram.Socket;
+    rtcp?: dgram.Socket;
 }
 
 export class RtspServer {
@@ -607,7 +609,7 @@ export class RtspServer {
         [trackId: string]: RtspTrack;
     } = {};
 
-    constructor(public client: Duplex, public sdp?: string, public udp?: dgram.Socket, public checkRequest?: (method: string, url: string, headers: Headers, rawMessage: string[]) => Promise<boolean>) {
+    constructor(public client: Duplex, public sdp?: string, public udp?: boolean, public checkRequest?: (method: string, url: string, headers: Headers, rawMessage: string[]) => Promise<boolean>) {
         this.session = randomBytes(4).toString('hex');
         if (sdp)
             sdp = sdp.trim();
@@ -675,9 +677,9 @@ export class RtspServer {
         return this.client.write(Buffer.from(rtp));
     }
 
-    sendUdp(port: number, packet: Buffer, rtcp: boolean) {
+    sendUdp(udp: dgram.Socket, port: number, packet: Buffer) {
         // todo: support non local host?
-        this.udp.send(packet, rtcp ? port + 1 : port, '127.0.0.1');
+        udp.send(packet, port, '127.0.0.1');
     }
 
     sendTrack(trackId: string, packet: Buffer, rtcp: boolean) {
@@ -691,7 +693,7 @@ export class RtspServer {
             if (!this.udp)
                 this.console?.warn('RTSP Server UDP socket not available.');
             else
-                this.sendUdp(track.destination, packet, rtcp);
+                this.sendUdp(rtcp ? track.rtcp : track.rtp, track.destination, packet);
             return true;
         }
 
@@ -723,7 +725,7 @@ export class RtspServer {
 
     // todo: use the sdp itself to determine the audio/video track ids so
     // rewriting is not necessary.
-    setup(url: string, requestHeaders: Headers) {
+    async setup(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
         let transport = requestHeaders['transport'];
         headers['Session'] = this.session;
@@ -742,22 +744,28 @@ export class RtspServer {
                 this.setupInterleaved(msection, low, high);
             }
         }
-        else  {
+        else {
             if (!this.udp) {
                 this.respond(461, 'Unsupported Transport', requestHeaders, {});
                 return;
             }
             const match = transport.match(/.*?client_port=([0-9]+)-([0-9]+)/);
             const [_, rtp, rtcp] = match;
+
+            const rtpServer = await createBindZero();
+            const rtcpServer = await createBindUdp(rtpServer.port + 1);
+            this.client.on('close', () => rtpServer.server.close())
+            this.client.on('close', () => rtcpServer.server.close())
             this.setupTracks[msection.control] = {
                 control: msection.control,
                 protocol: 'udp',
                 destination: parseInt(rtp),
                 codec: msection.codec,
+                rtp: rtpServer.server,
+                rtcp: rtcpServer.server,
             }
-            const port = this.udp.address().port;
             transport = transport.replace('RTP/AVP/UDP', 'RTP/AVP').replace('RTP/AVP', 'RTP/AVP/UDP');
-            transport += `;server_port=${port}-${port + 1}`;
+            transport += `;server_port=${rtpServer.port}-${rtcpServer.port}`;
         }
         headers['Transport'] = transport;
         this.respond(200, 'OK', requestHeaders, headers)

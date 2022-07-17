@@ -1,6 +1,6 @@
 import net from 'net';
 import { once } from 'events';
-import dgram from 'dgram';
+import dgram, { SocketType } from 'dgram';
 
 export async function closeQuiet(socket: dgram.Socket | net.Server) {
     if (!socket)
@@ -26,12 +26,12 @@ export async function bindZero(server: dgram.Socket) {
     return bindUdp(server, 0);
 }
 
-export async function createBindZero() {
-    return createBindUdp(0);
+export async function createBindZero(socketType?: SocketType) {
+    return createBindUdp(0, socketType);
 }
 
-export async function createBindUdp(usePort: number) {
-    const server = dgram.createSocket('udp4');
+export async function createBindUdp(usePort: number, socketType?: SocketType) {
+    const server = dgram.createSocket(socketType || 'udp4');
     const { port, url } = await bindUdp(server, usePort);
     return {
         server,
