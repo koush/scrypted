@@ -1076,10 +1076,8 @@ class PrebufferSession {
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
-        const { server: udp } = await createBindZero();
-        socket.on('close', () => closeQuiet(udp));
-        server = new RtspServer(socket, sdp, udp);
-        // server.console = this.console;
+        server = new RtspServer(socket, sdp, true);
+        server.console = this.console;
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
           if (track.protocol === 'udp') {
@@ -1567,7 +1565,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     this.rtspServer = new net.Server(async (client) => {
       let prebufferSession: PrebufferSession;
 
-      const server = new RtspServer(client, undefined, undefined, async (method, url, headers, rawMessage) => {
+      const server = new RtspServer(client, undefined, true, async (method, url, headers, rawMessage) => {
         server.checkRequest = undefined;
 
         const u = new URL(url);
@@ -1594,6 +1592,10 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
 
       try {
         await server.handlePlayback();
+        const map = new Map<string, string>();
+        for (const [id, track] of Object.entries(server.setupTracks)) {
+          map.set(track.codec, id);
+        }
         const session = await prebufferSession.parserSessionPromise;
 
         const requestedPrebuffer = Math.max(4000, prebufferSession.getDetectedIdrInterval() || 4000);;
@@ -1605,6 +1607,12 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
           session,
           socketPromise: Promise.resolve(client),
           requestedPrebuffer,
+          filter: (chunk, prebuffer) => {
+            const track = map.get(chunk.type);
+            if (track)
+              server.sendTrack(track, chunk.chunks[1], false);
+            return undefined;
+          }
         });
 
         await server.handleTeardown();
