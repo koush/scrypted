@@ -146,6 +146,12 @@ exports.MixinDeviceBase = MixinDeviceBase;
 })();
 let sdk = {};
 try {
+    let runtimeAPI;
+    try {
+        runtimeAPI = pluginRuntimeAPI;
+    }
+    catch (e) {
+    }
     sdk = Object.assign(sdk, {
         log: deviceManager.getDeviceLogger(undefined),
         deviceManager,
@@ -153,6 +159,7 @@ try {
         mediaManager,
         systemManager,
         pluginHostAPI,
+        ...runtimeAPI,
     });
     try {
         (_c = (_b = (_a = systemManager).setScryptedInterfaceDescriptors) === null || _b === void 0 ? void 0 : _b.call(_a, index_1.TYPES_VERSION, index_1.ScryptedInterfaceDescriptors)) === null || _c === void 0 ? void 0 : _c.catch(() => { });

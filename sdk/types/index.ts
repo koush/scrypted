@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.50";
+export const TYPES_VERSION = "0.0.52";
 
 
 export interface DeviceState {
@@ -2362,6 +2362,7 @@ export interface ScryptedStatic {
   systemManager: SystemManager,
 
   pluginHostAPI: any;
+  fork?: () => Promise<any>;
 }
 
 export declare interface DeviceState {

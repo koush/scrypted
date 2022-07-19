@@ -1598,6 +1598,7 @@ export interface ScryptedStatic {
   systemManager: SystemManager,
 
   pluginHostAPI: any;
+  fork?: () => Promise<any>;
 }
 
 export declare interface DeviceState {

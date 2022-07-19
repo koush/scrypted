@@ -182,8 +182,16 @@ declare const endpointManager: EndpointManager;
 declare const mediaManager: MediaManager;
 declare const systemManager: SystemManager;
 declare const pluginHostAPI: any;
+declare const pluginRuntimeAPI: any;
 
 try {
+  let runtimeAPI: any;
+  try {
+    runtimeAPI = pluginRuntimeAPI;
+  }
+  catch (e) {
+  }
+
   sdk = Object.assign(sdk, {
     log: deviceManager.getDeviceLogger(undefined),
     deviceManager,
@@ -191,6 +199,7 @@ try {
     mediaManager,
     systemManager,
     pluginHostAPI,
+    ...runtimeAPI,
   }); 
 
   try {
