@@ -18,7 +18,7 @@ export class WeriftSignalingSession implements RTCSignalingSession {
         // needs turn.
         // stun candidates will come through here, if connection is slow to establish.
         this.pc.onIceCandidate.subscribe(candidate => {
-            this.console.log('local candidate', candidate.candidate);
+            // this.console.log('local candidate', candidate.candidate);
             sendIceCandidate?.({
                 candidate: candidate.candidate,
                 sdpMid: candidate.sdpMid,

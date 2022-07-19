@@ -1,17 +1,28 @@
-import { H264RtpPayload, MediaStreamTrack, RTCPeerConnection, RtpPacket } from "@koush/werift";
-import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
+import { MediaStreamTrack, RTCPeerConnection, RtpPacket } from "@koush/werift";
 import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
-import sdk, { FFmpegInput, Intercom, MediaStreamDestination, MediaStreamTool, RequestMediaStream, RTCAVSignalingSetup, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
-import { turnIceServers, turnServer } from "./ice-servers";
-import { WeriftSignalingSession } from "./werift-signaling-session";
+import { turnServer } from "./ice-servers";
 import { waitConnected } from "./peerconnection-util";
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { ScryptedSessionControl } from "./session-control";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
+import { WeriftSignalingSession } from "./werift-signaling-session";
 import { isPeerConnectionAlive, logIsPrivateIceTransport } from "./werift-util";
+
+
+function getDebugModeH264EncoderArgs() {
+    return [
+        '-profile:v', 'baseline',
+        // '-preset','ultrafast',
+        '-g', '60',
+        "-c:v", "libx264",
+        "-bf", "0",
+        // "-tune", "zerolatency",
+    ];
+}
 
 function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
     return {
@@ -138,14 +149,14 @@ export async function createRTCPeerConnectionSink(
         if (options?.userAgent?.includes('Firefox/'))
             sessionSupportsH264High = true;
 
-        const willTranscode = !sessionSupportsH264High || maximumCompatibilityMode;
-        if (willTranscode) {
+        const transcodeBaseline = !sessionSupportsH264High || maximumCompatibilityMode;
+        if (transcodeBaseline) {
             console.log('Requesting medium-resolution stream', {
                 sessionSupportsH264High,
                 maximumCompatibilityMode,
             });
         }
-        const requestDestination: MediaStreamDestination = willTranscode ? 'medium-resolution' : 'local';
+        const requestDestination: MediaStreamDestination = transcodeBaseline ? 'medium-resolution' : 'local';
         const mo = await requestMediaStream({
             video: {
                 codec: 'h264',
@@ -154,7 +165,7 @@ export async function createRTCPeerConnectionSink(
                 codec: 'opus',
             },
             destination: isPrivate ? requestDestination : 'remote',
-            tool: willTranscode ? 'ffmpeg' : 'scrypted',
+            tool: transcodeBaseline ? 'ffmpeg' : 'scrypted',
         });
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
         const { mediaStreamOptions } = ffmpegInput;
@@ -169,7 +180,7 @@ export async function createRTCPeerConnectionSink(
         const { name: audioCodecCopy } = getAudioCodec(audioTransceiver.sender.codec);
 
         const videoArgs: string[] = [];
-        const transcode = willTranscode
+        const transcode = transcodeBaseline
             || mediaStreamOptions?.video?.codec !== 'h264'
             || ffmpegInput.h264EncoderArguments?.length
             || ffmpegInput.h264FilterArguments?.length;
@@ -196,10 +207,10 @@ export async function createRTCPeerConnectionSink(
             const scaleFilter = `scale='min(${width},iw)':-2`;
             addH264VideoFilterArguments(videoArgs, scaleFilter);
 
-            if (!sessionSupportsH264High || maximumCompatibilityMode) {
+            if (transcodeBaseline) {
                 // baseline profile must use libx264, not sure other encoders properly support it.
                 videoArgs.push(
-                    '-profile:v', 'baseline',
+
                     ...getDebugModeH264EncoderArgs(),
                 );
 

@@ -1,12 +1,11 @@
 import { closeQuiet, createBindZero } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import { RtspClient } from "@scrypted/common/src/rtsp-server";
-import { addTrackControls, getSpsPps, MSection, parseSdp, replaceSectionPort } from "@scrypted/common/src/sdp-utils";
+import { addTrackControls, MSection, parseSdp, replaceSectionPort } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { Writable } from "stream";
-import { H264Repacketizer } from '../../homekit/src/types/camera/h264-packetizer';
 
 const { mediaManager } = sdk;
 
@@ -25,6 +24,7 @@ export interface RtpTrack {
         crytoSuite: string;
         key: Buffer;
     };
+    bind?: Awaited<ReturnType<typeof createBindZero>>;
 }
 
 export type RtpTracks = {
@@ -42,7 +42,8 @@ export async function createTrackForwarders(console: Console, rtpTracks: RtpTrac
 
     for (const key of Object.keys(rtpTracks)) {
         const track: RtpTrack = rtpTracks[key];
-        const { server, port } = await createBindZero();
+        track.bind = await createBindZero();
+        const { server, port } = track.bind;
         sockets[key] = server;
         server.once('message', () => track.firstPacket?.());
         const outputArguments = track.outputArguments;
@@ -103,8 +104,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     let videoSection: MSection;
     let audioSection: MSection;
 
-    if (ffmpegInput.url &&
-        ffmpegInput.container?.startsWith('rtsp')
+    const isRtsp = ffmpegInput.container?.startsWith('rtsp');
+
+    if (ffmpegInput.url
+        && isRtsp
         && isCodecCopy(videoCodec, ffmpegInput.mediaStreamOptions?.video?.codec)) {
 
         console.log('video codec matched:', rtpTracks.video.codecCopy);
@@ -216,37 +219,127 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     const forwarders = await createTrackForwarders(console, rtpTracks);
 
+    const useGstreamer = false && isRtsp;
+
     let cp: ChildProcess;
     // will no op if there's no tracks
     if (Object.keys(rtpTracks).length) {
-        const outputArguments: string[] = [];
+        if (useGstreamer) {
+            const args = [
+                // '-v',
+                // 'fdsrc', 'fd=3', 'do-timestamp=true', '!',
+                // 'queue', '!',
+                // 'application/x-rtp-stream,media=video,clock-rate=90000,encoding-name=H264', '!', 'rtpstreamdepay', '!',
+                // '-v',
+                'rtspsrc', `location=${ffmpegInput.url}`,
+                'protocols=tcp',
+                // 'buffer-mode=0',
+                'latency=0',
+                'do-retransmission=0', 'do-rtcp=false', 'do-rtsp-keep-alive=false',
+                // 'debug=true',
+                // 'name=src','src.', '!',
+                '!',
+                'queue', '!',
+                'rtpjitterbuffer',
+                // 'mode=0',
+                'latency=0',
+                'max-dropout-time=0', 'faststart-min-packets=1', 'max-misorder-time=0',
+                '!',
+                'queue', '!',
+                'rtph264depay', '!',
+                'queue', '!',
+                'h264parse', '!',
 
-        for (const key of Object.keys(rtpTracks)) {
-            const track: RtpTrack = rtpTracks[key];
-            outputArguments.push(...track.outputArguments);
+                'decodebin', '!',
+                'videorate', 'max-rate=15', '!', 'video/x-raw,framerate=15/1', '!',
+                'queue', 'max-size-buffers=1', 'leaky=upstream', '!',
+                'queue', '!',
+                'x264enc', 'aud=false', 'bitrate=2000', 'speed-preset=ultrafast',
+                'bframes=0',
+                'key-int-max=60',
+                // 'tune=zerolatency',
+                '!',
+                'queue', '!',
+
+                'h264parse', '!',
+                'queue', '!',
+
+                'rtph264pay', 'aggregate-mode=max-stap', 'config-interval=-1', `mtu=${rtpTracks.video.packetSize.toString()}`, '!',
+                'queue', '!',
+                'udpsink', 'host=127.0.0.1', `port=${rtpTracks.video.bind.port}`, 'sync=false',
+                // 'src.', '!', 'decodebin', '!',  'rtpopuspay', '!', 'udpsink', 'host=127.0.0.1', `port=${rtpTracks.audio.bind.port}`, 'sync=false',
+            ];
+
+
+            safePrintFFmpegArguments(console, args);
+
+            cp = child_process.spawn('gst-launch-1.0', args, {
+                stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+            });
+            ffmpegLogInitialOutput(console, cp, true);
+            cp.on('exit', () => forwarders.close());
+
+
+            // rtspClient = new RtspClient(ffmpegInput.url, console);
+            // rtspClient.requestTimeout = 10000;
+
+            // await rtspClient.options();
+            // const describe = await rtspClient.describe();
+            // const sdp = describe.body.toString();
+            // const parsedSdp = parseSdp(sdp);
+
+            // rtpTracks = Object.assign({}, rtpTracks);
+
+            // videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
+            // // maybe fallback to udp forwarding/transcoding?
+            // if (!videoSection)
+            //     throw new Error(`advertised video codec ${videoCodec} not found in sdp.`);
+
+            // const pipe = cp.stdio[3] as Writable;
+            // let channel = 0;
+            // await rtspClient.setup({
+            //     type: 'tcp',
+            //     port: channel,
+            //     path: videoSection.control,
+            //     onRtp: (rtspHeader, rtp) => {
+            //         pipe.write(rtspHeader.subarray(2));
+            //         pipe.write(rtp);
+            //     },
+            // })
+
+            // await rtspClient.play();
+
         }
+        else {
+            const outputArguments: string[] = [];
 
-        const args = [
-            '-hide_banner',
+            for (const key of Object.keys(rtpTracks)) {
+                const track: RtpTrack = rtpTracks[key];
+                outputArguments.push(...track.outputArguments);
+            }
 
-            ...(videoDecoderArguments || []),
-            ...inputArguments,
-            ...outputArguments,
-            '-sdp_file', 'pipe:4',
-        ];
+            const args = [
+                '-hide_banner',
 
-        safePrintFFmpegArguments(console, args);
+                ...(videoDecoderArguments || []),
+                ...inputArguments,
+                ...outputArguments,
+                '-sdp_file', 'pipe:4',
+            ];
 
-        cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
-            stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
-        });
-        if (pipeSdp) {
-            const pipe = cp.stdio[3] as Writable;
-            pipe.write(pipeSdp);
-            pipe.end();
+            safePrintFFmpegArguments(console, args);
+
+            cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
+                stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+            });
+            if (pipeSdp) {
+                const pipe = cp.stdio[3] as Writable;
+                pipe.write(pipeSdp);
+                pipe.end();
+            }
+            ffmpegLogInitialOutput(console, cp);
+            cp.on('exit', () => forwarders.close());
         }
-        ffmpegLogInitialOutput(console, cp);
-        cp.on('exit', () => forwarders.close());
     }
     else {
         console.log('bypassing ffmpeg, perfect codecs');
@@ -278,7 +371,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         rtspClient?.readLoop().catch(() => { }).finally(kill);
     });
 
-    if (Object.keys(rtpTracks).length) {
+    if (!useGstreamer && Object.keys(rtpTracks).length) {
         const transcodeSdp = await new Promise<string>((resolve, reject) => {
             cp.on('exit', () => reject(new Error('ffmpeg exited before sdp was received')));
             cp.stdio[4].on('data', data => {

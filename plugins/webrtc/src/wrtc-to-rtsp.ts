@@ -1,11 +1,10 @@
 import { BundlePolicy, RTCIceCandidate, RTCPeerConnection, RtcpPayloadSpecificFeedback, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
 import { FullIntraRequest } from "@koush/werift/lib/rtp/src/rtcp/psfb/fullIntraRequest";
 import { Deferred } from "@scrypted/common/src/deferred";
-import { closeQuiet, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
+import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
-import dgram from 'dgram';
 import { waitClosed, waitConnected } from "./peerconnection-util";
 import { startRtpForwarderProcess } from "./rtp-forwarders";
 import { getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
@@ -47,9 +46,7 @@ export async function createRTCPeerConnectionSource(options: {
 
     const start = (async () => {
         const client = await clientPromise;
-        const udp = dgram.createSocket('udp4');
-        client.on('close', () => closeQuiet(udp));
-        const rtspServer = new RtspServer(client, undefined, udp);
+        const rtspServer = new RtspServer(client, undefined, true);
         // rtspServer.console = console;
 
         const ensurePeerConnection = (setup: RTCAVSignalingSetup) => {
@@ -171,7 +168,7 @@ export async function createRTCPeerConnectionSource(options: {
 
                 if (sendIceCandidate) {
                     pc.onicecandidate = ev => {
-                        console.log('sendIceCandidate', ev.candidate.sdpMLineIndex, ev.candidate.candidate);
+                        // console.log('sendIceCandidate', ev.candidate.sdpMLineIndex, ev.candidate.candidate);
                         sendIceCandidate({
                             ...ev.candidate,
                         });
@@ -213,7 +210,7 @@ export async function createRTCPeerConnectionSource(options: {
                 await pc.setRemoteDescription(description as any);
             }
             async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
-                console.log('addIceCandidate', candidate.sdpMLineIndex, candidate.candidate)
+                // console.log('addIceCandidate', candidate.sdpMLineIndex, candidate.candidate)
                 const pc = await peerConnection.promise;
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
             }

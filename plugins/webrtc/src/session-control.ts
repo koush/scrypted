@@ -44,9 +44,6 @@ export class ScryptedSessionControl implements RTCSessionControl {
 
         const client = await rtspTcpServer.clientPromise;
 
-        const audioOutput = await createBindZero();
-        client.on('close', ()=> closeQuiet(audioOutput.server));
-
         const sdpReturnAudio = [
             "v=0",
             "o=- 0 0 IN IP4 127.0.0.1",
@@ -60,10 +57,10 @@ export class ScryptedSessionControl implements RTCSessionControl {
             "a=fmtp:101 minptime=10;useinbandfec=1",
         ];
         let sdp = sdpReturnAudio.join('\r\n');
-        sdp = createSdpInput(audioOutput.port, 0, sdp);
+        sdp = createSdpInput(0, 0, sdp);
 
 
-        const rtspServer = new RtspServer(client, sdp, audioOutput.server);
+        const rtspServer = new RtspServer(client, sdp, true);
         this.rtspServer = rtspServer;
         // rtspServer.console = console;
         await rtspServer.handlePlayback();
