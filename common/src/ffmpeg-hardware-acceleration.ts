@@ -137,8 +137,14 @@ export function getH264EncoderArgs() {
 export function getDebugModeH264EncoderArgs() {
     return [
         "-c:v", "libx264",
+        // consider using yuv420 as that is simpler?
+        // https://trac.ffmpeg.org/wiki/Encode/H.264
         '-pix_fmt', 'yuvj420p',
+        // this seems to force constrained baseline? even if the
+        // profile is explicitly set?
         '-preset', 'ultrafast',
+        // this seems to be very picky about bitrate and fails easy.
+        // '-tune', 'zerolatency',
         "-bf", "0",
     ];
 }
