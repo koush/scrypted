@@ -67,6 +67,7 @@ class PrebufferSession {
   parsers: { [container: string]: StreamParser };
   sdp: Promise<string>;
   usingScryptedParser = false;
+  usingScryptedUdpParser = false;
 
   audioDisabled = false;
 
@@ -699,6 +700,7 @@ class PrebufferSession {
 
       let { parser, isDefault } = this.getParser(rtspMode, sessionMso);
       this.usingScryptedParser = parser === SCRYPTED_PARSER_TCP || parser === SCRYPTED_PARSER_UDP;
+      this.usingScryptedUdpParser = parser === SCRYPTED_PARSER_UDP;
 
       // prefer ffmpeg if this is a prebuffered stream.
       if (isDefault
@@ -1077,7 +1079,7 @@ class PrebufferSession {
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
         server = new RtspServer(socket, sdp, true);
-        server.console = this.console;
+        // server.console = this.console;
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
           if (track.protocol === 'udp') {
@@ -1146,11 +1148,17 @@ class PrebufferSession {
 
     const length = Math.max(500000, available).toString();
 
+    const inputArguments = [
+      '-analyzeduration', '0', '-probesize', length,
+    ];
+    if (!this.usingScryptedUdpParser)
+      inputArguments.push('-reorder_queue_size', '0');
+
     const ffmpegInput: FFmpegInput = {
       url,
       container,
       inputArguments: [
-        '-analyzeduration', '0', '-probesize', length,
+        ...inputArguments,
         ...(this.parsers[container].inputArguments || []),
         '-f', this.parsers[container].container,
         '-i', url,
@@ -1187,6 +1195,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     await this.ensurePrebufferSessions();
 
     let id = options?.id;
+    if (!this.sessions.has(id))
+      id = undefined;
     let h264EncoderArguments: string[];
     let videoFilterArguments: string;
     let destinationVideoBitrate: number;
