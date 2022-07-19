@@ -494,7 +494,10 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     localStorage,
                     pluginHostAPI: api,
                     WebSocket: createWebSocketClass(websocketConnect),
+                    pluginRuntimeAPI: ret,
                 };
+
+                params.pluginRuntimeAPI = ret;
 
                 return options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
             },

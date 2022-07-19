@@ -1,18 +1,19 @@
 import { DeviceManager, ScryptedNativeId, ScryptedStatic, SystemManager } from '@scrypted/types';
+import AdmZip from 'adm-zip';
 import { Console } from 'console';
+import fs from 'fs';
+import { Volume } from 'memfs';
 import net from 'net';
+import path from 'path';
 import { install as installSourceMapSupport } from 'source-map-support';
 import { PassThrough } from 'stream';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginRemoteLoadZipOptions } from './plugin-api';
 import { installOptionalDependencies } from './plugin-npm-dependencies';
-import { attachPluginRemote, PluginReader } from './plugin-remote';
+import { attachPluginRemote, PluginReader, setupPluginRemote } from './plugin-remote';
 import { createREPLServer } from './plugin-repl';
-import path from 'path';
-import AdmZip from 'adm-zip';
-import { Volume } from 'memfs';
-import fs from 'fs';
+import { NodeThreadWorker } from './runtime/node-thread-worker';
 const { link } = require('linkfs');
 
 export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
@@ -292,9 +293,34 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             pluginReader = undefined;
             const script = main.toString();
 
+            scrypted.fork = async () => {
+                const ntw = new NodeThreadWorker(pluginId, {
+                    env: process.env,
+                    pluginDebug: undefined,
+                });
+                const threadPeer = new RpcPeer('main', 'thread', (message, reject) => ntw.send(message, reject));
+                threadPeer.params.updateStats = (stats: any) => {
+                    // todo: merge.
+                    // this.stats = stats;
+                }
+                ntw.setupRpcPeer(threadPeer);
+
+                const remote = await setupPluginRemote(threadPeer, api, pluginId, () => systemManager.getSystemState());
+                const forkOptions = Object.assign({}, zipOptions);
+                forkOptions.fork = true;
+                return remote.loadZip(packageJson, zipData, forkOptions)
+            }
+
             try {
                 peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
                 pluginConsole?.log('plugin successfully loaded');
+
+                if (zipOptions?.fork) {
+                    const fork = exports.fork;
+                    const ret = await fork();
+                    ret[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] = true;
+                    return ret;
+                }
 
                 let pluginInstance = exports.default;
                 // support exporting a plugin class, plugin main function,

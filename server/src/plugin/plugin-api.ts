@@ -147,6 +147,7 @@ export interface PluginRemoteLoadZipOptions {
      * exist on the "remote", if it is not the same machine.
      */
     unzippedPath?: string;
+    fork?: boolean;
 }
 
 export interface PluginRemote {
