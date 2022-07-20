@@ -199,8 +199,7 @@ export async function createRTCPeerConnectionSink(
                 "-b:v", bitrate.toString(),
                 "-bufsize", (2 * bitrate).toString(),
                 "-maxrate", bitrate.toString(),
-                // '-r', '15',
-                '-f:v', 'fps=15',
+                '-r', '15',
             );
 
             const width = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
