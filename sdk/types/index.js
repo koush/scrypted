@@ -834,6 +834,7 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["PushEndpoint"] = "text/x-push-endpoint";
     ScryptedMimeTypes["MediaStreamUrl"] = "text/x-media-url";
     ScryptedMimeTypes["FFmpegInput"] = "x-scrypted/x-ffmpeg-input";
+    ScryptedMimeTypes["FFmpegTranscodeStream"] = "x-scrypted/x-ffmpeg-transcode-stream";
     ScryptedMimeTypes["RTCSignalingChannel"] = "x-scrypted/x-scrypted-rtc-signaling-channel";
     ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
     ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";

@@ -2,7 +2,7 @@ import { MediaStreamTrack, RTCPeerConnection, RtpPacket } from "@koush/werift";
 import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
-import sdk, { FFmpegInput, Intercom, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
 import { turnServer } from "./ice-servers";
 import { waitConnected } from "./peerconnection-util";
@@ -16,7 +16,10 @@ import { isPeerConnectionAlive, logIsPrivateIceTransport } from "./werift-util";
 function getDebugModeH264EncoderArgs() {
     return [
         '-profile:v', 'baseline',
-        // '-preset','ultrafast',
+        // ultrafast seems to have the lowest latency but forces constrained baseline
+        // so the prior argument is redundant. It actualy seems like decoding non-baseline
+        // on mac, at least, causes inherent latency which can't be flushed from upstream.
+        '-preset','ultrafast',
         '-g', '60',
         "-c:v", "libx264",
         "-bf", "0",
@@ -177,23 +180,27 @@ export async function createRTCPeerConnectionSink(
             audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
         }
 
-        const { name: audioCodecCopy } = getAudioCodec(audioTransceiver.sender.codec);
+        const { name: audioCodecName } = getAudioCodec(audioTransceiver.sender.codec);
+        let audioCodecCopy = maximumCompatibilityMode ? undefined : audioCodecName;
 
-        const videoArgs: string[] = [];
+        const videoTranscodeArguments: string[] = [
+            '-an', '-sn', '-dn',
+        ];
         const transcode = transcodeBaseline
             || mediaStreamOptions?.video?.codec !== 'h264'
             || ffmpegInput.h264EncoderArguments?.length
             || ffmpegInput.h264FilterArguments?.length;
 
+        let videoCodecCopy = transcode ? undefined : 'h264';
 
         if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
-            videoArgs.push("-bsf:v", "dump_extra");
-        videoArgs.push(...(ffmpegInput.h264FilterArguments || []));
+            videoTranscodeArguments.push("-bsf:v", "dump_extra");
+        videoTranscodeArguments.push(...(ffmpegInput.h264FilterArguments || []));
 
         if (transcode) {
             const conservativeDefaultBitrate = 500000;
             const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
-            videoArgs.push(
+            videoTranscodeArguments.push(
                 // this seems to cause issues with presets i think.
                 // '-level:v', '4.0',
                 "-b:v", bitrate.toString(),
@@ -204,11 +211,11 @@ export async function createRTCPeerConnectionSink(
 
             const width = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
             const scaleFilter = `scale='min(${width},iw)':-2`;
-            addH264VideoFilterArguments(videoArgs, scaleFilter);
+            addH264VideoFilterArguments(videoTranscodeArguments, scaleFilter);
 
             if (transcodeBaseline) {
                 // baseline profile must use libx264, not sure other encoders properly support it.
-                videoArgs.push(
+                videoTranscodeArguments.push(
 
                     ...getDebugModeH264EncoderArgs(),
                 );
@@ -220,18 +227,33 @@ export async function createRTCPeerConnectionSink(
                 // videoArgs.push('-tune', 'zerolatency');
             }
             else {
-                videoArgs.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
+                videoTranscodeArguments.push(...(ffmpegInput.h264EncoderArguments || getDebugModeH264EncoderArgs()));
             }
         }
         else {
-            videoArgs.push('-vcodec', 'copy')
+            videoTranscodeArguments.push('-vcodec', 'copy')
+        }
+
+        const audioTranscodeArguments = getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode);
+
+        try {
+            const transcodeStream: FFmpegTranscodeStream = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.FFmpegTranscodeStream);
+            await transcodeStream({
+                videoTranscodeArguments,
+                audioTranscodeArguments,
+            });
+            videoTranscodeArguments.splice(0, videoTranscodeArguments.length);
+            videoCodecCopy = 'copy';
+            audioCodecCopy = 'copy';
+        }
+        catch (e) {
         }
 
         const audioRtpTrack: RtpTrack = {
-            codecCopy: maximumCompatibilityMode ? undefined : audioCodecCopy,
+            codecCopy: audioCodecCopy,
             onRtp: buffer => audioTransceiver.sender.sendRtp(buffer),
             outputArguments: [
-                ...getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode),
+                ...audioTranscodeArguments,
             ]
         };
 
@@ -240,7 +262,7 @@ export async function createRTCPeerConnectionSink(
         let spsPps: ReturnType<typeof getSpsPps>;
 
         const videoRtpTrack: RtpTrack = {
-            codecCopy: transcode ? undefined : 'h264',
+            codecCopy: videoCodecCopy,
             packetSize: videoPacketSize,
             onMSection: (videoSection) => spsPps = getSpsPps(videoSection),
             onRtp: (buffer) => {
@@ -255,8 +277,7 @@ export async function createRTCPeerConnectionSink(
                 }
             },
             outputArguments: [
-                '-an', '-sn', '-dn',
-                ...videoArgs,
+                ...videoTranscodeArguments,
             ],
             firstPacket: () => console.log('first video packet', Date.now() - timeStart),
         };

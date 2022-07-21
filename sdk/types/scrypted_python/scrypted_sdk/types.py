@@ -142,6 +142,7 @@ class ScryptedInterface(Enum):
 
 class ScryptedMimeTypes(Enum):
     FFmpegInput = "x-scrypted/x-ffmpeg-input"
+    FFmpegTranscodeStream = "x-scrypted/x-ffmpeg-transcode-stream"
     InsecureLocalUrl = "text/x-insecure-local-uri"
     LocalUrl = "text/x-local-uri"
     MediaObject = "x-scrypted/x-scrypted-media-object"

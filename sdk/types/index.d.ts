@@ -1608,12 +1608,18 @@ export declare enum ScryptedMimeTypes {
     PushEndpoint = "text/x-push-endpoint",
     MediaStreamUrl = "text/x-media-url",
     FFmpegInput = "x-scrypted/x-ffmpeg-input",
+    FFmpegTranscodeStream = "x-scrypted/x-ffmpeg-transcode-stream",
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel",
     SchemePrefix = "x-scrypted/x-scrypted-scheme-",
     MediaObject = "x-scrypted/x-scrypted-media-object",
     RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
 }
 export declare type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
+export interface FFmpegTranscode {
+    videoTranscodeArguments?: string[];
+    audioTranscodeArguments?: string[];
+}
+export declare type FFmpegTranscodeStream = (options: FFmpegTranscode) => Promise<void>;
 export interface ScryptedStatic {
     /**
      * @deprecated
