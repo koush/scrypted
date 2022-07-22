@@ -239,7 +239,7 @@ export async function createRTCPeerConnectionSource(options: {
 
                 const { kill: destroy } = await startRtpForwarderProcess(console, ffmpegInput, {
                     audio: {
-                        outputArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode),
+                        encoderArguments: getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode),
                         onRtp: (rtp) => audioTransceiver.sender.sendRtp(rtp),
                     },
                 });
