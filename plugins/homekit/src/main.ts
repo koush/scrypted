@@ -209,6 +209,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         onDeviceEvent: async () => {
                         }
                     }, createHAPUsernameStorageSettingsDict())
+                    storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
 
@@ -217,7 +218,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                     const publish = () => {
                         published = true;
                         mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
-                        this.publishAccessory(accessory, storageSettings.values.mac, this.storageSettings.values.pincode, standaloneCategory);
+                        this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory);
                         if (!hasPublished) {
                             hasPublished = true;
                             logConnections(mixinConsole, accessory, this.seenConnections);

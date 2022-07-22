@@ -4,7 +4,11 @@ export function sequenceNumberDistance(s1: number, s2: number): number {
     if (s2 === s1)
         return 0;
     const distance = s2 - s1;
-    const rolloverDistance = s1 + 0x10000 - s2;
+    let rolloverDistance: number;
+    if (s2 > s1)
+        rolloverDistance = s1 + 0x10000 - s2;
+    else
+        rolloverDistance = s2 + 0x10000 - s2;
 
     if (Math.abs(distance) < Math.abs(rolloverDistance))
         return distance;
@@ -23,7 +27,7 @@ export class JitterBuffer {
     lastSequenceNumber: number;
     pending: RtpPacket[] = [];
 
-    constructor(public console: Console, public jitterSize: number, ) {
+    constructor(public console: Console, public jitterSize: number,) {
     }
 
     flushPending(afterSequenceNumber: number, ret: RtpPacket[]): RtpPacket[] {
