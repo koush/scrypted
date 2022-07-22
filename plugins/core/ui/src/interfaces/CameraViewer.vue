@@ -246,8 +246,8 @@ export default {
     },
     async toggleMute() {
       this.muted = !this.muted;
-      if (!this.control) return;
-      this.control.setPlayback({
+      if (!this.sessionControl?.control) return;
+      this.sessionControl.control.setPlayback({
         audio: !this.muted,
         video: true,
       });

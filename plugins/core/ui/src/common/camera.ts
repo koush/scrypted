@@ -6,6 +6,7 @@ export async function streamCamera(mediaManager: MediaManager, device: ScryptedD
   ret.mediaStream.then(mediaStream => {
     getVideo().srcObject = mediaStream;
   });
+  return ret;
 }
 
 export async function streamRecorder(mediaManager: MediaManager, device: ScryptedDevice & VideoRecorder, startTime: number, recordingStream: MediaObject, getVideo: () => HTMLVideoElement) {
