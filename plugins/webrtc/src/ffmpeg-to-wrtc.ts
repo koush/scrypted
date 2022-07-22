@@ -183,9 +183,7 @@ export async function createRTCPeerConnectionSink(
         const { name: audioCodecName } = getAudioCodec(audioTransceiver.sender.codec);
         let audioCodecCopy = maximumCompatibilityMode ? undefined : audioCodecName;
 
-        const videoTranscodeArguments: string[] = [
-            '-an', '-sn', '-dn',
-        ];
+        const videoTranscodeArguments: string[] = [];
         const transcode = transcodeBaseline
             || mediaStreamOptions?.video?.codec !== 'h264'
             || ffmpegInput.h264EncoderArguments?.length
@@ -252,7 +250,7 @@ export async function createRTCPeerConnectionSink(
         const audioRtpTrack: RtpTrack = {
             codecCopy: audioCodecCopy,
             onRtp: buffer => audioTransceiver.sender.sendRtp(buffer),
-            outputArguments: [
+            encoderArguments: [
                 ...audioTranscodeArguments,
             ]
         };
@@ -276,7 +274,7 @@ export async function createRTCPeerConnectionSink(
                     videoTransceiver.sender.sendRtp(packet);
                 }
             },
-            outputArguments: [
+            encoderArguments: [
                 ...videoTranscodeArguments,
             ],
             firstPacket: () => console.log('first video packet', Date.now() - timeStart),

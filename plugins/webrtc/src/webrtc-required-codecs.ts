@@ -55,9 +55,7 @@ export function getAudioCodec(outputCodecParameters: RTCRtpCodecParameters) {
 }
 
 export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodecParameters: RTCRtpCodecParameters, maximumCompatibilityMode: boolean) {
-    const ret = [
-        '-vn', '-sn', '-dn',
-    ];
+    const ret: string[] = [];
 
     const { encoder, name } = getAudioCodec(outputCodecParameters);
 

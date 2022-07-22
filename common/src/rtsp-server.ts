@@ -615,14 +615,15 @@ export class RtspServer {
             sdp = sdp.trim();
     }
 
-    async handleSetup() {
+    async handleSetup(methods = ['play', 'record', 'teardown']) {
         let currentHeaders: string[] = [];
         while (true) {
             let line = await readLine(this.client);
             line = line.trim();
             if (!line) {
-                if (!await this.headers(currentHeaders))
-                    break;
+                const method = await this.headers(currentHeaders);
+                if (methods.includes(method))
+                    return method;
                 currentHeaders = [];
                 continue;
             }
@@ -833,7 +834,7 @@ export class RtspServer {
         }
 
         await thisAny[method](url, requestHeaders);
-        return method !== 'play' && method !== 'record' && method !== 'teardown';
+        return method;
     }
 
     respond(code: number, message: string, requestHeaders: Headers, headers: Headers, buffer?: Buffer) {
