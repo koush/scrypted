@@ -32,12 +32,12 @@
    "dependencies": {
       "@types/node": "^16.6.1",
       "mailparser": "^3.4.0",
-      "smtp-server": "^3.9.0"
+      "smtp-server": "^3.11.0"
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",
       "@types/mailparser": "^3.0.3",
       "@types/smtp-server": "^3.5.7"
    },
-   "version": "0.0.7"
+   "version": "0.0.8"
 }
