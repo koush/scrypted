@@ -173,11 +173,13 @@ export async function createRTCPeerConnectionSink(
         const ffmpegInput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(mo, ScryptedMimeTypes.FFmpegInput);
         const { mediaStreamOptions } = ffmpegInput;
 
-        if (mediaStreamOptions.audio?.codec === 'pcm_ulaw') {
-            audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
-        }
-        else if (mediaStreamOptions.audio?.codec === 'pcm_alaw') {
-            audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
+        if (!maximumCompatibilityMode) {
+            if (mediaStreamOptions.audio?.codec === 'pcm_ulaw') {
+                audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
+            }
+            else if (mediaStreamOptions.audio?.codec === 'pcm_alaw') {
+                audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
+            }
         }
 
         const { name: audioCodecName } = getAudioCodec(audioTransceiver.sender.codec);
