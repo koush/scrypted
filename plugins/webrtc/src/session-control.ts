@@ -1,5 +1,5 @@
 import { RTCRtpTransceiver } from "@koush/werift";
-import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
+import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput, Intercom, RTCSessionControl } from "@scrypted/sdk";
