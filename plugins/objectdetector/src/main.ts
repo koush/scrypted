@@ -461,6 +461,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       );
     }
 
+    await this.ensureSettings();
     if (this.settings) {
       settings.push(...this.settings.map(setting =>
         Object.assign({}, setting, {
