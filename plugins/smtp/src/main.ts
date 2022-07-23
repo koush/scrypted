@@ -125,7 +125,7 @@ class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
             this.console.error("SMTP Error %s", e);
         });
         const port = this.getPort();
-        this.server.listen(port);
+        this.server.listen(port, '0.0.0.0');
         this.console.log('created SMTP server');
     }
 
