@@ -39,5 +39,5 @@
       "@types/mailparser": "^3.0.3",
       "@types/smtp-server": "^3.5.7"
    },
-   "version": "0.0.8"
+   "version": "0.0.9"
 }

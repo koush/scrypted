@@ -173,9 +173,10 @@ class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
-        const ret = new SmtpMixin(mixinDevice, mixinDeviceState, {
+        const ret = new SmtpMixin({
+            mixinDevice, mixinDeviceState,
             mixinDeviceInterfaces,
-            providerNativeId: this.nativeId,
+            mixinProviderNativeId: this.nativeId,
             group: "Mail",
             groupKey: "mail",
         });
