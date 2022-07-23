@@ -339,7 +339,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             HOMEKIT_MIXIN,
         ];
 
-        if (type === ScryptedDeviceType.Doorbell || type === ScryptedDeviceType.Camera)
+        if (interfaces.includes(ScryptedInterface.VideoCamera) && (type === ScryptedDeviceType.Doorbell || type === ScryptedDeviceType.Camera))
             ret.push(ScryptedInterface.Readme);
 
         return ret;
