@@ -214,18 +214,13 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       }
       this.running = true;
 
-      let selectedStream: MediaStreamOptions;
       let stream: MediaObject;
 
       // intenral streams must implicitly be available.
       if (!this.internal) {
-        const streamingChannel = this.storage.getItem('streamingChannel');
-        if (streamingChannel) {
-          const msos = await this.cameraDevice.getVideoStreamOptions();
-          selectedStream = msos.find(mso => mso.name === streamingChannel);
-        }
-
-        stream = await this.cameraDevice.getVideoStream(selectedStream);
+        stream = await this.cameraDevice.getVideoStream({
+          destination: 'low-resolution',
+        });
       }
       else {
         stream = await mediaManager.createMediaObject(Buffer.alloc(0), 'x-scrypted/x-internal-media-object');
@@ -415,16 +410,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       });
 
       if (this.detectionModes.includes(DETECT_VIDEO_MOTION)) {
-        if (msos?.length && !this.internal) {
-          settings.push({
-            title: 'Video Stream',
-            key: 'streamingChannel',
-            value: this.storage.getItem('streamingChannel') || msos[0].name,
-            description: 'The media stream to analyze.',
-            choices: msos.map(mso => mso.name),
-          });
-        }
-
         settings.push(
           {
             title: 'Detection Duration',
@@ -459,16 +444,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       );
     }
     else {
-      if (msos?.length && !this.internal) {
-        settings.push({
-          title: 'Video Stream',
-          key: 'streamingChannel',
-          value: this.storage.getItem('streamingChannel') || msos[0].name,
-          description: 'The media stream to analyze.',
-          choices: msos.map(mso => mso.name),
-        });
-      }
-
       settings.push({
         title: 'Motion Duration',
         description: 'The duration in seconds to wait to reset the motion sensor.',
@@ -571,9 +546,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     else if (key === 'motionAsObjects') {
       this.motionAsObjects = vs === 'true';
-    }
-    else if (key === 'streamingChannel') {
-      this.bindObjectDetection();
     }
     else if (key === 'analyzeButton') {
       await this.snapshotDetection();

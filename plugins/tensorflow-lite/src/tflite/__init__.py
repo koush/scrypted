@@ -6,13 +6,19 @@ from .common import *
 from PIL import Image
 from pycoral.adapters import detect
 from pycoral.adapters.common import input_size
-from pycoral.utils.edgetpu import run_inference
-from pycoral.utils.edgetpu import list_edge_tpus
-from pycoral.utils.edgetpu import make_interpreter
+loaded_py_coral = False
+try:
+    from pycoral.utils.edgetpu import run_inference
+    from pycoral.utils.edgetpu import list_edge_tpus
+    from pycoral.utils.edgetpu import make_interpreter
+    loaded_py_coral = True
+except:
+    pass
 import tflite_runtime.interpreter as tflite
 import re
 import scrypted_sdk
 from typing import Any, List
+from gi.repository import Gst
 
 from detect import DetectionSession, DetectPlugin
 
@@ -43,13 +49,15 @@ class TensorFlowLitePlugin(DetectPlugin):
         labels_contents = scrypted_sdk.zip.open(
             'fs/coco_labels.txt').read().decode('utf8')
         self.labels = parse_label_contents(labels_contents)
-        edge_tpus = list_edge_tpus()
-        print('edge tpu', edge_tpus)
-        if len(edge_tpus):
+        try:
+            edge_tpus = list_edge_tpus()
+            print('edge tpu', edge_tpus)
+            if not len(edge_tpus):
+                raise Exception('no edge tpu found')
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
             self.interpreter = make_interpreter(model)
-        else:
+        except:
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
             self.interpreter = tflite.Interpreter(model_content=model)
@@ -147,11 +155,34 @@ class TensorFlowLitePlugin(DetectPlugin):
     def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         score_threshold = self.parse_settings(settings)
 
-        gst_buffer = gstsample.get_buffer()
-        with self.mutex:
-            run_inference(self.interpreter, gst_buffer)
-            objs = detect.get_objects(
-                self.interpreter, score_threshold=score_threshold)
+        if loaded_py_coral:
+            gst_buffer = gstsample.get_buffer()
+            with self.mutex:
+                run_inference(self.interpreter, gst_buffer)
+                objs = detect.get_objects(
+                    self.interpreter, score_threshold=score_threshold)
+        else:
+            buf = gstsample.get_buffer()
+            caps = gstsample.get_caps()
+            # can't trust the width value, compute the stride
+            height = caps.get_structure(0).get_value('height')
+            width = caps.get_structure(0).get_value('width')
+            result, info = buf.map(Gst.MapFlags.READ)
+            if not result:
+                return
+            try:
+                image = Image.frombuffer('RGB', (width, height), info.data.tobytes())
+
+                _, scale = common.set_resized_input(
+                    self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
+
+                with self.mutex:
+                    self.interpreter.invoke()
+                    objs = detect.get_objects(
+                        self.interpreter, score_threshold=score_threshold, image_scale=scale)
+            finally:
+                buf.unmap(info)
+
 
         return self.create_detection_result(objs, src_size, convert_to_src_size)
 
