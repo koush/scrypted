@@ -2,18 +2,8 @@
   <v-card>
     <CardTitle v-if="!noTitle">Settings</CardTitle>
     <v-flex xs12 v-if="showChips" class="pt-0">
-      <v-chip-group
-        mandatory
-        active-class="deep-purple accent-4 white--text"
-        column
-        v-model="settingsGroupName"
-      >
-        <v-chip
-          small
-          :value="key"
-          v-for="[key] of Object.entries(settingsGroups)"
-          :key="key"
-        >
+      <v-chip-group mandatory active-class="deep-purple accent-4 white--text" column v-model="settingsGroupName">
+        <v-chip small :value="key" v-for="[key] of Object.entries(settingsGroups)" :key="key">
           {{ key.replace("Settings", "") || "General" }}
         </v-chip>
         <v-chip small value="extensions" v-if="availableMixins.length">
@@ -24,19 +14,14 @@
 
     <v-divider v-if="showChips"></v-divider>
 
-    <v-flex xs12 v-if="settingsGroupName !== 'extensions'">
+    <v-flex xs12 v-if="settingsGroupName !== 'extensions' || !showChips">
       <div v-for="setting in settingsGroup" :key="setting.key">
-        <Setting
-          v-if="
-            setting.value.choices ||
-            setting.value.type === 'device' ||
-            setting.value.type === 'interface' ||
-            !setting.value.multiple
-          "
-          :device="device"
-          v-model="setting.value"
-          @input="onInput"
-        ></Setting>
+        <Setting v-if="
+          setting.value.choices ||
+          setting.value.type === 'device' ||
+          setting.value.type === 'interface' ||
+          !setting.value.multiple
+        " :device="device" v-model="setting.value" @input="onInput"></Setting>
         <SettingMultiple v-else v-model="setting.value" :device="device">
         </SettingMultiple>
       </div>
@@ -104,7 +89,7 @@ export default {
     },
   },
   methods: {
-    onChange() {},
+    onChange() { },
     createInputValue(v) {
       return {
         settings: this.settings.map((setting) => setting.value),
@@ -121,9 +106,15 @@ export default {
         key: setting.key,
         value: setting,
       }));
+      if (!this.usingDefaultSettingsGroupName) {
+        if (this.settingsGroupName === 'extensions' && !this.availableMixins.length)
+          this.usingDefaultSettingsGroupName = true;
+        if (!this.settingsGroups[this.settingsGroupName])
+          this.usingDefaultSettingsGroupName = true;
+      }
       if (this.usingDefaultSettingsGroupName) {
         this.usingDefaultSettingsGroupName = false;
-        this.settingsGroupName = Object.entries(this.settingsGroups)?.[0]?.[0] || 'extensions';
+        this.settingsGroupName = Object.keys(this.settingsGroups)?.[0] || 'extensions';
       }
     },
   },
