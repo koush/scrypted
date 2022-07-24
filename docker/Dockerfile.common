@@ -1,5 +1,7 @@
 ARG BASE="16-bullseye"
+ARG S6_OVERLAY_VERSION=3.1.1.2
 FROM node:${BASE}
+ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
 
 # Coral Edge TPU sources.list
 # https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
@@ -54,7 +56,23 @@ RUN apt-get -y install \
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 
+# avahi advertiser support
+RUN apt-get -y install \
+    libnss-mdns \
+    avahi-discover \
+    libavahi-compat-libdnssd-dev
+
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
+
+# copy configurations and scripts
+COPY fs /
+
+# s6 process supervisor
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
+ENTRYPOINT ["/init"]
