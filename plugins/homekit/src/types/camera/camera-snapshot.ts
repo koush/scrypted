@@ -6,7 +6,7 @@ import type { HomeKitPlugin } from "../../main";
 const { systemManager, mediaManager } = sdk;
 
 function recommendSnapshotPlugin(console: Console, log: Logger, message: string) {
-    if (systemManager.getDeviceById('@scrypted/snapshot'))
+    if (systemManager.getDeviceByName('@scrypted/snapshot'))
         return;
     console.log(message);
     log.a(message);
