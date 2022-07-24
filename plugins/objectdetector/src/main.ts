@@ -285,6 +285,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
             }
           }
         }
+
+        // if this detector supports bounding boxes, and there are zones configured,
+        // filter the detections to the zones.
+        detection.detections = detection.detections.filter(o => !o.boundingBox || o?.zones?.length);
       }
       this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
     }
