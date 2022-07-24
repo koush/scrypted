@@ -1,4 +1,4 @@
-import { RTCPeerConnection } from '@koush/werift';
+import { RTCPeerConnection, defaultPeerConfig } from '@koush/werift';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
@@ -17,6 +17,12 @@ import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
+
+// https://github.com/shinyoshiaki/werift-webrtc/issues/240
+defaultPeerConfig.headerExtensions = {
+    video: [],
+    audio: [],
+};
 
 const supportedTypes = [
     ScryptedDeviceType.Camera,

@@ -19,7 +19,7 @@ function getDebugModeH264EncoderArgs() {
         // ultrafast seems to have the lowest latency but forces constrained baseline
         // so the prior argument is redundant. It actualy seems like decoding non-baseline
         // on mac, at least, causes inherent latency which can't be flushed from upstream.
-        '-preset','ultrafast',
+        '-preset', 'ultrafast',
         '-g', '60',
         "-c:v", "libx264",
         "-bf", "0",
