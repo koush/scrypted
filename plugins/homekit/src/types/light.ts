@@ -1,5 +1,5 @@
-import { Brightness, ColorSettingHsv, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { addSupportedType, bindCharacteristic,  } from '../common';
+import { Brightness, ColorSettingHsv, ColorSettingTemperature, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
+import { addSupportedType, bindCharacteristic, } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { getAccessory, probe } from './onoff-base';
 import type { HomeKitPlugin } from "../main";
@@ -7,7 +7,7 @@ import type { HomeKitPlugin } from "../main";
 addSupportedType({
     type: ScryptedDeviceType.Light,
     probe,
-    getAccessory: async (device: ScryptedDevice & OnOff & Brightness & ColorSettingHsv, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & OnOff & Brightness & ColorSettingHsv & ColorSettingTemperature, homekitPlugin: HomeKitPlugin) => {
         const { accessory, service } = getAccessory(device, homekitPlugin, Service.Lightbulb);
 
         if (device.interfaces.includes(ScryptedInterface.Brightness)) {
@@ -50,7 +50,15 @@ addSupportedType({
             bindCharacteristic(device, ScryptedInterface.ColorSettingHsv, service, Characteristic.Saturation,
                 () => (device.hsv?.s || 0) * 100);
         }
-
+        if (device.interfaces.includes(ScryptedInterface.ColorSettingTemperature)) {
+            // HomeKit uses micro-reciprocal degrees as a color temperature unit. 1 degree = 1,000,000 / K
+            service.addCharacteristic(Characteristic.ColorTemperature)
+                .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+                    callback();
+                    device.setColorTemperature(Math.round(1e6 / (value as number)));
+                });
+            bindCharacteristic(device, ScryptedInterface.ColorSettingTemperature, service, Characteristic.ColorTemperature, () => Math.round(1e6 / device.colorTemperature));
+        }
         return accessory;
     }
 });
