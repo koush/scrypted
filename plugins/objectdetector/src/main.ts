@@ -220,6 +220,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!this.internal) {
         stream = await this.cameraDevice.getVideoStream({
           destination: 'low-resolution',
+          // request no prebuffer because it will throw off detection timestamps.
+          prebuffer: 0,
         });
       }
       else {
@@ -250,6 +252,34 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (detectionInput)
       this.setDetection(this.detectionId, detectionInput);
 
+    // determine zones of the objects, if configured.
+    if (detection.detections && Object.keys(this.zones).length) {
+      for (const o of detection.detections) {
+        if (!o.boundingBox)
+          continue;
+        o.zones = []
+        let [x, y, width, height] = o.boundingBox;
+        let x2 = x + width;
+        let y2 = y + height;
+        // the zones are point paths in percentage format
+        x = x * 100 / detection.inputDimensions[0];
+        y = y * 100 / detection.inputDimensions[1];
+        x2 = x2 * 100 / detection.inputDimensions[0];
+        y2 = y2 * 100 / detection.inputDimensions[1];
+        const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
+        for (const [zone, zoneValue] of Object.entries(this.zones)) {
+          if (polygonOverlap(box, zoneValue)) {
+            this.console.log(o.className, 'inside', zone);
+            o.zones.push(zone);
+          }
+        }
+      }
+    }
+
+    // if this detector supports bounding boxes, and there are zones configured,
+    // filter the detections to the zones.
+    detection.detections = detection.detections.filter(o => !o.boundingBox || o?.zones?.length);
+
     if (this.hasMotionType) {
       const found = detection.detections?.find(d => d.className === 'motion');
       if (found) {
@@ -263,35 +293,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       }
     }
 
-    if (!this.hasMotionType || this.motionAsObjects) {
-      if (detection.detections && Object.keys(this.zones).length) {
-        for (const o of detection.detections) {
-          if (!o.boundingBox)
-            continue;
-          o.zones = []
-          let [x, y, width, height] = o.boundingBox;
-          let x2 = x + width;
-          let y2 = y + height;
-          // the zones are point paths in percentage format
-          x = x * 100 / detection.inputDimensions[0];
-          y = y * 100 / detection.inputDimensions[1];
-          x2 = x2 * 100 / detection.inputDimensions[0];
-          y2 = y2 * 100 / detection.inputDimensions[1];
-          const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
-          for (const [zone, zoneValue] of Object.entries(this.zones)) {
-            if (polygonOverlap(box, zoneValue)) {
-              this.console.log(o.className, 'inside', zone);
-              o.zones.push(zone);
-            }
-          }
-        }
-
-        // if this detector supports bounding boxes, and there are zones configured,
-        // filter the detections to the zones.
-        detection.detections = detection.detections.filter(o => !o.boundingBox || o?.zones?.length);
-      }
+    if (!this.hasMotionType || this.motionAsObjects)
       this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
-    }
   }
 
   async extendedObjectDetect() {
@@ -324,6 +327,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       id: detection.id,
       name: detection.className,
       detection,
+      lastSeen: detectionResult.timestamp,
     })), {
       timeout: this.detectionTimeout * 1000,
       added: d => found.push(d),

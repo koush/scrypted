@@ -2,7 +2,7 @@ export class DenoisedDetectionEntry<T> {
     id: string;
     name: string;
     detection: T;
-    timeout?: NodeJS.Timeout;
+    lastSeen: number;
 }
 
 export interface DenoisedDetectionOptions<T> {
@@ -15,6 +15,7 @@ export function denoiseDetections<T>(previousDetections: DenoisedDetectionEntry<
     currentDetections: DenoisedDetectionEntry<T>[],
     options?: DenoisedDetectionOptions<T>
 ) {
+    const now = Date.now();
     const newAndExisting: DenoisedDetectionEntry<T>[] = [];
     for (const cd of currentDetections) {
         let index = -1;
@@ -28,24 +29,20 @@ export function denoiseDetections<T>(previousDetections: DenoisedDetectionEntry<
         }
         else {
             const [found] = previousDetections.splice(index, 1);
-            if (found.timeout) {
-                clearTimeout(found.timeout);
-                found.timeout = undefined;
-            }
+            found.lastSeen = now;
             newAndExisting.push(cd);
         }
     }
 
+    const purgeTime = options?.timeout || 10000;
     // anything remaining in previousDetections at this point has possibly left the scene.
-    for (const cd of previousDetections) {
-        if (!cd.timeout) {
-            cd.timeout = setTimeout(() => {
-                const index = previousDetections.findIndex(check => check === cd);
-                if (index !== -1)
-                    previousDetections.splice(index, 1);
-                options?.removed?.(cd);
-            }, options?.timeout || 10000);
-        }
+    for (const cd of previousDetections.slice()) {
+        if (now - cd.lastSeen < purgeTime)
+            continue;
+        const index = previousDetections.findIndex(check => check === cd);
+        if (index !== -1)
+            previousDetections.splice(index, 1);
+        options?.removed?.(cd);
     }
 
     // add all the detections that are pending removal
