@@ -1,4 +1,4 @@
-#!/command/execlineb -P
+#!/bin/bash
 
 # make run folders
 mkdir -p /var/run/dbus
