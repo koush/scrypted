@@ -107,9 +107,10 @@ export default {
         value: setting,
       }));
       if (!this.usingDefaultSettingsGroupName) {
-        if (this.settingsGroupName === 'extensions' && !this.availableMixins.length)
-          this.usingDefaultSettingsGroupName = true;
-        if (!this.settingsGroups[this.settingsGroupName])
+        // make sure the selected settings tab still exists
+        if (this.settingsGroupName === 'extensions')
+          this.usingDefaultSettingsGroupName =  !this.availableMixins.length;
+        else if (!this.settingsGroups[this.settingsGroupName])
           this.usingDefaultSettingsGroupName = true;
       }
       if (this.usingDefaultSettingsGroupName) {
