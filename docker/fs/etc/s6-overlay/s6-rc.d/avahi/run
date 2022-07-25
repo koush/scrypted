@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/command/execlineb -P
 
 until [ -e /var/run/dbus/system_bus_socket ]; do
   echo "Waiting for dbus..."

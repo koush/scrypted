@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/command/execlineb -P
 
 echo "Starting dbus..."
 exec dbus-daemon --system --nofork
