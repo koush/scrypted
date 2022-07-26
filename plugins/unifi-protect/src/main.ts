@@ -327,6 +327,8 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                     }
                 }
 
+                const managementUrl = `https://${this.storage.getItem('ip')}/protect/timelapse/${camera.id}`;
+
                 const d: Device = {
                     providerNativeId: this.nativeId,
                     name: camera.name,
@@ -337,6 +339,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         firmware: camera.firmwareVersion,
                         version: camera.hardwareRevision,
                         serialNumber: camera.id,
+                        managementUrl,
                     },
                     interfaces: [
                         ScryptedInterface.Settings,

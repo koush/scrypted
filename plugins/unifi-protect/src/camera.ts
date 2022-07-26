@@ -55,13 +55,6 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         }
 
         this.updateState(protectCamera);
-
-        const info = this.info || {};
-        const managementUrl = `https://${protect.storage.getItem('ip')}/protect/timelapse/${protectCamera.id}`;
-        if (info?.managementUrl !== managementUrl) {
-            info.managementUrl = managementUrl;
-            this.info = info;
-        }
     }
 
     async setStatusLight(on: boolean) {
