@@ -12,6 +12,7 @@ import path from 'path';
 import bpmux from 'bpmux';
 import { PushManager } from './push';
 import type { CORSControl } from '../../../server/src/services/cors';
+import os from 'os';
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
@@ -218,6 +219,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
 
     async getOauthUrl(): Promise<string> {
         const args = qs.stringify({
+            hostname: os.hostname(),
             registration_id: await this.manager.registrationId,
             sender_id: DEFAULT_SENDER_ID,
         })
