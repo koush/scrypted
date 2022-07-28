@@ -155,7 +155,30 @@ async function start() {
     // use a hash of the private key as the cookie secret.
     app.use(cookieParser(crypto.createHash('sha256').update(certSetting.value.serviceKey).digest().toString('hex')));
 
-    app.all('*', async (req, res, next) => {
+    // trap to add access control headers.
+    app.use((req, res, next) => {
+        if (!req.headers.upgrade)
+            scrypted.addAccessControlHeaders(req, res);
+        next();
+    })
+
+    app.options('*', (req, res) => {
+        // add more?
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+        res.send(200);
+    });
+
+    const authSalt = crypto.randomBytes(16);
+    const createAuthorizationToken = (login_user_token: string) => {
+        const salted = login_user_token + authSalt;
+        const hash = crypto.createHash('sha256');
+        hash.update(salted);
+        const sha = hash.digest().toString('hex');
+        return `Bearer ${sha}#${login_user_token}`;
+    }
+
+    app.use(async (req, res, next) => {
         // this is a trap for all auth.
         // only basic auth will fail with 401. it is up to the endpoints to manage
         // lack of login from cookie auth.
@@ -165,10 +188,8 @@ async function start() {
             const userTokenParts = login_user_token.split('#');
             const username = userTokenParts[0];
             const timestamp = parseInt(userTokenParts[1]);
-            if (timestamp + 86400000 < Date.now()) {
-                console.warn('login expired');
+            if (timestamp + 86400000 < Date.now())
                 return next();
-            }
 
             // this database lookup on every web request is not necessary, the cookie
             // itself is the auth, and is signed. furthermore, this is currently
@@ -182,7 +203,27 @@ async function start() {
             // }
 
             res.locals.username = username;
-            (req as any).username = username;
+        }
+        else if (req.headers.authorization?.startsWith('Bearer ')) {
+            const splits = req.headers.authorization.substring('Bearer '.length).split('#');
+            const login_user_token = splits[1] + '#' + splits[2];
+            if (login_user_token) {
+                const check = splits[0];
+
+                const salted = login_user_token + authSalt;
+                const hash = crypto.createHash('sha256');
+                hash.update(salted);
+                const sha = hash.digest().toString('hex');
+
+                if (check === sha) {
+                    const splits2 = login_user_token.split('#');
+                    const username = splits2[0];
+                    const timestamp = parseInt(splits2[1]);
+                    if (timestamp + 86400000 < Date.now())
+                        return next();
+                    res.locals.username = username;
+                }
+            }
         }
         next();
     });
@@ -370,15 +411,12 @@ async function start() {
     let hasLogin = await db.getCount(ScryptedUser) > 0;
 
     app.options('/login', (req, res) => {
-        scrypted.addAccessControlHeaders(req, res);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
         res.send(200);
     });
 
     app.post('/login', async (req, res) => {
-        scrypted.addAccessControlHeaders(req, res);
-
         const { username, password, change_password } = req.body;
         const timestamp = Date.now();
         const maxAge = 86400000;
@@ -422,6 +460,7 @@ async function start() {
             }
 
             res.send({
+                authorization: createAuthorizationToken(login_user_token),
                 username,
                 expiration: maxAge,
                 addresses,
@@ -456,12 +495,14 @@ async function start() {
         });
 
         res.send({
+            authorization: createAuthorizationToken(login_user_token),
             username,
             token: user.token,
             expiration: maxAge,
             addresses,
         });
     });
+
 
     app.get('/login', async (req, res) => {
         scrypted.addAccessControlHeaders(req, res);
@@ -510,6 +551,7 @@ async function start() {
         }
 
         res.send({
+            authorization: createAuthorizationToken(login_user_token),
             expiration: 86400000 - (Date.now() - timestamp),
             username,
             addresses,
