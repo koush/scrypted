@@ -129,6 +129,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return ret;
   }
 
+  async motionTypeDetection() {
+    await this.ensureSettings();
+    await this.startVideoDetection();
+  }
+
   async snapshotDetection() {
     await this.ensureSettings();
 
@@ -167,6 +172,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       this.running = eventData.running;
     });
+
+    if (this.hasMotionType)
+      this.motionTypeDetection();
 
     if (this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS))
       this.snapshotDetection();
@@ -222,6 +230,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           destination: 'low-resolution',
           // request no prebuffer because it will throw off detection timestamps.
           prebuffer: 0,
+          // ask rebroadcast to mute audio, not needed.
+          audio: null,
         });
       }
       else {
@@ -278,7 +288,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     // if this detector supports bounding boxes, and there are zones configured,
     // filter the detections to the zones.
-    detection.detections = detection.detections.filter(o => !o.boundingBox || o?.zones?.length);
+    if (Object.keys(this.zones).length)
+      detection.detections = detection.detections.filter(o => !o.boundingBox || o?.zones?.length);
 
     if (this.hasMotionType) {
       const found = detection.detections?.find(d => d.className === 'motion');
