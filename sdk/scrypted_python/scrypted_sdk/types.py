@@ -1082,7 +1082,10 @@ class SystemManager:
     pass
 
 class MediaManager:
-    builtinConverters: list[BufferConverter]
+    async def addConverter(self, converter: BufferConverter) -> None:
+        pass
+    async def clearConverters(self) -> None:
+        pass
     async def convertMediaObject(self, mediaObject: MediaObject, toMimeType: str) -> Any:
         pass
     async def convertMediaObjectToBuffer(self, mediaObject: MediaObject, toMimeType: str) -> bytearray:

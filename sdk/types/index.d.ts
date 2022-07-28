@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.52";
+export declare const TYPES_VERSION = "0.0.55";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -1102,9 +1102,10 @@ export interface MediaObjectOptions {
 }
 export interface MediaManager {
     /**
-     * Additional plugin provided convertors to consider for use when converting MediaObjects.
+     * Add an convertor to consider for use when converting MediaObjects.
      */
-    builtinConverters: BufferConverter[];
+    addConverter(converter: BufferConverter): Promise<void>;
+    clearConverters(): Promise<void>;
     /**
      * Convert a media object to a Buffer, primtive type, or RPC Object.
      */

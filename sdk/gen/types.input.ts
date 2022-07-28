@@ -1016,9 +1016,10 @@ export interface MediaObjectOptions {
 
 export interface MediaManager {
   /**
-   * Additional plugin provided convertors to consider for use when converting MediaObjects.
+   * Add an convertor to consider for use when converting MediaObjects.
    */
-  builtinConverters: BufferConverter[];
+  addConverter(converter: BufferConverter): Promise<void>;
+  clearConverters(): Promise<void>;
 
   /**
    * Convert a media object to a Buffer, primtive type, or RPC Object.
