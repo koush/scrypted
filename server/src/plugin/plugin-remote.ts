@@ -361,7 +361,11 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         const systemManager = new SystemManagerImpl();
         const deviceManager = new DeviceManagerImpl(systemManager, getDeviceConsole, getMixinConsole);
         const endpointManager = new EndpointManagerImpl();
-        const mediaManager = await api.getMediaManager() || await createMediaManager(systemManager, deviceManager);
+        const hostMediaManager = await api.getMediaManager();
+        if (!hostMediaManager) {
+            peer.params['createMediaManager'] = async () => createMediaManager(systemManager, deviceManager);
+        }
+        const mediaManager = hostMediaManager || await createMediaManager(systemManager, deviceManager);
         peer.params['mediaManager'] = mediaManager;
         const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
 

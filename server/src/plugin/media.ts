@@ -32,6 +32,7 @@ const httpsAgent = new https.Agent({
 
 export abstract class MediaManagerBase implements MediaManager {
     builtinConverters: BufferConverter[] = [];
+    extraConverters: BufferConverter[] = [];
 
     constructor() {
         for (const h of ['http', 'https']) {
@@ -159,6 +160,14 @@ export abstract class MediaManagerBase implements MediaManager {
         });
     }
 
+    async addConverter(converter: BufferConverter): Promise<void> {
+        this.extraConverters.push(converter);
+    }
+
+    async clearConverters(): Promise<void> {
+        this.extraConverters = [];
+    }
+
     async convertMediaObjectToJSON<T>(mediaObject: MediaObject, toMimeType: string): Promise<T> {
         const buffer = await this.convertMediaObjectToBuffer(mediaObject, toMimeType);
         return JSON.parse(buffer.toString());
@@ -204,7 +213,14 @@ export abstract class MediaManagerBase implements MediaManager {
         const converters = Object.entries(this.getSystemState())
             .filter(([id, state]) => state[ScryptedInterfaceProperty.interfaces]?.value?.includes(ScryptedInterface.BufferConverter))
             .map(([id]) => this.getDeviceById<BufferConverter>(id));
+
+        // builtins should be after system converters. these should not be overriden by system,
+        // as it could cause system instability with misconfiguration.
         converters.push(...this.builtinConverters);
+
+        // extra converters are added last and do allow overriding builtins, as
+        // the instability would be confined to a single plugin.
+        converters.push(...this.extraConverters);
         return converters;
     }
 
@@ -352,14 +368,16 @@ export abstract class MediaManagerBase implements MediaManager {
 
                 // edge matches
                 if (mimeMatches(mediaMime, inputMime)) {
+                    const weight = parseFloat(inputMime.parameters.get('converter-weight'));
                     // catch all converters should be heavily weighted so as not to use them.
-                    mediaNode[targetId] = inputMime.essence === '*/*' ? 1000 : 1;
+                    mediaNode[targetId] = weight || (inputMime.essence === '*/*' ? 1000 : 1);
                 }
 
                 // target output matches
                 if (mimeMatches(outputMime, convertedMime) || converter.toMimeType === ScryptedMimeTypes.MediaObject) {
+                    const weight = parseFloat(inputMime.parameters.get('converter-weight'));
                     // catch all converters should be heavily weighted so as not to use them.
-                    node['output'] = converter.toMimeType === ScryptedMimeTypes.MediaObject ? 1000 : 1;
+                    node['output'] = weight || (convertedMime.essence === ScryptedMimeTypes.MediaObject ? 1000 : 1);
                 }
             }
             catch (e) {
@@ -436,14 +454,10 @@ export class MediaManagerImpl extends MediaManagerBase {
 
 export class MediaManagerHostImpl extends MediaManagerBase {
     constructor(public pluginDeviceId: string,
-        public systemState: { [id: string]: { [property: string]: SystemDeviceState } },
+        public getSystemState: () => { [id: string]: { [property: string]: SystemDeviceState } },
         public console: Console,
         public getDeviceById: (id: string) => any) {
         super();
-    }
-
-    getSystemState(): { [id: string]: { [property: string]: SystemDeviceState; }; } {
-        return this.systemState;
     }
 
     getPluginDeviceId(): string {

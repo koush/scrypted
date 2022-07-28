@@ -179,7 +179,7 @@ export class PluginHost {
 
         const { runtime } = this.packageJson.scrypted;
         const mediaManager = runtime === 'python'
-            ? new MediaManagerHostImpl(pluginDeviceId, scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
+            ? new MediaManagerHostImpl(pluginDeviceId, () => scrypted.stateManager.getSystemState(), console, id => scrypted.getDevice(id))
             : undefined;
 
         this.api = new PluginHostAPI(scrypted, this.pluginId, this, mediaManager);
@@ -374,7 +374,8 @@ export class PluginHost {
         serializer.setupRpcPeer(rpcPeer);
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
-        const api = new PluginAPIProxy(this.api, await this.peer.getParam('mediaManager'));
+        const createMediaManager = await this.peer.getParam('createMediaManager');
+        const api = new PluginAPIProxy(this.api, await createMediaManager());
         const kill = () => {
             serializer.onDisconnected();
             api.removeListeners();
@@ -389,7 +390,8 @@ export class PluginHost {
         const rpcPeer = createDuplexRpcPeer(`api/${this.pluginId}`, 'duplex', duplex, duplex);
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
-        const api = new PluginAPIProxy(this.api, await this.peer.getParam('mediaManager'));
+        const createMediaManager = await this.peer.getParam('createMediaManager');
+        const api = new PluginAPIProxy(this.api, await createMediaManager());
         const kill = () => {
             api.removeListeners();
         };
