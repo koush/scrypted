@@ -10,7 +10,6 @@ import { SidebandBufferSerializer } from '../../../server/src/plugin/buffer-seri
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer } from '../../../server/src/rpc-serializer';
-export * from "@scrypted/types";
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -33,14 +32,18 @@ function once(socket: IOClientSocket, event: 'open' | 'message') {
     });
 }
 
+export type ScryptedClientConnectionType = 'http' | 'webrtc' | 'http-local';
+
 export interface ScryptedClientStatic extends ScryptedStatic {
     disconnect(): void;
     onClose?: Function;
     userStorage: Storage,
     version: string;
+    connectionType: ScryptedClientConnectionType;
 }
 
 export interface ScryptedConnectionOptions {
+    webrtc?: boolean;
     baseUrl: string;
     axiosConfig?: AxiosRequestConfig;
 }
@@ -78,7 +81,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
 
     return {
-        cookie: response.headers["set-cookie"]?.[0],
+        authorization: response.data.authorization as string,
         error: response.data.error as string,
         token: response.data.token as string,
         addresses,
@@ -95,6 +98,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
 
     return {
+        authorization: response.data.authorization as string,
         username: response.data.username as string,
         expiration: response.data.expiration as number,
         hasLogin: !!response.data.hasLogin,
@@ -108,21 +112,21 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     const extraHeaders: { [header: string]: string } = {};
     let addresses: string[];
-    let trySideband: boolean;
+    let scryptedCloud: boolean;
 
     if (username && password) {
         const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);
-        if (loginResult.cookie)
-            extraHeaders['Cookie'] = loginResult.cookie;
+        if (loginResult.authorization)
+            extraHeaders['Authorization'] = loginResult.authorization;
         addresses = loginResult.addresses;
-        trySideband = loginResult.scryptedCloud;
+        scryptedCloud = loginResult.scryptedCloud;
     }
     else {
         const loginCheck = await checkScryptedClientLogin({
             baseUrl,
         });
         addresses = loginCheck.addresses;
-        trySideband = loginCheck.scryptedCloud;
+        scryptedCloud = loginCheck.scryptedCloud;
     }
 
     let socket: IOClientSocket;
@@ -136,9 +140,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const start = Date.now();
 
     const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
+    let connectionType: ScryptedClientConnectionType;
 
     let rpcPeer: RpcPeer;
-    if (trySideband) {
+    if (scryptedCloud || options.webrtc) {
         const publicEioOptions: Partial<SocketOptions> = {
             path: `${endpointPath}/public/engine.io/api`,
             extraHeaders,
@@ -174,7 +179,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 })());
             }
 
-            if (global.RTCPeerConnection) {
+            if (globalThis.RTCPeerConnection) {
                 promises.push((async () => {
                     const webrtcEioOptions: Partial<SocketOptions> = {
                         path: '/endpoint/@scrypted/webrtc/engine.io/',
@@ -196,6 +201,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             const { ready, id, webrtc, address } = await timeoutPromise(1000, any);
 
             if (!webrtc) {
+                connectionType = 'http-local';
+
                 console.log('using local address', address);
                 const url = `${eioOptions.path}/activate`;
                 await axios.post(url, {
@@ -207,6 +214,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 ready.send('/api/start');
             }
             else {
+                connectionType = 'webrtc';
+
                 ready.send(JSON.stringify({
                     pluginId,
                 }));
@@ -308,6 +317,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     }
 
     if (!socket) {
+        connectionType = 'http';
         socket = new eio.Socket(explicitBaseUrl, eioOptions);
         await once(socket, 'open');
     }
@@ -351,6 +361,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         }
 
         const ret: ScryptedClientStatic = {
+            connectionType,
             version,
             systemManager,
             deviceManager,
