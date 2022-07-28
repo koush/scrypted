@@ -198,7 +198,7 @@ export async function createRTCPeerConnectionSink(
         videoTranscodeArguments.push(...(ffmpegInput.h264FilterArguments || []));
 
         if (transcode) {
-            const conservativeDefaultBitrate = 500000;
+            const conservativeDefaultBitrate = isPrivate ? 1000000 : 500000;
             const bitrate = maximumCompatibilityMode ? conservativeDefaultBitrate : (ffmpegInput.destinationVideoBitrate || conservativeDefaultBitrate);
             videoTranscodeArguments.push(
                 // this seems to cause issues with presets i think.
@@ -236,17 +236,19 @@ export async function createRTCPeerConnectionSink(
 
         const audioTranscodeArguments = getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode);
 
-        try {
-            const transcodeStream: FFmpegTranscodeStream = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.FFmpegTranscodeStream);
-            await transcodeStream({
-                videoTranscodeArguments,
-                audioTranscodeArguments,
-            });
-            videoTranscodeArguments.splice(0, videoTranscodeArguments.length);
-            videoCodecCopy = 'copy';
-            audioCodecCopy = 'copy';
-        }
-        catch (e) {
+        if (transcode) {
+            try {
+                const transcodeStream: FFmpegTranscodeStream = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.FFmpegTranscodeStream);
+                await transcodeStream({
+                    videoTranscodeArguments,
+                    audioTranscodeArguments,
+                });
+                videoTranscodeArguments.splice(0, videoTranscodeArguments.length);
+                videoCodecCopy = 'copy';
+                audioCodecCopy = 'copy';
+            }
+            catch (e) {
+            }
         }
 
         const audioRtpTrack: RtpTrack = {
