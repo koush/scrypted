@@ -3,7 +3,7 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { Camera, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import axios, { Axios } from "axios";
 import https from 'https';
 import jimp from 'jimp';
@@ -95,6 +95,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             choices: [
                 'Default',
                 'Full Resolution',
+                'Requested Resolution',
             ],
             defaultValue: 'Default',
             hide: !this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera),
@@ -149,12 +150,36 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     takePicture = async (options?: RequestPictureOptions) => {
                         // if operating in full resolution mode, nuke any picture options containing
                         // the requested dimensions that are sent.
-                        if (this.storageSettings.values.snapshotResolution === 'Full Resolution' && options)
-                            options.picture = undefined;
+                        let picture = options?.picture;
+                        let psos: ResponsePictureOptions[];
+                        let needResize = false;
+                        if (options
+                            && (this.storageSettings.values.snapshotResolution === 'Full Resolution'
+                                || (this.storageSettings.values.snapshotResolution === 'Requested Resolution'
+                                    || this.storageSettings.values.snapshotResolution === 'Default'
+                                    && (options.picture?.width || options.picture?.height)))
+                        ) {
+                            if (this.storageSettings.values.snapshotResolution === 'Default') {
+                                try {
+                                    if (!psos)
+                                        psos = await this.mixinDevice.getPictureOptions();
+                                    if (!psos?.[0].canResize) {
+                                        needResize = true;
+                                    }
+                                }
+                                catch (e) {
+                                }
+                            }
+                            else {
+                                needResize = true;
+                                options.picture = undefined;
+                            }
+                        }
 
                         if (!options?.id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
                             try {
-                                const psos = await this.mixinDevice.getPictureOptions();
+                                if (!psos)
+                                    psos = await this.mixinDevice.getPictureOptions();
                                 const pso = psos.find(pso => pso.name === this.storageSettings.values.defaultSnapshotChannel);
                                 if (!options)
                                     options = {};
@@ -163,7 +188,16 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                             catch (e) {
                             }
                         }
-                        return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
+                        const ret = await this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
+                        if (!needResize)
+                            return ret;
+                        const image = await jimp.read(ret);
+                        const scale = Math.max((picture.width / image.getWidth()) || 0,
+                            (picture.height / image.getHeight()) || 0);
+                        if (Math.abs(1 - scale) < .2)
+                            return ret;
+                        image.scale(scale);
+                        return image.getBufferAsync('image/jpeg');
                     };
                 }
                 else if (this.storageSettings.values.snapshotsFromPrebuffer) {
@@ -213,7 +247,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             const pendingPicture = (async () => {
                 let picture: Buffer;
                 try {
-                    picture = await takePicture();
+                    picture = await takePicture(options);
                     picture = await this.cropAndScale(picture);
                     this.clearCachedPictures();
                     this.currentPicture = picture;
@@ -304,7 +338,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             const img = await jimp.read(buffer);
             let pw = xmax - xmin;
             let ph = pw / (16 / 9);
-    
+
             const x = Math.round(xmin * img.getWidth());
             const w = Math.round(xmax * img.getWidth()) - x;
             const ymid = (ymin + ymax) / 2;
