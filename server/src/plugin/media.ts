@@ -1,8 +1,8 @@
-import pathToFfmpeg from 'ffmpeg-static';
 import { BufferConverter, BufferConvertorOptions, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
 import child_process from 'child_process';
 import { once } from 'events';
+import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
 import mimeType from 'mime';
@@ -10,9 +10,8 @@ import mkdirp from "mkdirp";
 import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
-import rimraf from "rimraf";
-import tmp from 'tmp';
 import MimeType from 'whatwg-mimetype';
+import { safeKillFFmpeg } from '../media-helpers';
 import { MediaObjectRemote } from "./plugin-api";
 
 function typeMatches(target: string, candidate: string): boolean {
@@ -126,36 +125,47 @@ export abstract class MediaManagerBase implements MediaManager {
             convert: async (data, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<Buffer> => {
                 const console = this.getMixinConsole(options?.sourceId, undefined);
 
+                const mt = new MimeType(toMimeType);
+
                 const ffInput: FFmpegInput = JSON.parse(data.toString());
 
                 const args = [
                     '-hide_banner',
+                    '-y',
                 ];
                 args.push(...ffInput.inputArguments);
 
-                const tmpfile = tmp.fileSync();
-                try {
-                    args.push('-y', "-vframes", "1", '-f', 'image2', tmpfile.name);
+                const width = parseInt(mt.parameters.get('width'));
+                const height = parseInt(mt.parameters.get('height'));
 
-                    const cp = child_process.spawn(await this.getFFmpegPath(), args);
-                    console.log('converting ffmpeg input to image.');
-                    // ffmpegLogInitialOutput(console, cp);
-                    cp.on('error', (code) => {
-                        console.error('ffmpeg error code', code);
-                    })
-                    const to = setTimeout(() => {
-                        console.log('ffmpeg stream to image convesion timed out.');
-                        cp.kill('SIGKILL');
-                    }, 10000);
-                    clearTimeout(to);
-                    const [exitCode] = await once(cp, 'exit');
-                    if (exitCode)
-                        throw new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`);
-                    return fs.readFileSync(tmpfile.name);
+                if (mt.parameters.get('width') || mt.parameters.get('height')) {
+                    args.push(
+                        '-vf', `scale=${width || -1}:${height || -1}`,
+                    );
                 }
-                finally {
-                    rimraf.sync(tmpfile.name);
-                }
+
+                args.push("-vframes", "1", '-f', 'image2', 'pipe:3');
+
+                const buffers: Buffer[] = [];
+
+                const cp = child_process.spawn(await this.getFFmpegPath(), args, {
+                    stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+                });
+                console.log('converting ffmpeg input to image.');
+                // ffmpegLogInitialOutput(console, cp);
+                cp.on('error', (code) => {
+                    console.error('ffmpeg error code', code);
+                });
+                cp.stdio[3].on('data', data => buffers.push(data));
+                const to = setTimeout(() => {
+                    console.log('ffmpeg stream to image convesion timed out.');
+                    safeKillFFmpeg(cp);
+                }, 10000);
+                const [exitCode] = await once(cp, 'exit');
+                clearTimeout(to);
+                if (exitCode)
+                    throw new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`);
+                return Buffer.concat(buffers);
             }
         });
     }
@@ -400,13 +410,21 @@ export abstract class MediaManagerBase implements MediaManager {
         let value = await mediaObject.getData();
         let valueMime = new MimeType(mediaObject.mimeType);
 
-        for (const node of route) {
+        while (route.length) {
+            const node = route.shift();
             const converter = converterReverseids.get(node);
             const converterToMimeType = new MimeType(converter.toMimeType);
             const converterFromMimeType = new MimeType(converter.fromMimeType);
             const type = converterToMimeType.type === '*' ? valueMime.type : converterToMimeType.type;
             const subtype = converterToMimeType.subtype === '*' ? valueMime.subtype : converterToMimeType.subtype;
-            const targetMimeType = `${type}/${subtype}`;
+            let targetMimeType = `${type}/${subtype}`;
+            if (!route.length && outputMime.parameters.size) {
+                const withParameters = new MimeType(targetMimeType);
+                for (const k of outputMime.parameters.keys()) {
+                    withParameters.parameters.set(k, outputMime.parameters.get(k));
+                }
+                targetMimeType = outputMime.toString();
+            }
 
             if (converter.toMimeType === ScryptedMimeTypes.MediaObject) {
                 const mo = await converter.convert(value, valueMime.essence, toMimeType, { sourceId }) as MediaObject;
