@@ -72,13 +72,18 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         return pluginsPromise;
     }
 
+    const deviceConsoles = new Map<string, Console>();
     const getDeviceConsole = (nativeId?: ScryptedNativeId) => {
         // the the plugin console is simply the default console
         // and gets read from stderr/stdout.
         if (!nativeId)
             return console;
 
-        return getConsole(async (stdout, stderr) => {
+        let ret = deviceConsoles.get(nativeId);
+        if (ret)
+            return ret;
+
+        ret = getConsole(async (stdout, stderr) => {
             const connect = async () => {
                 const plugins = await getPlugins();
                 const port = await plugins.getRemoteServicePort(peer.selfName, 'console-writer');
@@ -99,10 +104,25 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             };
             connect();
         }, undefined, undefined);
+
+        deviceConsoles.set(nativeId, ret);
+        return ret;
     }
 
+    const mixinConsoles = new Map<string, Map<string, Console>>();
+
     const getMixinConsole = (mixinId: string, nativeId: ScryptedNativeId) => {
-        return getConsole(async (stdout, stderr) => {
+        let nativeIdConsoles = mixinConsoles.get(nativeId);
+        if (!nativeIdConsoles) {
+            nativeIdConsoles = new Map();
+            mixinConsoles.set(nativeId, nativeIdConsoles);
+        }
+
+        let ret = nativeIdConsoles.get(mixinId);
+        if (ret)
+            return ret;
+
+        ret = getConsole(async (stdout, stderr) => {
             if (!mixinId) {
                 return;
             }
@@ -153,6 +173,9 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             }
             tryConnect();
         }, getDeviceConsole(nativeId), `[${systemManager.getDeviceById(mixinId)?.name}]`);
+
+        nativeIdConsoles.set(mixinId, ret);
+        return ret;
     }
 
     peer.getParam('updateStats').then((updateStats: (stats: any) => void) => {

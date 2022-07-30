@@ -15,6 +15,7 @@
             "preLaunchTask": "npm: build",
             "program": "${workspaceFolder}/dist/scrypted-main.js",
             "runtimeArgs": [
+                "--trace-warnings",
                 "--expose-gc",
                 "--nolazy",
             ],
@@ -28,33 +29,6 @@
             ],
             "env": {
                 // "SCRYPTED_SHARED_WORKER": "true",
-                "DEBUG": "/scrypted/*",
-            }
-        },
-        {
-            "autoAttachChildProcesses": false,
-            "type": "pwa-node",
-            "request": "launch",
-            "name": "Launch Program TS Node",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceFolder}/src/scrypted-main.ts",
-            "runtimeArgs": [
-                "--expose-gc",
-                "--nolazy",
-                "-r",
-                "ts-node/register"
-            ],
-            "sourceMaps": true,
-            "resolveSourceMapLocations": [
-                "${workspaceFolder}/**",
-                "!**/node_modules/**"
-            ],
-            "outFiles": [
-                "${workspaceFolder}/**/*.js"
-            ],
-            "env": {
                 "DEBUG": "/scrypted/*",
             }
         },
