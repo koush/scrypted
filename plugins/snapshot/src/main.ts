@@ -6,8 +6,9 @@ import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/c
 import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import axios, { Axios } from "axios";
 import https from 'https';
-import jimp from 'jimp';
 import { newThread } from '../../../server/src/threading';
+import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
+import path from 'path';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -191,13 +192,11 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                         const ret = await this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
                         if (!needResize)
                             return ret;
-                        const image = await jimp.read(ret);
-                        const scale = Math.max((picture.width / image.getWidth()) || 0,
-                            (picture.height / image.getHeight()) || 0);
-                        if (Math.abs(1 - scale) < .2)
-                            return ret;
-                        image.scale(scale);
-                        return image.getBufferAsync('image/jpeg');
+
+                        return ffmpegFilterImageBuffer(ret, {
+                            resize: picture,
+                            timeout: 10000,
+                        });
                     };
                 }
                 else if (this.storageSettings.values.snapshotsFromPrebuffer) {
@@ -324,29 +323,15 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const xmax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => x)) / 100;
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
-        this.console.log(xmin, ymin, xmax, ymax);
-        return newThread({ jimp }, {
-            buffer,
-            xmin, xmax,
-            ymin, ymax,
-        }, async ({
-            jimp,
-            buffer,
-            xmin, xmax,
-            ymin, ymax,
-        }) => {
-            const img = await jimp.read(buffer);
-            let pw = xmax - xmin;
-            let ph = pw / (16 / 9);
-
-            const x = Math.round(xmin * img.getWidth());
-            const w = Math.round(xmax * img.getWidth()) - x;
-            const ymid = (ymin + ymax) / 2;
-            let y = Math.round((ymid - ph / 2) * img.getHeight());
-            let h = Math.round((ymid + ph / 2) * img.getHeight()) - y;
-            img.crop(x, y, w, h);
-            const cropped = await img.getBufferAsync('image/jpeg');
-            return cropped;
+        return ffmpegFilterImageBuffer(buffer, {
+            crop: {
+                fractional: true,
+                left: xmin,
+                top: ymin,
+                width: xmax - xmin,
+                height: ymax - ymin,
+            },
+            timeout: 10000,
         });
     }
 
@@ -409,36 +394,35 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     async createTextErrorImage(text: string) {
         const errorBackground = this.currentPicture || this.lastAvailablePicture;
         this.console.log('creating error image with background', text, !!errorBackground);
-        return newThread({ jimp }, {
-            errorBackground,
-            text,
-        }, async ({ errorBackground, text, jimp }) => {
-            const fontPromise = jimp.loadFont(jimp.FONT_SANS_64_WHITE);
 
-            if (!errorBackground) {
-                const img = await jimp.create(1920 / 2, 1080 / 2);
-                const font = await fontPromise;
-                img.print(font, 0, 0, {
+        const pluginVolume = process.env.SCRYPTED_PLUGIN_VOLUME;
+        const unzippedFs = path.join(pluginVolume, 'zip/unzipped/fs');
+        const fontFile = path.join(unzippedFs, 'Lato-Bold.ttf');
+
+        if (!errorBackground) {
+            const black = path.join(unzippedFs, 'black.jpg');
+            return ffmpegFilterImage([
+                '-i', black,
+            ], {
+                blur: true,
+                text: {
+                    fontFile,
                     text,
-                    alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                    alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-                }, img.getWidth(), img.getHeight());
-                return img.getBufferAsync('image/jpeg');
-            }
-            else {
-                const img = await jimp.read(errorBackground);
-                img.resize(1920 / 2, jimp.AUTO);
-                img.blur(8);
-                img.brightness(-.2);
-                const font = await fontPromise;
-                img.print(font, 0, 0, {
+                },
+                timeout: 10000,
+            })
+        }
+        else {
+            return ffmpegFilterImageBuffer(errorBackground, {
+                blur: true,
+                brightness: -.2,
+                text: {
+                    fontFile,
                     text,
-                    alignmentX: jimp.HORIZONTAL_ALIGN_CENTER,
-                    alignmentY: jimp.VERTICAL_ALIGN_MIDDLE,
-                }, img.getWidth(), img.getHeight());
-                return img.getBufferAsync('image/jpeg');
-            }
-        })
+                },
+                timeout: 10000,
+            });
+        }
     }
 
     async getPictureOptions() {

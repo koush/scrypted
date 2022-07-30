@@ -28,9 +28,6 @@
          "MixinProvider"
       ]
    },
-   "optionalDependencies": {
-      "jimp": "^0.16.1"
-   },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
       "@types/node": "^16.6.1",
