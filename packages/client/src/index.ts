@@ -278,7 +278,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             buffers.push(Buffer.from(message.data));
                             resolve(undefined);
 
-                            process.nextTick(() => {
+                            setTimeout(() => {
                                 if (buffers) {
                                     for (const buffer of buffers) {
                                         serializer.onData(Buffer.from(buffer));
@@ -286,7 +286,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                                     buffers = undefined;
                                 }
                                 dc.onmessage = message => serializer.onData(Buffer.from(message.data));
-                            });
+                            }, 0);
                         };
                     });
 
