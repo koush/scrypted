@@ -111,61 +111,12 @@ export abstract class MediaManagerBase implements MediaManager {
             }
         });
 
+        // todo: move this to snapshot plugin
         this.builtinConverters.push({
             fromMimeType: 'image/*',
             toMimeType: 'image/*',
             convert: async (data, fromMimeType: string): Promise<Buffer> => {
                 return data as Buffer;
-            }
-        });
-
-        this.builtinConverters.push({
-            fromMimeType: ScryptedMimeTypes.FFmpegInput,
-            toMimeType: 'image/jpeg',
-            convert: async (data, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<Buffer> => {
-                const console = this.getMixinConsole(options?.sourceId, undefined);
-
-                const mt = new MimeType(toMimeType);
-
-                const ffInput: FFmpegInput = JSON.parse(data.toString());
-
-                const args = [
-                    '-hide_banner',
-                    '-y',
-                ];
-                args.push(...ffInput.inputArguments);
-
-                const width = parseInt(mt.parameters.get('width'));
-                const height = parseInt(mt.parameters.get('height'));
-
-                if (mt.parameters.get('width') || mt.parameters.get('height')) {
-                    args.push(
-                        '-vf', `scale=${width || -1}:${height || -1}`,
-                    );
-                }
-
-                args.push("-vframes", "1", '-f', 'image2', 'pipe:3');
-
-                const buffers: Buffer[] = [];
-
-                const cp = child_process.spawn(await this.getFFmpegPath(), args, {
-                    stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-                });
-                console.log('converting ffmpeg input to image.');
-                // ffmpegLogInitialOutput(console, cp);
-                cp.on('error', (code) => {
-                    console.error('ffmpeg error code', code);
-                });
-                cp.stdio[3].on('data', data => buffers.push(data));
-                const to = setTimeout(() => {
-                    console.log('ffmpeg stream to image convesion timed out.');
-                    safeKillFFmpeg(cp);
-                }, 10000);
-                const [exitCode] = await once(cp, 'exit');
-                clearTimeout(to);
-                if (exitCode)
-                    throw new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`);
-                return Buffer.concat(buffers);
             }
         });
     }
