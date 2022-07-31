@@ -39,7 +39,7 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
         const height = crop.fractional ? `ih*${crop.height}` : crop.height;
 
         const filter = `crop=${width}:${height}:${left}:${top}`;
-        addVideoFilterArguments(inputArguments, filter, 'snapshotResize');
+        addVideoFilterArguments(inputArguments, filter, 'snapshotCrop');
     }
 
     if (options.resize) {
@@ -52,17 +52,18 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
     }
 
     if (options.brightness) {
-        addVideoFilterArguments(inputArguments, `eq=brightness=${options.brightness}`);
+        addVideoFilterArguments(inputArguments, `eq=brightness=${options.brightness}`, 'snapshotEq');
     }
 
     if (options.blur) {
-        addVideoFilterArguments(inputArguments, 'gblur=sigma=25');
+        addVideoFilterArguments(inputArguments, 'gblur=sigma=25', 'snapshotBlur');
     }
 
     if (options.text) {
         const { text } = options;
         addVideoFilterArguments(inputArguments,
-            `drawtext=fontfile=${text.fontFile}:text='${text.text}':fontcolor=white:fontsize=h/8:x=(w-text_w)/2:y=(h-text_h)/2`);
+            `drawtext=fontfile=${text.fontFile}:text='${text.text}':fontcolor=white:fontsize=h/8:x=(w-text_w)/2:y=(h-text_h)/2`,
+            'snapshotText');
     }
 
     return [
@@ -108,7 +109,7 @@ export async function ffmpegFilterImage(inputArguments: string[], options: FFmpe
         ...outputArguments,
     ];
 
-    console.log(args);
+    // console.log(args);
 
     const cp = child_process.spawn(options.ffmpegPath || 'ffmpeg',
         args, {

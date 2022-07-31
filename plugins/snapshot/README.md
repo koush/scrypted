@@ -1,3 +1,5 @@
 # Snapshot Plugin for Scrypted
 
-Add custom Snapshot URLs to any camera.
+The Snapshot Plugin is a core plugin that provides video to image conversion and image manipulation functionality.
+
+This plugin can be enabled on cameras to add custom snapshot URLs, crop and scale the snapshots, and improves camera snapshot responsiveness.

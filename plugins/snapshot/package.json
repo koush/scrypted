@@ -25,16 +25,19 @@
       "name": "Snapshot Plugin",
       "type": "API",
       "interfaces": [
-         "MixinProvider"
+         "MixinProvider",
+         "BufferConverter"
       ]
    },
    "dependencies": {
       "@koush/axios-digest-auth": "^0.8.5",
       "@types/node": "^16.6.1",
-      "axios": "^0.24.0"
+      "axios": "^0.24.0",
+      "whatwg-mimetype": "^3.0.0"
    },
    "devDependencies": {
       "@scrypted/common": "file:../../common",
-      "@scrypted/sdk": "file:../../sdk"
+      "@scrypted/sdk": "file:../../sdk",
+      "@types/whatwg-mimetype": "^2.1.1"
    }
 }

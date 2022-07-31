@@ -3,12 +3,13 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { Camera, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import axios, { Axios } from "axios";
 import https from 'https';
 import { newThread } from '../../../server/src/threading';
 import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 import path from 'path';
+import MimeType from 'whatwg-mimetype';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -123,6 +124,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
+        const eventSnapshot = options?.reason === 'event';
+
         let takePicture: (options?: RequestPictureOptions) => Promise<Buffer>;
         if (this.storageSettings.values.snapshotsFromPrebuffer) {
             try {
@@ -135,10 +138,13 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     };
 
                     const request = prebufferChannel as RequestMediaStreamOptions;
+                    // specify the prebuffer based on the usage. events shouldn't request
+                    // lengthy prebuffers as it may not contain the image it needs.
+                    request.prebuffer = eventSnapshot ? 1000 : 6000;
                     if (this.lastAvailablePicture)
                         request.refresh = false;
                     takePicture = async () => mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
-                    this.console.log('snapshotting active prebuffer');
+                    // this.console.log('snapshotting active prebuffer');
                 }
             }
             catch (e) {
@@ -279,21 +285,24 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             // this also has a side effect of only allowing snapshots every 5 seconds.
             pendingPicture.finally(() => {
                 clearTimeout(failureTimeout);
-                setTimeout(() => {
-                    if (this.pendingPicture === pendingPicture)
-                        this.pendingPicture = undefined;
-                }, 5000);
+                if (this.pendingPicture === pendingPicture)
+                    this.pendingPicture = undefined;
             });
         }
 
-        // this triggers an event to refresh the web ui.
-        // but only trigger a refresh if this call fetched the picture.
-        if (!hadPendingPicture)
-            this.pendingPicture.then(() => this.onDeviceEvent(ScryptedInterface.Camera, undefined));
+        let { snapshotMode } = this.storageSettings.values;
+        if (eventSnapshot) {
+            // event snapshots must be fulfilled
+            snapshotMode = 'Default';
+        }
+        else if (snapshotMode === 'Never Wait' && !options?.periodicRequest) {
+            // non periodic snapshots should use a short timeout.
+            snapshotMode = 'Timeout';
+        }
 
         let data: Buffer;
         try {
-            switch (this.storageSettings.values.snapshotMode) {
+            switch (snapshotMode) {
                 case 'Never Wait':
                     throw new NeverWaitError();
                 case 'Timeout':
@@ -438,7 +447,91 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
     }
 }
 
-class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider {
+type DimDict<T extends string> = {
+    [key in T]: string;
+};
+
+export function parseDims<T extends string>(dict: DimDict<T>) {
+    const ret: {
+        [key in T]?: number;
+    } & {
+        fractional?: boolean;
+    } = {
+    };
+
+    for (const t of Object.keys(dict)) {
+        const val = dict[t as T];
+        if (val?.endsWith('%')) {
+            ret.fractional = true;
+            ret[t] = parseFloat(val?.substring(0, val?.length - 1)) / 100;
+        }
+        else {
+            ret[t] = parseFloat(val);
+        }
+    }
+    return ret;
+}
+
+class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter {
+    constructor(nativeId?: string) {
+        super(nativeId);
+
+        this.fromMimeType = ScryptedMimeTypes.FFmpegInput;
+        this.toMimeType = 'image/jpeg';
+    }
+
+    async convert(data: any, fromMimeType: string, toMimeType: string, options?: BufferConvertorOptions): Promise<any> {
+        const mime = new MimeType(toMimeType);
+
+        const ffmpegInput = JSON.parse(data.toString()) as FFmpegInput;
+
+        const args = [
+            ...ffmpegInput.inputArguments,
+            ...(ffmpegInput.h264EncoderArguments || []),
+        ];
+
+        const {
+            width,
+            height,
+            fractional
+        } = parseDims({
+            width: mime.parameters.get('width'),
+            height: mime.parameters.get('height'),
+        });
+
+        const {
+            left,
+            top,
+            right,
+            bottom,
+            fractional: cropFractional,
+        } = parseDims({
+            left: mime.parameters.get('left'),
+            top: mime.parameters.get('top'),
+            right: mime.parameters.get('right'),
+            bottom: mime.parameters.get('bottom'),
+        });
+
+        return ffmpegFilterImage(args, {
+            resize: (isNaN(width) && isNaN(height))
+                ? undefined
+                : {
+                    width,
+                    height,
+                    fractional,
+                },
+            crop: (isNaN(left) && isNaN(top) && isNaN(right) && isNaN(bottom))
+                ? undefined
+                : {
+                    left,
+                    top,
+                    width: right - left,
+                    height: bottom - top,
+                    fractional: cropFractional,
+                }
+        });
+    }
+
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell) && interfaces.includes(ScryptedInterface.VideoCamera))
             return [ScryptedInterface.Camera, ScryptedInterface.Settings];
@@ -469,4 +562,4 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider {
     }
 }
 
-export default new SnapshotPlugin();
+export default SnapshotPlugin;
