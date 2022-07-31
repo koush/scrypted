@@ -1,5 +1,5 @@
 import { MediaStreamTrack, RTCPeerConnection, RtpPacket } from "@koush/werift";
-import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
+import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import sdk, { FFmpegInput, FFmpegTranscodeStream, Intercom, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
@@ -211,7 +211,7 @@ export async function createRTCPeerConnectionSink(
 
             const width = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
             const scaleFilter = `scale='min(${width},iw)':-2`;
-            addH264VideoFilterArguments(videoTranscodeArguments, scaleFilter);
+            addVideoFilterArguments(videoTranscodeArguments, scaleFilter);
 
             if (transcodeBaseline) {
                 // baseline profile must use libx264, not sure other encoders properly support it.
