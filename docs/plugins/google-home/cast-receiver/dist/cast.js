@@ -1,5 +1,5 @@
-import { RpcPeer } from './rpc';
-import { BrowserSignalingSession } from './rtc-signaling';
+import { RpcPeer } from './rpc.js';
+import { BrowserSignalingSession } from './rtc-signaling.js';
 document.addEventListener("DOMContentLoaded", function (event) {
     const options = new cast.framework.CastReceiverOptions();
     options.disableIdleTimeout = true;

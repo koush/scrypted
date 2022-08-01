@@ -1,4 +1,4 @@
-import { Deferred } from "./deferred";
+import { Deferred } from "./deferred.js";
 function getUserAgent() {
     try {
         return navigator.userAgent;

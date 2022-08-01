@@ -1,5 +1,5 @@
-import { RpcPeer } from './rpc';
-import { BrowserSignalingSession } from './rtc-signaling';
+import { RpcPeer } from './rpc.js';
+import { BrowserSignalingSession } from './rtc-signaling.js';
 
 declare const eio: any;
 declare const cast: any;
