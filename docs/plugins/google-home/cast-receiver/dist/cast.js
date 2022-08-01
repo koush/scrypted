@@ -56,8 +56,12 @@ document.addEventListener("DOMContentLoaded", function (event) {
                         cleanup();
                     }
                 });
-                const mediaStream = new MediaStream(pc.getReceivers().map((receiver) => receiver.track));
-                video.srcObject = mediaStream;
+                const applyTracks = () => {
+                    const mediaStream = new MediaStream(pc.getReceivers().map((receiver) => receiver.track));
+                    video.srcObject = mediaStream;
+                };
+                pc.ontrack = applyTracks;
+                applyTracks();
             });
             rpcPeer.params['session'] = session;
         });
