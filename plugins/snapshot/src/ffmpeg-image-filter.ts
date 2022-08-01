@@ -65,6 +65,8 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
             `drawtext=fontfile=${text.fontFile}:text='${text.text}':fontcolor=white:fontsize=h/8:x=(w-text_w)/2:y=(h-text_h)/2`,
             'snapshotText');
     }
+    
+    console.log(inputArguments);
 
     return [
         '-frames:v', '1',
