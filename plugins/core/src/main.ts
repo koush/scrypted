@@ -60,7 +60,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                 {
                     name: 'Media Core',
                     nativeId: 'mediacore',
-                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.BufferConverter],
+                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
                     type: ScryptedDeviceType.API,
                 },
             );
