@@ -1,3 +1,4 @@
+import { Deferred } from "./deferred";
 function getUserAgent() {
     try {
         return navigator.userAgent;
@@ -5,10 +6,38 @@ function getUserAgent() {
     catch (e) {
     }
 }
+// connectionState is not implemented in firefox? so watch iceConnectionState instead...
+export function waitPeerConnectionIceConnected(pc) {
+    return new Promise((resolve, reject) => {
+        if (pc.iceConnectionState === 'connected') {
+            resolve(undefined);
+            return;
+        }
+        pc.addEventListener('iceconnectionstatechange', () => {
+            if (pc.iceConnectionState === 'connected')
+                resolve(undefined);
+        });
+        waitPeerIceConnectionClosed(pc).then(reason => reject(new Error(reason)));
+    });
+}
+export function waitPeerIceConnectionClosed(pc) {
+    return new Promise(resolve => {
+        pc.addEventListener('iceconnectionstatechange', () => {
+            if (isPeerConnectionClosed(pc)) {
+                resolve(pc.iceConnectionState);
+            }
+        });
+    });
+}
+export function isPeerConnectionClosed(pc) {
+    return pc.iceConnectionState === 'disconnected'
+        || pc.iceConnectionState === 'failed'
+        || pc.iceConnectionState === 'closed';
+}
 export class BrowserSignalingSession {
-    peerConnectionCreated;
-    cleanup;
     pc;
+    pcDeferred = new Deferred();
+    dcDeferred = new Deferred();
     options = {
         userAgent: getUserAgent(),
         capabilities: {
@@ -26,12 +55,24 @@ export class BrowserSignalingSession {
             height: screen.height,
         },
     };
-    constructor(peerConnectionCreated, cleanup) {
-        this.peerConnectionCreated = peerConnectionCreated;
-        this.cleanup = cleanup;
+    constructor() {
     }
     async getOptions() {
         return this.options;
+    }
+    close() {
+        this.pcDeferred.promise.then(pc => {
+            for (const t of pc.getTransceivers() || []) {
+                try {
+                    t.sender?.track?.stop?.();
+                }
+                catch (e) {
+                }
+            }
+            pc.close();
+        })
+            .catch(() => { });
+        this.pcDeferred.reject(new Error('iceConnectionState ' + this.pc?.iceConnectionState));
     }
     async createPeerConnection(setup) {
         if (this.pc)
@@ -39,62 +80,61 @@ export class BrowserSignalingSession {
         const checkConn = () => {
             console.log('iceConnectionState', pc.iceConnectionState);
             console.log('connectionState', pc.connectionState);
-            if (pc.iceConnectionState === 'disconnected'
-                || pc.iceConnectionState === 'failed'
-                || pc.iceConnectionState === 'closed') {
-                this.cleanup?.();
-            }
-            if (pc.connectionState === 'closed'
-                || pc.connectionState === 'disconnected'
-                || pc.connectionState === 'failed') {
-                this.cleanup?.();
-            }
+            if (isPeerConnectionClosed(pc))
+                this.close();
         };
         const pc = this.pc = new RTCPeerConnection(setup.configuration);
-        await this.peerConnectionCreated?.(pc);
+        this.pcDeferred.resolve(pc);
         pc.addEventListener('connectionstatechange', checkConn);
         pc.addEventListener('iceconnectionstatechange', checkConn);
         pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState));
         pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState));
         pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'));
-        if (setup.datachannel)
-            this.pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
-        if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
-            try {
-                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
-                const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                for (const track of mic.getTracks()) {
-                    this.pc.addTrack(track);
+        if (setup.datachannel) {
+            const dc = pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
+            dc.binaryType = 'arraybuffer';
+            this.dcDeferred.resolve(dc);
+        }
+        if (setup.audio) {
+            if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
+                try {
+                    // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                    const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                    for (const track of mic.getTracks()) {
+                        pc.addTrack(track);
+                    }
+                }
+                catch (e) {
+                    let silence = () => {
+                        let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+                        const dest = ctx.createMediaStreamDestination();
+                        oscillator.connect(dest);
+                        oscillator.start();
+                        return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
+                    };
+                    pc.addTrack(silence());
                 }
             }
-            catch (e) {
-                let silence = () => {
-                    let ctx = new AudioContext(), oscillator = ctx.createOscillator();
-                    const dest = ctx.createMediaStreamDestination();
-                    oscillator.connect(dest);
-                    oscillator.start();
-                    return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
-                };
-                this.pc.addTrack(silence());
+            else {
+                pc.addTransceiver('audio', setup.audio);
             }
         }
-        else {
-            this.pc.addTransceiver('audio', setup.audio);
-        }
-        if (setup.video.direction === 'sendrecv' || setup.video.direction === 'sendonly') {
-            try {
-                // doing sendrecv on safari requires a mic be attached, or it fails to connect.
-                const camera = await navigator.mediaDevices.getUserMedia({ video: true });
-                for (const track of camera.getTracks()) {
-                    this.pc.addTrack(track);
+        if (setup.video) {
+            if (setup.video.direction === 'sendrecv' || setup.video.direction === 'sendonly') {
+                try {
+                    // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+                    const camera = await navigator.mediaDevices.getUserMedia({ video: true });
+                    for (const track of camera.getTracks()) {
+                        pc.addTrack(track);
+                    }
+                }
+                catch (e) {
+                    // what now
                 }
             }
-            catch (e) {
-                // what now
+            else {
+                pc.addTransceiver('video', setup.video);
             }
-        }
-        else {
-            this.pc.addTransceiver('video', setup.video);
         }
     }
     async createLocalDescription(type, setup, sendIceCandidate) {
@@ -115,7 +155,7 @@ export class BrowserSignalingSession {
             };
         });
         const toDescription = (init) => {
-            console.log('local description', init.sdp);
+            // console.log('local description', init.sdp);
             return {
                 type: init.type,
                 sdp: init.sdp,
@@ -123,8 +163,8 @@ export class BrowserSignalingSession {
         };
         if (type === 'offer') {
             let offer = await this.pc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
+                offerToReceiveAudio: !!setup.audio,
+                offerToReceiveVideo: !!setup.video,
             });
             const set = this.pc.setLocalDescription(offer);
             if (sendIceCandidate)
@@ -132,8 +172,8 @@ export class BrowserSignalingSession {
             await set;
             await gatheringPromise;
             offer = await this.pc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
+                offerToReceiveAudio: !!setup.audio,
+                offerToReceiveVideo: !!setup.video,
             });
             return toDescription(offer);
         }
@@ -149,20 +189,42 @@ export class BrowserSignalingSession {
         }
     }
     async setRemoteDescription(description, setup) {
+        await this.createPeerConnection(setup);
         await this.pc.setRemoteDescription(description);
-        console.log('remote description', description.sdp);
+        // console.log('remote description', description.sdp);
     }
     async addIceCandidate(candidate) {
         await this.pc.addIceCandidate(candidate);
-        console.log("remote candidate", candidate);
+        // console.log("remote candidate", candidate);
     }
     async endSession() {
     }
 }
 function logSendCandidate(console, type, session) {
     return async (candidate) => {
-        console.log(`${type} trickled candidate:`, candidate.candidate);
+        // console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
         return session.addIceCandidate(candidate);
+    };
+}
+function createCandidateQueue(console, type, session) {
+    let ready = false;
+    let candidateQueue = [];
+    const ls = logSendCandidate(console, type, session);
+    const queueSendCandidate = async (candidate) => {
+        if (!ready)
+            candidateQueue.push(candidate);
+        else
+            ls(candidate);
+    };
+    return {
+        flush() {
+            ready = true;
+            for (const candidate of candidateQueue) {
+                ls(candidate);
+            }
+            candidateQueue = [];
+        },
+        queueSendCandidate,
     };
 }
 export async function connectRTCSignalingClients(console, offerClient, offerSetup, answerClient, answerSetup) {
@@ -175,11 +237,15 @@ export async function connectRTCSignalingClients(console, offerClient, offerSetu
         throw new Error('Both RTC clients require offers and can not negotiate.');
     offerSetup.type = 'offer';
     answerSetup.type = 'answer';
-    const offer = await offerClient.createLocalDescription('offer', offerSetup, disableTrickle ? undefined : logSendCandidate(console, 'offer', answerClient));
-    console.log('offer sdp', offer.sdp);
+    const answerQueue = createCandidateQueue(console, 'offer', answerClient);
+    const offerQueue = createCandidateQueue(console, 'answer', offerClient);
+    const offer = await offerClient.createLocalDescription('offer', offerSetup, disableTrickle ? undefined : answerQueue.queueSendCandidate);
+    // console.log('offer sdp', offer.sdp);
     await answerClient.setRemoteDescription(offer, answerSetup);
-    const answer = await answerClient.createLocalDescription('answer', answerSetup, disableTrickle ? undefined : logSendCandidate(console, 'answer', offerClient));
-    console.log('answer sdp', answer.sdp);
+    answerQueue.flush();
+    const answer = await answerClient.createLocalDescription('answer', answerSetup, disableTrickle ? undefined : offerQueue.queueSendCandidate);
+    // console.log('answer sdp', answer.sdp);
     await offerClient.setRemoteDescription(answer, offerSetup);
+    offerQueue.flush();
 }
 //# sourceMappingURL=rtc-signaling.js.map

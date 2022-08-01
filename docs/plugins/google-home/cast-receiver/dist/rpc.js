@@ -68,8 +68,9 @@ class RpcProxy {
         // undefined is not JSON serializable.
         const method = target() || null;
         const args = [];
+        const serializationContext = {};
         for (const arg of (argArray || [])) {
-            args.push(this.peer.serialize(arg));
+            args.push(this.peer.serialize(arg, serializationContext));
         }
         const rpcApply = {
             type: "apply",
@@ -80,12 +81,12 @@ class RpcProxy {
         };
         if (this.proxyOneWayMethods?.includes?.(method)) {
             rpcApply.oneway = true;
-            this.peer.send(rpcApply);
+            this.peer.send(rpcApply, undefined, serializationContext);
             return Promise.resolve();
         }
         return this.peer.createPendingResult((id, reject) => {
             rpcApply.id = id;
-            this.peer.send(rpcApply, reject);
+            this.peer.send(rpcApply, reject, serializationContext);
         });
     }
 }
@@ -131,7 +132,6 @@ export class RpcPeer {
     peerName;
     send;
     idCounter = 1;
-    onOob;
     params = {};
     pendingResults = {};
     proxyCounter = 1;
@@ -173,6 +173,17 @@ export class RpcPeer {
     static PROPERTY_JSON_DISABLE_SERIALIZATION = '__json_disable_serialization';
     static PROPERTY_PROXY_PROPERTIES = '__proxy_props';
     static PROPERTY_JSON_COPY_SERIALIZE_CHILDREN = '__json_copy_serialize_children';
+    static PROBED_PROPERTIES = new Set([
+        'then',
+        'constructor',
+        '__proxy_id',
+        '__proxy_constructor',
+        '__proxy_peer',
+        RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS,
+        RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION,
+        RpcPeer.PROPERTY_PROXY_PROPERTIES,
+        RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN,
+    ]);
     constructor(selfName, peerName, send) {
         this.selfName = selfName;
         this.peerName = peerName;
@@ -224,12 +235,6 @@ export class RpcPeer {
             this.send(paramMessage, reject);
         });
     }
-    sendOob(oob) {
-        this.send({
-            type: 'oob',
-            oob,
-        });
-    }
     evalLocal(script, filename, coercedParams) {
         const params = Object.assign({}, this.params, coercedParams);
         let compile;
@@ -251,14 +256,14 @@ export class RpcPeer {
         result.result = e.name || 'no name';
         result.message = e.message || 'no message';
     }
-    deserialize(value) {
+    deserialize(value, deserializationContext) {
         if (!value)
             return value;
         const copySerializeChildren = value[RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN];
         if (copySerializeChildren) {
             const ret = {};
             for (const [key, val] of Object.entries(value)) {
-                ret[key] = this.deserialize(val);
+                ret[key] = this.deserialize(val, deserializationContext);
             }
             return ret;
         }
@@ -278,15 +283,15 @@ export class RpcPeer {
         }
         const deserializer = this.nameDeserializerMap.get(__remote_constructor_name);
         if (deserializer) {
-            return deserializer.deserialize(__serialized_value);
+            return deserializer.deserialize(__serialized_value, deserializationContext);
         }
         return value;
     }
-    serialize(value) {
+    serialize(value, serializationContext) {
         if (value?.[RpcPeer.PROPERTY_JSON_COPY_SERIALIZE_CHILDREN] === true) {
             const ret = {};
             for (const [key, val] of Object.entries(value)) {
-                ret[key] = this.serialize(val);
+                ret[key] = this.serialize(val, serializationContext);
             }
             return ret;
         }
@@ -320,7 +325,7 @@ export class RpcPeer {
             const serializer = this.nameDeserializerMap.get(serializerMapName);
             if (!serializer)
                 throw new Error('serializer not found for ' + serializerMapName);
-            const serialized = serializer.serialize(value);
+            const serialized = serializer.serialize(value, serializationContext);
             const ret = {
                 __remote_proxy_id: undefined,
                 __remote_proxy_finalizer_id: undefined,
@@ -360,17 +365,18 @@ export class RpcPeer {
         this.finalizers.register(rpc, localProxiedEntry);
         return proxy;
     }
-    async handleMessage(message) {
+    async handleMessage(message, deserializationContext) {
         try {
             switch (message.type) {
                 case 'param': {
                     const rpcParam = message;
+                    const serializationContext = {};
                     const result = {
                         type: 'result',
                         id: rpcParam.id,
-                        result: this.serialize(this.params[rpcParam.param])
+                        result: this.serialize(this.params[rpcParam.param], serializationContext)
                     };
-                    this.send(result);
+                    this.send(result, undefined, serializationContext);
                     break;
                 }
                 case 'apply': {
@@ -379,13 +385,14 @@ export class RpcPeer {
                         type: 'result',
                         id: rpcApply.id || '',
                     };
+                    const serializationContext = {};
                     try {
                         const target = this.localProxyMap[rpcApply.proxyId];
                         if (!target)
                             throw new Error(`proxy id ${rpcApply.proxyId} not found`);
                         const args = [];
                         for (const arg of (rpcApply.args || [])) {
-                            args.push(this.deserialize(arg));
+                            args.push(this.deserialize(arg, deserializationContext));
                         }
                         let value;
                         if (rpcApply.method) {
@@ -397,14 +404,14 @@ export class RpcPeer {
                         else {
                             value = await target(...args);
                         }
-                        result.result = this.serialize(value);
+                        result.result = this.serialize(value, serializationContext);
                     }
                     catch (e) {
                         // console.error('failure', rpcApply.method, e);
                         this.createErrorResult(result, e);
                     }
                     if (!rpcApply.oneway)
-                        this.send(result);
+                        this.send(result, undefined, serializationContext);
                     break;
                 }
                 case 'result': {
@@ -421,7 +428,7 @@ export class RpcPeer {
                         deferred.reject(e);
                         return;
                     }
-                    deferred.resolve(this.deserialize(rpcResult.result));
+                    deferred.resolve(this.deserialize(rpcResult.result, deserializationContext));
                     break;
                 }
                 case 'finalize': {
@@ -436,11 +443,6 @@ export class RpcPeer {
                         delete this.localProxyMap[rpcFinalize.__local_proxy_id];
                         this.localProxied.delete(local);
                     }
-                    break;
-                }
-                case 'oob': {
-                    const rpcOob = message;
-                    this.onOob?.(rpcOob.oob);
                     break;
                 }
                 default:
