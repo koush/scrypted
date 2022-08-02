@@ -312,33 +312,36 @@ export abstract class MediaManagerBase implements MediaManager {
             try {
                 const inputMime = new MimeType(converter.fromMimeType);
                 const convertedMime = new MimeType(converter.toMimeType);
+                // catch all converters should be heavily weighted so as not to use them.
+                const inputWeight = parseFloat(inputMime.parameters.get('converter-weight')) || (inputMime.essence === '*/*' ? 1000 : 1);
+                const convertedWeight = parseFloat(convertedMime.parameters.get('converter-weight')) || (convertedMime.essence === ScryptedMimeTypes.MediaObject ? 1000 : 1);
+                const conversionWeight = inputWeight + convertedWeight;
                 const targetId = converterIds.get(converter);
                 const node: any = nodes[targetId] = {};
+
+                // edge matches
                 for (const candidate of converters) {
                     try {
                         const candidateMime = new MimeType(candidate.fromMimeType);
                         if (!mimeMatches(convertedMime, candidateMime))
                             continue;
+                        const outputWeight = parseFloat(candidateMime.parameters.get('converter-weight')) || (candidateMime.essence === '*/*' ? 1000 : 1);
                         const candidateId = converterIds.get(candidate);
-                        node[candidateId] = 1;
+                        node[candidateId] = conversionWeight + outputWeight;
                     }
                     catch (e) {
                         console.warn('skipping converter due to error', e)
                     }
                 }
 
-                // edge matches
+                // source matches
                 if (mimeMatches(mediaMime, inputMime)) {
-                    const weight = parseFloat(inputMime.parameters.get('converter-weight'));
-                    // catch all converters should be heavily weighted so as not to use them.
-                    mediaNode[targetId] = weight || (inputMime.essence === '*/*' ? 1000 : 1);
+                    mediaNode[targetId] = conversionWeight;
                 }
 
                 // target output matches
                 if (mimeMatches(outputMime, convertedMime) || converter.toMimeType === ScryptedMimeTypes.MediaObject) {
-                    const weight = parseFloat(inputMime.parameters.get('converter-weight'));
-                    // catch all converters should be heavily weighted so as not to use them.
-                    node['output'] = weight || (convertedMime.essence === ScryptedMimeTypes.MediaObject ? 1000 : 1);
+                    node['output'] = conversionWeight;
                 }
             }
             catch (e) {
