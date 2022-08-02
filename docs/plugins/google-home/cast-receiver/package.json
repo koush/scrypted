@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "webpack-cli --devtool source-map --mode production -o js --entry ./dist/docs/plugins/google-home/cast-receiver/src/cast.js",
+    "build": "webpack-cli --devtool inline-source-map --mode production -o js --entry ./dist/docs/plugins/google-home/cast-receiver/src/cast.js",
     "prebuild": "rimraf js && rimraf dist && tsc"
   },
   "dependencies": {
