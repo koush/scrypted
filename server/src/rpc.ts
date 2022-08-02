@@ -321,7 +321,8 @@ export class RpcPeer {
         const params = Object.assign({}, this.params, coercedParams);
         let compile: CompileFunction;
         try {
-            compile = require('vm').compileFunction;;
+            // prevent bundlers from trying to include non-existent vm module.
+            compile = module[`require`]('vm').compileFunction;
         }
         catch (e) {
             compile = compileFunction;
