@@ -216,15 +216,24 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         let { allInterfaces } = await previousEntry;
         try {
             const mixinProvider = this.scrypted.getDevice(mixinId) as ScryptedDevice & MixinProvider;
-            const interfaces = mixinProvider?.interfaces?.includes(ScryptedInterface.MixinProvider) && await mixinProvider?.canMixin(type, allInterfaces) as any as ScryptedInterface[];
+            const isMixinProvider = mixinProvider?.interfaces?.includes(ScryptedInterface.MixinProvider);
+            const interfaces = isMixinProvider && await mixinProvider?.canMixin(type, allInterfaces) as any as ScryptedInterface[];
             if (!interfaces) {
                 // this is not an error
                 // do not advertise interfaces so it is skipped during
                 // vtable lookup.
-                console.log(`mixin provider ${mixinId} can no longer mixin ${this.id}`);
-                const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
-                this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
-                this.scrypted.datastore.upsert(pluginDevice);
+                if (!mixinProvider || (isMixinProvider && !interfaces)) {
+                    console.log(`Mixin provider ${mixinId} can no longer mixin ${this.id}. Removing.`, {
+                        mixinProvider: !!mixinProvider,
+                        interfaces,
+                    });
+                    const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+                    this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
+                    this.scrypted.datastore.upsert(pluginDevice);
+                }
+                else {
+                    console.log(`Mixin provider ${mixinId} can not mixin ${this.id}. It is no longer a MixinProvider. This may be temporary. Passing through.`);
+                }
                 return {
                     passthrough: true,
                     allInterfaces,
