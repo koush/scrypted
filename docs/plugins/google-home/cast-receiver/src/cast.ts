@@ -1,5 +1,5 @@
-import { RpcPeer } from './rpc';
-import { BrowserSignalingSession } from './rtc-signaling';
+import { RpcPeer } from '../../../../../server/src/rpc';
+import { BrowserSignalingSession } from '../../../../../common/src/rtc-signaling';
 
 declare const eio: any;
 declare const cast: any;
@@ -70,11 +70,13 @@ document.addEventListener("DOMContentLoaded", function (event) {
           }
         });
 
+
         const mediaStream = new MediaStream(
           pc.getReceivers().map((receiver) => receiver.track)
         );
+        pc.ontrack = e => mediaStream.addTrack(e.track);
         video.srcObject = mediaStream;
-      })
+      });
 
       rpcPeer.params['session'] = session;
     });

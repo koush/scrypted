@@ -1,8 +1,11 @@
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
+import { sleep } from '@scrypted/common/src/sleep';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import child_process, { ChildProcess } from 'child_process';
 import { once } from 'events';
 import { Writable } from 'stream';
+import { Pipe2Jpeg } from './pipe2jpeg';
+import crypto from 'crypto'
 
 export interface FFmpegImageFilterOptions {
     blur?: boolean;
@@ -27,6 +30,8 @@ export interface FFmpegImageFilterOptions {
         width: number;
         height: number;
     };
+
+    time?: number;
 }
 
 function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegImageFilterOptions) {
@@ -65,14 +70,8 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
             `drawtext=fontfile=${text.fontFile}:text='${text.text}':fontcolor=white:fontsize=h/8:x=(w-text_w)/2:y=(h-text_h)/2`,
             'snapshotText');
     }
-    
-    console.log(inputArguments);
 
-    return [
-        '-frames:v', '1',
-        '-f', 'image2',
-        'pipe:3',
-    ]
+    // console.log(inputArguments);
 }
 
 export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpegImageFilterOptions) {
@@ -80,7 +79,12 @@ export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpeg
         '-i', 'pipe:4',
     ];
 
-    const outputArguments = ffmpegCreateOutputArguments(inputArguments, options);
+    ffmpegCreateOutputArguments(inputArguments, options);
+    const outputArguments = [
+        '-frames:v', '1',
+        '-f', 'image2',
+        'pipe:3',
+    ];
     const args: string[] = [
         '-hide_banner',
         '-y',
@@ -101,7 +105,25 @@ export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpeg
 }
 
 export async function ffmpegFilterImage(inputArguments: string[], options: FFmpegImageFilterOptions) {
-    const outputArguments = ffmpegCreateOutputArguments(inputArguments, options);
+    ffmpegCreateOutputArguments(inputArguments, options);
+
+    let outputArguments: string[];
+    if (options.time) {
+        outputArguments = [
+            '-vsync', '0',
+            '-f', 'image2pipe',
+            'pipe:3',
+        ];
+    }
+    else {
+
+        outputArguments = [
+            '-frames:v', '1',
+            '-f', 'image2',
+            'pipe:3',
+        ];
+
+    }
 
     const args: string[] = [
         '-hide_banner',
@@ -118,7 +140,10 @@ export async function ffmpegFilterImage(inputArguments: string[], options: FFmpe
         stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
     });
 
-    return ffmpegFilterImageInternal(cp, options);
+    if (options.time)
+        return ffmpegFilterImageStream(cp, options);
+    else
+        return ffmpegFilterImageInternal(cp, options);
 }
 
 export async function ffmpegFilterImageInternal(cp: ChildProcess, options: FFmpegImageFilterOptions) {
@@ -137,4 +162,38 @@ export async function ffmpegFilterImageInternal(cp: ChildProcess, options: FFmpe
         throw new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`);
 
     return Buffer.concat(buffers);
+}
+
+export async function ffmpegFilterImageStream(cp: ChildProcess, options: FFmpegImageFilterOptions) {
+    const ret = new Promise<Buffer>((resolve, reject) => {
+        const to = options.timeout ? setTimeout(() => {
+            reject(new Error('ffmpeg stream to image convesion timed out.'));
+        }, 10000) : undefined;
+
+        const pipe = cp.stdio[3].pipe(new Pipe2Jpeg());
+        let last: Buffer;
+        let count = 0;
+        pipe.on('jpeg', jpeg => {
+            ++count;
+            last = jpeg;
+        });
+
+        pipe.once('jpeg', async () => {
+            clearTimeout(to);
+            // convert images for the requested number of milliseconds before returning a value.
+            // this may below through the prebuffer.
+            await sleep(options.time);
+            resolve(last);
+        });
+
+        cp.on('exit', exitCode => {
+            clearTimeout(to);
+            if (last)
+                resolve(last);
+            else
+                reject(new Error(`ffmpeg stream to image convesion failed with exit code: ${exitCode}`));
+        })
+    });
+
+    return ret.finally(() => safeKillFFmpeg(cp));
 }

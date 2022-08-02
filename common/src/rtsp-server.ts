@@ -854,4 +854,12 @@ export class RtspServer {
             this.console?.log('response body', buffer.toString());
         }
     }
+
+    destroy() {
+        this.client.destroy();
+        for (const track of Object.values(this.setupTracks)) {
+            closeQuiet(track.rtp);
+            closeQuiet(track.rtcp);
+        }
+    }
 }

@@ -1,9 +1,10 @@
-import { ScryptedDeviceBase, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions } from '@scrypted/sdk';
+import path from 'path';
+import { ScryptedDeviceBase, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions, HttpRequestHandler, HttpRequest, HttpResponse } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 import { BufferHost, FileHost } from './converters';
 
-export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, BufferConverter {
+export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, BufferConverter, HttpRequestHandler {
     httpHost: BufferHost;
     httpsHost: BufferHost;
     fileHost: FileHost;
@@ -54,11 +55,56 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         })();
     }
 
+    async onRequest(request: HttpRequest, response: HttpResponse): Promise<void> {
+        if (request.isPublicEndpoint) {
+            response.send('', {
+                code: 404,
+            });
+            return;
+        }
+        const pathname = request.url.substring(request.rootPath.length);
+        const [_, id, iface] = pathname.split('/');
+        try {
+            if (iface !== ScryptedInterface.Camera)
+                throw new Error();
+
+            const search = new URLSearchParams(pathname.split('?')[1]);
+
+            const picture = await systemManager.getDeviceById<Camera>(id).takePicture({
+                picture: {
+                    width: parseInt(search.get('width')) || undefined,
+                    height: parseInt(search.get('height')) || undefined,
+                }
+            });
+            const buffer = await mediaManager.convertMediaObjectToBuffer(picture, 'image/jpeg');
+
+            response.send(buffer, {
+                headers: {
+                    'Content-Type': 'image/jpeg',
+                    'Cache-Control': 'max-age=10',
+                }
+            });
+        }
+        catch (e) {
+            response.send('', {
+                code: 500,
+            });
+        }
+    }
+
+    async getLocalSnapshot(id: string, iface: string, search: string) {
+        const endpoint = await endpointManager.getAuthenticatedPath(this.nativeId);
+        const url = path.join(endpoint, id, iface, `${Date.now()}.jpg`) + `${search}`;
+        return mediaManager.createMediaObject(Buffer.from(url), ScryptedMimeTypes.LocalUrl);
+    }
+
     async convert(data: string, fromMimeType: string, toMimeType: string): Promise<MediaObject> {
         const url = new URL(data.toString());
         const id = url.hostname;
         const path = url.pathname.split('/')[1];
         if (path === ScryptedInterface.Camera) {
+            if (toMimeType === ScryptedMimeTypes.LocalUrl)
+                return this.getLocalSnapshot(id, path, url.search);
             return await systemManager.getDeviceById<Camera>(id).takePicture() as any;
         }
         if (path === ScryptedInterface.VideoCamera) {

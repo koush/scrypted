@@ -185,8 +185,8 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
         playbackPromise.then(async (client) => {
             client.setKeepAlive(true, 10000);
             let sip: SipSession;
-            const udp = (await createBindZero()).server;
             try {
+                let rtsp: RtspServer;
                 const cleanup = () => {
                     client.destroy();
                     if (this.session === sip)
@@ -197,7 +197,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
                     }
                     catch (e) {
                     }
-                    closeQuiet(udp);
+                    rtsp?.destroy();
                 }
 
                 client.on('close', cleanup);
@@ -224,7 +224,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
                 let alost = 0;
 
                 if (useRtsp) {
-                    const rtsp = new RtspServer(client, sdp, udp);
+                    rtsp = new RtspServer(client, sdp, true);
                     const parsedSdp = parseSdp(rtsp.sdp);
                     const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control;
                     const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;

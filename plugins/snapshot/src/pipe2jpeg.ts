@@ -5,11 +5,7 @@ import { Transform, TransformCallback } from 'stream';
 const _SOI = Buffer.from([0xff, 0xd8]); // jpeg start of image ff08
 const _EOI = Buffer.from([0xff, 0xd9]); // jpeg end of image ff09
 
-/**
- * @fileOverview Creates a stream transform for parsing piped jpegs from ffmpeg.
- * @requires stream.Transform
- */
-class Pipe2Jpeg extends Transform {
+export class Pipe2Jpeg extends Transform {
   _chunks: Buffer[] = [];
   _size: number = 0;
   _jpeg: Buffer;
