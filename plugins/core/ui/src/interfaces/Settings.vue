@@ -60,6 +60,9 @@ export default {
     device() {
       this.refresh();
     },
+    availableMixins() {
+      this.updateSettingsGroupName();
+    },
   },
   mounted() {
     this.refresh();
@@ -106,10 +109,14 @@ export default {
         key: setting.key,
         value: setting,
       }));
+
+      this.updateSettingsGroupName();
+    },
+    updateSettingsGroupName() {
       if (!this.usingDefaultSettingsGroupName) {
         // make sure the selected settings tab still exists
         if (this.settingsGroupName === 'extensions')
-          this.usingDefaultSettingsGroupName =  !this.availableMixins.length;
+          this.usingDefaultSettingsGroupName = !this.availableMixins.length;
         else if (!this.settingsGroups[this.settingsGroupName])
           this.usingDefaultSettingsGroupName = true;
       }
@@ -117,7 +124,7 @@ export default {
         this.usingDefaultSettingsGroupName = false;
         this.settingsGroupName = Object.keys(this.settingsGroups)?.[0] || 'extensions';
       }
-    },
+    }
   },
 };
 </script>
