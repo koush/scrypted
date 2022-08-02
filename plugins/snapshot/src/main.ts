@@ -528,7 +528,9 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
                     width: right - left,
                     height: bottom - top,
                     fractional: cropFractional,
-                }
+                },
+                timeout: 10000,
+                time: parseFloat(mime.parameters.get('time')),
         });
     }
 
