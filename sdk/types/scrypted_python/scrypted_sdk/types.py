@@ -435,6 +435,11 @@ class RecordedEventOptions(TypedDict):
     startTime: float
     pass
 
+class RecordingStreamThumbnailOptions(TypedDict):
+    crop: Any
+    resize: Any
+    pass
+
 class RequestMediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
@@ -1008,7 +1013,7 @@ class VideoRecorder:
         pass
     async def getRecordingStreamOptions(self) -> list[ResponseMediaStreamOptions]:
         pass
-    async def getRecordingStreamThumbnail(self, time: float) -> MediaObject:
+    async def getRecordingStreamThumbnail(self, time: float, options: RecordingStreamThumbnailOptions = None) -> MediaObject:
         pass
     pass
 

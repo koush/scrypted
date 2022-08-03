@@ -407,6 +407,10 @@ export interface MediaStreamOptions {
    */
   prebuffer?: number;
   /**
+   * Prebuffer size in bytes.
+   */
+  prebufferBytes?: number;
+  /**
    * The container type of this stream, ie: mp4, mpegts, rtsp.
    */
   container?: string;
@@ -508,6 +512,21 @@ export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions
   loop?: boolean;
 }
 
+export interface RecordingStreamThumbnailOptions {
+  resize?: {
+    width?: number;
+    height?: number;
+    percent?: boolean;
+  };
+  crop?: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    percent?: boolean;
+  };
+}
+
 export interface VideoRecorder {
   /**
    * Returns a MediaObject for a recording stream.
@@ -521,7 +540,7 @@ export interface VideoRecorder {
   getRecordingStream(options: RequestRecordingStreamOptions, recordingStream?: MediaObject): Promise<MediaObject>;
   getRecordingStreamCurrentTime(recordingStream: MediaObject): Promise<number>;
   getRecordingStreamOptions(): Promise<ResponseMediaStreamOptions[]>;
-  getRecordingStreamThumbnail(time: number): Promise<MediaObject>;
+  getRecordingStreamThumbnail(time: number, options?: RecordingStreamThumbnailOptions): Promise<MediaObject>;
 }
 
 export interface RecordedEvent {
