@@ -93,20 +93,32 @@ class TensorFlowLitePlugin(DetectPlugin):
                 'vtdec_hw',
             ],
         }
-        d['settings'] = [setting, decoderSetting]
+        allowList: Setting = {
+            'title': 'Allow List',
+            'description': 'The detection classes that will be reported. If none are specified, all detections will be reported.',
+            'choices': list(self.labels.values()),
+            'multiple': True,
+            'key': 'allowList',
+            'value': [],
+        }
+
+        d['settings'] = [setting, decoderSetting, allowList]
         return d
 
-    def create_detection_result(self, objs, size, convert_to_src_size=None):
+    def create_detection_result(self, objs, size, allowList, convert_to_src_size=None):
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = size
 
         for obj in objs:
+            className = self.labels.get(obj.id, obj.id)
+            if allowList and len(allowList) and className not in allowList:
+                continue
             detection: ObjectDetectionResult = {}
             detection['boundingBox'] = (
                 obj.bbox.xmin, obj.bbox.ymin, obj.bbox.xmax - obj.bbox.xmin, obj.bbox.ymax - obj.bbox.ymin)
-            detection['className'] = self.labels.get(obj.id, obj.id)
+            detection['className'] = className
             detection['score'] = obj.score
             detections.append(detection)
 
@@ -147,7 +159,9 @@ class TensorFlowLitePlugin(DetectPlugin):
             objs = detect.get_objects(
                 self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
-        return self.create_detection_result(objs, image.size)
+        allowList = settings.get('allowList', None)
+
+        return self.create_detection_result(objs, image.size, allowList)
 
     def get_detection_input_size(self, src_size):
         return input_size(self.interpreter)
@@ -184,7 +198,9 @@ class TensorFlowLitePlugin(DetectPlugin):
                 buf.unmap(info)
 
 
-        return self.create_detection_result(objs, src_size, convert_to_src_size)
+        allowList = settings.get('allowList', None)
+
+        return self.create_detection_result(objs, src_size, allowList, convert_to_src_size)
 
     def create_detection_session(self):
         return TensorFlowLiteSession()

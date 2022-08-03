@@ -4,6 +4,7 @@ import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
 import { DenoisedDetectionEntry, denoiseDetections } from './denoise';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider"
+import { safeParseJson } from './util';
 
 const polygonOverlap = require('polygon-overlap');
 
@@ -123,7 +124,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     const ret: any = {};
     for (const setting of this.settings) {
-      ret[setting.key] = this.storage.getItem(setting.key) || setting.value;
+      ret[setting.key] = (setting.multiple ? safeParseJson(this.storage.getItem(setting.key)) : this.storage.getItem(setting.key))
+        || setting.value;
     }
 
     return ret;
@@ -479,13 +481,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         }
       );
     }
-
+    const detectorSettings = await this.getCurrentSettings();
     await this.ensureSettings();
     if (this.settings) {
       settings.push(...this.settings.map(setting =>
         Object.assign({}, setting, {
           placeholder: setting.placeholder?.toString(),
-          value: this.storage.getItem(setting.key) || setting.value,
+          value: (setting.multiple ? safeParseJson(this.storage.getItem(setting.key)) : this.storage.getItem(setting.key))
+            || setting.value,
         } as Setting))
       );
     }
@@ -533,7 +536,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   }
 
   async putMixinSetting(key: string, value: string | number | boolean | string[] | number[]): Promise<void> {
-    const vs = value?.toString();
+    let vs = value?.toString();
 
     if (key === 'zones') {
       const newZones: Zones = {};
@@ -548,6 +551,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.zones[key.substring(5)] = JSON.parse(vs);
       this.storage.setItem('zones', JSON.stringify(this.zones));
       return;
+    }
+
+    if (value && this.settings?.find(s => s.key === key)?.multiple) {
+      vs = JSON.stringify(value);
     }
 
     this.storage.setItem(key, vs);
