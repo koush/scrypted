@@ -1,7 +1,7 @@
 
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
-import { addH264VideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
+import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
@@ -1145,6 +1145,7 @@ class PrebufferSession {
         available += chunk.length;
       }
     }
+    mediaStreamOptions.prebufferBytes = available;
 
     const length = Math.max(500000, available).toString();
 
@@ -1284,7 +1285,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     }
 
     if (ffmpegInput.h264FilterArguments && videoFilterArguments)
-      addH264VideoFilterArguments(ffmpegInput.h264FilterArguments, videoFilterArguments)
+      addVideoFilterArguments(ffmpegInput.h264FilterArguments, videoFilterArguments)
     else if (videoFilterArguments)
       ffmpegInput.h264FilterArguments = ['-filter_complex', videoFilterArguments];
 
