@@ -379,6 +379,7 @@ class MediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
+    prebufferBytes: float
     tool: MediaStreamTool
     video: VideoStreamOptions
     pass
@@ -449,6 +450,7 @@ class RequestMediaStreamOptions(TypedDict):
     metadata: Any
     name: str
     prebuffer: float
+    prebufferBytes: float
     refresh: bool
     tool: MediaStreamTool
     video: VideoStreamOptions
@@ -472,7 +474,9 @@ class RequestRecordingStreamOptions(TypedDict):
     loop: bool
     metadata: Any
     name: str
+    playbackRate: float
     prebuffer: float
+    prebufferBytes: float
     refresh: bool
     startTime: float
     tool: MediaStreamTool
@@ -487,6 +491,7 @@ class ResponseMediaStreamOptions(TypedDict):
     name: str
     oobCodecParameters: bool
     prebuffer: float
+    prebufferBytes: float
     refreshAt: float
     sdp: str
     source: MediaStreamSource

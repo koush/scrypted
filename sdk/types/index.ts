@@ -1274,6 +1274,7 @@ export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions
   startTime: number;
   duration?: number;
   loop?: boolean;
+  playbackRate?: number;
 }
 
 export interface RecordingStreamThumbnailOptions {
