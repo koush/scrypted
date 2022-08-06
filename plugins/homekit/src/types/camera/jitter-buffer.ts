@@ -8,7 +8,7 @@ export function sequenceNumberDistance(s1: number, s2: number): number {
     if (s2 > s1)
         rolloverDistance = s1 + 0x10000 - s2;
     else
-        rolloverDistance = s2 + 0x10000 - s2;
+        rolloverDistance = s2 + 0x10000 - s1;
 
     if (Math.abs(distance) < Math.abs(rolloverDistance))
         return distance;
