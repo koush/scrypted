@@ -214,7 +214,6 @@ export class PluginHost {
                 await remote.setNativeId(pluginDevice.nativeId, pluginDevice._id, pluginDevice.storage || {});
             }
 
-            await remote.setSystemState(scrypted.stateManager.getSystemState());
             const waitDebug = pluginDebug?.waitDebug;
             if (waitDebug) {
                 console.info('waiting for debugger...');

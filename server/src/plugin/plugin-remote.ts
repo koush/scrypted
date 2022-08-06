@@ -297,7 +297,7 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
         if (!peer.constructorSerializerMap.get(Buffer))
             peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
         const getRemote = await peer.getParam('getRemote');
-        const remote = await getRemote(api, pluginId);
+        const remote = await getRemote(api, pluginId) as PluginRemote;
 
         await remote.setSystemState(getSystemState());
         api.listen((id, eventDetails, eventData) => {
