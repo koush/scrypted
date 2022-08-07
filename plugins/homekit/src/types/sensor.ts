@@ -49,14 +49,15 @@ addSupportedType({
     getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & TamperSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
 
-        if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
-            const service = accessory.addService(Service.ContactSensor, device.name);
-            bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ContactSensorState,
-                () => !!device.binaryState);
-        } else if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
+        if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
             const service = accessory.addService(Service.ContactSensor, device.name);
             bindCharacteristic(device, ScryptedInterface.EntrySensor, service, Characteristic.ContactSensorState,
                 () => !!device.entryOpen);
+        }
+        else if (device.interfaces.includes(ScryptedInterface.BinarySensor)) {
+            const service = accessory.addService(Service.ContactSensor, device.name);
+            bindCharacteristic(device, ScryptedInterface.BinarySensor, service, Characteristic.ContactSensorState,
+                () => !!device.binaryState);
         }
 
         if (device.interfaces.includes(ScryptedInterface.OccupancySensor)) {
