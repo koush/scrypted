@@ -201,13 +201,6 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
                 readonly: true,
                 value: this.statistics ? `${this.statistics.commandsDroppedRX} / ${this.statistics.commandsDroppedTX}` : 'n/a',
             },
-            {
-                group: 'Statistics',
-                title: 'RTT',
-                key: 'zwave:rtt',
-                readonly: true,
-                value: this.statistics ? `${this.statistics.rtt}ms` : 'n/a',
-            }
         ];
     }
 
