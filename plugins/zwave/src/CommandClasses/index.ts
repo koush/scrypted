@@ -6,7 +6,7 @@ import LockToDoorLock from './LockToDoorLock';
 import BatteryToBattery from './BatteryToBattery';
 import ThermometerToSensorMultilevel from './ThermometerToSensorMultilevel';
 import HumidityToSensorMultilevel from './HumiditySensorToSensorMultilevel';
-import LuminanceSensorToSensorMultilevel from './LuminanceSensorToSensorMultilevel';
+import AmbientLightSensorToSensorMultilevel from './AmbientLightSensorToSensorMultilevel';
 import UltravioletSensorMultilevel from './UltravioletSensorToSensorMultilevel';
 import SettingsToConfiguration from './SettingsToConfiguration';
 import EntryToBarrierOperator from './EntryToBarrierOperator';
@@ -81,7 +81,7 @@ addCommandClassIndex(CommandClasses['Battery'], 'level', BatteryToBattery, 'Batt
 addCommandClassIndex(CommandClasses['Entry Control'], 'currentValue', EntryToBarrierOperator, 'Entry');
 addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Air temperature', ThermometerToSensorMultilevel, 'Thermometer');
 addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Humidity', HumidityToSensorMultilevel, 'HumiditySensor');
-addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Illuminance', LuminanceSensorToSensorMultilevel, 'LuminanceSensor');
+addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Illuminance', AmbientLightSensorToSensorMultilevel, ScryptedInterface.AmbientLightSensor);
 addCommandClassIndex(CommandClasses['Multilevel Sensor'], 'Ultraviolet', UltravioletSensorMultilevel, 'UltravioletSensor');
 
 addCommandClassIndex(CommandClasses['Notification'], 'Access Control', EntrySensorToAccessControl, 'EntrySensor');
