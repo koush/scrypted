@@ -272,6 +272,8 @@ export async function createRTCPeerConnectionSource(options: {
         sessionControl.reject(e);
         peerConnection.reject(e);
         intercom.reject(e);
+
+        cleanup();
     });
 
     const pcClose = peerConnection.promise.then(pc => waitClosed(pc));
