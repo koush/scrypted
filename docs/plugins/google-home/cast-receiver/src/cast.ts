@@ -1,5 +1,5 @@
 import { RpcPeer } from '../../../../../server/src/rpc';
-import { BrowserSignalingSession } from '../../../../../common/src/rtc-signaling';
+import { BrowserSignalingSession, waitPeerIceConnectionClosed } from '../../../../../common/src/rtc-signaling';
 
 declare const eio: any;
 declare const cast: any;
@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", function (event) {
   const context = cast.framework.CastReceiverContext.getInstance();
   const playerManager = context.getPlayerManager();
   const video = document.getElementById('media') as HTMLVideoElement;
+
+  let previousCleanup: () => void;
 
   // intercept the LOAD request to be able to read in a contentId and get data
   const interceptor: (loadRequestData: any) => void = (loadRequestData: any) => {
@@ -50,26 +52,19 @@ document.addEventListener("DOMContentLoaded", function (event) {
         rpcPeer.handleMessage(JSON.parse(data));
       });
 
-      const cleanup = () => window.close();
-
       const session = new BrowserSignalingSession();
-      session.pcDeferred.promise.then(pc => {
-        pc.addEventListener('connectionstatechange', () => {
-          if (pc.iceConnectionState === 'disconnected'
-            || pc.iceConnectionState === 'failed'
-            || pc.iceConnectionState === 'closed') {
-            cleanup();
-          }
-        });
-        pc.addEventListener('iceconnectionstatechange', () => {
-          console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
-          if (pc.iceConnectionState === 'disconnected'
-            || pc.iceConnectionState === 'failed'
-            || pc.iceConnectionState === 'closed') {
-            cleanup();
-          }
-        });
 
+      const cleanup = () => {
+        socket.close();
+        session.pcDeferred.promise.then(pc => pc.close());        
+      };
+      previousCleanup?.();
+      previousCleanup = cleanup;
+
+      socket.on('close', cleanup);
+
+      session.pcDeferred.promise.then(pc => {
+        waitPeerIceConnectionClosed(pc).then(cleanup);
 
         const mediaStream = new MediaStream(
           pc.getReceivers().map((receiver) => receiver.track)
