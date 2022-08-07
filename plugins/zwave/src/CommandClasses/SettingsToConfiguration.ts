@@ -1,6 +1,6 @@
 import { Settings, Setting } from "@scrypted/sdk";
 import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
-import { ValueID, CommandClasses } from "@zwave-js/core";
+import { TranslatedValueID, ValueID, CommandClasses } from "@zwave-js/core";
 
 export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings {
     async getSettings(): Promise<Setting[]> {
@@ -47,9 +47,11 @@ export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings
         if (metadata.type === 'number')
             value = parseInt(value);
         cc.setValue(valueId, value);
+        if (!!this.zwaveController.verboseLogs)
+            this.console.log(`[${this.name}] setting ${valueId.propertyName}=${value}`);
     }
 
-    _getValueIdOrThrow(key: string): ValueID {
+    _getValueIdOrThrow(key: string): TranslatedValueID {
         var valueId = this._getValueId(key);
         if (!valueId) {
             throw new Error(`ZwaveValueId not found: ${key}`);
@@ -57,7 +59,7 @@ export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings
         return valueId;
     }
 
-    _getValueId(key: string): ValueID {
+    _getValueId(key: string): TranslatedValueID {
         const cc = this.instance.commandClasses['Configuration'];
         if (!cc) {
             return null;

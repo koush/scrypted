@@ -44,10 +44,10 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
 
         const node = this.instance.getNodeUnsafe()
         node.on('wake up', node => {
-            this.console.log(`[${node.id}] woke up`)
+            this.console.log(`[${this.name}] woke up`)
         });
         node.on('sleep', node => {
-            this.console.log(`[${node.id}] sleeping`)
+            this.console.log(`[${this.name}] sleeping`)
         });
         node.on('statistics updated', (node: ZWaveNode, statistics: NodeStatistics) => {
             this.statistics = statistics;
@@ -65,6 +65,8 @@ export class ZwaveDeviceBase extends ScryptedDeviceBase implements Refresh, Sett
     }
 
     onValueChanged(valueId: ZWaveNodeValueUpdatedArgs) {
+        if (!!this.zwaveController.verboseLogs)
+            this.console.log(`[${this.name}] ${valueId.propertyName} ${valueId.propertyKeyName ? valueId.propertyKeyName : ''} old=${valueId.prevValue} new=${valueId.newValue}`)
         var cc = getCommandClassIndex(valueId.commandClass, valueId.property as number);
         if (!cc) {
             cc = getCommandClass(valueId.commandClass);

@@ -43,6 +43,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
     controller: ZWaveController;
     driverReady: Promise<void>;
     dskDeferred: {reject: any, resolve: any};
+    verboseLogs: boolean;
 
     constructor() {
         super();
