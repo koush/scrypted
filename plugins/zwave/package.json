@@ -41,6 +41,6 @@
       "@types/node": "^16.7.1"
    },
    "optionalDependencies": {
-      "zwave-js": "^8.11.5"
+      "zwave-js": "^9.6.2"
    }
 }
