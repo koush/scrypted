@@ -1,6 +1,6 @@
 import { Settings, Setting } from "@scrypted/sdk";
 import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
-import { TranslatedValueID, ValueID, CommandClasses } from "@zwave-js/core";
+import { TranslatedValueID, CommandClasses } from "@zwave-js/core";
 
 export class SettingsToConfiguration extends ZwaveDeviceBase implements Settings {
     async getSettings(): Promise<Setting[]> {
