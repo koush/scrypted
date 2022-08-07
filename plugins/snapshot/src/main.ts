@@ -3,13 +3,12 @@ import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-p
 import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { StorageSettings } from "@scrypted/common/src/settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
-import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
+import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import axios, { Axios } from "axios";
 import https from 'https';
-import { newThread } from '../../../server/src/threading';
-import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
+import { ffmpegFilterImage, ffmpegFilterImageBuffer } from './ffmpeg-image-filter';
 
 const { mediaManager, systemManager } = sdk;
 
@@ -200,6 +199,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                             return ret;
 
                         return ffmpegFilterImageBuffer(ret, {
+                            ffmpegPath: await mediaManager.getFFmpegPath(),
                             resize: picture,
                             timeout: 10000,
                         });
@@ -333,6 +333,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         const ymax = Math.max(...this.storageSettings.values.snapshotCropScale.map(([x, y]) => y)) / 100;
 
         return ffmpegFilterImageBuffer(buffer, {
+            ffmpegPath: await mediaManager.getFFmpegPath(),
             crop: {
                 fractional: true,
                 left: xmin,
@@ -413,6 +414,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             return ffmpegFilterImage([
                 '-i', black,
             ], {
+                ffmpegPath: await mediaManager.getFFmpegPath(),
                 blur: true,
                 text: {
                     fontFile,
@@ -423,6 +425,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         }
         else {
             return ffmpegFilterImageBuffer(errorBackground, {
+                ffmpegPath: await mediaManager.getFFmpegPath(),
                 blur: true,
                 brightness: -.2,
                 text: {
@@ -513,6 +516,7 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         });
 
         return ffmpegFilterImage(args, {
+            ffmpegPath: await mediaManager.getFFmpegPath(),
             resize: (isNaN(width) && isNaN(height))
                 ? undefined
                 : {

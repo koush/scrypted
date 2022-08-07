@@ -1,11 +1,10 @@
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
-import { sleep } from '@scrypted/common/src/sleep';
 import { safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
+import { sleep } from '@scrypted/common/src/sleep';
 import child_process, { ChildProcess } from 'child_process';
 import { once } from 'events';
 import { Writable } from 'stream';
 import { Pipe2Jpeg } from './pipe2jpeg';
-import crypto from 'crypto'
 
 export interface FFmpegImageFilterOptions {
     blur?: boolean;
