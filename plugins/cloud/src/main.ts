@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
+import { StorageSettings } from "@scrypted/common/src/settings"
 import qs from 'query-string';
 import { Duplex } from 'stream';
 import net from 'net';
@@ -31,7 +32,7 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 
 
     async convert(data: Buffer | string, fromMimeType: string): Promise<Buffer> {
-        if (this.cloud.storage.getItem('hostname')) {
+        if (this.cloud.storageSettings.values.hostname) {
             return Buffer.from(`https://${this.cloud.getHostname()}${await this.cloud.getCloudMessagePath()}/${data}`);
         }
 
@@ -41,19 +42,54 @@ class ScryptedPush extends ScryptedDeviceBase implements BufferConverter {
 }
 
 class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings, BufferConverter, DeviceProvider, HttpRequestHandler {
-    manager = new PushManager({
-        // Scrypted
-        [DEFAULT_SENDER_ID]: '',
-    });
+    manager = new PushManager(DEFAULT_SENDER_ID);
     server: Server;
     proxy: HttpProxy;
     push: ScryptedPush;
     whitelisted = new Map<string, string>();
+    storageSettings = new StorageSettings(this, {
+        hostname: {
+            title: 'Hostname',
+            description: 'Optional/Recommended: The hostname to reach this Scrypted server on https port 443. This will bypass usage of Scrypted cloud when possible. You will need to set up SSL termination.',
+            placeholder: 'my-server.dyndns.com'
+        },
+        token_info: {
+            hide: true,
+        },
+        lastPersistedRegistrationId: {
+            hide: true,
+        },
+    });
+
+    constructor() {
+        super();
+
+        this.fromMimeType = ScryptedMimeTypes.LocalUrl;
+        this.toMimeType = ScryptedMimeTypes.Url;
+
+        this.setupProxyServer();
+        this.setupCloudPush();
+
+        this.manager.on('registrationId', async (registrationId) => {
+            // currently the fcm registration id never changes, so, there's no need.
+            // if ever adding clockwork push, uncomment this.
+            this.sendRegistrationId(registrationId);
+        });
+
+        this.manager.registrationId.then(async registrationId => {
+            if (this.storageSettings.values.lastPersistedRegistrationId !== registrationId)
+                this.sendRegistrationId(registrationId);
+        })
+
+        this.updateCors();
+    }
+
+
 
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
         const local = Url.parse(localUrl);
 
-        if (this.storage.getItem('hostname')) {
+        if (this.storageSettings.values.hostname) {
             return Buffer.from(`${baseUrl}${local.path}`);
         }
 
@@ -61,7 +97,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             return Buffer.from(this.whitelisted.get(local.path));
         }
 
-        const token_info = this.storage.getItem('token_info');
+        const { token_info } = this.storageSettings.values;
         if (!token_info)
             throw new Error('@scrypted/cloud is not logged in.');
         const q = qs.stringify({
@@ -85,23 +121,6 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         return Buffer.from(url);
     }
 
-    constructor() {
-        super();
-
-        this.fromMimeType = ScryptedMimeTypes.LocalUrl;
-        this.toMimeType = ScryptedMimeTypes.Url;
-
-        this.setupProxyServer();
-        this.setupCloudPush();
-
-        this.manager.on('registrationId', async (registrationId) => {
-            // currently the fcm registration id never changes, so, there's no need.
-            // if ever adding clockwork push, uncomment this.
-            // this.sendRegistrationId();
-        });
-
-        this.updateCors();
-    }
 
     async updateCors() {
         try {
@@ -118,12 +137,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     server: 'http://home.scrypted.app',
                 },
                 // test
-                // {
-                //     tag: '@scrypted/cloud',
-                //     server: 'https://localhost:8081',
-                // },
+                {
+                    tag: '@scrypted/cloud',
+                    server: 'http://localhost:3000',
+                },
             );
-            const hostname = this.storage.getItem('hostname')
+            const { hostname } = this.storageSettings.values;
             if (hostname) {
                 cors.push(
                     {
@@ -143,19 +162,20 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    async sendRegistrationId(registrationId: string) {
+    async sendRegistrationId(registration_id: string) {
         const q = qs.stringify({
-            registrationId,
+            registration_id,
             sender_id: DEFAULT_SENDER_ID,
         })
 
-        const token_info = this.storage.getItem('token_info');
-        const response = await axios(`https://${SCRYPTED_SERVER}/_punch/scope?${q}`, {
+        const { token_info } = this.storageSettings.values;
+        const response = await axios(`https://${SCRYPTED_SERVER}/_punch/register?${q}`, {
             headers: {
                 Authorization: `Bearer ${token_info}`
             },
         });
         this.console.log('registered', response.data);
+        this.storageSettings.values.lastPersistedRegistrationId = registration_id;
     }
 
     async setupCloudPush() {
@@ -187,7 +207,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     getHostname() {
-        const hostname = this.storage.getItem('hostname') || SCRYPTED_SERVER;
+        const hostname = this.storageSettings.values.hostname || SCRYPTED_SERVER;
         return hostname;
     }
 
@@ -196,19 +216,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                title: 'Hostname',
-                key: 'hostname',
-                value: this.storage.getItem('hostname'),
-                description: 'Optional/Recommended: The hostname to reach this Scrypted server on https port 443. This will bypass usage of Scrypted cloud when possible. You will need to set up SSL termination.',
-                placeholder: 'my-server.dyndns.com'
-            },
-        ];
+        return this.storageSettings.getSettings();
     }
 
     async putSetting(key: string, value: string | number | boolean) {
-        this.storage.setItem(key, value.toString());
+        this.storageSettings.putSetting(key, value);
         this.updateCors();
     }
 
@@ -248,7 +260,8 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             if (url.path.startsWith('/web/oauth/callback') && url.query) {
                 const query = qs.parse(url.query);
                 if (!query.callback_url && query.token_info && query.user_info) {
-                    this.storage.setItem('token_info', query.token_info as string)
+                    this.storageSettings.values.token_info = query.token_info;
+                    this.storageSettings.values.lastPersistedRegistrationId = await this.manager.registrationId;
                     res.setHeader('Location', `https://${this.getHostname()}/endpoint/@scrypted/core/public/`);
                     res.writeHead(302);
                     res.end();
@@ -300,6 +313,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             res.headers['X-Scrypted-Cloud'] = 'true';
         });
 
+        let backoff = 0;
         this.manager.on('message', async (message) => {
             if (message.type === 'cloudmessage') {
                 try {
@@ -315,6 +329,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                 }
             }
             else if (message.type === 'callback') {
+                // queued push messages will be spammed on startup, ignore them.
+                if (Date.now() < backoff + 5000)
+                    return;
+                backoff = Date.now();
+                this.console.log('scrypted server requested a connection.');
                 const client = net.connect(4000, SCRYPTED_SERVER);
                 const registrationId = await this.manager.registrationId;
                 client.write(registrationId + '\n');
@@ -331,7 +350,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     await new Promise(resolve => process.nextTick(resolve));
 
                     socket.pipe(local).pipe(socket);
-                })
+                });
             }
         });
     }
