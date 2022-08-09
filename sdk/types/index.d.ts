@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.57";
+export declare const TYPES_VERSION = "0.0.58";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -1636,6 +1636,7 @@ export declare enum ScryptedMimeTypes {
 }
 export declare type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
 export interface FFmpegTranscode {
+    videoDecoderArguments?: string[];
     videoTranscodeArguments?: string[];
     audioTranscodeArguments?: string[];
 }

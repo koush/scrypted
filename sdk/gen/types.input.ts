@@ -1609,6 +1609,7 @@ export enum ScryptedMimeTypes {
 export type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
 
 export interface FFmpegTranscode {
+  videoDecoderArguments?: string[];
   videoTranscodeArguments?: string[];
   audioTranscodeArguments?: string[];
 }

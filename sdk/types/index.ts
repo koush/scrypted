@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.57";
+export const TYPES_VERSION = "0.0.58";
 
 
 export interface DeviceState {
@@ -2373,6 +2373,7 @@ export enum ScryptedMimeTypes {
 export type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
 
 export interface FFmpegTranscode {
+  videoDecoderArguments?: string[];
   videoTranscodeArguments?: string[];
   audioTranscodeArguments?: string[];
 }
