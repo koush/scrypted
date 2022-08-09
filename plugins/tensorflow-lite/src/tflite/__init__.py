@@ -1,4 +1,5 @@
 from __future__ import annotations
+from time import time
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 import threading
 import io
@@ -46,6 +47,8 @@ defaultThreshold = .4
 class TensorFlowLitePlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
+        self.crop = True
+
         labels_contents = scrypted_sdk.zip.open(
             'fs/coco_labels.txt').read().decode('utf8')
         self.labels = parse_label_contents(labels_contents)
@@ -168,6 +171,8 @@ class TensorFlowLitePlugin(DetectPlugin):
 
     def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         score_threshold = self.parse_settings(settings)
+
+        start = time()
 
         if loaded_py_coral:
             gst_buffer = gstsample.get_buffer()

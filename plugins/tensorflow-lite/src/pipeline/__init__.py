@@ -75,7 +75,7 @@ class GstPipelineBase:
         self.gst.set_state(Gst.State.NULL)
 
 class GstPipeline(GstPipelineBase):
-    def __init__(self, loop: AbstractEventLoop, finished: Future, appsink_name: str, user_function):
+    def __init__(self, loop: AbstractEventLoop, finished: Future, appsink_name: str, user_function, crop = False):
         super().__init__(loop, finished)
         self.appsink_name = appsink_name
         self.user_function = user_function
@@ -86,6 +86,7 @@ class GstPipeline(GstPipelineBase):
         self.dst_size = None
         self.pad_size = None
         self.scale_size = None
+        self.crop = crop
         self.condition = threading.Condition()
 
     def attach_launch(self, gst):
@@ -133,10 +134,19 @@ class GstPipeline(GstPipelineBase):
             _, h = structure.get_int('height')
             self.dst_size = (w, h)
 
-            # the dimension with the higher scale value got cropped.
-            # use the other dimension to figure out the crop amount.
+            appsink = self.gst.get_by_name(self.appsink_name)
+            structure = appsink.sinkpads[0].get_current_caps().get_structure(0)
+            _, w = structure.get_int('width')
+            _, h = structure.get_int('height')
+            self.dst_size = (w, h)
+
+            # the dimension with the higher scale value got cropped or boxed.
+            # use the other dimension to figure out the crop/box amount.
             scales = (self.dst_size[0] / self.src_size[0], self.dst_size[1] / self.src_size[1])
-            scale = min(scales[0], scales[1])
+            if self.crop:
+                scale = max(scales[0], scales[1])
+            else:
+                scale = min(scales[0], scales[1])
             self.scale_size = scale
 
             dx = self.src_size[0] * scale
@@ -203,11 +213,14 @@ def get_dev_board_model():
 def create_pipeline_sink(
                  appsink_name,
                  appsink_size,
-                 pixel_format):
+                 pixel_format,
+                 crop = False):
     SINK_ELEMENT = 'appsink name={appsink_name} emit-signals=true max-buffers=1 drop=true sync=false'.format(appsink_name=appsink_name)
-    SINK_CAPS = 'video/x-raw,format={pixel_format},width={width},height={height},pixel-aspect-ratio=1/1'
 
-    sink_caps = SINK_CAPS.format(width=appsink_size[0], height=appsink_size[1], pixel_format=pixel_format)
+    (width, height)= appsink_size
+
+    SINK_CAPS = 'video/x-raw,format={pixel_format},width={width},height={height},pixel-aspect-ratio=1/1'
+    sink_caps = SINK_CAPS.format(width=width, height=height, pixel_format=pixel_format)
     pipeline = " {sink_caps} ! {sink_element}".format(
         sink_caps=sink_caps,
         sink_element=SINK_ELEMENT)
@@ -219,6 +232,7 @@ def create_pipeline(
                  appsink_size,
                  video_input,
                  pixel_format,
+                 crop = False,
                  parse_only = False):
     if parse_only:
         sink = 'appsink name={appsink_name} emit-signals=true sync=false'.format(appsink_name=appsink_name)
@@ -226,10 +240,15 @@ def create_pipeline(
             ! {sink}
         """
     else:
-        sink = create_pipeline_sink(appsink_name, appsink_size, pixel_format)
-        PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! videoscale name=videoscale
-            ! {sink}
-        """
+        sink = create_pipeline_sink(appsink_name, appsink_size, pixel_format, crop = crop)
+        if crop:
+            PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! aspectratiocrop aspect-ratio=1/1 ! videoscale name=videoscale
+                ! {sink}
+            """
+        else:
+            PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! videoscale name=videoscale
+                ! {sink}
+            """
     pipeline = PIPELINE.format(video_input = video_input, sink = sink)
     print('Gstreamer pipeline:\n', pipeline)
     return pipeline
@@ -240,8 +259,9 @@ def run_pipeline(loop, finished,
                  appsink_size,
                  video_input,
                  pixel_format,
+                 crop = False,
                  parse_only = False):
-    gst = GstPipeline(loop, finished, appsink_name, user_function)
-    pipeline = create_pipeline(appsink_name, appsink_size, video_input, pixel_format, parse_only = parse_only)
+    gst = GstPipeline(loop, finished, appsink_name, user_function, crop = crop)
+    pipeline = create_pipeline(appsink_name, appsink_size, video_input, pixel_format, crop = crop, parse_only = parse_only)
     gst.parse_launch(pipeline)
     return gst

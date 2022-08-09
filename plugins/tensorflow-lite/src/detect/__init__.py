@@ -119,6 +119,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         super().__init__(nativeId=nativeId)
         self.detection_sessions: Mapping[str, DetectionSession] = {}
         self.session_mutex = threading.Lock()
+        self.crop = False
 
     def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, event_buffer: bytes = None):
         detection_result['detectionId'] = detection_session.id
@@ -281,7 +282,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             else:
                 raise Exception('unknown container %s' % container)
         elif videosrc.startswith('rtsp'):
-            videosrc = 'rtspsrc location=%s protocols=tcp ! rtph264depay ! h264parse' % videosrc
+            videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false ! rtph264depay ! h264parse' % videosrc
         
         decoder = settings.get('decoder', 'decodebin')
         videosrc += " ! %s " % decoder
@@ -373,6 +374,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                                           appsink_size=inference_size,
                                           video_input=video_input,
                                           pixel_format=self.get_pixel_format(),
+                                          crop=self.crop,
                                           )
         task = pipeline.run()
         asyncio.ensure_future(task)
