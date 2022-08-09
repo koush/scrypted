@@ -1078,7 +1078,7 @@ class PrebufferSession {
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
-        server = new RtspServer(socket, sdp, true);
+        server = new RtspServer(socket, sdp);
         // server.console = this.console;
         await server.handlePlayback();
         for (const track of Object.values(server.setupTracks)) {
@@ -1576,7 +1576,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     this.rtspServer = new net.Server(async (client) => {
       let prebufferSession: PrebufferSession;
 
-      const server = new RtspServer(client, undefined, true, async (method, url, headers, rawMessage) => {
+      const server = new RtspServer(client, undefined, false, async (method, url, headers, rawMessage) => {
         server.checkRequest = undefined;
 
         const u = new URL(url);
