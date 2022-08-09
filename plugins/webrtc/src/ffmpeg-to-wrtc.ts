@@ -240,6 +240,7 @@ export async function createRTCPeerConnectionSink(
             try {
                 const transcodeStream: FFmpegTranscodeStream = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.FFmpegTranscodeStream);
                 await transcodeStream({
+                    videoDecoderArguments: ffmpegInput.videoDecoderArguments,
                     videoTranscodeArguments,
                     audioTranscodeArguments,
                 });

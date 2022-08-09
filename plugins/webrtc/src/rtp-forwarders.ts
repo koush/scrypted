@@ -88,6 +88,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     const isRtsp = ffmpegInput.container?.startsWith('rtsp');
 
+    const sdpDeferred = new Deferred<string>();
     const videoSectionDeferred = new Deferred<MSection>();
     const audioSectionDeferred = new Deferred<MSection>();
     videoSectionDeferred.promise.then(s => video?.onMSection?.(s));
@@ -211,10 +212,11 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         }
     }
     else {
-        console.log('video codec/container not matched, transcoding:', rtpTracks.audio?.codecCopy);
+        console.log('video codec/container not matched, transcoding:', rtpTracks.video?.codecCopy);
     }
 
     const reportTranscodedSections = (sdp: string) => {
+        sdpDeferred.resolve(sdp);
         const parsedSdp = parseSdp(sdp);
         const videoSection = parsedSdp.msections.find(msection => msection.type === 'video');
         const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio');
@@ -399,6 +401,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     return {
         rtspServer: rtspServerDeferred.promise,
+        sdpContents: sdpDeferred.promise,
         videoSection: videoSectionDeferred.promise,
         audioSection: audioSectionDeferred.promise,
         kill,
