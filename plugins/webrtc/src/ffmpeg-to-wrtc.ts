@@ -236,6 +236,7 @@ export async function createRTCPeerConnectionSink(
 
         const audioTranscodeArguments = getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode);
 
+        let needPacketization = !transcode;
         if (transcode) {
             try {
                 const transcodeStream: FFmpegTranscodeStream = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.FFmpegTranscodeStream);
@@ -247,6 +248,7 @@ export async function createRTCPeerConnectionSink(
                 videoTranscodeArguments.splice(0, videoTranscodeArguments.length);
                 videoCodecCopy = 'copy';
                 audioCodecCopy = 'copy';
+                needPacketization = true;
             }
             catch (e) {
             }
@@ -269,14 +271,19 @@ export async function createRTCPeerConnectionSink(
             packetSize: videoPacketSize,
             onMSection: (videoSection) => spsPps = getSpsPps(videoSection),
             onRtp: (buffer) => {
-                if (!h264Repacketizer) {
-                    h264Repacketizer = new H264Repacketizer(console, videoPacketSize, {
-                        ...spsPps,
-                    });
+                if (needPacketization) {
+                    if (!h264Repacketizer) {
+                        h264Repacketizer = new H264Repacketizer(console, videoPacketSize, {
+                            ...spsPps,
+                        });
+                    }
+                    const repacketized = h264Repacketizer.repacketize(RtpPacket.deSerialize(buffer));
+                    for (const packet of repacketized) {
+                        videoTransceiver.sender.sendRtp(packet);
+                    }
                 }
-                const repacketized = h264Repacketizer.repacketize(RtpPacket.deSerialize(buffer));
-                for (const packet of repacketized) {
-                    videoTransceiver.sender.sendRtp(packet);
+                else {
+                    videoTransceiver.sender.sendRtp(buffer);
                 }
             },
             encoderArguments: [

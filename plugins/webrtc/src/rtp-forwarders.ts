@@ -54,13 +54,14 @@ function attachTrackDgram(track: RtpTrack, server: dgram.Socket) {
     server?.on('message', createPacketDelivery(track));
 }
 
-async function setupRtspClient(rtspClient: RtspClient, channel: number, section: MSection, deliver: ReturnType<typeof createPacketDelivery>) {
+async function setupRtspClient(console: Console, rtspClient: RtspClient, channel: number, section: MSection, deliver: ReturnType<typeof createPacketDelivery>) {
     try {
         await rtspClient.setup({
             type: 'udp',
             path: section.control,
             onRtp: (rtspHeader, rtp) => deliver(rtp),
         });
+        console.log('rtsp/udp', section.codec);
     }
     catch (e) {
         if (!(e instanceof RtspStatusError))
@@ -71,6 +72,7 @@ async function setupRtspClient(rtspClient: RtspClient, channel: number, section:
             path: section.control,
             onRtp: (rtspHeader, rtp) => deliver(rtp),
         });
+        console.log('rtsp/tcp', section.codec);
     }
 }
 
@@ -80,6 +82,7 @@ export async function createTrackForwarders(console: Console, rtpTracks: RtpTrac
     for (const key of Object.keys(rtpTracks)) {
         const track: RtpTrack = rtpTracks[key];
         track.bind = await createBindZero();
+        track.bind.server.setRecvBufferSize(1024 * 1024);
         const { server, port } = track.bind;
         sockets[key] = server;
         const outputArguments = track.outputArguments = [];
@@ -153,7 +156,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             videoSectionDeferred.resolve(videoSection);
 
             let channel = 0;
-            await setupRtspClient(rtspClient, channel, videoSection, createPacketDelivery(video));
+            await setupRtspClient(console, rtspClient, channel, videoSection, createPacketDelivery(video));
             channel += 2;
 
             const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio' && (msection.codec === audioCodec || audioCodec === 'copy'));
@@ -168,7 +171,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
                     audioSectionDeferred.resolve(audioSection);
 
-                    await setupRtspClient(rtspClient, channel, audioSection, createPacketDelivery(audio));
+                    await setupRtspClient(console, rtspClient, channel, audioSection, createPacketDelivery(audio));
                     channel += 2;
                 }
                 else {
