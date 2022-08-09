@@ -237,6 +237,19 @@ export function parseSemicolonDelimited(value: string) {
     return dict;
 }
 
+export interface RtspStatus {
+    line: string,
+    code: number,
+    version: string,
+    reason: string,
+}
+
+export class RtspStatusError extends Error {
+    constructor(public status: RtspStatus) {
+        super();
+    }
+}
+
 export class RtspBase {
     client: net.Socket;
 
@@ -455,15 +468,26 @@ export class RtspClient extends RtspBase {
 
     async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<{
         headers: Headers,
-        body: Buffer
+        body: Buffer,
+        status: RtspStatus,
     }> {
         this.writeRequest(method, headers, path, body);
 
         const message = this.requestTimeout ? await timeoutPromise(this.requestTimeout, this.readMessage()) : await this.readMessage();
-        const status = message[0];
+        const statusLine = message[0];
+        const [version, codeString, reason] = statusLine.split(' ', 3);
+        const code = parseInt(codeString);
         const response = parseHeaders(message);
-        if (!status.includes('200') && !response['www-authenticate'])
-            throw new Error(status);
+
+        const status = {
+            line: statusLine,
+            code,
+            version,
+            reason,
+        };
+
+        if (code !== 200 && !response['www-authenticate'])
+            throw new RtspStatusError(status);
 
         // it seems that the first www-authenticate header should be used, as latter ones that are
         // offered are not actually valid? weird issue seen on tp-link that offers both DIGEST and BASIC.
@@ -478,8 +502,12 @@ export class RtspClient extends RtspBase {
         }
         const cl = parseInt(response['content-length']);
         if (cl)
-            return { headers: response, body: await readLength(this.client, cl) };
-        return { headers: response, body: undefined };
+            return { headers: response, body: await readLength(this.client, cl), status };
+        return {
+            headers: response,
+            body: undefined,
+            status,
+        }
     }
 
     async options() {
