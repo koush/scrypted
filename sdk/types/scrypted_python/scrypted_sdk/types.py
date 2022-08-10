@@ -112,6 +112,7 @@ class ScryptedInterface(Enum):
     OnOff = "OnOff"
     Online = "Online"
     PM25Sensor = "PM25Sensor"
+    PanTiltZoom = "PanTiltZoom"
     PasswordStore = "PasswordStore"
     Pause = "Pause"
     PositionSensor = "PositionSensor"
@@ -408,6 +409,11 @@ class ObjectsDetected(TypedDict):
     inputDimensions: tuple[float, float]
     running: bool
     timestamp: float
+    pass
+
+class PanTiltZoomCommand(TypedDict):
+    horizontal: Any | Any
+    vertical: Any | Any
     pass
 
 class Position(TypedDict):
@@ -815,6 +821,12 @@ class PM25Sensor:
     pm25Density: float
     pass
 
+class PanTiltZoom:
+    ptzCapabilities: Any
+    async def ptzCommand(self, command: PanTiltZoomCommand) -> None:
+        pass
+    pass
+
 class PasswordStore:
     async def addPassword(self, password: str) -> None:
         pass
@@ -1166,6 +1178,7 @@ class ScryptedInterfaceProperty(Enum):
     temperature = "temperature"
     temperatureUnit = "temperatureUnit"
     humidity = "humidity"
+    ptzCapabilities = "ptzCapabilities"
     lockState = "lockState"
     entryOpen = "entryOpen"
     batteryLevel = "batteryLevel"
@@ -1407,6 +1420,13 @@ class DeviceState:
     @humidity.setter
     def humidity(self, value: float):
         self.setScryptedProperty("humidity", value)
+
+    @property
+    def ptzCapabilities(self) -> Any:
+        return self.getScryptedProperty("ptzCapabilities")
+    @ptzCapabilities.setter
+    def ptzCapabilities(self, value: Any):
+        self.setScryptedProperty("ptzCapabilities", value)
 
     @property
     def lockState(self) -> LockState:
@@ -1774,6 +1794,15 @@ ScryptedInterfaceDescriptors = {
       "getRecordingStreamThumbnail"
     ],
     "properties": []
+  },
+  "PanTiltZoom": {
+    "name": "PanTiltZoom",
+    "methods": [
+      "ptzCommand"
+    ],
+    "properties": [
+      "ptzCapabilities"
+    ]
   },
   "EventRecorder": {
     "name": "EventRecorder",

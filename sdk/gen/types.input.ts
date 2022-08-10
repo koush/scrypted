@@ -593,6 +593,17 @@ export interface Intercom {
   stopIntercom(): Promise<void>;
 }
 
+export interface PanTiltZoomCommand {
+  horizontal?: 'left' | 'right';
+  vertical?: 'up' |'down';
+}
+
+export interface PanTiltZoom {
+  ptzCapabilities: any;
+
+  ptzCommand(command: PanTiltZoomCommand): Promise<void>;
+}
+
 /**
  * Display devices can play back audio and video.
  */
@@ -1468,6 +1479,7 @@ export enum ScryptedInterface {
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
+  PanTiltZoom = "PanTiltZoom",
   EventRecorder = "EventRecorder",
   VideoClips = "VideoClips",
   VideoCameraConfiguration = "VideoCameraConfiguration",

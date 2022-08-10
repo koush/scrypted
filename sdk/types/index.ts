@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.58";
+export const TYPES_VERSION = "0.0.61";
 
 
 export interface DeviceState {
@@ -33,6 +33,7 @@ export interface DeviceState {
   temperature?: number
   temperatureUnit?: TemperatureUnit
   humidity?: number
+  ptzCapabilities?: any
   lockState?: LockState
   entryOpen?: boolean
   batteryLevel?: number
@@ -91,6 +92,7 @@ export class DeviceBase implements DeviceState {
   temperature?: number
   temperatureUnit?: TemperatureUnit
   humidity?: number
+  ptzCapabilities?: any
   lockState?: LockState
   entryOpen?: boolean
   batteryLevel?: number
@@ -150,6 +152,7 @@ export enum ScryptedInterfaceProperty {
   temperature = "temperature",
   temperatureUnit = "temperatureUnit",
   humidity = "humidity",
+  ptzCapabilities = "ptzCapabilities",
   lockState = "lockState",
   entryOpen = "entryOpen",
   batteryLevel = "batteryLevel",
@@ -370,6 +373,15 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       'getRecordingStreamThumbnail'
     ],
     properties: []
+  },
+  PanTiltZoom: {
+    name: 'PanTiltZoom',
+    methods: [
+      'ptzCommand'
+    ],
+    properties: [
+      'ptzCapabilities'
+    ]
   },
   EventRecorder: {
     name: 'EventRecorder',
@@ -1357,6 +1369,17 @@ export interface Intercom {
   stopIntercom(): Promise<void>;
 }
 
+export interface PanTiltZoomCommand {
+  horizontal?: 'left' | 'right';
+  vertical?: 'up' |'down';
+}
+
+export interface PanTiltZoom {
+  ptzCapabilities: any;
+
+  ptzCommand(command: PanTiltZoomCommand): Promise<void>;
+}
+
 /**
  * Display devices can play back audio and video.
  */
@@ -2232,6 +2255,7 @@ export enum ScryptedInterface {
   Display = "Display",
   VideoCamera = "VideoCamera",
   VideoRecorder = "VideoRecorder",
+  PanTiltZoom = "PanTiltZoom",
   EventRecorder = "EventRecorder",
   VideoClips = "VideoClips",
   VideoCameraConfiguration = "VideoCameraConfiguration",
