@@ -57,8 +57,6 @@ typeMap.set('binary_sensor', {
 // }
 
 export class MqttAutoDiscoveryProvider extends MqttDeviceBase implements DeviceProvider {
-    client: MqttClient;
-    pathname: string;
     devices = new Map<string, MqttAutoDiscoveryDevice>();
 
     constructor(nativeId: string) {

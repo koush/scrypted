@@ -165,14 +165,14 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
                 if (typeof str === 'object')
                     str = JSON.stringify(str);
 
-                this.client.publish(`${this.pathname}/${this.id}/${property}`, str?.toString() || '');
+                this.client.publish(`${this.pathname}/${property}`, str?.toString() || '');
             }
             else {
                 let str = eventData;
                 if (typeof str === 'object')
                     str = JSON.stringify(str);
 
-                this.client.publish(`${this.pathname}/${this.id}/${eventDetails.eventInterface}`, str?.toString() || '');
+                this.client.publish(`${this.pathname}/${eventDetails.eventInterface}`, str?.toString() || '');
             }
         })
     }
@@ -204,14 +204,13 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
 
     async putMixinSetting(key: string, value: string | number | boolean) {
         if (key === 'url') {
-            let url = value.toString();
-            if (!url.endsWith('/'))
-                url += '/';
-            this.storage.setItem(key, url);
+            this.storage.setItem(key, value.toString());
         }
         else {
             this.storage.setItem(key, value.toString());
         }
+        this.client.end();
+        this.connectClient();
     }
 
     connectClient() {
@@ -225,15 +224,16 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
             url = new URL(urlString);
             username = this.storage.getItem('username') || undefined;
             password = this.storage.getItem('password') || undefined;
+            this.pathname = url.pathname.substring(1);
         }
         else {
             const tcpPort = this.provider.storage.getItem('tcpPort') || '';
             username = this.provider.storage.getItem('username') || undefined;
             password = this.provider.storage.getItem('password') || undefined;
             url = new URL(`mqtt://localhost:${tcpPort}/scrypted`);
+            this.pathname = `${url.pathname.substring(1)}/${this.id}`;
         }
 
-        this.pathname = url.pathname.substring(1);
         const urlWithoutPath = new URL(url);
         urlWithoutPath.pathname = '';
 
@@ -252,7 +252,7 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
                     if (typeof str === 'object')
                         str = JSON.stringify(str);
 
-                    client.publish(`${this.pathname}/${this.id}/${prop}`, str?.toString() || '');
+                    client.publish(`${this.pathname}/${prop}`, str?.toString() || '');
                 }
             }
         })
@@ -395,7 +395,7 @@ class MqttProvider extends ScryptedDeviceBase implements DeviceProvider, Setting
                 nativeId,
                 name: name,
                 interfaces: [ScryptedInterface.Scriptable,
-                    ScryptedInterface.Settings,
+                ScryptedInterface.Settings,
                     '@scrypted/mqtt'
                 ],
                 type: ScryptedDeviceType.Unknown,
