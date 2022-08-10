@@ -25,12 +25,11 @@ export class PushManager extends EventEmitter {
                 savedConfig = {};
             }
 
-            const config = {
+            const instance = new PushReceiver({
                 ...savedConfig,
                 senderId,
-            };
-            const instance = new PushReceiver(config);
-
+                heartbeatIntervalMs: 15 * 60 * 1000,
+            });
 
             const deferred = new Deferred<string>();
 
@@ -54,7 +53,7 @@ export class PushManager extends EventEmitter {
 
             await instance.connect();
 
-            return config.credentials?.fcm?.token || deferred.promise;
+            return savedConfig.credentials?.fcm?.token || deferred.promise;
         })();
     }
 }
