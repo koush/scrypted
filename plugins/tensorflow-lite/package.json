@@ -30,6 +30,9 @@
    },
    "scrypted": {
       "name": "TensorFlow Lite (and Coral) Object Detection",
+      "pluginDependencies": [
+         "@scrypted/objectdetector"
+      ],
       "runtime": "python",
       "type": "API",
       "interfaces": [
@@ -39,5 +42,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.37"
+   "version": "0.0.38"
 }
