@@ -14,8 +14,9 @@ import sdk, { BufferConverter, DeviceProvider, FFmpegInput, H264Info, MediaObjec
 import crypto from 'crypto';
 import net from 'net';
 import { Duplex } from 'stream';
+import { FileRtspServer } from './file-rtsp-server';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
-import { startRtspSession } from './rtsp-session';
+import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
@@ -947,7 +948,7 @@ class PrebufferSession {
 
     handleRebroadcasterClient(socketPromise, {
       // console: this.console,
-      connect: (writeData, destroy) => {
+      connect: (connection) => {
         const now = Date.now();
 
         const safeWriteData = (chunk: StreamChunk, prebuffer?: boolean) => {
@@ -956,7 +957,7 @@ class PrebufferSession {
             if (!chunk)
               return;
           }
-          const buffered = writeData(chunk);
+          const buffered = connection.writeData(chunk);
           if (buffered > 100000000) {
             this.console.log('more than 100MB has been buffered, did downstream die? killing connection.', this.streamName);
             cleanup();
@@ -966,7 +967,7 @@ class PrebufferSession {
         const cleanup = () => {
           session.removeListener(container, safeWriteData);
           session.removeListener('killed', cleanup);
-          destroy();
+          connection.destroy();
         }
 
         session.on(container, safeWriteData);
@@ -1040,9 +1041,10 @@ class PrebufferSession {
     let socketPromise: Promise<Duplex>;
     let url: string;
     let filter: (chunk: StreamChunk, prebuffer: boolean) => StreamChunk;
-    const codecMap = new Map<string, number>();
-    const udpMap = new Map<string, RtspTrack>();
-    let server: RtspServer;
+    let interleavePassthrough = false;
+    const interleavedMap = new Map<string, number>();
+    const serverPortMap = new Map<string, RtspTrack>();
+    let server: FileRtspServer;
 
     if (container === 'rtsp') {
       const parsedSdp = parseSdp(sdp);
@@ -1055,41 +1057,65 @@ class PrebufferSession {
       const videoCodec = parsedSdp.msections.find(msection => msection.type === 'video')?.codec;
       sdp = parsedSdp.toSdp();
       filter = (chunk, prebuffer) => {
-        const channel = codecMap.get(chunk.type);
-        if (channel == undefined) {
-          const udp = udpMap.get(chunk.type);
-          if (udp)
-            server.sendTrack(udp.control, chunk.chunks[1], chunk.type.startsWith('rtcp-'));
-          return;
-        }
         // if no prebuffer is explicitly requested, don't send prebuffer audio
         if (prebuffer && filterPrebufferAudio && chunk.type !== videoCodec)
           return;
-        const chunks = chunk.chunks.slice();
-        const header = Buffer.from(chunks[0]);
-        header.writeUInt8(channel, 1);
-        chunks[0] = header;
-        return {
-          startStream: chunk.startStream,
-          chunks,
+
+        const channel = interleavedMap.get(chunk.type);
+        if (!interleavePassthrough) {
+          if (channel == undefined) {
+            const udp = serverPortMap.get(chunk.type);
+            if (udp)
+              server.sendTrack(udp.control, chunk.chunks[1], chunk.type.startsWith('rtcp-'));
+            return;
+          }
+
+          const chunks = chunk.chunks.slice();
+          const header = Buffer.from(chunks[0]);
+          header.writeUInt8(channel, 1);
+          chunks[0] = header;
+          chunk = {
+            startStream: chunk.startStream,
+            chunks,
+          }
         }
+        else if (channel === undefined) {
+          return;
+        }
+
+        if (server.writeStream) {
+          server.writeRtpPayload(chunk.chunks[0], chunk.chunks[1]);
+          return;
+        }
+
+        return chunk;
       }
 
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
-        server = new RtspServer(socket, sdp);
+        server = new FileRtspServer(socket, sdp);
+        if (session.parserSpecific) {
+          const parserSpecific = session.parserSpecific as RtspSessionParserSpecific;
+          server.resolveInterleaved = msection => {
+            const channel = parserSpecific.interleaved.get(msection.codec);
+            return [channel, channel + 1];
+          }
+        }
         // server.console = this.console;
         await server.handlePlayback();
+        server.handleTeardown().finally(() => socket.destroy());
         for (const track of Object.values(server.setupTracks)) {
           if (track.protocol === 'udp') {
-            udpMap.set(track.codec, track);
-            udpMap.set(`rtcp-${track.codec}`, track);
+            serverPortMap.set(track.codec, track);
+            serverPortMap.set(`rtcp-${track.codec}`, track);
             continue;
           }
-          codecMap.set(track.codec, track.destination);
-          codecMap.set(`rtcp-${track.codec}`, track.destination + 1);
+          interleavedMap.set(track.codec, track.destination);
+          interleavedMap.set(`rtcp-${track.codec}`, track.destination + 1);
         }
+
+        interleavePassthrough = session.parserSpecific && serverPortMap.size === 0;
         return socket;
       })
       url = client.url.replace('tcp://', 'rtsp://');
@@ -1097,7 +1123,7 @@ class PrebufferSession {
     else {
       const client = await listenZeroSingleClient();
       socketPromise = client.clientPromise;
-      url = `tcp://127.0.0.1:${client.port}`
+      url = client.url;
     }
 
     mediaStreamOptions.sdp = sdp;

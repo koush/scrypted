@@ -1,9 +1,11 @@
 import crypto, { randomBytes } from 'crypto';
 import dgram from 'dgram';
+import { once } from 'events';
 import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
 import net from 'net';
 import { Duplex, Readable } from 'stream';
 import tls from 'tls';
+import { Deferred } from './deferred';
 import { closeQuiet, createBindUdp, createBindZero } from './listen-cluster';
 import { timeoutPromise } from './promise-utils';
 import { readLength, readLine } from './read-stream';
@@ -13,7 +15,7 @@ import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser'
 
 export const RTSP_FRAME_MAGIC = 36;
 
-interface Headers {
+export interface Headers {
     [header: string]: string
 }
 
@@ -244,6 +246,12 @@ export interface RtspStatus {
     reason: string,
 }
 
+export interface RtspServerResponse {
+    headers: Headers;
+    body: Buffer;
+    status: RtspStatus;
+}
+
 export class RtspStatusError extends Error {
     constructor(public status: RtspStatus) {
         super();
@@ -394,7 +402,11 @@ export class RtspClient extends RtspBase {
         return this.handleDataPayload(header);
     }
 
-    async readLoop() {
+    createBadHeader(header: Buffer) {
+        return new Error('RTSP Client received invalid frame magic. This may be a bug in your camera firmware. If this error persists, switch your RTSP Parser to FFmpeg or Scrypted (UDP): ' + header.toString());
+    }
+
+    async readLoopLegacy() {
         try {
             while (true) {
                 if (this.needKeepAlive) {
@@ -413,6 +425,77 @@ export class RtspClient extends RtspBase {
         }
     }
 
+    async readLoop() {
+        const deferred = new Deferred<void>();
+
+        let header: Buffer;
+        let channel: number;
+        let length: number;
+
+        const read = async () => {
+            if (this.needKeepAlive) {
+                this.needKeepAlive = false;
+                if (this.hasGetParameter)
+                    this.writeGetParameter();
+                else
+                    this.writeOptions();
+            }
+
+            try {
+                while (true) {
+                    // get header if needed
+                    if (!header) {
+                        header = this.client.read(4);
+
+                        if (!header)
+                            return;
+
+                        // validate header once.
+                        if (header[0] !== RTSP_FRAME_MAGIC) {
+                            if (header.toString() !== 'RTSP')
+                                throw this.createBadHeader(header);
+
+                            this.client.unshift(header);
+                            header = undefined;
+
+                            // remove the listener to operate in pull mode.
+                            this.client.removeListener('readable', read);
+
+                            // do what with this?
+                            const message = await super.readMessage();
+
+                            // readd the listener to operate in streaming mode.
+                            this.client.on('readable', read);
+
+                            continue;
+                        }
+
+                        channel = header.readUInt8(1);
+                        length = header.readUInt16BE(2);
+                    }
+
+                    const data = this.client.read(length);
+                    if (!data)
+                        return;
+
+                    const h = header;
+                    header = undefined;
+                    const options = this.setupOptions.get(channel);
+                    options?.onRtp?.(h, data);
+                }
+            }
+            catch (e) {
+                deferred.reject(e);
+                this.client.destroy();
+            }
+        };
+
+        read();
+        this.client.on('readable', read);
+
+        await Promise.all([once(this.client, 'end')]);
+    }
+
     // rtsp over tcp will actually interleave RTSP request/responses
     // within the RTSP data stream. The only way to tell if it's a request/response
     // is to see if the header + data starts with RTSP/1.0 message line.
@@ -420,10 +503,13 @@ export class RtspClient extends RtspBase {
     async readMessage(): Promise<string[]> {
         while (true) {
             const header = await readLength(this.client, 4);
-            if (header.toString() === 'RTSP') {
-                this.client.unshift(header);
-                const message = await super.readMessage();
-                return message;
+            if (header[0] !== RTSP_FRAME_MAGIC) {
+                if (header.toString() === 'RTSP') {
+                    this.client.unshift(header);
+                    const message = await super.readMessage();
+                    return message;
+                }
+                throw this.createBadHeader(header);
             }
 
             await this.handleDataPayload(header);
@@ -466,11 +552,7 @@ export class RtspClient extends RtspBase {
         return `Digest ${paramsString}`;
     }
 
-    async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<{
-        headers: Headers,
-        body: Buffer,
-        status: RtspStatus,
-    }> {
+    async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<RtspServerResponse> {
         this.writeRequest(method, headers, path, body);
 
         const message = this.requestTimeout ? await timeoutPromise(this.requestTimeout, this.readMessage()) : await this.readMessage();
@@ -516,6 +598,11 @@ export class RtspClient extends RtspBase {
         const publicHeader = ret.headers['public'];
         if (publicHeader)
             this.hasGetParameter = publicHeader.toLowerCase().includes('get_parameter');
+        return ret;
+    }
+
+    writeOptions() {
+        return this.writeRequest('OPTIONS');
     }
 
     async getParameter() {
@@ -584,7 +671,7 @@ export class RtspClient extends RtspBase {
             }
         }
         if (options.type === 'tcp')
-            this.setupOptions.set(interleaved.begin, options);
+            this.setupOptions.set(interleaved ? interleaved.begin : port, options);
         return Object.assign({ interleaved, options }, response);
     }
 
@@ -696,14 +783,18 @@ export class RtspServer {
         }
     }
 
+    writeRtpPayload(header: Buffer, rtp: Buffer) {
+        this.client.write(header);
+        return this.client.write(Buffer.from(rtp));
+    }
+
     send(rtp: Buffer, channel: number) {
         const header = Buffer.alloc(4);
         header.writeUInt8(36, 0);
         header.writeUInt8(channel, 1);
         header.writeUInt16BE(rtp.length, 2);
 
-        this.client.write(header);
-        return this.client.write(Buffer.from(rtp));
+        return this.writeRtpPayload(header, rtp);
     }
 
     sendUdp(udp: dgram.Socket, port: number, packet: Buffer) {
@@ -729,9 +820,10 @@ export class RtspServer {
         return this.send(packet, rtcp ? track.destination + 1 : track.destination);
     }
 
+    availableOptions = ['DESCRIBE', 'OPTIONS', 'PAUSE', 'PLAY', 'SETUP', 'TEARDOWN', 'ANNOUNCE', 'RECORD'];
     options(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
-        headers['Public'] = 'DESCRIBE, OPTIONS, PAUSE, PLAY, SETUP, TEARDOWN, ANNOUNCE, RECORD';
+        headers['Public'] = this.availableOptions.join(', ');
 
         this.respond(200, 'OK', requestHeaders, headers);
     }
@@ -752,6 +844,9 @@ export class RtspServer {
         }
     }
 
+
+    resolveInterleaved?: (msection: MSection) => [number, number];
+
     // todo: use the sdp itself to determine the audio/video track ids so
     // rewriting is not necessary.
     async setup(url: string, requestHeaders: Headers) {
@@ -766,11 +861,18 @@ export class RtspServer {
         }
 
         if (transport.includes('TCP')) {
-            const match = transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
-            if (match) {
-                const low = parseInt(match[1]);
-                const high = parseInt(match[2]);
+            if (this.resolveInterleaved) {
+                const [low, high] = this.resolveInterleaved(msection);
                 this.setupInterleaved(msection, low, high);
+                transport = `RTP/AVP/TCP;unicast;interleaved=${low}-${high}`;
+            }
+            else {
+                const match = transport.match(/.*?interleaved=([0-9]+)-([0-9]+)/);
+                if (match) {
+                    const low = parseInt(match[1]);
+                    const high = parseInt(match[2]);
+                    this.setupInterleaved(msection, low, high);
+                }
             }
         }
         else {
@@ -856,7 +958,7 @@ export class RtspServer {
         }
 
         const thisAny = this as any;
-        if (!thisAny[method]) {
+        if (!thisAny[method] || !this.availableOptions.includes(method.toUpperCase())) {
             this.respond(400, 'Bad Request', requestHeaders, {});
             return;
         }

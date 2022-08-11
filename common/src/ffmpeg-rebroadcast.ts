@@ -12,6 +12,7 @@ import { StreamChunk, StreamParser } from './stream-parser';
 const { mediaManager } = sdk;
 
 export interface ParserSession<T extends string> {
+    parserSpecific?: any;
     sdp: Promise<Buffer[]>;
     resetActivityTimer?: () => void,
     negotiateMediaStream(requestMediaStream: RequestMediaStreamOptions): ResponseMediaStreamOptions;
@@ -347,8 +348,13 @@ export interface RebroadcastSessionCleanup {
     (): void;
 }
 
+export interface RebroadcasterConnection {
+    writeData: (data: StreamChunk) => number;
+    destroy: () => void;
+}
+
 export interface RebroadcasterOptions {
-    connect?: (writeData: (data: StreamChunk) => number, destroy: () => void) => RebroadcastSessionCleanup | undefined;
+    connect?: (connection: RebroadcasterConnection) => RebroadcastSessionCleanup | undefined;
     console?: Console;
     idle?: {
         timeout: number,
@@ -358,14 +364,14 @@ export interface RebroadcasterOptions {
 
 export async function handleRebroadcasterClient(duplex: Promise<Duplex> | Duplex, options?: RebroadcasterOptions) {
     const socket = await duplex;
-    let first = true;
-    const writeData = (data: StreamChunk) => {
-        if (first) {
-            first = false;
-            if (data.startStream) {
-                socket.write(data.startStream)
-            }
+    const firstWriteData = (data: StreamChunk) => {
+        if (data.startStream) {
+            socket.write(data.startStream)
         }
+        connection.writeData = writeData;
+        return writeData(data);
+    }
+    const writeData = (data: StreamChunk) => {
         for (const chunk of data.chunks) {
             socket.write(chunk);
         }
@@ -379,7 +385,13 @@ export async function handleRebroadcasterClient(duplex: Promise<Duplex> | Duplex
         socket.destroy();
         cb?.();
     }
-    let cleanupCallback = options?.connect(writeData, destroy);
+
+    const connection: RebroadcasterConnection = {
+        writeData: firstWriteData,
+        destroy,
+    };
+
+    let cleanupCallback = options?.connect(connection);
 
     socket.once('close', () => {
         destroy();

@@ -12,6 +12,9 @@ import { getSpsResolution } from "./sps-resolution";
 
 export type RtspChannelCodecMapping = { [key: number]: string };
 
+export interface RtspSessionParserSpecific {
+    interleaved: Map<string, number>;
+}
 
 export async function startRtspSession(console: Console, url: string, mediaStreamOptions: ResponseMediaStreamOptions, options: {
     useUdp: boolean,
@@ -84,6 +87,13 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
             }
         }
 
+        let parserSpecific: RtspSessionParserSpecific;
+        if (!useUdp) {
+            parserSpecific = {
+                interleaved: new Map(),
+            }
+        }
+
         const doSetup = async (control: string, codec: string) => {
             let udp: dgram.Socket;
             if (useUdp) {
@@ -133,10 +143,9 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
                     },
                 });
 
-                if (setupResult.interleaved)
-                    mapping[setupResult.interleaved.begin] = codec;
-                else
-                    mapping[channel] = codec;
+                const resultChannel = setupResult.interleaved ? setupResult.interleaved.begin : channel;
+                mapping[resultChannel] = codec;
+                parserSpecific.interleaved.set(codec, resultChannel);
             }
 
             channel += 2;
@@ -245,6 +254,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
             }
 
             return {
+                parserSpecific,
                 start,
                 sdp: Promise.resolve([Buffer.from(sdp)]),
                 inputAudioCodec,
