@@ -2138,7 +2138,7 @@ export interface MixinProvider {
   /**
    * Create a mixin that can be applied to the supplied device.
    */
-  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }): Promise<any>;
+  getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState): Promise<any>;
 
   /**
    * Release a mixin device that was previously returned from getMixin.
@@ -2431,6 +2431,7 @@ export interface ScryptedStatic {
 }
 
 export declare interface DeviceState {
+  id?: string;
   setState?(property: string, value: any): Promise<void>;
 }
 

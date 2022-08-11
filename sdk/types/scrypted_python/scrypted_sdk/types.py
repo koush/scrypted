@@ -765,7 +765,7 @@ class Microphone:
 class MixinProvider:
     async def canMixin(self, type: ScryptedDeviceType, interfaces: list[str]) -> list[str]:
         pass
-    async def getMixin(self, mixinDevice: Any, mixinDeviceInterfaces: list[ScryptedInterface], mixinDeviceState: Any) -> Any:
+    async def getMixin(self, mixinDevice: Any, mixinDeviceInterfaces: list[ScryptedInterface], mixinDeviceState: DeviceState) -> Any:
         pass
     async def releaseMixin(self, id: str, mixinDevice: Any) -> None:
         pass
