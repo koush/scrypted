@@ -10,14 +10,15 @@
             "port": 10081,
             "request": "attach",
             "skipFiles": [
-                "**/plugin-remote-worker.*",
+                // "**/plugin-remote-worker.*",
                 "<node_internals>/**"
             ],
+            "autoAttachChildProcesses": true,
             "preLaunchTask": "scrypted: deploy+debug",
             "sourceMaps": true,
             "localRoot": "${workspaceFolder}/out",
             "remoteRoot": "/plugin/",
-            "type": "pwa-node"
+            "type": "node"
         }
     ]
 }

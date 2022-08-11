@@ -10,7 +10,7 @@ import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
 import net from 'net';
 import { Duplex } from 'stream';
@@ -459,16 +459,17 @@ class PrebufferSession {
       addOddities();
     }
 
-    if (rtspMode) {
-      settings.push({
-        group,
-        key: 'rtspRebroadcastUrl',
-        title: 'RTSP Rebroadcast Url',
-        description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
-        readonly: true,
-        value: `rtsp://localhost:${this.mixin.plugin.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
-      });
-    }
+    // if (rtspMode) {
+    //   const transocde 
+    //   settings.push({
+    //     group,
+    //     key: 'rtspRebroadcastUrl',
+    //     title: 'RTSP Rebroadcast Url',
+    //     description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
+    //     readonly: true,
+    //     value: `rtsp://localhost:${this.mixin.plugin.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
+    //   });
+    // }
 
     if (this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
       settings.push({
@@ -1203,7 +1204,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
   streamSettings = createStreamSettings(this);
 
-  constructor(public plugin: RebroadcastPlugin, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
+  constructor(public getTranscodeStorageSettings: () => Promise<any>, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
 
     this.delayStart();
@@ -1237,6 +1238,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       title: string;
     };
 
+    const transcodeStorageSettings = await this.getTranscodeStorageSettings();
     const defaultLocalBitrate = 2000000;
     const defaultLowResolutionBitrate = 512000;
     if (!id) {
@@ -1244,7 +1246,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         case 'medium-resolution':
         case 'remote':
           result = this.streamSettings.getRemoteStream(msos);
-          destinationVideoBitrate = this.plugin.transcodeStorageSettings.values.remoteStreamingBitrate;
+          destinationVideoBitrate = transcodeStorageSettings.remoteStreamingBitrate;
           break;
         case 'low-resolution':
           result = this.streamSettings.getLowResolutionStream(msos);
@@ -1271,7 +1273,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       // for this reason, do not automatically supply h264 encoder arguments
       // even if h264 is requested, to force a visible failure.
       if (transcodingEnabled && this.streamSettings.storageSettings.values.transcodeStreams?.includes(result.title)) {
-        h264EncoderArguments = this.plugin.transcodeStorageSettings.values.h264EncoderArguments?.split(' ');
+        h264EncoderArguments = transcodeStorageSettings.h264EncoderArguments?.split(' ');
         if (this.streamSettings.storageSettings.values.videoFilterArguments)
           videoFilterArguments = this.streamSettings.storageSettings.values.videoFilterArguments;
       }
@@ -1488,6 +1490,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
   }
 
   async release() {
+    this.online = true;
     super.release();
     this.console.log('prebuffer session releasing if started');
     this.released = true;
@@ -1538,7 +1541,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     }
   });
   rtspServer: net.Server;
-  currentMixins = new Map<string, PrebufferMixin>();
+  currentMixins = new Map<string, ReturnType<typeof sdk.fork>>();
 
   constructor(nativeId?: string) {
     super(nativeId);
@@ -1568,7 +1571,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
     setTimeout(() => deviceManager.requestRestart(), twoAM);
 
-    this.startRtspServer();
+    // this.startRtspServer();
 
     process.nextTick(() => {
       deviceManager.onDeviceDiscovered({
@@ -1596,6 +1599,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     return this.storageSettings.putSetting(key, value);
   }
 
+  /*
   startRtspServer() {
     closeQuiet(this.rtspServer);
 
@@ -1665,6 +1669,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
 
     this.rtspServer.listen(this.storageSettings.values.rebroadcastPort);
   }
+  */
 
   async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer> {
     const json = JSON.parse(data.toString());
@@ -1692,7 +1697,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
 
     clientPromise.then(async (client) => {
       const rtsp = new RtspServer(client, sdp);
-      //rtsp.console = this.console;
+      rtsp.console = this.console;
       await rtsp.handlePlayback();
       const socket = net.connect(parseInt(u.port), u.hostname);
 
@@ -1730,25 +1735,58 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     return ret;
   }
 
-  async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }) {
+  async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState) {
     this.setHasEnabledMixin(mixinDeviceState.id);
-    const ret = new PrebufferMixin(this, {
-      mixinDevice,
-      mixinDeviceState,
-      mixinProviderNativeId: this.nativeId,
-      mixinDeviceInterfaces,
-      group: "Stream Management",
-      groupKey: "prebuffer",
-    });
-    this.currentMixins.set(mixinDeviceState.id, ret);
-    return ret;
+
+    // 8-11-2022
+    // old scrypted had a bug where mixin device state was not exposing properties like id correctly
+    // across rpc boundaries.
+    if (sdk.fork && typeof mixinDeviceState.id === 'string') {
+      const forked = sdk.fork();
+      const result = await forked.result as RebroadcastPluginFork;
+      const ret = result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
+      this.currentMixins.set(mixinDeviceState.id, forked);
+      return ret;
+    }
+    else {
+      const ret = newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
+      this.currentMixins.set(mixinDeviceState.id, {
+        result: Promise.resolve(ret),
+        worker: undefined,
+      });
+      return ret;
+    }
   }
 
-  async releaseMixin(id: string, mixinDevice: any) {
-    mixinDevice.online = true;
-    await mixinDevice.release();
+  async releaseMixin(id: string, mixinDevice: PrebufferMixin) {
+    const current = this.currentMixins.get(id);
     this.currentMixins.delete(id);
+    try {
+      await mixinDevice.release();
+    }
+    finally {
+      current?.worker?.terminate();
+    }
   }
 }
 
-export default new RebroadcastPlugin();
+async function newPrebufferMixin(getTranscodeStorageSettings: () => Promise<any>, mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: DeviceState) {
+  return new PrebufferMixin(getTranscodeStorageSettings, {
+    mixinDevice,
+    mixinDeviceState,
+    mixinProviderNativeId: undefined,
+    mixinDeviceInterfaces,
+    group: "Stream Management",
+    groupKey: "prebuffer",
+  })
+}
+
+class RebroadcastPluginFork {
+  newPrebufferMixin = newPrebufferMixin;
+}
+
+export async function fork() {
+  return new RebroadcastPluginFork();
+}
+
+export default RebroadcastPlugin;
