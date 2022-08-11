@@ -10,7 +10,7 @@
             "port": 10081,
             "request": "attach",
             "skipFiles": [
-                // "**/plugin-remote-worker.*",
+                "**/plugin-remote-worker.*",
                 "<node_internals>/**"
             ],
             "autoAttachChildProcesses": true,
