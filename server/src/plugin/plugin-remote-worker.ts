@@ -316,27 +316,32 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             pluginReader = undefined;
             const script = main.toString();
 
-            scrypted.fork = async () => {
+            scrypted.fork = () => {
                 const ntw = new NodeThreadWorker(pluginId, {
                     env: process.env,
                     pluginDebug: undefined,
                 });
-                const threadPeer = new RpcPeer('main', 'thread', (message, reject) => ntw.send(message, reject));
-                threadPeer.params.updateStats = (stats: any) => {
-                    // todo: merge.
-                    // this.stats = stats;
+                return {
+                    worker: ntw.worker,
+                    result: (async() => {
+                        const threadPeer = new RpcPeer('main', 'thread', (message, reject) => ntw.send(message, reject));
+                        threadPeer.params.updateStats = (stats: any) => {
+                            // todo: merge.
+                            // this.stats = stats;
+                        }
+                        ntw.setupRpcPeer(threadPeer);
+        
+                        const remote = await setupPluginRemote(threadPeer, api, pluginId, () => systemManager.getSystemState());
+        
+                        for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
+                            await remote.setNativeId(nativeId, dmd.id, dmd.storage);
+                        }
+        
+                        const forkOptions = Object.assign({}, zipOptions);
+                        forkOptions.fork = true;
+                        return remote.loadZip(packageJson, zipData, forkOptions)
+                    })(),
                 }
-                ntw.setupRpcPeer(threadPeer);
-
-                const remote = await setupPluginRemote(threadPeer, api, pluginId, () => systemManager.getSystemState());
-
-                for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
-                    await remote.setNativeId(nativeId, dmd.id, dmd.storage);
-                }
-
-                const forkOptions = Object.assign({}, zipOptions);
-                forkOptions.fork = true;
-                return remote.loadZip(packageJson, zipData, forkOptions)
             }
 
             try {
@@ -345,9 +350,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
 
                 if (zipOptions?.fork) {
                     const fork = exports.fork;
-                    const ret = await fork();
-                    ret[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] = true;
-                    return ret;
+                    return fork();
                 }
 
                 let pluginInstance = exports.default;

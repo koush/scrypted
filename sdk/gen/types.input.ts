@@ -1640,8 +1640,8 @@ export interface ScryptedStatic {
 
   pluginHostAPI: any;
 
-  fork?: () => {
-    result: Promise<any>;
+  fork?<T>(): {
+    result: Promise<T>;
     worker: {
       terminate(): Promise<number>;
     };

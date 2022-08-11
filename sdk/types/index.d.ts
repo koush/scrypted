@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.63";
+export declare const TYPES_VERSION = "0.0.64";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -1663,8 +1663,8 @@ export interface ScryptedStatic {
     mediaManager: MediaManager;
     systemManager: SystemManager;
     pluginHostAPI: any;
-    fork?: () => {
-        result: Promise<any>;
+    fork?<T>(): {
+        result: Promise<T>;
         worker: {
             terminate(): Promise<number>;
         };
