@@ -1056,6 +1056,8 @@ class Logger:
     pass
 
 class DeviceManager:
+    def createDeviceState(self, id: str, setState: Any) -> DeviceState:
+        pass
     def getDeviceConsole(self, nativeId: str = None) -> Console:
         pass
     def getDeviceLogger(self, nativeId: str = None) -> Logger:

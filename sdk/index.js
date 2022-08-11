@@ -73,6 +73,10 @@ class MixinDeviceBase extends index_1.DeviceBase {
         this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
         this.mixinStorageSuffix = options.mixinStorageSuffix;
         this._deviceState = options.mixinDeviceState;
+        if (!this._deviceState.constructor && deviceManager.createDeviceState && typeof this._deviceState.id === 'string') {
+            console.warn('recreating device state for thread');
+            this._deviceState = deviceManager.createDeviceState(this._deviceState.id, this._deviceState.setState);
+        }
         this.mixinProviderNativeId = options.mixinProviderNativeId;
     }
     get storage() {

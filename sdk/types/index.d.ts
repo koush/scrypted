@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.64";
+export declare const TYPES_VERSION = "0.0.68";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -1216,6 +1216,10 @@ export interface DeviceManager {
      */
     getDeviceState(nativeId?: ScryptedNativeId): DeviceState;
     /**
+     * Create a device state object that will trap all state setting calls. Used internally by mixins and fork.
+     */
+    createDeviceState?(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState;
+    /**
      * Get the storage for a mixin.
      * @param id The id of the device being mixined.
      * @param nativeId The nativeId of the MixinProvider.
@@ -1663,6 +1667,7 @@ export interface ScryptedStatic {
     mediaManager: MediaManager;
     systemManager: SystemManager;
     pluginHostAPI: any;
+    pluginRemoteAPI: any;
     fork?<T>(): {
         result: Promise<T>;
         worker: {
@@ -1671,6 +1676,7 @@ export interface ScryptedStatic {
     };
 }
 export declare interface DeviceState {
+    setState?(property: string, value: any): Promise<void>;
 }
 export interface ScryptedInterfaceDescriptor {
     name: string;

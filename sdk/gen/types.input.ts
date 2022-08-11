@@ -595,7 +595,7 @@ export interface Intercom {
 
 export interface PanTiltZoomCommand {
   horizontal?: 'left' | 'right';
-  vertical?: 'up' |'down';
+  vertical?: 'up' | 'down';
 }
 
 export interface PanTiltZoom {
@@ -1146,6 +1146,11 @@ export interface DeviceManager {
   getDeviceState(nativeId?: ScryptedNativeId): DeviceState;
 
   /**
+   * Create a device state object that will trap all state setting calls. Used internally by mixins and fork.
+   */
+  createDeviceState?(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState;
+
+  /**
    * Get the storage for a mixin.
    * @param id The id of the device being mixined.
    * @param nativeId The nativeId of the MixinProvider.
@@ -1639,6 +1644,7 @@ export interface ScryptedStatic {
   systemManager: SystemManager,
 
   pluginHostAPI: any;
+  pluginRemoteAPI: any;
 
   fork?<T>(): {
     result: Promise<T>;
@@ -1649,6 +1655,7 @@ export interface ScryptedStatic {
 }
 
 export declare interface DeviceState {
+  setState?(property: string, value: any): Promise<void>;
 }
 
 export interface ScryptedInterfaceDescriptor {

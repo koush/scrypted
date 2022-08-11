@@ -107,6 +107,10 @@ class DeviceStateProxyHandler implements ProxyHandler<any> {
     get?(target: any, p: PropertyKey, receiver: any) {
         if (p === 'id')
             return this.id;
+        if (p === RpcPeer.PROPERTY_PROXY_PROPERTIES)
+            return { id: this.id }
+        if (p === 'setState')
+            return this.setState;
         return this.deviceManager.systemManager.state[this.id][p as string]?.value;
     }
 
@@ -150,6 +154,11 @@ export class DeviceManagerImpl implements DeviceManager {
     getDeviceState(nativeId?: any): DeviceState {
         const handler = new DeviceStateProxyHandler(this, this.nativeIds.get(nativeId).id,
             (property, value) => this.api.setState(nativeId, property, value));
+        return new Proxy(handler, handler);
+    }
+
+    createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState {
+        const handler = new DeviceStateProxyHandler(this, id, setState);
         return new Proxy(handler, handler);
     }
 
@@ -381,6 +390,7 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             mediaManager,
             log,
             pluginHostAPI: api,
+            pluginRemoteAPI: undefined,
         }
 
         delete peer.params.getRemote;
@@ -402,9 +412,8 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 'setNativeId',
             ],
             getServicePort,
-            createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>) {
-                const handler = new DeviceStateProxyHandler(deviceManager, id, setState);
-                return new Proxy(handler, handler);
+            async createDeviceState(id: string, setState: (property: string, value: any) => Promise<void>) {
+                return deviceManager.createDeviceState(id, setState);
             },
 
             async ioEvent(id: string, event: string, message?: any) {
@@ -506,6 +515,8 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                 return options.onLoadZip(ret, params, packageJson, zipData, zipOptions);
             },
         }
+
+        ret.pluginRemoteAPI = remote;
 
         return remote;
     }
