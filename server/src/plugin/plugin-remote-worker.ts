@@ -11,7 +11,7 @@ import { RpcMessage, RpcPeer } from '../rpc';
 import { MediaManagerImpl } from './media';
 import { PluginAPI, PluginRemoteLoadZipOptions } from './plugin-api';
 import { installOptionalDependencies } from './plugin-npm-dependencies';
-import { attachPluginRemote, PluginReader, setupPluginRemote } from './plugin-remote';
+import { attachPluginRemote, DeviceManagerImpl, PluginReader, setupPluginRemote } from './plugin-remote';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 const { link } = require('linkfs');
@@ -20,7 +20,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
     const peer = new RpcPeer('unknown', 'host', peerSend);
 
     let systemManager: SystemManager;
-    let deviceManager: DeviceManager;
+    let deviceManager: DeviceManagerImpl;
     let api: PluginAPI;
 
     const getConsole = (hook: (stdout: PassThrough, stderr: PassThrough) => Promise<void>,
@@ -329,6 +329,11 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                 ntw.setupRpcPeer(threadPeer);
 
                 const remote = await setupPluginRemote(threadPeer, api, pluginId, () => systemManager.getSystemState());
+
+                for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
+                    await remote.setNativeId(nativeId, dmd.id, dmd.storage);
+                }
+
                 const forkOptions = Object.assign({}, zipOptions);
                 forkOptions.fork = true;
                 return remote.loadZip(packageJson, zipData, forkOptions)
@@ -365,7 +370,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         }
     }).then(scrypted => {
         systemManager = scrypted.systemManager;
-        deviceManager = scrypted.deviceManager;
+        deviceManager = scrypted.deviceManager as DeviceManagerImpl;
     });
 
     return peer;

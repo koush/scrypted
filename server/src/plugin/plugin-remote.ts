@@ -128,7 +128,7 @@ interface DeviceManagerDevice {
     storage: { [key: string]: any };
 }
 
-class DeviceManagerImpl implements DeviceManager {
+export class DeviceManagerImpl implements DeviceManager {
     api: PluginAPI;
     nativeIds = new Map<string, DeviceManagerDevice>();
     deviceStorage = new Map<string, StorageImpl>();
@@ -337,7 +337,7 @@ export interface WebSocketCustomHandler {
 export type PluginReader = (name: string) => Buffer;
 
 export interface PluginRemoteAttachOptions {
-    createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManager) => Promise<MediaManager>;
+    createMediaManager?: (systemManager: SystemManager, deviceManager: DeviceManagerImpl) => Promise<MediaManager>;
     getServicePort?: (name: string, ...args: any[]) => Promise<number>;
     getDeviceConsole?: (nativeId?: ScryptedNativeId) => Console;
     getPluginConsole?: () => Console;
