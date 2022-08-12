@@ -370,7 +370,10 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
 
                     const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, () => systemManager.getSystemState());
                     forks.add(remote);
-                    ntw.worker.on('exit', () => forks.delete(remote));
+                    ntw.worker.on('exit', () => {
+                        forks.delete(remote);
+                        allMemoryStats.delete(ntw);
+                    });
 
                     for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
                         await remote.setNativeId(nativeId, dmd.id, dmd.storage);
