@@ -6,7 +6,7 @@
     "configurations": [
         {
             "autoAttachChildProcesses": false,
-            "type": "pwa-node",
+            "type": "node",
             "request": "launch",
             "name": "Launch Program",
             "skipFiles": [

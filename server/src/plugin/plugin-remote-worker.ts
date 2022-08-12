@@ -9,12 +9,18 @@ import { install as installSourceMapSupport } from 'source-map-support';
 import { PassThrough } from 'stream';
 import { RpcMessage, RpcPeer } from '../rpc';
 import { MediaManagerImpl } from './media';
-import { PluginAPI, PluginRemoteLoadZipOptions } from './plugin-api';
+import { PluginAPI, PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { installOptionalDependencies } from './plugin-npm-dependencies';
 import { attachPluginRemote, DeviceManagerImpl, PluginReader, setupPluginRemote } from './plugin-remote';
 import { createREPLServer } from './plugin-repl';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
 const { link } = require('linkfs');
+
+interface PluginStats {
+    type: 'stats',
+    cpu: NodeJS.CpuUsage;
+    memoryUsage: NodeJS.MemoryUsage;
+}
 
 export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
     const peer = new RpcPeer('unknown', 'host', peerSend);
@@ -126,12 +132,6 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             if (!mixinId) {
                 return;
             }
-            // todo: fix this. a mixin provider can mixin another device to make it a mixin provider itself.
-            // so the mixin id in the mixin table will be incorrect.
-            // there's no easy way to fix this from the remote.
-            // if (!systemManager.getDeviceById(mixinId).mixins.includes(idForNativeId(nativeId))) {
-            //     return;
-            // }
             const reconnect = () => {
                 stdout.removeAllListeners();
                 stderr.removeAllListeners();
@@ -178,15 +178,35 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
         return ret;
     }
 
-    peer.getParam('updateStats').then((updateStats: (stats: any) => void) => {
-        let lastCpuUsage: NodeJS.CpuUsage;
+    // process.cpuUsage is for the entire process.
+    // process.memoryUsage is per thread.
+    const allMemoryStats = new Map<NodeThreadWorker, NodeJS.MemoryUsage>();
+
+    peer.getParam('updateStats').then((updateStats: (stats: PluginStats) => void) => {
         setInterval(() => {
-            const cpuUsage = process.cpuUsage(lastCpuUsage);
-            lastCpuUsage = cpuUsage;
+            const cpuUsage = process.cpuUsage();
+            allMemoryStats.set(undefined, process.memoryUsage());
+
+            const memoryUsage: NodeJS.MemoryUsage = {
+                rss: 0,
+                heapTotal: 0,
+                heapUsed: 0,
+                external: 0,
+                arrayBuffers: 0,
+            }
+
+            for (const mu of allMemoryStats.values()) {
+                memoryUsage.rss += mu.rss;
+                memoryUsage.heapTotal += mu.heapTotal;
+                memoryUsage.heapUsed += mu.heapUsed;
+                memoryUsage.external += mu.external;
+                memoryUsage.arrayBuffers += mu.arrayBuffers;
+            }
+
             updateStats({
                 type: 'stats',
                 cpu: cpuUsage,
-                memoryUsage: process.memoryUsage(),
+                memoryUsage,
             });
         }, 10000);
     });
@@ -316,31 +336,56 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
             pluginReader = undefined;
             const script = main.toString();
 
+
+            const forks = new Set<PluginRemote>();
+
             scrypted.fork = () => {
                 const ntw = new NodeThreadWorker(pluginId, {
                     env: process.env,
                     pluginDebug: undefined,
                 });
+
+                const result = (async () => {
+                    const threadPeer = new RpcPeer('main', 'thread', (message, reject) => ntw.send(message, reject));
+                    threadPeer.params.updateStats = (stats: PluginStats) => {
+                        allMemoryStats.set(ntw, stats.memoryUsage);
+                    }
+                    ntw.setupRpcPeer(threadPeer);
+
+                    class PluginForkAPI extends PluginAPIProxy {
+                        [RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS] = (api as any)[RpcPeer.PROPERTY_PROXY_ONEWAY_METHODS];
+
+                        setStorage(nativeId: string, storage: { [key: string]: any; }): Promise<void> {
+                            const id = deviceManager.nativeIds.get(nativeId).id;
+                            (scrypted.pluginRemoteAPI as PluginRemote).setNativeId(nativeId, id, storage);
+                            for (const r of forks) {
+                                if (r === remote)
+                                    continue;
+                                r.setNativeId(nativeId, id, storage);
+                            }
+                            return super.setStorage(nativeId, storage);
+                        }
+                    }
+                    const forkApi = new PluginForkAPI(api);
+
+                    const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, () => systemManager.getSystemState());
+                    forks.add(remote);
+                    ntw.worker.on('exit', () => forks.delete(remote));
+
+                    for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
+                        await remote.setNativeId(nativeId, dmd.id, dmd.storage);
+                    }
+
+                    const forkOptions = Object.assign({}, zipOptions);
+                    forkOptions.fork = true;
+                    return remote.loadZip(packageJson, zipData, forkOptions)
+                })();
+
+                result.catch(() => ntw.kill());
+
                 return {
                     worker: ntw.worker,
-                    result: (async() => {
-                        const threadPeer = new RpcPeer('main', 'thread', (message, reject) => ntw.send(message, reject));
-                        threadPeer.params.updateStats = (stats: any) => {
-                            // todo: merge.
-                            // this.stats = stats;
-                        }
-                        ntw.setupRpcPeer(threadPeer);
-        
-                        const remote = await setupPluginRemote(threadPeer, api, pluginId, () => systemManager.getSystemState());
-        
-                        for (const [nativeId, dmd] of deviceManager.nativeIds.entries()) {
-                            await remote.setNativeId(nativeId, dmd.id, dmd.storage);
-                        }
-        
-                        const forkOptions = Object.assign({}, zipOptions);
-                        forkOptions.fork = true;
-                        return remote.loadZip(packageJson, zipData, forkOptions)
-                    })(),
+                    result,
                 }
             }
 
