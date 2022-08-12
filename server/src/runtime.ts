@@ -8,7 +8,6 @@ import http, { ServerResponse } from 'http';
 import https from 'https';
 import { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import path from 'path';
-import qs from "query-string";
 import rimraf from 'rimraf';
 import semver from 'semver';
 import { PassThrough } from 'stream';
@@ -184,12 +183,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
             const url = new URL(callback_url as string);
             if (url.search) {
-                const search = qs.parse(url.search);
-                const state = search.state as string;
+                const state = url.searchParams.get('state');
                 if (state) {
                     const { s, d, r } = JSON.parse(state);
-                    search.state = s;
-                    url.search = '?' + qs.stringify(search);
+                    url.searchParams.set('state', s);
                     const oauthClient: ScryptedDevice & OauthClient = this.getDevice(d);
                     await oauthClient.onOauthCallback(url.toString()).catch();
                     res.redirect(r);
@@ -197,12 +194,12 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 }
             }
             if (url.hash) {
-                const hash = qs.parse(url.hash);
-                const state = hash.state as string;
+                const hash = new URLSearchParams(url.hash.substring(1));
+                const state = hash.get('state');
                 if (state) {
                     const { s, d, r } = JSON.parse(state);
-                    hash.state = s;
-                    url.hash = '#' + qs.stringify(hash);
+                    hash.set('state', s);
+                    url.hash = '#' + hash.toString();
                     const oauthClient: ScryptedDevice & OauthClient = this.getDevice(d);
                     await oauthClient.onOauthCallback(url.toString());
                     res.redirect(r);

@@ -12,7 +12,6 @@ import { getHostAddresses, SCRYPTED_DEBUG_PORT, SCRYPTED_INSECURE_PORT, SCRYPTED
 import crypto from 'crypto';
 import cookieParser from 'cookie-parser';
 import axios from 'axios';
-import qs from 'query-string';
 import { RPCResultError } from './rpc';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
@@ -318,8 +317,8 @@ async function start() {
 
     app.get('/web/component/script/search', async (req, res) => {
         try {
-            const query = qs.stringify({
-                text: req.query.text,
+            const query = new URLSearchParams({
+                text: req.query.text.toString(),
             })
             const response = await axios(`https://registry.npmjs.org/-/v1/search?${query}`);
             res.send(response.data);

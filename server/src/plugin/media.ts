@@ -1,7 +1,5 @@
-import { BufferConverter, BufferConvertorOptions, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
+import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
-import child_process from 'child_process';
-import { once } from 'events';
 import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
@@ -11,7 +9,6 @@ import Graph from 'node-dijkstra';
 import os from 'os';
 import path from 'path';
 import MimeType from 'whatwg-mimetype';
-import { safeKillFFmpeg } from '../media-helpers';
 import { MediaObjectRemote } from "./plugin-api";
 
 function typeMatches(target: string, candidate: string): boolean {
@@ -68,9 +65,9 @@ export abstract class MediaManagerBase implements MediaManager {
             fromMimeType: ScryptedMimeTypes.SchemePrefix + 'file',
             toMimeType: ScryptedMimeTypes.MediaObject,
             convert: async (data, fromMimeType, toMimeType) => {
-                const filename = data.toString();
+                const filename = data.toString().substring('file:'.length);
                 const ab = await fs.promises.readFile(filename);
-                const mt = mimeType.lookup(data.toString());
+                const mt = mimeType.getType(data.toString());
                 const mo = this.createMediaObject(ab, mt);
                 return mo;
             }
@@ -206,7 +203,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
     ensureMediaObjectRemote(mediaObject: string | MediaObject): MediaObjectRemote {
         if (typeof mediaObject === 'string') {
-            const mime = mimeType.lookup(mediaObject);
+            const mime = mimeType.getType(mediaObject);
             return this.createMediaObjectRemote(mediaObject, mime);
         }
         return mediaObject as MediaObjectRemote;
