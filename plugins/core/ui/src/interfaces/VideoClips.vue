@@ -4,18 +4,8 @@
       <video :src="playUrl" controls autoplay></video>
     </v-dialog>
 
-    <v-list-item
-      v-for="(clip, index) in pageClips"
-      :key="clip.id"
-      @click="playClip(clip, index)"
-    >
-      <v-img
-        class="mr-2"
-        :src="pageThumbnails[index]"
-        contain
-        max-height="100px"
-        max-width="100px"
-      >
+    <v-list-item v-for="(clip, index) in pageClips" :key="clip.id" @click="playClip(clip, index)">
+      <v-img class="mr-2" :src="pageThumbnails[index]" contain max-height="100px" max-width="100px">
       </v-img>
       <v-list-item-content>
         <v-list-item-title>
@@ -61,21 +51,17 @@
       <v-spacer></v-spacer>
       <v-dialog v-model="removeAllClipsDialog" v-if="pages" width="unset">
         <template v-slot:activator="{ on }">
-          <v-btn v-on="on" small text color="red"
-            ><v-icon x-small>fa fa-trash</v-icon></v-btn
-          >
+          <v-btn v-on="on" small text color="red">
+            <v-icon x-small>fa fa-trash</v-icon>
+          </v-btn>
         </template>
         <v-card>
           <v-card-title> Delete All Clips? </v-card-title>
-          <v-card-text
-            >Please confirm deletion of all video clips. This action can not be
-            undone.</v-card-text
-          >
+          <v-card-text>Please confirm deletion of all video clips. This action can not be
+            undone.</v-card-text>
           <v-card-actions>
             <v-spacer></v-spacer>
-            <v-btn small text @click="removeAllClipsDialog = false"
-              >Cancel</v-btn
-            >
+            <v-btn small text @click="removeAllClipsDialog = false">Cancel</v-btn>
             <v-btn small text color="red" @click="removeAllClips">Delete</v-btn>
           </v-card-actions>
         </v-card>
@@ -88,6 +74,7 @@ import { datePickerLocalTimeToUTC } from "../common/date";
 import { fetchClipThumbnail, fetchClipUrl } from "../common/videoclip";
 import RPCInterface from "./RPCInterface.vue";
 import Vue from "vue";
+import path from "path";
 
 export default {
   mixins: [RPCInterface],
@@ -189,7 +176,10 @@ export default {
     async downloadClip(clip) {
       const mediaManager = this.$scrypted.mediaManager;
       const url = await fetchClipUrl(mediaManager, this.device, clip);
-      window.open(url + "?attachment");
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', path.basename(url));
+      a.click();
     },
     async removeClip(clip) {
       this.device.removeVideoClips(clip.id);
