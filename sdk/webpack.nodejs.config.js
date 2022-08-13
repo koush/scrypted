@@ -51,10 +51,6 @@ const polyfills = [
     "memfs",
     "realfs",
     "fakefs",
-    // remove this at some point
-    // 1/21/2022
-    'wrtc',
-    '@koush/wrtc',
     "mdns",
     "typescript",
 ];
