@@ -12,7 +12,6 @@ import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
-import { createBrowserSignalingSession, isPeerConnectionAlive, startBrowserRTCSignaling, startRTCPeerConnectionForBrowser } from "@scrypted/common/src/ffmpeg-to-wrtc";
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
 
 const { pluginHostAPI, systemManager, deviceManager, mediaManager, endpointManager } = sdk;
@@ -184,82 +183,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return;
         }
 
-        const attachPeerConnection = (pc: RTCPeerConnection) => {
-            if (!pc)
-                return;
-            const checkConn = () => {
-                if (!isPeerConnectionAlive(pc))
-                    ws.close();
-            }
-            ws.addEventListener('close', () => pc.close());
-            pc.addEventListener('connectionstatechange', checkConn);
-            pc.addEventListener('iceconnectionstatechange', checkConn);
-        }
-
-        // 3/3/2022 todo: can remove this. leaving this around because
-        // cached ui will hit this endpoint.
-        if (this.checkEngineIoEndpoint(request, 'videocamera')) {
-            const url = new URL(`http://localhost${request.url}`);
-            const deviceId = url.searchParams.get('deviceId');
-            const camera = systemManager.getDeviceById<VideoCamera & RTCSignalingChannel>(deviceId);
-            if (!camera) {
-                ws.close();
-            }
-            else {
-                const pc = await startBrowserRTCSignaling(camera, ws, this.console);
-                // todo, pc is null if it's an rtc signaling channel. do we care?
-                attachPeerConnection(pc);
-            }
-            return;
-        }
-
-        // 3/3/2022 todo: can remove this. leaving this around because
-        // cached ui will hit this endpoint.
-        if (this.checkEngineIoEndpoint(request, 'videorecorder')) {
-            const url = new URL(`http://localhost${request.url}`);
-            const deviceId = url.searchParams.get('deviceId');
-            const startTime = parseInt(url.searchParams.get('startTime'));
-            const camera = systemManager.getDeviceById<VideoRecorder>(deviceId);
-            if (!camera) {
-                ws.close();
-            }
-            else {
-                const session = await createBrowserSignalingSession(ws);
-                const options = await session.getOptions();
-
-                const pc = await startRTCPeerConnectionForBrowser(this.console, await camera.getRecordingStream({
-                    id: undefined,
-                    startTime,
-                }), session, options);
-
-                attachPeerConnection(pc);
-            }
-            return;
-        }
-
-        if (request.isPublicEndpoint) {
-            ws.close();
-            return;
-        }
-
-        const peer = new RpcPeer("core", "web", message => ws.send(JSON.stringify(message)));
-        ws.onmessage = message => peer.handleMessage(JSON.parse(message.data));
-        const userStorage = new UserStorage(request.username);
-        peer.params.userStorage = userStorage;
-
-        const api = new PluginAPIProxy(pluginHostAPI, mediaManager);
-
-        ws.onclose = () => {
-            peer.kill('engine.io connection closed.')
-            api.removeListeners();
-        }
-
-        try {
-            await setupPluginRemote(peer, api, null, () => systemManager.getSystemState());
-        }
-        catch (e) {
-            ws.close();
-        }
+        ws.close();
     }
 
     handlePublicFinal(request: HttpRequest, response: HttpResponse) {
