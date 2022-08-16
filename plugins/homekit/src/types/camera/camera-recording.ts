@@ -1,6 +1,6 @@
 
 import { getDebugModeH264EncoderArgs } from "@scrypted/common/src/ffmpeg-hardware-acceleration";
-import { addH264VideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
+import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { FFmpegFragmentedMP4Session, parseFragmentedMP4, startFFMPegFragmentedMP4Session } from '@scrypted/common/src/ffmpeg-mp4-parser-session';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { timeoutPromise } from "@scrypted/common/src/promise-utils";
@@ -208,7 +208,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
                 videoArgs.push(...ffmpegInput.h264EncoderArguments);
             }
             const videoRecordingFilter = `scale=w='min(${configuration.videoCodec.resolution[0]},iw)':h=-2`;
-            addH264VideoFilterArguments(videoArgs, videoRecordingFilter);
+            addVideoFilterArguments(videoArgs, videoRecordingFilter);
             videoArgs.push(
                 '-b:v', `${configuration.videoCodec.bitrate}k`,
                 "-bufsize", (2 * request.video.max_bit_rate).toString() + "k",
