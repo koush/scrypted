@@ -1,4 +1,4 @@
-import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaStreamDestination, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
 const { systemManager, mediaManager, deviceManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
@@ -40,8 +40,11 @@ aggregators.set(ScryptedInterface.Lock,
 
 function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamera {
     async function getVideoStreamWrapped(options: RequestMediaStreamOptions) {
+        const destination: MediaStreamDestination = devices.length > 4 ? 'low-resolution' : "medium-resolution";
         const args = await Promise.allSettled(devices.map(async (device) => {
-            const mo = await device.getVideoStream();
+            const mo = await device.getVideoStream({
+                destination,
+            });
             const buffer = await mediaManager.convertMediaObjectToBuffer(mo, ScryptedMimeTypes.FFmpegInput);
             const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
             return ffmpegInput;
