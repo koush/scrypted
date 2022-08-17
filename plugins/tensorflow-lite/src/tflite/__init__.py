@@ -99,6 +99,7 @@ class TensorFlowLitePlugin(DetectPlugin):
             'choices': [
                 'decodebin',
                 'vtdec_hw',
+                'nvh264dec',
             ],
         }
         allowList: Setting = {

@@ -8,6 +8,7 @@ import imutils
 from gi.repository import Gst
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 
+
 class OpenCVDetectionSession(DetectionSession):
     def __init__(self) -> None:
         super().__init__()
@@ -20,9 +21,11 @@ class OpenCVDetectionSession(DetectionSession):
         self.gray = None
         self.gstsample = None
 
+
 defaultThreshold = 25
 defaultArea = 2000
 defaultInterval = 250
+
 
 class OpenCVPlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -82,6 +85,7 @@ class OpenCVPlugin(DetectPlugin):
                 'choices': [
                     'decodebin',
                     'vtdec_hw',
+                    'nvh264dec',
                 ],
             }
         ]
@@ -106,32 +110,38 @@ class OpenCVPlugin(DetectPlugin):
 
         # see get_detection_input_size on undocumented size requirements for GRAY8
         if self.color2Gray != None:
-            detection_session.gray = cv2.cvtColor(frame, self.color2Gray, dst=detection_session.gray)
+            detection_session.gray = cv2.cvtColor(
+                frame, self.color2Gray, dst=detection_session.gray)
             gray = detection_session.gray
         else:
             gray = frame
-        detection_session.curFrame = cv2.GaussianBlur(gray, (21,21), 0, dst=detection_session.curFrame)
+        detection_session.curFrame = cv2.GaussianBlur(
+            gray, (21, 21), 0, dst=detection_session.curFrame)
 
         if detection_session.previous_frame is None:
             detection_session.previous_frame = detection_session.curFrame
             detection_session.curFrame = None
             return
 
-        detection_session.frameDelta = cv2.absdiff(detection_session.previous_frame, detection_session.curFrame, dst=detection_session.frameDelta)
+        detection_session.frameDelta = cv2.absdiff(
+            detection_session.previous_frame, detection_session.curFrame, dst=detection_session.frameDelta)
         tmp = detection_session.curFrame
         detection_session.curFrame = detection_session.previous_frame
         detection_session.previous_frame = tmp
 
-        _, detection_session.thresh = cv2.threshold(detection_session.frameDelta, threshold, 255, cv2.THRESH_BINARY, dst=detection_session.thresh)
-        detection_session.dilated = cv2.dilate(detection_session.thresh, None, iterations=2, dst=detection_session.dilated)
-        fcontours = cv2.findContours(detection_session.dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        _, detection_session.thresh = cv2.threshold(
+            detection_session.frameDelta, threshold, 255, cv2.THRESH_BINARY, dst=detection_session.thresh)
+        detection_session.dilated = cv2.dilate(
+            detection_session.thresh, None, iterations=2, dst=detection_session.dilated)
+        fcontours = cv2.findContours(
+            detection_session.dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = imutils.grab_contours(fcontours)
 
         detections: List[ObjectDetectionResult] = []
         detection_result: ObjectsDetected = {}
         detection_result['detections'] = detections
         detection_result['inputDimensions'] = src_size
-        
+
         for c in contours:
             x, y, w, h = cv2.boundingRect(c)
             # if w * h != contour_area:
@@ -151,7 +161,7 @@ class OpenCVPlugin(DetectPlugin):
                 detection['score'] = 1 if area else contour_area
                 detections.append(detection)
 
-        return detection_result                
+        return detection_result
 
     def run_detection_jpeg(self, detection_session: DetectionSession, image_bytes: bytes, min_score: float) -> ObjectsDetected:
         raise Exception('can not run motion detection on image')
@@ -189,7 +199,7 @@ class OpenCVPlugin(DetectPlugin):
             detection_session.cap = None
         return super().end_session(detection_session)
 
-    def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size)-> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: OpenCVDetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         buf = gst_sample.get_buffer()
         caps = gst_sample.get_caps()
         # can't trust the width value, compute the stride
@@ -201,11 +211,12 @@ class OpenCVPlugin(DetectPlugin):
         try:
             mat = np.ndarray(
                 (height,
-                width,
-                self.pixelFormatChannelCount),
+                 width,
+                 self.pixelFormatChannelCount),
                 buffer=info.data,
-                dtype= np.uint8)
-            detections = self.detect(detection_session, mat, settings, src_size, convert_to_src_size)
+                dtype=np.uint8)
+            detections = self.detect(
+                detection_session, mat, settings, src_size, convert_to_src_size)
             # no point in triggering empty events.
             if detections and not len(detections['detections']):
                 self.detection_sleep(settings)
