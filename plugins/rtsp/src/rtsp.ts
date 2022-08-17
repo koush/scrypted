@@ -136,12 +136,14 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
 }
 
 export interface Destroyable {
+    on(eventName: string | symbol, listener: (...args: any[]) => void): void;
     destroy(): void;
+    emit(eventName: string | symbol, ...args: any[]): boolean;
 }
 
 export abstract class RtspSmartCamera extends RtspCamera {
     lastListen = 0;
-    listener: EventEmitter & Destroyable;
+    listener: Promise<Destroyable>;
 
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
@@ -159,21 +161,62 @@ export abstract class RtspSmartCamera extends RtspCamera {
             this.binaryState = false;
     }
 
-    listenLoop() {
+    async listenLoop() {
         this.resetSensors();
         this.lastListen = Date.now();
-        this.listener = this.listenEvents();
-        this.listener.on('error', e => {
-            this.console.error('listen loop error, restarting in 10 seconds', e);
+        if (this.listener) {
+            this.listener.then(l => l.destroy());
+            this.listener = undefined;
+        }
+
+        const restartListener = () => {
             const listenDuration = Date.now() - this.lastListen;
             const listenNext = listenDuration > 10000 ? 0 : 10000;
             setTimeout(() => this.listenLoop(), listenNext);
+        }
+
+        this.listener = this.listenEvents();
+        let listener: Destroyable;
+
+        try {
+            listener = await this.listener;
+        }
+        catch (e) {
+            this.console.error('listen loop connection failed, restarting listener.');
+            restartListener();
+            return;
+        }
+
+        let activityTimeout: NodeJS.Timeout;
+        const resetActivityTimeout = () => {
+            clearTimeout(activityTimeout);
+            activityTimeout = setTimeout(() => {
+                this.console.error('listen loop 5m idle timeout, destroying listener.');
+                listener.destroy();
+            }, 300000);
+        }
+        resetActivityTimeout();
+
+        const oldEmit = listener.emit;
+        listener.emit = function () {
+            resetActivityTimeout();
+            return oldEmit.apply(listener, arguments);
+        };
+
+        listener.on('close', () => {
+            this.console.error('listen loop closed, restarting listener.');
+            restartListener();
+        });
+
+        listener.on('error', e => {
+            this.console.error('listen loop error, restarting listener.', e);
+            restartListener();
         });
     }
 
     async putSetting(key: string, value: SettingValue) {
         this.putSettingBase(key, value);
-        this.listener.emit('error', new Error("new settings"));
+        this.listener.then(l => l.emit('error', new Error("new settings")));
     }
 
     async takePictureThrottled(option?: PictureOptions) {
@@ -279,7 +322,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
     }
 
     abstract getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]>;
-    abstract listenEvents(): EventEmitter & Destroyable;
+    abstract listenEvents(): Promise<Destroyable>;
 
     getIPAddress() {
         return this.storage.getItem('ip');
