@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.68";
+export declare const TYPES_VERSION = "0.0.69";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -696,6 +696,7 @@ export interface VideoClip {
     duration?: number;
     event?: string;
     description?: string;
+    detectionClasses?: ObjectDetectionClass[];
 }
 export interface VideoClipOptions {
     startTime?: number;

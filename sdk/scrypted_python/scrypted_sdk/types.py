@@ -561,6 +561,7 @@ class Setting(TypedDict):
 
 class VideoClip(TypedDict):
     description: str
+    detectionClasses: list[str]
     duration: float
     event: str
     id: str

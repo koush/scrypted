@@ -568,6 +568,7 @@ export interface VideoClip {
   duration?: number;
   event?: string;
   description?: string;
+  detectionClasses?: ObjectDetectionClass[];
 }
 
 export interface VideoClipOptions {

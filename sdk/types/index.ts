@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.68";
+export const TYPES_VERSION = "0.0.69";
 
 
 export interface DeviceState {
@@ -1344,6 +1344,7 @@ export interface VideoClip {
   duration?: number;
   event?: string;
   description?: string;
+  detectionClasses?: ObjectDetectionClass[];
 }
 
 export interface VideoClipOptions {
