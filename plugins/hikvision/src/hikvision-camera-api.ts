@@ -31,7 +31,7 @@ export interface HikVisionCameraStreamSetup {
 export class HikVisionCameraAPI {
     digestAuth: AxiosDigestAuth;
     deviceModel: Promise<string>;
-    listenerPromise: Promise<EventEmitter>;
+    listenerPromise: Promise<IncomingMessage>;
 
     constructor(public ip: string, username: string, password: string, public console: Console) {
         this.digestAuth = new AxiosDigestAuth({
@@ -131,11 +131,11 @@ export class HikVisionCameraAPI {
                         }
                     }
                 });
+                stream.on('close', () => this.listenerPromise = undefined);
                 resolve(stream);
             });
         }
 
-        const eventSource = await this.listenerPromise;
-        return eventSource;
+        return this.listenerPromise;
     }
 }

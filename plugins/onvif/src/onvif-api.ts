@@ -100,7 +100,7 @@ export class OnvifCameraAPI {
                     if (dataValue == "Ring" || dataValue == "CameraBellButton") {
                         ret.emit('event', OnvifEvent.BinaryRingEvent);
                     }
-                }                    
+                }
                 // else if (eventTopic.includes('DigitalInput')) {
                 //     if (dataValue)
                 //         ret.emit('event', OnvifEvent.BinaryStart)
@@ -174,6 +174,19 @@ export class OnvifCameraAPI {
             this.cam.createPullPointSubscription((err: Error, data: any, xml: string) => {
                 if (err) {
                     this.console.log('createSubscription error', err);
+                    return reject(err);
+                }
+
+                resolve(undefined);
+            });
+        })
+    }
+
+    unsubscribe() {
+        return new Promise((resolve, reject) => {
+            this.cam.unsubscribe((err: Error, data: any, xml: string) => {
+                if (err) {
+                    this.console.log('unsubscribe error', err);
                     return reject(err);
                 }
 

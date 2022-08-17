@@ -58,18 +58,8 @@ export class AmcrestCameraClient {
         });
         const stream = response.data as IncomingMessage;
         stream.socket.setKeepAlive(true);
-        let activityTimeout: NodeJS.Timeout;
-        const resetActivityTimeout = () => {
-            clearTimeout(activityTimeout);
-            activityTimeout = setTimeout(() => {
-                stream.destroy();
-            }, 60000);
-        }
-        resetActivityTimeout();
 
         stream.on('data', (buffer: Buffer) => {
-            resetActivityTimeout();
-
             const data = buffer.toString();
             const parts = data.split(';');
             let index: string;

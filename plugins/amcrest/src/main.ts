@@ -130,80 +130,64 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         return this.client;
     }
 
-    listenEvents() {
-        const ret = new EventEmitter() as (EventEmitter & Destroyable);
-        ret.destroy = () => {
-        };
-        (async () => {
-            try {
-                const client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
-                const events = await client.listenEvents();
-                const doorbellType = this.storage.getItem('doorbellType');
+    async listenEvents() {
+        const client = new AmcrestCameraClient(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console);
+        const events = await client.listenEvents();
+        const doorbellType = this.storage.getItem('doorbellType');
 
-                ret.destroy = () => {
-                    events.removeAllListeners();
-                    events.destroy();
-                };
+        let pulseTimeout: NodeJS.Timeout;
 
-                let pulseTimeout: NodeJS.Timeout;
-
-                events.on('close', () => ret.emit('error', new Error('close')));
-                events.on('error', e => ret.emit('error', e));
-                events.on('data', (data: Buffer) => {
-                    if (this.storage.getItem('debug'))
-                        this.console.log('event', data.toString());
-                });
-                events.on('event', (event: AmcrestEvent, index: string, payload: string) => {
-                    const channelNumber = this.getRtspChannel();
-                    if (channelNumber) {
-                        const idx = parseInt(index) + 1;
-                        if (idx.toString() !== channelNumber)
-                            return;
-                    }
-                    if (event === AmcrestEvent.MotionStart) {
-                        this.motionDetected = true;
-                    }
-                    else if (event === AmcrestEvent.MotionStop) {
-                        this.motionDetected = false;
-                    }
-                    else if (event === AmcrestEvent.AudioStart) {
-                        this.audioDetected = true;
-                    }
-                    else if (event === AmcrestEvent.AudioStop) {
-                        this.audioDetected = false;
-                    }
-                    else if (event === AmcrestEvent.TalkInvite
-                        || event === AmcrestEvent.PhoneCallDetectStart
-                        || event === AmcrestEvent.AlarmIPCStart
-                        || event === AmcrestEvent.DahuaTalkInvite) {
-                        this.binaryState = true;
-                    }
-                    else if (event === AmcrestEvent.TalkHangup
-                        || event === AmcrestEvent.PhoneCallDetectStop
-                        || event === AmcrestEvent.AlarmIPCStop
-                        || event === AmcrestEvent.DahuaTalkHangup) {
-                        this.binaryState = false;
-                    }
-                    else if (event === AmcrestEvent.TalkPulse && doorbellType === AMCREST_DOORBELL_TYPE) {
-                        if (payload.includes('Invite')) {
-                            this.binaryState = true;
-                        }
-                        else if (payload.includes('Hangup')) {
-                            this.binaryState = false;
-                        }
-                    }
-                    else if (event === AmcrestEvent.DahuaTalkPulse && doorbellType === DAHUA_DOORBELL_TYPE) {
-                        clearTimeout(pulseTimeout);
-                        pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
-                        this.binaryState = true;
-                    }
-                })
+        events.on('data', (data: Buffer) => {
+            if (this.storage.getItem('debug'))
+                this.console.log('event', data.toString());
+        });
+        events.on('event', (event: AmcrestEvent, index: string, payload: string) => {
+            const channelNumber = this.getRtspChannel();
+            if (channelNumber) {
+                const idx = parseInt(index) + 1;
+                if (idx.toString() !== channelNumber)
+                    return;
             }
-            catch (e) {
-                ret.emit('error', e);
+            if (event === AmcrestEvent.MotionStart) {
+                this.motionDetected = true;
             }
-        })();
-        return ret;
+            else if (event === AmcrestEvent.MotionStop) {
+                this.motionDetected = false;
+            }
+            else if (event === AmcrestEvent.AudioStart) {
+                this.audioDetected = true;
+            }
+            else if (event === AmcrestEvent.AudioStop) {
+                this.audioDetected = false;
+            }
+            else if (event === AmcrestEvent.TalkInvite
+                || event === AmcrestEvent.PhoneCallDetectStart
+                || event === AmcrestEvent.AlarmIPCStart
+                || event === AmcrestEvent.DahuaTalkInvite) {
+                this.binaryState = true;
+            }
+            else if (event === AmcrestEvent.TalkHangup
+                || event === AmcrestEvent.PhoneCallDetectStop
+                || event === AmcrestEvent.AlarmIPCStop
+                || event === AmcrestEvent.DahuaTalkHangup) {
+                this.binaryState = false;
+            }
+            else if (event === AmcrestEvent.TalkPulse && doorbellType === AMCREST_DOORBELL_TYPE) {
+                if (payload.includes('Invite')) {
+                    this.binaryState = true;
+                }
+                else if (payload.includes('Hangup')) {
+                    this.binaryState = false;
+                }
+            }
+            else if (event === AmcrestEvent.DahuaTalkPulse && doorbellType === DAHUA_DOORBELL_TYPE) {
+                clearTimeout(pulseTimeout);
+                pulseTimeout = setTimeout(() => this.binaryState = false, 3000);
+                this.binaryState = true;
+            }
+        });
+
+        return events;
     }
 
     async getOtherSettings(): Promise<Setting[]> {
