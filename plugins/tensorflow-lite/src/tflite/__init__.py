@@ -13,7 +13,8 @@ try:
     from pycoral.utils.edgetpu import list_edge_tpus
     from pycoral.utils.edgetpu import make_interpreter
     loaded_py_coral = True
-except:
+except Exception as e:
+    print('coral utils load failed', e)
     pass
 import tflite_runtime.interpreter as tflite
 import re
@@ -57,10 +58,12 @@ class TensorFlowLitePlugin(DetectPlugin):
             print('edge tpu', edge_tpus)
             if not len(edge_tpus):
                 raise Exception('no edge tpu found')
+            self.edge_tpu_found = str(edge_tpus)
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
             self.interpreter = make_interpreter(model)
         except:
+            self.edge_tpu_found = 'Edge TPU not found'
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
             self.interpreter = tflite.Interpreter(model_content=model)
@@ -104,8 +107,15 @@ class TensorFlowLitePlugin(DetectPlugin):
             'key': 'allowList',
             'value': [],
         }
+        coral: Setting = {
+            'title': 'Detected Edge TPU',
+            'description': 'The device paths of the Coral Edge TPUs that will be used for detections.',
+            'value': self.edge_tpu_found,
+            'readonly': True,
+            'key': 'coral',
+        }
 
-        d['settings'] = [setting, decoderSetting, allowList]
+        d['settings'] = [coral, setting, decoderSetting, allowList]
         return d
 
     def create_detection_result(self, objs, size, allowList, convert_to_src_size=None):
