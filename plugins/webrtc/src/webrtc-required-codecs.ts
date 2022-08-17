@@ -63,13 +63,8 @@ export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodec
         ret.push('-acodec', 'copy');
     }
     else {
-        // this may not work for anything but opus, but that's probably fine since opus is
-        // the preferred default. webrtc will never try to transcode to a non-pcm format currently
-        // i think? need to investigate ring pcm cameras.
         ret.push(
             '-acodec', encoder,
-            '-application', 'lowdelay',
-            '-frame_duration', '60',
             '-flags', '+global_header',
             '-ar', '48k',
             // choose a better birate? this is on the high end recommendation for voice.
@@ -77,6 +72,14 @@ export function getFFmpegRtpAudioOutputArguments(inputCodec: string, outputCodec
             '-bufsize', '96k',
             '-ac', outputCodecParameters.channels.toString(),
         )
+
+        if (encoder === 'libopus')
+            ret.push(
+                '-application', 'lowdelay',
+                // webrtc is supposed to support various frame durations but
+                // in practice it expects the default 20 in various implementations.
+                // '-frame_duration', '60',
+            );
     }
     return ret;
 }
