@@ -13,8 +13,9 @@ try:
     from pycoral.utils.edgetpu import list_edge_tpus
     from pycoral.utils.edgetpu import make_interpreter
     loaded_py_coral = True
+    print('coral edge tpu library loaded successfully')
 except Exception as e:
-    print('coral utils load failed', e)
+    print('coral edge tpu library load failed', e)
     pass
 import tflite_runtime.interpreter as tflite
 import re
@@ -62,7 +63,8 @@ class TensorFlowLitePlugin(DetectPlugin):
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite').read()
             self.interpreter = make_interpreter(model)
-        except:
+        except Exception as e:
+            print('unable to use Coral Edge TPU', e)
             self.edge_tpu_found = 'Edge TPU not found'
             model = scrypted_sdk.zip.open(
                 'fs/mobilenet_ssd_v2_coco_quant_postprocess.tflite').read()
