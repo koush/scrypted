@@ -2,7 +2,7 @@ import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, Vide
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
-import { DenoisedDetectionEntry, denoiseDetections } from './denoise';
+import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider"
 import { safeParseJson } from './util';
 
@@ -44,7 +44,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   detectionInterval = parseInt(this.storage.getItem('detectionInterval')) || defaultDetectionInterval;
   zones = this.getZones();
   detectionIntervalTimeout: NodeJS.Timeout;
-  currentDetections: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
+  detectionState: DenoisedDetectionState<ObjectDetectionResult> = {};
   detectionId: string;
   running = false;
   hasMotionType: boolean;
@@ -222,6 +222,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         if (this.running)
           return;
       }
+
+      // dummy up the last detection time to prevent the idle timers from purging everything.
+      this.detectionState.lastDetection = Date.now();
+
       this.running = true;
 
       let stream: MediaObject;
@@ -336,11 +340,12 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const { detections } = detectionResult;
 
     const found: DenoisedDetectionEntry<ObjectDetectionResult>[] = [];
-    denoiseDetections<ObjectDetectionResult>(this.currentDetections, detections.map(detection => ({
+    denoiseDetections<ObjectDetectionResult>(this.detectionState, detections.map(detection => ({
       id: detection.id,
       name: detection.className,
       detection,
       lastSeen: detectionResult.timestamp,
+      boundingBox: detection.boundingBox,
     })), {
       timeout: this.detectionTimeout * 1000,
       added: d => found.push(d),
@@ -356,7 +361,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         this.extendedObjectDetect();
     }
     if (found.length || showAll) {
-      this.console.log('current detections:', this.currentDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
+      this.console.log('current detections:', this.detectionState.previousDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
     }
   }
 
