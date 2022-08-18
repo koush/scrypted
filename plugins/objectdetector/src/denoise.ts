@@ -92,7 +92,7 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
             cd.lastSeen = now;
             cd.durationGone = 0;
             newAndExisting.push(cd);
-            options?.retained(found);
+            options?.retained?.(found);
         }
     }
 

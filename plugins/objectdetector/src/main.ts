@@ -344,24 +344,43 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       id: detection.id,
       name: detection.className,
       detection,
-      lastSeen: detectionResult.timestamp,
+      get firstSeen() {
+        return detection.history?.firstSeen
+      },
+      set firstSeen(value) {
+        detection.history = detection.history || {
+          firstSeen: value,
+          lastSeen: value,
+        };
+        detection.history.firstSeen = value;
+      },
+      get lastSeen() {
+        return detection.history?.lastSeen
+      },
+      set lastSeen(value) {
+        detection.history = detection.history || {
+          firstSeen: value,
+          lastSeen: value,
+        };
+        detection.history.lastSeen = value;
+      },
       boundingBox: detection.boundingBox,
     })), {
       timeout: this.detectionTimeout * 1000,
       added: d => found.push(d),
       removed: d => {
-        this.console.log('expired detection:', `${d.detection.className} (${d.detection.score}, ${d.detection.id})`);
+        this.console.log('expired detection:', `${d.detection.className} (${d.detection.score})`);
         if (detectionResult.running)
           this.extendedObjectDetect();
       }
     });
     if (found.length) {
-      this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
+      this.console.log('new detection:', found.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
       if (detectionResult.running)
         this.extendedObjectDetect();
     }
     if (found.length || showAll) {
-      this.console.log('current detections:', this.detectionState.previousDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.id})`).join(', '));
+      this.console.log('current detections:', this.detectionState.previousDetections.map(d => `${d.detection.className} (${d.detection.score})`).join(', '));
     }
   }
 
