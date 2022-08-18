@@ -362,12 +362,17 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         for (const mixin of this.mixinTable) {
             const entry = await mixin.entry;
             if (!entry.methods) {
-                const pluginDevice = this.scrypted.findPluginDeviceById(mixin.mixinProviderId || this.id);
-                const plugin = this.scrypted.plugins[pluginDevice.pluginId];
-                let methods = new Set<string>(getInterfaceMethods(ScryptedInterfaceDescriptors, entry.interfaces))
-                if (plugin.api.descriptors)
-                    methods = new Set<string>([...methods, ...getInterfaceMethods(plugin.api.descriptors, entry.interfaces)]);
-                entry.methods = methods;
+                if (entry.interfaces.size) {
+                    const pluginDevice = this.scrypted.findPluginDeviceById(mixin.mixinProviderId || this.id);
+                    const plugin = this.scrypted.plugins[pluginDevice.pluginId];
+                    let methods = new Set<string>(getInterfaceMethods(ScryptedInterfaceDescriptors, entry.interfaces))
+                    if (plugin.api.descriptors)
+                        methods = new Set<string>([...methods, ...getInterfaceMethods(plugin.api.descriptors, entry.interfaces)]);
+                    entry.methods = methods;
+                }
+                else {
+                    entry.methods = new Set();
+                }
             }
             if (entry.methods.has(method)) {
                 return { mixin, entry };
