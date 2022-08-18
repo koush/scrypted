@@ -164,19 +164,22 @@ export abstract class RtspSmartCamera extends RtspCamera {
     async listenLoop() {
         this.resetSensors();
         this.lastListen = Date.now();
-        if (this.listener) {
-            this.listener.then(l => l.destroy());
-            this.listener = undefined;
-        }
+        if (this.listener)
+            return;
 
+        let listener: Destroyable;
+        const listenerPromise = this.listener = this.listenEvents();
+
+        let activityTimeout: NodeJS.Timeout;
         const restartListener = () => {
+            if (listenerPromise === this.listener)
+                this.listener = undefined;
+            clearTimeout(activityTimeout);
+            listener?.destroy();
             const listenDuration = Date.now() - this.lastListen;
             const listenNext = listenDuration > 10000 ? 0 : 10000;
             setTimeout(() => this.listenLoop(), listenNext);
         }
-
-        this.listener = this.listenEvents();
-        let listener: Destroyable;
 
         try {
             listener = await this.listener;
@@ -187,21 +190,16 @@ export abstract class RtspSmartCamera extends RtspCamera {
             return;
         }
 
-        let activityTimeout: NodeJS.Timeout;
         const resetActivityTimeout = () => {
             clearTimeout(activityTimeout);
             activityTimeout = setTimeout(() => {
                 this.console.error('listen loop 5m idle timeout, destroying listener.');
-                listener.destroy();
+                restartListener();
             }, 300000);
         }
         resetActivityTimeout();
 
-        const oldEmit = listener.emit;
-        listener.emit = function () {
-            resetActivityTimeout();
-            return oldEmit.apply(listener, arguments);
-        };
+        listener.on('data', () => resetActivityTimeout);
 
         listener.on('close', () => {
             this.console.error('listen loop closed, restarting listener.');

@@ -167,6 +167,8 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
         this.console.log('listening events');
         const events = client.listenEvents();
         events.on('event', (event, className) => {
+            ret.emit('data', ...arguments);
+
             if (event === OnvifEvent.MotionBuggy) {
                 this.motionDetected = true;
                 clearTimeout(motionTimeout);
