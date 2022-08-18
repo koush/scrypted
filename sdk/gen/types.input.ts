@@ -897,17 +897,18 @@ export interface SecuritySystem {
   disarmSecuritySystem(): Promise<void>;
 }
 
-export interface ZoneHistory {
-  firstEntry: number;
-  lastEntry: number;
+export interface ObjectDetectionHistory {
+  firstSeen: number;
+  lastSeen: number;
 }
 export interface BoundingBoxResult {
   /**
    * x, y, width, height
    */
   boundingBox?: [number, number, number, number];
-  zoneHistory?: { [zone: string]: ZoneHistory };
+  zoneHistory?: { [zone: string]: ObjectDetectionHistory };
   zones?: string[];
+  history?: ObjectDetectionHistory;
 }
 export interface ObjectDetectionResult extends BoundingBoxResult {
   id?: string;

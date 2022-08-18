@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.69";
+export declare const TYPES_VERSION = "0.0.70";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -991,9 +991,9 @@ export interface SecuritySystem {
     armSecuritySystem(mode: SecuritySystemMode): Promise<void>;
     disarmSecuritySystem(): Promise<void>;
 }
-export interface ZoneHistory {
-    firstEntry: number;
-    lastEntry: number;
+export interface ObjectDetectionHistory {
+    firstSeen: number;
+    lastSeen: number;
 }
 export interface BoundingBoxResult {
     /**
@@ -1001,9 +1001,10 @@ export interface BoundingBoxResult {
      */
     boundingBox?: [number, number, number, number];
     zoneHistory?: {
-        [zone: string]: ZoneHistory;
+        [zone: string]: ObjectDetectionHistory;
     };
     zones?: string[];
+    history?: ObjectDetectionHistory;
 }
 export interface ObjectDetectionResult extends BoundingBoxResult {
     id?: string;

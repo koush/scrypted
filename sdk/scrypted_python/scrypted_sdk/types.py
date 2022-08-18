@@ -191,6 +191,11 @@ class H264Info(TypedDict):
     stapb: bool
     pass
 
+class ObjectDetectionHistory(TypedDict):
+    firstSeen: float
+    lastSeen: float
+    pass
+
 class AudioStreamOptions(TypedDict):
     bitrate: float
     codec: str
@@ -201,6 +206,7 @@ class AudioStreamOptions(TypedDict):
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
+    history: ObjectDetectionHistory
     id: str
     score: float
     zoneHistory: Any
