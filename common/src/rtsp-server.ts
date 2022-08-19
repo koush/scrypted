@@ -260,8 +260,9 @@ export class RtspStatusError extends Error {
 
 export class RtspBase {
     client: net.Socket;
+    console?: Console;
 
-    constructor(public console?: Console) {
+    constructor() {
     }
 
     write(messageLine: string, headers: Headers, body?: Buffer) {
@@ -316,8 +317,8 @@ export class RtspClient extends RtspBase {
     issuedTeardown = false;
     hasGetParameter = true;
 
-    constructor(public url: string, console?: Console) {
-        super(console);
+    constructor(public url: string) {
+        super();
         const u = new URL(url);
         const port = parseInt(u.port) || 554;
         if (url.startsWith('rtsps')) {

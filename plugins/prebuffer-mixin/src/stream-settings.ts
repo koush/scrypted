@@ -100,6 +100,12 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
             hide: false,
         },
         ...streamTypes,
+        rebroadcastPort: {
+            title: 'Rebroadcast Port',
+            description: 'The port of the RTSP server that will rebroadcast your streams.',
+            type: 'number',
+            hide: false,
+        },
         transcodeStreams: {
             group: 'Transcoding',
             title: 'Transcode Streams',
