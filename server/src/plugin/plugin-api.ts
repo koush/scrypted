@@ -90,7 +90,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
         return this.api.onDeviceEvent(nativeId, eventInterface, eventData);
     }
     onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void> {
-        return this.api.onMixinEvent(nativeId, eventInterface, eventData);
+        return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);
     }
     onDeviceRemoved(nativeId: string): Promise<void> {
         return this.api.onDeviceRemoved(nativeId);

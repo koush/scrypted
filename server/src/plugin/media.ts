@@ -1,6 +1,6 @@
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import fs from 'fs';
 import https from 'https';
 import mimeType from 'mime';
@@ -65,7 +65,19 @@ export abstract class MediaManagerBase implements MediaManager {
             fromMimeType: ScryptedMimeTypes.SchemePrefix + 'file',
             toMimeType: ScryptedMimeTypes.MediaObject,
             convert: async (data, fromMimeType, toMimeType) => {
-                const filename = data.toString().substring('file:'.length);
+                const url = data.toString();
+                const filename = url.substring('file:'.length);
+
+                if (toMimeType === ScryptedMimeTypes.FFmpegInput) {
+                    const ffmpegInput: FFmpegInput = {
+                        url,
+                        inputArguments: [
+                            '-i', filename,
+                        ]
+                    };
+                    return this.createFFmpegMediaObject(ffmpegInput);
+                }
+
                 const ab = await fs.promises.readFile(filename);
                 const mt = mimeType.getType(data.toString());
                 const mo = this.createMediaObject(ab, mt);
