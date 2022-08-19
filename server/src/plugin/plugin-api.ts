@@ -11,8 +11,8 @@ export interface PluginAPI {
     setState(nativeId: ScryptedNativeId, key: string, value: any): Promise<void>;
     onDevicesChanged(deviceManifest: DeviceManifest): Promise<void>;
     onDeviceDiscovered(device: Device): Promise<string>;
-    onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void>;
-    onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void>;
+    onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: string, eventData?: any): Promise<void>;
+    onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData?: any): Promise<void>;
     onDeviceRemoved(nativeId: string): Promise<void>;
     setStorage(nativeId: string, storage: {[key: string]: any}): Promise<void>;
 
@@ -89,7 +89,7 @@ export class PluginAPIProxy extends PluginAPIManagedListeners implements PluginA
     onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void> {
         return this.api.onDeviceEvent(nativeId, eventInterface, eventData);
     }
-    onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: any, eventData?: any): Promise<void> {
+    onMixinEvent(id: string, nativeId: ScryptedNativeId, eventInterface: string, eventData?: any): Promise<void> {
         return this.api.onMixinEvent(id, nativeId, eventInterface, eventData);
     }
     onDeviceRemoved(nativeId: string): Promise<void> {
