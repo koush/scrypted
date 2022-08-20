@@ -201,8 +201,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
   async register() {
     this.motionListener = this.cameraDevice.listen(ScryptedInterface.MotionSensor, async () => {
-      if (!this.cameraDevice.motionDetected)
+      if (!this.cameraDevice.motionDetected) {
+        if (this.running) {
+          this.console.log('motion stopped, cancelling ongoing detection')
+          this.objectDetection?.detectObjects(undefined, {
+            detectionId: this.detectionId,
+          });
+        }
         return;
+      }
 
       if (this.detectionModes.includes(DETECT_VIDEO_MOTION))
         await this.startVideoDetection();
