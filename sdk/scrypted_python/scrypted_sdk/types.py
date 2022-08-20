@@ -149,9 +149,13 @@ class ScryptedMimeTypes(Enum):
     MediaObject = "x-scrypted/x-scrypted-media-object"
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
+    RTCConnectionManagement = "x-scrypted/x-scrypted-rtc-connection-management"
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
+    RTCSignalingSession = "x-scrypted/x-scrypted-rtc-signaling-session"
     RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
+    ScryptedDevice = "x-scrypted/x-scrypted-device"
+    ScryptedDeviceId = "x-scrypted/x-scrypted-device-id"
     Url = "text/x-uri"
 
 class SecuritySystemMode(Enum):
@@ -265,6 +269,7 @@ class ColorRgb(TypedDict):
 class Device(TypedDict):
     info: DeviceInformation
     interfaces: list[str]
+    internal: bool
     name: str
     nativeId: str
     providerNativeId: str
