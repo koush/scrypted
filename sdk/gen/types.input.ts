@@ -1601,7 +1601,10 @@ export interface RTCMediaObjectTrack {
 
 export interface RTCConnectionManagement {
   negotiateRTCSignalingSession(): Promise<void>;
-  addTrack(mediaObject: MediaObject): Promise<RTCMediaObjectTrack>;
+  addTrack(mediaObject: MediaObject, options?: {
+    videoMid?: string,
+    audioMid?: string,
+  }): Promise<RTCMediaObjectTrack>;
   close(): Promise<void>;
 }
 
