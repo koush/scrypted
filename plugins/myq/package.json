@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/myq",
-   "version": "0.1.43",
+   "version": "0.1.44",
    "description": "A MyQ Garage plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -25,6 +25,7 @@
    "scrypted": {
       "name": "MyQ Garage Controller",
       "type": "DeviceProvider",
+      "realfs": true,
       "interfaces": [
          "DeviceProvider",
          "Settings"
@@ -32,15 +33,11 @@
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk",
-      "@types/lodash": "^4.14.172",
-      "@types/node-fetch": "^2.5.12"
+      "@types/lodash": "^4.14.172"
    },
    "dependencies": {
-      "@hjdhjd/myq": "^6.0.4",
-      "axios": "^0.19.2",
-      "lodash": "^4.17.21",
-      "node-fetch": "^3.0.0-beta.10",
-      "node-html-parser": "^4.1.4",
-      "pkce-challenge": "^2.2.0"
+      "@hjdhjd/myq": "^6.0.7",
+      "axios": "^0.27.2",
+      "lodash": "^4.17.21"
    }
 }

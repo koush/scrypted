@@ -129,15 +129,23 @@ class GarageDoor extends ScryptedDeviceBase implements Entry, Refresh, EntrySens
 
   async closeEntry() {
     this.controller.account.execute(this.device, 'close');
-    setTimeout(() => this.refresh(), 60000);
+    this.refreshForLongRunningOperation();
   }
   async openEntry() {
     this.controller.account.execute(this.device, 'open');
-    setTimeout(() => this.refresh(), 60000);
+    this.refreshForLongRunningOperation();
   }
   async getRefreshFrequency() {
     return 60;
   }
+
+  refreshForLongRunningOperation() {
+    // refreshf for 10 minutes.
+    for (let i = 0; i < 10; i++) {
+      setTimeout(() => this.refresh(), i * 60000);
+    }
+  }
+
   async refresh() {
     this.controller.throttleRefresh();
   }
