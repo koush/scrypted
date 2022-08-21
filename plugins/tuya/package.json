@@ -1,5 +1,5 @@
 {
-   "name": "@scrypted/tuya-plugin",
+   "name": "@scrypted/tuya",
    "private": true,
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",

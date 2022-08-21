@@ -1,7 +1,7 @@
 import { Axios, Method } from "axios";
 import { createHash, createHmac, randomBytes } from "crypto";
-import { getEndPointWithCountryCode } from "./tuya.utils";
-import { DeviceFunction, TuyaDeviceStatus, ProtectTuyaDeviceState, RTSPToken, TuyaDeviceInterface, TuyaResponse, ProtectTuyaDeviceStatePartial as ProtectTuyaDeviceStatePayload, ProtectTuyaDeviceStatus } from "./tuya.const";
+import { TuyaSupportedCountry } from "./tuya.utils";
+import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse } from "./tuya.const";
 
 
 interface Session {
@@ -12,38 +12,45 @@ interface Session {
 }
 
 export class TuyaCloud {
+
+    // Tuya IoT Cloud API
+
     private readonly userId: string;
     private readonly clientId: string;
     private readonly secret: string;
     private readonly nonce: string;
+    private readonly country: TuyaSupportedCountry;
     private session: Session | undefined;
     private client: Axios;
 
-    private _cameras: ProtectTuyaDeviceState[] | null;
+    private _cameras: TuyaDeviceConfig[] | null;
 
     constructor(
         userId: string,
         clientId: string,
         secret: string,
-        countryCode = 1
+        country: TuyaSupportedCountry
     ) {
         this.userId = userId;
         this.clientId = clientId;
         this.secret = secret;
         this.nonce = randomBytes(16).toString('hex');
+        this.country = country;
         this.client = new Axios({
-            baseURL: getEndPointWithCountryCode(countryCode),
+            baseURL: country.endPoint,
             timeout: 5 * 1e3
         });
         this._cameras = null;
     }
 
+    // Set Device Status
+
     public async updateDevice(
-        device: ProtectTuyaDeviceState, 
-        statuses: ProtectTuyaDeviceStatus[]
+        device: TuyaDeviceConfig, 
+        statuses: TuyaDeviceStatus[]
     ): Promise<boolean> {
         if (!device) {
-            return null;
+            return false;
         }
 
         const result = await this.post<boolean>(
@@ -53,15 +60,13 @@ export class TuyaCloud {
             }
         );
 
-        return result.result || result.success;
+        return result.success && result.result;
     }
 
-    public get cameras(): ProtectTuyaDeviceState[] {
-        return this._cameras;
-    }
+    // Get Devices
 
     public async fetchDevices(): Promise<boolean> {
-        let response = await this.get<TuyaDeviceInterface[]>(`/v1.0/users/${this.userId}/devices`);
+        let response = await this.get<TuyaDeviceConfig[]>(`/v1.0/users/${this.userId}/devices`);
 
         if (!response.success) {
             return false;
@@ -72,7 +77,7 @@ export class TuyaCloud {
         for (const state of devicesState) {
             let response = await this.get<DeviceFunction[]>(`/v1.0/devices/${state.id}/functions`);
             if (!response.success) {
-                return false;
+                continue;
             }
 
             state.functions = response.result;
@@ -82,10 +87,39 @@ export class TuyaCloud {
         return true;
     }
 
+    public get cameras(): TuyaDeviceConfig[] | null {
+        return this._cameras;
+    }
+
+    // Camera Functions
+
+    public async getRTSPS(camera: TuyaDeviceConfig): Promise<RTSPToken | undefined> {
+        interface RTSPResponse {
+            url: string
+        }
+
+        const response = await this.post<RTSPResponse>(
+            `/v1.0/devices/${camera.id}/stream/actions/allocate`,
+            { type: 'rtsp' }
+        );
+
+        if (response.success) {
+            return {
+                url: response.result.url,
+                expires: new Date(response.t + 30 * 1000)   // This will expire in 30 seconds.
+            };
+        } else {
+            return undefined;
+        }
+    }
+
+    // User Requests
+
     async getUser(): Promise<TuyaResponse<undefined>> {
         return this.get<undefined>(`/v1.0/users/${this.userId}/infos`);
     }
 
+    // Tuya IoT Cloud Requests API
 
     async get<T>(
         path: string,
@@ -196,41 +230,5 @@ export class TuyaCloud {
             tokenExpiresAt: newExpiration,
             uid: objData.result.uid
         };
-    }
-
-    // Device functions
-
-    public async getRTSPS(camera: ProtectTuyaDeviceState): Promise<RTSPToken | undefined> {
-        interface RTSPResponse {
-            url: string
-        }
-
-        const response = await this.post<RTSPResponse>(
-            `/v1.0/devices/${camera.id}/stream/actions/allocate`,
-            { type: 'rtsp' }
-        );
-
-        if (response.success) {
-            return {
-                url: response.result.url,
-                expires: new Date(response.t + 30 * 1000)   // This will expire in 30 seconds.
-            };
-        } else {
-            return undefined;
-        }
-    }
-
-    private async sendCommand(
-        device: ProtectTuyaDeviceState,
-        commands: TuyaDeviceStatus[]
-    ): Promise<boolean> {
-        const response = await this.post<boolean>(
-            `/v1.0/devices/${device.id}/commands`,
-            { 
-                commands: commands
-            }
-        );
-
-        return response.result;
     }
 }

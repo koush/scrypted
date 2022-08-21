@@ -5,10 +5,11 @@ import { TuyaCloud } from './tuya/cloud';
 import { TuyaDevice } from './tuya/tuya.device';
 import { createInstanceableProviderPlugin } from '@scrypted/common/src/provider-plugin';
 import { TuyaCamera } from './camera';
+import { TuyaSupportedCountry, TUYA_COUNTRIES } from './tuya/tuya.utils';
 
 const { deviceManager } = sdk;
 
-export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
+export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
     api: TuyaCloud;
     cameras: Map<string, TuyaCamera> = new Map();
 
@@ -16,29 +17,28 @@ export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvid
         userId: {
             title: 'User Id',
             description: 'Required: You can find this information in Tuya IoT -> Cloud -> Devices -> Linked Devices.',
-            onPut: async () => this.clearTryDiscoverDevices(),
+            onPut: async () => this.discoverDevices(0),
         },
         accessId: {
             title: 'Access Id',
             description: 'Requirerd: This is located on the main project.',
-            onPut: async () => this.clearTryDiscoverDevices(),
+            onPut: async () => this.discoverDevices(0),
         },
         accessKey: {
             title: 'Access Key/Secret',
             description: 'Requirerd: This is located on the main project.',
             type: 'password',
-            onPut: async () => this.clearTryDiscoverDevices(),
+            onPut: async () => this.discoverDevices(0),
         },
-        countryCode: {
-            title: 'Country Code',
-            description: 'Your two integer country code.',
-            type: 'number',
-            value: 1,
-            onPut: async (oldValue, newValue) => {
-                await this.tryLogin(newValue);
-                await this.discoverDevices(0);
-            },
-        },
+        country: {
+            title: 'Country',
+            description: 'Required: This is the country where you registered your devices.',
+            type: 'string',
+            choices: TUYA_COUNTRIES.map(value => value.country),
+            // mapPut: (oldValue, newValue) => TUYA_COUNTRIES.find(value => value.country === newValue),
+            onPut: async () => this.discoverDevices(0)
+            // mapGet: (value) => (value as TuyaSupportedCountry).country,
+        }
     });
 
     constructor(nativeId?: string) {
@@ -46,27 +46,26 @@ export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvid
         this.discoverDevices(0);
     }
 
-    clearTryDiscoverDevices() {
-        // add code to clear any refresh tokens, etc, here. login changed.
-        this.discoverDevices(0);
-    }
-
-    async tryLogin(code?: number) {
-        const createTuyaApi = async () => {
-            this.api = new TuyaCloud(
-                this.settingsStorage.values.userId,
-                this.settingsStorage.values.accessId,
-                this.settingsStorage.values.accessKey,
-                code || 1
-            );
+    async tryLogin() {
+        const userId = this.settingsStorage.getItem('userId');
+        const accessId = this.settingsStorage.getItem('accessId');
+        const accessKey = this.settingsStorage.getItem('accessKey');
+        const country = TUYA_COUNTRIES.find(value => value.country == this.settingsStorage.getItem('country'));
+        if (!userId || 
+            !accessId || 
+            !accessKey ||
+            !country
+        ) {
+            this.log.a('Enter your Tuya User Id, access Id, access key, and country to complete the setup.');
+            throw new Error('User Id, access Id, access key, and country info are missing.');
         }
 
-        if (!this.settingsStorage.values.userId || !this.settingsStorage.values.accessId || !this.settingsStorage.values.accessKey) {
-            this.log.a('Enter your Tuya User Id, access Id and access key to complete the setup.');
-            throw new Error('User Id, access Id, and access key are missing.');
-        }
-
-        await createTuyaApi();
+        this.api = new TuyaCloud(
+            userId,
+            accessId,
+            accessKey,
+            country
+        );
 
         const response = await this.api.getUser();
 
@@ -87,7 +86,8 @@ export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvid
     async discoverDevices(duration: number) {
         await this.tryLogin();
 
-        this.log.d("Successsfully logged in with credentials! Now discovering devices.");
+        this.log.clearAlerts();
+        this.log.a("Successsfully logged in with credentials! Now discovering devices.");
 
         if (!await this.api.fetchDevices()) {
             this.log.e("Could not fetch devices.");
@@ -96,23 +96,24 @@ export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvid
 
         const devices: Device[] = [];
 
-        for (const tuyaDevice of this.api.cameras) {
-            const nativeId = tuyaDevice.id;
+        // Camera Setup
+
+        for (const camera of this.api.cameras || []) {
+            const nativeId = camera.id;
 
             const device: Device = {
                 providerNativeId: this.nativeId,
-                name: tuyaDevice.name,
+                name: camera.name,
                 nativeId,
                 info: {
                     manufacturer: 'Tuya',
-                    model: tuyaDevice.model,
+                    model: camera.model,
                     serialNumber: nativeId
                 },
-                type: TuyaDevice.isDoorbell(tuyaDevice)
+                type: TuyaDevice.isDoorbell(camera)
                     ? ScryptedDeviceType.Doorbell
                     : ScryptedDeviceType.Camera,
                 interfaces: [
-                    // ScryptedInterface.Settings,
                     ScryptedInterface.Camera,
                     ScryptedInterface.VideoCamera,
                     ScryptedInterface.MotionSensor,
@@ -121,15 +122,15 @@ export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvid
                 ]
             };
 
-            if (TuyaDevice.isDoorbell(tuyaDevice)) {
+            if (TuyaDevice.isDoorbell(camera)) {
                 device.interfaces.push(ScryptedInterface.BinarySensor);
             }
 
-            if (TuyaDevice.hasStatusIndicator(tuyaDevice)) {
+            if (TuyaDevice.hasStatusIndicator(camera)) {
                 device.interfaces.push(ScryptedInterface.OnOff);
             }
 
-            if (TuyaDevice.hasLightSwitch(tuyaDevice)) {
+            if (TuyaDevice.hasLightSwitch(camera)) {
                 device.interfaces.push(ScryptedInterface.DeviceProvider);
             }
 
@@ -147,11 +148,12 @@ export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvid
             this.getDevice(device.nativeId).then(device => device?.updateState());
         }
 
-        // Handle any devices that have a light switch
+        // Handle any camera device that have a light switch
 
         for (const camera of this.api.cameras) {
-            if (!TuyaDevice.hasLightSwitch(camera))
+            if (!TuyaDevice.hasLightSwitch(camera)) {
                 continue;
+            }
             const nativeId = camera.id + '-light';
             const device: Device = {
                 providerNativeId: camera.id,
@@ -191,4 +193,4 @@ export class TuyaCameraPlugin extends ScryptedDeviceBase implements DeviceProvid
     }
 }
 
-export default createInstanceableProviderPlugin("Tuya Camera Plugin", nativeId => new TuyaCameraPlugin(nativeId));
+export default createInstanceableProviderPlugin("Tuya", nativeId => new TuyaPlugin(nativeId));

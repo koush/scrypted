@@ -1,7 +1,7 @@
 import { ScryptedDeviceBase, Intercom, Camera, VideoCamera, MotionSensor, BinarySensor, PictureOptions, MediaObject, ScryptedInterface, RequestMediaStreamOptions, FFmpegInput, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger } from "@scrypted/sdk";
 import sdk from '@scrypted/sdk';
-import { TuyaCameraPlugin } from "./main";
-import { ProtectTuyaDeviceState, TuyaDeviceInterface } from "./tuya/tuya.const";
+import { TuyaPlugin } from "./main";
+import { TuyaDeviceConfig } from "./tuya/tuya.const";
 import { TuyaDevice } from "./tuya/tuya.device";
 const { deviceManager, mediaManager, systemManager } = sdk;
 
@@ -26,7 +26,7 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online
         const camera = this.camera.findCamera();
         const lightSwitchStatus = TuyaDevice.getLightSwitchStatus(camera);
 
-        if (lightSwitchStatus) {
+        if (camera.online && lightSwitchStatus) {
             await this.camera.plugin.api.updateDevice(camera, [
                 {
                     code: lightSwitchStatus.code,
@@ -36,7 +36,7 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online
         }
     }
 
-    updateState(camera?: ProtectTuyaDeviceState) {
+    updateState(camera?: TuyaDeviceConfig) {
         camera = camera || this.camera.findCamera();
         if (!camera)
             return;
@@ -51,9 +51,9 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
     private pendingSnapshot?: Promise<MediaObject>;
 
     constructor(
-        public plugin: TuyaCameraPlugin,
+        public plugin: TuyaPlugin,
         nativeId: string,
-        tuyaDevice: TuyaDeviceInterface
+        tuyaDevice: TuyaDeviceConfig
     ) {
         super(nativeId);
 
@@ -104,31 +104,26 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
         options?: PictureOptions
     ): Promise<MediaObject> {
 
-        // Throttles snapshot requests
+        // Throttles snapshot requests, especially for rtsps streams
 
-        if (this.pendingSnapshot) {
-            return this.pendingSnapshot;
-        }
-
-        let fetchedPrebufferSnapshot = false;
-
-        const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
-        try {
-            if (realDevice.interfaces.includes(ScryptedInterface.VideoCamera)) {
-                const msos = await realDevice.getVideoStreamOptions();
-                const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
-                if (prebuffered) {
-                    this.pendingSnapshot = realDevice.getVideoStream(prebuffered);
-                    prebuffered.refresh = false;
-                    fetchedPrebufferSnapshot = true;
+        const fetchSnapshotFromStream = async () => {
+            const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
+            try {
+                if (realDevice.interfaces.includes(ScryptedInterface.VideoCamera)) {
+                    const msos = await realDevice.getVideoStreamOptions();
+                    const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
+                    if (prebuffered) {
+                        prebuffered.refresh = false;
+                        return realDevice.getVideoStream(prebuffered);
+                    }
                 }
+            } catch (e) {
+                this.logger.w("Could not get screenshot from prebuffer.");
             }
-        } catch (e) {
-            this.logger.w("Could not get screenshot from prebuffer.");
+            return undefined;
         }
 
-        if (!fetchedPrebufferSnapshot) {
-            // Fetch rtsps video and get a snapshot from it.
+        const fetchSnapshotFromRTSPS = async () => {
             const camera = this.findCamera();
 
             if (!camera) {
@@ -137,7 +132,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
             }
 
             if (!camera.online) {
-                this.logger.w("Camera is currently offline. Showing a camera offline icon for stream preview.");
+                this.logger.w(`${this.name} is currently offline. Will not be able to show stream preview until device is back online.`);
                 throw new Error(`Failed to capture snapshot for ${this.name}: Camera is offline.`);
             }
 
@@ -154,21 +149,23 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
                     '-i', rtsps.url,
                     '-frames:v', '1',
                     '-hide_banner',
-                    '-loglevel', 'error',
                     '-f', 'image2',
                     '-'
                 ]
             };
 
-            this.pendingSnapshot = mediaManager.createFFmpegMediaObject(ffmpegInput);
+            return mediaManager.createFFmpegMediaObject(ffmpegInput);
         }
 
-        return this.pendingSnapshot.finally(() =>  this.pendingSnapshot = undefined);
+        if (!this.pendingSnapshot) {
+            this.pendingSnapshot = fetchSnapshotFromStream().then(value => value ? value : fetchSnapshotFromRTSPS());
+            this.pendingSnapshot?.finally(() => this.pendingSnapshot = undefined);
+        }
+
+        return this.pendingSnapshot;
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
-        // can optionally provide the different resolutions of images that are available.
-        // used by homekit, if available.
         return;
     }
 
@@ -270,7 +267,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
         return this.plugin.api.cameras.find(device => device.id === this.nativeId);
     }
 
-    updateState(camera?: ProtectTuyaDeviceState) {
+    updateState(camera?: TuyaDeviceConfig) {
         camera = camera || this.findCamera();
         if (!camera) {
             return;
@@ -279,9 +276,12 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
         this.on = TuyaDevice.getStatusIndicator(camera)?.value;
         this.online = camera.online;
 
-        this.getDevice(this.nativeId + '-light').updateState(camera);
+        this.getDevice(this.nativeLightId).updateState(camera);
     }
 
+    private get nativeLightId(): string {
+        return `${this.nativeId}-light`;
+    }
     private get logger(): Logger {
         return deviceManager.getDeviceLogger(this.nativeId);
     }

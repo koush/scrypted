@@ -1,13 +1,11 @@
-import { EventEmitter } from "stream"
-import { TuyaCloud } from "./cloud"
-import { TuyaDeviceStatus, ProtectTuyaDeviceStatus, ProtectTuyaDeviceState, RTSPToken, TuyaDeviceInterface } from "./tuya.const";
+import { TuyaDeviceStatus, TuyaDeviceConfig as TuyaDeviceConfig } from "./tuya.const";
 
 export namespace TuyaDevice {
-    export function hasLightSwitch(camera: ProtectTuyaDeviceState): boolean {
+    export function hasLightSwitch(camera: TuyaDeviceConfig): boolean {
         return getLightSwitchStatus(camera) !== undefined;
     }
 
-    export function getLightSwitchStatus(camera: ProtectTuyaDeviceState): ProtectTuyaDeviceStatus | undefined {
+    export function getLightSwitchStatus(camera: TuyaDeviceConfig): TuyaDeviceStatus | undefined {
         const lightStatusCode = [
             'floodlight_switch',    // Devices with floodlight switch
         ];
@@ -15,16 +13,15 @@ export namespace TuyaDevice {
         return camera.status.find(element => lightStatusCode.includes(element.code));
     }
 
-
-    export function hasStatusIndicator(camera: ProtectTuyaDeviceState): boolean {
+    export function hasStatusIndicator(camera: TuyaDeviceConfig): boolean {
         return getStatusIndicator(camera) !== undefined;
     }
 
-    export function getStatusIndicator(camera: ProtectTuyaDeviceState): ProtectTuyaDeviceStatus | undefined {
+    export function getStatusIndicator(camera: TuyaDeviceConfig): TuyaDeviceStatus | undefined {
         return camera.status.find(element => element.code === 'basic_indicator');
     }
 
-    export function isDoorbell(camera: ProtectTuyaDeviceState): boolean {
+    export function isDoorbell(camera: TuyaDeviceConfig): boolean {
         return false;
     }
 }

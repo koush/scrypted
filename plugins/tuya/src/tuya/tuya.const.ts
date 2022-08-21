@@ -6,7 +6,7 @@ export interface TuyaResponse<T> {
     result: T
 }
 
-export interface TuyaDeviceInterface {
+export interface TuyaDeviceConfig {
     id: string;
     name: string;
     local_key: string;
@@ -51,15 +51,14 @@ export interface RTSPToken {
     expires: Date;
 }
 
-// From Unify Protext Api:
+// From Unify Protect Api:
 // This type declaration make all properties optional recursively including nested objects. This should
 // only be used on JSON objects only. Otherwise...you're going to end up with class methods marked as
 // optional as well. Credit for this belongs to: https://github.com/joonhocho/tsdef. #Grateful
-export type DeepPartial<T> = {
-    [P in keyof T]?: T[P] extends Array<infer I> ? Array<DeepPartial<I>> : DeepPartial<T[P]>
-};
+// export type DeepPartial<T> = {
+//     [P in keyof T]?: T[P] extends Array<infer I> ? Array<DeepPartial<I>> : DeepPartial<T[P]>
+// };
 
-
-export type ProtectTuyaDeviceState = Readonly<TuyaDeviceInterface>;
-export type ProtectTuyaDeviceStatus = Readonly<TuyaDeviceStatus>;
-export type ProtectTuyaDeviceStatePartial = DeepPartial<TuyaDeviceInterface>;
+// export type ProtectTuyaDeviceConfig = Readonly<TuyaDeviceInterface>;
+// export type ProtectTuyaDeviceConfigPartial = DeepPartial<TuyaDeviceInterface>;
+// export type ProtectTuyaDeviceStatus = Readonly<TuyaDeviceStatus>;

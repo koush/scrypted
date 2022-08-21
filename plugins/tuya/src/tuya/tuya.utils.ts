@@ -3,13 +3,13 @@ const EUROPE = 'https://openapi.tuyaeu.com';
 const INDIA = 'https://openapi.tuyain.com';
 const CHINA = 'https://openapi.tuyacn.com';
 
-interface TuyaSupportedCountry {
+export interface TuyaSupportedCountry {
     country: string
     countryCode: number
     endPoint: string
 }
 
-const TUYA_COUNTRIES: TuyaSupportedCountry[] = [
+export const TUYA_COUNTRIES: TuyaSupportedCountry[] = [
     { country: 'Afghanistan', countryCode: 93, endPoint: EUROPE },
     { country: 'Albania', countryCode: 355, endPoint: EUROPE },
     { country: 'Algeria', countryCode: 213, endPoint: EUROPE },
@@ -220,6 +220,7 @@ const TUYA_COUNTRIES: TuyaSupportedCountry[] = [
     { country: 'Turkmenistan', countryCode: 993, endPoint: EUROPE },
     { country: 'Turks and Caicos Islands', countryCode: 1649, endPoint: EUROPE },
     { country: 'Tuvalu', countryCode: 688, endPoint: EUROPE },
+    { country: 'United States of America', countryCode: 1, endPoint: AMERICA },
     { country: 'U.S. Virgin Islands', countryCode: 1340, endPoint: EUROPE },
     { country: 'Uganda', countryCode: 256, endPoint: EUROPE },
     { country: 'Ukraine', countryCode: 380, endPoint: EUROPE },
