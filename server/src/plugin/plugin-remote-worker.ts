@@ -394,13 +394,14 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
 
             try {
                 peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
-                pluginConsole?.log('plugin successfully loaded');
 
                 if (zipOptions?.fork) {
+                    pluginConsole?.log('plugin forked');
                     const fork = exports.fork;
                     return fork();
                 }
 
+                pluginConsole?.log('plugin loaded');
                 let pluginInstance = exports.default;
                 // support exporting a plugin class, plugin main function,
                 // or a plugin instance

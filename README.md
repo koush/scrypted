@@ -6,7 +6,7 @@ Scrypted is a home automation platform primarily focusing on making camera exper
  * Google Home support: "Ok Google, Stream Backyard"
  * Alexa Support: Streaming to Alexa app on iOS/Android and Echo Show.
 
-<img width="400" alt="Scrypted_Management_Console" src="https://user-images.githubusercontent.com/73924/131903488-722d87ac-a0b0-40fe-b605-326e6b886e35.png">
+<img width="400" alt="Scrypted_Management_Console" src="https://user-images.githubusercontent.com/73924/185666320-ae972867-6c2c-488a-8413-fd8a215e9fee.png">
 
 # Installation
 

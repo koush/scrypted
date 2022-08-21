@@ -27,7 +27,6 @@
       "type": "API",
       "interfaces": [
          "DeviceProvider",
-         "Settings",
          "MixinProvider",
          "BufferConverter"
       ]

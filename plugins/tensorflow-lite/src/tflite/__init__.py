@@ -204,17 +204,16 @@ class TensorFlowLitePlugin(DetectPlugin):
                 return
             try:
                 image = Image.frombuffer('RGB', (width, height), info.data.tobytes())
-
-                _, scale = common.set_resized_input(
-                    self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
-
-                with self.mutex:
-                    self.interpreter.invoke()
-                    objs = detect.get_objects(
-                        self.interpreter, score_threshold=score_threshold, image_scale=scale)
             finally:
                 buf.unmap(info)
 
+            _, scale = common.set_resized_input(
+                self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
+
+            with self.mutex:
+                self.interpreter.invoke()
+                objs = detect.get_objects(
+                    self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
         allowList = settings.get('allowList', None)
 

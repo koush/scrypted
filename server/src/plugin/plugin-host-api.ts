@@ -47,7 +47,7 @@ export class PluginHostAPI extends PluginAPIManagedListeners implements PluginAP
 
     // do we care about mixin validation here?
     // maybe to prevent/notify errant dangling events?
-    async onMixinEvent(id: string, nativeIdOrMixinDevice: ScryptedNativeId | any, eventInterface: any, eventData?: any) {
+    async onMixinEvent(id: string, nativeIdOrMixinDevice: ScryptedNativeId | any, eventInterface: string, eventData?: any) {
         // nativeId code path has been deprecated in favor of mixin object 12/10/2021
         const device = this.scrypted.findPluginDeviceById(id);
 

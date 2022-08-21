@@ -10,9 +10,10 @@ import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, PluginFork, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import crypto from 'crypto';
-import net from 'net';
+import { once } from 'events';
+import net, { AddressInfo } from 'net';
 import { Duplex } from 'stream';
 import { FileRtspServer } from './file-rtsp-server';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
@@ -459,17 +460,16 @@ class PrebufferSession {
       addOddities();
     }
 
-    // if (rtspMode) {
-    //   const transocde 
-    //   settings.push({
-    //     group,
-    //     key: 'rtspRebroadcastUrl',
-    //     title: 'RTSP Rebroadcast Url',
-    //     description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
-    //     readonly: true,
-    //     value: `rtsp://localhost:${this.mixin.plugin.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
-    //   });
-    // }
+    if (rtspMode) {
+      settings.push({
+        group,
+        key: 'rtspRebroadcastUrl',
+        title: 'RTSP Rebroadcast Url',
+        description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
+        readonly: true,
+        value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
+      });
+    }
 
     if (this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
       settings.push({
@@ -1203,11 +1203,83 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
   sessions = new Map<string, PrebufferSession>();
 
   streamSettings = createStreamSettings(this);
+  rtspServer: net.Server;
 
   constructor(public getTranscodeStorageSettings: () => Promise<any>, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
 
     this.delayStart();
+
+    this.startRtspServer();
+  }
+
+  startRtspServer() {
+    closeQuiet(this.rtspServer);
+
+    this.rtspServer = new net.Server(async (client) => {
+      let prebufferSession: PrebufferSession;
+
+      const server = new RtspServer(client, undefined, false, async (method, url, headers, rawMessage) => {
+        server.checkRequest = undefined;
+
+        const u = new URL(url);
+
+        for (const session of this.sessions.values()) {
+          if (u.pathname.endsWith(session.rtspServerPath)) {
+            server.console = session.console;
+            prebufferSession = session;
+            prebufferSession.ensurePrebufferSession();
+            await prebufferSession.parserSessionPromise;
+            server.sdp = await prebufferSession.sdp;
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      this.console.log('RTSP Rebroadcast connection started.')
+      server.console = this.console;
+
+      try {
+        await server.handlePlayback();
+        const map = new Map<string, string>();
+        for (const [id, track] of Object.entries(server.setupTracks)) {
+          map.set(track.codec, id);
+        }
+        const session = await prebufferSession.parserSessionPromise;
+
+        const requestedPrebuffer = Math.max(4000, prebufferSession.getDetectedIdrInterval() || 4000);;
+
+        prebufferSession.handleRebroadcasterClient({
+          findSyncFrame: true,
+          isActiveClient: true,
+          container: 'rtsp',
+          session,
+          socketPromise: Promise.resolve(client),
+          requestedPrebuffer,
+          filter: (chunk, prebuffer) => {
+            const track = map.get(chunk.type);
+            if (track)
+              server.sendTrack(track, chunk.chunks[1], false);
+            return undefined;
+          }
+        });
+
+        await server.handleTeardown();
+      }
+      catch (e) {
+        client.destroy();
+      }
+      this.console.log('RTSP Rebroadcast connection finished.')
+    });
+
+    this.rtspServer.listen(this.streamSettings.storageSettings.values.rebroadcastPort || 0);
+
+    once(this.rtspServer, 'listening').then(() => {
+      const port = (this.rtspServer.address() as AddressInfo).port;
+      this.streamSettings.storageSettings.values.rebroadcastPort = port;
+    })
   }
 
   delayStart() {
@@ -1517,13 +1589,8 @@ function millisUntilMidnight() {
 }
 
 export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinProvider, BufferConverter, Settings, DeviceProvider {
-  storageSettings = new StorageSettings(this, {
-    rebroadcastPort: {
-      title: 'Rebroadcast Port',
-      description: 'The port of the RTSP server that will rebroadcast your streams.',
-      type: 'number',
-    },
-  });
+  // no longer in use, but kept for future use.
+  storageSettings = new StorageSettings(this, {});
   transcodeStorageSettings = new StorageSettings(this, {
     remoteStreamingBitrate: {
       title: 'Remote Streaming Bitrate',
@@ -1540,8 +1607,10 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       mapPut: (oldValue, newValue) => getH264EncoderArgs()[newValue]?.join(' ') || newValue || getDebugModeH264EncoderArgs().join(' '),
     }
   });
-  rtspServer: net.Server;
-  currentMixins = new Map<string, ReturnType<typeof sdk.fork>>();
+  currentMixins = new Map<string, {
+    terminate(): Promise<number>,
+    mixin: Promise<PrebufferMixin>,
+  }>();
 
   constructor(nativeId?: string) {
     super(nativeId);
@@ -1571,8 +1640,6 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     this.log.i(`Rebroadcaster scheduled for restart at 2AM: ${Math.round(twoAM / 1000 / 60)} minutes`)
     setTimeout(() => deviceManager.requestRestart(), twoAM);
 
-    // this.startRtspServer();
-
     process.nextTick(() => {
       deviceManager.onDeviceDiscovered({
         nativeId: TRANSCODE_MIXIN_PROVIDER_NATIVE_ID,
@@ -1599,77 +1666,6 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     return this.storageSettings.putSetting(key, value);
   }
 
-  /*
-  startRtspServer() {
-    closeQuiet(this.rtspServer);
-
-    this.rtspServer = new net.Server(async (client) => {
-      let prebufferSession: PrebufferSession;
-
-      const server = new RtspServer(client, undefined, false, async (method, url, headers, rawMessage) => {
-        server.checkRequest = undefined;
-
-        const u = new URL(url);
-
-        for (const id of this.currentMixins.keys()) {
-          const mixin = this.currentMixins.get(id);
-          for (const session of mixin.sessions.values()) {
-            if (u.pathname.endsWith(session.rtspServerPath)) {
-              server.console = session.console;
-              prebufferSession = session;
-              prebufferSession.ensurePrebufferSession();
-              await prebufferSession.parserSessionPromise;
-              server.sdp = await prebufferSession.sdp;
-              return true;
-            }
-          }
-        }
-
-        return false;
-      });
-
-      this.console.log('RTSP Rebroadcast connection started.')
-      server.console = this.console;
-
-      try {
-        await server.handlePlayback();
-        const map = new Map<string, string>();
-        for (const [id, track] of Object.entries(server.setupTracks)) {
-          map.set(track.codec, id);
-        }
-        const session = await prebufferSession.parserSessionPromise;
-
-        const requestedPrebuffer = Math.max(4000, prebufferSession.getDetectedIdrInterval() || 4000);;
-
-        prebufferSession.handleRebroadcasterClient({
-          findSyncFrame: true,
-          isActiveClient: true,
-          container: 'rtsp',
-          session,
-          socketPromise: Promise.resolve(client),
-          requestedPrebuffer,
-          filter: (chunk, prebuffer) => {
-            const track = map.get(chunk.type);
-            if (track)
-              server.sendTrack(track, chunk.chunks[1], false);
-            return undefined;
-          }
-        });
-
-        await server.handleTeardown();
-      }
-      catch (e) {
-        client.destroy();
-      }
-      this.console.log('RTSP Rebroadcast connection finished.')
-    });
-
-    if (!this.storageSettings.values.rebroadcastPort)
-      this.storageSettings.values.rebroadcastPort = Math.round(Math.random() * 10000 + 30000);
-
-    this.rtspServer.listen(this.storageSettings.values.rebroadcastPort);
-  }
-  */
 
   async convert(data: Buffer, fromMimeType: string, toMimeType: string): Promise<Buffer> {
     const json = JSON.parse(data.toString());
@@ -1742,17 +1738,20 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     // old scrypted had a bug where mixin device state was not exposing properties like id correctly
     // across rpc boundaries.
     if (sdk.fork && typeof mixinDeviceState.id === 'string') {
-      const forked = sdk.fork();
+      const forked = sdk.fork<RebroadcastPluginFork>();
       const result = await forked.result as RebroadcastPluginFork;
       const ret = result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
-      this.currentMixins.set(mixinDeviceState.id, forked);
+      this.currentMixins.set(mixinDeviceState.id, {
+        terminate: () => forked.worker.terminate(),
+        mixin: ret,
+      });
       return ret;
     }
     else {
       const ret = newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
       this.currentMixins.set(mixinDeviceState.id, {
-        result: Promise.resolve(ret),
-        worker: undefined,
+        mixin: Promise.resolve(ret),
+        terminate: undefined,
       });
       return ret;
     }
@@ -1765,7 +1764,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       await mixinDevice.release();
     }
     finally {
-      current?.worker?.terminate();
+      current?.terminate?.();
     }
   }
 }

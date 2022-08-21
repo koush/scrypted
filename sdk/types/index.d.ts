@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.70";
+export declare const TYPES_VERSION = "0.0.83";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -1286,6 +1286,7 @@ export interface Device {
      */
     providerNativeId?: ScryptedNativeId;
     room?: string;
+    internal?: boolean;
 }
 /**
  * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
@@ -1600,6 +1601,13 @@ export interface RTCSignalingOptions {
         height: number;
     };
 }
+/**
+ * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer.
+ * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
+ */
+export interface RTCSignalingClient {
+    createRTCSignalingSession(): Promise<RTCSignalingSession>;
+}
 export interface RTCSessionControl {
     getRefreshAt(): Promise<number | void>;
     extendSession(): Promise<void>;
@@ -1609,12 +1617,21 @@ export interface RTCSessionControl {
         video: boolean;
     }): Promise<void>;
 }
-/**
- * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer.
- * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
- */
-export interface RTCSignalingClient {
-    createRTCSignalingSession(): Promise<RTCSignalingSession>;
+export interface RTCMediaObjectTrack {
+    replace(mediaObject: MediaObject): Promise<void>;
+    remove(): Promise<void>;
+    setPlayback(options: {
+        audio: boolean;
+        video: boolean;
+    }): Promise<void>;
+}
+export interface RTCConnectionManagement {
+    negotiateRTCSignalingSession(): Promise<void>;
+    addTrack(mediaObject: MediaObject, options?: {
+        videoMid?: string;
+        audioMid?: string;
+    }): Promise<RTCMediaObjectTrack>;
+    close(): Promise<void>;
 }
 /**
  * An inflexible RTC Signaling channel, typically a vendor, like Nest or Ring.
@@ -1623,6 +1640,9 @@ export interface RTCSignalingClient {
  */
 export interface RTCSignalingChannel {
     startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl | undefined>;
+}
+export interface ScryptedRTCSignalingChannel {
+    startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCConnectionManagement | undefined>;
 }
 export interface RTCAVSignalingSetup {
     /**
@@ -1642,13 +1662,17 @@ export declare enum ScryptedMimeTypes {
     InsecureLocalUrl = "text/x-insecure-local-uri",
     LocalUrl = "text/x-local-uri",
     PushEndpoint = "text/x-push-endpoint",
+    SchemePrefix = "x-scrypted/x-scrypted-scheme-",
     MediaStreamUrl = "text/x-media-url",
+    MediaObject = "x-scrypted/x-scrypted-media-object",
+    RequestMediaStream = "x-scrypted/x-scrypted-request-stream",
+    ScryptedDevice = "x-scrypted/x-scrypted-device",
+    ScryptedDeviceId = "x-scrypted/x-scrypted-device-id",
     FFmpegInput = "x-scrypted/x-ffmpeg-input",
     FFmpegTranscodeStream = "x-scrypted/x-ffmpeg-transcode-stream",
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel",
-    SchemePrefix = "x-scrypted/x-scrypted-scheme-",
-    MediaObject = "x-scrypted/x-scrypted-media-object",
-    RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
+    RTCSignalingSession = "x-scrypted/x-scrypted-rtc-signaling-session",
+    RTCConnectionManagement = "x-scrypted/x-scrypted-rtc-connection-management"
 }
 export declare type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
 export interface FFmpegTranscode {
@@ -1657,6 +1681,12 @@ export interface FFmpegTranscode {
     audioTranscodeArguments?: string[];
 }
 export declare type FFmpegTranscodeStream = (options: FFmpegTranscode) => Promise<void>;
+export interface PluginFork<T> {
+    result: Promise<T>;
+    worker: {
+        terminate(): Promise<number>;
+    };
+}
 export interface ScryptedStatic {
     /**
      * @deprecated
@@ -1668,12 +1698,7 @@ export interface ScryptedStatic {
     systemManager: SystemManager;
     pluginHostAPI: any;
     pluginRemoteAPI: any;
-    fork?<T>(): {
-        result: Promise<T>;
-        worker: {
-            terminate(): Promise<number>;
-        };
-    };
+    fork?<T>(): PluginFork<T>;
 }
 export declare interface DeviceState {
     id?: string;

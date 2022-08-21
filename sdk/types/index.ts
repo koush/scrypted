@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.70";
+export const TYPES_VERSION = "0.0.83";
 
 
 export interface DeviceState {
@@ -2001,6 +2001,8 @@ export interface Device {
    */
   providerNativeId?: ScryptedNativeId;
   room?: string;
+
+  internal?: boolean;
 }
 /**
  * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
@@ -2346,6 +2348,14 @@ export interface RTCSignalingOptions {
   };
 }
 
+/**
+ * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer. 
+ * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
+ */
+export interface RTCSignalingClient {
+  createRTCSignalingSession(): Promise<RTCSignalingSession>;
+}
+
 export interface RTCSessionControl {
   getRefreshAt(): Promise<number | void>;
   extendSession(): Promise<void>;
@@ -2356,12 +2366,22 @@ export interface RTCSessionControl {
   }): Promise<void>;
 }
 
-/**
- * A flexible RTC signaling endpoint, typically a browser, that can handle offer and answer. 
- * Like Chromecast, etc, which has a Chromecast AppId that can connect to Scrypted.
- */
-export interface RTCSignalingClient {
-  createRTCSignalingSession(): Promise<RTCSignalingSession>;
+export interface RTCMediaObjectTrack {
+  replace(mediaObject: MediaObject): Promise<void>;
+  remove(): Promise<void>;
+  setPlayback(options: {
+    audio: boolean,
+    video: boolean,
+  }): Promise<void>;
+}
+
+export interface RTCConnectionManagement {
+  negotiateRTCSignalingSession(): Promise<void>;
+  addTrack(mediaObject: MediaObject, options?: {
+    videoMid?: string,
+    audioMid?: string,
+  }): Promise<RTCMediaObjectTrack>;
+  close(): Promise<void>;
 }
 
 /**
@@ -2371,6 +2391,10 @@ export interface RTCSignalingClient {
  */
 export interface RTCSignalingChannel {
   startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl | undefined>;
+}
+
+export interface ScryptedRTCSignalingChannel {
+  startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCConnectionManagement | undefined>;
 }
 
 export interface RTCAVSignalingSetup {
@@ -2391,14 +2415,23 @@ export enum ScryptedMimeTypes {
   Url = 'text/x-uri',
   InsecureLocalUrl = 'text/x-insecure-local-uri',
   LocalUrl = 'text/x-local-uri',
+
   PushEndpoint = 'text/x-push-endpoint',
-  MediaStreamUrl = 'text/x-media-url',
-  FFmpegInput = 'x-scrypted/x-ffmpeg-input',
-  FFmpegTranscodeStream = 'x-scrypted/x-ffmpeg-transcode-stream',
-  RTCSignalingChannel = 'x-scrypted/x-scrypted-rtc-signaling-channel',
+
   SchemePrefix = 'x-scrypted/x-scrypted-scheme-',
+
+  MediaStreamUrl = 'text/x-media-url',
   MediaObject = 'x-scrypted/x-scrypted-media-object',
   RequestMediaStream = 'x-scrypted/x-scrypted-request-stream',
+  ScryptedDevice = 'x-scrypted/x-scrypted-device',
+  ScryptedDeviceId = 'x-scrypted/x-scrypted-device-id',
+
+  FFmpegInput = 'x-scrypted/x-ffmpeg-input',
+  FFmpegTranscodeStream = 'x-scrypted/x-ffmpeg-transcode-stream',
+
+  RTCSignalingChannel = 'x-scrypted/x-scrypted-rtc-signaling-channel',
+  RTCSignalingSession = 'x-scrypted/x-scrypted-rtc-signaling-session',
+  RTCConnectionManagement = 'x-scrypted/x-scrypted-rtc-connection-management',
 }
 
 export type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
@@ -2409,6 +2442,13 @@ export interface FFmpegTranscode {
   audioTranscodeArguments?: string[];
 }
 export type FFmpegTranscodeStream = (options: FFmpegTranscode) => Promise<void>;
+
+export interface PluginFork<T> {
+  result: Promise<T>;
+  worker: {
+    terminate(): Promise<number>;
+  };
+}
 
 export interface ScryptedStatic {
   /**
@@ -2424,12 +2464,7 @@ export interface ScryptedStatic {
   pluginHostAPI: any;
   pluginRemoteAPI: any;
 
-  fork?<T>(): {
-    result: Promise<T>;
-    worker: {
-      terminate(): Promise<number>;
-    };
-  };
+  fork?<T>(): PluginFork<T>;
 }
 
 export declare interface DeviceState {

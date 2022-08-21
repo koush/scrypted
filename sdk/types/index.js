@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.SecuritySystemObstruction = exports.SecuritySystemMode = exports.AirQuality = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = exports.TYPES_VERSION = void 0;
-exports.TYPES_VERSION = "0.0.70";
+exports.TYPES_VERSION = "0.0.83";
 class DeviceBase {
 }
 exports.DeviceBase = DeviceBase;
@@ -843,12 +843,16 @@ var ScryptedMimeTypes;
     ScryptedMimeTypes["InsecureLocalUrl"] = "text/x-insecure-local-uri";
     ScryptedMimeTypes["LocalUrl"] = "text/x-local-uri";
     ScryptedMimeTypes["PushEndpoint"] = "text/x-push-endpoint";
+    ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
     ScryptedMimeTypes["MediaStreamUrl"] = "text/x-media-url";
+    ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
+    ScryptedMimeTypes["RequestMediaStream"] = "x-scrypted/x-scrypted-request-stream";
+    ScryptedMimeTypes["ScryptedDevice"] = "x-scrypted/x-scrypted-device";
+    ScryptedMimeTypes["ScryptedDeviceId"] = "x-scrypted/x-scrypted-device-id";
     ScryptedMimeTypes["FFmpegInput"] = "x-scrypted/x-ffmpeg-input";
     ScryptedMimeTypes["FFmpegTranscodeStream"] = "x-scrypted/x-ffmpeg-transcode-stream";
     ScryptedMimeTypes["RTCSignalingChannel"] = "x-scrypted/x-scrypted-rtc-signaling-channel";
-    ScryptedMimeTypes["SchemePrefix"] = "x-scrypted/x-scrypted-scheme-";
-    ScryptedMimeTypes["MediaObject"] = "x-scrypted/x-scrypted-media-object";
-    ScryptedMimeTypes["RequestMediaStream"] = "x-scrypted/x-scrypted-request-stream";
+    ScryptedMimeTypes["RTCSignalingSession"] = "x-scrypted/x-scrypted-rtc-signaling-session";
+    ScryptedMimeTypes["RTCConnectionManagement"] = "x-scrypted/x-scrypted-rtc-connection-management";
 })(ScryptedMimeTypes = exports.ScryptedMimeTypes || (exports.ScryptedMimeTypes = {}));
 //# sourceMappingURL=index.js.map

@@ -27,7 +27,8 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
     events.on('error', e => console.error('rebroadcast error', e));
 
     let servers: dgram.Socket[] = [];
-    const rtspClient = new RtspClient(url, console);
+    const rtspClient = new RtspClient(url);
+    rtspClient.console = console;
     rtspClient.requestTimeout = options.rtspRequestTimeout;
 
     const cleanupSockets = () => {
@@ -183,6 +184,7 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
         const start = async () => {
             try {
                 await rtspClient.play();
+                rtspClient.console = undefined;
                 await rtspClient.readLoop();
             }
             catch (e) {
