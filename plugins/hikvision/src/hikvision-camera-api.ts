@@ -111,7 +111,7 @@ export class HikVisionCameraAPI {
         if (!this.listenerPromise) {
             this.listenerPromise = new Promise(async (resolve, reject) => {
                 const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
-                this.console.log('listener url', url);
+                // this.console.log('listener url', url);
 
                 const response = await this.digestAuth.request({
                     method: "GET",
@@ -123,11 +123,11 @@ export class HikVisionCameraAPI {
 
                 stream.on('data', (buffer: Buffer) => {
                     const data = buffer.toString();
-                    // this.console.log(data);
                     for (const event of Object.values(HikVisionCameraEvent)) {
                         if (data.indexOf(event) !== -1) {
                             const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
-                            stream.emit('event', event, cameraNumber);
+                            const inactive = data.indexOf('<eventState>inactive</eventState>') !== -1;
+                            stream.emit('event', event, cameraNumber, inactive);
                         }
                     }
                 });

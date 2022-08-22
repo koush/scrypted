@@ -433,11 +433,7 @@ export class MediaManagerImpl extends MediaManagerBase {
             fromMimeType: ScryptedMimeTypes.ScryptedDeviceId,
             toMimeType: ScryptedMimeTypes.ScryptedDevice,
             convert: async (data, fromMimeType, toMimeType) => {
-                const url = new URL(data.toString());
-                const id = url.hostname;
-                const device = this.getDeviceById(id);
-                const mo = this.createMediaObject(device, ScryptedMimeTypes.ScryptedDevice);
-                return mo;
+                return this.getDeviceById(data.toString());
             }
         });
     }

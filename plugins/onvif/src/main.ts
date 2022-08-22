@@ -1,9 +1,9 @@
-import sdk, { MediaObject, ScryptedInterface, Setting, ScryptedDeviceType, PictureOptions, VideoCamera, DeviceDiscovery, ObjectDetector, ObjectDetectionTypes, ObjectsDetected, Settings, Intercom, SettingValue } from "@scrypted/sdk";
-import { EventEmitter, Stream } from "stream";
-import { RtspSmartCamera, RtspProvider, Destroyable, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
-import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
-import xml2js from 'xml2js';
+import sdk, { DeviceDiscovery, Intercom, MediaObject, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, PictureOptions, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
 import onvif from 'onvif';
+import { Stream } from "stream";
+import xml2js from 'xml2js';
+import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { connectCameraAPI, OnvifCameraAPI, OnvifEvent } from "./onvif-api";
 import { OnvifIntercom } from "./onvif-intercom";
 
 const { mediaManager, systemManager, deviceManager } = sdk;
@@ -224,7 +224,7 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
     }
 
     createClient() {
-        return connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'), !!this.storage.getItem('debug'));
+        return connectCameraAPI(this.getHttpAddress(), this.getUsername(), this.getPassword(), this.console, this.storage.getItem('onvifDoorbellEvent'));
     }
 
     async getClient() {
