@@ -9,7 +9,7 @@ import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCrea
 import crypto from 'crypto';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
-import { createRTCPeerConnectionSink, WebRTCBridge } from "./ffmpeg-to-wrtc";
+import { createRTCPeerConnectionSink, RTC_BRIDGE_NATIVE_ID, WebRTCBridge } from "./ffmpeg-to-wrtc";
 import { stunIceServers } from './ice-servers';
 import { waitClosed, waitConnected } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
@@ -23,8 +23,6 @@ defaultPeerConfig.headerExtensions = {
     video: [],
     audio: [],
 };
-
-const RTC_BRIDGE_NATIVE_ID = 'rtc-bridge';
 
 const supportedTypes = [
     ScryptedDeviceType.Camera,

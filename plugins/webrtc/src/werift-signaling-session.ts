@@ -26,9 +26,6 @@ export class WeriftSignalingSession implements RTCSignalingSession {
             });
         });
 
-        waitConnected(this.pc)
-        .then(() =>logIsPrivateIceTransport(this.console, this.pc));
-
         let ret: RTCSessionDescriptionInit;
         if (type === 'offer') {
             const offer = await this.pc.createOffer();
