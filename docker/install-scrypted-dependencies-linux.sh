@@ -12,6 +12,11 @@ systemctl stop scrypted.service
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
+    if [ -z "$ALLOW_RUN" ]
+    then
+        return
+    fi
+
     # echo "Running: $@"
     $@
     if [ $? -ne 0 ]
@@ -19,6 +24,16 @@ RUN() {
         echo 'Error during previous command.'
         exit 1
     fi
+}
+
+# The Dockefile.common contains an S6 overlay that should not be installed.
+# Do not run anything until the ENTRYPOINT directive is sent.
+ENTRYPOINT() {
+    ALLOW_RUN=1
+}
+
+COPY() {
+    echo "ignoring COPY $1"
 }
 
 FROM() {
@@ -50,6 +65,9 @@ then
     exit 1
 fi
 
+
+echo "Stopping scrypted.service"
+RUN systemctl stop scrypted.service
 
 # this is not RUN as we do not care about the result
 echo "Setting permissions on /home/$SERVICE_USER/.scrypted"

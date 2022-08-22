@@ -1,6 +1,40 @@
 ARG BASE="16-bullseye"
 FROM node:${BASE}
 
+### BEGIN S6 OVERLAY
+### S6 overlay and ENTRYPOINT directive must be before everything else.
+### The ENTRYPOINT directive signals the install-scrypted-dependencies-linux.sh
+### script to start running.
+
+# avahi advertiser support
+RUN apt-get -y install \
+    libnss-mdns \
+    avahi-discover \
+    libavahi-compat-libdnssd-dev
+
+# copy configurations and scripts
+COPY fs /
+
+# s6 process supervisor
+ARG S6_OVERLAY_VERSION=3.1.1.2
+ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+RUN case "$(uname -m)" in \
+    x86_64) S6_ARCH='x86_64';; \
+    armv7l) S6_ARCH='armhf';; \
+    aarch64) S6_ARCH='aarch64';; \
+    *) echo "Your system architecture isn't supported."; exit 1 ;; \
+    esac \
+  && cd /tmp \
+  && set -x \
+  && curl -SLOf https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
+  && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
+  && curl -SLOf  https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz \
+  && tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz
+
+ENTRYPOINT ["/init"]
+### END S6 OVERLAY
+
+
 # Coral Edge TPU sources.list
 # https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list
@@ -58,30 +92,3 @@ ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"
 ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
-
-# avahi advertiser support
-RUN apt-get -y install \
-    libnss-mdns \
-    avahi-discover \
-    libavahi-compat-libdnssd-dev
-
-# copy configurations and scripts
-COPY fs /
-
-# s6 process supervisor
-ARG S6_OVERLAY_VERSION=3.1.1.2
-ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
-RUN case "$(uname -m)" in \
-    x86_64) S6_ARCH='x86_64';; \
-    armv7l) S6_ARCH='armhf';; \
-    aarch64) S6_ARCH='aarch64';; \
-    *) echo "Your system architecture isn't supported."; exit 1 ;; \
-    esac \
-  && cd /tmp \
-  && set -x \
-  && curl -SLOf https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
-  && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
-  && curl -SLOf  https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz \
-  && tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz
-
-ENTRYPOINT ["/init"]
