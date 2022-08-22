@@ -199,7 +199,11 @@ export abstract class RtspSmartCamera extends RtspCamera {
         }
         resetActivityTimeout();
 
-        listener.on('data', resetActivityTimeout);
+        listener.on('data', (data) => {
+            if (this.storage.getItem('debug') === 'true')
+                this.console.log('debug event:\n', data.toString());
+            resetActivityTimeout();
+        });
 
         listener.on('close', () => {
             this.console.error('listen loop closed, restarting listener.');
@@ -259,6 +263,17 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 ... await this.getRtspUrlSettings(),
             );
         }
+
+        ret.push(
+            {
+                group: 'Advanced',
+                key: 'debug',
+                title: 'Debug Events',
+                description: "Log all events to the console. This will be very noisy and should not be left enabled.",
+                value: !!this.storage.getItem('debug'),
+                type: 'boolean',
+            }
+        )
 
         return ret;
     }

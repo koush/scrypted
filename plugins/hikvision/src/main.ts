@@ -1,4 +1,4 @@
-import sdk, { MediaObject, Camera, ScryptedInterface } from "@scrypted/sdk";
+import sdk, { MediaObject, Camera, ScryptedInterface, Setting } from "@scrypted/sdk";
 import { EventEmitter } from "stream";
 import { HikVisionCameraAPI } from "./hikvision-camera-api";
 import { Destroyable, UrlMediaStreamOptions, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
@@ -36,7 +36,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
 
         let ignoreCameraNumber: boolean;
 
-        events.on('event', async (event: HikVisionCameraEvent, cameraNumber: string) => {
+        events.on('event', async (event: HikVisionCameraEvent, cameraNumber: string, inactive: boolean) => {
             if (event === HikVisionCameraEvent.MotionDetected
                 || event === HikVisionCameraEvent.LineDetection
                 || event === HikVisionCameraEvent.FieldDetection) {
@@ -75,7 +75,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                 // this.console.error('### Detected motion, camera: ', cameraNumber);
                 this.motionDetected = true;
                 clearTimeout(motionTimeout);
-                motionTimeout = setTimeout(() => this.motionDetected = false, 30000);
+                motionTimeout = setTimeout(() => this.motionDetected = false, inactive ? 5000 : 30000);
             }
         })
 
@@ -97,9 +97,26 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         return mediaManager.createMediaObject(await api.jpegSnapshot(this.getRtspChannel()), 'image/jpeg');
     }
 
-    async getUrlSettings() {
+    async getRtspUrlSettings(): Promise<Setting[]> {
+        const ret = await super.getRtspUrlSettings();
+
+        ret.push(
+            {
+                group: 'Advanced',
+                key: 'rtspUrlParams',
+                title: 'RTSP URL Parameters Override',
+                description: "Optional: Override the RTSP URL parameters. E.g.: ?transportmode=unicast",
+                placeholder: this.getRtspUrlParams(),
+                value: this.storage.getItem('rtspUrlParams'),
+            },
+        );
+        return ret;
+    }
+
+    async getUrlSettings(): Promise<Setting[]> {
         return [
             {
+                group: 'Advanced',
                 key: 'rtspChannel',
                 title: 'Channel Number',
                 description: "Optional: The channel number to use for snapshots. E.g., 101, 201, etc. The camera portion, e.g., 1, 2, etc, will be used to construct the RTSP stream.",
@@ -107,13 +124,6 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                 value: this.storage.getItem('rtspChannel'),
             },
             ...await super.getUrlSettings(),
-            {
-                key: 'rtspUrlParams',
-                title: 'RTSP URL Parameters Override',
-                description: "Optional: Override the RTSP URL parameters. E.g.: ?transportmode=unicast",
-                placeholder: this.getRtspUrlParams(),
-                value: this.storage.getItem('rtspUrlParams'),
-            },
         ]
     }
 

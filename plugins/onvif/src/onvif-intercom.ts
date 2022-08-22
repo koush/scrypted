@@ -40,6 +40,7 @@ function addSupportedCodec(ffmpegCodec: string, sdpName: string) {
 addSupportedCodec('pcm_mulaw', 'PCMU');
 addSupportedCodec('pcm_alaw', 'PCMA');
 addSupportedCodec('pcm_s16be', 'L16');
+addSupportedCodec('adpcm_g726', 'G726');
 addSupportedCodec('aac', 'MPEG4-GENERIC');
 
 interface CodecMatch {
@@ -78,6 +79,7 @@ export class OnvifIntercom implements Intercom {
         url.username = username;
         url.password = password;
         this.intercomClient = new RtspClient(url.toString());
+        this.intercomClient.console = this.camera.console;
         await this.intercomClient.options();
         const Require = 'www.onvif.org/ver20/backchannel';
 

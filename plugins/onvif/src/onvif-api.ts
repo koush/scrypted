@@ -61,7 +61,7 @@ export class OnvifCameraAPI {
     digestAuth: AxiosDigestAuth;
     detections: Map<string, string>;
 
-    constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string, public debug?: boolean) {
+    constructor(public cam: any, username: string, password: string, public console: Console, binaryStateEvent: string) {
         this.binaryStateEvent = binaryStateEvent
         this.digestAuth = new AxiosDigestAuth({
             username,
@@ -74,11 +74,6 @@ export class OnvifCameraAPI {
 
         this.cam.on('event', (event: any, xml: string) => {
             const eventTopic = stripNamespaces(event.topic._)
-            if (this.debug) {
-                this.console.log('event', eventTopic);
-                this.console.log(JSON.stringify(event, null, 2));
-                this.console.log(xml);
-            }
 
             if (event.message.message.data && event.message.message.data.simpleItem) {
                 const dataValue = event.message.message.data.simpleItem.$.Value;
@@ -271,7 +266,7 @@ export class OnvifCameraAPI {
     }
 }
 
-export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console, binaryStateEvent: string, debugLog?: boolean) {
+export async function connectCameraAPI(ipAndPort: string, username: string, password: string, console: Console, binaryStateEvent: string) {
     const split = ipAndPort.split(':');
     const [hostname, port] = split;
     const cam = await promisify(cb => {
@@ -282,5 +277,5 @@ export async function connectCameraAPI(ipAndPort: string, username: string, pass
             port,
         }, (err: Error) => cb(err, cam));
     });
-    return new OnvifCameraAPI(cam, username, password, console, binaryStateEvent, debugLog);
+    return new OnvifCameraAPI(cam, username, password, console, binaryStateEvent);
 }
