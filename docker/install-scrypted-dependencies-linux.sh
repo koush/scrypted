@@ -12,11 +12,6 @@ systemctl stop scrypted.service
 # bad hack to run a dockerfile like a shell script.
 
 RUN() {
-    if [ -z "$ALLOW_RUN" ]
-    then
-        return
-    fi
-
     # echo "Running: $@"
     $@
     if [ $? -ne 0 ]
@@ -37,21 +32,19 @@ COPY() {
 }
 
 FROM() {
-    echo 'Installing nodejs repo'
-    RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-    RUN apt-get update
-    RUN apt-get install -y nodejs
+    echo "ignoring FROM $1"
 }
 
+# process ARG for script variables but ignore ENV
 ARG() {
-    echo "ignoring ARG $1"
+    $@
 }
 
 ENV() {
     echo "ignoring ENV $1"
 }
 
-source <(curl -s https://raw.githubusercontent.com/koush/scrypted/avahi/docker/Dockerfile.common)
+source <(curl -s https://raw.githubusercontent.com/koush/scrypted/avahi/docker/template/Dockerfile.common.header)
 
 if [ -z "$SERVICE_USER" ]
 then
