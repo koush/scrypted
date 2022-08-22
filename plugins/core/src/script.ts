@@ -12,9 +12,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
     }
 
     async saveScript(source: ScriptSource): Promise<void> {
-        this.storage.setItem('data', JSON.stringify({
-            'script.ts': source.script,
-        }));
+        this.storage.setItem('data', JSON.stringify(source));
     }
 
     async loadScripts(): Promise<{ [filename: string]: ScriptSource; }> {
@@ -92,7 +90,7 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
         }
     }
 
-    async eval(source: ScriptSource, variables: { [name: string]: any }) {
+    async eval(source: ScriptSource, variables?: { [name: string]: any }) {
         this.prepareScript();
 
         const { value, defaultExport } = await scryptedEval(this, source.script, Object.assign({
