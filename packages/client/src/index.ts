@@ -6,10 +6,9 @@ import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-uti
 import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
 import type { IOSocket } from '../../../server/src/io';
-import { SidebandBufferSerializer } from '../../../server/src/plugin/buffer-serializer';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
-import { createRpcDuplexSerializer } from '../../../server/src/rpc-serializer';
+import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -324,22 +323,28 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     try {
         if (!rpcPeer) {
-            rpcPeer = new RpcPeer(clientName || 'engine.io-client', "api", message => socket.send(JSON.stringify(message)));
-            let pendingSerializationContext: any = {};
+            const serializer = createRpcSerializer({
+                sendMessageBuffer: buffer => socket.send(buffer),
+                sendMessageFinish: message => socket.send(JSON.stringify(message)),
+            });
+
+            rpcPeer = new RpcPeer(clientName || 'engine.io-client', "api", (message, reject, serializationContext) => {
+                try {
+                    serializer.sendMessage(message, reject, serializationContext);
+                }
+                catch (e) {
+                    reject?.(e);
+                }
+            });
             socket.on('message', data => {
                 if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
-                    pendingSerializationContext = pendingSerializationContext || {
-                        buffers: [],
-                    };
-                    const buffers: Buffer[] = pendingSerializationContext.buffers;
-                    buffers.push(Buffer.from(data));
-                    return;
+                    serializer.onMessageBuffer(Buffer.from(data));
                 }
-                const messageSerializationContext = pendingSerializationContext;
-                pendingSerializationContext = undefined;
-                rpcPeer.handleMessage(JSON.parse(data as string), messageSerializationContext);
+                else {
+                    serializer.onMessageFinish(JSON.parse(data as string));
+                }
             });
-            rpcPeer.addSerializer(Buffer, 'Buffer', new SidebandBufferSerializer());
+            serializer.setupRpcPeer(rpcPeer);
         }
 
         const scrypted = await attachPluginRemote(rpcPeer, undefined);
