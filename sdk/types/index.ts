@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.83";
+export const TYPES_VERSION = "0.0.85";
 
 
 export interface DeviceState {
@@ -2368,7 +2368,7 @@ export interface RTCSessionControl {
 
 export interface RTCMediaObjectTrack {
   replace(mediaObject: MediaObject): Promise<void>;
-  remove(): Promise<void>;
+  stop(): Promise<void>;
   setPlayback(options: {
     audio: boolean,
     video: boolean,
@@ -2391,10 +2391,6 @@ export interface RTCConnectionManagement {
  */
 export interface RTCSignalingChannel {
   startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl | undefined>;
-}
-
-export interface ScryptedRTCSignalingChannel {
-  startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCConnectionManagement | undefined>;
 }
 
 export interface RTCAVSignalingSetup {
