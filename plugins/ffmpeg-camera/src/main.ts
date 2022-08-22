@@ -6,7 +6,17 @@ import child_process, { ChildProcess } from "child_process";
 
 const { mediaManager } = sdk;
 
-class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom {
+function parseDoubleQuotedArguments(input: string) {
+    const regex = new RegExp('"[^"]+"|[\\S]+', 'g');
+    const parsed: string[] = [];
+    input.match(regex).forEach(element => {
+        if (!element) return;
+        return parsed.push(element.replace(/"/g, ''));
+    });
+    return parsed;
+}
+
+class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> {
     takePictureThrottled(option?: PictureOptions): Promise<MediaObject> {
         throw new Error("The RTSP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
     }
@@ -18,39 +28,39 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
             placeholder: '-i rtmp://[user:password@]192.168.1.100[:1935]/channel/101',
             multiple: true,
         },
-        ffmpegOutput: {
-            title: 'FFmpeg Output Stream Arguments',
-            description: 'Optional (two way audio): FFmpeg output arguments passed to the command line ffmpeg tool to play back an audio stream.',
-            placeholder: '-vn -acodec copy -f adts udp://192.168.1.101:1234',
-            onPut: (_, newValue) => {
-                let interfaces = this.providedInterfaces;
-                if (!newValue)
-                    interfaces = interfaces.filter(iface => iface !== ScryptedInterface.Intercom);
-                else
-                    interfaces.push(ScryptedInterface.Intercom);
-                this.provider.updateDevice(this.nativeId, this.providedName, interfaces);
-            },
-        },
+        // ffmpegOutput: {
+        //     title: 'FFmpeg Output Stream Arguments',
+        //     description: 'Optional (two way audio): FFmpeg output arguments passed to the command line ffmpeg tool to play back an audio stream.',
+        //     placeholder: '-vn -acodec copy -f adts udp://192.168.1.101:1234',
+        //     onPut: (_, newValue) => {
+        //         let interfaces = this.providedInterfaces;
+        //         if (!newValue)
+        //             interfaces = interfaces.filter(iface => iface !== ScryptedInterface.Intercom);
+        //         else
+        //             interfaces.push(ScryptedInterface.Intercom);
+        //         this.provider.updateDevice(this.nativeId, this.providedName, interfaces);
+        //     },
+        // },
     })
 
-    twoway: ChildProcess;
+    // twoway: ChildProcess;
 
-    async startIntercom(media: MediaObject): Promise<void> {
-        const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
-        const ffmpegInput: FFmpegInput = JSON.parse(buffer.toString());
+    // async startIntercom(media: MediaObject): Promise<void> {
+    //     const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
+    //     const ffmpegInput: FFmpegInput = JSON.parse(buffer.toString());
 
-        const args = ffmpegInput.inputArguments.slice();
-        args.push(...this.storageSettings.values.ffmpegOutput.split(' '));
-        this.console.log('starting intercom', safePrintFFmpegArguments(this.console, args));
-        this.stopIntercom();
-        this.twoway = child_process.spawn(await mediaManager.getFFmpegPath(), args);
-        ffmpegLogInitialOutput(this.console, this.twoway);
-    }
+    //     const args = ffmpegInput.inputArguments.slice();
+    //     args.push(...this.storageSettings.values.ffmpegOutput.split(' '));
+    //     this.console.log('starting intercom', safePrintFFmpegArguments(this.console, args));
+    //     this.stopIntercom();
+    //     this.twoway = child_process.spawn(await mediaManager.getFFmpegPath(), args);
+    //     ffmpegLogInitialOutput(this.console, this.twoway);
+    // }
 
-    async stopIntercom(): Promise<void> {
-        this.twoway?.kill('SIGKILL');
-        this.twoway = undefined;
-    }
+    // async stopIntercom(): Promise<void> {
+    //     this.twoway?.kill('SIGKILL');
+    //     this.twoway = undefined;
+    // }
 
     createFFmpegMediaStreamOptions(ffmpegInput: string, index: number) {
         // this might be usable as a url so check that.
@@ -71,7 +81,7 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
     }
 
     getRawVideoStreamOptions(): UrlMediaStreamOptions[] {
-        const ffmpegInputs = this.storageSettings.values.ffmpegInputs;
+        const ffmpegInputs = this.storageSettings.values.ffmpegInputs as string[];
 
         // filter out empty strings.
         const ret = ffmpegInputs
@@ -105,7 +115,7 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
 
     async createVideoStream(options?: UrlMediaStreamOptions): Promise<MediaObject> {
         const index = this.getRawVideoStreamOptions()?.findIndex(vso => vso.id === options.id);
-        const ffmpegInputs = this.storageSettings.values.ffmpegInputs;
+        const ffmpegInputs = this.storageSettings.values.ffmpegInputs as string[];
         const ffmpegInput = ffmpegInputs[index];
 
         if (!ffmpegInput)
@@ -113,7 +123,7 @@ class FFmpegCamera extends CameraBase<UrlMediaStreamOptions> implements Intercom
 
         const ret: FFmpegInput = {
             url: options.url,
-            inputArguments: ffmpegInput.split(' '),
+            inputArguments: parseDoubleQuotedArguments(ffmpegInput),
             mediaStreamOptions: options,
         };
 
