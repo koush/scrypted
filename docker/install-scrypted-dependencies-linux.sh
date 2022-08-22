@@ -51,7 +51,7 @@ ENV() {
     echo "ignoring ENV $1"
 }
 
-source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/Dockerfile.common)
+source <(curl -s https://raw.githubusercontent.com/koush/scrypted/avahi/docker/Dockerfile.common)
 
 if [ -z "$SERVICE_USER" ]
 then
@@ -64,10 +64,6 @@ then
     echo "Scrypted SERVICE_USER root is not allowed."
     exit 1
 fi
-
-
-echo "Stopping scrypted.service"
-RUN systemctl stop scrypted.service
 
 # this is not RUN as we do not care about the result
 echo "Setting permissions on /home/$SERVICE_USER/.scrypted"
