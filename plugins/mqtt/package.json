@@ -24,6 +24,7 @@
       "interfaces": [
          "MixinProvider",
          "DeviceProvider",
+         "DeviceCreator",
          "Settings"
       ]
    },
@@ -40,5 +41,5 @@
       "@scrypted/common": "file:../../common",
       "@types/nunjucks": "^3.2.0"
    },
-   "version": "0.0.53"
+   "version": "0.0.54"
 }

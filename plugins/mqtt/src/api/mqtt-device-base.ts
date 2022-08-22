@@ -1,13 +1,14 @@
 import { Settings, Setting, ScryptedDeviceBase } from '@scrypted/sdk';
 import { connect, Client } from 'mqtt';
+import { ScriptableDeviceBase } from '../scrypted-eval';
 
-export class MqttDeviceBase extends ScryptedDeviceBase implements Settings {
+export class MqttDeviceBase extends ScriptableDeviceBase implements Settings {
     client: Client;
     handler: any;
     pathname: string;
 
     constructor(nativeId: string) {
-        super(nativeId);
+        super(nativeId, undefined);
     }
 
     async getSettings(): Promise<Setting[]> {

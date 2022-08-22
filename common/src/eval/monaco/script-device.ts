@@ -1,6 +1,6 @@
 export interface ScriptDevice {
     /**
-     * @deprecated Use export default instead.
+     * @deprecated Use the default export to specify the device handler.
      * @param handler 
      */
     handle<T>(handler?: T & object): void;
