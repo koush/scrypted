@@ -37,7 +37,7 @@ FROM() {
 
 # process ARG for script variables but ignore ENV
 ARG() {
-    $@
+    export $@
 }
 
 ENV() {
