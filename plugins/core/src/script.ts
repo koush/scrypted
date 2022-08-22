@@ -12,7 +12,9 @@ export class Script extends ScryptedDeviceBase implements Scriptable, Program, S
     }
 
     async saveScript(source: ScriptSource): Promise<void> {
-        this.storage.setItem('data', JSON.stringify(source));
+        this.storage.setItem('data', JSON.stringify({
+            'script.ts': source.script,
+        }));
     }
 
     async loadScripts(): Promise<{ [filename: string]: ScriptSource; }> {
