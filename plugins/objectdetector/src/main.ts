@@ -49,6 +49,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   running = false;
   hasMotionType: boolean;
   settings: Setting[];
+  analyzeStarted = 0;
 
   constructor(mixinDevice: VideoCamera & Camera & MotionSensor & ObjectDetector & Settings, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any }, providerNativeId: string, public objectDetection: ObjectDetection & ScryptedDevice, modelName: string, group: string, public internal: boolean) {
     super({
@@ -203,6 +204,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.motionListener = this.cameraDevice.listen(ScryptedInterface.MotionSensor, async () => {
       if (!this.cameraDevice.motionDetected) {
         if (this.running) {
+          // allow anaysis due to user request.
+          if (this.analyzeStarted + 60000 > Date.now())
+            return;
+
           this.console.log('motion stopped, cancelling ongoing detection')
           this.objectDetection?.detectObjects(undefined, {
             detectionId: this.detectionId,
@@ -606,6 +611,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.motionAsObjects = vs === 'true';
     }
     else if (key === 'analyzeButton') {
+      this.analyzeStarted = Date.now();
       await this.snapshotDetection();
       await this.startVideoDetection();
       await this.extendedObjectDetect();
