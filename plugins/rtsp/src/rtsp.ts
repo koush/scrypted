@@ -199,7 +199,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         }
         resetActivityTimeout();
 
-        listener.on('data', () => resetActivityTimeout);
+        listener.on('data', resetActivityTimeout);
 
         listener.on('close', () => {
             this.console.error('listen loop closed, restarting listener.');
