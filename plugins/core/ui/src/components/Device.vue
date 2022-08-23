@@ -647,7 +647,7 @@ export default {
       }
     },
     openManagementUrl() {
-      window.open(this.device.info.managementUrl);
+      window.location = this.device.info.managementUrl;
     },
     async openRepl() {
       this.showRepl = !this.showRepl;
