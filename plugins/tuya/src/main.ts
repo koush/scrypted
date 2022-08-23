@@ -10,7 +10,7 @@ import { TuyaPulsar, TuyaPulsarMessage } from './tuya/pulsar';
 
 const { deviceManager } = sdk;
 
-export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
+export class TuyaController extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
     api: TuyaCloud;
     pulsar: TuyaPulsar;
     cameras: Map<string, TuyaCamera> = new Map();
@@ -281,4 +281,4 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
     }
 }
 
-export default createInstanceableProviderPlugin("Tuya", nativeId => new TuyaPlugin(nativeId));
+export default createInstanceableProviderPlugin("Tuya", nativeId => new TuyaController(nativeId));

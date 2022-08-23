@@ -1,6 +1,6 @@
 import { ScryptedDeviceBase, VideoCamera, MotionSensor, BinarySensor, MediaObject, ScryptedInterface, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger, Intercom } from "@scrypted/sdk";
 import sdk from '@scrypted/sdk';
-import { TuyaPlugin } from "./main";
+import { TuyaController } from "./main";
 import { TuyaDeviceConfig } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
 const { deviceManager, mediaManager, systemManager } = sdk;
@@ -27,7 +27,7 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
         const lightSwitchStatus = TuyaDevice.getLightSwitchStatus(camera);
 
         if (camera.online && lightSwitchStatus) {
-            await this.camera.plugin.api.updateDevice(camera, [
+            await this.camera.controller.api.updateDevice(camera, [
                 {
                     code: lightSwitchStatus.code,
                     value: on
@@ -50,7 +50,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     private previousMotion?: any;
 
     constructor(
-        public plugin: TuyaPlugin,
+        public controller: TuyaController,
         nativeId: string,
         config: TuyaDeviceConfig
     ) {
@@ -88,7 +88,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
         const statusIndicator = TuyaDevice.getStatusIndicator(camera);
 
         if (statusIndicator) {
-            await this.plugin.api.updateDevice(camera, [
+            await this.controller.api.updateDevice(camera, [
                 {
                     code: statusIndicator.code,
                     value: on
@@ -120,7 +120,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
             throw new Error(`Failed to stream ${this.name}: Camera is offline.`);
         }
 
-        const rtsps = await this.plugin.api.getRTSPS(camera);
+        const rtsps = await this.controller.api.getRTSPS(camera);
 
         if (!rtsps) {
             this.logger.w("There was an error retreiving camera's rtsps for streamimg.");
@@ -172,7 +172,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     }
 
     findCamera() {
-        return this.plugin.api.cameras.find(device => device.id === this.nativeId);
+        return this.controller.api.cameras.find(device => device.id === this.nativeId);
     }
 
     updateState(camera?: TuyaDeviceConfig) {

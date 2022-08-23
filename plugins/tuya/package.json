@@ -20,7 +20,7 @@
       "Tuya"
    ],
    "scrypted": {
-      "name": "Tuya Plugin",
+      "name": "Tuya Controller",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
