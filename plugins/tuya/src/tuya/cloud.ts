@@ -1,8 +1,11 @@
 import { Axios, Method } from "axios";
 import { createHash, createHmac, randomBytes } from "crypto";
-import { TuyaSupportedCountry } from "./tuya.utils";
-import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse } from "./tuya.const";
+import { getTuyaCloudEndpoint, TuyaSupportedCountry } from "./utils";
+import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse, MQTTConfig } from "./const";
+import sdk from '@scrypted/sdk';
+import { TuyaPulsarMessage } from "./pulsar";
 
+const { log } = sdk;
 
 interface Session {
     accessToken: string;
@@ -15,21 +18,17 @@ export class TuyaCloud {
 
     // Tuya IoT Cloud API
 
-    private readonly userId: string;
-    private readonly clientId: string;
-    private readonly secret: string;
     private readonly nonce: string;
-    private readonly country: TuyaSupportedCountry;
-    private session: Session | undefined;
+    private session?: Session = undefined;
     private client: Axios;
 
     private _cameras: TuyaDeviceConfig[] | null;
 
     constructor(
-        userId: string,
-        clientId: string,
-        secret: string,
-        country: TuyaSupportedCountry
+        private readonly userId: string,
+        private readonly clientId: string,
+        private readonly secret: string,
+        private readonly country: TuyaSupportedCountry
     ) {
         this.userId = userId;
         this.clientId = clientId;
@@ -37,16 +36,26 @@ export class TuyaCloud {
         this.nonce = randomBytes(16).toString('hex');
         this.country = country;
         this.client = new Axios({
-            baseURL: country.endPoint,
+            baseURL: getTuyaCloudEndpoint(this.country),
             timeout: 5 * 1e3
         });
         this._cameras = null;
     }
 
+    public async login(): Promise<boolean> {
+        await this.refreshAccessTokenIfNeeded();
+
+        return this.isLoggedIn();
+    }
+
+    public isLoggedIn(): boolean {
+        return this.session !== undefined && this.session.tokenExpiresAt.getTime() > Date.now();
+    }
+
     // Set Device Status
 
     public async updateDevice(
-        device: TuyaDeviceConfig, 
+        device: TuyaDeviceConfig,
         statuses: TuyaDeviceStatus[]
     ): Promise<boolean> {
         if (!device) {
@@ -54,7 +63,7 @@ export class TuyaCloud {
         }
 
         const result = await this.post<boolean>(
-            `/v1.0/devices/${device.id}/commands`, 
+            `/v1.0/devices/${device.id}/commands`,
             {
                 commands: statuses
             }
@@ -113,22 +122,20 @@ export class TuyaCloud {
         }
     }
 
-    // User Requests
-
-    async getUser(): Promise<TuyaResponse<undefined>> {
-        return this.get<undefined>(`/v1.0/users/${this.userId}/infos`);
+    public getSessionUserId(): string | undefined {
+        return this.session?.uid;
     }
 
     // Tuya IoT Cloud Requests API
 
-    async get<T>(
+    public async get<T>(
         path: string,
         query: { [k: string]: any } = {},
     ): Promise<TuyaResponse<T>> {
         return this.request<T>('GET', path, query);
     }
 
-    async post<T>(
+    public async post<T>(
         path: string,
         body: { [k: string]: any } = {}
     ): Promise<TuyaResponse<T>> {
@@ -192,7 +199,7 @@ export class TuyaCloud {
     }
 
     private async refreshAccessTokenIfNeeded() {
-        if (this.session && this.session.tokenExpiresAt.getTime() > Date.now()) {
+        if (this.isLoggedIn()) {
             return;
         }
 

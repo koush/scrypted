@@ -2,15 +2,17 @@ import { Device, DeviceDiscovery, DeviceProvider, ScryptedDeviceBase, ScryptedDe
 import sdk from '@scrypted/sdk';
 import { StorageSettings } from '../../../common/src/settings';
 import { TuyaCloud } from './tuya/cloud';
-import { TuyaDevice } from './tuya/tuya.device';
+import { TuyaDevice } from './tuya/device';
 import { createInstanceableProviderPlugin } from '@scrypted/common/src/provider-plugin';
 import { TuyaCamera } from './camera';
-import { TuyaSupportedCountry, TUYA_COUNTRIES } from './tuya/tuya.utils';
+import { getTuyaPulsarEndpoint, TUYA_COUNTRIES } from './tuya/utils';
+import { TuyaPulsar, TuyaPulsarMessage } from './tuya/pulsar';
 
 const { deviceManager } = sdk;
 
 export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
     api: TuyaCloud;
+    pulsar: TuyaPulsar;
     cameras: Map<string, TuyaCamera> = new Map();
 
     settingsStorage = new StorageSettings(this, {
@@ -35,9 +37,7 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
             description: 'Required: This is the country where you registered your devices.',
             type: 'string',
             choices: TUYA_COUNTRIES.map(value => value.country),
-            // mapPut: (oldValue, newValue) => TUYA_COUNTRIES.find(value => value.country === newValue),
             onPut: async () => this.discoverDevices(0)
-            // mapGet: (value) => (value as TuyaSupportedCountry).country,
         }
     });
 
@@ -51,8 +51,9 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
         const accessId = this.settingsStorage.getItem('accessId');
         const accessKey = this.settingsStorage.getItem('accessKey');
         const country = TUYA_COUNTRIES.find(value => value.country == this.settingsStorage.getItem('country'));
-        if (!userId || 
-            !accessId || 
+
+        if (!userId ||
+            !accessId ||
             !accessKey ||
             !country
         ) {
@@ -67,11 +68,90 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
             country
         );
 
-        const response = await this.api.getUser();
+        const success = await this.api.login();
 
-        if (!response.success) {
+        if (!success) {
             this.log.e("Failed to log in with credentials.");
+            this.api = undefined;
+            this.pulsar?.stop();
+            this.pulsar = undefined;
             throw new Error("Failed to log in with credentials, please check if everything is correct.");
+        }
+
+        this.pulsar = new TuyaPulsar({
+            accessId: accessId,
+            accessKey: accessKey,
+            url: getTuyaPulsarEndpoint(country)
+        });
+
+        this.pulsar.open(() => {
+            this.log.i(`TulsaPulse: opening connection.`)
+        });
+
+        this.pulsar.message((ws, message) => {
+            this.pulsar.ackMessage(message.messageId);
+            this.log.i(`TuyaPulse: message received: ${message}`);
+            const tuyaDevice = handleMessage(message);
+            if (!tuyaDevice) {
+                return;
+            }
+            tuyaDevice.updateState();
+        });
+
+        this.pulsar.reconnect(() => {
+            this.log.i(`TuyaPulse: restarting connection.`);
+        });
+
+        this.pulsar.close((ws, ...args) => {
+            this.log.w(`TuyaPulse: closed connection.`);
+        });
+
+        this.pulsar.error((ws, error) => {
+            this.log.e(`TuyaPulse: ${error}`);
+        });
+
+        this.pulsar.start();
+
+        const handleMessage = (message: TuyaPulsarMessage) => {
+            const data = message.payload.data;
+            const { devId, productKey } = data;
+
+            const device = this.api.cameras?.find(c => c.id === devId);
+
+            if (data.bizCode) {
+                if (!device && data.bizCode !== 'add') {
+                    return;
+                }
+
+                if (data.bizCode === 'online' || data.bizCode === 'offline') {
+                    // Device status changed
+                    const isOnline = data.bizCode === 'online';
+                    device.online = isOnline;   
+                } else if (data.bizCode === 'delete') {
+                    // Device needs to be deleted
+                    // - devId
+                    // - uid
+
+                    const { uid } = data.bizData;
+                } else if (data.bizCode === 'add') {
+                    // There is a new device added, refetch
+                }
+            } else {
+                if (!device) {
+                    return;
+                }
+
+                const newStatus = data.status || [];
+
+                newStatus.forEach(item => {
+                    const index = device.status.findIndex(status => status.code == item.code);
+                    if (index !== -1) {
+                        device.status[index].value = item.value
+                    }
+                });
+
+                return this.cameras.get(devId);
+            }    
         }
     }
 
@@ -114,10 +194,8 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
                     ? ScryptedDeviceType.Doorbell
                     : ScryptedDeviceType.Camera,
                 interfaces: [
-                    ScryptedInterface.Camera,
-                    ScryptedInterface.VideoCamera,
-                    ScryptedInterface.MotionSensor,
                     ScryptedInterface.Intercom,
+                    ScryptedInterface.VideoCamera,
                     ScryptedInterface.Online
                 ]
             };
@@ -132,6 +210,10 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
 
             if (TuyaDevice.hasLightSwitch(camera)) {
                 device.interfaces.push(ScryptedInterface.DeviceProvider);
+            }
+
+            if (TuyaDevice.hasMotionDetection(camera)) {
+                device.interfaces.push(ScryptedInterface.MotionSensor);
             }
 
             devices.push(device);

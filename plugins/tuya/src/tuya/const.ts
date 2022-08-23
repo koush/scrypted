@@ -51,6 +51,16 @@ export interface RTSPToken {
     expires: Date;
 }
 
+export interface MQTTConfig {
+    url: string;
+    client_id: string;
+    username: string;
+    password: string;
+    source_topic: string;
+    sink_topic: string;
+    expire_topic: string;
+}
+
 // From Unify Protect Api:
 // This type declaration make all properties optional recursively including nested objects. This should
 // only be used on JSON objects only. Otherwise...you're going to end up with class methods marked as

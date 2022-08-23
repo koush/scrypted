@@ -32,12 +32,18 @@
       ]
    },
    "dependencies": {
-      "@types/node": "^16.6.1",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "axios": "^0.27.0"
+      "axios": "^0.27.0",
+      "crypto-js": "^4.1.1",
+      "mqtt": "^4.3.7",
+      "uuid": "^8.3.2"
    },
    "devDependencies": {
+      "@types/crypto-js": "^4.1.1",
+      "@types/node": "^16.6.1",
+      "@types/uuid": "^8.3.4",
+      "@types/ws": "^8.5.3"
    },
    "version": "0.0.1"
 }
