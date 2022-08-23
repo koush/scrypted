@@ -371,6 +371,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                     const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, () => systemManager.getSystemState());
                     forks.add(remote);
                     ntw.worker.on('exit', () => {
+                        forkApi.removeListeners();
                         forks.delete(remote);
                         allMemoryStats.delete(ntw);
                     });

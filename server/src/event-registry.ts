@@ -17,11 +17,10 @@ export class EventRegistry {
 
     listen(callback: (id: string, eventDetails: EventDetails, eventData: any) => void): EventListenerRegister {
         const events = this.systemListeners;
-        let cb = callback;
-        events.add(cb);
+        events.add(callback);
         return new EventListenerRegisterImpl(() => {
-            events.delete(cb);
-            cb = undefined;
+            events.delete(callback);
+            callback = undefined;
         });
     }
 

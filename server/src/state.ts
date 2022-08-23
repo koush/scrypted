@@ -116,7 +116,7 @@ export class ScryptedStateManager extends EventRegistry {
         let cb = (eventDetails: EventDetails, eventData: any) => {
             if (denoise && lastData === eventData)
                 return;
-            callback(eventDetails, eventData);
+            callback?.(eventDetails, eventData);
         };
 
         const wrappedRegister = super.listenDevice(id, options, cb);
@@ -124,6 +124,7 @@ export class ScryptedStateManager extends EventRegistry {
         return new EventListenerRegisterImpl(() => {
             wrappedRegister.removeListener();
             cb = undefined;
+            callback = undefined;
             polling = false;
         });
     }
