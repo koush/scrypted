@@ -1,12 +1,10 @@
-import { listenZero } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from "@scrypted/common/src/read-stream";
 import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, PictureOptions, RequestRecordingStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoCameraConfiguration, VideoRecorder } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
-import net from 'net';
-import { EventEmitter, PassThrough, Stream } from "stream";
+import { PassThrough, Readable, Stream } from "stream";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
-import { Destroyable, RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { AmcrestCameraClient, AmcrestEvent, amcrestHttpsAgent } from "./amcrest-api";
 
 const { mediaManager } = sdk;
@@ -210,8 +208,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const isDoorbell = doorbellType === AMCREST_DOORBELL_TYPE || doorbellType === DAHUA_DOORBELL_TYPE;
 
         let twoWayAudio = this.storage.getItem('twoWayAudio');
-        if (twoWayAudio === 'true')
-            twoWayAudio = 'Amcrest';
 
         const choices = [
             'Amcrest',
@@ -220,6 +216,11 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         if (!isDoorbell)
             choices.unshift('None');
+
+        twoWayAudio = choices.find(c => c === twoWayAudio);
+
+        if (!twoWayAudio)
+            twoWayAudio = isDoorbell ? 'Amcrest' : 'None';
 
         ret.push(
             {
@@ -439,9 +440,24 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
         const args = ffmpegInput.inputArguments.slice();
         args.unshift('-hide_banner');
 
-        const server = new net.Server(async (socket) => {
-            server.close();
+        args.push(
+            "-vn",
+            '-acodec', 'aac',
+            '-f', 'adts',
+            'pipe:3',
+        );
 
+        this.console.log('ffmpeg intercom', args);
+
+        const ffmpeg = await mediaManager.getFFmpegPath();
+        this.cp = child_process.spawn(ffmpeg, args, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+        this.cp.on('exit', () => this.cp = undefined);
+        ffmpegLogInitialOutput(this.console, this.cp);
+        const socket = this.cp.stdio[3] as Readable;
+
+        (async () => {
             const url = `http://${this.getHttpAddress()}/cgi-bin/audio.cgi?action=postAudio&httptype=singlepart&channel=${channel}`;
             this.console.log('posting audio data to', url);
 
@@ -473,22 +489,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
             }
 
             this.stopIntercom();
-        });
-        const port = await listenZero(server)
-
-        args.push(
-            "-vn",
-            '-acodec', 'aac',
-            '-f', 'adts',
-            `tcp://127.0.0.1:${port}`,
-        );
-
-        this.console.log('ffmpeg intercom', args);
-
-        const ffmpeg = await mediaManager.getFFmpegPath();
-        this.cp = child_process.spawn(ffmpeg, args);
-        this.cp.on('exit', () => this.cp = undefined);
-        ffmpegLogInitialOutput(this.console, this.cp);
+        })();
     }
 
     async stopIntercom(): Promise<void> {
