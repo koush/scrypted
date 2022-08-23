@@ -1,7 +1,8 @@
 import crypto, { randomBytes } from 'crypto';
 import dgram from 'dgram';
 import { once } from 'events';
-import { BASIC, DIGEST } from 'http-auth-utils/dist/index';
+import { BASIC } from 'http-auth-utils/dist/index';
+import { parseHTTPHeadersQuotedKeyValueSet } from 'http-auth-utils/dist/utils';
 import net from 'net';
 import { Duplex, Readable } from 'stream';
 import tls from 'tls';
@@ -12,6 +13,18 @@ import { readLength, readLine } from './read-stream';
 import { MSection, parseSdp } from './sdp-utils';
 import { sleep } from './sleep';
 import { StreamChunk, StreamParser, StreamParserOptions } from './stream-parser';
+
+const REQUIRED_WWW_AUTHENTICATE_KEYS = ['realm', 'nonce'];
+
+type DigestWWWAuthenticateData = {
+    realm: string;
+    domain?: string;
+    nonce: string;
+    opaque?: string;
+    stale?: 'true' | 'false';
+    algorithm?: 'MD5' | 'MD5-sess' | 'token';
+    qop?: 'auth' | 'auth-int' | string;
+};
 
 export const RTSP_FRAME_MAGIC = 36;
 
@@ -526,7 +539,21 @@ export class RtspClient extends RtspBase {
             return `Basic ${hash}`;
         }
 
-        const wwwAuth = DIGEST.parseWWWAuthenticateRest(this.wwwAuthenticate);
+        // hikvision sends out of spec 'random' name and value parameter,
+        // which causes the digest auth lib to fail. so, need to parse the header
+        // manually with a relax set of authorized parameters.
+        // https://github.com/koush/scrypted/issues/344#issuecomment-1223627956
+        // https://github.com/nfroidure/http-auth-utils/blob/7532d21a419ad098d1240c9e1b55855020df5d7f/src/mechanisms/digest.ts#L97
+        // const wwwAuth = DIGEST.parseWWWAuthenticateRest(this.wwwAuthenticate);
+        const wwwAuth = parseHTTPHeadersQuotedKeyValueSet(
+            this.wwwAuthenticate,
+            // the parser will call indexOf to see if the key is authorized. monkey patch this call.
+            // https://github.com/nfroidure/http-auth-utils/blob/17186d3eefb86535916d044c7f59a340bc765603/src/utils.ts#L43
+            {
+                indexOf: () => 0,
+            } as any,
+            REQUIRED_WWW_AUTHENTICATE_KEYS,
+        ) as DigestWWWAuthenticateData;
 
         const authedUrl = new URL(this.url);
         const username = decodeURIComponent(authedUrl.username);
