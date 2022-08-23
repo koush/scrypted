@@ -5,7 +5,9 @@ Most commonly this plugin is used with 2 plugins: Rebroadcast and HomeKit.
 Device must have built-in motion detection (most HikVision cameras or NVRs have this).
 If the camera or NVR do not have motion detection, you will have to use a separate plugin or device to achieve this (e.g., `opencv`, `pam-diff`, or `dummy-switch`) and group it to the camera.
 
-**NOTE:** 2-way audio is not currently supported.
+## Two Way Audio
+
+Two Way Audio is supported if the audio codec is set to PCM-ULAW (G.711ulaw) on the camera. This audio codec will also work with HomeKit. Using ONVIF Two Way is recommended.
 
 ## Codec Settings for HomeKit
 Configure optimal codec settings (as required by HomeKit) through HikVision's configuration webpage or device interface (not Scrypted).
