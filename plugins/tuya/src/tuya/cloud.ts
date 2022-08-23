@@ -1,11 +1,7 @@
 import { Axios, Method } from "axios";
-import { createHash, createHmac, randomBytes } from "crypto";
+import { HmacSHA256, SHA256, lib } from 'crypto-js';
 import { getTuyaCloudEndpoint, TuyaSupportedCountry } from "./utils";
-import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse, MQTTConfig } from "./const";
-import sdk from '@scrypted/sdk';
-import { TuyaPulsarMessage } from "./pulsar";
-
-const { log } = sdk;
+import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse } from "./const";
 
 interface Session {
     accessToken: string;
@@ -22,7 +18,7 @@ export class TuyaCloud {
     private session?: Session = undefined;
     private client: Axios;
 
-    private _cameras: TuyaDeviceConfig[] | null;
+    private _cameras: TuyaDeviceConfig[] | undefined;
 
     constructor(
         private readonly userId: string,
@@ -33,13 +29,13 @@ export class TuyaCloud {
         this.userId = userId;
         this.clientId = clientId;
         this.secret = secret;
-        this.nonce = randomBytes(16).toString('hex');
+        this.nonce = lib.WordArray.random(16).toString();
         this.country = country;
         this.client = new Axios({
             baseURL: getTuyaCloudEndpoint(this.country),
             timeout: 5 * 1e3
         });
-        this._cameras = null;
+        this._cameras = undefined;
     }
 
     public async login(): Promise<boolean> {
@@ -96,7 +92,7 @@ export class TuyaCloud {
         return true;
     }
 
-    public get cameras(): TuyaDeviceConfig[] | null {
+    public get cameras(): TuyaDeviceConfig[] | undefined {
         return this._cameras;
     }
 
@@ -154,8 +150,12 @@ export class TuyaCloud {
         const headers = { client_id: this.clientId };
 
         const stringToSign = this.getStringToSign(method, path, query, headers, body);
-        const hmac = createHmac('sha256', this.secret);
-        const sign = hmac.update(this.clientId + this.session.accessToken + timestamp + this.nonce + stringToSign).digest('hex').toUpperCase();
+        const sign = HmacSHA256(
+            this.clientId + this.session.accessToken + timestamp + this.nonce + stringToSign,
+            this.secret
+        )
+            .toString()
+            .toUpperCase();
 
         let requestHeaders = {
             'client_id': this.clientId,
@@ -190,11 +190,11 @@ export class TuyaCloud {
         const isHeaderEmpty = Object.keys(headers).length == 0;
         const isBodyEmpty = Object.keys(body).length == 0;
         const httpMethod = method.toUpperCase();
-        const url = path + (isQueryEmpty ? '' : '?' + Object.keys(query).map(key => { return `${key}=${query[key]}` }).join('&'));
-        const sha256 = createHash('sha256');
-        const contentHashed = sha256.update(isBodyEmpty ? '' : JSON.stringify(body)).digest('hex');
-        const headersParsed = Object.keys(headers).map(key => { return `${key}:${headers[key]}` }).join('\n')
-        const signStr = [httpMethod, contentHashed, (isHeaderEmpty ? '' : headersParsed + '\n'), url].join('\n');
+        const url = path + (isQueryEmpty ? '' : '?' + Object.keys(query).map(key => `${key}=${query[key]}`).join('&'));
+        const contentHashed = SHA256(isBodyEmpty ? '' : JSON.stringify(body)).toString();
+        const headersParsed = Object.keys(headers).map(key => `${key}:${headers[key]}`).join('\n');
+        const headersStr = isHeaderEmpty ? '' : headersParsed + '\n'
+        const signStr = [httpMethod, contentHashed, headersStr, url].join('\n');
         return signStr
     }
 
@@ -213,8 +213,7 @@ export class TuyaCloud {
 
         const timestamp = new Date().getTime().toString();
         const stringToSign = this.getStringToSign('GET', url);
-        const hmac = createHmac('sha256', this.secret);
-        const signString = hmac.update(this.clientId + timestamp + stringToSign).digest('hex').toUpperCase();
+        const signString = HmacSHA256(this.clientId + timestamp + stringToSign, this.secret).toString().toUpperCase();
 
         const headers = {
             t: timestamp,

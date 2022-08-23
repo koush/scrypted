@@ -26,16 +26,11 @@ export interface TuyaPulsarMessage {
     key: string;
 }
 
-export enum DataPoint {
-    ReportStatus = 4,
-    UpdateStatus = 20,
-    OutdoorGeofence = 22
-}
-
 interface StatusItem {
     code: string;
     value: any;
     t: number;
+    // "data point": string
 }
 
 interface IConfig {

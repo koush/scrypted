@@ -92,9 +92,8 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
             this.pulsar.ackMessage(message.messageId);
             this.log.i(`TuyaPulse: message received: ${message}`);
             const tuyaDevice = handleMessage(message);
-            if (!tuyaDevice) {
+            if (!tuyaDevice)
                 return;
-            }
             tuyaDevice.updateState();
         });
 
@@ -118,6 +117,8 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
 
             const device = this.api.cameras?.find(c => c.id === devId);
 
+            let returnDevice = false;
+
             if (data.bizCode) {
                 if (!device && data.bizCode !== 'add') {
                     return;
@@ -126,7 +127,8 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
                 if (data.bizCode === 'online' || data.bizCode === 'offline') {
                     // Device status changed
                     const isOnline = data.bizCode === 'online';
-                    device.online = isOnline;   
+                    device.online = isOnline;
+                    returnDevice = true;
                 } else if (data.bizCode === 'delete') {
                     // Device needs to be deleted
                     // - devId
@@ -134,7 +136,7 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
 
                     const { uid } = data.bizData;
                 } else if (data.bizCode === 'add') {
-                    // There is a new device added, refetch
+                    // TODO: There is a new device added, refetch
                 }
             } else {
                 if (!device) {
@@ -150,8 +152,12 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
                     }
                 });
 
-                return this.cameras.get(devId);
+                returnDevice = true;
             }    
+
+            if (returnDevice) {
+                return this.cameras.get(devId);
+            }
         }
     }
 
@@ -194,9 +200,7 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
                     ? ScryptedDeviceType.Doorbell
                     : ScryptedDeviceType.Camera,
                 interfaces: [
-                    ScryptedInterface.Intercom,
                     ScryptedInterface.VideoCamera,
-                    ScryptedInterface.Online
                 ]
             };
 
@@ -208,12 +212,14 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
                 device.interfaces.push(ScryptedInterface.OnOff);
             }
 
-            if (TuyaDevice.hasLightSwitch(camera)) {
-                device.interfaces.push(ScryptedInterface.DeviceProvider);
-            }
-
             if (TuyaDevice.hasMotionDetection(camera)) {
                 device.interfaces.push(ScryptedInterface.MotionSensor);
+            }
+
+            // Device Provider
+
+            if (TuyaDevice.hasLightSwitch(camera)) {
+                device.interfaces.push(ScryptedInterface.DeviceProvider);
             }
 
             devices.push(device);
@@ -247,7 +253,7 @@ export class TuyaPlugin extends ScryptedDeviceBase implements DeviceProvider, De
                     serialNumber: camera.id,
                 },
                 interfaces: [
-                    ScryptedInterface.OnOff
+                    ScryptedInterface.OnOff,
                 ],
                 type: ScryptedDeviceType.Light,
             }

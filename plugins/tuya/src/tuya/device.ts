@@ -44,10 +44,18 @@ export namespace TuyaDevice {
     }
 
     export function getMotionSwitch(camera: TuyaDeviceConfig) {
-        const motionDetectionCodes = [
+        const motionSwitchCodes = [
             'motion_switch',
             'pir_sensitivity'
         ]
+        return getStatus(camera, motionSwitchCodes);
+    }
+
+    export function getMotionDetectionStatus(camera: TuyaDeviceConfig) {
+        const motionDetectionCodes = [
+            'movement_detect_pic'
+        ];
+
         return getStatus(camera, motionDetectionCodes);
     }
 

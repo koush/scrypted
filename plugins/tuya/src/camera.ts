@@ -5,7 +5,7 @@ import { TuyaDeviceConfig } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online {
+export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(
         public camera: TuyaCamera,
         nativeId: string
@@ -41,19 +41,18 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online
         if (!camera)
             return;
 
-        this.online = camera.online;
         this.on = TuyaDevice.getLightSwitchStatus(camera)?.value;
     }
 }
 
-export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Intercom, VideoCamera, BinarySensor, MotionSensor, OnOff, Online {
+export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff {
     cameraLight?: TuyaCameraLight
-    private previousMotion: any | undefined;
+    private previousMotion?: any;
 
     constructor(
         public plugin: TuyaPlugin,
         nativeId: string,
-        tuyaDevice: TuyaDeviceConfig
+        config: TuyaDeviceConfig
     ) {
         super(nativeId);
 
@@ -61,7 +60,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
             this.binaryState = false;
         }
 
-        this.updateState(tuyaDevice);
+        this.updateState(config);
     }
 
     // Camera Light Provider
@@ -72,16 +71,6 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
         }
 
         return this.cameraLight;
-    }
-
-    // MARK: Intercom
-
-    startIntercom(media: MediaObject): Promise<void> {
-        throw new Error("Method not implemented.");
-    }
-
-    stopIntercom(): Promise<void> {
-        throw new Error("Method not implemented.");
     }
 
     // OnOff Status Indicator
@@ -138,13 +127,12 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
             throw new Error(`Failed to capture stream for ${this.name}: RTSPS link not found.`);
         }
 
-        const streamUrl: MediaStreamUrl = {
+        const mediaStreamUrl: MediaStreamUrl = {
             url: rtsps.url,
             container: 'rtsp',
             mediaStreamOptions: vso
         }
-
-        return mediaManager.createMediaObject(Buffer.from(JSON.stringify(streamUrl)), ScryptedMimeTypes.MediaStreamUrl);
+        return this.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
@@ -189,21 +177,21 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, In
 
     updateState(camera?: TuyaDeviceConfig) {
         camera = camera || this.findCamera();
+
         if (!camera) {
             return;
         }
 
         this.on = TuyaDevice.getStatusIndicator(camera)?.value;
-        this.online = camera.online;
 
         const hasMotionSwitchStatus = TuyaDevice.getMotionSwitch(camera) !== undefined;
         if (hasMotionSwitchStatus) {
-            const movementDetectPicVal = camera.status.find(status => status.code === 'movement_detect_pic')?.value;
-            if (movementDetectPicVal) {
+            const movementDetectedStatus = TuyaDevice.getMotionDetectionStatus(camera);
+            if (movementDetectedStatus) {
                 if (!this.previousMotion) {
-                    this.previousMotion = movementDetectPicVal;
-                } else if (this.previousMotion !== movementDetectPicVal) {
-                    this.previousMotion = movementDetectPicVal;
+                    this.previousMotion = movementDetectedStatus.value;
+                } else if (this.previousMotion !== movementDetectedStatus.value) {
+                    this.previousMotion = movementDetectedStatus.value;
                     this.triggerMotion();
                 }    
             }
