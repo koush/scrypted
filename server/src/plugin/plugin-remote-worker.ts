@@ -398,7 +398,9 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                 if (zipOptions?.fork) {
                     pluginConsole?.log('plugin forked');
                     const fork = exports.fork;
-                    return fork();
+                    const forked = await fork();
+                    forked[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] = true;
+                    return forked;
                 }
 
                 pluginConsole?.log('plugin loaded');
