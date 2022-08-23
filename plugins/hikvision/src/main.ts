@@ -1,14 +1,20 @@
-import sdk, { MediaObject, Camera, ScryptedInterface, Setting } from "@scrypted/sdk";
-import { EventEmitter } from "stream";
-import { HikVisionCameraAPI } from "./hikvision-camera-api";
-import { Destroyable, UrlMediaStreamOptions, RtspProvider, RtspSmartCamera } from "../../rtsp/src/rtsp";
+import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
+import { readLength } from '@scrypted/common/src/read-stream';
+import sdk, { Camera, FFmpegInput, Intercom, MediaObject, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
+import child_process, { ChildProcess } from 'child_process';
+import { PassThrough, Readable } from "stream";
 import { sleep } from "../../../common/src/sleep";
-import { HikVisionCameraEvent } from "./hikvision-camera-api";
+import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
+import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
+import { getChannel, HikVisionCameraAPI, HikVisionCameraEvent, hikvisionHttpsAgent } from "./hikvision-camera-api";
+
 const { mediaManager } = sdk;
 
-class HikVisionCamera extends RtspSmartCamera implements Camera {
+class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     channelIds: Promise<string[]>;
     client: HikVisionCameraAPI;
+    onvifIntercom = new OnvifIntercom(this);
+    cp: ChildProcess;
 
     // bad hack, but whatever.
     codecCheck = (async () => {
@@ -28,6 +34,24 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
             }
         }
     })();
+
+    constructor(nativeId: string, provider: RtspProvider) {
+        super(nativeId, provider);
+
+        this.updateManagementUrl();
+    }
+
+    updateManagementUrl() {
+        const ip = this.storage.getItem('ip');
+        if (!ip)
+            return;
+        const info = this.info || {};
+        const managementUrl = `http://${ip}`;
+        if (info.managementUrl !== managementUrl) {
+            info.managementUrl = managementUrl;
+            this.info = info;
+        }
+    }
 
     async listenEvents() {
         let motionTimeout: NodeJS.Timeout;
@@ -169,6 +193,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
                     resolve([camNumber + '01', camNumber + '02']);
                 } else try {
                     const response = await client.digestAuth.request({
+                        httpsAgent: hikvisionHttpsAgent,
                         url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
                         responseType: 'text',
                     });
@@ -213,6 +238,156 @@ class HikVisionCamera extends RtspSmartCamera implements Camera {
         this.client = undefined;
         this.channelIds = undefined;
         super.putSetting(key, value);
+
+        const doorbellType = this.storage.getItem('doorbellType');
+        const isDoorbell = doorbellType === 'true';
+
+        const twoWayAudio = this.storage.getItem('twoWayAudio') === 'true'
+            || this.storage.getItem('twoWayAudio') === 'ONVIF'
+            || this.storage.getItem('twoWayAudio') === 'Hikvision';
+
+        const interfaces = this.provider.getInterfaces();
+        let type: ScryptedDeviceType = undefined;
+        if (isDoorbell) {
+            type = ScryptedDeviceType.Doorbell;
+            interfaces.push(ScryptedInterface.BinarySensor)
+        }
+        if (isDoorbell || twoWayAudio) {
+            interfaces.push(ScryptedInterface.Intercom);
+        }
+
+        this.provider.updateDevice(this.nativeId, this.name, interfaces, type);
+
+        this.updateManagementUrl();
+    }
+
+    async getOtherSettings(): Promise<Setting[]> {
+        const ret = await super.getOtherSettings();
+
+        const doorbellType = this.storage.getItem('doorbellType');
+        const isDoorbell = doorbellType === 'true';
+
+        let twoWayAudio = this.storage.getItem('twoWayAudio');
+
+        const choices = [
+            'Hikvision',
+            'ONVIF',
+        ];
+
+        if (!isDoorbell)
+            choices.unshift('None');
+
+        twoWayAudio = choices.find(c => c === twoWayAudio);
+
+        if (!twoWayAudio)
+            twoWayAudio = isDoorbell ? 'Hikvision' : 'None';
+
+        ret.push(
+            {
+                title: 'Doorbell',
+                type: 'boolean',
+                description: 'This device is a Hikvision doorbell.',
+                value: isDoorbell,
+                key: 'doorbellType',
+            },
+            {
+                title: 'Two Way Audio',
+                value: twoWayAudio,
+                key: 'twoWayAudio',
+                description: 'Hikvision cameras may support both Hikvision and ONVIF two way audio protocols. ONVIF generally performs better when supported.',
+                choices,
+            },
+        );
+
+        return ret;
+    }
+
+
+    async startIntercom(media: MediaObject): Promise<void> {
+        if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
+            const options = await this.getConstructedVideoStreamOptions();
+            const stream = options[0];
+            const url = new URL(stream.url);
+            // amcrest onvif requires this proto query parameter, or onvif two way
+            // will not activate.
+            url.searchParams.set('proto', 'Onvif');
+            this.onvifIntercom.url = url.toString();
+            return this.onvifIntercom.startIntercom(media);
+        }
+
+        const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
+        const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
+
+        const args = ffmpegInput.inputArguments.slice();
+        args.unshift('-hide_banner');
+
+        args.push(
+            "-vn",
+            '-ar', '8000',
+            '-ac', '1',
+            '-acodec', 'pcm_mulaw',
+            '-f', 'mulaw',
+            'pipe:3',
+        );
+
+        this.console.log('ffmpeg intercom', args);
+
+        const ffmpeg = await mediaManager.getFFmpegPath();
+        this.cp = child_process.spawn(ffmpeg, args, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+        this.cp.on('exit', () => this.cp = undefined);
+        ffmpegLogInitialOutput(this.console, this.cp);
+        const socket = this.cp.stdio[3] as Readable;
+
+        (async () => {
+            const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/audioData`;
+            this.console.log('posting audio data to', url);
+
+            // seems the dahua doorbells preferred 1024 chunks. should investigate adts
+            // parsing and sending multipart chunks instead.
+            const passthrough = new PassThrough();
+            this.getClient().digestAuth.request({
+                httpsAgent: hikvisionHttpsAgent,
+                method: 'PUT',
+                url,
+                headers: {
+                    'Content-Type': 'Audio/G.711Mu',
+                    // 'Connection': 'close',
+                    // 'Content-Length': '9999999'
+                },
+                data: passthrough,
+            });
+
+            try {
+                while (true) {
+                    const data = await readLength(socket, 1024);
+                    passthrough.push(data);
+                }
+            }
+            catch (e) {
+            }
+            finally {
+                this.console.log('audio finished');
+                passthrough.end();
+            }
+
+            this.stopIntercom();
+        })();
+    }
+
+
+    async stopIntercom(): Promise<void> {
+        if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
+            return this.onvifIntercom.stopIntercom();
+        }
+        
+        const client = this.getClient();
+        await client.digestAuth.request({
+            httpsAgent: hikvisionHttpsAgent,
+            method: 'PUT',
+            url: `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/close`,
+        })
     }
 }
 

@@ -1,9 +1,12 @@
-import { Readable } from 'stream';
 import AxiosDigestAuth from '@koush/axios-digest-auth';
-import { EventEmitter } from "stream";
 import { IncomingMessage } from 'http';
+import https from 'https';
 
-function getChannel(channel: string) {
+export const hikvisionHttpsAgent = new https.Agent({
+    rejectUnauthorized: false,
+});
+
+export function getChannel(channel: string) {
     return channel || '101';
 }
 
@@ -45,6 +48,7 @@ export class HikVisionCameraAPI {
             this.deviceModel = new Promise(async (resolve, reject) => {
                 try {
                     const response = await this.digestAuth.request({
+                        httpsAgent: hikvisionHttpsAgent,
                         method: "GET",
                         responseType: 'text',
                         url: `http://${this.ip}/ISAPI/System/deviceInfo`,
@@ -78,6 +82,7 @@ export class HikVisionCameraAPI {
         }
 
         const response = await this.digestAuth.request({
+            httpsAgent: hikvisionHttpsAgent,
             method: "GET",
             responseType: 'text',
             url: `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/capabilities`,
@@ -98,6 +103,7 @@ export class HikVisionCameraAPI {
         const url = `http://${this.ip}/ISAPI/Streaming/channels/${getChannel(channel)}/picture?snapShotImageType=JPEG`
 
         const response = await this.digestAuth.request({
+            httpsAgent: hikvisionHttpsAgent,
             method: "GET",
             responseType: 'arraybuffer',
             url: url,
@@ -114,6 +120,7 @@ export class HikVisionCameraAPI {
                 // this.console.log('listener url', url);
 
                 const response = await this.digestAuth.request({
+                    httpsAgent: hikvisionHttpsAgent,
                     method: "GET",
                     url,
                     responseType: 'stream',

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/hikvision",
-   "version": "0.0.97",
+   "version": "0.0.98",
    "description": "HikVision Plugin for Scrypted",
    "author": "Scrypted",
    "license": "Apache",
@@ -35,6 +35,7 @@
       ]
    },
    "dependencies": {
+      "@scrypted/common": "file:../../common",
       "@koush/axios-digest-auth": "^0.8.5",
       "@scrypted/sdk": "file:../../sdk",
       "@types/highland": "^2.12.14",
