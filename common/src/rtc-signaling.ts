@@ -99,12 +99,11 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         const pc = this.pc = new RTCPeerConnection(setup.configuration);
         this.pcDeferred.resolve(pc);
 
-        pc.addEventListener('connectionstatechange', checkConn);
+        // pc.addEventListener('connectionstatechange', checkConn);
         pc.addEventListener('iceconnectionstatechange', checkConn);
-
-        pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState))
-        pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState))
-        pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
+        // pc.addEventListener('icegatheringstatechange', ev => console.log('iceGatheringState', pc.iceGatheringState))
+        // pc.addEventListener('signalingstatechange', ev => console.log('signalingState', pc.signalingState))
+        // pc.addEventListener('icecandidateerror', ev => console.log('icecandidateerror'))
 
         if (setup.datachannel) {
             const dc = pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
