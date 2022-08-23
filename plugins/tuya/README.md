@@ -12,6 +12,10 @@ Follow this [guide](https://developer.tuya.com/en/docs/iot/Configuration_Guide_c
 
 Once you have retreived both the `Access Id` and `Access Key` from the project, you can get the `User Id` by going to Tuya Cloud IoT -> Select the Project -> Devices -> Link Tuya App Account -> and then get the UID.
 
+## TODOs
+- Fix 2-way talk for supported platforms (Can only work with WebRTC since we only get one stream with RTSPS)
+- Add support for camera doorbells (Just need to implement doorbell notification)
+
 ## npm commands
 - npm run scrypted-webpack
 - npm run scrypted-deploy
