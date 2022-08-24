@@ -1,5 +1,3 @@
-import { type } from "os";
-
 export interface TuyaResponse<T> {
     success: boolean
     t: number

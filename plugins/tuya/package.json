@@ -1,6 +1,5 @@
 {
    "name": "@scrypted/tuya",
-   "private": true,
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -17,10 +16,10 @@
    "keywords": [
       "scrypted",
       "plugin",
-      "Tuya"
+      "tuya"
    ],
    "scrypted": {
-      "name": "Tuya Controller",
+      "name": "Tuya Plugin",
       "type": "DeviceProvider",
       "interfaces": [
          "DeviceProvider",
@@ -28,16 +27,15 @@
       ],
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin",
-         "@scrypted/webrtc"
+         "@scrypted/snapshot"
       ]
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "axios": "^0.27.0",
+      "axios": "^0.27.2",
       "crypto-js": "^4.1.1",
-      "mqtt": "^4.3.7",
-      "uuid": "^8.3.2"
+      "ws": "^8.8.1"
    },
    "devDependencies": {
       "@types/crypto-js": "^4.1.1",
