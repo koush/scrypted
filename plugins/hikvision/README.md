@@ -7,14 +7,18 @@ If the camera or NVR do not have motion detection, you will have to use a separa
 
 ## Two Way Audio
 
-Two Way Audio is supported if the audio codec is set to PCM-ULAW (G.711ulaw) on the camera. This audio codec will also work with HomeKit. Using ONVIF Two Way is recommended.
+There are two options for Two Way Audio:
+* ONVIF (Recommended)
+* HikVision (Untested)
 
-## Codec Settings for HomeKit
+Two Way Audio is supported if the audio codec is set to G.711ulaw on the camera, which is usually the default audio codec. This audio codec will also work with HomeKit. Changing the audio codec from G.711ulaw will cause Two Way Audio to fail on the cameras that were tested.
+
+## Codec Settings
 Configure optimal codec settings (as required by HomeKit) through HikVision's configuration webpage or device interface (not Scrypted).
 
-HikVision's [iVMS 4200 software](https://www.hikvision.com/en/support/tools/), or similar, may be utilized to configure device as well as create a motion detection grid (required for motion detection and hardware dependent).
+HikVision's [iVMS 4200 software](https://www.HikVision.com/en/support/tools/), or similar, may be utilized to configure device as well as create a motion detection grid (required for motion detection and hardware dependent).
 
-Generally, for newer devices the main stream (Stream 1) may be incompatible with HomeKit.
+Generally, for newer devices the main stream (Stream 1) may be incompatible with HomeKit as it only outputs HEVC.
 Configure and specify a substream instead (Stream 2 or 3).
 
 The optimal/reliable codec settings can be found in the documentation for the [Homekit Plugin](https://github.com/koush/scrypted/tree/main/plugins/homekit).

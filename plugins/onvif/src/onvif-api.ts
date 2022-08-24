@@ -73,7 +73,9 @@ export class OnvifCameraAPI {
         const ret = new EventEmitter();
 
         this.cam.on('event', (event: any, xml: string) => {
-            const eventTopic = stripNamespaces(event.topic._)
+            ret.emit('data', xml);
+
+            const eventTopic = stripNamespaces(event.topic._);
 
             if (event.message.message.data && event.message.message.data.simpleItem) {
                 const dataValue = event.message.message.data.simpleItem.$.Value;

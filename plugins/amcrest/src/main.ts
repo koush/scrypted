@@ -248,7 +248,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
     async getUrlSettings() {
         return [
-            ...await super.getUrlSettings(),
             {
                 key: 'rtspChannel',
                 title: 'Channel Number Override',
@@ -257,6 +256,7 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
                 placeholder: '1',
                 value: this.storage.getItem('rtspChannel'),
             },
+            ...await super.getUrlSettings(),
         ]
     }
 

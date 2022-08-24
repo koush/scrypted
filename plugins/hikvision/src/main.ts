@@ -16,25 +16,6 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     onvifIntercom = new OnvifIntercom(this);
     cp: ChildProcess;
 
-    // bad hack, but whatever.
-    codecCheck = (async () => {
-        while (true) {
-            try {
-                const streamSetup = await this.client.checkStreamSetup(this.getRtspChannel(), await this.isOld());
-                if (streamSetup.videoCodecType !== 'H.264') {
-                    this.log.a(`This camera is configured for ${streamSetup.videoCodecType} on the main channel. Configuring it it for H.264 is recommended for optimal performance.`);
-                }
-                if (!this.isAudioDisabled() && streamSetup.audioCodecType && streamSetup.audioCodecType !== 'AAC') {
-                    this.log.a(`This camera is configured for ${streamSetup.audioCodecType} on the main channel. Configuring it for AAC is recommended for optimal performance.`);
-                }
-                break;
-            }
-            catch (e) {
-                await sleep(60000);
-            }
-        }
-    })();
-
     constructor(nativeId: string, provider: RtspProvider) {
         super(nativeId, provider);
 
@@ -341,25 +322,35 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
         const socket = this.cp.stdio[3] as Readable;
 
         (async () => {
-            const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/audioData`;
-            this.console.log('posting audio data to', url);
-
-            // seems the dahua doorbells preferred 1024 chunks. should investigate adts
-            // parsing and sending multipart chunks instead.
             const passthrough = new PassThrough();
-            this.getClient().digestAuth.request({
-                httpsAgent: hikvisionHttpsAgent,
-                method: 'PUT',
-                url,
-                headers: {
-                    'Content-Type': 'Audio/G.711Mu',
-                    // 'Connection': 'close',
-                    // 'Content-Length': '9999999'
-                },
-                data: passthrough,
-            });
 
             try {
+                const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/open`;
+                const {data} = await this.getClient().digestAuth.request({
+                    httpsAgent: hikvisionHttpsAgent,
+                    method: 'PUT',
+                    url: open,
+                });
+                this.console.log('two way audio opened', data);
+
+                const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/audioData`;
+                this.console.log('posting audio data to', url);
+    
+                // seems the dahua doorbells preferred 1024 chunks. should investigate adts
+                // parsing and sending multipart chunks instead.
+                this.getClient().digestAuth.request({
+                    httpsAgent: hikvisionHttpsAgent,
+                    method: 'PUT',
+                    url,
+                    headers: {
+                        'Content-Type': 'application/octet-stream',
+                        // 'Connection': 'close',
+                        'Content-Length': '0'
+                    },
+                    data: passthrough,
+                });
+
+
                 while (true) {
                     const data = await readLength(socket, 1024);
                     passthrough.push(data);

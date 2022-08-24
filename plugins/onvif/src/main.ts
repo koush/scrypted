@@ -34,6 +34,24 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
     rtspMediaStreamOptions: Promise<UrlMediaStreamOptions[]>;
     intercom = new OnvifIntercom(this);
 
+    constructor(nativeId: string, provider: RtspProvider) {
+        super(nativeId, provider);
+
+        this.updateManagementUrl();
+    }
+
+    updateManagementUrl() {
+        const ip = this.storage.getItem('ip');
+        if (!ip)
+            return;
+        const info = this.info || {};
+        const managementUrl = `http://${ip}`;
+        if (info.managementUrl !== managementUrl) {
+            info.managementUrl = managementUrl;
+            this.info = info;
+        }
+    }
+
     getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject> {
         throw new Error("Method not implemented.");
     }
@@ -167,8 +185,6 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
         this.console.log('listening events');
         const events = client.listenEvents();
         events.on('event', (event, className) => {
-            ret.emit('data', ...arguments);
-
             if (event === OnvifEvent.MotionBuggy) {
                 this.motionDetected = true;
                 clearTimeout(motionTimeout);
@@ -307,6 +323,8 @@ class OnvifCamera extends RtspSmartCamera implements ObjectDetector, Intercom {
     async putSetting(key: string, value: string) {
         this.client = undefined;
         this.rtspMediaStreamOptions = undefined;
+
+        this.updateManagementUrl();
 
         if (key !== 'onvifDoorbell' && key !== 'onvifTwoWay')
             return super.putSetting(key, value);

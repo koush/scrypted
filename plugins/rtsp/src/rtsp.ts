@@ -270,7 +270,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 key: 'debug',
                 title: 'Debug Events',
                 description: "Log all events to the console. This will be very noisy and should not be left enabled.",
-                value: !!this.storage.getItem('debug'),
+                value: this.storage.getItem('debug') === 'true',
                 type: 'boolean',
             }
         )
