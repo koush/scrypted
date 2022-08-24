@@ -15,16 +15,3 @@ Once you have retreived both the `Access Id` and `Access Key` from the project, 
 ## TODOs
 - Fix 2-way talk for supported platforms (Can only work with WebRTC since we only get one stream with RTSPS)
 - Add support for camera doorbells (Just need to implement doorbell notification)
-
-## npm commands
-- npm run scrypted-webpack
-- npm run scrypted-deploy
-- npm run scrypted-debug
-
-## scrypted distribution via npm
-1. Ensure package.json is set up properly for publishing on npm. 
-2. npm publish
-
-## Visual Studio Code configuration
-- If using a remote server, edit .vscode/settings.json to specify the IP Address of the Scrypted server.
-- Launch Scrypted Debugger from the launch menu.

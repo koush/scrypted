@@ -3,7 +3,7 @@ import sdk from '@scrypted/sdk';
 import { TuyaController } from "./main";
 import { TuyaDeviceConfig } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
-const { deviceManager, mediaManager, systemManager } = sdk;
+const { deviceManager } = sdk;
 
 export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
     constructor(
@@ -48,6 +48,7 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
 export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff {
     cameraLight?: TuyaCameraLight
     private previousMotion?: any;
+    private motionTimeout?: NodeJS.Timeout;
 
     constructor(
         public controller: TuyaController,
@@ -102,8 +103,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     async getVideoStream(
         options?: MediaStreamOptions
     ): Promise<MediaObject> {
-        const vsos = await this.getVideoStreamOptions();
-        const vso = vsos.find(find => find.id === options.id) || vsos[0];
+        const vso = (await this.getVideoStreamOptions())[0];
 
         // Always create new rtsp since it can only be used once and we only have 30 seconds before we can
         // use it.
@@ -159,16 +159,27 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     // so set a timeout ourselves to reset the state.
 
     triggerBinaryState() {
-        this.binaryState = true;
-        setTimeout(() => this.binaryState = false, 10000);
+        // TODO: Implement doorbell chime
+        // this.binaryState = true;
+        // setTimeout(() => this.binaryState = false, 10000);
     }
 
-    // most cameras have have motion and doorbell press events, but dont notify when the event ends.
-    // so set a timeout ourselves to reset the state.
+    // This will trigger a motion detected alert if it has no timeout. If there is a timeout, then
+    // it will restart the timeout in order to turn off motion detected
 
     triggerMotion() {
-        this.motionDetected = true;
-        setTimeout(() => this.motionDetected = false, 10000);
+        const timeoutCallback = () => {
+            this.motionDetected = false;
+            this.motionTimeout = undefined;
+        }
+        if (!this.motionTimeout) {
+            this.motionTimeout = setTimeout(timeoutCallback, 10 * 1000)
+            this.motionDetected = true;
+        } else {
+            // Cancel the timeout and start again.
+            clearTimeout(this.motionTimeout);
+            this.motionTimeout = setTimeout(timeoutCallback, 10 * 1000);
+        }
     }
 
     findCamera() {
