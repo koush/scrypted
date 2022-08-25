@@ -98,6 +98,7 @@ class ScryptedInterface(Enum):
     HumiditySensor = "HumiditySensor"
     HumiditySetting = "HumiditySetting"
     Intercom = "Intercom"
+    LauncherApplication = "LauncherApplication"
     Lock = "Lock"
     LuminanceSensor = "LuminanceSensor"
     MediaPlayer = "MediaPlayer"
@@ -362,6 +363,12 @@ class HumiditySettingStatus(TypedDict):
     dehumidifierSetpoint: float
     humidifierSetpoint: float
     mode: HumidityMode
+    pass
+
+class LauncherApplicationInfo(TypedDict):
+    description: str
+    icon: str
+    name: str
     pass
 
 class Logger(TypedDict):
@@ -742,6 +749,10 @@ class Intercom:
         pass
     async def stopIntercom(self) -> None:
         pass
+    pass
+
+class LauncherApplication:
+    applicationInfo: LauncherApplicationInfo
     pass
 
 class Lock:
@@ -1218,6 +1229,7 @@ class ScryptedInterfaceProperty(Enum):
     airQuality = "airQuality"
     humiditySetting = "humiditySetting"
     fan = "fan"
+    applicationInfo = "applicationInfo"
 
 class DeviceState:
     def getScryptedProperty(self, property: str) -> Any:
@@ -1616,6 +1628,13 @@ class DeviceState:
     @fan.setter
     def fan(self, value: FanStatus):
         self.setScryptedProperty("fan", value)
+
+    @property
+    def applicationInfo(self) -> LauncherApplicationInfo:
+        return self.getScryptedProperty("applicationInfo")
+    @applicationInfo.setter
+    def applicationInfo(self, value: LauncherApplicationInfo):
+        self.setScryptedProperty("applicationInfo", value)
 
 ScryptedInterfaceDescriptors = {
   "ScryptedDevice": {
@@ -2206,6 +2225,13 @@ ScryptedInterfaceDescriptors = {
       "createRTCSignalingSession"
     ],
     "properties": []
+  },
+  "LauncherApplication": {
+    "name": "LauncherApplication",
+    "methods": [],
+    "properties": [
+      "applicationInfo"
+    ]
   }
 }
 

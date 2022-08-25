@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ScryptedMimeTypes = exports.ScryptedInterface = exports.MediaPlayerState = exports.SecuritySystemObstruction = exports.SecuritySystemMode = exports.AirQuality = exports.LockState = exports.ThermostatMode = exports.TemperatureUnit = exports.FanMode = exports.HumidityMode = exports.ScryptedDeviceType = exports.ScryptedInterfaceDescriptors = exports.ScryptedInterfaceProperty = exports.DeviceBase = exports.TYPES_VERSION = void 0;
-exports.TYPES_VERSION = "0.0.85";
+exports.TYPES_VERSION = "0.0.86";
 class DeviceBase {
 }
 exports.DeviceBase = DeviceBase;
@@ -63,6 +63,7 @@ var ScryptedInterfaceProperty;
     ScryptedInterfaceProperty["airQuality"] = "airQuality";
     ScryptedInterfaceProperty["humiditySetting"] = "humiditySetting";
     ScryptedInterfaceProperty["fan"] = "fan";
+    ScryptedInterfaceProperty["applicationInfo"] = "applicationInfo";
 })(ScryptedInterfaceProperty = exports.ScryptedInterfaceProperty || (exports.ScryptedInterfaceProperty = {}));
 exports.ScryptedInterfaceDescriptors = {
     ScryptedDevice: {
@@ -653,6 +654,13 @@ exports.ScryptedInterfaceDescriptors = {
             'createRTCSignalingSession'
         ],
         properties: []
+    },
+    LauncherApplication: {
+        name: 'LauncherApplication',
+        methods: [],
+        properties: [
+            'applicationInfo'
+        ]
     }
 };
 var ScryptedDeviceType;
@@ -836,6 +844,7 @@ var ScryptedInterface;
     ScryptedInterface["Fan"] = "Fan";
     ScryptedInterface["RTCSignalingChannel"] = "RTCSignalingChannel";
     ScryptedInterface["RTCSignalingClient"] = "RTCSignalingClient";
+    ScryptedInterface["LauncherApplication"] = "LauncherApplication";
 })(ScryptedInterface = exports.ScryptedInterface || (exports.ScryptedInterface = {}));
 var ScryptedMimeTypes;
 (function (ScryptedMimeTypes) {

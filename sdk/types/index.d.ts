@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.85";
+export declare const TYPES_VERSION = "0.0.86";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -57,6 +57,7 @@ export interface DeviceState {
     airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
+    applicationInfo?: LauncherApplicationInfo;
 }
 export declare class DeviceBase implements DeviceState {
     id?: string;
@@ -115,6 +116,7 @@ export declare class DeviceBase implements DeviceState {
     airQuality?: AirQuality;
     humiditySetting?: HumiditySettingStatus;
     fan?: FanStatus;
+    applicationInfo?: LauncherApplicationInfo;
 }
 export declare enum ScryptedInterfaceProperty {
     id = "id",
@@ -172,7 +174,8 @@ export declare enum ScryptedInterfaceProperty {
     co2ppm = "co2ppm",
     airQuality = "airQuality",
     humiditySetting = "humiditySetting",
-    fan = "fan"
+    fan = "fan",
+    applicationInfo = "applicationInfo"
 }
 export declare const ScryptedInterfaceDescriptors: {
     [scryptedInterface: string]: ScryptedInterfaceDescriptor;
@@ -1501,6 +1504,17 @@ export interface Setting {
     multiple?: boolean;
     value?: SettingValue;
 }
+export interface LauncherApplicationInfo {
+    name?: string;
+    /**
+     * Supports: mdi-icon, fa-icon, urls.
+     */
+    icon?: string;
+    description?: string;
+}
+export interface LauncherApplication {
+    applicationInfo?: LauncherApplicationInfo;
+}
 export declare enum ScryptedInterface {
     ScryptedDevice = "ScryptedDevice",
     ScryptedPlugin = "ScryptedPlugin",
@@ -1571,7 +1585,8 @@ export declare enum ScryptedInterface {
     HumiditySetting = "HumiditySetting",
     Fan = "Fan",
     RTCSignalingChannel = "RTCSignalingChannel",
-    RTCSignalingClient = "RTCSignalingClient"
+    RTCSignalingClient = "RTCSignalingClient",
+    LauncherApplication = "LauncherApplication"
 }
 export declare type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
 export interface RTCSignalingSession {

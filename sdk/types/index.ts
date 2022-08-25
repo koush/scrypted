@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.85";
+export const TYPES_VERSION = "0.0.86";
 
 
 export interface DeviceState {
@@ -59,6 +59,7 @@ export interface DeviceState {
   airQuality?: AirQuality
   humiditySetting?: HumiditySettingStatus
   fan?: FanStatus
+  applicationInfo?: LauncherApplicationInfo
 }
 
 export class DeviceBase implements DeviceState {
@@ -118,6 +119,7 @@ export class DeviceBase implements DeviceState {
   airQuality?: AirQuality
   humiditySetting?: HumiditySettingStatus
   fan?: FanStatus
+  applicationInfo?: LauncherApplicationInfo
 }
 
 
@@ -178,6 +180,7 @@ export enum ScryptedInterfaceProperty {
   airQuality = "airQuality",
   humiditySetting = "humiditySetting",
   fan = "fan",
+  applicationInfo = "applicationInfo",
 
 }
 
@@ -771,6 +774,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       'createRTCSignalingSession'
     ],
     properties: []
+  },
+  LauncherApplication: {
+    name: 'LauncherApplication',
+    methods: [],
+    properties: [
+      'applicationInfo'
+    ]
   }
 }
 
@@ -2244,6 +2254,19 @@ export interface Setting {
   value?: SettingValue;
 }
 
+export interface LauncherApplicationInfo {
+  name?: string;
+  /**
+   * Supports: mdi-icon, fa-icon, urls.
+   */
+  icon?: string;
+  description?: string;
+}
+
+export interface LauncherApplication {
+  applicationInfo?: LauncherApplicationInfo;
+}
+
 export enum ScryptedInterface {
   ScryptedDevice = "ScryptedDevice",
   ScryptedPlugin = "ScryptedPlugin",
@@ -2315,6 +2338,7 @@ export enum ScryptedInterface {
   Fan = "Fan",
   RTCSignalingChannel = "RTCSignalingChannel",
   RTCSignalingClient = "RTCSignalingClient",
+  LauncherApplication = "LauncherApplication",
 }
 
 export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;

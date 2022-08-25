@@ -1468,6 +1468,19 @@ export interface Setting {
   value?: SettingValue;
 }
 
+export interface LauncherApplicationInfo {
+  name?: string;
+  /**
+   * Supports: mdi-icon, fa-icon, urls.
+   */
+  icon?: string;
+  description?: string;
+}
+
+export interface LauncherApplication {
+  applicationInfo?: LauncherApplicationInfo;
+}
+
 export enum ScryptedInterface {
   ScryptedDevice = "ScryptedDevice",
   ScryptedPlugin = "ScryptedPlugin",
@@ -1539,6 +1552,7 @@ export enum ScryptedInterface {
   Fan = "Fan",
   RTCSignalingChannel = "RTCSignalingChannel",
   RTCSignalingClient = "RTCSignalingClient",
+  LauncherApplication = "LauncherApplication",
 }
 
 export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
