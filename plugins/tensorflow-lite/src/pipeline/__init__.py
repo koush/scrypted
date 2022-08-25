@@ -69,10 +69,11 @@ class GstPipelineBase:
         # Run pipeline.
         self.gst.set_state(Gst.State.PLAYING)
 
-        await self.run_attached()
-
-        # Clean up.
-        self.gst.set_state(Gst.State.NULL)
+        try:
+            await self.run_attached()
+        finally:
+            # Clean up.
+            self.gst.set_state(Gst.State.NULL)
 
 class GstPipeline(GstPipelineBase):
     def __init__(self, loop: AbstractEventLoop, finished: Future, appsink_name: str, user_function, crop = False):
