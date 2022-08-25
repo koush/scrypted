@@ -145,6 +145,9 @@ export class TuyaCloud {
         body: { [k: string]: any } = {}
     ): Promise<TuyaResponse<T>> {
         await this.refreshAccessTokenIfNeeded();
+        if (!this.session) {
+            throw new Error(`Token session not available for TuyaCloud.`);
+        }
 
         const timestamp = Date.now().toString();
         const headers = { client_id: this.clientId };

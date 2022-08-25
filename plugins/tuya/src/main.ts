@@ -11,8 +11,8 @@ import { TuyaPulsar, TuyaPulsarMessage } from './tuya/pulsar';
 const { deviceManager } = sdk;
 
 export class TuyaController extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
-    api: TuyaCloud;
-    pulsar: TuyaPulsar;
+    cloud?: TuyaCloud;
+    pulsar?: TuyaPulsar;
     cameras: Map<string, TuyaCamera> = new Map();
 
     settingsStorage = new StorageSettings(this, {
@@ -61,20 +61,18 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
             throw new Error('User Id, access Id, access key, and country info are missing.');
         }
 
-        this.api = new TuyaCloud(
+        this.cloud = new TuyaCloud(
             userId,
             accessId,
             accessKey,
             country
         );
 
-        const success = await this.api.login();
+        const success = await this.cloud.login();
 
         if (!success) {
             this.log.e("Failed to log in with credentials.");
-            this.api = undefined;
-            this.pulsar?.stop();
-            this.pulsar = undefined;
+            this.cloud = undefined;
             throw new Error("Failed to log in with credentials, please check if everything is correct.");
         }
 
@@ -89,7 +87,7 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
         });
 
         this.pulsar.message((ws, message) => {
-            this.pulsar.ackMessage(message.messageId);
+            this.pulsar?.ackMessage(message.messageId);
             this.log.i(`TuyaPulse: message received: ${message}`);
             const tuyaDevice = handleMessage(message);
             if (!tuyaDevice)
@@ -115,21 +113,15 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
             const data = message.payload.data;
             const { devId, productKey } = data;
 
-            const device = this.api.cameras?.find(c => c.id === devId);
-
-            let returnDevice = false;
+            const device = this.cloud?.cameras?.find(c => c.id === devId);
 
             if (data.bizCode) {
-                if (!device && data.bizCode !== 'add') {
-                    return;
-                }
-
-                if (data.bizCode === 'online' || data.bizCode === 'offline') {
+                if (device && (data.bizCode === 'online' || data.bizCode === 'offline')) {
                     // Device status changed
                     const isOnline = data.bizCode === 'online';
                     device.online = isOnline;
-                    returnDevice = true;
-                } else if (data.bizCode === 'delete') {
+                    return this.cameras.get(devId);
+                } else if (device && data.bizCode === 'delete') {
                     // Device needs to be deleted
                     // - devId
                     // - uid
@@ -152,10 +144,6 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
                     }
                 });
 
-                returnDevice = true;
-            }    
-
-            if (returnDevice) {
                 return this.cameras.get(devId);
             }
         }
@@ -175,7 +163,13 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
         this.log.clearAlerts();
         this.log.a("Successsfully logged in with credentials! Now discovering devices.");
 
-        if (!await this.api.fetchDevices()) {
+        const cloud = this.cloud;
+
+        if (!cloud) {
+            throw new Error("There was an error: TuyaCloud not initialized");
+        }
+
+        if (!await cloud.fetchDevices()) {
             this.log.e("Could not fetch devices.");
             throw new Error("There was an error fetching devices.");
         }
@@ -184,7 +178,7 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
 
         // Camera Setup
 
-        for (const camera of this.api.cameras || []) {
+        for (const camera of cloud.cameras || []) {
             const nativeId = camera.id;
 
             const device: Device = {
@@ -200,7 +194,7 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
                     ? ScryptedDeviceType.Doorbell
                     : ScryptedDeviceType.Camera,
                 interfaces: [
-                    ScryptedInterface.VideoCamera,
+                    ScryptedInterface.VideoCamera
                 ]
             };
 
@@ -230,15 +224,9 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
             devices
         });
 
-        // Update devices with new state
-
-        for (const device of devices) {
-            this.getDevice(device.nativeId).then(device => device?.updateState());
-        }
-
         // Handle any camera device that have a light switch
 
-        for (const camera of this.api.cameras) {
+        for (const camera of cloud.cameras || []) {
             if (!TuyaDevice.hasLightSwitch(camera)) {
                 continue;
             }
@@ -263,14 +251,20 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
                 devices: [device]
             });
         }
+
+         // Update devices with new state
+
+        for (const device of devices) {
+            await this.getDevice(device.nativeId).then(device => device?.updateState());
+        }
     }
 
-    async getDevice(nativeId: string): Promise<TuyaCamera> {
+    async getDevice(nativeId: string) {
         if (this.cameras.has(nativeId)) {
             return this.cameras.get(nativeId);
         }
 
-        const camera = this.api.cameras.find(camera => camera.id === nativeId);
+        const camera = this.cloud?.cameras?.find(camera => camera.id === nativeId);
         if (camera) {
             const ret = new TuyaCamera(this, nativeId, camera);
             this.cameras.set(nativeId, ret);
