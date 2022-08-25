@@ -366,6 +366,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         }
 
         const ret: ScryptedClientStatic = {
+            pluginRemoteAPI: undefined,
             connectionType,
             version,
             systemManager,
