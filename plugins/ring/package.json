@@ -41,5 +41,5 @@
    "optionalDependencies": {
       "got": "11.8.2"
    },
-   "version": "0.0.82"
+   "version": "0.0.83"
 }
