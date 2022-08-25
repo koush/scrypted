@@ -43,5 +43,5 @@
       "@types/uuid": "^8.3.4",
       "@types/ws": "^8.5.3"
    },
-   "version": "0.0.3"
+   "version": "0.0.4"
 }
