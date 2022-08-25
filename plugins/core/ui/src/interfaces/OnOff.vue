@@ -5,7 +5,7 @@
     inset
     :label="device ? undefined : label"
     v-model="lazyValue.on"
-    :color="device ? 'white' : 'indigo'"
+    color="info"
     @click.self="onClick"
     @change="onChange"
   ></v-switch>

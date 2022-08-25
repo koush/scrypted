@@ -182,7 +182,6 @@ export default {
     return {
       updateAvailable: null,
       actives: {},
-      // components: [],
       builtinComponents: [
               {
             id: "plugin",
@@ -190,13 +189,6 @@ export default {
             icon: "fa-puzzle-piece",
             path: '/component/plugin',
         },
-        // {
-        //   id: "dashboard",
-        //   name: "Dashboard",
-        //   icon: "fa-tachometer-alt",
-        //   path: "/",
-        //   active: false,
-        // },
         {
           id: "devices",
           name: "Devices",

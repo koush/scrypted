@@ -7,7 +7,7 @@ import './plugins/maps';
 import './plugins/async-computed';
 import './plugins/apexcharts';
 import './plugins/is-mobile';
-import App from './App.vue'
+import Launcher from './Launcher.vue'
 import './registerServiceWorker'
 
 // STYLES
@@ -19,6 +19,6 @@ Vue.directive('linkified', require('vue-linkify'))
 Vue.config.productionTip = false
 
 new Vue({
-  render: h => h(App),
+  render: h => h(Launcher),
   vuetify,
 }).$mount('#app')

@@ -10,7 +10,6 @@ import InstallPlugin from "./components/plugin/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";
 import SettingsComponent from "./components/builtin/SettingsComponent.vue";
 import ShellComponent from "./components/builtin/ShellComponent.vue";
-import Dashboard from "./components/dashboard/Dashboard.vue";
 
 let router = new VueRouter({
     routes: [
@@ -18,14 +17,6 @@ let router = new VueRouter({
         path: "/device",
         component: Devices
       },
-      // {
-      //   path: "/",
-      //   component: Devices
-      // },
-      // {
-      //   path: "/",
-      //   component: Dashboard
-      // },
       {
         path: "/",
         redirect: '/component/plugin',
@@ -72,5 +63,6 @@ let router = new VueRouter({
       }
     ]
   });
-  
+
   export default router;
+  

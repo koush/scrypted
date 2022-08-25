@@ -3,7 +3,7 @@ import Vue from 'vue';
 import VueFeather from 'vue-feather';
 Vue.use(VueFeather);
 
-import { library } from '@fortawesome/fontawesome-svg-core'
+import { IconDefinition, library } from '@fortawesome/fontawesome-svg-core'
 import {
   faQuestion,
   faServer,
@@ -81,6 +81,7 @@ import {
   faCalendarAlt,
   faShieldAlt,
   faWrench,
+  faVideoCamera,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -88,7 +89,7 @@ import {
   faGithub,
 } from '@fortawesome/free-brands-svg-icons'
 
-const icons =[
+const icons: IconDefinition[] =[
   faHistory,
   faQuestion,
   faServer,
@@ -168,6 +169,7 @@ const icons =[
   faCalendarAlt,
   faShieldAlt,
   faWrench,
+  faVideoCamera,
 ];
 
 for (var icon in icons) {

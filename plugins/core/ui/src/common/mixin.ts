@@ -14,16 +14,16 @@ export async function setMixin(systemManager: SystemManager, device: ScryptedDev
     plugins.setMixins(device.id, mixins);
 }
 
-function getAllDevices<T>(systemManager: SystemManager) {
-    return Object.keys(systemManager.getSystemState()).map(id => systemManager.getDeviceById<T>(id)).filter(device => !!device);
+export function getAllDevices(systemManager: SystemManager) {
+    return Object.keys(systemManager.getSystemState()).map(id => systemManager.getDeviceById(id)).filter(device => !!device);
 }
 
 export async function getDeviceAvailableMixins(systemManager: SystemManager, device: ScryptedDevice): Promise<(ScryptedDevice & MixinProvider)[]> {
-    const results = await Promise.all(getAllDevices<MixinProvider>(systemManager).map(async (check) => {
+    const results = await Promise.all(getAllDevices(systemManager).map(async (check) => {
         try {
             if (check.interfaces.includes(ScryptedInterface.MixinProvider)) {
-                if (await check.canMixin(device.type, device.interfaces))
-                    return check;
+                if (await (check as any as MixinProvider).canMixin(device.type, device.interfaces))
+                    return check as MixinProvider & ScryptedDevice;
             }
         }
         catch (e) {

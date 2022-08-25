@@ -5,8 +5,8 @@
     <v-app-bar app clipped-left>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
 
-      <v-toolbar-title class="headline text-uppercase">
-        <span>{{ title }}</span>
+      <v-toolbar-title class="headline text-uppercase" >
+        <span style="cursor: pointer" @click="goHome">{{ title }}</span>
       </v-toolbar-title>
       <v-spacer></v-spacer>
       <v-menu left bottom>
@@ -122,92 +122,12 @@
       </v-menu>
     </v-app-bar>
 
-    <v-dialog
+    <Login
       v-if="$store.state.isLoggedIn === false"
-      :value="true"
-      persistent
-      max-width="600px"
     >
-      <v-form @submit.prevent="doLogin">
-        <v-card>
-          <v-toolbar dark dense color="deep-purple accent-4">
-            Scrypted Management Console
-          </v-toolbar>
-          <v-card-text>
-            <v-container grid-list-md>
-              <v-layout wrap>
-                <v-flex xs12>
-                  <v-text-field
-                    dense
-                    outlined
-                    v-model="username"
-                    label="User Name"
-                  ></v-text-field>
-                  <v-text-field
-                    dense
-                    outlined
-                    v-model="password"
-                    type="password"
-                    label="Password"
-                  ></v-text-field>
-                  <v-checkbox
-                    dense
-                    v-if="$store.state.hasLogin === true"
-                    v-model="changePassword"
-                    label="Change Password"
-                  ></v-checkbox>
-                  <v-text-field
-                    dense
-                    v-model="newPassword"
-                    v-if="changePassword"
-                    type="password"
-                    label="New Password"
-                  ></v-text-field>
-                  <v-text-field
-                    dense
-                    v-model="confirmPassword"
-                    v-if="changePassword || $store.state.hasLogin === false"
-                    type="password"
-                    label="Confirm Password"
-                    :rules="[
-                      (
-                        changePassword
-                          ? confirmPassword !== newPassword
-                          : confirmPassword !== password
-                      )
-                        ? 'Passwords do not match.'
-                        : true,
-                    ]"
-                  ></v-text-field>
-                </v-flex>
-              </v-layout>
-              <div v-if="loginResult">{{ loginResult }}</div>
-            </v-container>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn type="submit" text @click.prevent="doLogin">Log In</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-form>
-    </v-dialog>
-    <v-dialog
-      v-else-if="$store.state.isConnected === false"
-      :value="true"
-      persistent
-      max-width="600px"
-    >
-      <v-card dark color="purple">
-        <v-card-title>
-          <span class="headline">Scrypted Management Console</span>
-        </v-card-title>
-        <v-card-text></v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn text @click="reconnect">Reconnect</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    </Login>
+    <Reconnect v-else-if="$store.state.isConnected === false" ></Reconnect>
+
 
     <v-main elevation="-2">
       <v-container
@@ -227,22 +147,20 @@
 </template>
 
 <script>
-import qs from "query-string";
 import axios from "axios";
-
 import Drawer from "./components/Drawer.vue";
 import { removeAlert, getAlertIcon } from "./components/helpers";
 import router from "./router";
-
-import Vue from "vue";
+import Login from "./Login.vue";
+import Reconnect from "./Reconnect.vue";
 import store from "./store";
-import "./client";
-import { loginScrypted } from './client';
 
 export default {
   name: "App",
   components: {
     Drawer,
+    Login,
+    Reconnect,
   },
   mounted() {
     if (this.darkMode) this.$vuetify.theme.dark = true;
@@ -257,62 +175,19 @@ export default {
     clearInterval(this._timer);
   },
   methods: {
+    goHome() {
+      window.location ='/';
+    },
     toggleDarkMode() {
       this.darkMode = !this.darkMode;
       this.$vuetify.theme.dark = this.darkMode;
       localStorage.setItem("darkMode", this.darkMode.toString());
-    },
-    reconnect() {
-      this.$connectScrypted().catch((e) => (this.loginResult = e.toString()));
     },
     reload() {
       window.location.reload();
     },
     logout() {
       axios.get("/logout").then(() => window.location.reload());
-    },
-    doLogin() {
-      const body = {
-        username: this.username,
-        password: this.password,
-      };
-      if (this.changePassword || this.$store.state.hasLogin === false) {
-        if (
-          this.$store.state.hasLogin === false &&
-          this.password !== this.confirmPassword
-        ) {
-          this.loginResult = "Passwords do not match.";
-          return;
-        } else if (
-          this.changePassword &&
-          this.newPassword !== this.confirmPassword
-        ) {
-          this.loginResult = "Passwords do not match.";
-          return;
-        }
-        body.change_password = this.confirmPassword;
-      }
-
-      this.loginResult = "";
-      loginScrypted(this.username, this.password, this.confirmPassword || undefined)
-        .then((response) => {
-          if (response.error) {
-            this.loginResult = response.error;
-            return;
-          }
-          window.location.reload();
-        })
-        .catch((e) => {
-          this.loginResult = e.toString();
-          // cert may need to be reaccepted? Server is down? Go to the
-          // server root to force the network error to bypass the PWA cache.
-          if (
-            e.toString().includes("Network Error") &&
-            window.location.href.startsWith("https:")
-          ) {
-            window.location = "/";
-          }
-        });
     },
     async clearAlerts() {
       const alerts = await this.$scrypted.systemManager.getComponent("alerts");
@@ -361,29 +236,15 @@ export default {
       next();
     });
   },
-  store,
   router,
+  store,
   data() {
     const self = this;
     return {
-      darkMode: localStorage.getItem("darkMode") !== "false",
+      darkMode: localStorage.getItem("darkMode") === "true",
       now: 0,
       title: "Scrypted",
       drawer: this.$vuetify.breakpoint.lgAndUp,
-      changePassword: false,
-      username: null,
-      password: null,
-      confirmPassword: null,
-      newPassword: null,
-      loginResult: undefined,
-      passwordRules: [
-        () => {
-          if (self.password != self.confirmPassword && self.changePassword) {
-            return "Passwords do not match.";
-          }
-          return true;
-        },
-      ],
     };
   },
 };
