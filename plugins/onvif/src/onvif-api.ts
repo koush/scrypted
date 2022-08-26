@@ -242,7 +242,16 @@ export class OnvifCameraAPI {
             try {
                 const result = await promisify(cb => this.cam.getSnapshotUri({ profileToken }, cb)) as any;
                 const url = result.uri;
-                this.snapshotUrls.set(profileToken, url);
+                try {
+                    const parsedUrl = new URL(url);
+                    // have seen weird behavior where onvif may return the wrong host/port in the url.
+                    parsedUrl.hostname = this.cam.hostname;
+                    parsedUrl.port = this.cam.port || '';
+                    this.snapshotUrls.set(profileToken, parsedUrl.toString());
+                }
+                catch (e) {
+                    this.snapshotUrls.set(profileToken, url);
+                }
             }
             catch (e) {
                 if (e.message && e.message.indexOf('ActionNotSupported') !== -1) {
