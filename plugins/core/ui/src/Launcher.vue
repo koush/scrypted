@@ -10,7 +10,7 @@
                     <v-card width="300px" class="elevation-24">
                         <v-card-title style="justify-content: center;" class="headline text-uppercase">Scrypted
                         </v-card-title>
-                        <v-card-subtitle style="text-align: center;" >{{ $store.state.version }}</v-card-subtitle>
+                        <v-card-subtitle style="text-align: center;">{{ $store.state.version }}</v-card-subtitle>
                         <v-list class="transparent">
                             <v-list-item v-for="application in applications" :key="application.name"
                                 @click="application.click">
@@ -36,6 +36,14 @@
                                 </template>
                                 <span>Discord</span>
                             </v-tooltip>
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon @click="logout">
+                                        <v-icon small>fa-solid fa-arrow-right-from-bracket</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>Log Out</span>
+                            </v-tooltip>
                         </div>
                     </v-card>
                 </div>
@@ -53,6 +61,7 @@ import VueRouter from "vue-router";
 import Reconnect from "./Reconnect.vue";
 import { getAllDevices } from "./common/mixin";
 import { ScryptedInterface } from "@scrypted/types";
+import axios from 'axios';
 
 let router = new VueRouter({
     routes: [
@@ -79,6 +88,9 @@ export default {
         this.refreshApplications();
     },
     methods: {
+        logout() {
+            axios.get("/logout").then(() => window.location.reload());
+        },
         refreshApplications() {
             console.log('check', this.$store.state.isConnected, this.$store.state.isLoggedIn)
             if (!this.$store.state.isConnected || !this.$store.state.isLoggedIn || this.$route.name !== 'Launcher')

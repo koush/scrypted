@@ -1,60 +1,74 @@
 <template>
-    <v-dialog :value="true" persistent max-width="600px">
-        <v-form @submit.prevent="doLogin">
-            <v-card>
-                <v-toolbar dark dense color="deep-purple accent-4">
-                    Scrypted Management Console
-                </v-toolbar>
-                <v-card-text>
-                    <v-container grid-list-md>
-                        <v-layout wrap>
-                            <v-flex xs12>
-                                <v-text-field dense outlined v-model="username" label="User Name"></v-text-field>
-                                <v-text-field dense outlined v-model="password" type="password" label="Password">
-                                </v-text-field>
-                                <v-checkbox dense v-if="$store.state.hasLogin === true" v-model="changePassword"
-                                    label="Change Password"></v-checkbox>
-                                <v-text-field dense outlined v-model="newPassword" v-if="changePassword" type="password"
-                                    label="New Password"></v-text-field>
-                                <v-text-field dense v-model="confirmPassword"
-                                    v-if="changePassword || $store.state.hasLogin === false" type="password"
-                                    label="Confirm Password" :rules="[
-                                        (
-                                            changePassword
-                                                ? confirmPassword !== newPassword
-                                                : confirmPassword !== password
-                                        )
-                                            ? 'Passwords do not match.'
-                                            : true,
-                                    ]"></v-text-field>
-                            </v-flex>
-                        </v-layout>
-                        <div v-if="loginResult">{{ loginResult }}</div>
-                    </v-container>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer></v-spacer>
-                    <v-btn type="submit" text @click.prevent="doLogin">Log In</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-form>
-    </v-dialog>
+  <v-dialog :value="true" persistent max-width="300px">
+    <v-form @submit.prevent="doLogin">
+      <v-card>
+        <v-card-text>
+          <v-card-title style="justify-content: center;" class="headline text-uppercase">Scrypted
+          </v-card-title>
+          <v-container grid-list-md>
+            <v-layout wrap>
+              <v-flex xs12>
+                <v-text-field dense outlined v-model="username" label="User Name"></v-text-field>
+                <v-text-field dense outlined v-model="password" type="password" label="Password">
+                </v-text-field>
+                <v-checkbox dense v-if="$store.state.hasLogin === true" v-model="changePassword"
+                  label="Change Password"></v-checkbox>
+                <v-text-field dense outlined v-model="newPassword" v-if="changePassword" type="password"
+                  label="New Password"></v-text-field>
+                <v-text-field dense outlined v-model="confirmPassword"
+                  v-if="changePassword || $store.state.hasLogin === false" type="password" label="Confirm Password"
+                  :rules="[
+                    (
+                      changePassword
+                        ? confirmPassword !== newPassword
+                        : confirmPassword !== password
+                    )
+                      ? 'Passwords do not match.'
+                      : true,
+                  ]"></v-text-field>
+              </v-flex>
+            </v-layout>
+            <div v-if="loginResult">{{ loginResult }}</div>
+          </v-container>
+        </v-card-text>
+        <v-card-actions>
+          <v-tooltip bottom>
+            <template v-slot:activator="{ on }">
+              <v-btn v-on="on" icon href="https://github.com/koush/scrypted">
+                <v-icon small>fab fa-github</v-icon>
+              </v-btn>
+            </template>
+            <span>Github</span>
+          </v-tooltip>
+          <v-tooltip bottom>
+            <template v-slot:activator="{ on }">
+              <v-btn v-on="on" icon href="https://discord.gg/DcFzmBHYGq">
+                <v-icon small>fab fa-discord</v-icon>
+              </v-btn>
+            </template>
+            <span>Discord</span>
+          </v-tooltip>
+          <v-spacer></v-spacer>
+          <v-btn type="submit" text @click.prevent="doLogin">Log In</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-form>
+  </v-dialog>
 </template>
 <script>
-import axios from "axios";
-import Vue from "vue";
 import store from "./store";
 import "./client";
 import { loginScrypted } from './client';
 
 export default {
-  name: "Launcher",
+  name: "Login",
   methods: {
-    doLogin() {
+    async doLogin() {
       const body = {
         username: this.username,
         password: this.password,
       };
+
       if (this.changePassword || this.$store.state.hasLogin === false) {
         if (
           this.$store.state.hasLogin === false &&
@@ -73,25 +87,36 @@ export default {
       }
 
       this.loginResult = "";
-      loginScrypted(this.username, this.password, this.confirmPassword || undefined)
-        .then((response) => {
-          if (response.error) {
-            this.loginResult = response.error;
+      try {
+        const response = await loginScrypted(this.username, this.password, this.confirmPassword || undefined);
+        if (response.error) {
+          this.loginResult = response.error;
+          return;
+        }
+        try {
+          const redirect_uri = new URL(window.location).searchParams.get('redirect_uri'); 
+          if (redirect_uri) {
+            window.location = redirect_uri;
             return;
           }
-          window.location.reload();
-        })
-        .catch((e) => {
-          this.loginResult = e.toString();
-          // cert may need to be reaccepted? Server is down? Go to the
-          // server root to force the network error to bypass the PWA cache.
-          if (
-            e.toString().includes("Network Error") &&
-            window.location.href.startsWith("https:")
-          ) {
-            window.location = "/";
-          }
-        });
+
+        }
+        catch (e) {
+
+        }
+        window.location.reload();
+      }
+      catch (e) {
+        this.loginResult = e.toString();
+        // cert may need to be reaccepted? Server is down? Go to the
+        // server root to force the network error to bypass the PWA cache.
+        if (
+          e.toString().includes("Network Error") &&
+          window.location.href.startsWith("https:")
+        ) {
+          window.location = "/";
+        }
+      }
     },
   },
   store,
