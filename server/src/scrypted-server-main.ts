@@ -404,7 +404,12 @@ async function start() {
 
     app.get('/logout', (req, res) => {
         res.clearCookie(getLoginUserToken(req.secure));
-        res.send({});
+        if (req.headers['accept']?.startsWith('application/json')) {
+            res.send({});
+        }
+        else {
+            res.redirect('/endpoint/@scrypted/core/public/');
+        }
     });
 
     let hasLogin = await db.getCount(ScryptedUser) > 0;
