@@ -97,6 +97,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
 
     return {
+        error: response.data.error as string,
         authorization: response.data.authorization as string,
         username: response.data.username as string,
         expiration: response.data.expiration as number,
@@ -104,6 +105,22 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
         addresses: response.data.addresses as string[],
         scryptedCloud,
     };
+}
+
+export class ScryptedClientLoginError extends Error {
+    constructor(public result: Awaited<ReturnType<typeof checkScryptedClientLogin>>) {
+        super(result.error);
+    }
+}
+
+export function redirectScryptedLogin(baseUrl?: string) {
+    baseUrl = baseUrl || '';
+    window.location.href = `${baseUrl}/endpoint/@scrypted/core/public/?redirect_uri=${encodeURIComponent(window.location.href)}`;
+}
+
+export async function redirectScryptedLogout(baseUrl?: string) {
+    baseUrl = baseUrl || '';
+    window.location.href = `${baseUrl}/logout`;
 }
 
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
@@ -124,6 +141,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         const loginCheck = await checkScryptedClientLogin({
             baseUrl,
         });
+        if (loginCheck.error)
+            throw new ScryptedClientLoginError(loginCheck);
         addresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
     }
