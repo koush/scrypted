@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.87";
+export const TYPES_VERSION = "0.0.88";
 
 
 export interface DeviceState {
@@ -2401,7 +2401,7 @@ export interface RTCMediaObjectTrack {
 }
 
 export interface RTCConnectionManagement {
-  negotiateRTCSignalingSession(serverOffer?: boolean): Promise<void>;
+  negotiateRTCSignalingSession(): Promise<void>;
   addTrack(mediaObject: MediaObject, options?: {
     videoMid?: string,
     audioMid?: string,
