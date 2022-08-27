@@ -1,0 +1,4 @@
+#!/bin/bash
+
+echo "Starting dbus..."
+exec dbus-daemon --system --nofork

@@ -21,22 +21,30 @@ RUN() {
     fi
 }
 
-FROM() {
-    echo 'Installing nodejs repo'
-    RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-    RUN apt-get update
-    RUN apt-get install -y nodejs
+# The Dockefile.common contains an S6 overlay that should not be installed.
+# Do not run anything until the ENTRYPOINT directive is sent.
+ENTRYPOINT() {
+    ALLOW_RUN=1
 }
 
+COPY() {
+    echo "ignoring COPY $1"
+}
+
+FROM() {
+    echo "ignoring FROM $1"
+}
+
+# process ARG for script variables but ignore ENV
 ARG() {
-    echo "ignoring ARG $1"
+    export $@
 }
 
 ENV() {
     echo "ignoring ENV $1"
 }
 
-source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/Dockerfile.common)
+source <(curl -s https://raw.githubusercontent.com/koush/scrypted/avahi/docker/template/Dockerfile.common.header)
 
 if [ -z "$SERVICE_USER" ]
 then
@@ -49,7 +57,6 @@ then
     echo "Scrypted SERVICE_USER root is not allowed."
     exit 1
 fi
-
 
 # this is not RUN as we do not care about the result
 echo "Setting permissions on /home/$SERVICE_USER/.scrypted"
