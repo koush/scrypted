@@ -51,22 +51,37 @@ export interface RTSPToken {
 
 export interface MQTTConfig {
     url: string;
-    client_id: string;
     username: string;
     password: string;
+    client_id: string;
     source_topic: string;
     sink_topic: string;
     expire_topic: string;
 }
 
-// From Unify Protect Api:
-// This type declaration make all properties optional recursively including nested objects. This should
-// only be used on JSON objects only. Otherwise...you're going to end up with class methods marked as
-// optional as well. Credit for this belongs to: https://github.com/joonhocho/tsdef. #Grateful
-// export type DeepPartial<T> = {
-//     [P in keyof T]?: T[P] extends Array<infer I> ? Array<DeepPartial<I>> : DeepPartial<T[P]>
-// };
+export interface WebRTCDeviceConfig {
+    audio_attributes: AudioAttributes;
+    auth: string;
+    id: string;
+    moto_id: string;
+    p2p_config: P2PConfig;
+    skill: string;
+    supports_webrtc: boolean;
+    vedio_clarity: number;
+}
 
-// export type ProtectTuyaDeviceConfig = Readonly<TuyaDeviceInterface>;
-// export type ProtectTuyaDeviceConfigPartial = DeepPartial<TuyaDeviceInterface>;
-// export type ProtectTuyaDeviceStatus = Readonly<TuyaDeviceStatus>;
+interface AudioAttributes {
+    call_mode: number[];
+    hardware_capability: number[];
+}
+
+interface P2PConfig {
+    ices: Ice[];
+}
+
+interface Ice {
+    urls: string;
+    credential?: string;
+    ttl?: number;
+    username?: string;
+}

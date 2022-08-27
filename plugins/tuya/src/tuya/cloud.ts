@@ -1,7 +1,8 @@
 import { Axios, Method } from "axios";
 import { HmacSHA256, SHA256, lib } from 'crypto-js';
 import { getTuyaCloudEndpoint, TuyaSupportedCountry } from "./utils";
-import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse } from "./const";
+import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse, MQTTConfig, WebRTCDeviceConfig } from "./const";
+import { randomBytes } from "crypto";
 
 interface Session {
     accessToken: string;
@@ -97,7 +98,9 @@ export class TuyaCloud {
 
     // Camera Functions
 
-    public async getRTSPS(camera: TuyaDeviceConfig): Promise<RTSPToken | undefined> {
+    public async getRTSPS(
+        camera: TuyaDeviceConfig
+    ): Promise<RTSPToken | undefined> {
         interface RTSPResponse {
             url: string
         }
@@ -115,6 +118,28 @@ export class TuyaCloud {
         } else {
             return undefined;
         }
+    }
+
+    public async getWebRTConfig(camera: TuyaDeviceConfig) : Promise<TuyaResponse<WebRTCDeviceConfig>> {
+        const response = await this.get<WebRTCDeviceConfig>(
+            `/v1.0/users/${this.userId}/devices/${camera.id}/webrtc-configs`
+        );
+
+        return response;
+    }
+
+    public async getWebRTCMQConfig() : Promise<TuyaResponse<MQTTConfig>> {
+        const response = await this.post<MQTTConfig>(
+            `/v1.0/open-hub/access/config`,
+            {
+                link_id: randomBytes(8).readUInt8(),
+                uid: this.userId,
+                link_type: 'mqtt',
+                topics: 'ipc' 
+            }
+        );
+
+        return response;
     }
 
     public getSessionUserId(): string | undefined {

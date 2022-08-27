@@ -35,6 +35,7 @@
       "@scrypted/sdk": "file:../../sdk",
       "axios": "^0.27.2",
       "crypto-js": "^4.1.1",
+      "mqtt": "^4.3.7",
       "ws": "^8.8.1"
    },
    "devDependencies": {
