@@ -11,7 +11,6 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
         nativeId: string
     ) {
         super(nativeId);
-        this.updateState();
     }
 
     async turnOff(): Promise<void> {
@@ -52,27 +51,32 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
 }
 
 export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff {
-    cameraLight?: TuyaCameraLight
+    private cameraLightSwitch?: TuyaCameraLight
     private previousMotion?: any;
     private motionTimeout?: NodeJS.Timeout;
 
     constructor(
         public controller: TuyaController,
-        nativeId: string,
-        config: TuyaDeviceConfig
+        nativeId: string
     ) {
         super(nativeId);
-        this.updateState(config);
     }
 
-    // Camera Light Provider
+    // Camera Light Device Provider.
 
     getDevice(nativeId: string) {
-        if (!this.cameraLight) {
-            this.cameraLight = new TuyaCameraLight(this, nativeId);
+        // Find created devices
+        if (this.cameraLightSwitch?.id === nativeId) {
+            return this.cameraLightSwitch;
         }
 
-        return this.cameraLight;
+        // Create devices if not found.
+        if (nativeId === this.nativeLightSwitchId) {
+            this.cameraLightSwitch = new TuyaCameraLight(this, nativeId);
+            return this.cameraLightSwitch;
+        }
+
+        throw new Error("This Camera Device Provider has not been implemented of type: " + nativeId.split('-')[1]);
     }
 
     // OnOff Status Indicator
@@ -153,8 +157,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
                     codec: 'pcm_ulaw'
                 },
                 source: 'cloud',
-                tool: 'scrypted',
-                userConfigurable: false
+                tool: 'scrypted'
             }
         ];
     }
@@ -199,24 +202,32 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
             return;
         }
 
-        this.on = TuyaDevice.getStatusIndicator(camera)?.value;
+        this.online = camera.online;
 
-        const hasMotionSwitchStatus = TuyaDevice.getMotionSwitch(camera) !== undefined;
-        if (hasMotionSwitchStatus) {
-            const movementDetectedStatus = TuyaDevice.getMotionDetectionStatus(camera);
-            if (movementDetectedStatus) {
+        if (TuyaDevice.hasStatusIndicator(camera)) {
+            this.on = TuyaDevice.getStatusIndicator(camera)?.value;
+        }
+
+        if (TuyaDevice.hasMotionDetection(camera)) {
+            const motionDetectedStatus = TuyaDevice.getMotionDetectionStatus(camera);
+            if (motionDetectedStatus) {
                 if (!this.previousMotion) {
-                    this.previousMotion = movementDetectedStatus.value;
-                } else if (this.previousMotion !== movementDetectedStatus.value) {
-                    this.previousMotion = movementDetectedStatus.value;
+                    this.previousMotion = motionDetectedStatus.value;
+                } else if (this.previousMotion !== motionDetectedStatus.value) {
+                    this.previousMotion = motionDetectedStatus.value;
                     this.triggerMotion();
                 }    
             }
         }
-        this.getDevice(this.nativeLightId).updateState(camera);
+
+        // By the time this is called, scrypted would have already reported the device
+        // Only set light switch on cameras that have a status light indicator.
+        if (TuyaDevice.hasLightSwitch(camera)) {
+            this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
+        }
     }
 
-    private get nativeLightId(): string {
+    private get nativeLightSwitchId(): string {
         return `${this.nativeId}-light`;
     }
 

@@ -51,6 +51,7 @@ export class TuyaPulsar {
     static reconnect = 'TUYA_RECONNECT';
     static ping = 'TUYA_PING';
     static pong = 'TUYA_PONG';
+    static maxRetries = 'TUYA_MAXRETRIES';
 
     private config: IConfig;
     private server?: WebSocket;
@@ -64,7 +65,7 @@ export class TuyaPulsar {
                 ackTimeoutMillis: 3000,
                 subscriptionType: 'Failover',
                 retryTimeout: 1000,
-                maxRetryTimes: 100,
+                maxRetryTimes: 10,
                 timeout: 30000,
                 logger: console.log,
             },
@@ -114,6 +115,10 @@ export class TuyaPulsar {
         this.event.on(TuyaPulsar.close, cb);
     }
 
+    public maxRetries(cb: () => void) {
+        this.event.on(TuyaPulsar.maxRetries, cb);
+    }
+
     private _reconnect() {
         if (this.config.maxRetryTimes && this.retryTimes < this.config.maxRetryTimes) {
             const timer = setTimeout(() => {
@@ -121,6 +126,9 @@ export class TuyaPulsar {
                 this.retryTimes++;
                 this._connect(false);
             }, this.config.retryTimeout);
+        } else {
+            this.clearKeepAlive();
+            this.event.emit(TuyaPulsar.maxRetries);
         }
     }
 
