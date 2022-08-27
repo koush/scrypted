@@ -79,12 +79,12 @@ export class TuyaCloud {
         let devicesState = response.result;
 
         for (const state of devicesState) {
-            let response = await this.get<DeviceFunction[]>(`/v1.0/devices/${state.id}/functions`);
+            let response = await this.get<any>(`/v1.0/devices/${state.id}/functions`);
             if (!response.success) {
                 continue;
             }
 
-            state.functions = response.result;
+            state.functions = response.result.functions;
         }
 
         this._cameras = devicesState.filter(element => element.category === 'sp');

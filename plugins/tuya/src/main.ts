@@ -23,39 +23,56 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
     private handlePulsarMessage(message: TuyaPulsarMessage) {
         const data = message.payload.data;
         const { devId, productKey } = data;
+        let refreshDevice = false;
 
         const device = this.cloud?.cameras?.find(c => c.id === devId);
+
+        let pulsarMessageLogs: string[] = ['Received new TuyaPulsar Message:'];
 
         if (data.bizCode) {
             if (device && (data.bizCode === 'online' || data.bizCode === 'offline')) {
                 // Device status changed
                 const isOnline = data.bizCode === 'online';
                 device.online = isOnline;
-                return this.cameras.get(devId);
+                refreshDevice = true;
+                pulsarMessageLogs.push(`- Changed device to ${data.bizCode} for ${device.name}`);
             } else if (device && data.bizCode === 'delete') {
                 // Device needs to be deleted
                 // - devId
                 // - uid
 
+                pulsarMessageLogs.push(`- Delete ${device.name} from homekit`);
                 const { uid } = data.bizData;
                 // TODO: delete device
             } else if (data.bizCode === 'add') {
                 // TODO: There is a new device added, refetch
+                pulsarMessageLogs.push(`- Add new device with devId: ${data.devId} to homekit`);
+            } else {
+                pulsarMessageLogs.push(`- Unknown bizCode: ${data.bizCode} with data: ${JSON.stringify(data.bizData)}.`);
             }
-        } else {
-            if (!device) {
-                return;
-            }
-
+        } else if (device && data.status) {
             const newStatus = data.status || [];
 
+            pulsarMessageLogs.push(`- ${device.name} received new status updates:`);
+
             newStatus.forEach(item => {
+                pulsarMessageLogs.push(`\t- ${JSON.stringify(item)}`);
+
                 const index = device.status.findIndex(status => status.code == item.code);
                 if (index !== -1) {
                     device.status[index].value = item.value
                 }
             });
 
+            refreshDevice = true;
+        } else {
+            pulsarMessageLogs.push(`- Unknown TuyaPulsar message received: ${JSON.stringify(data)}`);
+        }
+
+        pulsarMessageLogs.push('');
+        this.log.i(pulsarMessageLogs.join('\n'));
+
+        if (refreshDevice) {
             return this.cameras.get(devId);
         }
     }
@@ -122,7 +139,6 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
 
         this.pulsar.message((ws, message) => {
             this.pulsar?.ackMessage(message.messageId);
-            this.log.i(`TuyaPulse: message received: ${message}`);
             const tuyaDevice = this.handlePulsarMessage(message);
             if (!tuyaDevice)
                 return;
@@ -169,28 +185,48 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
                     ? ScryptedDeviceType.Doorbell
                     : ScryptedDeviceType.Camera,
                 interfaces: [
-                    ScryptedInterface.VideoCamera
+                    ScryptedInterface.VideoCamera,
+                    ScryptedInterface.Online
                 ]
             };
 
+            let deviceInfo: string[] = [`Creating camera device for: \n- ${camera.name}`];
+
             if (TuyaDevice.isDoorbell(camera)) {
+                deviceInfo.push(`- Doorbell Notification`);
                 device.interfaces.push(ScryptedInterface.BinarySensor);
             }
 
             if (TuyaDevice.hasStatusIndicator(camera)) {
+                deviceInfo.push(`- Status Indicator`);
                 device.interfaces.push(ScryptedInterface.OnOff);
             }
 
             if (TuyaDevice.hasMotionDetection(camera)) {
+                deviceInfo.push(`- Motion Detection`);
                 device.interfaces.push(ScryptedInterface.MotionSensor);
             }
 
             // Device Provider
 
             if (TuyaDevice.hasLightSwitch(camera)) {
+                deviceInfo.push(`- Light Switch`);
                 device.interfaces.push(ScryptedInterface.DeviceProvider);
             }
 
+            deviceInfo.push(`- Status:`);
+            for (let status of camera.status) {
+                deviceInfo.push(`\t${status.code}: ${status.value}`);
+            }
+
+            deviceInfo.push(`- Functions:`);
+            for (let func of camera.functions) {
+                deviceInfo.push(`\t${func.code}`);
+            }
+
+            deviceInfo.push(``);
+            this.log.i(deviceInfo.join('\n\t'));
+    
             devices.push(device);
         }
 
@@ -216,6 +252,7 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
                 },
                 interfaces: [
                     ScryptedInterface.OnOff,
+                    ScryptedInterface.Online
                 ],
                 type: ScryptedDeviceType.Light,
             }
