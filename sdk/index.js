@@ -130,14 +130,18 @@ exports.MixinDeviceBase = MixinDeviceBase;
 (function () {
     function _createGetState(state) {
         return function () {
+            var _a;
             this._lazyLoadDeviceState();
-            return this._deviceState[state];
+            return (_a = this._deviceState) === null || _a === void 0 ? void 0 : _a[state];
         };
     }
     function _createSetState(state) {
         return function (value) {
             this._lazyLoadDeviceState();
-            this._deviceState[state] = value;
+            if (!this._deviceState)
+                console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
+            else
+                this._deviceState[state] = value;
         };
     }
     for (var field of Object.values(index_1.ScryptedInterfaceProperty)) {

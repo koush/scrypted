@@ -136,7 +136,7 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   /**
    * Fire an event for this device.
    */
-   onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
+  onDeviceEvent(eventInterface: string, eventData: any): Promise<void> {
     return deviceManager.onMixinEvent(this.id, this, eventInterface, eventData);
   }
 
@@ -159,14 +159,17 @@ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   function _createGetState(state: any) {
     return function () {
       this._lazyLoadDeviceState();
-      return this._deviceState[state];
+      return this._deviceState?.[state];
     };
   }
 
   function _createSetState(state: any) {
     return function (value: any) {
       this._lazyLoadDeviceState();
-      this._deviceState[state] = value;
+      if (!this._deviceState)
+        console.warn('device state is unavailable. the device must be discovered with deviceManager.onDeviceDiscovered or deviceManager.onDevicesChanged before the state can be set.');
+      else
+        this._deviceState[state] = value;
     };
   }
 
@@ -207,16 +210,16 @@ try {
     systemManager,
     pluginHostAPI,
     ...runtimeAPI,
-  }); 
+  });
 
   try {
-    (systemManager as any).setScryptedInterfaceDescriptors?.(TYPES_VERSION, ScryptedInterfaceDescriptors)?.catch(() => {});
+    (systemManager as any).setScryptedInterfaceDescriptors?.(TYPES_VERSION, ScryptedInterfaceDescriptors)?.catch(() => { });
   }
   catch (e) {
   }
 }
 catch (e) {
-  console.error('sdk initialization error, import @scrypted/types or use @scrypted/web-sdk instead', e);
+  console.error('sdk initialization error, import @scrypted/types or use @scrypted/client instead', e);
 }
 
 export default sdk;
