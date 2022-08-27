@@ -339,6 +339,7 @@ export class UnifiProtect extends ScryptedDeviceBase implements Settings, Device
                         firmware: camera.firmwareVersion,
                         version: camera.hardwareRevision,
                         serialNumber: camera.id,
+                        mac: camera.mac,
                         managementUrl,
                     },
                     interfaces: [
