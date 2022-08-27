@@ -40,15 +40,12 @@ export namespace TuyaDevice {
     // MARK: Motion Detection
 
     export function hasMotionDetection(camera: TuyaDeviceConfig): boolean {
-        return getMotionSwitch(camera) !== undefined;
-    }
-
-    export function getMotionSwitch(camera: TuyaDeviceConfig) {
         const motionSwitchCodes = [
             'motion_switch',
             'pir_sensitivity'
         ]
-        return getStatus(camera, motionSwitchCodes);
+
+        return getStatus(camera, motionSwitchCodes) !== undefined;
     }
 
     export function getMotionDetectionStatus(camera: TuyaDeviceConfig) {

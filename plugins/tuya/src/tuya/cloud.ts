@@ -40,7 +40,6 @@ export class TuyaCloud {
 
     public async login(): Promise<boolean> {
         await this.refreshAccessTokenIfNeeded();
-
         return this.isLoggedIn();
     }
 
@@ -144,9 +143,12 @@ export class TuyaCloud {
         query: { [k: string]: any } = {},
         body: { [k: string]: any } = {}
     ): Promise<TuyaResponse<T>> {
-        await this.refreshAccessTokenIfNeeded();
-        if (!this.session) {
-            throw new Error(`Token session not available for TuyaCloud.`);
+        if (!await this.login()) {
+            return {
+                result: undefined,
+                success: false,
+                t: Date.now()
+            }
         }
 
         const timestamp = Date.now().toString();
@@ -229,15 +231,25 @@ export class TuyaCloud {
             { headers }
         );
 
-        let objData = JSON.parse(data);
+        interface Token {
+            access_token: string;
+            refresh_token: string;
+            expire_time: number;
+            uid: string;
+        }
 
-        const newExpiration = new Date(Date.now() + objData.result.expire_time * 1000);
+        let response: TuyaResponse<Token> = JSON.parse(data);
 
-        this.session = {
-            accessToken: objData.result.access_token,
-            refreshToken: objData.result.refresh_token,
-            tokenExpiresAt: newExpiration,
-            uid: objData.result.uid
-        };
+        if (!response.success) {
+            this.session = undefined;
+        } else {
+            const newExpiration = new Date(Date.now() + response.result.expire_time * 1000);
+            this.session = {
+                accessToken: response.result.access_token,
+                refreshToken: response.result.refresh_token,
+                tokenExpiresAt: newExpiration,
+                uid: response.result.uid
+            };    
+        }
     }
 }
