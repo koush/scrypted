@@ -139,7 +139,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         maximumCompatibilityMode: {
             title: 'Maximum Compatibility Mode',
             description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
-            defaultValue: true,
+            defaultValue: false,
             type: 'boolean',
         }
     });
