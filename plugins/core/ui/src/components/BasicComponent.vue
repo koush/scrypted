@@ -82,8 +82,8 @@ export default {
       });
     },
   },
-  computed: {
-    deviceGroups() {
+  asyncComputed: {
+    async deviceGroups() {
       const ids = this.$store.state.scrypted.devices;
       const devices = ids
         .map((id) => this.$scrypted.systemManager.getDeviceById(id))
@@ -108,6 +108,8 @@ export default {
         },
       ];
     },
+  },
+  computed: {
     componentWebPath() {
       return getComponentWebPath(this.id);
     },

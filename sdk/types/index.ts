@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.86";
+export const TYPES_VERSION = "0.0.87";
 
 
 export interface DeviceState {
@@ -1991,6 +1991,7 @@ export interface DeviceInformation {
   version?: string;
   firmware?: string;
   serialNumber?: string;
+  mac?: string;
   metadata?: any;
   managementUrl?: string;
 }
@@ -2400,7 +2401,7 @@ export interface RTCMediaObjectTrack {
 }
 
 export interface RTCConnectionManagement {
-  negotiateRTCSignalingSession(): Promise<void>;
+  negotiateRTCSignalingSession(serverOffer?: boolean): Promise<void>;
   addTrack(mediaObject: MediaObject, options?: {
     videoMid?: string,
     audioMid?: string,

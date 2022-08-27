@@ -70,9 +70,10 @@ export async function streamMedia(device: RTCSignalingChannel) {
       }
     });
 
-    const mediaStream = new MediaStream();
+    const mediaStream = new MediaStream(
+      pc.getReceivers().map((receiver) => receiver.track)
+    );
     pc.ontrack = e => {
-      // console.log('got track', e.track);
       mediaStream.addTrack(e.track);
     }
     return mediaStream;

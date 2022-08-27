@@ -366,14 +366,15 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     async negotiateRTCSignalingSession(): Promise<void> {
         try {
             await connectRTCSignalingClients(this.console,
-                this.weriftSignalingSession, createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
                 this.clientSession, createSetup(this.options?.disableIntercom ? 'recvonly' : 'sendrecv', 'recvonly'),
+                this.weriftSignalingSession, createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
             );
             this.negotiationDeferred.resolve(undefined);
         }
         catch (e) {
             this.console.error('negotiation failed', e);
             this.negotiationDeferred.reject(e);
+            throw e;
         }
     }
 

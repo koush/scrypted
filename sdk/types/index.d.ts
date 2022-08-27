@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.86";
+export declare const TYPES_VERSION = "0.0.87";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -1269,6 +1269,7 @@ export interface DeviceInformation {
     version?: string;
     firmware?: string;
     serialNumber?: string;
+    mac?: string;
     metadata?: any;
     managementUrl?: string;
 }
@@ -1641,7 +1642,7 @@ export interface RTCMediaObjectTrack {
     }): Promise<void>;
 }
 export interface RTCConnectionManagement {
-    negotiateRTCSignalingSession(): Promise<void>;
+    negotiateRTCSignalingSession(serverOffer?: boolean): Promise<void>;
     addTrack(mediaObject: MediaObject, options?: {
         videoMid?: string;
         audioMid?: string;

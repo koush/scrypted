@@ -179,7 +179,7 @@ try {
     }
 }
 catch (e) {
-    console.error('sdk initialization error, import @scrypted/types or use @scrypted/web-sdk instead', e);
+    console.error('sdk initialization error, import @scrypted/types or use @scrypted/client instead', e);
 }
 exports.default = sdk;
 //# sourceMappingURL=index.js.map
