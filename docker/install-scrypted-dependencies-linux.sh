@@ -44,7 +44,7 @@ ENV() {
     echo "ignoring ENV $1"
 }
 
-source <(curl -s https://raw.githubusercontent.com/koush/scrypted/avahi/docker/template/Dockerfile.common.header)
+source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/template/Dockerfile.common.header)
 
 if [ -z "$SERVICE_USER" ]
 then
