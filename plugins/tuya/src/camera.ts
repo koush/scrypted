@@ -1,8 +1,9 @@
-import { ScryptedDeviceBase, VideoCamera, MotionSensor, BinarySensor, MediaObject, ScryptedInterface, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger, Intercom } from "@scrypted/sdk";
+import { ScryptedDeviceBase, VideoCamera, MotionSensor, BinarySensor, MediaObject, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger, Intercom, RTCSignalingClient, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate } from "@scrypted/sdk";
 import sdk from '@scrypted/sdk';
 import { TuyaController } from "./main";
 import { TuyaDeviceConfig } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
+import { TuyaMQ } from "./tuya/mq";
 const { deviceManager } = sdk;
 
 export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online {
@@ -124,19 +125,19 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
         const camera = this.findCamera();
 
         if (!camera) {
-            this.logger.w(`Could not find camera for ${this.name} to show stream.`);
+            this.logger.e(`Could not find camera for ${this.name} to show stream.`);
             throw new Error(`Failed to stream ${this.name}: Camera not found.`);
         }
 
         if (!camera.online) {
-            this.logger.w(`${this.name} is currently offline. Will not be able to stream until device is back online.`);
+            this.logger.e(`${this.name} is currently offline. Will not be able to stream until device is back online.`);
             throw new Error(`Failed to stream ${this.name}: Camera is offline.`);
         }
 
         const rtsps = await this.controller.cloud?.getRTSPS(camera);
 
         if (!rtsps) {
-            this.logger.w("There was an error retreiving camera's rtsps for streamimg.");
+            this.logger.e("There was an error retreiving camera's rtsps for streamimg.");
             throw new Error(`Failed to capture stream for ${this.name}: RTSPS link not found.`);
         }
 
@@ -146,6 +147,50 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
             mediaStreamOptions: vso
         }
         return this.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
+    }
+
+    async createRTCSignalingSession(): Promise<RTCSignalingSession> {
+        const camera = this.findCamera();
+
+        if (!camera) {
+            this.logger.e(`Could not find camera for ${this.name} to create rtc signal session.`);
+            throw new Error(`Failed to create rtc config for ${this.name}: Camera not found.`);
+        }
+
+        const webrtcConf = await this.controller.cloud?.getWebRTConfig(camera);
+
+        if (!webrtcConf?.success) {
+            this.logger.e(`[${this.name}] There was an error retrieving WebRTConfig.`);
+            throw new Error(`Failed to create device rtc config for ${this.name}: request failed: ${webrtcConf?.result}.`);
+        }
+
+        const mqResponse = await this.controller.cloud?.getWebRTCMQConfig();
+        if (!mqResponse?.success) {
+            this.logger.e(`[${this.name}] There was an error retrieving WebRTC MQTT Config.`);
+            throw new Error(`Failed to create rtc mqtt config for ${this.name}: request failed: ${mqResponse?.result}.`);
+        }
+
+        const mqttWebRTConfig = mqResponse.result;
+        const mqtt = new TuyaMQ(mqttWebRTConfig);
+        mqtt.start();
+
+        // return undefined;
+        const session: RTCSignalingSession = {
+            createLocalDescription: (type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate | undefined): Promise<RTCSessionDescriptionInit> => {
+                throw new Error("Function not implemented.");
+            },
+            setRemoteDescription: (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> => {
+                throw new Error("Function not implemented.");
+            },
+            addIceCandidate: (candidate: RTCIceCandidateInit): Promise<void> => {
+                throw new Error("Function not implemented.");
+            },
+            getOptions: function (): Promise<RTCSignalingOptions> {
+                throw new Error("Function not implemented.");
+            }
+        }
+
+        return session;
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
@@ -239,6 +284,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
 
         // By the time this is called, scrypted would have already reported the device
         // Only set light switch on cameras that have a status light indicator.
+
         if (TuyaDevice.hasLightSwitch(camera)) {
             this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
         }

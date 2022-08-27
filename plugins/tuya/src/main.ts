@@ -1,4 +1,4 @@
-import { Device, DeviceDiscovery, DeviceProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import { Device, DeviceDiscovery, DeviceProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { StorageSettings } from '../../../common/src/settings';
 import { TuyaCloud } from './tuya/cloud';
