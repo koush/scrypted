@@ -1,11 +1,11 @@
 import Event from 'events';
 import * as mqtt from "mqtt";
+import { IPublishPacket } from 'mqtt-packet'
 import { MQTTConfig } from "./const";
-import sdk from '@scrypted/sdk';
 
 
 export class TuyaMQ {
-    static connect = "TUYA_CONNECT";
+    static connected = "TUYA_CONNECTED";
     static message = "TUYA_MESSAGE";
     static error = "TUYA_ERROR";
     static close = "TUYA_CLOSE";
@@ -32,7 +32,7 @@ export class TuyaMQ {
     public connect(
         cb: (client: mqtt.MqttClient) => void
     ) {
-        this.event.on(TuyaMQ.connect, cb);
+        this.event.on(TuyaMQ.connected, cb);
     }
 
     public message(
@@ -41,12 +41,20 @@ export class TuyaMQ {
         this.event.on(TuyaMQ.message, cb);
     }
 
-    public error(cb: (client: mqtt.MqttClient, error: any) => void) {
+    public error(
+        cb: (client: mqtt.MqttClient, error: Error) => void
+    ) {
         this.event.on(TuyaMQ.error, cb);
     }
 
-    public close(cb: (client: mqtt.MqttClient) => void) {
+    public close(
+        cb: (client: mqtt.MqttClient) => void
+    ) {
         this.event.on(TuyaMQ.close, cb);
+    }
+
+    public publish(topic: string, message: string) {
+        this.client?.publish(topic, message);
     }
 
     private _connect() {
@@ -68,7 +76,7 @@ export class TuyaMQ {
             if (client.connected) {
                 this.client?.subscribe(this.config.source_topic);
                 this.event.emit(
-                    TuyaMQ.connect,
+                    TuyaMQ.connected,
                     this.client
                 )   
             }
@@ -76,20 +84,28 @@ export class TuyaMQ {
     }
 
     private subMessage(client: mqtt.MqttClient) {
-        client.on('message', () => {
-            client.connected
+        client.on('message', (topic: string, payload: Buffer, packet: IPublishPacket) => {
+            this.event.emit(
+                TuyaMQ.message
+            )
         });
     }
 
     private subError(client: mqtt.MqttClient) {
-        client.on('error', () => {
-
+        client.on('error', (error: Error) => {
+            this.event.emit(
+                TuyaMQ.error,
+                error
+            )
         });
     }
 
     private subClose(client: mqtt.MqttClient) {
         client.on('close', () => {
-
+            this.event.emit(
+                TuyaMQ.close,
+                this.client
+            );
         });
     }
 } 

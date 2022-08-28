@@ -74,7 +74,7 @@ export namespace TuyaDevice {
     // Supports WebRTC
 
     export async function supportsWebRTC(camera: TuyaDeviceConfig, cloud: TuyaCloud) {
-        const webRTConfig = await cloud.getWebRTConfig(camera);
+        const webRTConfig = await cloud.getDeviceWebRTConfig(camera);
         return webRTConfig.success && webRTConfig.result.supports_webrtc;
     }
 
