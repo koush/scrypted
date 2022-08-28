@@ -56,7 +56,7 @@ export interface MQTTConfig {
     client_id: string;
     source_topic: string;
     sink_topic: string;
-    expire_topic: string;
+    expire_time: number;
 }
 
 export interface WebRTCDeviceConfig {

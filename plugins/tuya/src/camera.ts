@@ -1,7 +1,7 @@
-import { ScryptedDeviceBase, VideoCamera, MotionSensor, BinarySensor, MediaObject, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger, Intercom, RTCSignalingClient, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate } from "@scrypted/sdk";
-import sdk from '@scrypted/sdk';
+import sdk, { ScryptedDeviceBase, VideoCamera, MotionSensor, BinarySensor, MediaObject, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger, Intercom, RTCSignalingClient, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingChannel, RTCSessionControl } from "@scrypted/sdk";
+import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { TuyaController } from "./main";
-import { TuyaDeviceConfig } from "./tuya/const";
+import { TuyaDeviceConfig, WebRTCDeviceConfig } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
 import { TuyaMQ } from "./tuya/mq";
 const { deviceManager } = sdk;
@@ -52,7 +52,27 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online
     }
 }
 
-export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff, Online {
+class TuyaRTCSessionControl implements RTCSessionControl {
+    constructor(
+        private config: WebRTCDeviceConfig
+    ) {
+    }
+
+    getRefreshAt(): Promise<number | void> {
+        throw new Error("Method not implemented.");
+    }
+    extendSession(): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+    endSession(): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+    setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+}
+
+export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff, Online, RTCSignalingChannel {
     private cameraLightSwitch?: TuyaCameraLight
     private previousMotion?: any;
     private previousDoorbellRing?: any;
@@ -149,7 +169,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
         return this.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
     }
 
-    async createRTCSignalingSession(): Promise<RTCSignalingSession> {
+    async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
         const camera = this.findCamera();
 
         if (!camera) {
@@ -157,40 +177,64 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
             throw new Error(`Failed to create rtc config for ${this.name}: Camera not found.`);
         }
 
-        const webrtcConf = await this.controller.cloud?.getWebRTConfig(camera);
+        const deviceWebRTConfigResponse = await this.controller.cloud?.getDeviceWebRTConfig(camera);
 
-        if (!webrtcConf?.success) {
+        if (!deviceWebRTConfigResponse?.success) {
             this.logger.e(`[${this.name}] There was an error retrieving WebRTConfig.`);
-            throw new Error(`Failed to create device rtc config for ${this.name}: request failed: ${webrtcConf?.result}.`);
+            throw new Error(`Failed to create device rtc config for ${this.name}: request failed: ${deviceWebRTConfigResponse?.result}.`);
         }
 
-        const mqResponse = await this.controller.cloud?.getWebRTCMQConfig();
+        const deviceWebRTConfig = deviceWebRTConfigResponse.result;
+
+        let mqResponse = await this.controller.cloud?.getWebRTCMQConfig(deviceWebRTConfig);
         if (!mqResponse?.success) {
-            this.logger.e(`[${this.name}] There was an error retrieving WebRTC MQTT Config.`);
+            this.logger.e(`[${this.name}] There was an error retrieving WebRTC MQTT RTC Config.`);
             throw new Error(`Failed to create rtc mqtt config for ${this.name}: request failed: ${mqResponse?.result}.`);
         }
 
         const mqttWebRTConfig = mqResponse.result;
-        const mqtt = new TuyaMQ(mqttWebRTConfig);
-        mqtt.start();
 
-        // return undefined;
-        const session: RTCSignalingSession = {
-            createLocalDescription: (type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate | undefined): Promise<RTCSessionDescriptionInit> => {
+        // const mqttRTC = new TuyaMQ(mqttWebRTConfig);
+        // mqttRTC.start();    
+
+        //// Type of signals it accepts for audio and video qualities
+        // const skill = JSON.parse(webRTConfig.skill);
+
+        const offerSetup: RTCAVSignalingSetup = {
+            type: "offer",
+            audio: {
+                direction: 'sendrecv',
+            },
+            video: {
+                direction: 'recvonly',
+            },
+        }
+
+        // Calls getOptions, setRemoteDescription, 
+        const answerSession: RTCSignalingSession = {
+            createLocalDescription: async (type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> => {
                 throw new Error("Function not implemented.");
             },
-            setRemoteDescription: (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> => {
+            setRemoteDescription: async (description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> => {
+                // throw new Error("Function not implemented.");
+            },
+            addIceCandidate: async (candidate: RTCIceCandidateInit): Promise<void> => {
                 throw new Error("Function not implemented.");
             },
-            addIceCandidate: (candidate: RTCIceCandidateInit): Promise<void> => {
-                throw new Error("Function not implemented.");
-            },
-            getOptions: function (): Promise<RTCSignalingOptions> {
-                throw new Error("Function not implemented.");
+            getOptions: async (): Promise<RTCSignalingOptions> => {
+                return {
+                    requiresOffer: true,
+                    disableTrickle: false
+                };
             }
         }
 
-        return session;
+        const answerSetup: Partial<RTCAVSignalingSetup> = {
+        }
+
+        await connectRTCSignalingClients(this.console, session, offerSetup, answerSession, answerSetup);
+
+        return new TuyaRTCSessionControl(deviceWebRTConfig);
     }
 
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
@@ -266,7 +310,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
                 } else if (this.previousMotion !== motionDetectedStatus.value) {
                     this.previousMotion = motionDetectedStatus.value;
                     this.triggerMotion();
-                }    
+                }
             }
         }
 
