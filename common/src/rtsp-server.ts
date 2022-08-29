@@ -477,6 +477,7 @@ export class RtspClient extends RtspBase {
 
                             // do what with this?
                             const message = await super.readMessage();
+                            const body = await this.readBody(parseHeaders(message));
 
                             // readd the listener to operate in streaming mode.
                             this.client.on('readable', read);
@@ -580,6 +581,12 @@ export class RtspClient extends RtspBase {
         return `Digest ${paramsString}`;
     }
 
+    async readBody(response: Headers) {
+        const cl = parseInt(response['content-length']);
+        if (cl)
+            return readLength(this.client, cl)
+    }
+
     async request(method: string, headers?: Headers, path?: string, body?: Buffer, authenticating?: boolean): Promise<RtspServerResponse> {
         this.writeRequest(method, headers, path, body);
 
@@ -610,12 +617,9 @@ export class RtspClient extends RtspBase {
 
             return this.request(method, headers, path, body, true);
         }
-        const cl = parseInt(response['content-length']);
-        if (cl)
-            return { headers: response, body: await readLength(this.client, cl), status };
         return {
             headers: response,
-            body: undefined,
+            body: await this.readBody(response),
             status,
         }
     }
@@ -848,11 +852,16 @@ export class RtspServer {
         return this.send(packet, rtcp ? track.destination + 1 : track.destination);
     }
 
-    availableOptions = ['DESCRIBE', 'OPTIONS', 'PAUSE', 'PLAY', 'SETUP', 'TEARDOWN', 'ANNOUNCE', 'RECORD'];
+    availableOptions = ['DESCRIBE', 'OPTIONS', 'PAUSE', 'PLAY', 'SETUP', 'TEARDOWN', 'ANNOUNCE', 'RECORD', 'GET_PARAMETER'];
     options(url: string, requestHeaders: Headers) {
         const headers: Headers = {};
         headers['Public'] = this.availableOptions.join(', ');
 
+        this.respond(200, 'OK', requestHeaders, headers);
+    }
+
+    async get_parameter(url: string, requestHeaders: Headers) {
+        const headers: Headers = {};
         this.respond(200, 'OK', requestHeaders, headers);
     }
 
