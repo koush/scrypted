@@ -468,7 +468,7 @@ export async function createRTCPeerConnectionSink(
         connection.pc.close();
     }
 
-    connection.negotiateRTCSignalingSession();
+    connection.negotiateRTCSignalingSession(true);
 
     return track.control;
 }
