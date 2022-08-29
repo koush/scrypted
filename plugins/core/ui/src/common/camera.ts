@@ -3,9 +3,7 @@ import { MediaManager, MediaObject, RequestMediaStream, RequestRecordingStreamOp
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
   const ret = await streamMedia(device);
-  ret.mediaStream.then(mediaStream => {
-    getVideo().srcObject = mediaStream;
-  });
+  getVideo().srcObject = ret.mediaStream;
   return ret;
 }
 
@@ -39,9 +37,7 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
   const channel: RTCSignalingChannel = await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.RTCSignalingChannel);
 
   const ret = await streamMedia(channel);
-  ret.mediaStream.then(mediaStream => {
-    getVideo().srcObject = mediaStream;
-  });
+  getVideo().srcObject = ret.mediaStream;
   recordingStream = await rp;
 
   return {
@@ -53,7 +49,8 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
 export async function streamMedia(device: RTCSignalingChannel) {
   const session = new BrowserSignalingSession();
   const control: RTCSessionControl = await device.startRTCSignalingSession(session);
-  const mediaStream = session.pcDeferred.promise.then(pc => {
+  const mediaStream = new MediaStream();
+  session.pcDeferred.promise.then(pc => {
     pc.addEventListener('connectionstatechange', () => {
       if (pc.iceConnectionState === 'disconnected'
         || pc.iceConnectionState === 'failed'
@@ -70,13 +67,12 @@ export async function streamMedia(device: RTCSignalingChannel) {
       }
     });
 
-    const mediaStream = new MediaStream(
-      pc.getReceivers().map((receiver) => receiver.track)
-    );
+    // for (const r of pc.getReceivers()) {
+    //   mediaStream.addTrack(r.track);
+    // }
     pc.ontrack = e => {
       mediaStream.addTrack(e.track);
     }
-    return mediaStream;
   });
 
   const close = () => {

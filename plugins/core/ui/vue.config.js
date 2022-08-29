@@ -102,7 +102,7 @@ module.exports = {
   runtimeCompiler: true,
   devServer: {
     disableHostCheck: true,
-    host: 'localhost',
+    host: '127.0.0.1',
     https: true,
     port: 8081,
     progress: false,
