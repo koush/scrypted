@@ -1,6 +1,6 @@
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
+import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
 import https from 'https';
 import mimeType from 'mime';
@@ -186,7 +186,7 @@ export abstract class MediaManagerBase implements MediaManager {
             return f;
 
         const defaultPath = os.platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-        return ffmpegInstaller.path || defaultPath;
+        return pathToFfmpeg || defaultPath;
     }
 
     async getFilesPath(): Promise<string> {
