@@ -1737,7 +1737,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     // 8-11-2022
     // old scrypted had a bug where mixin device state was not exposing properties like id correctly
     // across rpc boundaries.
-    if (sdk.fork && typeof mixinDeviceState.id === 'string') {
+    if (false && sdk.fork && typeof mixinDeviceState.id === 'string') {
       const forked = sdk.fork<RebroadcastPluginFork>();
       const result = await forked.result as RebroadcastPluginFork;
       const ret = result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);

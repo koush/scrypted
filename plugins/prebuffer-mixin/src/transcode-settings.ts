@@ -34,7 +34,10 @@ export class TranscodeMixinProvider extends ScryptedDeviceBase implements MixinP
     }
 
     invalidateSettings(id: string) {
-        process.nextTick(() =>this.plugin.currentMixins.get(id)?.onDeviceEvent(ScryptedInterface.Settings, undefined));
+        process.nextTick(async () =>{
+            const mixin = await this.plugin.currentMixins.get(id)?.mixin;
+            mixin?.onDeviceEvent(ScryptedInterface.Settings, undefined)
+        });
     }
 
     async getMixin(mixinDevice: any, mixinDeviceInterfaces: ScryptedInterface[], mixinDeviceState: { [key: string]: any; }): Promise<any> {
