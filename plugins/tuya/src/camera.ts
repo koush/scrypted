@@ -5,7 +5,7 @@ import { TuyaDeviceConfig } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
 const { deviceManager } = sdk;
 
-export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
+export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online {
     constructor(
         public camera: TuyaCamera,
         nativeId: string
@@ -47,13 +47,16 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff {
             return;
 
         this.on = TuyaDevice.getLightSwitchStatus(camera)?.value;
+        this.online = camera.online;
     }
 }
 
-export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff {
+export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff, Online {
     private cameraLightSwitch?: TuyaCameraLight
     private previousMotion?: any;
+    private previousDoorbellRing?: any;
     private motionTimeout?: NodeJS.Timeout;
+    private binaryTimeout: NodeJS.Timeout;
 
     constructor(
         public controller: TuyaController,
@@ -168,9 +171,11 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     // so set a timeout ourselves to reset the state.
 
     triggerBinaryState() {
-        // TODO: Implement doorbell chime
-        // this.binaryState = true;
-        // setTimeout(() => this.binaryState = false, 10000);
+        clearTimeout(this.binaryTimeout);
+        this.binaryState = true;
+        this.binaryTimeout = setTimeout(() => {
+            this.binaryState = false;
+        }, 10 * 1000);
     }
 
     // This will trigger a motion detected alert if it has no timeout. If there is a timeout, then
@@ -217,6 +222,18 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
                     this.previousMotion = motionDetectedStatus.value;
                     this.triggerMotion();
                 }    
+            }
+        }
+
+        if (TuyaDevice.isDoorbell(camera)) {
+            const doorbellRingStatus = TuyaDevice.getDoorbellRing(camera);
+            if (doorbellRingStatus) {
+                if (!this.previousDoorbellRing) {
+                    this.previousDoorbellRing = doorbellRingStatus.value;
+                } else if (this.previousDoorbellRing !== doorbellRingStatus.value) {
+                    this.previousDoorbellRing = doorbellRingStatus.value;
+                    this.triggerBinaryState();
+                }
             }
         }
 

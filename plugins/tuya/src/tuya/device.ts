@@ -29,12 +29,26 @@ export namespace TuyaDevice {
     // MARK: Doorbell
 
     export function isDoorbell(camera: TuyaDeviceConfig): boolean {
-        return getDoorbellStatus(camera) !== undefined;
+        const search = [
+            'wireless_powermode',   // According to tuya, most low-powered devices are doorbells
+            'doorbell_ring_exist'   // Typically, doorbells are able to add chimes. If this option is available, then most likely it is a doorbell.
+            // 'doorbell_active',   // Seems to be very common even in non-doorbell config
+        ];
+
+        for (const code of search) {
+            const status = camera.status.find(status => status.code == code);
+            if (status?.value !== undefined) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    export function getDoorbellStatus(camera) : TuyaDeviceStatus | undefined {
-        const doorbellStatus = getStatus(camera, ['dorbell_chime']);
-        return doorbellStatus?.value !== undefined ? doorbellStatus : undefined;
+    export function getDoorbellRing(camera: TuyaDeviceConfig): TuyaDeviceStatus {
+        const ring = [
+            'alarm_message'
+        ];
+        return getStatus(camera, ring)
     }
 
     // MARK: Motion Detection
