@@ -156,6 +156,11 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                     check = request.connection.localAddress;
                 }
 
+                // ignore the IP if it is APIPA (Automatic Private IP Addressing)
+                if (check?.startsWith('169.')) {
+                    check = undefined;
+                }
+
                 // sanity check this address.
                 if (check) {
                     const infos = os.networkInterfaces()[request.connection.networkInterface];
@@ -163,6 +168,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                         response.addressOverride = check;
                     }
                 }
+            }
+
+            if (!response.addressOverride) {
+                console.warn('===========================================================================');
+                console.warn('The Scrypted Server Address is not set in the HomeKit plugin.');
+                console.warn('If there are issues streaming, set this address to your wired IP address manually.');
+                console.warn('More information can be found in the HomeKit Plugin README.');
+                console.warn('===========================================================================');
             }
 
             console.log('source address', response.addressOverride, videoPort, audioPort);

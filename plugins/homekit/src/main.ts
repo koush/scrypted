@@ -215,14 +215,20 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
 
                     let published = false;
                     let hasPublished = false;
-                    const publish = () => {
-                        published = true;
-                        mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
-                        this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory);
-                        if (!hasPublished) {
-                            hasPublished = true;
-                            logConnections(mixinConsole, accessory, this.seenConnections);
-                            storageSettings.values.qrCode = accessory.setupURI();
+                    const publish = async () => {
+                        try {
+                            published = true;
+                            mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
+
+                            await this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory);
+                            if (!hasPublished) {
+                                hasPublished = true;
+                                storageSettings.values.qrCode = accessory.setupURI();
+                                logConnections(mixinConsole, accessory, this.seenConnections);
+                            }
+                        }
+                        catch (e) {
+                            mixinConsole.error('There was an error publishing the standalone accessory', e);
                         }
                     }
 
@@ -345,8 +351,8 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         return ret;
     }
 
-    publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories) {
-        accessory.publish({
+    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories) {
+        await accessory.publish({
             username,
             port: 0,
             pincode,
