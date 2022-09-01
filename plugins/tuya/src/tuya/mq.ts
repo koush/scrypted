@@ -1,5 +1,6 @@
 import Event from 'events';
 import * as mqtt from "mqtt";
+import { IClientPublishOptions } from 'mqtt';
 import { IPublishPacket } from 'mqtt-packet'
 import { MQTTConfig } from "./const";
 
@@ -21,18 +22,24 @@ export class TuyaMQ {
         this.event = new Event();
     }
 
-    public start() {
-        this.client = this._connect();
-    }
-
     public stop() {
         this.client?.end();
     }
 
-    public connect(
-        cb: (client: mqtt.MqttClient) => void
-    ) {
-        this.event.on(TuyaMQ.connected, cb);
+    public async connect(): Promise<mqtt.Client> {
+        return new Promise((resolve, reject) => {
+            this.event.on(
+                TuyaMQ.connected, 
+                (client: mqtt.MqttClient) => {
+                    if (client.connected) {
+                        resolve(client);
+                    } else {
+                        reject(new Error('Client did not connect successfully.'));
+                    }
+                }
+            );
+            this.client = this._connect();
+        });
     }
 
     public message(
@@ -53,8 +60,19 @@ export class TuyaMQ {
         this.event.on(TuyaMQ.close, cb);
     }
 
-    public publish(topic: string, message: string) {
-        this.client?.publish(topic, message);
+    public publish(message: string) {
+        const properties: IClientPublishOptions = {
+            qos: 1,
+            retain: false
+        }
+
+        this.client?.publish(this.config.sink_topic, message, properties);
+    }
+
+    public removeMessageListener(
+        cb: (client: mqtt.MqttClient, message: any) => void
+    ) {
+        this.event.removeListener(TuyaMQ.message, cb);
     }
 
     private _connect() {
@@ -73,20 +91,20 @@ export class TuyaMQ {
 
     private subConnect(client: mqtt.MqttClient) {
         client.on('connect', () => {
-            if (client.connected) {
-                this.client?.subscribe(this.config.source_topic);
-                this.event.emit(
-                    TuyaMQ.connected,
-                    this.client
-                )   
-            }
+            client.subscribe(this.config.source_topic);
+            this.event.emit(
+                TuyaMQ.connected,
+                client
+            )   
         });
     }
 
     private subMessage(client: mqtt.MqttClient) {
         client.on('message', (topic: string, payload: Buffer, packet: IPublishPacket) => {
             this.event.emit(
-                TuyaMQ.message
+                TuyaMQ.message,
+                client,
+                payload
             )
         });
     }

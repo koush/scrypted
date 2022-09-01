@@ -1,7 +1,7 @@
 import { Axios, Method } from "axios";
 import { HmacSHA256, SHA256, lib } from 'crypto-js';
 import { getTuyaCloudEndpoint, TuyaSupportedCountry } from "./utils";
-import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse, MQTTConfig, WebRTCDeviceConfig } from "./const";
+import { TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse, MQTTConfig, DeviceWebRTConfig as DeviceWebRTConfig } from "./const";
 import { randomBytes } from "crypto";
 
 interface Session {
@@ -120,15 +120,15 @@ export class TuyaCloud {
         }
     }
 
-    public async getDeviceWebRTConfig(camera: TuyaDeviceConfig) : Promise<TuyaResponse<WebRTCDeviceConfig>> {
-        const response = await this.get<WebRTCDeviceConfig>(
+    public async getDeviceWebRTConfig(camera: TuyaDeviceConfig) : Promise<TuyaResponse<DeviceWebRTConfig>> {
+        const response = await this.get<DeviceWebRTConfig>(
             `/v1.0/users/${this.userId}/devices/${camera.id}/webrtc-configs`
         );
 
         return response;
     }
 
-    public async getWebRTCMQConfig(webRTCDeviceConfig: WebRTCDeviceConfig) : Promise<TuyaResponse<MQTTConfig>> {
+    public async getWebRTCMQConfig(webRTCDeviceConfig: DeviceWebRTConfig) : Promise<TuyaResponse<MQTTConfig>> {
         const response = await this.post<any>(
             `/v1.0/open-hub/access/config`,
             {
