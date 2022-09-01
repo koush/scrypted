@@ -14,21 +14,18 @@ export interface AudioMode {
 export async function startCameraStreamSrtp(media: FFmpegInput, console: Console, audioMode: AudioMode, session: CameraStreamingSession) {
     const { url, mediaStreamOptions } = media;
     let { sdp } = mediaStreamOptions;
-    let socket: Readable;
-    let rtspClient: RtspClient;
     let videoSender: (rtp: RtpPacket) => void;
     let audioSender: (rtp: RtpPacket) => void;
 
+    const rtspClient = new RtspClient(url);
+    rtspClient.requestTimeout = 1000;
+
     const cleanup = () => {
-        socket?.destroy();
         rtspClient?.safeTeardown();
         session.kill();
     };
 
     session.killPromise.finally(cleanup);
-
-    rtspClient = new RtspClient(url);
-    rtspClient.requestTimeout = 1000;
     rtspClient.client.once('close', cleanup);
 
     try {
