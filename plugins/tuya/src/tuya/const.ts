@@ -59,7 +59,7 @@ export interface MQTTConfig {
     expire_time: number;
 }
 
-export interface WebRTCDeviceConfig {
+export interface DeviceWebRTConfig {
     audio_attributes: AudioAttributes;
     auth: string;
     id: string;
@@ -84,4 +84,46 @@ interface Ice {
     credential?: string;
     ttl?: number;
     username?: string;
+}
+
+export interface WebRTCMQMessage {
+    protocol: number;
+    pv: string;
+    t: number;
+    data: {
+        header: {
+            type: 'offer' | 'answer' | 'candidate' | 'disconnect';
+            from: string;
+            to: string;
+            sub_dev_id: string;
+            sessionid: string;
+            moto_id: string;
+            tid: string;
+        },
+        msg: OfferMessage | AnswerMessage | CandidateMessage | DisconnectMessage
+    }
+}
+
+export interface OfferMessage {
+    mode: string;
+    sdp: string;
+    auth: string;
+    stream_type: number;
+}
+
+export interface AnswerMessage {
+    mode: string;
+    sdp: string;
+    stream_type: number;
+    token: Ice[];
+    replay: any;
+}
+
+export interface CandidateMessage {
+    mode: string;
+    candidate: string;
+}
+
+export interface DisconnectMessage {
+    mode: string;
 }
