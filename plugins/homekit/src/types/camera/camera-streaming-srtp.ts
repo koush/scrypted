@@ -1,8 +1,6 @@
 import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
-import { readLength } from '@scrypted/common/src/read-stream';
 import { getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { FFmpegInput } from '@scrypted/sdk';
-import net from 'net';
 import { Readable } from 'stream';
 import { RtspClient } from '../../../../../common/src/rtsp-server';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
@@ -18,7 +16,6 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
     let { sdp } = mediaStreamOptions;
     let socket: Readable;
     let rtspClient: RtspClient;
-    const isRtsp = url.startsWith('rtsp');
     let videoSender: (rtp: RtpPacket) => void;
     let audioSender: (rtp: RtpPacket) => void;
 
@@ -30,106 +27,58 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
 
     session.killPromise.finally(cleanup);
 
-    if (isRtsp) {
-        rtspClient = new RtspClient(url);
-        rtspClient.requestTimeout = 1000;
-        rtspClient.client.once('close', cleanup);
+    rtspClient = new RtspClient(url);
+    rtspClient.requestTimeout = 1000;
+    rtspClient.client.once('close', cleanup);
 
-        try {
-            await rtspClient.options();
-            const sdpResponse = await rtspClient.describe();
-            sdp = sdpResponse.body.toString().trim();
-            const parsedSdp = parseSdp(sdp);
-            const video = parsedSdp.msections.find(msection => msection.type === 'video');
-            const audio = parsedSdp.msections.find(msection => msection.type === 'audio');
+    try {
+        await rtspClient.options();
+        const sdpResponse = await rtspClient.describe();
+        sdp = sdpResponse.body.toString().trim();
+        const parsedSdp = parseSdp(sdp);
+        const video = parsedSdp.msections.find(msection => msection.type === 'video');
+        const audio = parsedSdp.msections.find(msection => msection.type === 'audio');
 
-            let channel = 0;
-            if (audio && !audioMode.mute) {
-                await rtspClient.setup({
-                    type: 'tcp',
-                    port: channel,
-                    path: audio.control,
-                    onRtp: (header, data) => {
-                        if (session.killed)
-                            return;
-                        const rtp = RtpPacket.deSerialize(data);
-                        if (audioMode.udpPort) {
-                            session.audioReturn.send(rtp.serialize(), audioMode.udpPort, '127.0.0.1');
-                        }
-                        else {
-                            audioSender(rtp);
-                        }
-                    },
-                });
-                channel += 2;
-            }
-
+        let channel = 0;
+        if (audio && !audioMode.mute) {
             await rtspClient.setup({
                 type: 'tcp',
                 port: channel,
-                path: video.control,
+                path: audio.control,
                 onRtp: (header, data) => {
                     if (session.killed)
                         return;
                     const rtp = RtpPacket.deSerialize(data);
-                    videoSender(rtp);
+                    if (audioMode.udpPort) {
+                        session.audioReturn.send(rtp.serialize(), audioMode.udpPort, '127.0.0.1');
+                    }
+                    else {
+                        audioSender(rtp);
+                    }
                 },
             });
             channel += 2;
+        }
 
-            if (session.killed)
-                throw new Error('killed');
-        }
-        catch (e) {
-            cleanup();
-            throw e;
-        }
+        await rtspClient.setup({
+            type: 'tcp',
+            port: channel,
+            path: video.control,
+            onRtp: (header, data) => {
+                if (session.killed)
+                    return;
+                const rtp = RtpPacket.deSerialize(data);
+                videoSender(rtp);
+            },
+        });
+        channel += 2;
+
+        if (session.killed)
+            throw new Error('killed');
     }
-    else {
-        const u = new URL(url);
-        socket = net.connect(parseInt(u.port), u.hostname);
-
-        const startStreaming = async () => {
-            try {
-                await waitForFirstVideoRtcp(console, session);
-
-                while (!session.killed) {
-                    const header = await readLength(socket, 2);
-                    const length = header.readUInt16BE(0);
-                    const data = await readLength(socket, length);
-                    const rtp = RtpPacket.deSerialize(data);
-                    if (!session.killed)
-                        break;
-                    const isAudio = audioPayloadTypes.includes(rtp.header.payloadType);
-                    const isVideo = videoPayloadTypes.includes(rtp.header.payloadType);
-                    if (isAudio && isVideo)
-                        throw new Error('audio and video on same channel?');
-
-                    if (isAudio) {
-                        if (audioMode.udpPort) {
-                            session.audioReturn.send(rtp.serialize(), audioMode.udpPort, '127.0.0.1');
-                        }
-                        else {
-                            audioSender(rtp);
-                        }
-                    }
-                    else if (isVideo) {
-                        videoSender(rtp);
-                    }
-                    else {
-                        console.warn('invalid payload type', rtp.header.payloadType);
-                    }
-                }
-            }
-            catch (e) {
-                console.error('streaming ended', e);
-            }
-            finally {
-                cleanup();
-            }
-        }
-
-        process.nextTick(startStreaming);
+    catch (e) {
+        cleanup();
+        throw e;
     }
 
     const parsedSdp = parseSdp(sdp);
@@ -160,9 +109,6 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
     );
     audioSender = as.sendRtp;
     as.sendRtcp();
-
-    const audioPayloadTypes = parsedSdp.msections.find(msection => msection.type === 'audio')?.payloadTypes;
-    const videoPayloadTypes = video?.payloadTypes;
 
     if (rtspClient) {
         waitForFirstVideoRtcp(console, session).then(async () => {
