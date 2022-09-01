@@ -1,5 +1,4 @@
 import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
-import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
 import { getSpsPps, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { FFmpegInput } from '@scrypted/sdk';
@@ -77,9 +76,6 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
                 },
             });
             channel += 2;
-            await waitForFirstVideoRtcp(console, session);
-            await rtspClient.play();
-            rtspClient.readLoop().catch(() => { }).finally(cleanup);
 
             if (session.killed)
                 throw new Error('killed');
@@ -167,6 +163,18 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
 
     const audioPayloadTypes = parsedSdp.msections.find(msection => msection.type === 'audio')?.payloadTypes;
     const videoPayloadTypes = video?.payloadTypes;
+
+    if (rtspClient) {
+        waitForFirstVideoRtcp(console, session).then(async () => {
+            try {
+                await rtspClient.play();
+                await rtspClient.readLoop();
+            }
+            finally {
+                cleanup();
+            }
+        });
+    }
 
     return sdp;
 }
