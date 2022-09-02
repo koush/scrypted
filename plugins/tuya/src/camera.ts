@@ -387,7 +387,8 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         return [
             {
-                id: 'default',
+                id: 'cloud-rtsp',
+                name: 'Cloud RTSP',
                 container: 'rtsp',
                 video: {
                     codec: 'h264',
@@ -474,7 +475,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
         }
 
         // By the time this is called, scrypted would have already reported the device
-        // Only set light switch on cameras that have a status light indicator.
+        // Only set light switch on cameras that have a light switch.
 
         if (TuyaDevice.hasLightSwitch(camera)) {
             this.getDevice(this.nativeLightSwitchId)?.updateState(camera);

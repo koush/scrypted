@@ -5,6 +5,8 @@ This is a Tuya controller that integrates Tuya devices, specifically cameras, in
 The plugin will discover all the cameras within Tuya Cloud IoT project and report them to Scrypted, including motion events, for the ones that are supported.
 
 ## Requirements
+
+### Access Id, Access Key, and User Id
 In order to retrieve `Access Id` and `Access Key`, you must follow the guide below:
 - [Using Smart Home PaaS (TuyaSmart, SmartLife, ect...)](https://developer.tuya.com/en/docs/iot/Platform_Configuration_smarthome?id=Kamcgamwoevrx&_source=6435717a3be1bc67fdd1f6699a1a59ac)
 
@@ -12,12 +14,8 @@ In order to retrieve `Access Id` and `Access Key`, you must follow the guide bel
 
 Once you have retreived both the `Access Id` and `Access Key` from the project, you can get the `User Id` by going to Tuya Cloud IoT -> Select the Project -> Devices -> Link Tuya App Account -> and then get the UID.
 
-You also need to enable Messages Service in your project in order to receive real time notifications to Scrypted. (motion events, online/offline, light switch ect...) The way this is achieved is by following this [guide](https://developer.tuya.com/en/docs/iot/subscribe-mq?id=Kavqcrvckbh9h). 
+### Tuya Pulsar
+You need to enable Messages Service in your project in order to receive real time notifications to Scrypted. (motion events, online/offline, light switch ect...) The way this is achieved is by following this [guide](https://developer.tuya.com/en/docs/iot/subscribe-mq?id=Kavqcrvckbh9h). 
 
 - You do not need to set an alert notification of your phone.
-- This might not be necessary in the future if I believe MQTT is the way to go, but in the mean time, TuyaPulse is required for this project.
-
-
-## TODOs
-- Fix 2-way talk for supported platforms (Can only work with WebRTC since we only get one stream with RTSPS)
-- Add support for camera doorbells (Just need to implement doorbell notification)
+  

@@ -202,14 +202,14 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
             }
 
             if (TuyaDevice.hasMotionDetection(camera)) {
-                deviceInfo.push(`- Motion Detection`);
+                deviceInfo.push(`- Motion Detection Supported`);
                 device.interfaces.push(ScryptedInterface.MotionSensor);
             }
 
             // Device Provider
 
             if (TuyaDevice.hasLightSwitch(camera)) {
-                deviceInfo.push(`- Light Switch`);
+                deviceInfo.push(`- Has Light Switch`);
                 device.interfaces.push(ScryptedInterface.DeviceProvider);
             }
 

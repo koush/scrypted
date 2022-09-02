@@ -46,5 +46,5 @@
       "@types/uuid": "^8.3.4",
       "@types/ws": "^8.5.3"
    },
-   "version": "0.0.7-beta.0"
+   "version": "0.0.7-beta.1"
 }
