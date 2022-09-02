@@ -1,6 +1,7 @@
 # ONVIF Plugin for Scrypted
 
 Import ONVIF cameras into Scrypted.
+Cameras must support the ONVIF-T profile to receive motion events.
 
 # ONVIF NVR Notes
 
