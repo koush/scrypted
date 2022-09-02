@@ -1,7 +1,7 @@
 const path = require('path');
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 
-const scryptedServer = `https://${process.env.SCRYPTED_SERVER || '127.0.0.1'}:10443`;
+const scryptedServer = `https://${process.env.SCRYPTED_SERVER || '127.0.0.1:10443'}`;
 
 const proxyOpts = {
   changeOrigin: true,

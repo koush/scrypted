@@ -57,6 +57,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
     dcDeferred = new Deferred<RTCDataChannel>();
     microphone: RTCRtpSender;
     micEnabled = false;
+    onPeerConnection: (pc: RTCPeerConnection) => Promise<void>;
     options: RTCSignalingOptions = {
         userAgent: getUserAgent(),
         capabilities: {
@@ -121,6 +122,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
         const pc = this.pc = new RTCPeerConnection(setup.configuration);
         this.pcDeferred.resolve(pc);
+        await this.onPeerConnection?.(pc)
 
         // pc.addEventListener('connectionstatechange', checkConn);
         pc.addEventListener('iceconnectionstatechange', checkConn);
