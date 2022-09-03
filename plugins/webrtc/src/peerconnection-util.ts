@@ -13,6 +13,18 @@ export function waitConnected(pc: RTCPeerConnection) {
     });
 }
 
+export function waitIceConnected(pc: RTCPeerConnection) {
+    return new Promise(resolve => {
+        const check = () => {
+            if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                resolve(undefined);
+            }
+        };
+        check();
+        pc.iceConnectionStateChange.subscribe(check);
+    });
+}
+
 export function waitClosed(pc: RTCPeerConnection) {
     return new Promise(resolve => {
         pc.iceGatheringStateChange.subscribe(() => {

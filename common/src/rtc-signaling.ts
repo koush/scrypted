@@ -235,8 +235,14 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
 function logSendCandidate(console: Console, type: string, session: RTCSignalingSession): RTCSignalingSendIceCandidate {
     return async (candidate) => {
-        // console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
-        return session.addIceCandidate(candidate);
+        try {
+            // console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
+            await session.addIceCandidate(candidate);
+        }
+        catch (e) {
+            console.error('addIceCandidate error', e);
+            throw e;
+        }
     }
 }
 
