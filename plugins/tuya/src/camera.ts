@@ -1,8 +1,10 @@
-import { ScryptedDeviceBase, VideoCamera, MotionSensor, BinarySensor, MediaObject, ScryptedInterface, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger, Intercom } from "@scrypted/sdk";
-import sdk from '@scrypted/sdk';
+import sdk, { ScryptedDeviceBase, VideoCamera, MotionSensor, BinarySensor, MediaObject, MediaStreamOptions, MediaStreamUrl, ScryptedMimeTypes, ResponseMediaStreamOptions, OnOff, DeviceProvider, Online, Logger, Intercom, RTCSignalingClient, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingChannel, RTCSessionControl } from "@scrypted/sdk";
+import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { TuyaController } from "./main";
-import { TuyaDeviceConfig } from "./tuya/const";
+import { MQTTConfig, TuyaDeviceConfig, DeviceWebRTConfig, WebRTCMQMessage, OfferMessage, CandidateMessage, AnswerMessage } from "./tuya/const";
 import { TuyaDevice } from "./tuya/device";
+import { TuyaMQ } from "./tuya/mq";
+import { randomUUID } from "crypto";
 const { deviceManager } = sdk;
 
 export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online {
@@ -51,7 +53,174 @@ export class TuyaCameraLight extends ScryptedDeviceBase implements OnOff, Online
     }
 }
 
-export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff, Online {
+class TuyaRTCSessionControl implements RTCSessionControl {
+
+    constructor(
+        private readonly sessionId: string,
+        private mqtt: TuyaMQ,
+        private readonly mqttWebRTConfig: MQTTConfig, 
+        private readonly deviceWebRTConfig: DeviceWebRTConfig,
+    ) {
+    }
+
+    async getRefreshAt(): Promise<number | void> {}
+
+    async extendSession(): Promise<void> {}
+
+    async setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {}
+
+    async endSession(): Promise<void> {
+        let webRTCMessage: WebRTCMQMessage = {
+            protocol: 302,
+            pv: "2.2",
+            t: Date.now(),
+            data: {
+                header: {
+                    type: 'disconnect',
+                    from: this.mqttWebRTConfig.source_topic.split('/')[3],
+                    to: this.deviceWebRTConfig.id,
+                    sub_dev_id: '',
+                    sessionid: this.sessionId,
+                    moto_id: this.deviceWebRTConfig.moto_id,
+                    tid: ''
+                },
+                msg: {
+                    mode: 'webrtc'
+                }
+            }
+        };
+
+        this.mqtt.publish(JSON.stringify(webRTCMessage));
+    }
+}
+
+class TuyaRTCSignalingSesion implements RTCSignalingSession {
+    private readonly sessionId: string;
+
+    constructor(
+        private mqtt: TuyaMQ,
+        private readonly mqttWebRTConfig: MQTTConfig, 
+        private readonly deviceWebRTConfig: DeviceWebRTConfig,
+        private readonly log: Logger
+    ) {
+        this.sessionId = randomUUID();
+    }
+
+    async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
+        return new Promise((resolve, reject) => {
+            if (type !== 'answer')
+                reject(Error('[WebRTC] - Can only create answer value.'));
+
+            const messageHandler = (_client: any, message: any) => {
+                const webRTCMessage = JSON.parse(message) as WebRTCMQMessage;
+
+                this.log.i(`[WebRTC] - TuyaMQ message received: ${JSON.stringify(webRTCMessage)}`);
+
+                if (webRTCMessage.data.header.type == 'answer') {
+                    const answer = webRTCMessage.data.msg as AnswerMessage;
+                    resolve({
+                        sdp: answer.sdp,
+                        type: 'answer'
+                    });
+                } else if (webRTCMessage.data.header.type == 'candidate') {
+                    const candidate = webRTCMessage.data.msg as CandidateMessage;
+                    if (!candidate?.candidate || candidate.candidate == '') {
+                        return;
+                    }
+
+                    sendIceCandidate({
+                        candidate: candidate.candidate,
+                        sdpMid: '0',
+                        sdpMLineIndex: 0            
+                    });
+                } else {
+                    this.log.e('[WebRTC] - TuyaMQ: There was an error trying to get an answer or candidate from TuyaMQ.');
+                    this.mqtt.removeMessageListener(messageHandler);
+                    this.mqtt.stop();
+                    reject(new Error('[WebRTC] - TuyaMQ: There was an error trying to get an answer or candidate from TuyaMQ.'));
+                }
+            }
+
+            this.mqtt.message(messageHandler);
+        });
+    }
+
+    async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> {
+        if (description.type !== 'offer') 
+            throw new Error("This only accepts offer request.");
+
+        let offerMessage: OfferMessage = {
+            mode: 'webrtc',
+            sdp: description.sdp,
+            auth: this.deviceWebRTConfig.auth,
+            stream_type: 1
+        }
+
+        let webRTCMessage: WebRTCMQMessage = {
+            protocol: 302,
+            pv: "2.2",
+            t: Date.now(),
+            data: {
+                header: {
+                    type: 'offer',
+                    from: this.mqttWebRTConfig.source_topic.split('/')[3],
+                    to: this.deviceWebRTConfig.id,
+                    sub_dev_id: '',
+                    sessionid: this.sessionId,
+                    moto_id: this.deviceWebRTConfig.moto_id,
+                    tid: ''
+                },
+                msg: offerMessage
+            }
+        };
+
+        this.mqtt.publish(JSON.stringify(webRTCMessage));
+        this.log.i(`[WebRTC] - TuyaMQ: Sent Offer w/ sdp.`);
+    }
+
+    async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
+        const acandidate = candidate.candidate ? `a=${candidate.candidate}` : '';
+
+        let candidateMessage: CandidateMessage = {
+            mode: 'webrtc',
+            candidate: acandidate
+        }
+
+        let webRTCMQMessage: WebRTCMQMessage = {
+            protocol: 302,
+            pv: '2.2',
+            t: Date.now(),
+            data: {
+                header: {
+                    type: 'candidate',
+                    from: this.mqttWebRTConfig.source_topic.split('/')[3],
+                    to: this.deviceWebRTConfig.id,
+                    sub_dev_id: '',
+                    sessionid: this.sessionId,
+                    moto_id: this.deviceWebRTConfig.moto_id,
+                    tid: ''
+                },
+                msg: candidateMessage 
+            }
+        };
+
+        this.mqtt.publish(JSON.stringify(webRTCMQMessage));
+        this.log.i(`[WebRTC] - TuyaMQ: Sent candidate.`);
+    }
+
+    async getOptions(): Promise<RTCSignalingOptions> {
+        return {
+            requiresOffer: true,
+            disableTrickle: false
+        };
+    }
+
+    get id(): string {
+        return this.sessionId;
+    }
+}
+
+export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, VideoCamera, BinarySensor, MotionSensor, OnOff, Online, RTCSignalingChannel {
     private cameraLightSwitch?: TuyaCameraLight
     private previousMotion?: any;
     private previousDoorbellRing?: any;
@@ -124,19 +293,19 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
         const camera = this.findCamera();
 
         if (!camera) {
-            this.logger.w(`Could not find camera for ${this.name} to show stream.`);
+            this.logger.e(`Could not find camera for ${this.name} to show stream.`);
             throw new Error(`Failed to stream ${this.name}: Camera not found.`);
         }
 
         if (!camera.online) {
-            this.logger.w(`${this.name} is currently offline. Will not be able to stream until device is back online.`);
+            this.logger.e(`${this.name} is currently offline. Will not be able to stream until device is back online.`);
             throw new Error(`Failed to stream ${this.name}: Camera is offline.`);
         }
 
         const rtsps = await this.controller.cloud?.getRTSPS(camera);
 
         if (!rtsps) {
-            this.logger.w("There was an error retreiving camera's rtsps for streamimg.");
+            this.logger.e("There was an error retreiving camera's rtsps for streamimg.");
             throw new Error(`Failed to capture stream for ${this.name}: RTSPS link not found.`);
         }
 
@@ -148,10 +317,80 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
         return this.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
     }
 
+    async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
+        const camera = this.findCamera();
+
+        if (!camera) {
+            this.logger.e(`Could not find camera for ${this.name} to create rtc signal session.`);
+            throw new Error(`Failed to create rtc config for ${this.name}: Camera not found.`);
+        }
+
+        const deviceWebRTConfigResponse = await this.controller.cloud?.getDeviceWebRTConfig(camera);
+
+        if (!deviceWebRTConfigResponse?.success) {
+            this.logger.e(`[${this.name}] There was an error retrieving WebRTConfig.`);
+            throw new Error(`Failed to create device rtc config for ${this.name}: request failed: ${deviceWebRTConfigResponse?.result}.`);
+        }
+
+        const deviceWebRTConfig = deviceWebRTConfigResponse.result;
+
+        let mqResponse = await this.controller.cloud?.getWebRTCMQConfig(deviceWebRTConfig);
+        if (!mqResponse?.success) {
+            this.logger.e(`[${this.name}] There was an error retrieving WebRTC MQTT RTC Config.`);
+            throw new Error(`Failed to create rtc mqtt config for ${this.name}: request failed: ${mqResponse?.result}.`);
+        }
+
+        const mqttWebRTConfig = mqResponse.result;
+
+        const mqtt = new TuyaMQ(mqttWebRTConfig);
+        await mqtt.connect();
+
+        const tuyaSignalingSession = new TuyaRTCSignalingSesion(mqtt, mqttWebRTConfig, deviceWebRTConfig, this.logger);
+
+        const iceServers = deviceWebRTConfig.p2p_config.ices.map((ice): RTCIceServer => {
+            return {
+                credential: ice.credential,
+                urls: ice.urls,
+                username: ice.username    
+            }
+        });
+
+        const offerSetup: RTCAVSignalingSetup = {
+            type: "offer",
+            configuration: {
+                iceServers: iceServers
+            },
+            audio: {
+                direction: 'sendrecv',
+            },
+            video: {
+                direction: 'recvonly',
+            },
+        }
+
+        const tuyaAnswerSetup: Partial<RTCAVSignalingSetup> = {}
+
+        await connectRTCSignalingClients(
+            this.console, 
+            session, 
+            offerSetup, 
+            tuyaSignalingSession, 
+            tuyaAnswerSetup
+        );
+
+        return new TuyaRTCSessionControl(
+            tuyaSignalingSession.id,
+            mqtt, 
+            mqttWebRTConfig, 
+            deviceWebRTConfig
+        );
+    }
+
     async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
         return [
             {
-                id: 'default',
+                id: 'cloud-rtsp',
+                name: 'Cloud RTSP',
                 container: 'rtsp',
                 video: {
                     codec: 'h264',
@@ -221,7 +460,7 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
                 } else if (this.previousMotion !== motionDetectedStatus.value) {
                     this.previousMotion = motionDetectedStatus.value;
                     this.triggerMotion();
-                }    
+                }
             }
         }
 
@@ -238,7 +477,8 @@ export class TuyaCamera extends ScryptedDeviceBase implements DeviceProvider, Vi
         }
 
         // By the time this is called, scrypted would have already reported the device
-        // Only set light switch on cameras that have a status light indicator.
+        // Only set light switch on cameras that have a light switch.
+
         if (TuyaDevice.hasLightSwitch(camera)) {
             this.getDevice(this.nativeLightSwitchId)?.updateState(camera);
         }

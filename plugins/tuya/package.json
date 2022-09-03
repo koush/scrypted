@@ -27,7 +27,8 @@
       ],
       "pluginDependencies": [
          "@scrypted/prebuffer-mixin",
-         "@scrypted/snapshot"
+         "@scrypted/snapshot",
+         "@scrypted/webrtc"
       ]
    },
    "dependencies": {
@@ -35,6 +36,8 @@
       "@scrypted/sdk": "file:../../sdk",
       "axios": "^0.27.2",
       "crypto-js": "^4.1.1",
+      "mqtt": "^4.3.7",
+      "mqtt-packet": "^8.1.2",
       "ws": "^8.8.1"
    },
    "devDependencies": {
@@ -43,5 +46,5 @@
       "@types/uuid": "^8.3.4",
       "@types/ws": "^8.5.3"
    },
-   "version": "0.0.6"
+   "version": "0.0.7-beta.2"
 }

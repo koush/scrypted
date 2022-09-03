@@ -1,3 +1,4 @@
+import { TuyaCloud } from "./cloud";
 import { TuyaDeviceStatus, TuyaDeviceConfig as TuyaDeviceConfig } from "./const";
 
 export namespace TuyaDevice {
@@ -69,6 +70,15 @@ export namespace TuyaDevice {
 
         return getStatus(camera, motionDetectionCodes);
     }
+
+    // Supports WebRTC
+
+    export async function supportsWebRTC(camera: TuyaDeviceConfig, cloud: TuyaCloud) {
+        const webRTConfig = await cloud.getDeviceWebRTConfig(camera);
+        return webRTConfig.success && webRTConfig.result.supports_webrtc;
+    }
+
+    // Device Status
 
     function getStatus(camera: TuyaDeviceConfig, statusCode: string[]) : TuyaDeviceStatus | undefined {
         return camera.status.find(value => statusCode.includes(value.code));

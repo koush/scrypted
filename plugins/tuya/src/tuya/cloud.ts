@@ -1,7 +1,8 @@
 import { Axios, Method } from "axios";
 import { HmacSHA256, SHA256, lib } from 'crypto-js';
 import { getTuyaCloudEndpoint, TuyaSupportedCountry } from "./utils";
-import { DeviceFunction, TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse } from "./const";
+import { TuyaDeviceStatus, RTSPToken, TuyaDeviceConfig, TuyaResponse, MQTTConfig, DeviceWebRTConfig as DeviceWebRTConfig } from "./const";
+import { randomBytes } from "crypto";
 
 interface Session {
     accessToken: string;
@@ -97,7 +98,9 @@ export class TuyaCloud {
 
     // Camera Functions
 
-    public async getRTSPS(camera: TuyaDeviceConfig): Promise<RTSPToken | undefined> {
+    public async getRTSPS(
+        camera: TuyaDeviceConfig
+    ): Promise<RTSPToken | undefined> {
         interface RTSPResponse {
             url: string
         }
@@ -115,6 +118,39 @@ export class TuyaCloud {
         } else {
             return undefined;
         }
+    }
+
+    public async getDeviceWebRTConfig(camera: TuyaDeviceConfig) : Promise<TuyaResponse<DeviceWebRTConfig>> {
+        const response = await this.get<DeviceWebRTConfig>(
+            `/v1.0/users/${this.userId}/devices/${camera.id}/webrtc-configs`
+        );
+
+        return response;
+    }
+
+    public async getWebRTCMQConfig(webRTCDeviceConfig: DeviceWebRTConfig) : Promise<TuyaResponse<MQTTConfig>> {
+        const response = await this.post<any>(
+            `/v1.0/open-hub/access/config`,
+            {
+                link_id: randomBytes(8).readUInt8(),
+                uid: this.userId,
+                link_type: 'mqtt',
+                topics: 'ipc' 
+            }
+        );
+
+        if (response.success) {
+            response.result = {
+                ...response.result,
+                sink_topic: (response.result.sink_topic.ipc as string)
+                                .replace('{device_id}', webRTCDeviceConfig.id)
+                                .replace('moto_id', webRTCDeviceConfig.moto_id),
+                source_topic: response.result.source_topic.ipc as string
+            }
+            return response
+        }
+
+        return response;
     }
 
     public getSessionUserId(): string | undefined {
