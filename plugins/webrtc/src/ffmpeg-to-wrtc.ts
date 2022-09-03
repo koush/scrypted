@@ -461,7 +461,10 @@ export async function createRTCPeerConnectionSink(
         disableIntercom,
     });
 
-    const track = await connection.addTrack(mo);
+    const track = await connection.addTrack(mo, {
+        audioMid: '0',
+        videoMid: '1',
+    });
 
     track.control.cleanup = async () => {
         track.cleanup(true);
