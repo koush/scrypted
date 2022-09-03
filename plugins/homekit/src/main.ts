@@ -297,6 +297,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             category: Categories.BRIDGE,
             addIdentifyingMaterial: true,
             advertiser: this.storageSettings.values.advertiserOverride,
+            bind: this.storageSettings.values.addressOverride || undefined,
         };
 
         this.bridge.publish(publishInfo, true);
