@@ -359,6 +359,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
             category,
             addIdentifyingMaterial: false,
             advertiser: this.storageSettings.values.advertiserOverride,
+            bind: this.storageSettings.values.addressOverride || undefined,
         });
     }
 
