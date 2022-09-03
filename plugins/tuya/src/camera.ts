@@ -124,6 +124,10 @@ class TuyaRTCSignalingSesion implements RTCSignalingSession {
                     });
                 } else if (webRTCMessage.data.header.type == 'candidate') {
                     const candidate = webRTCMessage.data.msg as CandidateMessage;
+                    if (!candidate?.candidate || candidate.candidate == '') {
+                        return;
+                    }
+
                     sendIceCandidate({
                         candidate: candidate.candidate,
                         sdpMid: '0',
@@ -145,11 +149,9 @@ class TuyaRTCSignalingSesion implements RTCSignalingSession {
         if (description.type !== 'offer') 
             throw new Error("This only accepts offer request.");
 
-        let sdp = description.sdp?.replace(/\r\na=extmap[^\r\n]*/g, '') || '';
-
         let offerMessage: OfferMessage = {
             mode: 'webrtc',
-            sdp: sdp,
+            sdp: description.sdp,
             auth: this.deviceWebRTConfig.auth,
             stream_type: 1
         }
