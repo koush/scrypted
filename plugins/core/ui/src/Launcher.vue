@@ -18,6 +18,11 @@
                                 <v-list-item-title style="text-align: center;">{{ application.name }}
                                 </v-list-item-title>
                             </v-list-item>
+                            <v-list-item>
+                                <v-progress-circular :size="16" color="primary" indeterminate></v-progress-circular>
+                                <v-list-item-title style="text-align: center;">Loading...
+                                </v-list-item-title>
+                            </v-list-item>
                         </v-list>
                         <div style="justify-content: center; display: flex;">
                             <v-tooltip bottom>
@@ -81,7 +86,16 @@ export default {
     },
     data() {
         return {
-            applications: null,
+            loading: true,
+            applications: [
+                {
+                    name: 'Management Console',
+                    icon: 'fa-cog',
+                    click: () => {
+                        this.$router.push('/component/plugin');
+                    }
+                },
+            ],
         }
     },
     mounted() {
@@ -92,9 +106,10 @@ export default {
             axios.get("/logout").then(() => window.location.reload());
         },
         refreshApplications() {
-            console.log('check', this.$store.state.isConnected, this.$store.state.isLoggedIn)
             if (!this.$store.state.isConnected || !this.$store.state.isLoggedIn || this.$route.name !== 'Launcher')
                 return;
+
+            this.loading = false;
 
             const { systemManager } = this.$scrypted;
             const applications = getAllDevices(systemManager).filter(device => device.interfaces.includes(ScryptedInterface.LauncherApplication));
