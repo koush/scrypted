@@ -1,0 +1,47 @@
+{
+   "name": "@scrypted/reolink",
+   "version": "0.0.3",
+   "description": "Reolink Plugin for Scrypted",
+   "author": "Scrypted",
+   "license": "Apache",
+   "scripts": {
+      "scrypted-setup-project": "scrypted-setup-project",
+      "prescrypted-setup-project": "scrypted-package-json",
+      "build": "scrypted-webpack",
+      "prepublishOnly": "NODE_ENV=production scrypted-webpack",
+      "prescrypted-vscode-launch": "scrypted-webpack",
+      "scrypted-vscode-launch": "scrypted-deploy-debug",
+      "scrypted-deploy-debug": "scrypted-deploy-debug",
+      "scrypted-debug": "scrypted-debug",
+      "scrypted-deploy": "scrypted-deploy",
+      "scrypted-readme": "scrypted-readme",
+      "scrypted-package-json": "scrypted-package-json"
+   },
+   "keywords": [
+      "scrypted",
+      "plugin",
+      "reolink",
+      "camera"
+   ],
+   "scrypted": {
+      "name": "Reolink Camera Plugin",
+      "type": "DeviceProvider",
+      "interfaces": [
+         "DeviceProvider",
+         "DeviceCreator"
+      ],
+      "pluginDependencies": [
+         "@scrypted/prebuffer-mixin"
+      ]
+   },
+   "dependencies": {
+      "@koush/axios-digest-auth": "^0.8.5",
+      "@scrypted/sdk": "file:../../sdk",
+      "@scrypted/common": "file:../../common",
+      "@types/multiparty": "^0.0.33",
+      "multiparty": "^4.2.2"
+   },
+   "devDependencies": {
+      "@types/node": "^16.11.0"
+   }
+}
