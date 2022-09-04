@@ -129,7 +129,7 @@ class TuyaRTCSignalingSesion implements RTCSignalingSession {
                     }
 
                     sendIceCandidate({
-                        candidate: candidate.candidate,
+                        candidate: candidate.candidate.trim(),
                         sdpMid: '0',
                         sdpMLineIndex: 0            
                     });

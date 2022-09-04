@@ -80,6 +80,9 @@ export async function createRTCPeerConnectionSource(options: {
             pc.iceConnectionStateChange.subscribe(() => {
                 console.log('iceConnectionState', pc.iceConnectionState);
             });
+            pc.connectionStateChange.subscribe(() => {
+                console.log('connectionState', pc.connectionState);
+            });
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
             audioTransceiver.mid = '0';
             audioTransceiver.onTrack.subscribe((track) => {

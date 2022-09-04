@@ -204,7 +204,7 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
 
                 enabledStreams = {
                     defaultValue: getDefaultPrebufferedStreams(msos)?.map(mso => mso.name),
-                    choices: msos.map(mso => mso.name),
+                    choices: msos.map((mso, index) => mso.name || `Stream ${index}`),
                     hide: false,
                 };
 

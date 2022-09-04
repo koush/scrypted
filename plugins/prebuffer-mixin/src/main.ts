@@ -194,7 +194,7 @@ class PrebufferSession {
   }
 
   get streamName() {
-    return this.advertisedMediaStreamOptions.name;
+    return this.advertisedMediaStreamOptions.name || `Stream ${this.streamId}`;
   }
 
   clearPrebuffers() {
@@ -301,7 +301,7 @@ class PrebufferSession {
     const elapsed = Date.now() - start;
     const bitrate = Math.round(total / elapsed * 8);
 
-    const group = this.streamName ? `Stream: ${this.streamName}` : 'Stream';
+    const group = `Stream: ${this.streamName}`;
 
     settings.push(
       {
