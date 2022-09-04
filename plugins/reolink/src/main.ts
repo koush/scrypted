@@ -56,7 +56,9 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
         (async () => {
             while (!killed) {
                 try {
-                    this.motionDetected = await client.getMotionState();
+                    const {value, data} = await client.getMotionState();
+                    this.motionDetected = value;
+                    ret.emit('data', data);
                 }
                 catch (e) {
                     this.console.error('polling error', e);

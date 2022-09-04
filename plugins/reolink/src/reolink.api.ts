@@ -31,7 +31,10 @@ export class ReolinkCameraClient {
         const response = await this.digestAuth.request({
             url: url.toString(),
         });
-        return !!response.data[0].value.state;
+        return {
+            value: !!response.data[0].value.state,
+            data: response.data,
+        };
     }
 
     async jpegSnapshot() {
