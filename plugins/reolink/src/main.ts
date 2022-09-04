@@ -61,7 +61,7 @@ class ReolinkCamera extends RtspSmartCamera implements Camera {
                     ret.emit('data', data);
                 }
                 catch (e) {
-                    this.console.error('polling error', e);
+                    ret.emit('error', e);
                 }
                 await sleep(1000);
             }
