@@ -18,7 +18,7 @@
                                 <v-list-item-title style="text-align: center;">{{ application.name }}
                                 </v-list-item-title>
                             </v-list-item>
-                            <v-list-item>
+                            <v-list-item v-if="loading">
                                 <v-progress-circular :size="16" color="primary" indeterminate></v-progress-circular>
                                 <v-list-item-title style="text-align: center;">Loading...
                                 </v-list-item-title>
