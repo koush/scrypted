@@ -203,7 +203,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         cameras = self.arlo.GetDevices(['camera', "arloq", "doorbell"])
         for camera in cameras:
             if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
-                self.logger.debug(f"Skipping camera {camera['deviceId']} because its basestation was not found")
+                self.logger.info(f"Skipping camera {camera['deviceId']} because its basestation was not found")
                 continue
 
             device = {
@@ -219,13 +219,11 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                     ScryptedInterface.VideoCamera.value,
                     ScryptedInterface.Camera.value,
                     ScryptedInterface.MotionSensor.value,
+                    ScryptedInterface.Battery.value,
                 ],
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,
             }
-
-            if "batteryLevel" in camera["properties"]:
-                device["interfaces"].append(ScryptedInterface.Battery.value)
 
             devices.append(device)
 

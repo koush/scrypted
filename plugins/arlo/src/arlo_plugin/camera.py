@@ -15,7 +15,9 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
 
     def __init__(self, nativeId, arlo_device, arlo_basestation, provider):
         super().__init__(nativeId=nativeId)
-        self.logger_name = f"ArloCamera[{nativeId}]"
+
+        this_class = type(self)
+        self.logger_name = f"{this_class.__name__}[{nativeId}]"
 
         self.nativeId = nativeId
         self.arlo_device = arlo_device
@@ -25,18 +27,26 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         
         self._update_device_details(arlo_device)
 
-        self.stop_motion_subscription = False
+        self.stop_subscriptions = False
         self.start_motion_subscription()
+        self.start_battery_subscription()
 
     def __del__(self):
-        self.stop_motion_subscription = True
+        self.stop_subscriptions = True
 
     def start_motion_subscription(self):
         def callback(motionDetected):
             self.motionDetected = motionDetected
-            return self.stop_motion_subscription
+            return self.stop_subscriptions
 
         self.provider.arlo.SubscribeToMotionEvents(self.arlo_basestation, self.arlo_device, callback)
+
+    def start_battery_subscription(self):
+        def callback(batteryLevel):
+            self.batteryLevel = batteryLevel
+            return self.stop_subscriptions
+
+        self.provider.arlo.SubscribeToBatteryEvents(self.arlo_basestation, self.arlo_device, callback)
 
     async def getPictureOptions(self):
         return []
@@ -85,4 +95,6 @@ class ArloCamera(ScryptedDeviceBase, Camera, VideoCamera, MotionSensor, Battery,
         return await scrypted_sdk.mediaManager.createMediaObject(str.encode(rtsp_url), ScryptedMimeTypes.Url.value)
 
     def _update_device_details(self, arlo_device):
+        """For updating device details from the Arlo dictionary retrieved from Arlo's REST API.
+        """
         self.batteryLevel = arlo_device["properties"].get("batteryLevel")

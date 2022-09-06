@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/arlo",
-   "version": "0.2.13",
+   "version": "0.2.14",
    "description": "Arlo Plugin for Scrypted",
    "keywords": [
       "scrypted",
@@ -19,7 +19,8 @@
       "scrypted-debug": "scrypted-debug",
       "scrypted-deploy": "scrypted-deploy",
       "scrypted-readme": "scrypted-readme",
-      "scrypted-package-json": "scrypted-package-json"
+      "scrypted-package-json": "scrypted-package-json",
+      "scrypted-webpack": "scrypted-webpack"
    },
    "scrypted": {
       "name": "Arlo Camera Plugin",
