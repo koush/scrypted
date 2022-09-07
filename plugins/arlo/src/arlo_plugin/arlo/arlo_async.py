@@ -364,14 +364,11 @@ class Arlo(object):
         Use this method to subscribe to doorbell events. You must provide a callback function which will get called once per doorbell event.
 
         The callback function should have the following signature:
-        def callback(self)
+        def callback(self, event)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
         """
-
-        # TODO THIS FUNCTION DOES NOT WORK YET
-        # NEED TO DETERMINE WHAT EVENT TYPE DOORBELLS RETURN
 
         resource = f"siren/{doorbell.get('deviceId')}"
 
