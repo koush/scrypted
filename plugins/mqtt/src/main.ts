@@ -171,7 +171,12 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         super(options);
 
         this.device = systemManager.getDeviceById(this.id);
-        this.connectClient();
+        try {
+            this.connectClient();
+        }
+        catch (e) {
+            this.console.error('error while connecting client.', e);
+        }
 
         this.listener = this.device.listen(undefined, (eventSource, eventDetails, eventData) => {
             const { property } = eventDetails;
@@ -224,7 +229,6 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         else {
             this.storage.setItem(key, value.toString());
         }
-        this.client.end();
         this.connectClient();
     }
 
