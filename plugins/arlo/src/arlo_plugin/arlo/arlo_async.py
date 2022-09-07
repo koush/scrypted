@@ -359,12 +359,12 @@ class Arlo(object):
 
         asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
-    def SubscribeToDoorbellEvents(self, basestation, camera, callback):
+    def SubscribeToDoorbellEvents(self, basestation, doorbell, callback):
         """
         Use this method to subscribe to doorbell events. You must provide a callback function which will get called once per doorbell event.
 
         The callback function should have the following signature:
-        def callback(self, event)
+        def callback(self)
 
         This is an example of handling a specific event, in reality, you'd probably want to write a callback for HandleEvents()
         that has a big switch statement in it to handle all the various events Arlo produces.
@@ -373,13 +373,21 @@ class Arlo(object):
         # TODO THIS FUNCTION DOES NOT WORK YET
         # NEED TO DETERMINE WHAT EVENT TYPE DOORBELLS RETURN
 
-        resource = f"cameras/{camera.get('deviceId')}"
+        resource = f"siren/{doorbell.get('deviceId')}"
+
+        async def unpress_doorbell(callback):
+            # It's unclear what events correspond to arlo doorbell presses
+            # and which ones are unpresses, so we sleep and unset after
+            # a period of time
+            await asyncio.sleep(1)
+            callback(False)
 
         def callbackwrapper(self, event):
             properties = event.get('properties', {})
             stop = None
-            if 'motionDetected' in properties:
-                stop = callback(properties['motionDetected'])
+            if 'pattern' in properties and 'sirenType' in properties:
+                stop = callback(True)
+                asyncio.get_event_loop().create_task(unpress_doorbell(callback))
             if not stop:
                 return None
             return stop

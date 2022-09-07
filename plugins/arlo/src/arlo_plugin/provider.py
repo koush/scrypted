@@ -10,6 +10,7 @@ from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, Scrypt
 from .arlo import Arlo
 from .arlo.logging import logger as arlo_lib_logger
 from .camera import ArloCamera
+from .doorbell import ArloDoorbell
 from .logging import ScryptedDeviceLoggerMixin 
 
 class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery, ScryptedDeviceLoggerMixin):
@@ -225,6 +226,9 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "providerNativeId": self.nativeId,
             }
 
+            if camera['deviceType'] == 'doorbell':
+                device["interfaces"].append(ScryptedInterface.BinarySensor.value)
+
             devices.append(device)
 
             if camera["deviceId"] == camera["parentId"]:
@@ -259,4 +263,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             return None
         arlo_basestation = self.arlo_basestations[arlo_camera["parentId"]]
 
-        return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
+        if arlo_camera["deviceType"] == "doorbell":
+            return ArloDoorbell(nativeId, arlo_camera, arlo_basestation, self)
+        else:
+            return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
