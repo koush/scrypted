@@ -45,6 +45,7 @@ export class PluginComponent {
     async setMixins(id: string, mixins: string[]) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
         this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
+        this.scrypted.stateManager.updateDescriptor(pluginDevice);
         await this.scrypted.datastore.upsert(pluginDevice);
         // device may not exist, so force creation.
         this.scrypted.rebuildPluginDeviceMixinTable(id);
