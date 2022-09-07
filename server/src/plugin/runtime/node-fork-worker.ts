@@ -64,6 +64,6 @@ export class NodeForkWorker extends ChildProcessWorker {
     }
 
     get pid() {
-        return this.worker.pid;
+        return this.worker?.pid;
     }
 }

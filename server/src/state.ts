@@ -46,7 +46,7 @@ export class ScryptedStateManager extends EventRegistry {
         if (!eventInterface)
             throw new Error(`${property} is not a valid property`);
 
-        const changed = setState(device, property, value);
+        const changed = setState(device, property, value) && eventInterface !== ScryptedInterface.ScryptedDevice;
 
         const eventTime = device?.state?.[property]?.lastEventTime;
 
