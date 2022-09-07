@@ -20,8 +20,10 @@
         setting.value.choices ||
         setting.value.type === 'device' ||
         setting.value.type === 'interface' ||
-        !setting.value.multiple" v-model="setting.value" @input="onInput"></Setting>
-        <SettingMultiple v-else v-model="setting.value" @input="onInput">
+        !setting.value.multiple" v-model="setting.value" @input="onInput"
+          :device="setting.value.type === 'clippath' ? device : undefined"></Setting>
+        <SettingMultiple v-else v-model="setting.value" :device="setting.value.type === 'clippath' ? device : undefined"
+          @input="onInput">
         </SettingMultiple>
       </div>
     </v-flex>
@@ -119,7 +121,7 @@ export default {
       else {
         settings = [];
       }
-      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
+      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin) && hasFixedPhysicalLocation(this.device.type, this.device.interfaces)) {
         const inferredTypes = inferTypesFromInterfaces(
           this.device.type,
           this.device.providedType,
@@ -144,24 +146,22 @@ export default {
             },
           );
         }
-        if (hasFixedPhysicalLocation(this.device.type, this.device.interfaces)) {
-          const existingRooms = this.$store.state.scrypted.devices
-            .map(
-              (device) => this.$scrypted.systemManager.getDeviceById(device).room
-            )
-            .filter((room) => room);
+        const existingRooms = this.$store.state.scrypted.devices
+          .map(
+            (device) => this.$scrypted.systemManager.getDeviceById(device).room
+          )
+          .filter((room) => room);
 
-          editables.push(
-            {
-              group: 'Edit',
-              key: '__room',
-              title: 'Room',
-              value: this.device.room,
-              combobox: true,
-              choices: existingRooms,
-            },
-          );
-        }
+        editables.push(
+          {
+            group: 'Edit',
+            key: '__room',
+            title: 'Room',
+            value: this.device.room,
+            combobox: true,
+            choices: existingRooms,
+          },
+        );
 
         settings.splice(settings?.[0]?.group ? 0 : 1, 0, ...editables);
       }
