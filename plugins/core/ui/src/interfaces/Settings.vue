@@ -17,18 +17,21 @@
     <v-flex xs12 v-if="settingsGroupName !== 'extensions' || !showChips">
       <div v-for="setting in settingsGroup" :key="setting.key">
         <Setting v-if="
-          setting.value.choices ||
-          setting.value.type === 'device' ||
-          setting.value.type === 'interface' ||
-          !setting.value.multiple
-        " :device="device" v-model="setting.value" @input="onInput"></Setting>
-        <SettingMultiple v-else v-model="setting.value" :device="device">
+        setting.value.choices ||
+        setting.value.type === 'device' ||
+        setting.value.type === 'interface' ||
+        !setting.value.multiple" v-model="setting.value" @input="onInput"></Setting>
+        <SettingMultiple v-else v-model="setting.value" @input="onInput">
         </SettingMultiple>
       </div>
     </v-flex>
     <AvailableMixins v-else :device="device"></AvailableMixins>
 
     <slot name="append"></slot>
+    <v-card-actions v-if="device">
+      <v-spacer></v-spacer>
+      <v-btn @click="save" :disabled="!dirty" small>Save</v-btn>
+    </v-card-actions>
   </v-card>
 </template>
 <script>
@@ -39,6 +42,7 @@ import CardTitle from "../components/CardTitle.vue";
 import AvailableMixins from "../components/AvailableMixins.vue";
 import Mixin from "../components/Mixin.vue";
 import { ScryptedInterface } from "@scrypted/types";
+import { hasFixedPhysicalLocation, inferTypesFromInterfaces } from "../components/helpers";
 
 export default {
   components: {
@@ -90,6 +94,13 @@ export default {
       }
       return ret;
     },
+    dirty() {
+      for (const { value } of this.settings) {
+        if (JSON.stringify(value.value) !== JSON.stringify(value.originalValue))
+          return true;
+      }
+      return false;
+    }
   },
   methods: {
     onChange() { },
@@ -102,8 +113,61 @@ export default {
       let settings;
       if (!this.device) {
         settings = this.value.settings;
-      } else {
+      } else if (this.device.interfaces.includes(ScryptedInterface.Settings)) {
         settings = await this.rpc().getSettings();
+      }
+      else {
+        settings = [];
+      }
+      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
+        const inferredTypes = inferTypesFromInterfaces(
+          this.device.type,
+          this.device.providedType,
+          this.device.interfaces
+        );
+        const editables = [
+          {
+            group: 'Edit',
+            key: '__name',
+            title: 'Name',
+            value: this.device.name,
+          },
+        ];
+        if (inferredTypes.length > 1) {
+          editables.push(
+            {
+              group: 'Edit',
+              key: '__type',
+              title: 'Type',
+              value: this.device.type,
+              choices: inferredTypes,
+            },
+          );
+        }
+        if (hasFixedPhysicalLocation(this.device.type, this.device.interfaces)) {
+          const existingRooms = this.$store.state.scrypted.devices
+            .map(
+              (device) => this.$scrypted.systemManager.getDeviceById(device).room
+            )
+            .filter((room) => room);
+
+          editables.push(
+            {
+              group: 'Edit',
+              key: '__room',
+              title: 'Room',
+              value: this.device.room,
+              combobox: true,
+              choices: existingRooms,
+            },
+          );
+        }
+
+        settings.splice(settings?.[0]?.group ? 0 : 1, 0, ...editables);
+      }
+
+      for (const setting of settings) {
+        setting.originalValue = setting.value;
       }
       this.settings = settings.map((setting) => ({
         key: setting.key,
@@ -111,6 +175,26 @@ export default {
       }));
 
       this.updateSettingsGroupName();
+    },
+    save() {
+      for (const { value } of this.settings) {
+        if (value.key === '__name') {
+          this.device.setName(value.value);
+          continue;
+        }
+        if (value.key === '__type') {
+          this.device.setType(value.value);
+          continue;
+        }
+        if (value.key === '__room') {
+          this.device.setRoom(value.value);
+          continue;
+        }
+        if (JSON.stringify(value.value) !== JSON.stringify(value.originalValue)) {
+          this.device.putSetting(value.key, value.value);
+          // value.originalValue = value.value;
+        }
+      }
     },
     updateSettingsGroupName() {
       if (!this.usingDefaultSettingsGroupName) {
