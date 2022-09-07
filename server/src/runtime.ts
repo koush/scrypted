@@ -697,12 +697,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         // JSON stringify over rpc turns undefined into null.
         if (device.nativeId === null)
             device.nativeId = undefined;
-        let newDevice = false;
         let pluginDevice = this.findPluginDevice(pluginId, device.nativeId);
         if (!pluginDevice) {
             pluginDevice = new PluginDevice(this.datastore.nextId().toString());
             pluginDevice.stateVersion = PLUGIN_DEVICE_STATE_VERSION;
-            newDevice = true;
         }
         this.pluginDevices[pluginDevice._id] = pluginDevice;
         pluginDevice.pluginId = pluginId;
@@ -750,11 +748,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.room, getProvidedRoomOrDefault(pluginDevice));
 
         const ret = this.notifyPluginDeviceDescriptorChanged(pluginDevice);
-
-        if (newDevice) {
-            const logger = this.getDeviceLogger(pluginDevice);
-            logger.log('a', 'New Device Added.');
-        }
 
         return {
             pluginDevicePromise: ret,
