@@ -27,6 +27,9 @@ jobs:
         with:
           path: server
 
+      - name: Print Version
+        run: echo "Version ${{ github.event.inputs.package_version || steps.package-version.outputs.current-version }}"
+
       - name: Get current date
         id: date
         run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
