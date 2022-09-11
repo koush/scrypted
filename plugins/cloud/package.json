@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/cloud",
-   "description": "Scrypted Cloud plugin which makes your hub accessible at home.scrypted.app",
+   "description": "Scrypted Cloud plugin which makes your hub accessible at home.scrypted.io",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",

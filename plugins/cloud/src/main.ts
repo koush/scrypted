@@ -14,11 +14,12 @@ import bpmux from 'bpmux';
 import { PushManager } from './push';
 import type { CORSControl } from '../../../server/src/services/cors';
 import os from 'os';
+import crypto from 'crypto';
 
 const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
-const SCRYPTED_SERVER = 'home.scrypted.app';
+const SCRYPTED_SERVER = 'home.scrypted.io';
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
 
@@ -59,6 +60,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         lastPersistedRegistrationId: {
             hide: true,
         },
+        registrationSecret: {
+            hide: true,
+        }
     });
 
     constructor() {
@@ -77,14 +81,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
 
         this.manager.registrationId.then(async registrationId => {
-            if (this.storageSettings.values.lastPersistedRegistrationId !== registrationId)
+            if (this.storageSettings.values.lastPersistedRegistrationId !== registrationId || !this.storageSettings.values.registrationSecret)
                 this.sendRegistrationId(registrationId);
         })
 
         this.updateCors();
     }
-
-
 
     async whitelist(localUrl: string, ttl: number, baseUrl: string): Promise<Buffer> {
         const local = Url.parse(localUrl);
@@ -130,16 +132,19 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             cors.push(
                 {
                     tag: '@scrypted/cloud',
+                    server: 'https://home.scrypted.io',
+                },
+                {
+                    tag: '@scrypted/cloud',
+                    server: 'http://home.scrypted.io',
+                },
+                {
+                    tag: '@scrypted/cloud',
                     server: 'https://home.scrypted.app',
                 },
                 {
                     tag: '@scrypted/cloud',
                     server: 'http://home.scrypted.app',
-                },
-                // test
-                {
-                    tag: '@scrypted/cloud',
-                    server: 'http://localhost:3000',
                 },
             );
             const { hostname } = this.storageSettings.values;
@@ -163,10 +168,12 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
     }
 
     async sendRegistrationId(registration_id: string) {
+        const registration_secret = this.storageSettings.values.registrationSecret || crypto.randomBytes(8).toString('base64');
         const q = qs.stringify({
             registration_id,
             sender_id: DEFAULT_SENDER_ID,
-        })
+            registration_secret,
+        });
 
         const { token_info } = this.storageSettings.values;
         const response = await axios(`https://${SCRYPTED_SERVER}/_punch/register?${q}`, {
@@ -176,6 +183,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         });
         this.console.log('registered', response.data);
         this.storageSettings.values.lastPersistedRegistrationId = registration_id;
+        this.storageSettings.values.registrationSecret = registration_secret;
     }
 
     async setupCloudPush() {
@@ -268,9 +276,11 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
                     return;
                 }
             }
-
             else if (url.path === '/web/') {
-                res.setHeader('Location', `https://${this.getHostname()}/endpoint/@scrypted/core/public/`);
+                if (this.storageSettings.values.hostname)
+                    res.setHeader('Location', `https://${this.storageSettings.values.hostname}/endpoint/@scrypted/core/public/`);
+                else
+                    res.setHeader('Location', '/endpoint/@scrypted/core/public/');
                 res.writeHead(302);
                 res.end();
                 return;
