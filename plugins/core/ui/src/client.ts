@@ -1,5 +1,5 @@
 import Vue from "vue";
-import { checkScryptedClientLogin, connectScryptedClient, loginScryptedClient } from '../../../../packages/client/src/index';
+import { checkScryptedClientLogin, connectScryptedClient, loginScryptedClient, redirectScryptedLogin } from '../../../../packages/client/src/index';
 import store from './store';
 
 function hasValue(state: any, property: string) {
@@ -50,6 +50,10 @@ Vue.use(Vue => {
 
         return checkScryptedClientLogin()
             .then(response => {
+                if (response.redirect) {
+                    redirectScryptedLogin();
+                    return;
+                }
                 if (!response.expiration) {
                     store.commit("setHasLogin", response.hasLogin);
                     throw new Error("Login failed.");

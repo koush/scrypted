@@ -96,7 +96,10 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     });
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
 
+    console.log('login response', response.data);
+
     return {
+        redirect: response.data.redirect as string,
         error: response.data.error as string,
         authorization: response.data.authorization as string,
         username: response.data.username as string,
