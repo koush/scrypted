@@ -144,7 +144,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         const loginCheck = await checkScryptedClientLogin({
             baseUrl,
         });
-        if (loginCheck.error)
+        if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
         addresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
