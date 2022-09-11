@@ -34,14 +34,14 @@ async function runCommandEatError(command: string, ...args: string[]) {
     }
 }
 
-export async function runServer() {
+export async function runServer(installDir: string) {
     console.log('Starting scrypted main...');
-    await runCommand('npm', 'exec', 'scrypted-serve');
+    await runCommand('npm',  '--prefix', installDir, 'exec', 'scrypted-serve');
 }
 
-async function startServer() {
+async function startServer(installDir: string) {
     try {
-        await runServer();
+        await runServer(installDir);
     }
     catch (e) {
         console.error('scrypted server exited with error', e);
@@ -109,7 +109,7 @@ export async function serveMain(installVersion?: string) {
         rimraf.sync(EXIT_FILE);
         rimraf.sync(UPDATE_FILE);
 
-        await startServer();
+        await startServer(installDir);
 
         if (fs.existsSync(EXIT_FILE)) {
             console.log('Exiting.');
