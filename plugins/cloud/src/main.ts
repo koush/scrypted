@@ -19,7 +19,7 @@ import crypto from 'crypto';
 const { deviceManager, endpointManager, systemManager } = sdk;
 
 export const DEFAULT_SENDER_ID = '827888101440';
-const SCRYPTED_SERVER = 'home.scrypted.io';
+const SCRYPTED_SERVER = 'home.scrypted.app';
 
 const SCRYPTED_CLOUD_MESSAGE_PATH = '/_punch/cloudmessage';
 
@@ -130,14 +130,14 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
             let cors = await corsControl.getCORS();
             cors = cors.filter(entry => entry.tag !== '@scrypted/cloud');
             cors.push(
-                {
-                    tag: '@scrypted/cloud',
-                    server: 'https://home.scrypted.io',
-                },
-                {
-                    tag: '@scrypted/cloud',
-                    server: 'http://home.scrypted.io',
-                },
+                // {
+                //     tag: '@scrypted/cloud',
+                //     server: 'https://home.scrypted.io',
+                // },
+                // {
+                //     tag: '@scrypted/cloud',
+                //     server: 'http://home.scrypted.io',
+                // },
                 {
                     tag: '@scrypted/cloud',
                     server: 'https://home.scrypted.app',
