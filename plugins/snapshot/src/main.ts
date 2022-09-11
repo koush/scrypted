@@ -124,6 +124,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
         const eventSnapshot = options?.reason === 'event';
+        let needResize = !!options?.picture?.width || options?.picture?.height;
 
         let takePicture: (options?: RequestPictureOptions) => Promise<Buffer>;
         if (this.storageSettings.values.snapshotsFromPrebuffer) {
@@ -143,7 +144,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     if (this.lastAvailablePicture)
                         request.refresh = false;
                     takePicture = async () => mediaManager.convertMediaObjectToBuffer(await realDevice.getVideoStream(request), 'image/jpeg');
-                    // this.console.log('snapshotting active prebuffer');
+                    this.console.log('snapshotting active prebuffer');
                 }
             }
             catch (e) {
@@ -156,20 +157,21 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     takePicture = async (options?: RequestPictureOptions) => {
                         // if operating in full resolution mode, nuke any picture options containing
                         // the requested dimensions that are sent.
-                        let picture = options?.picture;
                         let psos: ResponsePictureOptions[];
-                        let needResize = false;
                         if (options
                             && (this.storageSettings.values.snapshotResolution === 'Full Resolution'
                                 || (this.storageSettings.values.snapshotResolution === 'Requested Resolution'
                                     || this.storageSettings.values.snapshotResolution === 'Default'
                                     && (options.picture?.width || options.picture?.height)))
                         ) {
-                            if (this.storageSettings.values.snapshotResolution === 'Default') {
+                            // only use the hardware resize if this image is not cropping.
+                            // resize should be applied after crop.
+                            if (this.storageSettings.values.snapshotResolution === 'Default'
+                                && !this.storageSettings.values.snapshotCropScale?.length) {
                                 try {
                                     if (!psos)
                                         psos = await this.mixinDevice.getPictureOptions();
-                                    if (!psos?.[0].canResize) {
+                                    if (!psos?.[0]?.canResize) {
                                         needResize = true;
                                     }
                                 }
@@ -194,15 +196,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                             catch (e) {
                             }
                         }
-                        const ret = await this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
-                        if (!needResize)
-                            return ret;
-
-                        return ffmpegFilterImageBuffer(ret, {
-                            ffmpegPath: await mediaManager.getFFmpegPath(),
-                            resize: picture,
-                            timeout: 10000,
-                        });
+                        return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
                     };
                 }
                 else if (this.storageSettings.values.snapshotsFromPrebuffer) {
@@ -243,17 +237,25 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                     method: "GET",
                     responseType: 'arraybuffer',
                     url: this.storageSettings.values.snapshotUrl,
-                }).then((response: { data: any; }) => response.data);
+                }).then(async (response: { data: any; }) => response.data);
             }
         }
 
-        const hadPendingPicture = !!this.pendingPicture;
-        if (!hadPendingPicture) {
-            const pendingPicture = (async () => {
+        const isFullImage = !needResize;
+        let pendingPicture = this.pendingPicture;
+        if (!pendingPicture || !isFullImage) {
+            pendingPicture = (async () => {
                 let picture: Buffer;
                 try {
                     picture = await takePicture(options);
                     picture = await this.cropAndScale(picture);
+                    if (needResize) {
+                        picture = await ffmpegFilterImageBuffer(picture, {
+                            ffmpegPath: await mediaManager.getFFmpegPath(),
+                            resize: options?.picture,
+                            timeout: 10000,
+                        });
+                    }
                     this.clearCachedPictures();
                     this.currentPicture = picture;
                     this.lastAvailablePicture = picture;
@@ -273,7 +275,8 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 return picture;
             })();
 
-            this.pendingPicture = pendingPicture;
+            if (isFullImage)
+                this.pendingPicture = pendingPicture;
 
             // don't allow a snapshot to take longer than 1 minute.
             const failureTimeout = setTimeout(() => {
@@ -306,10 +309,10 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
                 case 'Never Wait':
                     throw new NeverWaitError();
                 case 'Timeout':
-                    data = await timeoutPromise(1000, this.pendingPicture);
+                    data = await timeoutPromise(1000, pendingPicture);
                     break;
                 default:
-                    data = await this.pendingPicture;
+                    data = await pendingPicture;
                     break;
             }
         }
@@ -533,8 +536,8 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
                     height: bottom - top,
                     fractional: cropFractional,
                 },
-                timeout: 10000,
-                time: parseFloat(mime.parameters.get('time')),
+            timeout: 10000,
+            time: parseFloat(mime.parameters.get('time')),
         });
     }
 
