@@ -1097,6 +1097,7 @@ class PrebufferSession {
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
         server = new FileRtspServer(socket, sdp);
+        server.writeConsole = this.console;
         if (session.parserSpecific) {
           const parserSpecific = session.parserSpecific as RtspSessionParserSpecific;
           server.resolveInterleaved = msection => {

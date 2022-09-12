@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/prebuffer-mixin",
-   "version": "0.9.35",
+   "version": "0.9.37",
    "description": "Video Stream Rebroadcast, Prebuffer, and Management Plugin for Scrypted.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -29,7 +29,8 @@
          "DeviceProvider",
          "MixinProvider",
          "BufferConverter"
-      ]
+      ],
+      "realfs": true
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",

@@ -6,11 +6,13 @@ import fs from 'fs';
 export class FileRtspServer extends RtspServer {
     writeStream: fs.WriteStream;
     segmentBytesWritten = 0;
+    writeConsole: Console;
 
     constructor(client: net.Socket, sdp?: string) {
         super(client, sdp);
 
         this.client.on('close', () => {
+            this.writeConsole?.log('RTSP WRITE client closed.');
             this.cleanup();
         });
 
@@ -19,6 +21,8 @@ export class FileRtspServer extends RtspServer {
 
     cleanup() {
         const ws = this.writeStream;
+        if (ws)
+            return;
         this.writeStream = undefined;
         ws?.end(() => ws?.destroy());
     }
@@ -32,8 +36,11 @@ export class FileRtspServer extends RtspServer {
         if (!file)
             return this.respond(400, 'Bad Request', requestHeaders, {});
 
+        this.writeConsole?.log('RTSP WRITE file', file);
         this.writeStream = fs.createWriteStream(file);
-
+        this.writeStream.on('error', e => {
+            this.writeConsole?.error('RTSP WRITE error', e);
+        });
         this.respond(200, 'OK', requestHeaders, {});
     }
 
