@@ -194,6 +194,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         audioSection = newSdp.msections.find(msection => msection.type === 'audio');
 
                     if (!audioSection) {
+                        delete rtpTracks.audio;
                         console.warn(`audio section not found in sdp.`);
                         audioSectionDeferred.resolve(undefined);
                     }
