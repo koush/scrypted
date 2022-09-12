@@ -20,6 +20,7 @@ import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
+import semver from 'semver';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -1737,7 +1738,16 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     // 8-11-2022
     // old scrypted had a bug where mixin device state was not exposing properties like id correctly
     // across rpc boundaries.
-    if (sdk.fork && typeof mixinDeviceState.id === 'string') {
+    let fork = false;
+    try {
+      const info = await systemManager.getComponent('info');
+      const version = await info.getVersion();
+      fork = semver.gte('0.2.5', version);
+    }
+    catch (e) {
+    }
+
+    if (fork && sdk.fork && typeof mixinDeviceState.id === 'string') {
       const forked = sdk.fork<RebroadcastPluginFork>();
       const result = await forked.result as RebroadcastPluginFork;
       const ret = result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
