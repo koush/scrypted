@@ -32,6 +32,15 @@ function toIpAndPort(ip: string) {
     return ip;
 }
 
+interface Login {
+    username: string;
+    token: string;
+}
+
+interface LoginFile {
+    [host: string]: Login;
+}
+
 async function doLogin(host: string) {
     host = toIpAndPort(host);
 
@@ -51,7 +60,7 @@ async function doLogin(host: string) {
     }, axiosConfig));
 
     mkdirp.sync(scryptedHome);
-    let login: any;
+    let login: LoginFile;
     try {
         login = JSON.parse(fs.readFileSync(loginPath).toString());
     }
@@ -64,14 +73,14 @@ async function doLogin(host: string) {
 
     login[host] = response.data;
     fs.writeFileSync(loginPath, JSON.stringify(login));
-    return response.data.token;
+    return login;
 }
 
 async function getOrDoLogin(host: string): Promise<{
     username: string,
     token: string,
 }> {
-    let login: any;
+    let login: LoginFile;
     try {
         login = JSON.parse(fs.readFileSync(loginPath).toString());
         if (typeof login !== 'object')
