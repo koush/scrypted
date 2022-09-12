@@ -15,5 +15,6 @@ export function isPublishable(type: ScryptedDeviceType, interfaces: string[]): b
     set.delete(ScryptedInterface.BufferConverter);
     set.delete(ScryptedInterface.ScryptedPlugin);
     set.delete(ScryptedInterface.OauthClient);
+    set.delete(ScryptedInterface.LauncherApplication);
     return !!set.size;
 }
