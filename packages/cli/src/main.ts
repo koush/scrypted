@@ -217,6 +217,7 @@ async function main() {
         console.log('examples:');
         console.log('   npx scrypted install @scrypted/rtsp');
         console.log('   npx scrypted install @scrypted/rtsp/0.0.51');
+        console.log('   npx scrypted install @scrypted/rtsp/0.0.51 192.168.2.100');
         process.exit(1);
     }
 }
