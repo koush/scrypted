@@ -213,6 +213,10 @@ async function main() {
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
+        console.log();
+        console.log('examples:');
+        console.log('   npx scrypted install @scrypted/rtsp');
+        console.log('   npx scrypted install @scrypted/rtsp/0.0.51');
         process.exit(1);
     }
 }
