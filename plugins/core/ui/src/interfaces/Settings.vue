@@ -1,8 +1,9 @@
 <template>
   <v-card>
     <CardTitle v-if="!noTitle">Settings</CardTitle>
-    <v-flex xs12 v-if="showChips" class="pt-0">
-      <v-chip-group mandatory active-class="deep-purple accent-4 white--text" column v-model="settingsGroupName">
+    <v-flex xs12 v-if="showChips" >
+      <v-chip-group class="pt-0" mandatory active-class="deep-purple accent-4 white--text" column v-model="settingsGroupName"
+        v-if="Object.entries(settingsGroups).length < 4 || true">
         <v-chip small :value="key" v-for="[key] of Object.entries(settingsGroups)" :key="key">
           {{ key.replace("Settings", "") || "General" }}
         </v-chip>
@@ -10,6 +11,9 @@
           Integrations and Extensions
         </v-chip>
       </v-chip-group>
+      <v-select v-else dense filled outlined :items="selectGroupNames" v-model="settingsGroupName" :hide-details="true">
+
+      </v-select>
     </v-flex>
 
     <v-divider v-if="showChips"></v-divider>
@@ -21,8 +25,8 @@
         setting.value.type === 'device' ||
         setting.value.type === 'interface' ||
         !setting.value.multiple" v-model="setting.value" @input="onInput"
-          :device="setting.value.type === 'clippath' ? device : undefined"></Setting>
-        <SettingMultiple v-else v-model="setting.value" :device="setting.value.type === 'clippath' ? device : undefined"
+          :device="needsDevice(setting) ? device : undefined"></Setting>
+        <SettingMultiple v-else v-model="setting.value" :device="needsDevice(setting) ? device : undefined"
           @input="onInput">
         </SettingMultiple>
       </div>
@@ -74,6 +78,19 @@ export default {
     this.refresh();
   },
   computed: {
+    selectGroupNames() {
+      const ret = Object.keys(this.settingsGroups).map(key => ({
+        text: key.replace("Settings", "") || "General",
+        value: key,
+      }));
+      if (this.availableMixins.length) {
+        ret.push({
+          value: 'extensions',
+          text: 'Integrations and Extensions',
+        })
+      }
+      return ret;
+    },
     ScryptedInterface() {
       return ScryptedInterface;
     },
@@ -110,6 +127,9 @@ export default {
       return {
         settings: this.settings.map((setting) => setting.value),
       };
+    },
+    needsDevice(setting) {
+      return setting.value.type === 'clippath' || setting.value.type === 'button';
     },
     async refresh() {
       let settings;
