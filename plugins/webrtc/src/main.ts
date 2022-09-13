@@ -161,7 +161,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             ],
             internal: true,
         })
-        .then(() => this.bridge = new WebRTCBridge(this, RTC_BRIDGE_NATIVE_ID));
+            .then(() => this.bridge = new WebRTCBridge(this, RTC_BRIDGE_NATIVE_ID));
     }
 
     getSettings(): Promise<Setting[]> {
@@ -366,6 +366,9 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             const debouncer = new DataChannelDebouncer({
                 send: u8 => dc.send(Buffer.from(u8)),
+            }, e => {
+                this.console.error('datachannel send error', e);
+                socket.destroy();
             });
             socket.on('data', data => debouncer.send(data));
             socket.on('close', cleanup);

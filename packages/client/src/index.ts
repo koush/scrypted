@@ -270,7 +270,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     const dc = await session.dcDeferred.promise;
                     console.log('got dc', dc);
 
-                    const debouncer = new DataChannelDebouncer(dc);
+                    const debouncer = new DataChannelDebouncer(dc, e => {
+                        console.error('datachannel send error', e);
+                        ret.kill('datachannel send error');
+                    });
                     const serializer = createRpcDuplexSerializer({
                         write: (data) => debouncer.send(data),
                     });
@@ -402,7 +405,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             pluginHostAPI: undefined,
         }
 
-        socket.on('close', () => ret.onClose?.());
+        socket.on('close', () => {
+            rpcPeer.kill('socket closed');
+            ret.onClose?.();
+        });
 
         return ret;
     }
