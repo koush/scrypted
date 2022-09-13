@@ -24,7 +24,7 @@
       </v-list-item-content>
 
       <v-list-item-action
-        ><v-btn small @click.stop="openDevice(mixin.id)"
+        ><v-btn small :to="getDeviceViewPath(mixin.id)"
           ><v-icon x-small>fa-external-link-alt</v-icon></v-btn
         ></v-list-item-action
       >
@@ -33,11 +33,15 @@
 </template>
 <script>
 import Mixin from "./Mixin.vue";
+import { getDeviceViewPath } from './helpers';
 
 export default {
     props: ["device"],
     mixins: [
         Mixin,
     ],
+    methods: {
+      getDeviceViewPath,
+    }
 };
 </script>

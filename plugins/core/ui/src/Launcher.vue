@@ -13,7 +13,7 @@
                         <v-card-subtitle style="text-align: center;">{{ $store.state.version }}</v-card-subtitle>
                         <v-list class="transparent">
                             <v-list-item v-for="application in applications" :key="application.name"
-                                @click="application.click">
+                                :to="application.to" :href="application.href">
                                 <v-icon small>{{ application.icon }}</v-icon>
                                 <v-list-item-title style="text-align: center;">{{ application.name }}
                                 </v-list-item-title>
@@ -91,9 +91,7 @@ export default {
                 {
                     name: 'Management Console',
                     icon: 'fa-cog',
-                    click: () => {
-                        this.$router.push('/component/plugin');
-                    }
+                    to: '/component/plugin',
                 },
             ],
         }
@@ -113,14 +111,15 @@ export default {
 
             const { systemManager } = this.$scrypted;
             const applications = getAllDevices(systemManager).filter(device => device.interfaces.includes(ScryptedInterface.LauncherApplication));
-            this.applications = applications.map(app => ({
-                name: (app.applicationInfo && app.applicationInfo.name) || app.name,
-                icon: app.applicationInfo && app.applicationInfo.icon,
-                click: async () => {
-                    const { endpointManager } = this.$scrypted;
-                    window.location = `/endpoint/${app.id}/public/`;
-                }
-            }));
+            this.applications = applications.map(app => {
+                const appId = app.interfaces.includes(ScryptedInterface.ScryptedPlugin) ? app.pluginId : app.id;
+                const ret = {
+                    name: (app.applicationInfo && app.applicationInfo.name) || app.name,
+                    icon: app.applicationInfo && app.applicationInfo.icon,
+                    href: `/endpoint/${appId}/public/`,
+                };
+                return ret;
+            });
             if (!applications.length) {
                 this.$router.push('/component/plugin');
                 return;
@@ -130,10 +129,8 @@ export default {
                 {
                     name: 'Management Console',
                     icon: 'fa-cog',
-                    click: () => {
-                        this.$router.push('/component/plugin');
-                    }
-                }
+                    to: '/component/plugin',
+                },
             )
         }
     },
