@@ -1,7 +1,8 @@
-import { ScryptedStatic } from "@scrypted/types";
+import { ScryptedStatic, RTCConnectionManagement } from "@scrypted/types";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
+import { Deferred } from "../../../common/src/deferred";
 import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-utils";
 import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
@@ -39,6 +40,8 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     userStorage: Storage,
     version: string;
     connectionType: ScryptedClientConnectionType;
+    rtcConnectionManagement?: RTCConnectionManagement;
+    browserSignalingSession?: BrowserSignalingSession;
 }
 
 export interface ScryptedConnectionOptions {
@@ -164,6 +167,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     let connectionType: ScryptedClientConnectionType;
 
     let rpcPeer: RpcPeer;
+    // underlying webrtc rpc transport may queue up messages before its ready to be to be handled.
+    // watch for this flush.
+    const flush = new Deferred<void>();
+
     if (scryptedCloud || options.webrtc) {
         const publicEioOptions: Partial<SocketOptions> = {
             path: `${endpointPath}/public/engine.io/api`,
@@ -237,15 +244,28 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             else {
                 connectionType = 'webrtc';
 
+                const connectionManagementId = `connectionManagement-${Math.random()}`;
                 ready.send(JSON.stringify({
                     pluginId,
+                    connectionManagementId,
                 }));
+                const dcDeferred = new Deferred<RTCDataChannel>();
                 const session = new BrowserSignalingSession();
+                session.onPeerConnection = async pc => {
+                    pc.ondatachannel = e => {
+                        e.channel.onmessage = () => console.log('dropped mesage');
+                        dcDeferred.resolve(e.channel)
+                    };
+                }
                 const pcPromise = session.pcDeferred.promise;
 
-                const upgradingPeer = new RpcPeer(clientName || 'webrtc-upgrade', "api", (message, reject) => {
+                const serializer = createRpcSerializer({
+                    sendMessageBuffer: buffer => ready.send(buffer),
+                    sendMessageFinish: message => ready.send(JSON.stringify(message)),
+                });
+                const upgradingPeer = new RpcPeer(clientName || 'webrtc-upgrade', "api", (message, reject, serializationContext) => {
                     try {
-                        ready.send(JSON.stringify(message));
+                        serializer.sendMessage(message, reject, serializationContext);
                     }
                     catch (e) {
                         reject?.(e);
@@ -253,8 +273,14 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 });
 
                 ready.on('message', data => {
-                    upgradingPeer.handleMessage(JSON.parse(data.toString()));
+                    if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
+                        serializer.onMessageBuffer(Buffer.from(data));
+                    }
+                    else {
+                        serializer.onMessageFinish(JSON.parse(data as string));
+                    }
                 });
+                serializer.setupRpcPeer(upgradingPeer);
 
                 const readyClose = new Promise<RpcPeer>((resolve, reject) => {
                     ready.on('close', () => reject(new Error('closed')))
@@ -267,7 +293,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
                     await waitPeerConnectionIceConnected(pc);
 
-                    const dc = await session.dcDeferred.promise;
+                    const dc = await dcDeferred.promise;
                     console.log('got dc', dc);
 
                     const debouncer = new DataChannelDebouncer(dc, e => {
@@ -289,7 +315,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     });
                     serializer.setupRpcPeer(ret);
 
-
                     waitPeerIceConnectionClosed(pc).then(() => ready.close());
                     ready.on('close', () => {
                         console.log('datachannel upgrade cancelled/closed');
@@ -302,7 +327,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             buffers.push(Buffer.from(message.data));
                             resolve(undefined);
 
-                            setTimeout(() => {
+                            flush.promise.finally(() => {
                                 if (buffers) {
                                     for (const buffer of buffers) {
                                         serializer.onData(Buffer.from(buffer));
@@ -310,9 +335,13 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                                     buffers = undefined;
                                 }
                                 dc.onmessage = message => serializer.onData(Buffer.from(message.data));
-                            }, 0);
+                            });
                         };
                     });
+
+                    const rtcConnectionManagement = await upgradingPeer.getParam('rtcConnectionManagement');
+                    ret.params['rtcConnectionManagement'] = rtcConnectionManagement;
+                    ret.params['browserSignalingSession'] = session;
 
                     if (isTimedOut()) {
                         console.log('peer connection established too late. closing.');
@@ -372,6 +401,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             serializer.setupRpcPeer(rpcPeer);
         }
 
+        setTimeout(() => flush.resolve(undefined), 0);
         const scrypted = await attachPluginRemote(rpcPeer, undefined);
         const {
             systemManager,
@@ -403,6 +433,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 socket.close();
             },
             pluginHostAPI: undefined,
+            rtcConnectionManagement: rpcPeer.params['rtcConnectionManagement'],
+            browserSignalingSession: rpcPeer.params['browserSignalingSession'],
         }
 
         socket.on('close', () => {
