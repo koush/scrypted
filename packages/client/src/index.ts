@@ -315,6 +315,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     });
                     serializer.setupRpcPeer(ret);
 
+                    ret.params['connectionManagementId'] = connectionManagementId;
+                    ret.params['browserSignalingSession'] = session;
+
                     waitPeerIceConnectionClosed(pc).then(() => ready.close());
                     ready.on('close', () => {
                         console.log('datachannel upgrade cancelled/closed');
@@ -338,10 +341,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             });
                         };
                     });
-
-                    const rtcConnectionManagement = await upgradingPeer.getParam('rtcConnectionManagement');
-                    ret.params['rtcConnectionManagement'] = rtcConnectionManagement;
-                    ret.params['browserSignalingSession'] = session;
 
                     if (isTimedOut()) {
                         console.log('peer connection established too late. closing.');
@@ -420,6 +419,17 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         catch (e) {
         }
 
+        const { browserSignalingSession, connectionManagementId } = rpcPeer.params;
+        let rtcConnectionManagement: RTCConnectionManagement;
+        if (connectionManagementId) {
+            try {
+                const plugins = await systemManager.getComponent('plugins');
+                rtcConnectionManagement = await plugins.getHostParam('@scrypted/webrtc', connectionManagementId);
+            }
+            catch (e) {
+            }
+        }
+
         const ret: ScryptedClientStatic = {
             pluginRemoteAPI: undefined,
             connectionType,
@@ -433,8 +443,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 socket.close();
             },
             pluginHostAPI: undefined,
-            rtcConnectionManagement: rpcPeer.params['rtcConnectionManagement'],
-            browserSignalingSession: rpcPeer.params['browserSignalingSession'],
+            rtcConnectionManagement,
+            browserSignalingSession,
         }
 
         socket.on('close', () => {
