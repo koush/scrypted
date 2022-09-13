@@ -262,7 +262,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
                 upgradingPeer.params['session'] = session;
 
-                rpcPeer = await Promise.race([readyClose, timeoutFunction(2000, async (isTimedOut) => {
+                rpcPeer = await Promise.race([readyClose, timeoutFunction(options.webrtc ? 10000 : 2000, async (isTimedOut) => {
                     const pc = await pcPromise;
 
                     await waitPeerConnectionIceConnected(pc);
@@ -329,7 +329,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             sockets = sockets.filter(s => s !== socket);
         }
         catch (e) {
-            // console.error('local check failed', e);
+            console.error('peer to peer failed', e);
         }
         sockets.forEach(s => {
             try {
