@@ -119,9 +119,15 @@ export class ScryptedClientLoginError extends Error {
     }
 }
 
-export function redirectScryptedLogin(baseUrl?: string) {
+export function redirectScryptedLogin(options?: {
+    redirect?: string, baseUrl?: string
+}) {
+    let { baseUrl, redirect } = options || {};
     baseUrl = baseUrl || '';
-    window.location.href = `${baseUrl}/endpoint/@scrypted/core/public/?redirect_uri=${encodeURIComponent(window.location.href)}`;
+    redirect = redirect || `${baseUrl}/endpoint/@scrypted/core/public/`
+    const redirect_uri = `${redirect}?redirect_uri=${encodeURIComponent(window.location.href)}`;
+    console.log('redirect_uri', redirect_uri);
+    window.location.href = redirect_uri;
 }
 
 export async function redirectScryptedLogout(baseUrl?: string) {
