@@ -11,8 +11,8 @@ import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
-import { stunServer, turnServer } from "./ice-servers";
-import { waitClosed, waitConnected } from "./peerconnection-util";
+import { stunIceServers, stunServer, turnServer } from "./ice-servers";
+import { waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
 import { WeriftSignalingSession } from "./werift-signaling-session";
@@ -32,24 +32,6 @@ function getDebugModeH264EncoderArgs() {
         // "-tune", "zerolatency",
     ];
 }
-
-function createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
-    return {
-        configuration: {
-            iceServers: [
-                // ok this apparently works!
-                // turnServer,
-                stunServer,
-            ],
-        },
-        audio: {
-            direction: audioDirection,
-        },
-        video: {
-            direction: videoDirection,
-        },
-    }
-};
 
 export async function createTrackForwarder(timeStart: number, isPrivate: boolean,
     requestMediaStream: RequestMediaStream,
@@ -297,6 +279,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         public sessionSupportsH264High: boolean,
         public options?: {
             disableIntercom?: boolean,
+            setup?: Partial<RTCAVSignalingSetup>,
         }) {
 
         this.pc = new RTCPeerConnection({
@@ -363,18 +346,30 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         return this.negotiationDeferred.promise;
     }
 
+    createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
+        return {
+            audio: {
+                direction: audioDirection,
+            },
+            video: {
+                direction: videoDirection,
+            },
+            ...this.options?.setup,
+        }
+    };
+
     async negotiateRTCSignalingSession(clientOffer?: boolean): Promise<void> {
         try {
             if (clientOffer) {
                 await connectRTCSignalingClients(this.console,
-                    this.clientSession, createSetup(this.options?.disableIntercom ? 'recvonly' : 'sendrecv', 'recvonly'),
-                    this.weriftSignalingSession, createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
+                    this.clientSession, this.createSetup(this.options?.disableIntercom ? 'recvonly' : 'sendrecv', 'recvonly'),
+                    this.weriftSignalingSession, this.createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
                 );
             }
             else {
                 await connectRTCSignalingClients(this.console,
-                    this.weriftSignalingSession, createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
-                    this.clientSession, createSetup(this.options?.disableIntercom ? 'recvonly' : 'sendrecv', 'recvonly'),
+                    this.weriftSignalingSession, this.createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
+                    this.clientSession, this.createSetup(this.options?.disableIntercom ? 'recvonly' : 'sendrecv', 'recvonly'),
                 );
             }
             this.negotiationDeferred.resolve(undefined);
@@ -407,7 +402,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         this.negotiation.then(async () => {
             if (ret.removed.finished)
                 return;
-            await waitConnected(this.pc);
+            await waitIceConnected(this.pc);
             const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
             waitClosed(this.pc).finally(() => f.kill());
             ret.removed.promise.finally(() => f.kill());
