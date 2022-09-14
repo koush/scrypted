@@ -22,7 +22,7 @@ export class ReolinkCameraClient {
     //     }
     //  ]
     async getMotionState() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'GetMdState');
         params.set('channel', this.channelId.toString());
@@ -38,7 +38,7 @@ export class ReolinkCameraClient {
     }
 
     async jpegSnapshot() {
-        const url = new URL(`http://${this.host}/api.cgi`);
+        const url = new URL(`http://${this.host}/cgi-bin/api.cgi`);
         const params = url.searchParams;
         params.set('cmd', 'Snap');
         params.set('channel', this.channelId.toString());
