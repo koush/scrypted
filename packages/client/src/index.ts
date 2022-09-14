@@ -58,6 +58,7 @@ export interface ScryptedLoginOptions extends ScryptedConnectionOptions {
      */
     password: string;
     change_password: string,
+    maxAge?: number;
 }
 
 export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
@@ -65,13 +66,22 @@ export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
     clientName?: string;
 }
 
+function isRunningStandalone() {
+    return globalThis.matchMedia?.('(display-mode: standalone)').matches;
+}
+
 export async function loginScryptedClient(options: ScryptedLoginOptions) {
-    let { baseUrl, username, password, change_password } = options;
+    let { baseUrl, username, password, change_password, maxAge } = options;
+    // pwa should stay logged in for a year.
+    if (!maxAge && isRunningStandalone())
+        maxAge = 365 * 24 * 60 * 60 * 1000;
+
     const url = `${baseUrl || ''}/login`;
     const response = await axios.post(url, {
         username,
         password,
         change_password,
+        maxAge,
     }, {
         ...options.axiosConfig,
     });
@@ -127,12 +137,12 @@ export function redirectScryptedLogin(options?: {
     redirect = redirect || `${baseUrl}/endpoint/@scrypted/core/public/`
     const redirect_uri = `${redirect}?redirect_uri=${encodeURIComponent(window.location.href)}`;
     console.log('redirect_uri', redirect_uri);
-    window.location.href = redirect_uri;
+    globalThis.location.href = redirect_uri;
 }
 
 export async function redirectScryptedLogout(baseUrl?: string) {
     baseUrl = baseUrl || '';
-    window.location.href = `${baseUrl}/logout`;
+    globalThis.location.href = `${baseUrl}/logout`;
 }
 
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
@@ -169,7 +179,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
     const start = Date.now();
 
-    const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
+    const explicitBaseUrl = baseUrl || `${globalThis.location.protocol}//${globalThis.location.host}`;
     let connectionType: ScryptedClientConnectionType;
 
     let rpcPeer: RpcPeer;
