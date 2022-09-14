@@ -24,6 +24,8 @@ import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } 
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 
+const ONE_DAY_MILLISECONDS = 86400000;
+
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
 }
@@ -187,7 +189,7 @@ async function start() {
             const userTokenParts = login_user_token.split('#');
             const username = userTokenParts[0];
             const timestamp = parseInt(userTokenParts[1]);
-            if (timestamp + 86400000 < Date.now())
+            if (timestamp + ONE_DAY_MILLISECONDS < Date.now())
                 return next();
 
             // this database lookup on every web request is not necessary, the cookie
@@ -218,7 +220,7 @@ async function start() {
                     const splits2 = login_user_token.split('#');
                     const username = splits2[0];
                     const timestamp = parseInt(splits2[1]);
-                    if (timestamp + 86400000 < Date.now())
+                    if (timestamp + ONE_DAY_MILLISECONDS < Date.now())
                         return next();
                     res.locals.username = username;
                 }
@@ -421,9 +423,9 @@ async function start() {
     });
 
     app.post('/login', async (req, res) => {
-        const { username, password, change_password } = req.body;
+        const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
-        const maxAge = 86400000;
+        const maxAge = parseInt(maxAgeRequested) || ONE_DAY_MILLISECONDS;
         const addresses = getHostAddresses(true, true).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
 
         if (hasLogin) {
@@ -546,7 +548,7 @@ async function start() {
         const userTokenParts = login_user_token.split('#');
         const username = userTokenParts[0];
         const timestamp = parseInt(userTokenParts[1]);
-        if (timestamp + 86400000 < Date.now()) {
+        if (timestamp + ONE_DAY_MILLISECONDS < Date.now()) {
             res.send({
                 error: 'Login expired.',
                 hasLogin,
@@ -556,7 +558,7 @@ async function start() {
 
         res.send({
             authorization: createAuthorizationToken(login_user_token),
-            expiration: 86400000 - (Date.now() - timestamp),
+            expiration: ONE_DAY_MILLISECONDS - (Date.now() - timestamp),
             username,
             addresses,
         })

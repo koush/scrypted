@@ -157,4 +157,22 @@ export class PluginComponent {
 
         return this.scrypted.plugins[pluginId].remote.getServicePort(name, ...args);
     }
+
+    async setHostParam(pluginId: string, name: string, param?: any) {
+        const host = this.scrypted.plugins[pluginId];
+        if (!host)
+            return;
+
+        const key = `oob-param-${name}`;
+        if (param === undefined)
+            delete host.peer.params[key];
+        else
+            host.peer.params[key] = param;
+    }
+
+    async getHostParam(pluginId: string, name: string) {
+        const host = this.scrypted.plugins[pluginId];
+        const key = `oob-param-${name}`;
+        return host?.peer?.params?.[key];
+    }
 }

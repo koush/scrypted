@@ -284,6 +284,7 @@ export class RpcPeer {
             result.reject(error);
         }
         this.pendingResults = Object.freeze({});
+        this.params = Object.freeze({});
         this.remoteWeakProxies = Object.freeze({});
         this.localProxyMap = Object.freeze({});
         this.localProxied.clear();
