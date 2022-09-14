@@ -51,7 +51,9 @@ Vue.use(Vue => {
         return checkScryptedClientLogin()
             .then(response => {
                 if (response.redirect) {
-                    redirectScryptedLogin();
+                    redirectScryptedLogin({
+                        redirect: response.redirect,
+                    });
                     return;
                 }
                 if (!response.expiration) {
