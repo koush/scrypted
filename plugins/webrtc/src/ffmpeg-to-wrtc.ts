@@ -401,7 +401,10 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
 
         this.negotiation.then(async () => {
             this.console.log('waiting ice connected');
-            await waitIceConnected(this.pc);
+            if (this.pc.remoteIsBundled)
+                await waitConnected(this.pc);
+            else
+                await waitIceConnected(this.pc);
             if (ret.removed.finished)
                 return;
             this.console.log('done waiting ice connected');
