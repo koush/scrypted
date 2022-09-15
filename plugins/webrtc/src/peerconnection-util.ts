@@ -31,7 +31,7 @@ export function waitClosed(pc: RTCPeerConnection) {
             console.log('iceGatheringStateChange', pc.iceGatheringState);
         });
         pc.iceConnectionStateChange.subscribe(() => {
-            console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
+            console.log('iceConnectionStateChange', pc.iceConnectionState);
             if (pc.iceConnectionState === 'disconnected'
                 || pc.iceConnectionState === 'failed'
                 || pc.iceConnectionState === 'closed') {
@@ -39,7 +39,7 @@ export function waitClosed(pc: RTCPeerConnection) {
             }
         });
         pc.connectionStateChange.subscribe(() => {
-            console.log('connectionStateChange', pc.connectionState, pc.iceConnectionState);
+            console.log('connectionStateChange', pc.iceConnectionState);
             if (pc.connectionState === 'closed'
                 || pc.connectionState === 'disconnected'
                 || pc.connectionState === 'failed') {

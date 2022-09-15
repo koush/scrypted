@@ -400,9 +400,11 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         const ret = new WebRTCTrack(this, videoTransceiver, audioTransceiver, this.options?.disableIntercom ? undefined : intercom);
 
         this.negotiation.then(async () => {
+            this.console.log('waiting ice connected');
+            await waitIceConnected(this.pc);
             if (ret.removed.finished)
                 return;
-            await waitIceConnected(this.pc);
+            this.console.log('done waiting ice connected');
             const f = await createTrackForwarder(videoTransceiver, audioTransceiver);
             waitClosed(this.pc).finally(() => f.kill());
             ret.removed.promise.finally(() => f.kill());

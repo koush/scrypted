@@ -43,6 +43,7 @@ export function getWeriftIceServers(configuration: RTCConfiguration): RTCIceServ
 }
 
 export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection) {
+    return true;
     let isPrivate = true;
     for (const ice of pc.iceTransports) {
         const [address, port] = ice.connection.remoteAddr;
