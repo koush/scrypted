@@ -23,8 +23,7 @@ import { sleep } from './sleep';
 import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } from './cert';
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
-
-const ONE_DAY_MILLISECONDS = 86400000;
+import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -184,13 +183,9 @@ async function start() {
         // only basic auth will fail with 401. it is up to the endpoints to manage
         // lack of login from cookie auth.
 
-        const login_user_token = getSignedLoginUserToken(req);
-        if (login_user_token) {
-            const userTokenParts = login_user_token.split('#');
-            const username = userTokenParts[0];
-            const timestamp = parseInt(userTokenParts[1]);
-            if (timestamp + ONE_DAY_MILLISECONDS < Date.now())
-                return next();
+        const userToken = getSignedLoginUserToken(req);
+        if (userToken) {
+            const { username } = userToken;
 
             // this database lookup on every web request is not necessary, the cookie
             // itself is the auth, and is signed. furthermore, this is currently
@@ -206,23 +201,18 @@ async function start() {
             res.locals.username = username;
         }
         else if (req.headers.authorization?.startsWith('Bearer ')) {
-            const splits = req.headers.authorization.substring('Bearer '.length).split('#');
-            const login_user_token = splits[1] + '#' + splits[2];
-            if (login_user_token) {
-                const check = splits[0];
-
-                const salted = login_user_token + authSalt;
+            const [checkHash, ...tokenParts] = req.headers.authorization.substring('Bearer '.length).split('#');
+            const tokenPart = tokenParts?.join('#');
+            if (checkHash && tokenPart) {
+                const salted = tokenPart + authSalt;
                 const hash = crypto.createHash('sha256');
                 hash.update(salted);
                 const sha = hash.digest().toString('hex');
 
-                if (check === sha) {
-                    const splits2 = login_user_token.split('#');
-                    const username = splits2[0];
-                    const timestamp = parseInt(splits2[1]);
-                    if (timestamp + ONE_DAY_MILLISECONDS < Date.now())
-                        return next();
-                    res.locals.username = username;
+                if (checkHash === sha) {
+                    const userToken = validateToken(tokenPart);
+                    if (userToken)
+                        res.locals.username = userToken.username;
                 }
             }
         }
@@ -400,9 +390,19 @@ async function start() {
         return reqSecure ? 'login_user_token' : 'login_user_token_insecure';
     };
 
-    const getSignedLoginUserToken = (req: Request<any>): string => {
-        return req.signedCookies[getLoginUserToken(req.secure)];
-    };
+    const validateToken = (token: string) => {
+        if (!token)
+            return;
+        try {
+            return UserToken.validateToken(token);
+        }
+        catch (e) {
+            console.warn('invalid token', e.message);
+        }
+    }
+
+    const getSignedLoginUserTokenRawValue = (req: Request<any>) => req.signedCookies[getLoginUserToken(req.secure)] as string;
+    const getSignedLoginUserToken = (req: Request<any>) => validateToken(getSignedLoginUserTokenRawValue(req));
 
     app.get('/logout', (req, res) => {
         res.clearCookie(getLoginUserToken(req.secure));
@@ -450,7 +450,8 @@ async function start() {
                 return;
             }
 
-            const login_user_token = `${username}#${timestamp}`;
+            const userToken = new UserToken(username, timestamp, maxAge);
+            const login_user_token = userToken.toString();
             res.cookie(getLoginUserToken(req.secure), login_user_token, {
                 maxAge,
                 secure: req.secure,
@@ -492,7 +493,8 @@ async function start() {
         await db.upsert(user);
         hasLogin = true;
 
-        const login_user_token = `${username}#${timestamp}`
+        const userToken = new UserToken(username, timestamp);
+        const login_user_token = userToken.toString();
         res.cookie(getLoginUserToken(req.secure), login_user_token, {
             maxAge,
             secure: req.secure,
@@ -536,32 +538,25 @@ async function start() {
             return;
         }
 
-        const login_user_token = getSignedLoginUserToken(req);
-        if (!login_user_token) {
+        try {
+            const login_user_token = getSignedLoginUserTokenRawValue(req);
+            if (!login_user_token)
+                throw new Error('Not logged in.');
+            const userToken = UserToken.validateToken(login_user_token);
+
             res.send({
-                error: 'Not logged in.',
+                authorization: createAuthorizationToken(login_user_token),
+                expiration: (userToken.timestamp + userToken.duration) - Date.now(),
+                username: userToken.username,
+                addresses,
+            })
+        }
+        catch (e) {
+            res.send({
+                error: e?.message || 'Unknown Error.',
                 hasLogin,
             })
-            return;
         }
-
-        const userTokenParts = login_user_token.split('#');
-        const username = userTokenParts[0];
-        const timestamp = parseInt(userTokenParts[1]);
-        if (timestamp + ONE_DAY_MILLISECONDS < Date.now()) {
-            res.send({
-                error: 'Login expired.',
-                hasLogin,
-            })
-            return;
-        }
-
-        res.send({
-            authorization: createAuthorizationToken(login_user_token),
-            expiration: ONE_DAY_MILLISECONDS - (Date.now() - timestamp),
-            username,
-            addresses,
-        })
     });
 
     app.get('/', (_req, res) => res.redirect('/endpoint/@scrypted/core/public/'));
