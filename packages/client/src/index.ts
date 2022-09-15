@@ -146,6 +146,7 @@ export async function redirectScryptedLogout(baseUrl?: string) {
 }
 
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
+    const start = Date.now();
     let { baseUrl, pluginId, clientName, username, password } = options;
 
     const extraHeaders: { [header: string]: string } = {};
@@ -158,6 +159,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             extraHeaders['Authorization'] = loginResult.authorization;
         addresses = loginResult.addresses;
         scryptedCloud = loginResult.scryptedCloud;
+        console.log('login result', loginResult);
     }
     else {
         const loginCheck = await checkScryptedClientLogin({
@@ -167,6 +169,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             throw new ScryptedClientLoginError(loginCheck);
         addresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
+        console.log('login checked', loginCheck);
     }
 
     let socket: IOClientSocket;
@@ -176,8 +179,6 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         extraHeaders,
         rejectUnauthorized: false,
     };
-
-    const start = Date.now();
 
     const explicitBaseUrl = baseUrl || `${globalThis.location.protocol}//${globalThis.location.host}`;
     let connectionType: ScryptedClientConnectionType;
@@ -359,7 +360,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     });
 
                     if (isTimedOut()) {
-                        console.log('peer connection established too late. closing.');
+                        console.log('peer connection established too late. closing.', Date.now() - start);
                         ready.close();
                     }
                     else {
@@ -373,7 +374,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             sockets = sockets.filter(s => s !== socket);
         }
         catch (e) {
-            console.error('peer to peer failed', e);
+            console.error('peer to peer failed', Date.now() - start, e);
         }
         sockets.forEach(s => {
             try {
@@ -424,27 +425,38 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             endpointManager,
             mediaManager,
         } = scrypted;
-
-        const userStorage = await rpcPeer.getParam('userStorage');
-
-        const info = await systemManager.getComponent('info');
-        let version = 'unknown';
-        try {
-            version = await info.getVersion();
-        }
-        catch (e) {
-        }
+        console.log('api attached', Date.now() - start);
 
         const { browserSignalingSession, connectionManagementId } = rpcPeer.params;
-        let rtcConnectionManagement: RTCConnectionManagement;
-        if (connectionManagementId) {
-            try {
-                const plugins = await systemManager.getComponent('plugins');
-                rtcConnectionManagement = await plugins.getHostParam('@scrypted/webrtc', connectionManagementId);
-            }
-            catch (e) {
-            }
-        }
+
+        const [userStorage, version, rtcConnectionManagement] = await Promise.all([
+            rpcPeer.getParam('userStorage'),
+            (async () => {
+                const info = await systemManager.getComponent('info');
+                let version = 'unknown';
+                try {
+                    version = await info.getVersion();
+                }
+                catch (e) {
+                }
+                return version;
+            })(),
+            (async () => {
+                let rtcConnectionManagement: RTCConnectionManagement;
+                if (connectionManagementId) {
+                    try {
+                        const plugins = await systemManager.getComponent('plugins');
+                        rtcConnectionManagement = await plugins.getHostParam('@scrypted/webrtc', connectionManagementId);
+                        return rtcConnectionManagement;
+                    }
+                    catch (e) {
+                    }
+                }
+            })(),
+        ]);
+
+        console.log('api initialized', Date.now() - start);
+        console.log('api queried, version:', version);
 
         const ret: ScryptedClientStatic = {
             pluginRemoteAPI: undefined,
