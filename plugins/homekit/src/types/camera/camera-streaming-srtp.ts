@@ -83,13 +83,21 @@ export async function startCameraStreamSrtp(media: FFmpegInput, console: Console
 
     let opusFramesPerPacket = session.startRequest.audio.packet_time / 20;
 
+    let spsPps: ReturnType<typeof getSpsPps>;
+    try {
+        spsPps = getSpsPps(video);
+    }
+    catch (e) {
+        console.warn('sps/pps parse error', e);
+    }
+
     const vs = createCameraStreamSender(console, session.vconfig, session.videoReturn,
         session.videossrc, session.startRequest.video.pt,
         session.prepareRequest.video.port, session.prepareRequest.targetAddress,
         session.startRequest.video.rtcp_interval,
         {
             maxPacketSize: session.startRequest.video.mtu,
-            ...getSpsPps(video),
+            ...spsPps,
         });
     videoSender = vs.sendRtp;
     vs.sendRtcp();

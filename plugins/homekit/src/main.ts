@@ -28,27 +28,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     videoClipsId: string;
     cameraMixins = new Map<string, CameraMixin>();
     storageSettings = new StorageSettings(this, {
-        ...createHAPUsernameStorageSettingsDict(),
-        pincode: {
-            title: "Manual Pairing Code",
-            persistedDefaultValue: randomPinCode(),
-            readonly: true,
-        },
-        resetAccessory: {
-            title: 'Reset Pairing',
-            description: 'This will reset the Scrypted HomeKit Bridge and all bridged devices. The previous Scrypted HomeKit Bridge must be removed from the Home app, and Scrypted must be paired with HomeKit again.',
-            placeholder: 'RESET',
-            mapPut: (oldValue, newValue) => {
-                if (newValue === 'RESET') {
-                    this.storage.removeItem(this.storageSettings.keys.mac);
-                    this.log.a(`You must reload the HomeKit plugin for the changes to take effect.`);
-                    // generate a new reset accessory random value.
-                    return crypto.randomBytes(8).toString('hex');
-                }
-                throw new Error('HomeKit Accessory Reset cancelled.');
-            },
-            mapGet: () => '',
-        },
+        ...createHAPUsernameStorageSettingsDict(this, undefined, 'Network'),
         addressOverride: {
             group: 'Network',
             title: 'Scrypted Server Address',
@@ -64,9 +44,9 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         },
         portOverride: {
             group: 'Network',
-            title: 'Bridge Port',
+            title: 'Server Port',
             persistedDefaultValue: createRandomPort(),
-            description: 'Optional: The TCP port used by the Scrypted bridge. If none is specified, a random port will be chosen.',
+            description: 'Optional: The TCP port used by the Scrypted Server. If none is specified, a random port will be chosen.',
             type: 'number',
         },
         advertiserOverride: {
@@ -208,7 +188,13 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                         storage: mixinStorage,
                         onDeviceEvent: async () => {
                         }
-                    }, createHAPUsernameStorageSettingsDict())
+                    }, createHAPUsernameStorageSettingsDict({
+                        storage: mixinStorage,
+                        get name() {
+                            return device.name
+                        }
+                    },
+                        'HomeKit', 'HomeKit Pairing'));
                     storageSettings.settings.pincode.persistedDefaultValue = randomPinCode();
 
                     const mixinConsole = deviceManager.getMixinConsole(device.id, this.nativeId);
@@ -220,7 +206,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                             published = true;
                             mixinConsole.log('Device is in accessory mode and is online. HomeKit services are being published.');
 
-                            await this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory);
+                            await this.publishAccessory(accessory, storageSettings.values.mac, storageSettings.values.pincode, standaloneCategory, storageSettings.values.portOverride);
                             if (!hasPublished) {
                                 hasPublished = true;
                                 storageSettings.values.qrCode = accessory.setupURI();
@@ -352,10 +338,10 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         return ret;
     }
 
-    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories) {
+    async publishAccessory(accessory: Accessory, username: string, pincode: string, category: Categories, port: number) {
         await accessory.publish({
             username,
-            port: 0,
+            port,
             pincode,
             category,
             addIdentifyingMaterial: false,
