@@ -5,7 +5,7 @@ import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
-import { waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
+import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { startRtpForwarderProcess } from "./rtp-forwarders";
 import { getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive } from "./werift-util";
@@ -52,7 +52,7 @@ export async function createRTCPeerConnectionSource(options: {
         const ensurePeerConnection = (setup: RTCAVSignalingSetup) => {
             if (peerConnection.finished)
                 return;
-            peerConnection.resolve(new RTCPeerConnection({
+            const ret = new RTCPeerConnection({
                 bundlePolicy: setup.configuration?.bundlePolicy as BundlePolicy,
                 codecs: {
                     audio: [
@@ -63,7 +63,10 @@ export async function createRTCPeerConnectionSource(options: {
                     ],
                 },
                 iceServers: getWeriftIceServers(setup.configuration),
-            }));
+            });
+
+            logConnectionState(console, ret);
+            peerConnection.resolve(ret);
         }
 
         let audioTrack: string;

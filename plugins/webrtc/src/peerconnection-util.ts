@@ -1,50 +1,68 @@
 import { RTCPeerConnection } from "@koush/werift";
 
+interface Event {
+    subscribe: (execute: () => void) => {
+        unSubscribe: () => void;
+    };
+}
+
+async function statePromise(e: Event, check: () => boolean): Promise<void> {
+    if (check())
+        return;
+
+    return new Promise((r, f) => {
+        const u = e.subscribe(() => {
+            try {
+                if (check()) {
+                    u.unSubscribe();
+                    r(undefined);
+                }
+            }
+            catch (e) {
+                u.unSubscribe();
+                f(e);
+            }
+        });
+    })
+}
+
+function isPeerConnectionClosed(pc: RTCPeerConnection) {
+    return (pc.connectionState === 'closed'
+    || pc.connectionState === 'disconnected'
+    || pc.connectionState === 'failed')
+}
+
 export function waitConnected(pc: RTCPeerConnection) {
-    return new Promise(resolve => {
-        if (pc.connectionState === 'connected') {
-            resolve(undefined);
-            return;
-        }
-        pc.connectionStateChange.subscribe(() => {
-            if (pc.connectionState === 'connected')
-                resolve(undefined);
-        })
-    });
+    return statePromise(pc.connectionStateChange, () => {
+        if (isPeerConnectionClosed(pc))
+            throw new Error('peer connection closed');
+        return pc.connectionState === 'connected';
+    })
+}
+
+function isPeerIceConnectionClosed(pc: RTCPeerConnection) {
+    return (pc.iceConnectionState === 'disconnected'
+    || pc.iceConnectionState === 'failed'
+    || pc.iceConnectionState === 'closed')
 }
 
 export function waitIceConnected(pc: RTCPeerConnection) {
-    return new Promise(resolve => {
-        const check = () => {
-            if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-                resolve(undefined);
-            }
-        };
-        check();
-        pc.iceConnectionStateChange.subscribe(check);
-    });
+    return statePromise(pc.iceConnectionStateChange, () => {
+        if (isPeerIceConnectionClosed(pc))
+            throw new Error('peer ice connection closed');
+        return pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed';
+    })
 }
 
 export function waitClosed(pc: RTCPeerConnection) {
-    return new Promise(resolve => {
-        pc.iceGatheringStateChange.subscribe(() => {
-            console.log('iceGatheringStateChange', pc.iceGatheringState);
-        });
-        pc.iceConnectionStateChange.subscribe(() => {
-            console.log('iceConnectionStateChange', pc.iceConnectionState);
-            if (pc.iceConnectionState === 'disconnected'
-                || pc.iceConnectionState === 'failed'
-                || pc.iceConnectionState === 'closed') {
-                resolve(undefined);
-            }
-        });
-        pc.connectionStateChange.subscribe(() => {
-            console.log('connectionStateChange', pc.iceConnectionState);
-            if (pc.connectionState === 'closed'
-                || pc.connectionState === 'disconnected'
-                || pc.connectionState === 'failed') {
-                resolve(undefined);
-            }
-        });
-    });
+    return statePromise(pc.connectionStateChange, () => {
+        return isPeerConnectionClosed(pc);
+    })
+}
+
+export function logConnectionState(console: Console, pc: RTCPeerConnection) {
+    pc.iceConnectionStateChange.subscribe(() => console.log('iceConnectionState', pc.iceConnectionState));
+    pc.iceGatheringStateChange.subscribe(() => console.log('iceGatheringState', pc.iceGatheringState));
+    pc.signalingStateChange.subscribe(() => console.log('signalingState', pc.signalingState));
+    pc.connectionStateChange.subscribe(() => console.log('connectionState', pc.connectionState));
 }

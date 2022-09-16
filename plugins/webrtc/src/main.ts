@@ -146,7 +146,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             title: 'Use TURN Servers',
             description: 'Use a intermediary server to send video streams. Reduces performance and should only be used with restrictive NATs.',
             type: 'boolean',
-            defaultValue: false,
+            defaultValue: true,
         },
     });
     bridge: WebRTCBridge;

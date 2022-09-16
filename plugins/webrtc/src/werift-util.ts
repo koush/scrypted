@@ -46,8 +46,15 @@ export function logIsPrivateIceTransport(console: Console, pc: RTCPeerConnection
     let isPrivate = true;
     for (const ice of pc.iceTransports) {
         const [address, port] = ice.connection.remoteAddr;
+        const {turnServer} = ice.connection;
         isPrivate = isPrivate && ip.isPrivate(address);
-        console.log('ice transport ip', address, port);
+        console.log('ice transport ip', {
+            address,
+            port,
+            turnServer: !!turnServer,
+        });
+        if (turnServer)
+            console.warn('Turn server is in use. For optimal performance ensure that your router supports source NAT.');
     }
     console.log('Connection is local network:', isPrivate);
     return isPrivate;

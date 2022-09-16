@@ -11,7 +11,7 @@ import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
-import { waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
+import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
 import { WeriftSignalingSession } from "./werift-signaling-session";
@@ -294,6 +294,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 ],
             }
         });
+        logConnectionState(console, this.pc);
 
         this.pc.signalingStateChange.subscribe(() => {
             this.console.log('sig change', this.pc.signalingState);
