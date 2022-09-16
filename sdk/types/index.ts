@@ -1497,6 +1497,9 @@ export interface DeviceDiscovery {
 export interface Battery {
   batteryLevel?: number;
 }
+export interface Charger {
+  chargerStatus?: 'charging' | 'not-charging' | 'not-chargeable';
+}
 /**
  * Refresh indicates that this device has properties that are not automatically updated, and must be periodically refreshed via polling. Device implementations should never implement their own underlying polling algorithm, and instead implement Refresh to allow Scrypted to manage polling intelligently.
  */
@@ -2303,6 +2306,7 @@ export enum ScryptedInterface {
   DeviceDiscovery = "DeviceDiscovery",
   DeviceCreator = "DeviceCreator",
   Battery = "Battery",
+  Charger = 'Charger',
   Refresh = "Refresh",
   MediaPlayer = "MediaPlayer",
   Online = "Online",
