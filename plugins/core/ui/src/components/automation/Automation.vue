@@ -23,7 +23,7 @@
       </v-flex>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="primary" text @click="$emit('save')">
+        <v-btn color="primary" text @click="saveAutomation">
           Save Triggers
         </v-btn>
       </v-card-actions>
@@ -52,7 +52,7 @@
       </v-flex>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="primary" text @click="$emit('save')">
+        <v-btn color="primary" text @click="saveAutomation">
           Save Actions
         </v-btn>
       </v-card-actions>
@@ -77,7 +77,7 @@
       </v-flex>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="primary" text @click="$emit('save')">
+        <v-btn color="primary" text @click="saveAutomation">
           Save Actions
         </v-btn>
       </v-card-actions>
@@ -221,6 +221,13 @@ export default {
     },
   },
   methods: {
+    saveAutomation() {
+      this.device.triggers = this.device.triggers.slice().filter(e => e.id != "unassigned");
+      this.device.actions = this.device.actions.slice().filter(e => e.id != "unassigned");
+      this.device.deactivateActions = this.device.deactivateActions?.slice().filter(e => e.id != "unassigned");
+      this.onChange();
+      this.$emit('save')
+    },
     onChange() {
       this.$emit("input", JSON.stringify(this.device));
     },

@@ -33,6 +33,7 @@ Vue.use(Vue => {
     Vue.prototype.$connectScrypted = () => {
         const clientPromise = connectScryptedClient({
             pluginId: '@scrypted/core',
+            webrtc: true,
         })
             .then(async (scrypted) => {
                 // todo: fix this.
