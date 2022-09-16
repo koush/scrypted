@@ -31,8 +31,5 @@ export async function createBrowserSignalingSession(ws: WebSocket, localName: st
     serializer.setupRpcPeer(rpcPeer);
 
     const session: RTCSignalingSession = await rpcPeer.getParam('session');
-    return {
-        session,
-        rpcPeer,
-    };
+    return session;
 }

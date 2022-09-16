@@ -11,7 +11,6 @@ import { addVideoFilterArguments } from "@scrypted/common/src/ffmpeg-helpers";
 import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
-import { stunIceServers, stunServer, turnServer } from "./ice-servers";
 import { waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
@@ -279,7 +278,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         public sessionSupportsH264High: boolean,
         public options?: {
             disableIntercom?: boolean,
-            setup?: Partial<RTCAVSignalingSetup>,
+            configuration?: RTCConfiguration,
         }) {
 
         this.pc = new RTCPeerConnection({
@@ -354,7 +353,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             video: {
                 direction: videoDirection,
             },
-            ...this.options?.setup,
+            configuration: this.options?.configuration,
         }
     };
 
@@ -439,7 +438,9 @@ export class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter 
         const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
 
         const console = sdk.deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
-        const ret = new WebRTCConnectionManagement(console, session, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High);
+        const ret = new WebRTCConnectionManagement(console, session, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
+            configuration: this.plugin.getRTCConfiguration(),
+        });
         // todo: move this into api, provide a client stream.
         ret.pc.createDataChannel('dummy');
         const offer = await ret.pc.createOffer();
@@ -454,11 +455,13 @@ export async function createRTCPeerConnectionSink(
     disableIntercom: boolean,
     mo: MediaObject,
     maximumCompatibilityMode: boolean,
+    configuration: RTCConfiguration,
 ) {
     const { transcodeWidth, sessionSupportsH264High } = parseOptions(await clientSignalingSession.getOptions());
 
     const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
         disableIntercom,
+        configuration,
     });
 
     const track = await connection.addTrack(mo);

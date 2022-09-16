@@ -1,21 +1,18 @@
-import { defaultPeerConfig, RTCPeerConnection } from '@koush/werift';
+import { defaultPeerConfig } from '@koush/werift';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
-import { connectRTCSignalingClients } from '@scrypted/common/src/rtc-signaling';
 import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
-import { sleep } from '@scrypted/common/src/sleep';
-import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import crypto from 'crypto';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
 import { createRTCPeerConnectionSink, parseOptions, RTC_BRIDGE_NATIVE_ID, WebRTCBridge, WebRTCConnectionManagement } from "./ffmpeg-to-wrtc";
-import { stunIceServers, stunServer } from './ice-servers';
-import { waitClosed, waitConnected, waitIceConnected } from './peerconnection-util';
+import { stunServer, turnServer } from './ice-servers';
+import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
-import { WeriftSignalingSession } from './werift-signaling-session';
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
@@ -91,6 +88,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             !hasIntercom,
             mo,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
+            this.plugin.getRTCConfiguration(),
         );
     }
 
@@ -143,7 +141,13 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             description: 'Enables maximum compatibility with WebRTC clients by using the most conservative transcode options.',
             defaultValue: false,
             type: 'boolean',
-        }
+        },
+        useTurnServer: {
+            title: 'Use TURN Servers',
+            description: 'Use a intermediary server to send video streams. Reduces performance and should only be used with restrictive NATs.',
+            type: 'boolean',
+            defaultValue: false,
+        },
     });
     bridge: WebRTCBridge;
 
@@ -189,6 +193,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                         true,
                         mo,
                         plugin.storageSettings.values.maximumCompatibilityMode,
+                        plugin.getRTCConfiguration(),
                     );
                 }
             }
@@ -200,7 +205,12 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const mo = await mediaManager.createMediaObject(rms, ScryptedMimeTypes.RequestMediaStream);
             class OnDemandSignalingChannel implements RTCSignalingChannel {
                 async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
-                    return createRTCPeerConnectionSink(session, console, true, mo, plugin.storageSettings.values.maximumCompatibilityMode);
+                    return createRTCPeerConnectionSink(session, console,
+                        true,
+                        mo,
+                        plugin.storageSettings.values.maximumCompatibilityMode,
+                        plugin.getRTCConfiguration(),
+                    );
                 }
             }
 
@@ -301,6 +311,14 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return new WebRTCCamera(this, nativeId);
     }
 
+    getRTCConfiguration(): RTCConfiguration {
+        // google seems to be throttling requests on their open stun server... using a hosted one seems faster.
+        const iceServers = this.storageSettings.values.useTurnServer ? [turnServer] : [stunServer];
+        return {
+            iceServers,
+        };
+    }
+
     async onConnection(request: HttpRequest, webSocketUrl: string) {
         const cleanup = new Deferred<string>();
         cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
@@ -322,6 +340,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
         const message = await new Promise<{
             connectionManagementId: string,
+            updateSessionId: string,
         }>((resolve, reject) => {
             const close = () => {
                 const str = 'Connection closed while waiting for message';
@@ -336,42 +355,37 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
         });
 
-
         try {
-            const { session, rpcPeer: signalingRpcPeer } = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
+            const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
             const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
             const connection = new WebRTCConnectionManagement(this.console, session,
                 this.storageSettings.values.maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
-                setup: {
-                    configuration: {
-                        iceServers: [
-                            // seemingly this is faster than google which may have throttling on requests?
-                            // unsure, but leaving this as is.
-                            stunServer,
-                        ],
-                    },
-                }
+                configuration: this.getRTCConfiguration(),
             });
             cleanup.promise.finally(() => connection.close());
 
-            const { connectionManagementId } = message;
+            const { connectionManagementId, updateSessionId } = message;
             if (connectionManagementId) {
                 const plugins = await systemManager.getComponent('plugins');
                 plugins.setHostParam('@scrypted/webrtc', connectionManagementId, connection);
                 cleanup.promise.finally(() => plugins.setHostParam('@scrypted/webrtc', connectionManagementId));
             }
+            if (updateSessionId) {
+                const plugins = await systemManager.getComponent('plugins');
+                await plugins.setHostParam('@scrypted/webrtc', updateSessionId, (session: RTCSignalingSession) => connection.clientSession = session);
+                cleanup.promise.finally(() => plugins.setHostParam('@scrypted/webrtc', updateSessionId));
+            }
 
             const { pc } = connection;
-            const dc = pc.createDataChannel('rpc');
             waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
 
-            const start = Date.now();
+            const dc = pc.createDataChannel('rpc');
+            dc.message.subscribe(message => socket.write(message));
 
             await connection.negotiateRTCSignalingSession();
             // await waitIceConnected(pc);
             // await sleep(5000);
             // const [dc] = await dcPromise;
-            dc.message.subscribe(message => socket.write(message));
 
             const cp = await client.clientPromise;
             cp.on('close', () => cleanup.resolve('socket client closed'));
