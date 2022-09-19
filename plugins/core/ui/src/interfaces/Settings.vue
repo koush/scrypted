@@ -1,9 +1,9 @@
 <template>
   <v-card>
     <CardTitle v-if="!noTitle">Settings</CardTitle>
-    <v-flex xs12 v-if="showChips" >
-      <v-chip-group class="pt-0" mandatory active-class="deep-purple accent-4 white--text" column v-model="settingsGroupName"
-        v-if="Object.entries(settingsGroups).length < 4 || true">
+    <v-flex xs12 v-if="showChips">
+      <v-chip-group class="pt-0" mandatory active-class="deep-purple accent-4 white--text" column
+        v-model="settingsGroupName" v-if="Object.entries(settingsGroups).length < 4 || true">
         <v-chip small :value="key" v-for="[key] of Object.entries(settingsGroups)" :key="key">
           {{ key.replace("Settings", "") || "General" }}
         </v-chip>
@@ -141,12 +141,13 @@ export default {
       else {
         settings = [];
       }
-      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin) && hasFixedPhysicalLocation(this.device.type, this.device.interfaces)) {
+      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
         const inferredTypes = inferTypesFromInterfaces(
           this.device.type,
           this.device.providedType,
           this.device.interfaces
         );
+
         const editables = [
           {
             group: 'Edit',
@@ -172,16 +173,18 @@ export default {
           )
           .filter((room) => room);
 
-        editables.push(
-          {
-            group: 'Edit',
-            key: '__room',
-            title: 'Room',
-            value: this.device.room,
-            combobox: true,
-            choices: existingRooms,
-          },
-        );
+        if (hasFixedPhysicalLocation(this.device.type, this.device.interfaces)) {
+          editables.push(
+            {
+              group: 'Edit',
+              key: '__room',
+              title: 'Room',
+              value: this.device.room,
+              combobox: true,
+              choices: existingRooms,
+            },
+          );
+        }
 
         settings.splice(settings?.[0]?.group ? 0 : 1, 0, ...editables);
       }
