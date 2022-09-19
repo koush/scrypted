@@ -19,7 +19,13 @@ You can use the admin page provided by your camera manufacturer to set the optim
 
 If recordings dont work, it's generally because of a few reasons, **follow the steps to determine where it is failing before asking for help**:
 
-1) The motion wasn't triggered. You can view if there are motion events in the camera `Events` section (a small icon button next to the `Console` button`.
+1) The motion wasn't triggered. You can view if there are motion events in the camera `Events` section (a small icon button next to the `Console` button`. If no motion event was delivered to Scrypted this may be for several reasons which may depend on the camera type, including:
+  * Local cameras:
+    * Motion detection is disabled in the camera. Enable in the camera manufacturer admin app/webpage.
+    * There are no motion zone configured on the camera, and there is no default zone. Configure in the camera manufacturer admin app/webpage.
+    * The camera may not support motion detection via that plugin (ie, an ONVIF camera not supporting the ONVIF-T profile). Using another delivery mechanism such as mail (SMTP) or webhook is an alernative and reliable option.
+  * Cloud cameras:
+    * Motion delivery issue from the cloud service.
 
 2) After a motion trigger, the home hub will start recording. Verify that HomeKit is requesting recording by looking in the Camera's Console: you will see logs such as `[HomeKit]: Camera recording session starting`. If you do not see this, there are two possible causes and solutions:
   * The Home Hubs are bugged out and have stopped responding to motion. Reboot all Home Hubs when this happens. **iPads and HomePods, which are wireless, are not reliable Home Hubs.** If you have an iPad as a Home Hub, remove it from acting as a Home Hub from within the iOS Home app. Unfortunately this is not possible to do with HomePods.
