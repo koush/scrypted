@@ -32,7 +32,7 @@ export class ReolinkCameraClient {
             url: url.toString(),
         });
         return {
-            value: !!response.data[0].value.state,
+            value: !!response.data?.[0]?.value?.state,
             data: response.data,
         };
     }
