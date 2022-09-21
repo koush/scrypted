@@ -1,8 +1,0 @@
-{
-  "entryPoints": [
-    "./gen"
-  ],
-  "json": "schema.json",
-  "name": "Scrypted Documentation",
-  "tsconfig": "./gen/tsconfig.json"
-}

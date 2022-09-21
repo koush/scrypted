@@ -7,7 +7,7 @@
   "license": "ISC",
   "scripts": {
     "prepublishOnly": "npm run build",
-    "build": "cd .. && typedoc && cd types && ts-node ../gen/build && tsc"
+    "build": "typedoc && cd ../types && ts-node ../gen/build && tsc"
   },
   "dependencies": {},
   "devDependencies": {},
