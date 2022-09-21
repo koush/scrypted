@@ -1,0 +1,21 @@
+{
+  "entryPoints": [
+    "./"
+  ],
+  "sort": ["source-order"],
+  "name": "Scrypted Documentation",
+  "tsconfig": "./tsconfig.json",
+  "out": "./developer.scrypted.app/docs",
+  "categorizeByGroup": false,
+  "defaultCategory": "Device Interfaces Reference",
+  "excludePrivate": true,
+  "disableSources": true,
+  "categoryOrder": [
+    "Core Reference",
+    "Device Provider Reference",
+    "Media Reference",
+    "Webhook and Push Reference"
+  ],
+  "customCss": "docs.css",
+  "readme": "./README.md"
+}

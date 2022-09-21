@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.89";
+export declare const TYPES_VERSION = "0.0.90";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
@@ -183,6 +183,8 @@ export declare const ScryptedInterfaceDescriptors: {
 export declare type ScryptedNativeId = string | undefined;
 /**
  * All devices in Scrypted implement ScryptedDevice, which contains the id, name, and type. Add listeners to subscribe to events from that device.
+ *
+ * @category Core Reference
  */
 export interface ScryptedDevice {
     /**
@@ -227,6 +229,9 @@ export interface EventListenerOptions {
      */
     watch?: boolean;
 }
+/**
+ * @category Core Reference
+ */
 export declare type EventListener = (eventSource: ScryptedDevice | undefined, eventDetails: EventDetails, eventData: any) => void;
 export interface EventDetails {
     changed?: boolean;
@@ -236,10 +241,15 @@ export interface EventDetails {
 }
 /**
  * Returned when an event listener is attached to an EventEmitter. Call removeListener to unregister from events.
- */
+ *
+ * @category Core Reference
+*/
 export interface EventListenerRegister {
     removeListener(): void;
 }
+/**
+ * @category Core Reference
+ */
 export declare enum ScryptedDeviceType {
     Builtin = "Builtin",
     Camera = "Camera",
@@ -353,6 +363,8 @@ export interface Notifier {
 }
 /**
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.
+ *
+ * @category Media Reference
  */
 export interface MediaObject {
     mimeType: string;
@@ -785,7 +797,74 @@ export interface EntrySensor {
     entryOpen?: boolean;
 }
 /**
+ * DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted.
+ *
+ * @category Device Provider Reference
+ */
+export interface DeviceManager {
+    /**
+     * Get the logger for a device given a native id.
+     */
+    getDeviceLogger(nativeId?: ScryptedNativeId): Logger;
+    /**
+     * Get the console for the device given a native id.
+     */
+    getDeviceConsole?(nativeId?: ScryptedNativeId): Console;
+    /**
+     * Get the console for the device given a native id.
+     */
+    getMixinConsole?(mixinId: string, nativeId?: ScryptedNativeId): Console;
+    /**
+     * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
+     */
+    getDeviceState(nativeId?: ScryptedNativeId): DeviceState;
+    /**
+     * Create a device state object that will trap all state setting calls. Used internally by mixins and fork.
+     */
+    createDeviceState?(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState;
+    /**
+     * Get the storage for a mixin.
+     * @param id The id of the device being mixined.
+     * @param nativeId The nativeId of the MixinProvider.
+     */
+    getMixinStorage(id: string, nativeId?: ScryptedNativeId): Storage;
+    /**
+     * Fire an event for a mixin provided by this plugin.
+     */
+    onMixinEvent(id: string, mixinDevice: any, eventInterface: string, eventData: any): Promise<void>;
+    /**
+    * Get the device Storage object.
+    */
+    getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
+    /**
+     * Get all the native ids that have been reported by this plugin. This always includes "undefined", the plugin itself.
+     */
+    getNativeIds(): string[];
+    /**
+     * onDeviceDiscovered is used to report new devices that are trickle discovered, one by one, such as via a network broadcast.
+     */
+    onDeviceDiscovered(device: Device): Promise<string>;
+    /**
+     * Fire an event for a device provided by this plugin.
+     */
+    onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: string, eventData: any): Promise<void>;
+    /**
+     * onDeviceRemoved is used to report when discovered devices are removed.
+     */
+    onDeviceRemoved(nativeId: string): Promise<void>;
+    /**
+     * onDevicesChanged is used to sync Scrypted with devices that are attached to a hub, such as Hue or SmartThings. All the devices should be reported at once.
+     */
+    onDevicesChanged(devices: DeviceManifest): Promise<void>;
+    /**
+     * Restart the plugin. May not happen immediately.
+     */
+    requestRestart(): Promise<void>;
+}
+/**
  * DeviceProvider acts as a controller/hub and exposes multiple devices to Scrypted Device Manager.
+ *
+ * @category Device Provider Reference
  */
 export interface DeviceProvider {
     /**
@@ -793,11 +872,25 @@ export interface DeviceProvider {
      */
     getDevice(nativeId: ScryptedNativeId): any;
 }
+/**
+ * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
+ *
+ * @category Device Provider Reference
+ */
+export interface DeviceManifest {
+    /**
+     * The native id of the hub or discovery DeviceProvider that manages these devices.
+     */
+    providerNativeId?: ScryptedNativeId;
+    devices?: Device[];
+}
 export interface DeviceCreatorSettings {
     [key: string]: SettingValue;
 }
 /**
  * A DeviceProvider that allows the user to create a device.
+ *
+ * @category Device Provider Reference
  */
 export interface DeviceCreator {
     getCreateDeviceSettings(): Promise<Setting[]>;
@@ -809,6 +902,8 @@ export interface DeviceCreator {
 }
 /**
  * A DeviceProvider that has a device discovery mechanism.
+ *
+ * @category Device Provider Reference
  */
 export interface DeviceDiscovery {
     /**
@@ -824,6 +919,8 @@ export interface Battery {
 }
 /**
  * Refresh indicates that this device has properties that are not automatically updated, and must be periodically refreshed via polling. Device implementations should never implement their own underlying polling algorithm, and instead implement Refresh to allow Scrypted to manage polling intelligently.
+ *
+ * @category Device Provider Reference
  */
 export interface Refresh {
     /**
@@ -1135,6 +1232,9 @@ export interface MediaObjectOptions {
      */
     sourceId?: string;
 }
+/**
+ * @category Media Reference
+ */
 export interface MediaManager {
     /**
      * Add an convertor to consider for use when converting MediaObjects.
@@ -1200,69 +1300,6 @@ export interface FFmpegInput extends MediaStreamUrl {
     videoDecoderArguments?: string[];
     h264FilterArguments?: string[];
 }
-/**
- * DeviceManager is the interface used by DeviceProvider to report new devices, device states, and device events to Scrypted.
- */
-export interface DeviceManager {
-    /**
-     * Get the logger for a device given a native id.
-     */
-    getDeviceLogger(nativeId?: ScryptedNativeId): Logger;
-    /**
-     * Get the console for the device given a native id.
-     */
-    getDeviceConsole?(nativeId?: ScryptedNativeId): Console;
-    /**
-     * Get the console for the device given a native id.
-     */
-    getMixinConsole?(mixinId: string, nativeId?: ScryptedNativeId): Console;
-    /**
-     * Get the device state maintained by Scrypted. Setting properties on this state will update the state in Scrypted.
-     */
-    getDeviceState(nativeId?: ScryptedNativeId): DeviceState;
-    /**
-     * Create a device state object that will trap all state setting calls. Used internally by mixins and fork.
-     */
-    createDeviceState?(id: string, setState: (property: string, value: any) => Promise<void>): DeviceState;
-    /**
-     * Get the storage for a mixin.
-     * @param id The id of the device being mixined.
-     * @param nativeId The nativeId of the MixinProvider.
-     */
-    getMixinStorage(id: string, nativeId?: ScryptedNativeId): Storage;
-    /**
-     * Fire an event for a mixin provided by this plugin.
-     */
-    onMixinEvent(id: string, mixinDevice: any, eventInterface: string, eventData: any): Promise<void>;
-    /**
-    * Get the device Storage object.
-    */
-    getDeviceStorage(nativeId?: ScryptedNativeId): Storage;
-    /**
-     * Get all the native ids that have been reported by this plugin. This always includes "undefined", the plugin itself.
-     */
-    getNativeIds(): string[];
-    /**
-     * onDeviceDiscovered is used to report new devices that are trickle discovered, one by one, such as via a network broadcast.
-     */
-    onDeviceDiscovered(device: Device): Promise<string>;
-    /**
-     * Fire an event for a device provided by this plugin.
-     */
-    onDeviceEvent(nativeId: ScryptedNativeId, eventInterface: string, eventData: any): Promise<void>;
-    /**
-     * onDeviceRemoved is used to report when discovered devices are removed.
-     */
-    onDeviceRemoved(nativeId: string): Promise<void>;
-    /**
-     * onDevicesChanged is used to sync Scrypted with devices that are attached to a hub, such as Hue or SmartThings. All the devices should be reported at once.
-     */
-    onDevicesChanged(devices: DeviceManifest): Promise<void>;
-    /**
-     * Restart the plugin. May not happen immediately.
-     */
-    requestRestart(): Promise<void>;
-}
 export interface DeviceInformation {
     model?: string;
     manufacturer?: string;
@@ -1275,6 +1312,8 @@ export interface DeviceInformation {
 }
 /**
  * Device objects are created by DeviceProviders when new devices are discover and synced to Scrypted via the DeviceManager.
+ *
+ * @category Device Provider Reference
  */
 export interface Device {
     name: string;
@@ -1293,17 +1332,9 @@ export interface Device {
     internal?: boolean;
 }
 /**
- * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)
- */
-export interface DeviceManifest {
-    /**
-     * The native id of the hub or discovery DeviceProvider that manages these devices.
-     */
-    providerNativeId?: ScryptedNativeId;
-    devices?: Device[];
-}
-/**
  * EndpointManager provides publicly accessible URLs that can be used to contact your Scrypted Plugin.
+ *
+ * @category Webhook and Push Reference
  */
 export interface EndpointManager {
     /**
@@ -1353,6 +1384,8 @@ export interface EndpointManager {
 }
 /**
  * SystemManager is used by scripts to query device state and access devices.
+ *
+ * @category Core Reference
  */
 export interface SystemManager {
     /**
@@ -1422,6 +1455,8 @@ export interface MixinProvider {
 }
 /**
  * The HttpRequestHandler allows handling of web requests under the endpoint path: /endpoint/npm-package-name/*.
+ *
+ * @category Webhook and Push Reference
  */
 export interface HttpRequestHandler {
     /**
@@ -1429,6 +1464,9 @@ export interface HttpRequestHandler {
      */
     onRequest(request: HttpRequest, response: HttpResponse): Promise<void>;
 }
+/**
+ * @category Webhook and Push Reference
+ */
 export interface HttpRequest {
     body?: string;
     headers?: object;
@@ -1440,6 +1478,8 @@ export interface HttpRequest {
 }
 /**
  * Response object provided by the HttpRequestHandler.
+ *
+ * @category Webhook and Push Reference
  */
 export interface HttpResponse {
     send(body: string): void;
@@ -1450,6 +1490,9 @@ export interface HttpResponse {
     sendFile(path: string, options: HttpResponseOptions): void;
     sendSocket(socket: any, options: HttpResponseOptions): void;
 }
+/**
+ * @category Webhook and Push Reference
+ */
 export interface HttpResponseOptions {
     code?: number;
     headers?: object;
@@ -1457,6 +1500,10 @@ export interface HttpResponseOptions {
 export interface EngineIOHandler {
     onConnection(request: HttpRequest, webSocketUrl: string): Promise<void>;
 }
+/**
+ * @category Webhook and Push Reference
+ *
+ */
 export interface PushHandler {
     /**
      * Callback to handle an incoming push.

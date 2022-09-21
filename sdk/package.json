@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.0.207",
+  "version": "0.0.208",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -40,7 +40,7 @@
     "@types/stringify-object": "^4.0.0",
     "stringify-object": "^3.3.0",
     "ts-node": "^10.4.0",
-    "typedoc": "^0.22.8",
+    "typedoc": "^0.23.15",
     "typescript-json-schema": "^0.50.1"
   },
   "types": "index.d.ts"
