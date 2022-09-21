@@ -185,17 +185,8 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex xs12 v-if="
-          availableMixins.length &&
-          !device.interfaces.includes(ScryptedInterface.Settings)
-        ">
-          <v-card raised>
-            <CardTitle icon="fa-puzzle-piece">
-              Integrations and Extensions
-            </CardTitle>
-
-            <AvailableMixins :device="device"></AvailableMixins>
-          </v-card>
+        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings)">
+          <Settings :device="device"></Settings>
         </v-flex>
       </v-layout>
     </v-flex>
