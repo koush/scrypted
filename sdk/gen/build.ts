@@ -155,7 +155,7 @@ for (const e of enums) {
 class ${e.name}(Enum):
 `
     for (const val of e.children) {
-        pythonEnums += `    ${val.name} = ${val.defaultValue}
+        pythonEnums += `    ${val.name} = "${val.type.value}"
 `;
     }
 }

@@ -1,5 +1,5 @@
 
-export const TYPES_VERSION = "0.0.90";
+export const TYPES_VERSION = "0.0.91";
 
 
 export interface DeviceState {
