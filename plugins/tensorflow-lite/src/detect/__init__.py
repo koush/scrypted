@@ -21,6 +21,7 @@ from gi.repository import Gst
 
 from scrypted_sdk.types import FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
+
 def optional_chain(root, *keys):
     result = root
     for k in keys:
@@ -35,6 +36,7 @@ def optional_chain(root, *keys):
 
 class PipelineValve:
     allowPacketCounter: int
+
     def __init__(self, gst, name) -> None:
         self.allowPacketCounter = 1
         self.mutex = threading.Lock()
@@ -43,6 +45,7 @@ class PipelineValve:
         self.name = name
 
         needRemove = False
+
         def probe(pad, info):
             nonlocal needRemove
             if needRemove:
@@ -53,27 +56,32 @@ class PipelineValve:
             return Gst.PadProbeReturn.PASS
 
         # need one buffer to go through to go into flowing state
-        self.probe = self.pad.add_probe(Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
+        self.probe = self.pad.add_probe(
+            Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
 
     def open(self):
         with self.mutex:
             if self.probe != None:
                 self.pad.remove_probe(self.probe)
                 self.probe = None
+
     def close(self):
         with self.mutex:
             if self.probe != None:
                 self.pad.remove_probe(self.probe)
                 self.probe = None
+
             def probe(pad, info):
                 return Gst.PadProbeReturn.OK
 
-            self.probe = self.pad.add_probe(Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
+            self.probe = self.pad.add_probe(
+                Gst.PadProbeType.BLOCK | Gst.PadProbeType.BUFFER | Gst.PadProbeType.BUFFER_LIST, probe)
 
 
 def setupPipelineValve(name: str, gst: Any) -> PipelineValve:
     ret = PipelineValve(gst, name)
     return ret
+
 
 class DetectionSession:
     id: str
@@ -108,11 +116,14 @@ class DetectionSession:
     def setTimeout(self, duration: float):
         with self.mutex:
             self.clearTimeoutLocked()
-            self.timerHandle = self.loop.call_later(duration, lambda: self.timedOut())
+            self.timerHandle = self.loop.call_later(
+                duration, lambda: self.timedOut())
+
 
 class DetectionSink(TypedDict):
     pipeline: str
     input_size: Tuple[number, number]
+
 
 class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def __init__(self, nativeId: str | None = None):
@@ -121,7 +132,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         self.session_mutex = threading.Lock()
         self.crop = False
 
-    def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, event_buffer: bytes = None):
+    def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected):
         detection_result['detectionId'] = detection_session.id
         detection_result['timestamp'] = int(time.time() * 1000)
         asyncio.run_coroutine_threadsafe(self.onDeviceEvent(
@@ -180,7 +191,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             duration = session.get('duration', None)
             settings = session.get('settings', None)
 
-        is_image = mediaObjectMimeType and mediaObjectMimeType.startswith('image/')
+        is_image = mediaObjectMimeType and mediaObjectMimeType.startswith(
+            'image/')
 
         ending = False
         new_session = False
@@ -211,7 +223,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     lambda _: self.end_session(detection_session))
 
         if not ending and detection_session and time.time() - detection_session.last_sample > 30 and not mediaObjectMimeType:
-            print('detection session has not received a sample in 30 seconds, terminating', detection_session.id)
+            print('detection session has not received a sample in 30 seconds, terminating',
+                  detection_session.id)
             ending = True
 
         if ending:
@@ -249,7 +262,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             duration = session.get('duration', None)
             settings = session.get('settings', None)
 
-        create, detection_session, objects_detected = self.ensure_session(mediaObject and mediaObject.mimeType, session)
+        create, detection_session, objects_detected = self.ensure_session(
+            mediaObject and mediaObject.mimeType, session)
 
         if is_image:
             return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
@@ -283,12 +297,14 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                 raise Exception('unknown container %s' % container)
         elif videosrc.startswith('rtsp'):
             videosrc = 'rtspsrc buffer-mode=0 location=%s protocols=tcp latency=0 is-live=false ! rtph264depay ! h264parse' % videosrc
-        
+
         decoder = settings.get('decoder', 'decodebin')
         videosrc += " ! %s " % decoder
 
-        width = optional_chain(j, 'mediaStreamOptions', 'video', 'width') or 1920
-        height = optional_chain(j, 'mediaStreamOptions', 'video', 'height') or 1080
+        width = optional_chain(j, 'mediaStreamOptions',
+                               'video', 'width') or 1920
+        height = optional_chain(j, 'mediaStreamOptions',
+                                'video', 'height') or 1080
         src_size = (width, height)
 
         self.run_pipeline(detection_session, duration, src_size, videosrc)
@@ -303,7 +319,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         ret: DetectionSink = {}
 
         ret['input_size'] = inference_size
-        ret['pipeline'] = create_pipeline_sink(type(self).__name__, inference_size, self.get_pixel_format())
+        ret['pipeline'] = create_pipeline_sink(
+            type(self).__name__, inference_size, self.get_pixel_format())
 
         return ret
 
@@ -312,6 +329,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
     def create_user_callback(self, detection_session: DetectionSession, duration: number):
         first_frame = True
+
         def user_callback(gst_sample, src_size, convert_to_src_size):
             try:
                 detection_session.last_sample = time.time()
@@ -329,14 +347,16 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     self.detection_event_notified(detection_session.settings)
 
                 if not detection_session or duration == None:
-                    safe_set_result(detection_session.loop, detection_session.future)
+                    safe_set_result(detection_session.loop,
+                                    detection_session.future)
             finally:
                 pass
 
         return user_callback
 
     def attach_pipeline(self, gstPipeline: GstPipelineBase, session: ObjectDetectionSession, valveName: str = None):
-        create, detection_session, objects_detected = self.ensure_session('video/dummy', session)
+        create, detection_session, objects_detected = self.ensure_session(
+            'video/dummy', session)
 
         if detection_session and valveName:
             valve = setupPipelineValve(valveName, gstPipeline.gst)
@@ -351,7 +371,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         if session:
             duration = session.get('duration', None)
 
-        pipeline = GstPipeline(gstPipeline.loop, gstPipeline.finished, type(self).__name__, self.create_user_callback(detection_session, duration))
+        pipeline = GstPipeline(gstPipeline.loop, gstPipeline.finished, type(
+            self).__name__, self.create_user_callback(detection_session, duration))
         pipeline.attach_launch(gstPipeline.gst)
 
         return create, detection_session, objects_detected, pipeline
@@ -365,16 +386,16 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         with detection_session.mutex:
             detection_session.running = False
         detection_session.clearTimeout()
- 
+
     def run_pipeline(self, detection_session: DetectionSession, duration, src_size, video_input):
         inference_size = self.get_detection_input_size(src_size)
 
         pipeline = run_pipeline(detection_session.loop, detection_session.future, self.create_user_callback(detection_session, duration),
-                                          appsink_name=type(self).__name__,
-                                          appsink_size=inference_size,
-                                          video_input=video_input,
-                                          pixel_format=self.get_pixel_format(),
-                                          crop=self.crop,
-                                          )
+                                appsink_name=type(self).__name__,
+                                appsink_size=inference_size,
+                                video_input=video_input,
+                                pixel_format=self.get_pixel_format(),
+                                crop=self.crop,
+                                )
         task = pipeline.run()
         asyncio.ensure_future(task)

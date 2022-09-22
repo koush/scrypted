@@ -1,5 +1,8 @@
 from __future__ import annotations
+import binascii
+import os
 from time import time
+from typing_extensions import TypedDict
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 import threading
 import io
@@ -20,16 +23,19 @@ except Exception as e:
 import tflite_runtime.interpreter as tflite
 import re
 import scrypted_sdk
-from typing import Any, List
+from typing import Any, List, Tuple
 from gi.repository import Gst
+import asyncio
 
 from detect import DetectionSession, DetectPlugin
 
+class QueuedSample(TypedDict):
+    gst_buffer: Any
+    eventId: str
 
 class TensorFlowLiteSession(DetectionSession):
     def __init__(self) -> None:
         super().__init__()
-
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -44,7 +50,6 @@ def parse_label_contents(contents: str):
 
 
 defaultThreshold = .4
-
 
 class TensorFlowLitePlugin(DetectPlugin):
     def __init__(self, nativeId: str | None = None):
@@ -71,6 +76,14 @@ class TensorFlowLitePlugin(DetectPlugin):
             self.interpreter = tflite.Interpreter(model_content=model)
         self.interpreter.allocate_tensors()
         self.mutex = threading.Lock()
+        self.sampleQueue = []
+
+        # periodic restart because there seems to be leaks in tflite or coral API.
+        loop = asyncio.get_event_loop()
+        loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+
+    def requestRestart(self):
+        asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
 
     async def getDetectionModel(self) -> ObjectDetectionModel:
         _, height, width, channels = self.interpreter.get_input_details()[
@@ -81,7 +94,7 @@ class TensorFlowLitePlugin(DetectPlugin):
             'classes': list(self.labels.values()),
             'inputSize': [int(width), int(height), int(channels)],
         }
-        setting: Setting = {
+        confidence: Setting = {
             'title': 'Minimum Detection Confidence',
             'description': 'Higher values eliminate false positives and low quality recognition candidates.',
             'key': 'score_threshold',
@@ -118,7 +131,7 @@ class TensorFlowLitePlugin(DetectPlugin):
             'key': 'coral',
         }
 
-        d['settings'] = [coral, setting, decoderSetting, allowList]
+        d['settings'] = [coral, confidence, decoderSetting, allowList]
         return d
 
     def create_detection_result(self, objs, size, allowList, convert_to_src_size=None):
@@ -185,27 +198,25 @@ class TensorFlowLitePlugin(DetectPlugin):
     def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
         score_threshold = self.parse_settings(settings)
 
-        start = time()
-
         if loaded_py_coral:
-            gst_buffer = gstsample.get_buffer()
             with self.mutex:
+                gst_buffer = gstsample.get_buffer()
                 run_inference(self.interpreter, gst_buffer)
                 objs = detect.get_objects(
                     self.interpreter, score_threshold=score_threshold)
         else:
-            buf = gstsample.get_buffer()
             caps = gstsample.get_caps()
             # can't trust the width value, compute the stride
             height = caps.get_structure(0).get_value('height')
             width = caps.get_structure(0).get_value('width')
-            result, info = buf.map(Gst.MapFlags.READ)
+            gst_buffer = gstsample.get_buffer()
+            result, info = gst_buffer.map(Gst.MapFlags.READ)
             if not result:
                 return
             try:
                 image = Image.frombuffer('RGB', (width, height), info.data.tobytes())
             finally:
-                buf.unmap(info)
+                gst_buffer.unmap(info)
 
             _, scale = common.set_resized_input(
                 self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
