@@ -49,6 +49,7 @@ import AvailableMixins from "../components/AvailableMixins.vue";
 import Mixin from "../components/Mixin.vue";
 import { ScryptedInterface } from "@scrypted/types";
 import { hasFixedPhysicalLocation, inferTypesFromInterfaces } from "../components/helpers";
+import Vue from 'vue';
 
 export default {
   components: {
@@ -61,9 +62,8 @@ export default {
   props: ["noTitle"],
   data() {
     return {
-      usingDefaultSettingsGroupName: true,
-      settingsGroupName: undefined,
-      settings: [],
+      rawSettingsGroupName: undefined,
+      deviceSettings: [],
     };
   },
   watch: {
@@ -78,6 +78,83 @@ export default {
     this.refresh();
   },
   computed: {
+    settingsGroupName: {
+      get() {
+        if (this.rawSettingsGroupName)
+          return this.rawSettingsGroupName;
+          return Object.keys(this.settingsGroups)?.[0] || 'extensions';
+      },
+      set(value) {
+        this.rawSettingsGroupName = value;
+      },
+    },
+    settings() {
+      const settings = [];
+
+      let addAt = 0;
+
+      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
+        const inferredTypes = inferTypesFromInterfaces(
+          this.device.type,
+          this.device.providedType,
+          this.device.interfaces
+        );
+
+        const editables = [
+          {
+            group: 'Edit',
+            key: '__name',
+            title: 'Name',
+            value: this.device.name,
+          },
+        ];
+        if (inferredTypes.length > 1) {
+          editables.push(
+            {
+              group: 'Edit',
+              key: '__type',
+              title: 'Type',
+              value: this.device.type,
+              choices: inferredTypes,
+            },
+          );
+        }
+        const existingRooms = this.$store.state.scrypted.devices
+          .map(
+            (device) => this.$scrypted.systemManager.getDeviceById(device).room
+          )
+          .filter((room) => room);
+
+        if (hasFixedPhysicalLocation(this.device.type, this.device.interfaces)) {
+          editables.push(
+            {
+              group: 'Edit',
+              key: '__room',
+              title: 'Room',
+              value: this.device.room,
+              combobox: true,
+              choices: existingRooms,
+            },
+          );
+        }
+
+        settings.push(...editables);
+      }
+
+      for (const setting of settings) {
+        setting.originalValue = setting.value;
+      }
+
+      const mergingSettings = settings.map((setting) => ({
+        key: setting.key,
+        value: setting,
+      }));
+
+      const deviceSettings = this.deviceSettings.slice();
+      addAt = deviceSettings?.[0]?.value?.group ? 0 : 1;
+      deviceSettings.splice(addAt, 0, ...mergingSettings);
+      return Vue.observable(deviceSettings);
+    },
     selectGroupNames() {
       const ret = Object.keys(this.settingsGroups).map(key => ({
         text: key.replace("Settings", "") || "General",
@@ -141,62 +218,16 @@ export default {
       else {
         settings = [];
       }
-      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
-        const inferredTypes = inferTypesFromInterfaces(
-          this.device.type,
-          this.device.providedType,
-          this.device.interfaces
-        );
-
-        const editables = [
-          {
-            group: 'Edit',
-            key: '__name',
-            title: 'Name',
-            value: this.device.name,
-          },
-        ];
-        if (inferredTypes.length > 1) {
-          editables.push(
-            {
-              group: 'Edit',
-              key: '__type',
-              title: 'Type',
-              value: this.device.type,
-              choices: inferredTypes,
-            },
-          );
-        }
-        const existingRooms = this.$store.state.scrypted.devices
-          .map(
-            (device) => this.$scrypted.systemManager.getDeviceById(device).room
-          )
-          .filter((room) => room);
-
-        if (hasFixedPhysicalLocation(this.device.type, this.device.interfaces)) {
-          editables.push(
-            {
-              group: 'Edit',
-              key: '__room',
-              title: 'Room',
-              value: this.device.room,
-              combobox: true,
-              choices: existingRooms,
-            },
-          );
-        }
-
-        settings.splice(settings?.[0]?.group ? 0 : 1, 0, ...editables);
-      }
 
       for (const setting of settings) {
         setting.originalValue = setting.value;
       }
-      this.settings = settings.map((setting) => ({
+
+      this.deviceSettings = settings.map((setting) => ({
         key: setting.key,
         value: setting,
       }));
-
+      
       this.updateSettingsGroupName();
     },
     save() {
@@ -220,6 +251,7 @@ export default {
       }
     },
     updateSettingsGroupName() {
+      return;
       if (!this.usingDefaultSettingsGroupName) {
         // make sure the selected settings tab still exists
         if (this.settingsGroupName === 'extensions')
@@ -228,7 +260,6 @@ export default {
           this.usingDefaultSettingsGroupName = true;
       }
       if (this.usingDefaultSettingsGroupName) {
-        this.usingDefaultSettingsGroupName = false;
         this.settingsGroupName = Object.keys(this.settingsGroups)?.[0] || 'extensions';
       }
     }
