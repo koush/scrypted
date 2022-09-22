@@ -293,9 +293,9 @@ export class PluginHost {
             }
         }
 
-        this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
+        this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
             if (connected) {
-                this.worker.send(message, reject);
+                this.worker.send(message, reject, serializationContext);
             }
             else if (reject) {
                 reject(new Error('peer disconnected'));
