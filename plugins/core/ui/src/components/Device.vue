@@ -185,7 +185,7 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings)">
+        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || !device.interfaces.includes(ScryptedInterface.ScryptedPlugin))">
           <Settings :device="device"></Settings>
         </v-flex>
       </v-layout>
