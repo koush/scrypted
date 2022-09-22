@@ -507,6 +507,13 @@ exports.ScryptedInterfaceDescriptors = {
             'securitySystemState'
         ]
     },
+    PM10Sensor: {
+        name: 'PM10Sensor',
+        methods: [],
+        properties: [
+            'pm10Density'
+        ]
+    },
     PM25Sensor: {
         name: 'PM25Sensor',
         methods: [],
@@ -519,6 +526,13 @@ exports.ScryptedInterfaceDescriptors = {
         methods: [],
         properties: [
             'vocDensity'
+        ]
+    },
+    NOXSensor: {
+        name: 'NOXSensor',
+        methods: [],
+        properties: [
+            'noxDensity'
         ]
     },
     CO2Sensor: {
@@ -807,8 +821,10 @@ var ScryptedInterface;
     ScryptedInterface["LuminanceSensor"] = "LuminanceSensor";
     ScryptedInterface["PositionSensor"] = "PositionSensor";
     ScryptedInterface["SecuritySystem"] = "SecuritySystem";
+    ScryptedInterface["PM10Sensor"] = "PM10Sensor";
     ScryptedInterface["PM25Sensor"] = "PM25Sensor";
     ScryptedInterface["VOCSensor"] = "VOCSensor";
+    ScryptedInterface["NOXSensor"] = "NOXSensor";
     ScryptedInterface["CO2Sensor"] = "CO2Sensor";
     ScryptedInterface["AirQualitySensor"] = "AirQualitySensor";
     ScryptedInterface["Readme"] = "Readme";

@@ -837,11 +837,17 @@ export interface Position {
 export interface PositionSensor {
   position?: Position;
 }
+export interface PM10Sensor {
+  pm10Density?: number;
+}
 export interface PM25Sensor {
   pm25Density?: number;
 }
 export interface VOCSensor {
   vocDensity?: number;
+}
+export interface NOXSensor {
+  noxDensity?: number;
 }
 export interface CO2Sensor {
   co2ppm?: number;
@@ -1500,8 +1506,10 @@ export enum ScryptedInterface {
   LuminanceSensor = "LuminanceSensor",
   PositionSensor = "PositionSensor",
   SecuritySystem = 'SecuritySystem',
+  PM10Sensor = "PM10Sensor",
   PM25Sensor = "PM25Sensor",
   VOCSensor = "VOCSensor",
+  NOXSensor = "NOXSensor",
   CO2Sensor = "CO2Sensor",
   AirQualitySensor = "AirQualitySensor",
   Readme = "Readme",
