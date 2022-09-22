@@ -4,6 +4,7 @@ import asyncio
 import base64
 import gc
 import json
+import mimetypes
 import os
 import platform
 import shutil
@@ -22,7 +23,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import aiofiles
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
-                                                MediaManager,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 from typing_extensions import TypedDict
@@ -42,6 +42,50 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
 
     async def getComponent(self, id: str) -> Any:
         return await self.api.getComponent(id)
+
+class MediaObjectRemote(scrypted_python.scrypted_sdk.types.MediaObject):
+    def __init__(self, data, mimeType, sourceId):
+        self.mimeType = mimeType
+        self.data = data
+        self.__proxy_props = {
+            'mimeType': mimeType,
+            'sourceId': sourceId,
+        }
+
+    async def getData(self):
+        return self.data
+
+class MediaManager:
+    def __init__(self, mediaManager: scrypted_python.scrypted_sdk.types.MediaManager):
+        self.mediaManager = mediaManager
+
+    async def addConverter(self, converter: scrypted_python.scrypted_sdk.types.BufferConverter) -> None:
+        return await self.mediaManager.addConverter(converter)
+    async def clearConverters(self) -> None:
+        return await self.mediaManager.clearConverters()
+    async def convertMediaObject(self, mediaObject: scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> Any:
+        return await self.mediaManager.convertMediaObject(mediaObject, toMimeType)
+    async def convertMediaObjectToBuffer(self, mediaObject: scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> bytearray:
+        return await self.mediaManager.convertMediaObjectToBuffer(mediaObject, toMimeType)
+    async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> str:
+        return await self.mediaManager.convertMediaObjectToInsecureLocalUrl(mediaObject, toMimeType)
+    async def convertMediaObjectToJSON(self, mediaObject: scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> Any:
+        return await self.mediaManager.convertMediaObjectToJSON(mediaObject, toMimeType)
+    async def convertMediaObjectToLocalUrl(self, mediaObject: str | scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> str:
+        return await self.mediaManager.convertMediaObjectToLocalUrl(mediaObject, toMimeType)
+    async def convertMediaObjectToUrl(self, mediaObject: str | scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> str:
+        return await self.mediaManager.convertMediaObjectToUrl(mediaObject, toMimeType)
+    async def createFFmpegMediaObject(self, ffmpegInput: scrypted_python.scrypted_sdk.types.FFmpegInput, options: scrypted_python.scrypted_sdk.types.MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
+        return await self.mediaManager.createFFmpegMediaObject(ffmpegInput, options)
+    async def createMediaObject(self, data: Any, mimeType: str, options: scrypted_python.scrypted_sdk.types.MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
+        # return await self.createMediaObject(data, mimetypes, options)
+        return MediaObjectRemote(data, mimeType, options.get('sourceId', None) if options else None)
+    async def createMediaObjectFromUrl(self, data: str, options:scrypted_python.scrypted_sdk.types. MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
+        return await self.mediaManager.createMediaObjectFromUrl(data, options)
+    async def getFFmpegPath(self) -> str:
+        return await self.mediaManager.getFFmpegPath()
+    async def getFilesPath(self) -> str:
+        return await self.mediaManager.getFilesPath()
 
 class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):
     def __init__(self, id: str, nativeId: str, systemManager: SystemManager, deviceManager: scrypted_python.scrypted_sdk.types.DeviceManager) -> None:
@@ -292,7 +336,7 @@ class PluginRemote:
         from scrypted_sdk import sdk_init  # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
-        self.mediaManager = await self.api.getMediaManager()
+        self.mediaManager = MediaManager(await self.api.getMediaManager())
         sdk_init(zip, self, self.systemManager,
                  self.deviceManager, self.mediaManager)
         from main import create_scrypted_plugin  # type: ignore
