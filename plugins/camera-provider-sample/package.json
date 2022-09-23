@@ -32,7 +32,7 @@
       "axios": "^0.24.0"
    },
    "devDependencies": {
-      "@scrypted/sdk": "file:../../sdk"
+      "@scrypted/sdk": "^0.0.199"
    },
    "version": "0.0.7"
 }
