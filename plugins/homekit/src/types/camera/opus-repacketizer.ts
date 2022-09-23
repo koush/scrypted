@@ -2,7 +2,7 @@ import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
 
 // https://datatracker.ietf.org/doc/html/rfc6716
 
-// INPUT
+// INPUT (for single frame sample, see RFC for other 4 code values)
 
 // 0                   1                   2                   3
 // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -62,33 +62,115 @@ import type { RtpPacket } from "@koush/werift-src/packages/rtp/src/rtp/rtp";
 // size of the packet.
 
 export class OpusRepacketizer {
-    packets: RtpPacket[] = [];
+    depacketized: Buffer[] = [];
 
     constructor(public framesPerPacket: number) {
     }
 
     // repacketize a packet with a single frame into a packet with multiple frames.
-    repacketize(packet: RtpPacket): RtpPacket|undefined {
-        if (this.framesPerPacket === 1)
-            return packet;
+    repacketize(packet: RtpPacket): RtpPacket | undefined {
+        const code = packet.payload[0] & 0b00000011;
+        let offset: number;
 
-        if (packet.payload[0] & 0b00000011)
-            throw new Error('expected opus packet with a single frame.');
-        this.packets.push(packet);
+        // see Frame Length Coding in RFC
+        const decodeFrameLength = () => {
+            let frameLength = packet.payload.readUInt8(offset);
+            if (frameLength >= 252) {
+                offset++;
+                frameLength += packet.payload.readUInt8(offset) * 4;
+            }
+            return frameLength;
+        }
+        // code 0: cbr, 1 packet
+        // code 1: cbr, 2 packets
+        // code 2: vbr, 2 packets
+        // code 3: cbr/vbr signaled, variable packets
 
-        if (this.packets.length != this.framesPerPacket)
+        if (code === 0) {
+            if (this.framesPerPacket === 1 && !this.depacketized.length)
+                return packet;
+            // depacketize by stripping off the config byte
+            this.depacketized.push(packet.payload.subarray(1));
+        }
+        else if (code === 1) {
+            if (this.framesPerPacket === 2 && !this.depacketized.length)
+                return packet;
+            // depacketize by dividing the remaining payload into two equal sized frames
+            const remaining = packet.payload.length - 1;
+            if (remaining % 2)
+                throw new Error('expected equal sized opus packets (code 1)');
+            const frameLength = remaining / 2;
+            this.depacketized.push(packet.payload.subarray(1, 1 + frameLength));
+            this.depacketized.push(packet.payload.subarray(1 + frameLength));
+        }
+        else if (code === 2) {
+            if (this.framesPerPacket === 2 && !this.depacketized.length)
+                return packet;
+            offset = 1;
+            // depacketize by dividing the remaining payload into two inequal sized frames
+            const frameLength = decodeFrameLength();
+            this.depacketized.push(packet.payload.subarray(offset, offset + frameLength));
+            this.depacketized.push(packet.payload.subarray(offset + frameLength));
+        }
+        else if (code === 3) {
+            // code 3 packet will have a frame count and padding indicator, and whether the packets
+            // are equal size or not.
+            const frameCountByte = packet.payload[1];
+            const packetFrameCount = frameCountByte & 0b00111111;
+            const vbr = frameCountByte & 0b10000000;
+            if (this.framesPerPacket === packetFrameCount && !this.depacketized.length)
+                return packet;
+            const paddingIndicator = frameCountByte & 0b01000000;
+            offset = 2;
+            let padding = 0;
+            if (paddingIndicator) {
+                padding = packet.payload.readUInt8(offset);
+                offset++;
+                if (padding === 255) {
+                    padding = 254 + packet.payload.readUInt8(offset);
+                    offset++;
+                }
+            }
+
+            if (!vbr) {
+                const remaining = packet.payload.length - offset - padding;
+                if (remaining % packetFrameCount)
+                    throw new Error('expected equal sized opus packets (code 3)');
+                const frameLength = remaining / packetFrameCount;
+                for (let i = 0; i < packetFrameCount; i++) {
+                    const start = offset + i * frameLength;
+                    const end = start + frameLength;
+                    this.depacketized.push(packet.payload.subarray(start, end));
+                }
+            }
+            else {
+                const frameLengths: number[] = [];
+                for (let i = 0; i < packetFrameCount; i++) {
+                    const frameLength = decodeFrameLength();
+                    frameLengths.push(frameLength);
+                }
+                for (let i = 0; i < packetFrameCount; i++) {
+                    const frameLength = frameLengths[i];
+                    const start = offset;
+                    offset += frameLength;
+                    this.depacketized.push(packet.payload.subarray(start, offset));
+                }
+            }
+        }
+
+        if (this.depacketized.length < this.framesPerPacket)
             return;
 
-        const first = this.packets[0];
-        const depacketized = this.packets.map(packet => packet.payload.subarray(1));
-        this.packets = [];
+        const depacketized = this.depacketized.slice(0, this.framesPerPacket);
+        this.depacketized = this.depacketized.slice(this.framesPerPacket);
 
-        let config = first.payload[0];
-        config = config | 0b00000011;
-        let frameCount = 0b10000000 | this.framesPerPacket;
+        // reuse the config and stereo indicator, but change the code to 3.
+        let toc = packet.payload[0];
+        toc = toc | 0b00000011;
+        // vbr | padding indicator | packet count
+        let frameCountByte = 0b10000000 | this.framesPerPacket;
 
-        const newHeader: number[] = [config, frameCount];
-        // depacketize by stripping off the config byte
+        const newHeader: number[] = [toc, frameCountByte];
 
         // M-1 length bytes
         newHeader.push(...depacketized.slice(0, -1).map(data => data.length));
