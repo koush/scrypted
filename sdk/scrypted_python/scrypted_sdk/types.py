@@ -106,12 +106,14 @@ class ScryptedInterface(Enum):
     MixinProvider = "MixinProvider"
     MotionSensor = "MotionSensor"
     Notifier = "Notifier"
+    NOXSensor = "NOXSensor"
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
     ObjectDetector = "ObjectDetector"
     OccupancySensor = "OccupancySensor"
     OnOff = "OnOff"
     Online = "Online"
+    PM10Sensor = "PM10Sensor"
     PM25Sensor = "PM25Sensor"
     PanTiltZoom = "PanTiltZoom"
     PasswordStore = "PasswordStore"
@@ -773,6 +775,10 @@ class Notifier:
         pass
     pass
 
+class NOXSensor:
+    noxDensity: float
+    pass
+
 class OauthClient:
     async def getOauthUrl(self) -> str:
         pass
@@ -808,6 +814,10 @@ class OnOff:
 
 class Online:
     online: bool
+    pass
+
+class PM10Sensor:
+    pm10Density: float
     pass
 
 class PM25Sensor:
@@ -2049,6 +2059,13 @@ ScryptedInterfaceDescriptors = {
       "securitySystemState"
     ]
   },
+  "PM10Sensor": {
+    "name": "PM10Sensor",
+    "methods": [],
+    "properties": [
+      "pm10Density"
+    ]
+  },
   "PM25Sensor": {
     "name": "PM25Sensor",
     "methods": [],
@@ -2061,6 +2078,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "vocDensity"
+    ]
+  },
+  "NOXSensor": {
+    "name": "NOXSensor",
+    "methods": [],
+    "properties": [
+      "noxDensity"
     ]
   },
   "CO2Sensor": {

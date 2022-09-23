@@ -31,8 +31,10 @@ const supportedSensors: string[] = [
     ScryptedInterface.HumiditySensor,
     ScryptedInterface.FloodSensor,
     ScryptedInterface.AirQualitySensor,
+    ScryptedInterface.PM10Sensor,
     ScryptedInterface.PM25Sensor,
     ScryptedInterface.VOCSensor,
+    ScryptedInterface.NOXSensor,
     ScryptedInterface.EntrySensor,
     ScryptedInterface.CO2Sensor,
 ];
@@ -46,7 +48,7 @@ addSupportedType({
         }
         return false;
     },
-    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM25Sensor & VOCSensor & EntrySensor & TamperSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & OccupancySensor & AmbientLightSensor & AmbientLightSensor & AudioSensor & BinarySensor & MotionSensor & Thermometer & HumiditySensor & FloodSensor & AirQualitySensor & PM10Sensor & PM25Sensor & VOCSensor & NOXSensor & EntrySensor & TamperSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
 
         if (device.interfaces.includes(ScryptedInterface.EntrySensor)) {
@@ -106,7 +108,11 @@ addSupportedType({
             const service = accessory.addService(Service.AirQualitySensor, device.name);
             bindCharacteristic(device, ScryptedInterface.AirQualitySensor, service, Characteristic.AirQuality,
                 () => airQualityToHomekit(device.airQuality));
-            
+          
+            if (device.interfaces.includes(ScryptedInterface.PM10Sensor)) {
+                bindCharacteristic(device, ScryptedInterface.PM10Sensor, service, Characteristic.PM2_5Density,
+                    () => device.pm10Density || 0);
+            }
             if (device.interfaces.includes(ScryptedInterface.PM25Sensor)) {
                 bindCharacteristic(device, ScryptedInterface.PM25Sensor, service, Characteristic.PM2_5Density,
                     () => device.pm25Density || 0);
@@ -114,6 +120,10 @@ addSupportedType({
             if (device.interfaces.includes(ScryptedInterface.VOCSensor)) {
                 bindCharacteristic(device, ScryptedInterface.VOCSensor, service, Characteristic.VOCDensity,
                     () => device.vocDensity || 0);
+            }
+            if (device.interfaces.includes(ScryptedInterface.NOXSensor)) {
+                bindCharacteristic(device, ScryptedInterface.NOXSensor, service, Characteristic.PM2_5Density,
+                    () => device.noxDensity || 0);
             }
         }
 
