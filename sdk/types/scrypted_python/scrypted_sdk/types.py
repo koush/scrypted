@@ -208,6 +208,11 @@ class AudioStreamOptions(TypedDict):
     profile: str
     pass
 
+class HttpResponseOptions(TypedDict):
+    code: float
+    headers: object
+    pass
+
 class ObjectDetectionResult(TypedDict):
     boundingBox: tuple[float, float, float, float]
     className: str
@@ -244,11 +249,6 @@ class MediaStreamSource(TypedDict):
     pass
 
 class MediaStreamTool(TypedDict):
-    pass
-
-class BufferConverter(TypedDict):
-    fromMimeType: str
-    toMimeType: str
     pass
 
 class BufferConvertorOptions(TypedDict):
@@ -310,9 +310,6 @@ class EventListenerOptions(TypedDict):
     watch: bool
     pass
 
-class EventListenerRegister(TypedDict):
-    pass
-
 class FFmpegInput(TypedDict):
     container: str
     destinationVideoBitrate: float
@@ -349,9 +346,6 @@ class HttpRequest(TypedDict):
     username: str
     pass
 
-class HttpResponse(TypedDict):
-    pass
-
 class HumidityCommand(TypedDict):
     dehumidifierSetpoint: float
     humidifierSetpoint: float
@@ -370,9 +364,6 @@ class LauncherApplicationInfo(TypedDict):
     description: str
     icon: str
     name: str
-    pass
-
-class Logger(TypedDict):
     pass
 
 class MediaObjectOptions(TypedDict):
@@ -439,12 +430,6 @@ class Position(TypedDict):
     accuracyRadius: float
     latitude: float
     longitude: float
-    pass
-
-class RTCSessionControl(TypedDict):
-    pass
-
-class RTCSignalingSession(TypedDict):
     pass
 
 class RecordedEvent(TypedDict):
@@ -537,22 +522,6 @@ class ScriptSource(TypedDict):
     monacoEvalDefaults: str
     name: str
     script: str
-    pass
-
-class ScryptedDevice(TypedDict):
-    id: str
-    info: DeviceInformation
-    interfaces: list[str]
-    mixins: list[str]
-    name: str
-    pluginId: str
-    providedInterfaces: list[str]
-    providedName: ScryptedDeviceType
-    providedRoom: str
-    providedType: ScryptedDeviceType
-    providerId: str
-    room: str
-    type: ScryptedDeviceType
     pass
 
 class SecuritySystemState(TypedDict):
@@ -812,7 +781,7 @@ class OauthClient:
     pass
 
 class ObjectDetection:
-    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
+    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         pass
     async def getDetectionModel(self) -> ObjectDetectionModel:
         pass
@@ -883,16 +852,6 @@ class Program:
 
 class PushHandler:
     async def onPush(self, request: HttpRequest) -> None:
-        pass
-    pass
-
-class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession) -> RTCSessionControl:
-        pass
-    pass
-
-class RTCSignalingClient:
-    async def createRTCSignalingSession(self) -> RTCSignalingSession:
         pass
     pass
 
@@ -2235,4 +2194,25 @@ ScryptedInterfaceDescriptors = {
     ]
   }
 }
+
+class EventListenerRegister:
+    def removeListener(self) -> None:
+        pass
+    pass
+
+class HttpResponse:
+    def send(self, body: str) -> None:
+        pass
+    def sendFile(self, path: str) -> None:
+        pass
+    def sendSocket(self, socket: Any, options: HttpResponseOptions) -> None:
+        pass
+    pass
+
+class ObjectDetectionCallbacks:
+    async def onDetection(self, detection: ObjectsDetected, mediaObject: MediaObject = None) -> bool:
+        pass
+    async def onDetectionEnded(self, detection: ObjectsDetected) -> None:
+        pass
+    pass
 

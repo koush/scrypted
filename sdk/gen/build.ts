@@ -61,8 +61,8 @@ ${fs.readFileSync(path.join(__dirname, './types.input.ts'))}
 
 fs.writeFileSync(path.join(__dirname, '../types/index.ts'), contents);
 
-const dictionaryTypes = new Set<string>();
-dictionaryTypes.add('EventDetails');
+const discoveredTypes = new Set<string>();
+discoveredTypes.add('EventDetails');
 
 function toPythonType(type: any): string {
     if (type.type === 'array')
@@ -92,7 +92,7 @@ function toPythonType(type: any): string {
 
     if (typeof type !== 'string')
         return 'Any';
-    dictionaryTypes.add(type);
+    discoveredTypes.add(type);
     return type;
 }
 
@@ -129,7 +129,16 @@ for (const iface of ['Logger', 'DeviceManager', 'SystemManager', 'MediaManager',
     interfaces.push(schema.children.find((child: any) => child.name === iface));
 }
 
-for (const td of interfaces) {
+let seen = new Set<string>();
+
+seen.add('DeviceState');
+seen.add('MediaObject');
+seen.add('RTCSignalingSession');
+seen.add('RTCSignalingChannel');
+seen.add('RTCSignalingClient');
+
+function addNonDictionaryType(td: any) {
+    seen.add(td.name);
     python += `
 class ${td.name}:
 `;
@@ -147,6 +156,12 @@ class ${td.name}:
     }
     python += `    pass
 `;
+}
+
+for (const td of interfaces) {
+    if (seen.has(td.name))
+        continue;
+    addNonDictionaryType(td);
 }
 
 let pythonEnums = ''
@@ -190,15 +205,11 @@ python += `
 ScryptedInterfaceDescriptors = ${JSON.stringify(ScryptedInterfaceDescriptors, null, 2)}
 `
 
-let seen = new Set<string>();
-seen.add('DeviceState');
-seen.add('MediaObject');
+while (discoveredTypes.size) {
+    const unknowns = schema.children.filter((child: any) => discoveredTypes.has(child.name) && !enums.find((e: any) => e.name === child.name));
 
-while (dictionaryTypes.size) {
-    const unknowns = schema.children.filter((child: any) => dictionaryTypes.has(child.name) && !enums.find((e: any) => e.name === child.name));
-
-    const newSeen = new Set([...seen, ...dictionaryTypes]);
-    dictionaryTypes.clear();
+    const newSeen = new Set([...seen, ...discoveredTypes]);
+    discoveredTypes.clear();
 
     let pythonUnknowns = '';
 
@@ -207,6 +218,11 @@ while (dictionaryTypes.size) {
             continue;
         if (td.name === 'EventListener' || td.name === 'SettingValue')
             continue;
+        const isDictionary = !td.children?.find((c: any) => c.kindString === 'Method');
+        if (!isDictionary) {
+            addNonDictionaryType(td);
+            continue;
+        }
         pythonUnknowns += `
 class ${td.name}(TypedDict):
 `;

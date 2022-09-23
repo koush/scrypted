@@ -1860,12 +1860,16 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   inputSize?: number[];
   settings: Setting[];
 }
+export interface ObjectDetectionCallbacks {
+  onDetection(detection: ObjectsDetected, mediaObject?: MediaObject): Promise<boolean>;
+  onDetectionEnded(detection: ObjectsDetected): Promise<void>;
+}
 /**
  * ObjectDetection can run classifications or analysis on arbitrary media sources.
  * E.g. TensorFlow, OpenCV, or a Coral TPU.
  */
 export interface ObjectDetection {
-  detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected>;
+  detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
   getDetectionModel(): Promise<ObjectDetectionModel>;
 }
 /**
