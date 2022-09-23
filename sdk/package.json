@@ -6,6 +6,7 @@
   "scripts": {
     "prepublishOnly": "npm run build && cd types && npm version patch && npm publish",
     "prebuild": "cd types && npm run build",
+    "predocs": "npm run build",
     "docs": "typedoc && cp developer.scrypted.app/CNAME developer.scrypted.app/docs",
     "build": "tsc",
     "webpack": "webpack-cli --config webpack.config.js",

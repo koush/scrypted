@@ -199,8 +199,8 @@ class MyDeviceProvider extends ScryptedDeviceBase implements DeviceProvider {
         });
     }
 
-    // After the device is discovered, Scrypted will request the plugin create the
-    // instance that can be used to create the light.
+    // After the lights are discovered, Scrypted will request the plugin create the
+    // instance that can be used to control and query the light.
     getDevice(nativeId: string) {
         return new TypescriptLight(nativeId);
     }
