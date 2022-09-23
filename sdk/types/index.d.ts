@@ -1,5 +1,5 @@
 /// <reference types="node" />
-export declare const TYPES_VERSION = "0.0.91";
+export declare const TYPES_VERSION = "0.0.93";
 export interface DeviceState {
     id?: string;
     info?: DeviceInformation;
