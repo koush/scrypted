@@ -84,7 +84,7 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
     }
 
     get(target: any, p: PropertyKey, receiver: any): any {
-        if (p === '__proxy_id')
+        if (p === RpcPeer.PROPERTY_PROXY_ID)
             return this.entry.id;
         if (p === '__proxy_constructor')
             return this.constructorName;
@@ -214,6 +214,10 @@ export class RpcPeer {
 
     static readonly finalizerIdSymbol = Symbol('rpcFinalizerId');
 
+    static isRpcProxy(value: any) {
+        return !!value?.[RpcPeer.PROPERTY_PROXY_ID];
+    }
+
     static getDefaultTransportSafeArgumentTypes() {
         const jsonSerializable = new Set<string>();
         jsonSerializable.add(Number.name);
@@ -242,6 +246,7 @@ export class RpcPeer {
         }
     }
 
+    static readonly PROPERTY_PROXY_ID = '__proxy_id';
     static readonly PROPERTY_PROXY_ONEWAY_METHODS = '__proxy_oneway_methods';
     static readonly PROPERTY_JSON_DISABLE_SERIALIZATION = '__json_disable_serialization';
     static readonly PROPERTY_PROXY_PROPERTIES = '__proxy_props';

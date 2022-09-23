@@ -72,7 +72,7 @@ class RpcProxy(object):
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name == '__proxy_finalizer_id':
-            self.dict['__proxy_entry']['finalizerId'] = value
+            self.__dict__['__proxy_entry']['finalizerId'] = value
 
         return super().__setattr__(name, value)
 
@@ -241,7 +241,7 @@ class RpcPeer:
             if not proxy:
                 proxy = self.newProxy(__remote_proxy_id, __remote_constructor_name,
                                       __remote_proxy_props, __remote_proxy_oneway_methods)
-            proxy.__proxy_finalizer_id = __remote_proxy_finalizer_id
+            setattr(proxy, '__proxy_finalizer_id', __remote_proxy_finalizer_id)
             return proxy
 
         if __local_proxy_id:
