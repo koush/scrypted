@@ -53,8 +53,10 @@ export interface DeviceState {
   luminance?: number
   position?: Position
   securitySystemState?: SecuritySystemState
+  pm10Density?: number
   pm25Density?: number
   vocDensity?: number
+  noxDensity?: number
   co2ppm?: number
   airQuality?: AirQuality
   humiditySetting?: HumiditySettingStatus
@@ -113,8 +115,10 @@ export class DeviceBase implements DeviceState {
   luminance?: number
   position?: Position
   securitySystemState?: SecuritySystemState
+  pm10Density?: number
   pm25Density?: number
   vocDensity?: number
+  noxDensity?: number
   co2ppm?: number
   airQuality?: AirQuality
   humiditySetting?: HumiditySettingStatus
@@ -174,8 +178,10 @@ export enum ScryptedInterfaceProperty {
   luminance = "luminance",
   position = "position",
   securitySystemState = "securitySystemState",
+  pm10Density = "pm10Density",
   pm25Density = "pm25Density",
   vocDensity = "vocDensity",
+  noxDensity = "noxDensity",
   co2ppm = "co2ppm",
   airQuality = "airQuality",
   humiditySetting = "humiditySetting",
@@ -1760,11 +1766,17 @@ export interface Position {
 export interface PositionSensor {
   position?: Position;
 }
+export interface PM10Sensor {
+  pm10Density?: number;
+}
 export interface PM25Sensor {
   pm25Density?: number;
 }
 export interface VOCSensor {
   vocDensity?: number;
+}
+export interface NOXSensor {
+  noxDensity?: number;
 }
 export interface CO2Sensor {
   co2ppm?: number;

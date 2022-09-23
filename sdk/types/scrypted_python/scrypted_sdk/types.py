@@ -105,8 +105,8 @@ class ScryptedInterface(Enum):
     Microphone = "Microphone"
     MixinProvider = "MixinProvider"
     MotionSensor = "MotionSensor"
-    Notifier = "Notifier"
     NOXSensor = "NOXSensor"
+    Notifier = "Notifier"
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
     ObjectDetector = "ObjectDetector"
@@ -770,13 +770,13 @@ class MotionSensor:
     motionDetected: bool
     pass
 
+class NOXSensor:
+    noxDensity: float
+    pass
+
 class Notifier:
     async def sendNotification(self, title: str, body: str, media: str | MediaObject = None) -> None:
         pass
-    pass
-
-class NOXSensor:
-    noxDensity: float
     pass
 
 class OauthClient:
@@ -1193,8 +1193,10 @@ class ScryptedInterfaceProperty(Enum):
     luminance = "luminance"
     position = "position"
     securitySystemState = "securitySystemState"
+    pm10Density = "pm10Density"
     pm25Density = "pm25Density"
     vocDensity = "vocDensity"
+    noxDensity = "noxDensity"
     co2ppm = "co2ppm"
     airQuality = "airQuality"
     humiditySetting = "humiditySetting"
@@ -1558,6 +1560,13 @@ class DeviceState:
         self.setScryptedProperty("securitySystemState", value)
 
     @property
+    def pm10Density(self) -> float:
+        return self.getScryptedProperty("pm10Density")
+    @pm10Density.setter
+    def pm10Density(self, value: float):
+        self.setScryptedProperty("pm10Density", value)
+
+    @property
     def pm25Density(self) -> float:
         return self.getScryptedProperty("pm25Density")
     @pm25Density.setter
@@ -1570,6 +1579,13 @@ class DeviceState:
     @vocDensity.setter
     def vocDensity(self, value: float):
         self.setScryptedProperty("vocDensity", value)
+
+    @property
+    def noxDensity(self) -> float:
+        return self.getScryptedProperty("noxDensity")
+    @noxDensity.setter
+    def noxDensity(self, value: float):
+        self.setScryptedProperty("noxDensity", value)
 
     @property
     def co2ppm(self) -> float:
