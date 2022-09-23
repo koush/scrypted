@@ -638,6 +638,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
       'securitySystemState'
     ]
   },
+  PM10Sensor: {
+    name: 'PM10Sensor',
+    methods: [],
+    properties: [
+      'pm10Density'
+    ]
+  },
   PM25Sensor: {
     name: 'PM25Sensor',
     methods: [],
@@ -650,6 +657,13 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
     methods: [],
     properties: [
       'vocDensity'
+    ]
+  },
+  NOXSensor: {
+    name: 'NOXSensor',
+    methods: [],
+    properties: [
+      'noxDensity'
     ]
   },
   CO2Sensor: {
@@ -2369,8 +2383,10 @@ export enum ScryptedInterface {
   LuminanceSensor = "LuminanceSensor",
   PositionSensor = "PositionSensor",
   SecuritySystem = 'SecuritySystem',
+  PM10Sensor = "PM10Sensor",
   PM25Sensor = "PM25Sensor",
   VOCSensor = "VOCSensor",
+  NOXSensor = "NOXSensor",
   CO2Sensor = "CO2Sensor",
   AirQualitySensor = "AirQualitySensor",
   Readme = "Readme",

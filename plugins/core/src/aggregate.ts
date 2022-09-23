@@ -33,6 +33,8 @@ aggregators.set(ScryptedInterface.LuminanceSensor, average);
 aggregators.set(ScryptedInterface.UltravioletSensor, average);
 aggregators.set(ScryptedInterface.CO2Sensor, average);
 aggregators.set(ScryptedInterface.PM25Sensor, average);
+aggregators.set(ScryptedInterface.PM10Sensor, average);
+aggregators.set(ScryptedInterface.NOXSensor, average);
 aggregators.set(ScryptedInterface.FloodSensor, allFalse);
 aggregators.set(ScryptedInterface.Lock,
     values => values.reduce((prev, cur) => cur === LockState.Unlocked ? cur : prev, LockState.Locked));
