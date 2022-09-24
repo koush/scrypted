@@ -1,4 +1,4 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState, ObjectDetectionCallbacks } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
@@ -27,7 +27,7 @@ const DETECT_VIDEO_MOTION = "Video Motion";
 type ClipPath = [number, number][];
 type Zones = { [zone: string]: ClipPath };
 
-class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera & MotionSensor & ObjectDetector> implements ObjectDetector, Settings {
+class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera & MotionSensor & ObjectDetector> implements ObjectDetector, Settings, ObjectDetectionCallbacks {
   released = false;
   motionListener: EventListenerRegister;
   detectionListener: EventListenerRegister;
@@ -67,6 +67,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.bindObjectDetection();
     this.register();
     this.resetDetectionTimeout();
+
   }
 
   getDetectionModes(): string[] {
@@ -202,6 +203,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
   async register() {
     this.motionListener = this.cameraDevice.listen(ScryptedInterface.MotionSensor, async () => {
+      // ignore any motion events if this is a motion detector.
+      if (this.hasMotionType)
+        return;
+
       if (!this.cameraDevice.motionDetected) {
         if (this.running) {
           // allow anaysis due to user request.
@@ -221,6 +226,23 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     });
   }
 
+  report(detection: ObjectsDetected, mediaObject?: MediaObject) {
+    if (detection?.detectionId !== this.detectionId)
+      return;
+    this.objectsDetected(detection);
+    this.reportObjectDetections(detection, undefined);
+
+    this.running = detection.running;
+  }
+
+  async onDetection(detection: ObjectsDetected, mediaObject?: MediaObject): Promise<boolean> {
+    this.report(detection, mediaObject);
+    return true;
+  }
+  async onDetectionEnded(detection: ObjectsDetected): Promise<void> {
+    this.report(detection);
+  }
+  
   async startVideoDetection() {
     try {
       // prevent stream retrieval noise until notified that the detection is no longer running.
@@ -229,7 +251,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           detectionId: this.detectionId,
           duration: this.getDetectionDuration(),
           settings: await this.getCurrentSettings(),
-        });
+        }, this);
         this.running = session.running;
         if (this.running)
           return;
@@ -242,7 +264,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       let stream: MediaObject;
 
-      // intenral streams must implicitly be available.
+      // internal streams must implicitly be available.
       if (!this.internal) {
         stream = await this.cameraDevice.getVideoStream({
           destination: 'low-resolution',
@@ -260,7 +282,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         detectionId: this.detectionId,
         duration: this.getDetectionDuration(),
         settings: await this.getCurrentSettings(),
-      });
+      }, this);
 
       this.running = session.running;
     }
@@ -326,12 +348,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.onDeviceEvent(ScryptedInterface.ObjectDetector, detection);
   }
 
-  async extendedObjectDetect() {
+  async extendedObjectDetect(force?: boolean) {
     try {
+      if (!force && !this.motionDetected)
+        return;
       await this.objectDetection?.detectObjects(undefined, {
         detectionId: this.detectionId,
         duration: this.getDetectionDuration(),
-      });
+      }, this);
     }
     catch (e) {
       // ignore any
@@ -517,7 +541,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         }
       );
     }
-    const detectorSettings = await this.getCurrentSettings();
+
     await this.ensureSettings();
     if (this.settings) {
       settings.push(...this.settings.map(setting =>
@@ -614,7 +638,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.analyzeStarted = Date.now();
       await this.snapshotDetection();
       await this.startVideoDetection();
-      await this.extendedObjectDetect();
+      await this.extendedObjectDetect(true);
     }
     else if (key === 'detectionModes') {
       this.storage.setItem(key, JSON.stringify(value));
@@ -723,4 +747,4 @@ class ObjectDetectionPlugin extends AutoenableMixinProvider {
   }
 }
 
-export default new ObjectDetectionPlugin();
+export default ObjectDetectionPlugin;
