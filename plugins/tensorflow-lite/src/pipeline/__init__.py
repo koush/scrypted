@@ -1,17 +1,3 @@
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the 'License');
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an 'AS IS' BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
 import threading
@@ -40,9 +26,9 @@ class GstPipelineBase:
         self.attach_launch(Gst.parse_launch(pipeline))
 
         # Set up a pipeline bus watch to catch errors.
-        bus = self.gst.get_bus()
-        bus.add_signal_watch()
-        bus.connect('message', self.on_bus_message)
+        self.bus = self.gst.get_bus()
+        self.watchId = self.bus.connect('message', self.on_bus_message)
+        self.bus.add_signal_watch()
 
     def on_bus_message(self, bus, message):
         # seeing the following error on pi 32 bit
@@ -73,13 +59,18 @@ class GstPipelineBase:
             await self.run_attached()
         finally:
             # Clean up.
+            self.bus.remove_signal_watch()
+            self.bus.disconnect(self.watchId)
             self.gst.set_state(Gst.State.NULL)
+            self.bus = None
+            self.watchId = None
+            self.gst = None
 
 class GstPipeline(GstPipelineBase):
-    def __init__(self, loop: AbstractEventLoop, finished: Future, appsink_name: str, user_function, crop = False):
+    def __init__(self, loop: AbstractEventLoop, finished: Future, appsink_name: str, user_callback, crop = False):
         super().__init__(loop, finished)
         self.appsink_name = appsink_name
-        self.user_function = user_function
+        self.user_callback = user_callback
         self.running = False
         self.gstsample = None
         self.sink_size = None
@@ -198,8 +189,7 @@ class GstPipeline(GstPipelineBase):
                     break
                 gstsample = self.gstsample
                 self.gstsample = None
-
-            self.user_function(gstsample, self.get_src_size(), lambda p, normalize=False: self.convert_to_src_size(p, normalize))
+                self.user_callback(gstsample, self.get_src_size(), lambda p, normalize=False: self.convert_to_src_size(p, normalize))
 
 def get_dev_board_model():
   try:
@@ -255,14 +245,14 @@ def create_pipeline(
     return pipeline
 
 def run_pipeline(loop, finished,
-                 user_function,
+                 user_callback,
                  appsink_name,
                  appsink_size,
                  video_input,
                  pixel_format,
                  crop = False,
                  parse_only = False):
-    gst = GstPipeline(loop, finished, appsink_name, user_function, crop = crop)
+    gst = GstPipeline(loop, finished, appsink_name, user_callback, crop = crop)
     pipeline = create_pipeline(appsink_name, appsink_size, video_input, pixel_format, crop = crop, parse_only = parse_only)
     gst.parse_launch(pipeline)
     return gst

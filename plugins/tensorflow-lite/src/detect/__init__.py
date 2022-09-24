@@ -19,7 +19,7 @@ from pipeline import run_pipeline
 
 from gi.repository import Gst
 
-from scrypted_sdk.types import FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
+from scrypted_sdk.types import FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionSession, ObjectsDetected, ScryptedInterface, ScryptedMimeTypes
 
 
 def optional_chain(root, *keys):
@@ -91,6 +91,7 @@ class DetectionSession:
     settings: Any
     running: bool
     plugin: DetectPlugin
+    callbacks: ObjectDetectionCallbacks
 
     def __init__(self) -> None:
         self.timerHandle = None
@@ -131,12 +132,18 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         self.detection_sessions: Mapping[str, DetectionSession] = {}
         self.session_mutex = threading.Lock()
         self.crop = False
+        self.loop = asyncio.get_event_loop()
 
-    def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected):
+    async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, mediaObject = None):
         detection_result['detectionId'] = detection_session.id
         detection_result['timestamp'] = int(time.time() * 1000)
-        asyncio.run_coroutine_threadsafe(self.onDeviceEvent(
-            ScryptedInterface.ObjectDetection.value, detection_result), loop=detection_session.loop)
+        if detection_session.callbacks:
+            if detection_session.running:
+                return await detection_session.callbacks.onDetection(detection_result, mediaObject)
+            else:
+                await detection_session.callbacks.onDetectionEnded(detection_result)
+        else:
+            await self.onDeviceEvent(ScryptedInterface.ObjectDetection.value, detection_result)
 
     def end_session(self, detection_session: DetectionSession):
         print('detection ended', detection_session.id)
@@ -159,7 +166,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         detection_result: ObjectsDetected = {}
         detection_result['running'] = False
 
-        self.detection_event(detection_session, detection_result)
+        asyncio.run_coroutine_threadsafe(self.detection_event(detection_session, detection_result), loop=detection_session.loop)
 
     def create_detection_result_status(self, detection_id: str, running: bool):
         detection_result: ObjectsDetected = {}
@@ -177,7 +184,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def create_detection_session(self):
         return DetectionSession()
 
-    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: DetectionSession, gst_sample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Any]:
         pass
 
     def ensure_session(self, mediaObjectMimeType: str, session: ObjectDetectionSession) -> Tuple[bool, DetectionSession, ObjectsDetected]:
@@ -252,7 +259,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         return (True, detection_session, None)
 
-    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
+    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         is_image = mediaObject and mediaObject.mimeType.startswith('image/')
 
         settings = None
@@ -264,6 +271,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
         create, detection_session, objects_detected = self.ensure_session(
             mediaObject and mediaObject.mimeType, session)
+        if detection_session:
+            detection_session.callbacks = callbacks
 
         if is_image:
             return self.run_detection_jpeg(detection_session, bytes(await scrypted_sdk.mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')), settings)
@@ -327,6 +336,12 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     def detection_event_notified(self, settings: Any):
         pass
 
+    async def createMedia(self, data: Any) -> MediaObject:
+        pass
+
+    def invalidateMedia(self, data: Any):
+        pass
+
     def create_user_callback(self, detection_session: DetectionSession, duration: number):
         first_frame = True
 
@@ -339,11 +354,31 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                     first_frame = False
                     print("first frame received", detection_session.id)
 
-                detection_result = self.run_detection_gstsample(
+                detection_result, data = self.run_detection_gstsample(
                     detection_session, gst_sample, detection_session.settings, src_size, convert_to_src_size)
                 if detection_result:
                     detection_result['running'] = True
-                    self.detection_event(detection_session, detection_result)
+
+                    mo = None
+                    retain = False
+
+                    def maybeInvalidate():
+                        if not retain:
+                            self.invalidateMedia(data)
+
+                    async def report_event():
+                        nonlocal mo
+                        nonlocal retain
+                        mo = await self.createMedia(data)
+                        retain = await self.detection_event(detection_session, detection_result, mo)
+                        maybeInvalidate()
+
+                    t = asyncio.run_coroutine_threadsafe(report_event(), self.loop)
+                    try:
+                        t.result(2)
+                        maybeInvalidate()
+                    except:
+                        self.invalidateMedia(data)
                     self.detection_event_notified(detection_session.settings)
 
                 if not detection_session or duration == None:

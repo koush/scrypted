@@ -36,6 +36,7 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
+         "BufferConverter",
          "ObjectDetection"
       ]
    },

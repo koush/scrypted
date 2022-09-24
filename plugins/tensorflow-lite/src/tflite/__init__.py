@@ -1,7 +1,4 @@
 from __future__ import annotations
-import binascii
-import os
-from time import time
 from typing_extensions import TypedDict
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 import threading
@@ -12,6 +9,7 @@ from pycoral.adapters import detect
 from pycoral.adapters.common import input_size
 loaded_py_coral = False
 try:
+    raise Exception()
     from pycoral.utils.edgetpu import run_inference
     from pycoral.utils.edgetpu import list_edge_tpus
     from pycoral.utils.edgetpu import make_interpreter
@@ -51,9 +49,21 @@ def parse_label_contents(contents: str):
 
 defaultThreshold = .4
 
-class TensorFlowLitePlugin(DetectPlugin):
+class RawImage:
+    jpeg: scrypted_sdk.MediaObject
+
+    def __init__(self, image: Image.Image):
+        self.image = image
+
+MIME_TYPE = 'x-scrypted-tensorflow-lite/x-raw-image'
+
+class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
+
+        self.fromMimeType = MIME_TYPE
+        self.toMimeType = scrypted_sdk.ScryptedMimeTypes.MediaObject.value
+
         self.crop = True
 
         labels_contents = scrypted_sdk.zip.open(
@@ -61,7 +71,7 @@ class TensorFlowLitePlugin(DetectPlugin):
         self.labels = parse_label_contents(labels_contents)
         try:
             edge_tpus = list_edge_tpus()
-            print('edge tpu', edge_tpus)
+            print('edge tpus', edge_tpus)
             if not len(edge_tpus):
                 raise Exception('no edge tpu found')
             self.edge_tpu_found = str(edge_tpus)
@@ -81,6 +91,34 @@ class TensorFlowLitePlugin(DetectPlugin):
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+
+    async def createMedia(sekf, data: Image.Image) -> scrypted_sdk.MediaObject:
+        mo = await scrypted_sdk.mediaManager.createMediaObject(RawImage(data), MIME_TYPE)
+        return mo
+
+    def invalidateMedia(self, data: RawImage):
+        if not data:
+            return
+        image = data.image
+        data.image = None
+        if image:
+            image.close()
+        data.jpeg = None
+
+    async def convert(self, data: RawImage, fromMimeType: str, toMimeType: str, options: scrypted_sdk.BufferConvertorOptions = None) -> Any:
+        mo = data.jpeg
+        if not mo:
+            image = data.image
+            if not image:
+                raise Exception('tensorflow-lite data is no longer valid')
+
+            bio = io.BytesIO()
+            image.save(bio, format='JPEG')
+            jpegBytes = bio.getvalue()
+            mo = await scrypted_sdk.mediaManager.createMediaObject(jpegBytes, 'image/jpeg')
+            data.jpeg = mo
+            data.image = None
+        return mo
 
     def requestRestart(self):
         asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
@@ -195,10 +233,10 @@ class TensorFlowLitePlugin(DetectPlugin):
     def get_detection_input_size(self, src_size):
         return input_size(self.interpreter)
 
-    def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> ObjectsDetected:
+    def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
         score_threshold = self.parse_settings(settings)
 
-        if loaded_py_coral:
+        if False and loaded_py_coral:
             with self.mutex:
                 gst_buffer = gstsample.get_buffer()
                 run_inference(self.interpreter, gst_buffer)
@@ -228,7 +266,7 @@ class TensorFlowLitePlugin(DetectPlugin):
 
         allowList = settings.get('allowList', None)
 
-        return self.create_detection_result(objs, src_size, allowList, convert_to_src_size)
+        return self.create_detection_result(objs, src_size, allowList, convert_to_src_size), RawImage(image)
 
     def create_detection_session(self):
         return TensorFlowLiteSession()
