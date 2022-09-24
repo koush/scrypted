@@ -9,7 +9,6 @@ from pycoral.adapters import detect
 from pycoral.adapters.common import input_size
 loaded_py_coral = False
 try:
-    raise Exception()
     from pycoral.utils.edgetpu import run_inference
     from pycoral.utils.edgetpu import list_edge_tpus
     from pycoral.utils.edgetpu import make_interpreter
