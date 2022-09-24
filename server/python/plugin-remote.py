@@ -418,35 +418,38 @@ async def readLoop(loop, peer: rpc.RpcPeer, reader):
 async def async_main(loop: AbstractEventLoop):
     reader = await aiofiles.open(3, mode='rb')
 
-    def send(message, reject=None, serializationContext = None):
-        if serializationContext:
-            buffers = serializationContext.get('buffers', None)
-            if buffers:
-                for buffer in buffers:
-                    length = len(buffer) + 1
-                    lb = length.to_bytes(4, 'big')
-                    type = 1
-                    try:
-                        os.write(4, lb)
-                        os.write(4, bytes([type]))
-                        os.write(4, buffer)
-                    except Exception as e:
-                        if reject:
-                            reject(e)
-                        return
+    mutex = threading.Lock()
 
-        jsonString = json.dumps(message)
-        b = bytes(jsonString, 'utf8')
-        length = len(b) + 1
-        lb = length.to_bytes(4, 'big')
-        type = 0
-        try:
-            os.write(4, lb)
-            os.write(4, bytes([type]))
-            os.write(4, b)
-        except Exception as e:
-            if reject:
-                reject(e)
+    def send(message, reject=None, serializationContext = None):
+        with mutex:
+            if serializationContext:
+                buffers = serializationContext.get('buffers', None)
+                if buffers:
+                    for buffer in buffers:
+                        length = len(buffer) + 1
+                        lb = length.to_bytes(4, 'big')
+                        type = 1
+                        try:
+                            os.write(4, lb)
+                            os.write(4, bytes([type]))
+                            os.write(4, buffer)
+                        except Exception as e:
+                            if reject:
+                                reject(e)
+                            return
+
+            jsonString = json.dumps(message)
+            b = bytes(jsonString, 'utf8')
+            length = len(b) + 1
+            lb = length.to_bytes(4, 'big')
+            type = 0
+            try:
+                os.write(4, lb)
+                os.write(4, bytes([type]))
+                os.write(4, b)
+            except Exception as e:
+                if reject:
+                    reject(e)
 
     peer = rpc.RpcPeer(send)
     peer.nameDeserializerMap['Buffer'] = SidebandBufferSerializer()
