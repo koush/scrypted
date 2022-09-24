@@ -3,8 +3,8 @@ import { ScryptedInterface, ScryptedInterfaceDescriptor } from "./types.input";
 import path from 'path';
 import fs from "fs";
 
-const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../schema.json')).toString());
-const typesVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../types/package.json')).toString()).version;
+const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../gen/schema.json')).toString());
+const typesVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json')).toString()).version;
 const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: ScryptedInterfaceDescriptor } = {};
 
 const allProperties: { [property: string]: any } = {};
@@ -59,7 +59,7 @@ export const ScryptedInterfaceDescriptors: { [scryptedInterface: string]: Scrypt
 ${fs.readFileSync(path.join(__dirname, './types.input.ts'))}
 `;
 
-fs.writeFileSync(path.join(__dirname, '../types/index.ts'), contents);
+fs.writeFileSync(path.join(__dirname, '../gen/index.ts'), contents);
 
 const discoveredTypes = new Set<string>();
 discoveredTypes.add('EventDetails');
@@ -252,6 +252,6 @@ ${pythonEnums}
 ${python}
 `
 
-fs.writeFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/types.py'), pythonTypes);
-fs.writeFileSync(path.join(__dirname, '../types/scrypted_python/scrypted_sdk/types.py'), pythonTypes);
-fs.copyFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/other.py'), path.join(__dirname, '../types/scrypted_python/scrypted_sdk/other.py'));
+fs.writeFileSync(path.join(__dirname, '../../scrypted_python/scrypted_sdk/types.py'), pythonTypes);
+fs.writeFileSync(path.join(__dirname, '../../scrypted_python/scrypted_sdk/types.py'), pythonTypes);
+fs.copyFileSync(path.join(__dirname, '../../scrypted_python/scrypted_sdk/other.py'), path.join(__dirname, '../../scrypted_python/scrypted_sdk/other.py'));

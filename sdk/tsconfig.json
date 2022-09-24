@@ -1,14 +1,14 @@
 {
     "compilerOptions": {
         "module": "commonjs",
-        "target": "es2019",
+        "target": "ESNext",
         "noImplicitAny": true,
         "esModuleInterop": true,
         "sourceMap": true,
         "declaration": true,
+        "outDir": "dist"
     },
-    "exclude": [
-        "gen",
-        "types"
-    ]
+    "include": [
+        "src/**/*",
+    ],
 }

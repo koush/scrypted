@@ -1,6 +1,6 @@
 {
   "entryPoints": [
-    "./"
+    "./src"
   ],
   "sort": ["source-order"],
   "name": "Scrypted Documentation",
@@ -16,6 +16,6 @@
     "Media Reference",
     "Webhook and Push Reference"
   ],
-  "customCss": "docs.css",
+  "customCss": "./developer.scrypted.app/docs.css",
   "readme": "./README.md"
 }

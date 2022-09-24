@@ -1,1 +1,6 @@
 __pycache__
+gen
+tsconfig.json
+tsconfig.typedoc.json
+typedoc.json
+src

@@ -206,6 +206,9 @@ function isSameValue(value1: any, value2: any) {
 }
 
 export function setState(pluginDevice: PluginDevice, property: string, value: any): boolean {
+    // device may have been deleted.
+    if (!pluginDevice.state)
+        return;
     if (!pluginDevice.state[property])
         pluginDevice.state[property] = {};
     const state = pluginDevice.state[property];

@@ -1,4 +1,4 @@
-import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
+import sdk, { ScryptedInterface, Setting, Settings, SettingValue } from ".";
 
 const { systemManager } = sdk;
 
