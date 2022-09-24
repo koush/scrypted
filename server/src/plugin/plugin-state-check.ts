@@ -1,4 +1,5 @@
 import { ScryptedInterface, ScryptedInterfaceProperty } from "@scrypted/types";
+import { RpcPeer } from "../rpc";
 import { propertyInterfaces } from "./descriptor";
 
 export function checkProperty(key: string, value: any) {
@@ -8,6 +9,8 @@ export function checkProperty(key: string, value: any) {
         throw new Error("mixins is read only");
     if (key === ScryptedInterfaceProperty.interfaces)
         throw new Error("interfaces is a read only post-mixin computed property, use providedInterfaces");
+    if (RpcPeer.isRpcProxy(value))
+        throw new Error('value must be a primitive type')
     const iface = propertyInterfaces[key.toString()];
     if (iface === ScryptedInterface.ScryptedDevice) {
         // only allow info to be set, since that doesn't actually change the descriptor
