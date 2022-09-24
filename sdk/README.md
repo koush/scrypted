@@ -8,7 +8,7 @@
   * [Creating Multiple Devices](#creating-multiple-devices)
   * [Full Reference](/modules)
   * [Sample Plugins](https://github.com/koush/scrypted/tree/main/plugins)
-    * [Camera Provider Sample](https://github.com/koush/scrypted/tree/main/plugins/camera-provider-sample)
+    * [Camera Provider Sample](https://github.com/koush/scrypted-sample-cameraprovider)
 
 <br/>
 <br/>
