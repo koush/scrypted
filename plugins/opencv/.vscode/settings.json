@@ -10,7 +10,7 @@
 
     // local checkout
     "scrypted.debugHost": "127.0.0.1",
-    "scrypted.serverRoot": "/Volumes/Dev/scrypted/server",
+    "scrypted.serverRoot": "/Users/koush/.scrypted",
 
     "scrypted.pythonRemoteRoot": "${config:scrypted.serverRoot}/volume/plugin.zip",
     "python.analysis.extraPaths": [

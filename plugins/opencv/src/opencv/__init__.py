@@ -218,12 +218,13 @@ class OpenCVPlugin(DetectPlugin):
             detections = self.detect(
                 detection_session, mat, settings, src_size, convert_to_src_size)
             # no point in triggering empty events.
-            if detections and not len(detections['detections']):
-                self.detection_sleep(settings)
-                return None
-            return detections
         finally:
             buf.unmap(info)
+
+        if not detections or not len(detections['detections']):
+            self.detection_sleep(settings)
+            return None
+        return detections
 
     def create_detection_session(self):
         return OpenCVDetectionSession()
