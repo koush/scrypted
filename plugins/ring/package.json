@@ -39,7 +39,8 @@
       "axios": "^0.24.0"
    },
    "optionalDependencies": {
-      "got": "11.8.2"
+      "got": "11.8.2",
+      "socket.io-client": "^2.4.0"
    },
-   "version": "0.0.83"
+   "version": "0.0.84"
 }
