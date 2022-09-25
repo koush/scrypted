@@ -975,19 +975,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         await deviceManager.onDevicesChanged({
             devices: locationDevices,
         });
-
-
-        // await Promise.all(locations.map(async location => {
-
-
-        //     if (!location.hasAlarmBaseStation)
-        //         return;
-        //     try {
-        //     }
-        //     catch (e) {
-        //         this.console.error('ring alarm setup failed', e);
-        //     }
-        // }));
     }
 
     getDevice(nativeId: string) {
