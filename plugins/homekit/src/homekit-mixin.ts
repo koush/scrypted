@@ -1,7 +1,6 @@
-import { StorageSettings } from "@scrypted/common/src/settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { ScryptedInterface, SettingValue } from "@scrypted/sdk";
-import crypto from 'crypto';
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { createHAPUsernameStorageSettingsDict } from "./hap-utils";
 const { log } = sdk;
 

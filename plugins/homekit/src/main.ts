@@ -1,4 +1,4 @@
-import { StorageSettings } from '@scrypted/common/src/settings';
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import sdk, { DeviceProvider, MixinProvider, Online, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedInterfaceProperty, Setting, Settings } from '@scrypted/sdk';
 import crypto from 'crypto';

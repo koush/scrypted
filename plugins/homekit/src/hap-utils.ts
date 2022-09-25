@@ -1,14 +1,12 @@
-import { MixinDeviceBase, ScryptedDeviceBase, ScryptedDeviceType } from '@scrypted/sdk';
-import { randomBytes } from 'crypto';
-import { Categories, EventedHTTPServer, HAPStorage } from './hap';
-import './types';
-import os from 'os';
-import { StorageSettingsDict } from '@scrypted/common/src/settings';
-import crypto from 'crypto';
 import { closeQuiet, createBindZero } from '@scrypted/common/src/listen-cluster';
+import sdk, { ScryptedDeviceType } from '@scrypted/sdk';
+import { StorageSettingsDict } from "@scrypted/sdk/storage-settings";
+import crypto, { randomBytes } from 'crypto';
 import { once } from 'events';
+import os from 'os';
+import { Categories, EventedHTTPServer, HAPStorage } from './hap';
 import { randomPinCode } from './pincode';
-import sdk from '@scrypted/sdk';
+import './types';
 
 class HAPLocalStorage {
     initSync() {

@@ -1,4 +1,4 @@
-import { StorageSettings } from "@scrypted/common/src/settings";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import sdk, { MediaObject, MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
 import checkDiskSpace from 'check-disk-space';
 import { canCameraMixin } from "./camera-mixin";
