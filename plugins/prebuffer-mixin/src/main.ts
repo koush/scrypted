@@ -7,7 +7,7 @@ import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/co
 import { readLength } from '@scrypted/common/src/read-stream';
 import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import { StorageSettings } from '@scrypted/common/src/settings';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
 import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, PluginFork, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
@@ -1018,12 +1018,18 @@ class PrebufferSession {
     if (options?.refresh === false && !this.parserSessionPromise)
       throw new Error('Stream is currently unavailable and will not be started for this request. RequestMediaStreamOptions.refresh === false');
 
+    const startedParserSession = !this.parserSessionPromise;
+
     this.ensurePrebufferSession();
 
     const session = await this.parserSessionPromise;
 
     let requestedPrebuffer = options?.prebuffer;
-    if (requestedPrebuffer == null) {
+    // if no prebuffer was requested, try to find a sync frame in the prebuffer.
+    // also do this if this request initiated the prebuffer: so, an explicit request for 0 prebuffer
+    // will still send the initial sync frame in the stream start. it may otherwise be missed
+    // if some time passes between the initial stream request and the actual pulling of the stream.
+    if (requestedPrebuffer == null || startedParserSession) {
       // prebuffer search for remote streaming should be even more conservative than local network.
       const defaultPrebuffer = options?.destination === 'remote' ? 2000 : 4000;
       // try to gaurantee a sync frame, but don't search too much prebuffer to make it happen.
@@ -1743,7 +1749,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     try {
       const info = await systemManager.getComponent('info');
       const version = await info.getVersion();
-      fork = semver.gte('0.2.5', version);
+      fork = semver.gte(version, '0.2.5');
     }
     catch (e) {
     }
