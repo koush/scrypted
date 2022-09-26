@@ -47,10 +47,10 @@ class MediaObjectRemote(scrypted_python.scrypted_sdk.types.MediaObject):
     def __init__(self, data, mimeType, sourceId):
         self.mimeType = mimeType
         self.data = data
-        self.__proxy_props = {
+        setattr(self, '__proxy_props', {
             'mimeType': mimeType,
             'sourceId': sourceId,
-        }
+        })
 
     async def getData(self):
         return self.data

@@ -317,7 +317,7 @@ class RpcPeer:
                         result, type(e).__name__, str(e), tb)
 
                 if not message.get('oneway', False):
-                    self.send(result, serializationContext)
+                    self.send(result, None, serializationContext)
 
             elif messageType == 'result':
                 id = message['id']
