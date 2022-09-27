@@ -379,8 +379,8 @@ export class RtspClient extends RtspBase {
                 
                 // 9/27-2022
                 // this seems wrong actually. even though ffmpeg does deliver
-                // query strings after paths, that does not seem to be the correct behavior
-                // on some cameras. rather, amcrest cameras seem to support it.
+                // query strings after paths, that does not seem to be behavior that is accepted
+                // on all cameras. rather, amcrest cameras seem to support this quirk.
 
                 // early 2021
                 // strangely, relative RTSP urls do not behave like expected from an HTTP-ish server.
