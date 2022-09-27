@@ -267,7 +267,7 @@ export interface RtspServerResponse {
 
 export class RtspStatusError extends Error {
     constructor(public status: RtspStatus) {
-        super();
+        super(`RTSP Error: ${status.line}`);
     }
 }
 
@@ -373,10 +373,20 @@ export class RtspClient extends RtspBase {
                 fullUrl = path;
             }
             else {
+                const u = new URL(fullUrl);
+                u.pathname +=  (u.pathname.endsWith('/') ? '' : '/') + path;
+                fullUrl = u.toString();
+                
+                // 9/27-2022
+                // this seems wrong actually. even though ffmpeg does deliver
+                // query strings after paths, that does not seem to be the correct behavior
+                // on some cameras. rather, amcrest cameras seem to support it.
+
+                // early 2021
                 // strangely, relative RTSP urls do not behave like expected from an HTTP-ish server.
                 // ffmpeg will happily suffix path segments after query strings:
                 // SETUP rtsp://localhost:5554/cam/realmonitor?channel=1&subtype=0/trackID=0 RTSP/1.0
-                fullUrl += (fullUrl.endsWith('/') ? '' : '/') + path;
+                // fullUrl += (fullUrl.endsWith('/') ? '' : '/') + path;
             }
         }
 
