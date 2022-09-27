@@ -135,7 +135,6 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
         self.loop = asyncio.get_event_loop()
 
     async def detection_event(self, detection_session: DetectionSession, detection_result: ObjectsDetected, mediaObject = None):
-        detection_result['detectionId'] = detection_session.id
         detection_result['timestamp'] = int(time.time() * 1000)
         if detection_session.callbacks:
             if detection_session.running:
@@ -143,6 +142,8 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
             else:
                 await detection_session.callbacks.onDetectionEnded(detection_result)
         else:
+            # legacy path, nuke this pattern in opencv, pam diff, and full tensorflow.
+            detection_result['detectionId'] = detection_session.id
             await self.onDeviceEvent(ScryptedInterface.ObjectDetection.value, detection_result)
 
     def end_session(self, detection_session: DetectionSession):
@@ -339,7 +340,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
     async def createMedia(self, data: Any) -> MediaObject:
         pass
 
-    def invalidateMedia(self, data: Any):
+    def invalidateMedia(self, detection_session: DetectionSession, data: Any):
         pass
 
     def create_user_callback(self, detection_session: DetectionSession, duration: number):
@@ -364,21 +365,22 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
 
                     def maybeInvalidate():
                         if not retain:
-                            self.invalidateMedia(data)
+                            self.invalidateMedia(detection_session, data)
 
                     async def report_event():
                         nonlocal mo
-                        nonlocal retain
                         mo = await self.createMedia(data)
-                        retain = await self.detection_event(detection_session, detection_result, mo)
-                        maybeInvalidate()
+                        async def report():
+                            nonlocal retain
+                            retain = await self.detection_event(detection_session, detection_result, mo)
+                        t = asyncio.ensure_future(report(), loop = self.loop)
+                        try:
+                            await asyncio.wait_for(asyncio.shield(t), 2)
+                            maybeInvalidate()
+                        except:
+                            self.invalidateMedia(detection_session, data)
 
-                    t = asyncio.run_coroutine_threadsafe(report_event(), self.loop)
-                    try:
-                        t.result(2)
-                        maybeInvalidate()
-                    except:
-                        self.invalidateMedia(data)
+                    asyncio.run_coroutine_threadsafe(report_event(), loop = self.loop)
                     self.detection_event_notified(detection_session.settings)
 
                 if not detection_session or duration == None:

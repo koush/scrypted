@@ -206,7 +206,7 @@ def create_pipeline_sink(
                  appsink_size,
                  pixel_format,
                  crop = False):
-    SINK_ELEMENT = 'appsink name={appsink_name} emit-signals=true max-buffers=1 drop=true sync=false'.format(appsink_name=appsink_name)
+    SINK_ELEMENT = 'appsink name={appsink_name} emit-signals=true max-buffers=0 drop=true sync=false'.format(appsink_name=appsink_name)
 
     (width, height)= appsink_size
 
@@ -233,11 +233,11 @@ def create_pipeline(
     else:
         sink = create_pipeline_sink(appsink_name, appsink_size, pixel_format, crop = crop)
         if crop:
-            PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! aspectratiocrop aspect-ratio=1/1 ! videoscale name=videoscale
+            PIPELINE = """ {video_input} ! videoconvert name=videoconvert ! aspectratiocrop aspect-ratio=1/1 ! videoscale name=videoscale ! queue leaky=downstream max-size-buffers=0 
                 ! {sink}
             """
         else:
-            PIPELINE = """ {video_input} ! queue leaky=upstream max-size-buffers=1 ! videoconvert name=videoconvert ! videoscale name=videoscale
+            PIPELINE = """ {video_input} ! queue leaky=downstream max-size-buffers=0 ! videoconvert name=videoconvert ! videoscale name=videoscale
                 ! {sink}
             """
     pipeline = PIPELINE.format(video_input = video_input, sink = sink)

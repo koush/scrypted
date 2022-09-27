@@ -31,8 +31,11 @@ class QueuedSample(TypedDict):
     eventId: str
 
 class TensorFlowLiteSession(DetectionSession):
+    image: Image.Image
+
     def __init__(self) -> None:
         super().__init__()
+        self.image = None
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -53,6 +56,7 @@ class RawImage:
 
     def __init__(self, image: Image.Image):
         self.image = image
+        self.jpeg = None
 
 MIME_TYPE = 'x-scrypted-tensorflow-lite/x-raw-image'
 
@@ -91,17 +95,28 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
 
-    async def createMedia(sekf, data: Image.Image) -> scrypted_sdk.MediaObject:
-        mo = await scrypted_sdk.mediaManager.createMediaObject(RawImage(data), MIME_TYPE)
+    async def createMedia(sekf, data: RawImage) -> scrypted_sdk.MediaObject:
+        mo = await scrypted_sdk.mediaManager.createMediaObject(data, MIME_TYPE)
         return mo
 
-    def invalidateMedia(self, data: RawImage):
+    def end_session(self, detection_session: TensorFlowLiteSession):
+        image = detection_session.image
+        if image:
+            detection_session.image = None
+            image.close()
+
+        return super().end_session(detection_session)
+
+    def invalidateMedia(self, detection_session: TensorFlowLiteSession, data: RawImage):
         if not data:
             return
         image = data.image
         data.image = None
         if image:
-            image.close()
+            if not detection_session.image:
+                detection_session.image = image
+            else:
+                image.close()
         data.jpeg = None
 
     async def convert(self, data: RawImage, fromMimeType: str, toMimeType: str, options: scrypted_sdk.BufferConvertorOptions = None) -> Any:
@@ -115,7 +130,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
             image.save(bio, format='JPEG')
             jpegBytes = bio.getvalue()
             mo = await scrypted_sdk.mediaManager.createMediaObject(jpegBytes, 'image/jpeg')
-            data.jpeg = mo
+            data.jpeg = jpegBytes
             data.image = None
         return mo
 
@@ -123,8 +138,9 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
 
     async def getDetectionModel(self) -> ObjectDetectionModel:
-        _, height, width, channels = self.interpreter.get_input_details()[
-            0]['shape']
+        with self.mutex:
+            _, height, width, channels = self.interpreter.get_input_details()[
+                0]['shape']
 
         d: ObjectDetectionModel = {
             'name': '@scrypted/tensorflow-lite',
@@ -216,21 +232,21 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         stream = io.BytesIO(image_bytes)
         image = Image.open(stream)
 
-        _, scale = common.set_resized_input(
-            self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
-
         score_threshold = self.parse_settings(settings)
         with self.mutex:
+            _, scale = common.set_resized_input(
+                self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
             self.interpreter.invoke()
             objs = detect.get_objects(
                 self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
-        allowList = settings.get('allowList', None)
+        allowList = settings and settings.get('allowList', None)
 
         return self.create_detection_result(objs, image.size, allowList)
 
     def get_detection_input_size(self, src_size):
-        return input_size(self.interpreter)
+        with self.mutex:
+            return input_size(self.interpreter)
 
     def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
         score_threshold = self.parse_settings(settings)
@@ -251,14 +267,22 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
             if not result:
                 return
             try:
-                image = Image.frombuffer('RGB', (width, height), info.data.tobytes())
+                image = detection_session.image
+                detection_session.image = None
+
+                if image and (image.width != width or image.height != height):
+                    image.close()
+                    image = None
+                if image:
+                    image.frombytes(info.data.tobytes())
+                else:
+                    image = Image.frombuffer('RGB', (width, height), info.data.tobytes())
             finally:
                 gst_buffer.unmap(info)
 
-            _, scale = common.set_resized_input(
-                self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
-
             with self.mutex:
+                _, scale = common.set_resized_input(
+                    self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
                 self.interpreter.invoke()
                 objs = detect.get_objects(
                     self.interpreter, score_threshold=score_threshold, image_scale=scale)

@@ -36,7 +36,8 @@
       "type": "API",
       "interfaces": [
          "MixinProvider"
-      ]
+      ],
+      "realfs": true
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
