@@ -14,7 +14,9 @@
     "Core Reference",
     "Device Provider Reference",
     "Media Reference",
-    "Webhook and Push Reference"
+    "Webhook and Push Reference",
+    "Mixin Reference",
+    "WebRTC Reference"
   ],
   "customCss": "./developer.scrypted.app/docs.css",
   "readme": "./README.md"

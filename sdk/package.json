@@ -1,18 +1,18 @@
 {
   "name": "@scrypted/sdk",
-  "version": "0.1.4",
+  "version": "0.1.14",
   "description": "",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./storage-settings": "./dist/storage-settings.js"
+    ".": "./dist/src/index.js",
+    "./storage-settings": "./dist/src/storage-settings.js"
   },
   "scripts": {
     "prepublishOnly": "npm run build && cd types && npm version patch && npm publish",
     "prebuild": "cd types && npm run build",
     "predocs": "npm run build",
     "docs": "typedoc && cp developer.scrypted.app/CNAME developer.scrypted.app/docs",
-    "build": "rimraf dist && npm link @scrypted/types && tsc",
+    "build": "rimraf dist && tsc",
     "webpack": "webpack-cli --config webpack.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -29,12 +29,11 @@
   "license": "ISC",
   "dependencies": {
     "@babel/preset-typescript": "^7.16.7",
-    "@scrypted/types": "^0.0.96",
     "adm-zip": "^0.4.13",
     "axios": "^0.21.4",
     "babel-loader": "^8.2.3",
     "babel-plugin-const-enum": "^1.1.0",
-    "esbuild": "^0.13.8",
+    "esbuild": "^0.15.9",
     "ncp": "^2.0.0",
     "raw-loader": "^4.0.2",
     "rimraf": "^3.0.2",
@@ -49,5 +48,5 @@
     "ts-node": "^10.4.0",
     "typedoc": "^0.23.15"
   },
-  "types": "dist/index.d.ts"
+  "types": "dist/src/index.d.ts"
 }

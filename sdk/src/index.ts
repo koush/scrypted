@@ -1,7 +1,10 @@
-export * from '@scrypted/types';
-import type { DeviceManager, DeviceState, EndpointManager, EventListenerRegister, Logger, MediaManager, MediaObject, ScryptedInterface, ScryptedNativeId, ScryptedStatic, SystemManager } from '@scrypted/types';
-import { DeviceBase, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, TYPES_VERSION } from '@scrypted/types';
+export * from '../types/gen/index';
+import type { DeviceManager, DeviceState, EndpointManager, EventListenerRegister, Logger, MediaManager, MediaObject, ScryptedInterface, ScryptedNativeId, ScryptedStatic, SystemManager } from '../types/gen/index';
+import { DeviceBase, ScryptedInterfaceDescriptors, ScryptedInterfaceProperty, TYPES_VERSION } from '../types/gen/index';
 
+/**
+ * @category Core Reference
+ */
 export class ScryptedDeviceBase extends DeviceBase {
   private _storage: Storage;
   private _log: Logger;
@@ -65,6 +68,9 @@ export class ScryptedDeviceBase extends DeviceBase {
   }
 }
 
+/**
+ * @category Mixin Reference
+ */
 export interface MixinDeviceOptions<T> {
   mixinDevice: T;
   mixinProviderNativeId: ScryptedNativeId;
@@ -73,7 +79,10 @@ export interface MixinDeviceOptions<T> {
   mixinDeviceState: DeviceState;
 }
 
-export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
+/**
+ * @category Mixin Reference
+ */
+ export class MixinDeviceBase<T> extends DeviceBase implements DeviceState {
   mixinProviderNativeId: ScryptedNativeId;
   mixinDevice: T;
   mixinDeviceInterfaces: ScryptedInterface[];

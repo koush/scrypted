@@ -1401,6 +1401,8 @@ export interface SystemManager {
 }
 /**
  * MixinProviders can add and intercept interfaces to other devices to add or augment their behavior.
+ * 
+ * @category Mixin Reference
  */
 export interface MixinProvider {
   /**
@@ -1616,8 +1618,16 @@ export enum ScryptedInterface {
   LauncherApplication = "LauncherApplication",
 }
 
+/**
+ * @category WebRTC Reference
+ */
 export type RTCSignalingSendIceCandidate = (candidate: RTCIceCandidateInit) => Promise<void>;
 
+/**
+ * Implemented by WebRTC cameras to negotiate a peer connection session with Scrypted.
+ * 
+ * @category WebRTC Reference
+ */
 export interface RTCSignalingSession {
   createLocalDescription(type: 'offer' | 'answer', setup: RTCAVSignalingSetup, sendIceCandidate: undefined | RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit>;
   setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void>;
@@ -1625,6 +1635,9 @@ export interface RTCSignalingSession {
   getOptions(): Promise<RTCSignalingOptions>;
 }
 
+/**
+ * @category WebRTC Reference
+ */
 export interface RTCSignalingOptions {
   /**
    * Indicates that this client requires an answer, and is providing an offer.
@@ -1655,6 +1668,9 @@ export interface RTCSignalingClient {
   createRTCSignalingSession(): Promise<RTCSignalingSession>;
 }
 
+/**
+ * @category WebRTC Reference
+ */
 export interface RTCSessionControl {
   getRefreshAt(): Promise<number | void>;
   extendSession(): Promise<void>;
@@ -1664,7 +1680,9 @@ export interface RTCSessionControl {
     video: boolean,
   }): Promise<void>;
 }
-
+/**
+ * @category WebRTC Reference
+ */
 export interface RTCMediaObjectTrack {
   replace(mediaObject: MediaObject): Promise<void>;
   stop(): Promise<void>;
@@ -1674,6 +1692,9 @@ export interface RTCMediaObjectTrack {
   }): Promise<void>;
 }
 
+/**
+ * @category WebRTC Reference
+ */
 export interface RTCConnectionManagement {
   negotiateRTCSignalingSession(): Promise<void>;
   addTrack(mediaObject: MediaObject, options?: {
@@ -1687,11 +1708,16 @@ export interface RTCConnectionManagement {
  * An inflexible RTC Signaling channel, typically a vendor, like Nest or Ring.
  * They generally can only handle either offer or answer, but not both. Usually has
  * strict requirements and expectations on client setup.
+ * 
+ * @category WebRTC Reference
  */
 export interface RTCSignalingChannel {
   startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl | undefined>;
 }
 
+/**
+ * @category WebRTC Reference
+ */
 export interface RTCAVSignalingSetup {
   /**
    * Mechanism to allow configuration of TURN/STUN servers, etc.
