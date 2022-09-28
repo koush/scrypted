@@ -804,7 +804,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         }
 
         if (!this.settingsStorage.values.email || !this.settingsStorage.values.password) {
-            this.log.a('Enter your Ring usernmae and password to complete setup.');
+            this.log.a('Enter your Ring username and password to complete setup.');
             throw new Error('refresh token, username, and password are missing.');
         }
 
