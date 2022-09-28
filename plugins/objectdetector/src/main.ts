@@ -5,7 +5,7 @@ import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider"
 import { safeParseJson } from './util';
-import fs from 'fs';
+import crypto from 'crypto';
 
 const polygonOverlap = require('polygon-overlap');
 
@@ -150,7 +150,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       settings: await this.getCurrentSettings(),
     });
     this.objectsDetected(detections, true);
-    this.reportObjectDetections(detections, undefined);
+    this.reportObjectDetections(detections);
   }
 
   bindObjectDetection() {
@@ -170,7 +170,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (eventData?.detectionId !== this.detectionId)
         return;
       this.objectsDetected(eventData);
-      this.reportObjectDetections(eventData, undefined);
+      this.reportObjectDetections(eventData);
 
       this.running = eventData.running;
     });
@@ -194,7 +194,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
           settings: await this.getCurrentSettings(),
         });
         this.objectsDetected(detections, true);
-        this.reportObjectDetections(detections, eventData.detectionId);
+        this.setDetection(detections, mo);
+        this.reportObjectDetections(detections);
       });
     }
   }
@@ -228,7 +229,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     this.running = detection.running;
 
     const newOrBetterDetection = this.objectsDetected(detection);
-    this.reportObjectDetections(detection, newOrBetterDetection ? mediaObject : undefined);
+    if (newOrBetterDetection)
+      this.setDetection(detection, mediaObject);
+    this.reportObjectDetections(detection);
     // if (newOrBetterDetection) {
     //   mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')
     //     .then(jpeg => {
@@ -302,10 +305,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return this.hasMotionType ? this.detectionInterval * 1000 * 5 : this.detectionDuration * 1000;
   }
 
-  reportObjectDetections(detection: ObjectsDetected, detectionInput?: MediaObject) {
-    if (detectionInput)
-      this.setDetection(detection.detectionId, detectionInput);
-
+  reportObjectDetections(detection: ObjectsDetected) {
     // determine zones of the objects, if configured.
     if (detection.detections && Object.keys(this.zones).length) {
       for (const o of detection.detections) {
@@ -441,7 +441,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return newOrBetterDetection;
   }
 
-  setDetection(detectionId: string, detectionInput: MediaObject) {
+  setDetection(detection: ObjectsDetected, detectionInput: MediaObject) {
+    if (!detection.detectionId)
+      detection.detectionId = crypto.randomBytes(4).toString('hex');
+
+    const { detectionId } = detection;
     this.detections.set(detectionId, detectionInput);
     setTimeout(() => {
       this.detections.delete(detectionId);
@@ -465,7 +469,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   async getDetectionInput(detectionId: any): Promise<MediaObject> {
     const detection = this.detections.get(detectionId);
     if (detection)
-      return;
+      return detection;
     if (this.mixinDeviceInterfaces.includes(ScryptedInterface.ObjectDetector))
       return this.mixinDevice.getDetectionInput(detectionId);
     throw new Error('Detection not found. It may have expired.');

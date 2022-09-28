@@ -207,7 +207,7 @@ class OpenCVPlugin(DetectPlugin):
         width = caps.get_structure(0).get_value('width')
         result, info = buf.map(Gst.MapFlags.READ)
         if not result:
-            return
+            return None, None
         try:
             mat = np.ndarray(
                 (height,
@@ -223,8 +223,8 @@ class OpenCVPlugin(DetectPlugin):
 
         if not detections or not len(detections['detections']):
             self.detection_sleep(settings)
-            return None
-        return detections
+            return None, None
+        return detections, None
 
     def create_detection_session(self):
         return OpenCVDetectionSession()
