@@ -527,6 +527,7 @@ export interface RequestRecordingStreamOptions extends RequestMediaStreamOptions
 }
 
 export interface RecordingStreamThumbnailOptions {
+  detectionId?: string;
   resize?: {
     width?: number;
     height?: number;
@@ -1042,7 +1043,7 @@ export interface ObjectsDetected {
   /**
    * The id for the detection session.
    */
-  detectionId?: any;
+  detectionId?: string;
   /**
    * The id for this specific event/frame within a detection video session.
    * Will be undefined for single image detections.
@@ -1067,7 +1068,7 @@ export interface ObjectDetector {
    * Get the media (image or video) that contains this detection.
    * @param detectionId
    */
-  getDetectionInput(detectionId: any, eventId?: any): Promise<MediaObject>;
+  getDetectionInput(detectionId: string, eventId?: any): Promise<MediaObject>;
   getObjectTypes(): Promise<ObjectDetectionTypes>;
 }
 export interface ObjectDetectionSession {

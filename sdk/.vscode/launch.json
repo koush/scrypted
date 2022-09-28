@@ -6,13 +6,13 @@
     "configurations": [
         {
             "autoAttachChildProcesses": false,
-            "type": "pwa-node",
+            "type": "node",
             "request": "launch",
             "name": "Launch Build TS Node",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/gen/build.ts",
+            "program": "${workspaceFolder}/types/src/build.ts",
             "runtimeArgs": [
                 "--expose-gc",
                 "--nolazy",

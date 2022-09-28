@@ -415,7 +415,7 @@ class ObjectDetectionTypes(TypedDict):
     pass
 
 class ObjectsDetected(TypedDict):
-    detectionId: Any
+    detectionId: str
     detections: list[ObjectDetectionResult]
     eventId: Any
     inputDimensions: tuple[float, float]
@@ -450,6 +450,7 @@ class RecordedEventOptions(TypedDict):
 
 class RecordingStreamThumbnailOptions(TypedDict):
     crop: Any
+    detectionId: str
     resize: Any
     pass
 
@@ -794,7 +795,7 @@ class ObjectDetection:
     pass
 
 class ObjectDetector:
-    async def getDetectionInput(self, detectionId: Any, eventId: Any = None) -> MediaObject:
+    async def getDetectionInput(self, detectionId: str, eventId: Any = None) -> MediaObject:
         pass
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass

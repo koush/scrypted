@@ -252,6 +252,4 @@ ${pythonEnums}
 ${python}
 `
 
-fs.writeFileSync(path.join(__dirname, '../../scrypted_python/scrypted_sdk/types.py'), pythonTypes);
-fs.writeFileSync(path.join(__dirname, '../../scrypted_python/scrypted_sdk/types.py'), pythonTypes);
-fs.copyFileSync(path.join(__dirname, '../../scrypted_python/scrypted_sdk/other.py'), path.join(__dirname, '../../scrypted_python/scrypted_sdk/other.py'));
+fs.writeFileSync(path.join(__dirname, '../scrypted_python/scrypted_sdk/types.py'), pythonTypes);
