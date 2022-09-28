@@ -249,11 +249,11 @@ def create_pipeline(
         sink = create_pipeline_sink(
             appsink_name, appsink_size, pixel_format, crop=crop)
         if crop:
-            PIPELINE = """ {video_input} ! queue leaky=downstream max-size-buffers=0 ! videoconvert name=videoconvert ! aspectratiocrop aspect-ratio=1/1 ! videoscale name=videoscale 
+            PIPELINE = """ {video_input} ! videoconvert name=videoconvert ! aspectratiocrop aspect-ratio=1/1 ! videoscale name=videoscale ! queue leaky=downstream max-size-buffers=0
                 ! {sink}
             """
         else:
-            PIPELINE = """ {video_input} ! queue leaky=downstream max-size-buffers=0 ! videoconvert name=videoconvert ! videoscale name=videoscale
+            PIPELINE = """ {video_input} ! videoconvert name=videoconvert ! videoscale name=videoscale ! queue leaky=downstream max-size-buffers=0
                 ! {sink}
             """
     pipeline = PIPELINE.format(video_input=video_input, sink=sink)

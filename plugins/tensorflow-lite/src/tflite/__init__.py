@@ -312,7 +312,6 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         if second_pass_crop or not second_score_threshold or not len(ret['detections']):
             return ret, RawImage(image)
         
-        secondPassDetections: List[ObjectDetectionResult] = []
         detections = ret['detections']
         ret['detections'] = []
         for detection in detections:
