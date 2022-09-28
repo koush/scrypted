@@ -276,7 +276,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         stream = await this.cameraDevice.getVideoStream({
           destination: 'low-resolution',
           // request no prebuffer because it will throw off detection timestamps.
-          // prebuffer: 0,
+          prebuffer: 0,
           // ask rebroadcast to mute audio, not needed.
           audio: null,
         });

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from lib2to3.pytree import convert
 from typing_extensions import TypedDict
 from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 import threading
@@ -23,7 +24,6 @@ import scrypted_sdk
 from typing import Any, List, Tuple
 from gi.repository import Gst
 import asyncio
-import numpy
 
 from detect import DetectionSession, DetectPlugin
 
@@ -243,7 +243,8 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         stream = io.BytesIO(image_bytes)
         image = Image.open(stream)
 
-        return self.run_detection_image(self, settings, image.size)
+        detections, _ = self.run_detection_image(image, settings, image.size)
+        return detections
 
     def get_detection_input_size(self, src_size):
         return (None, None)
@@ -275,18 +276,24 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
             oh = round((scaled.height - h) / 2)
             input = scaled.crop((ow, oh, ow + w, oh + h))
 
-            def cvss(point, normalize=False):
-                converted = convert_to_src_size(point, normalize)
-                return ((converted[0] + ow) / s, (converted[1] + oh) / s, converted[2])
+            if convert_to_src_size:
+                def cvss(point, normalize=False):
+                    converted = convert_to_src_size(point, normalize)
+                    return ((converted[0] + ow) / s, (converted[1] + oh) / s, converted[2])
+            else:
+                cvss = None
         else:
             (l, t, r, b) = second_pass_crop
             cropped = image.crop(second_pass_crop)
             (cw, ch) = cropped.size
             input = cropped.resize((w, h), Image.ANTIALIAS)
 
-            def cvss(point, normalize=False):
-                converted = convert_to_src_size(point, normalize)
-                return ((converted[0] / w) * cw + l, (converted[1] / h) * ch + t, converted[2])
+            if convert_to_src_size:
+                def cvss(point, normalize=False):
+                    converted = convert_to_src_size(point, normalize)
+                    return ((converted[0] / w) * cw + l, (converted[1] / h) * ch + t, converted[2])
+            else:
+                cvss = None
                 
         with self.mutex:
             common.set_input(
@@ -299,7 +306,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
                 self.interpreter, score_threshold=score_threshold, image_scale=scale)
 
         
-        allowList = settings.get('allowList', None)
+        allowList = settings.get('allowList', None) if settings else None
         ret = self.create_detection_result(objs, src_size, allowList, cvss)
 
         if second_pass_crop or not second_score_threshold or not len(ret['detections']):
