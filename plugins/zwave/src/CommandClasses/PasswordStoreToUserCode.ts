@@ -2,9 +2,12 @@ import sdk, { PasswordStore, ScryptedInterface } from "@scrypted/sdk";
 import { ValueID } from "@zwave-js/core";
 import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
 import { UserIDStatus } from "zwave-js";
-import { UserCode } from "zwave-js/lib/commandclass/UserCodeCC";
 const { deviceManager} = sdk;
 
+interface UserCode {
+    userIdStatus: UserIDStatus;
+    userCode: string;
+}
 
 function isEmpty(str: string) {
     return !str || !str.length;

@@ -34,13 +34,12 @@
    "dependencies": {
       "@scrypted/sdk": "file:../../sdk",
       "@types/lodash": "^4.14.168",
-      "@zwave-js/file-stream-rotator": "file:./file-stream-rotator",
       "lodash": "^4.17.21"
    },
    "devDependencies": {
       "@types/node": "^16.7.1"
    },
    "optionalDependencies": {
-      "zwave-js": "^8.11.9"
+      "zwave-js": "^9.6.2"
    }
 }

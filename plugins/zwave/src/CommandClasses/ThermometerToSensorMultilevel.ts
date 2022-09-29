@@ -14,6 +14,10 @@ export class ThermometerToSensorMultilevel extends ZwaveDeviceBase implements Th
             zwaveDevice.temperatureUnit = TemperatureUnit.F;
         }
     }
+    
+    async setTemperatureUnit(temperatureUnit: TemperatureUnit): Promise<void> {
+        
+    }
 }
 
 export default ThermometerToSensorMultilevel;
