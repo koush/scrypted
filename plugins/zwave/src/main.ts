@@ -155,6 +155,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 });
 
                 resolve();
+                log.clearAlerts();
             });
 
             driver.start().catch(reject);
@@ -163,6 +164,8 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         this.driverReady.catch(e => {
             log.a(`Zwave Driver startup error. Verify the Z-Wave USB stick is plugged in and the Serial Port setting is correct.`);
             this.console.error('zwave driver start error', e);
+            this.console.log('This issue may be due to a driver or database lock, and the plugin will restart automatically momentarily.');
+            sdk.deviceManager.requestRestart();
         });
     }
 
