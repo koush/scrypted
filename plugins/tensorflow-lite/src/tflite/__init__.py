@@ -50,7 +50,7 @@ def parse_label_contents(contents: str):
     return ret
 
 
-defaultThreshold = .4
+defaultThreshold = .2
 defaultSecondThreshold = .7
 
 class RawImage:
@@ -237,13 +237,6 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
 
         # print(detection_result)
         return detection_result
-
-    def parse_settings(self, settings: Any):
-        score_threshold = .4
-        if settings:
-            score_threshold = float(settings.get(
-                'score_threshold', score_threshold))
-        return score_threshold
 
     def run_detection_jpeg(self, detection_session: TensorFlowLiteSession, image_bytes: bytes, settings: Any) -> ObjectsDetected:
         stream = io.BytesIO(image_bytes)
