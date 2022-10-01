@@ -74,9 +74,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
     catch (e) {
       return [
-        DETECT_PERIODIC_SNAPSHOTS,
         DETECT_VIDEO_MOTION,
-        DETECT_MOTION_SNAPSHOTS,
       ];
     }
   }

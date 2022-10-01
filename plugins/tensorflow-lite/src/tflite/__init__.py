@@ -185,6 +185,12 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
             'key': 'allowList',
             'value': [
                 'person',
+                'dog',
+                'cat',
+                'car',
+                'truck',
+                'bus',
+                'motorcycle',
             ],
         }
         coral: Setting = {
