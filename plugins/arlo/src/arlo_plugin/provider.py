@@ -201,7 +201,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         self.logger.info(f"Discovered {len(basestations)} basestations")
 
         devices = []
-        cameras = self.arlo.GetDevices(['camera', "arloq", "doorbell"])
+        cameras = self.arlo.GetDevices(['camera', "arloq", "arloqs", "doorbell"])
         for camera in cameras:
             if camera["deviceId"] != camera["parentId"] and camera["parentId"] not in self.arlo_basestations:
                 self.logger.info(f"Skipping camera {camera['deviceId']} because its basestation was not found")
@@ -263,7 +263,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             return None
         arlo_basestation = self.arlo_basestations[arlo_camera["parentId"]]
 
-        if arlo_camera["deviceType"] == "doorbell":
+        if False and arlo_camera["deviceType"] == "doorbell":
             return ArloDoorbell(nativeId, arlo_camera, arlo_basestation, self)
         else:
             return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
