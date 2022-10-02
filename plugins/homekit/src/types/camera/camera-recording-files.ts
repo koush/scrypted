@@ -64,7 +64,7 @@ export async function pruneClips(pruneAge: number, console: Console) {
 
 export async function getSavePath() {
     const savePath = path.join(await mediaManager.getFilesPath(), 'hksv');
-    mkdirp.sync(savePath);
+    await mkdirp(savePath);
     return savePath;
 }
 
