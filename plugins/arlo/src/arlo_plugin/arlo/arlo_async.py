@@ -417,7 +417,8 @@ class Arlo(object):
             while self.event_stream.connected:
                 event, action = await self.event_stream.get(resource, actions, seen_events)
 
-                if event is None or self.event_stream.event_stream_stop_event.is_set():
+                if event is None or self.event_stream is None \
+                    or self.event_stream.event_stream_stop_event.is_set():
                     return None
 
                 seen_events[event.uuid] = event
