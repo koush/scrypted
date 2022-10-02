@@ -1,61 +1,31 @@
-import { ScryptedInterface, ScryptedInterfaceProperty } from "@scrypted/types";
+import { ScryptedInterfaceProperty } from "@scrypted/types";
 import { ScryptedRuntime } from "../runtime";
 import { getState } from "../state";
-import Graph from 'node-dijkstra';
 
-export function hasMixinCycle(scrypted: ScryptedRuntime, id: string, mixins?: string[]) {
+function getMixins(scrypted: ScryptedRuntime, id: string) {
     const pluginDevice = scrypted.findPluginDeviceById(id);
     if (!pluginDevice)
-        return false;
-    mixins = mixins || getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+        return [];
+    return getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
+}
 
-    if (!mixins.length)
-        return false;
+export function hasMixinCycle(scrypted: ScryptedRuntime, id: string, mixins?: string[]) {
+    mixins = mixins || getMixins(scrypted, id);
 
-    if (mixins.includes(id))
-        return true;
+    // given the mixins for a device, find all the mixins for those mixins,
+    // and create a visited graph.
+    // if the visited graphs includes the original device, that indicates
+    // a cyclical dependency for that device.
+    const visitedMixins = new Set(mixins);
 
-    // connect all devices to their mixin providers.
-    const nodes: { [node: string]: { [edge: string]: number } } = {};
-    for (const nodeId of Object.keys(scrypted.stateManager.getSystemState())) {
-        const node = scrypted.findPluginDeviceById(nodeId);
-        // const interfaces = getState(node, ScryptedInterfaceProperty.interfaces) || [];
-        // if (!interfaces.includes(ScryptedInterface.MixinProvider))
-        //     continue;
-        const edges: { [edge: string]: number } = nodes[nodeId] = {};
-
-        let nodeMixins: string[];
-
-        // when finding the node that is being checked for cyclical mixins, skip it.
-        if (id === nodeId)
+    while (mixins.length) {
+        const mixin = mixins.pop();
+        if (visitedMixins.has(mixin))
             continue;
-
-        nodeMixins = getState(node, ScryptedInterfaceProperty.mixins) || [];
-        for (const nodeMixin of nodeMixins) {
-            edges[nodeMixin] = 1;
-        }
+        visitedMixins.add(mixin);
+        const providerMixins = getMixins(scrypted, mixin);
+        mixins.push(...providerMixins);
     }
 
-    // remove anything that isn't a mixin provider itself.
-    for (const nodeId of Object.keys(scrypted.stateManager.getSystemState())) {
-        const node = scrypted.findPluginDeviceById(nodeId);
-        const interfaces = getState(node, ScryptedInterfaceProperty.interfaces) || [];
-        if (!interfaces.includes(ScryptedInterface.MixinProvider)) {
-            delete nodes[nodeId];
-        }
-    }
-
-    const graph = new Graph();
-    for (const id of Object.keys(nodes)) {
-        graph.addNode(id, nodes[id]);
-    }
-
-    // determine if any of the mixins have a path back to the original device.
-    for (const mixinId of mixins) {
-        const route = graph.path(mixinId, id) as Array<string>;
-        if (route?.length)
-            return true;
-    }
-
-    return false;
+    return visitedMixins.has(id);
 }
