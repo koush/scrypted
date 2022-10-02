@@ -211,6 +211,8 @@ export class RpcPeer {
     nameDeserializerMap = new Map<string, RpcSerializer>();
     constructorSerializerMap = new Map<any, string>();
     transportSafeArgumentTypes = RpcPeer.getDefaultTransportSafeArgumentTypes();
+    killed: Promise<void>;
+    killedDeferred: Deferred;
 
     static readonly finalizerIdSymbol = Symbol('rpcFinalizerId');
 
@@ -264,6 +266,9 @@ export class RpcPeer {
     ]);
 
     constructor(public selfName: string, public peerName: string, public send: (message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any) => void) {
+        this.killed = new Promise((resolve, reject) => {
+            this.killedDeferred = { resolve, reject };
+        });
     }
 
     createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
@@ -285,6 +290,7 @@ export class RpcPeer {
 
     kill(message?: string) {
         const error = new RPCResultError(this, message || 'peer was killed');
+        this.killedDeferred.reject(error);
         for (const result of Object.values(this.pendingResults)) {
             result.reject(error);
         }

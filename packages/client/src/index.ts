@@ -480,7 +480,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             mediaManager,
             userStorage,
             disconnect() {
-                socket.close();
+                rpcPeer.kill('disconnect requested');
             },
             pluginHostAPI: undefined,
             rtcConnectionManagement,
@@ -489,6 +489,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
         socket.on('close', () => {
             rpcPeer.kill('socket closed');
+        });
+
+        rpcPeer.killed.finally(() => {
+            socket.close();
             ret.onClose?.();
         });
 
