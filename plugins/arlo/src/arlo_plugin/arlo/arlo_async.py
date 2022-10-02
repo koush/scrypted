@@ -24,7 +24,8 @@ limitations under the License.
 # Import helper classes that are part of this library.
 
 from .request import Request
-from .eventstream_async import EventStream
+from .mqtt_stream_async import MQTTStream
+from .sse_stream_async import EventStream
 from .logging import logger
     
 # Import all of the other stuff.
@@ -36,6 +37,17 @@ import base64
 import math
 import random
 import time
+
+stream_class = MQTTStream
+
+def change_stream_class(s_class):
+    global stream_class
+    if s_class == "MQTT":
+        stream_class = MQTTStream
+    elif s_class == "SSE":
+        stream_class = EventStream
+    else:
+        raise NotImplementedError(s_class)
 
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
@@ -196,7 +208,7 @@ class Arlo(object):
                 await asyncio.sleep(interval)
 
         if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
-            self.event_stream = EventStream(self)
+            self.event_stream = stream_class(self)
             await self.event_stream.start()
 
         while not self.event_stream.connected:
@@ -213,9 +225,10 @@ class Arlo(object):
                 cameras[camera['deviceId']] = camera
 
             # filter out cameras without basestation, where they are their own basestations
+            # for now, keep doorbells in the list so they get pings
             proper_basestations = {}
             for basestation in basestations.values():
-                if basestation['deviceId'] == basestation.get('parentId'):
+                if basestation['deviceId'] == basestation.get('parentId') and basestation['deviceType'] != 'doorbell':
                     continue
                 proper_basestations[basestation['deviceId']] = basestation
 
@@ -359,7 +372,7 @@ class Arlo(object):
 
         asyncio.get_event_loop().create_task(self.HandleEvents(basestation, resource, ['is'], callbackwrapper))
 
-    def SubscribeToDoorbellEvents(self, basestation, camera, callback):
+    def SubscribeToDoorbellEvents(self, basestation, doorbell, callback):
         """
         Use this method to subscribe to doorbell events. You must provide a callback function which will get called once per doorbell event.
 
@@ -370,16 +383,21 @@ class Arlo(object):
         that has a big switch statement in it to handle all the various events Arlo produces.
         """
 
-        # TODO THIS FUNCTION DOES NOT WORK YET
-        # NEED TO DETERMINE WHAT EVENT TYPE DOORBELLS RETURN
+        resource = f"siren/{doorbell.get('deviceId')}"
 
-        resource = f"cameras/{camera.get('deviceId')}"
+        async def unpress_doorbell(callback):
+            # It's unclear what events correspond to arlo doorbell presses
+            # and which ones are unpresses, so we sleep and unset after
+            # a period of time
+            await asyncio.sleep(1)
+            callback(False)
 
         def callbackwrapper(self, event):
             properties = event.get('properties', {})
             stop = None
-            if 'motionDetected' in properties:
-                stop = callback(properties['motionDetected'])
+            if 'pattern' in properties and 'sirenType' in properties:
+                stop = callback(True)
+                asyncio.get_event_loop().create_task(unpress_doorbell(callback))
             if not stop:
                 return None
             return stop
@@ -400,7 +418,8 @@ class Arlo(object):
             while self.event_stream.connected:
                 event, action = await self.event_stream.get(resource, actions, seen_events)
 
-                if event is None or self.event_stream.event_stream_stop_event.is_set():
+                if event is None or self.event_stream is None \
+                    or self.event_stream.event_stream_stop_event.is_set():
                     return None
 
                 seen_events[event.uuid] = event
