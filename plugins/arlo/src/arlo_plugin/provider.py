@@ -65,7 +65,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     def arlo_transport(self):
         transport = self.storage.getItem("arlo_transport")
         if transport is None:
-            transport = "MQTT"
+            transport = "SSE"
             self.storage.setItem("arlo_transport", transport)
         return transport
 
@@ -293,7 +293,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             return None
         arlo_basestation = self.arlo_basestations[arlo_camera["parentId"]]
 
-        if False and arlo_camera["deviceType"] == "doorbell":
+        if arlo_camera["deviceType"] == "doorbell":
             return ArloDoorbell(nativeId, arlo_camera, arlo_basestation, self)
         else:
             return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
