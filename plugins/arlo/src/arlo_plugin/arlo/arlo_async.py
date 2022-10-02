@@ -24,7 +24,8 @@ limitations under the License.
 # Import helper classes that are part of this library.
 
 from .request import Request
-from .eventstream_async import EventStream
+from .mqtt_stream_async import MQTTStream
+from .sse_stream_async import EventStream
 from .logging import logger
     
 # Import all of the other stuff.
@@ -36,6 +37,17 @@ import base64
 import math
 import random
 import time
+
+stream_class = MQTTStream
+
+def change_stream_class(s_class):
+    global stream_class
+    if s_class == "MQTT":
+        stream_class = MQTTStream
+    elif s_class == "SSE":
+        stream_class = EventStream
+    else:
+        raise NotImplementedError(s_class)
 
 class Arlo(object):
     BASE_URL = 'my.arlo.com'
@@ -196,7 +208,7 @@ class Arlo(object):
                 await asyncio.sleep(interval)
 
         if not self.event_stream or (not self.event_stream.initializing and not self.event_stream.connected):
-            self.event_stream = EventStream(self)
+            self.event_stream = stream_class(self)
             await self.event_stream.start()
 
         while not self.event_stream.connected:

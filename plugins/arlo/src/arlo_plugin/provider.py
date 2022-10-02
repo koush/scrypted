@@ -8,6 +8,7 @@ from scrypted_sdk import ScryptedDeviceBase
 from scrypted_sdk.types import Settings, DeviceProvider, DeviceDiscovery, ScryptedInterface, ScryptedDeviceType
 
 from .arlo import Arlo
+from .arlo.arlo_async import change_stream_class
 from .arlo.logging import logger as arlo_lib_logger
 from .camera import ArloCamera
 from .doorbell import ArloDoorbell
@@ -27,6 +28,8 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         "Verbose": logging.DEBUG
     }
 
+    arlo_transport_choices = ["MQTT", "SSE"]
+
     def __init__(self, nativeId=None):
         super().__init__(nativeId=nativeId)
         self.logger_name = "ArloProvider"
@@ -36,6 +39,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         self.scrypted_devices = {}
 
         self.propagate_verbosity()
+        self.propagate_transport()
 
         def load(self):
             _ = self.arlo
@@ -56,6 +60,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
     @property
     def arlo_user_id(self):
         return self.storage.getItem("arlo_user_id")
+
+    @property
+    def arlo_transport(self):
+        transport = self.storage.getItem("arlo_transport")
+        if transport is None:
+            transport = "MQTT"
+            self.storage.setItem("arlo_transport", transport)
+        return transport
 
     @property
     def plugin_verbosity(self):
@@ -137,6 +149,10 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             device.logger.setLevel(log_level)
         arlo_lib_logger.setLevel(log_level)
 
+    def propagate_transport(self):
+        self.print(f"Setting plugin transport to {self.arlo_transport}")
+        change_stream_class(self.arlo_transport)
+
     async def getSettings(self):
         return [
             {
@@ -156,6 +172,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
                 "description": "Enter the code sent by Arlo to your email or phone number.",
             },
             {
+                "key": "arlo_transport",
+                "title": "Underlying Transport Protocol",
+                "description": "Select the underlying transport protocol used to connect to Arlo Cloud.",
+                "value": self.arlo_transport,
+                "choices": self.arlo_transport_choices,
+            },
+            {
                 "key": "plugin_verbosity",
                 "title": "Plugin Verbosity",
                 "description": "Select the verbosity of this plugin. 'Few' will only show warnings and errors. 'Verbose' will show debugging messages, including events received from connected Arlo cameras.",
@@ -172,6 +195,13 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             if key == "plugin_verbosity":
                 self.propagate_verbosity()
+            elif key == "arlo_transport":
+                self.propagate_transport()
+                # force arlo client to be invalidated and reloaded, but
+                # keep any mfa codes
+                if self.arlo is not None:
+                    self._arlo.Unsubscribe()
+                    self._arlo = None
             else:
                 # force arlo client to be invalidated and reloaded
                 if self.arlo is not None:
