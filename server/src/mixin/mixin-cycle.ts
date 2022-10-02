@@ -18,6 +18,7 @@ export function hasMixinCycle(scrypted: ScryptedRuntime, id: string, mixins?: st
     // a cyclical dependency for that device.
     const visitedMixins = new Set(mixins);
 
+    mixins = mixins.slice();
     while (mixins.length) {
         const mixin = mixins.pop();
         if (visitedMixins.has(mixin))
