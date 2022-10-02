@@ -225,9 +225,10 @@ class Arlo(object):
                 cameras[camera['deviceId']] = camera
 
             # filter out cameras without basestation, where they are their own basestations
+            # for now, keep doorbells in the list so they get pings
             proper_basestations = {}
             for basestation in basestations.values():
-                if basestation['deviceId'] == basestation.get('parentId'):
+                if basestation['deviceId'] == basestation.get('parentId') and basestation['deviceType'] != 'doorbell':
                     continue
                 proper_basestations[basestation['deviceId']] = basestation
 
