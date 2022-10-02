@@ -24,7 +24,7 @@
       </v-list-item-content>
 
       <v-list-item-action
-        ><v-btn small :to="getDeviceViewPath(mixin.id)"
+        ><v-btn small :to="getDeviceViewPath(mixin.id)" @click.stop
           ><v-icon x-small>fa-external-link-alt</v-icon></v-btn
         ></v-list-item-action
       >

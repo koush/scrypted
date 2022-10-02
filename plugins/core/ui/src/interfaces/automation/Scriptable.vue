@@ -39,7 +39,7 @@
 <script>
 import RPCInterface from "../RPCInterface.vue";
 import types from "!!raw-loader!@scrypted/types/dist/index.d.ts";
-import sdk from "!!raw-loader!@scrypted/sdk/dist/index.d.ts";
+import sdk from "!!raw-loader!@scrypted/sdk/dist/src/index.d.ts";
 import * as monaco from "monaco-editor";
 
 function monacoEvalDefaults() {

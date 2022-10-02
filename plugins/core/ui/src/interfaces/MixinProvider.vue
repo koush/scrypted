@@ -16,7 +16,7 @@
         </v-list-item-content>
 
         <v-list-item-action>
-          <v-btn x-small :to="getDeviceViewPath(mixin.id)">
+          <v-btn x-small :to="getDeviceViewPath(mixin.id)" @click.stop>
             <v-icon x-small>{{ typeToIcon(mixin.type) }}</v-icon>
           </v-btn>
         </v-list-item-action>
