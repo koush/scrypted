@@ -338,7 +338,7 @@ export abstract class MediaManagerBase implements MediaManager {
             converterMap.set(c.id, c);
         }
 
-        const nodes: any = {};
+        const nodes: { [node: string]: { [edge: string]: number } } = {};
         const mediaNode: any = {};
         nodes['mediaObject'] = mediaNode;
         nodes['output'] = {};
@@ -351,7 +351,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 // const convertedWeight = parseFloat(convertedMime.parameters.get('converter-weight')) || (convertedMime.essence === ScryptedMimeTypes.MediaObject ? 1000 : 1);
                 // const conversionWeight = inputWeight + convertedWeight;
                 const targetId = converter.id;
-                const node: any = nodes[targetId] = {};
+                const node: { [edge: string]: number } = nodes[targetId] = {};
 
                 // edge matches
                 for (const candidate of converters) {

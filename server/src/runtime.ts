@@ -20,6 +20,7 @@ import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefaul
 import { IOServer } from './io';
 import { Level } from './level';
 import { LogEntry, Logger, makeAlertId } from './logger';
+import { hasMixinCycle } from './mixin/mixin-cycle';
 import { PluginDebug } from './plugin/plugin-debug';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { PluginHost } from './plugin/plugin-host';
@@ -809,6 +810,14 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
 
             if (dirty) {
                 this.datastore.upsert(pluginDevice);
+            }
+        }
+
+        for (const id of Object.keys(this.stateManager.getSystemState())) {
+            if (hasMixinCycle(this, id)) {
+                console.warn(`initialize: ${id} has a mixin cycle. Clearing mixins.`);
+                const pluginDevice = this.findPluginDeviceById(id);
+                setState(pluginDevice, ScryptedInterfaceProperty.mixins, []);
             }
         }
 
