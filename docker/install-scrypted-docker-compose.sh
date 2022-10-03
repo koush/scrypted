@@ -15,6 +15,13 @@ fi
 USER_HOME=$(eval echo ~$SERVICE_USER)
 SCRYPTED_HOME=$USER_HOME/.scrypted
 mkdir -p $SCRYPTED_HOME
+
+set -e
+cd $SCRYPTED_HOME
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+usermod -aG docker $SERVICE_USER
+
 WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum)
 DOCKER_COMPOSE_YML=$SCRYPTED_HOME/docker-compose.yml
 echo "Created $DOCKER_COMPOSE_YML"
@@ -23,11 +30,15 @@ curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/docker-comp
 echo "Setting permissions on $SCRYPTED_HOME"
 chown -R $SERVICE_USER $SCRYPTED_HOME
 
-cd $SCRYPTED_HOME
+set +e
+
 echo "docker compose down"
 sudo -u $SERVICE_USER docker compose down 2> /dev/null
 echo "docker compose rm -rf"
 sudo -u $SERVICE_USER docker rm -f /scrypted /scrypted-watchtower 2> /dev/null
+
+set -e
+
 echo "docker compose pull"
 sudo -u $SERVICE_USER docker compose pull
 echo "docker compose up -d"
