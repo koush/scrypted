@@ -59,8 +59,9 @@ then
 fi
 
 # this is not RUN as we do not care about the result
-echo "Setting permissions on /home/$SERVICE_USER/.scrypted"
-chown -R $SERVICE_USER /home/$SERVICE_USER/.scrypted
+USER_HOME=$(eval echo ~$SERVICE_USER)
+echo "Setting permissions on $USER_HOME/.scrypted"
+chown -R $SERVICE_USER $USER_HOME/.scrypted
 
 echo "Installing Scrypted..."
 RUN sudo -u $SERVICE_USER npx -y scrypted@latest install-server

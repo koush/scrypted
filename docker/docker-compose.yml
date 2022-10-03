@@ -28,6 +28,7 @@ services:
             # this is not recommended.
             - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
         image: containrrr/watchtower
+        container_name: scrypted-watchtower
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock
         labels:
