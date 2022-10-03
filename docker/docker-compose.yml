@@ -1,7 +1,10 @@
-version: '3.5'
+version: "3.5"
 
 services:
     scrypted:
+        environment:
+            - SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION=Bearer SET_THIS_TO_SOME_RANDOM_TEXT
+            - SCRYPTED_WEBHOOK_UPDATE=http://localhost:10444/v1/update
         image: koush/scrypted
         container_name: scrypted
         restart: unless-stopped
@@ -11,5 +14,28 @@ services:
         logging:
             driver: "json-file"
             options:
-               max-size: "10m"
-               max-file: "10"
+                max-size: "10m"
+                max-file: "10"
+        labels:
+            - "com.centurylinklabs.watchtower.scope=scrypted"
+
+    # watchtower manages updates for Scrypted.
+    watchtower:
+        environment:
+            - WATCHTOWER_HTTP_API_TOKEN=SET_THIS_TO_SOME_RANDOM_TEXT
+            - WATCHTOWER_HTTP_API_UPDATE=true
+            # remove the following line to never allow docker to auto update.
+            # this is not recommended.
+            - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
+        image: containrrr/watchtower
+        container_name: scrypted-watchtower
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        labels:
+            - "com.centurylinklabs.watchtower.scope=scrypted"
+        ports:
+            # The auto update port 10444 can be configured
+            # Must match the port in the auto update url above.
+            - 10444:8080
+        # check for updates once an hour (interval is in seconds)
+        command: --interval 3600 --cleanup
