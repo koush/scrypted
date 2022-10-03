@@ -329,7 +329,9 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
             y2 = y + d
 
             secondPassResult, _ = self.run_detection_image(image, settings, src_size, convert_to_src_size, (x, y, x2, y2))
-            ret['detections'].extend(secondPassResult['detections'])
+            filtered = list(filter(lambda d: d['className'] == detection['className'], secondPassResult['detections']))
+            filtered.sort(key = lambda c: c['score'], reverse = True)
+            ret['detections'].extend(filtered[:1])
 
         return ret, RawImage(image)
 
