@@ -18,7 +18,12 @@ export class ServiceControl {
     async update() {
         const webhookUpdate = process.env.SCRYPTED_WEBHOOK_UPDATE;
         if (webhookUpdate) {
-            const response = await axios.get(webhookUpdate);
+            const webhookUpdateAuthorization = process.env.SCRYPTED_WEBHOOK_UPDATE_AUTHORIZATION;
+            const response = await axios.get(webhookUpdate, {
+                headers: {
+                    Authorization: webhookUpdateAuthorization,
+                }
+            });
             return response.data;
         }
         else {
