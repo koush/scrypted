@@ -63,11 +63,6 @@ RUN apt-get -y install \
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 
-ENV SCRYPTED_DOCKER_SERVE="true"
-ENV SCRYPTED_CAN_RESTART="true"
-ENV SCRYPTED_VOLUME="/server/volume"
-ENV SCRYPTED_INSTALL_PATH="/server"
-
 ################################################################
 # End section generated from template/Dockerfile.common.header
 ################################################################
@@ -102,6 +97,11 @@ RUN case "$(uname -m)" in \
   && tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz
 
 ENTRYPOINT ["/init"]
+
+ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_CAN_RESTART="true"
+ENV SCRYPTED_VOLUME="/server/volume"
+ENV SCRYPTED_INSTALL_PATH="/server"
 
 ################################################################
 # End section generated from template/Dockerfile.common.footer

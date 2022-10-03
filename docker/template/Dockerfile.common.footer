@@ -30,6 +30,11 @@ RUN case "$(uname -m)" in \
 
 ENTRYPOINT ["/init"]
 
+ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_CAN_RESTART="true"
+ENV SCRYPTED_VOLUME="/server/volume"
+ENV SCRYPTED_INSTALL_PATH="/server"
+
 ################################################################
 # End section generated from template/Dockerfile.common.footer
 ################################################################
