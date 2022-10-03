@@ -327,6 +327,7 @@ class FanState(TypedDict):
     counterClockwise: bool
     mode: FanMode
     speed: float
+    swing: bool
     pass
 
 class FanStatus(TypedDict):
@@ -336,6 +337,7 @@ class FanStatus(TypedDict):
     maxSpeed: float
     mode: FanMode
     speed: float
+    swing: bool
     pass
 
 class HttpRequest(TypedDict):

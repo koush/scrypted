@@ -289,11 +289,13 @@ export interface FanStatus {
   maxSpeed?: number;
   counterClockwise?: boolean;
   availableModes?: FanMode[];
+  swing?: boolean;
 }
 export interface FanState {
   speed?: number;
   mode?: FanMode;
   counterClockwise?: boolean;
+  swing?: boolean;
 }
 export interface Fan {
   fan?: FanStatus;
