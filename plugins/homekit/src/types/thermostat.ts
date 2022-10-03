@@ -1,4 +1,4 @@
-import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM25Sensor, VOCSensor, CO2Sensor } from '@scrypted/sdk';
+import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM10Sensor, PM25Sensor, VOCSensor, NOXSensor, CO2Sensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -11,7 +11,7 @@ addSupportedType({
             return false;
         return true;
     },
-    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting & AirQualitySensor & PM25Sensor & VOCSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting & AirQualitySensor & PM10Sensor & PM25Sensor & VOCSensor & NOXSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
         const service = accessory.addService(Service.Thermostat, device.name);
         service.setPrimaryService();
@@ -300,6 +300,10 @@ addSupportedType({
             bindCharacteristic(device, ScryptedInterface.AirQualitySensor, airQualityService, Characteristic.AirQuality,
                 () => airQualityToHomekit(device.airQuality));
             
+            if (device.interfaces.includes(ScryptedInterface.PM10Sensor)) {
+                bindCharacteristic(device, ScryptedInterface.PM10Sensor, airQualityService, Characteristic.PM10Density,
+                    () => device.pm10Density || 0);
+            }
             if (device.interfaces.includes(ScryptedInterface.PM25Sensor)) {
                 bindCharacteristic(device, ScryptedInterface.PM25Sensor, airQualityService, Characteristic.PM2_5Density,
                     () => device.pm25Density || 0);
@@ -307,6 +311,10 @@ addSupportedType({
             if (device.interfaces.includes(ScryptedInterface.VOCSensor)) {
                 bindCharacteristic(device, ScryptedInterface.VOCSensor, airQualityService, Characteristic.VOCDensity,
                     () => device.vocDensity || 0);
+            }
+            if (device.interfaces.includes(ScryptedInterface.NOXSensor)) {
+                bindCharacteristic(device, ScryptedInterface.NOXSensor, airQualityService, Characteristic.NitrogenDioxideDensity,
+                    () => device.noxDensity || 0);
             }
         }
 

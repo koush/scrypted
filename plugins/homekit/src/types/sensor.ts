@@ -1,4 +1,4 @@
-import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, AirQuality, EntrySensor, TamperSensor, CO2Sensor } from '@scrypted/sdk';
+import { AmbientLightSensor, AudioSensor, BinarySensor, FloodSensor, HumiditySensor, MotionSensor, OccupancySensor, PM10Sensor, PM25Sensor, AirQualitySensor, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Thermometer, VOCSensor, NOXSensor, AirQuality, EntrySensor, TamperSensor, CO2Sensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, Service } from '../hap';
 import { makeAccessory } from './common';
@@ -110,7 +110,7 @@ addSupportedType({
                 () => airQualityToHomekit(device.airQuality));
           
             if (device.interfaces.includes(ScryptedInterface.PM10Sensor)) {
-                bindCharacteristic(device, ScryptedInterface.PM10Sensor, service, Characteristic.PM2_5Density,
+                bindCharacteristic(device, ScryptedInterface.PM10Sensor, service, Characteristic.PM10Density,
                     () => device.pm10Density || 0);
             }
             if (device.interfaces.includes(ScryptedInterface.PM25Sensor)) {
@@ -122,7 +122,7 @@ addSupportedType({
                     () => device.vocDensity || 0);
             }
             if (device.interfaces.includes(ScryptedInterface.NOXSensor)) {
-                bindCharacteristic(device, ScryptedInterface.NOXSensor, service, Characteristic.PM2_5Density,
+                bindCharacteristic(device, ScryptedInterface.NOXSensor, service, Characteristic.NitrogenDioxideDensity,
                     () => device.noxDensity || 0);
             }
         }
