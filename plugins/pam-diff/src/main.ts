@@ -1,4 +1,4 @@
-import { FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
+import { FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { ffmpegLogInitialOutput } from "../../../common/src/media-helpers";
 
@@ -39,16 +39,15 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         pds.timeout = setTimeout(() => this.endSession(pds), duration);
     }
 
-    async detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession): Promise<ObjectsDetected> {
+    async detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected> {
         if (mediaObject && mediaObject.mimeType?.startsWith('image/'))
             throw new Error('can not run motion detection on image')
 
         let { detectionId } = session;
         let pds = this.sessions.get(detectionId);
-        if (!mediaObject) {
-            if (pds) {
+        if (!session?.duration || !pds) {
+            if (pds)
                 this.endSession(pds);
-            }
             return {
                 detectionId,
                 running: false,
