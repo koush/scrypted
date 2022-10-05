@@ -45,9 +45,17 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
 
         let { detectionId } = session;
         let pds = this.sessions.get(detectionId);
-        if (!session?.duration || !pds) {
+        if (!session?.duration) {
             if (pds)
                 this.endSession(pds);
+            return {
+                detectionId,
+                running: false,
+                timestamp: Date.now(),
+            }
+        }
+
+        if (!mediaObject) {
             return {
                 detectionId,
                 running: false,
