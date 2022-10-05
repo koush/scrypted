@@ -402,6 +402,7 @@ class MediaStreamOptions(TypedDict):
 class ObjectDetectionModel(TypedDict):
     classes: list[str]
     inputSize: list[float]
+    inputStream: MediaStreamDestination
     name: str
     settings: list[Setting]
     pass

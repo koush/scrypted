@@ -1082,6 +1082,7 @@ export interface ObjectDetectionModel extends ObjectDetectionTypes {
   name: string;
   inputSize?: number[];
   settings: Setting[];
+  inputStream?: MediaStreamDestination;
 }
 export interface ObjectDetectionCallbacks {
   onDetection(detection: ObjectsDetected, mediaObject?: MediaObject): Promise<boolean>;
