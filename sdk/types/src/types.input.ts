@@ -1094,7 +1094,7 @@ export interface ObjectDetectionCallbacks {
  */
 export interface ObjectDetection {
   detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected>;
-  getDetectionModel(): Promise<ObjectDetectionModel>;
+  getDetectionModel(settings?: { [key: string]: any }): Promise<ObjectDetectionModel>;
 }
 /**
  * Logger is exposed via log.* to allow writing to the Scrypted log.

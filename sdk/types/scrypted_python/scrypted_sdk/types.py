@@ -793,7 +793,7 @@ class OauthClient:
 class ObjectDetection:
     async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         pass
-    async def getDetectionModel(self) -> ObjectDetectionModel:
+    async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
     pass
 
