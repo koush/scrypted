@@ -1,4 +1,4 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState, ObjectDetectionCallbacks } from '@scrypted/sdk';
+import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState, ObjectDetectionCallbacks, ObjectDetectionModel } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
@@ -250,12 +250,14 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
   async startVideoDetection() {
     try {
+      const settings = await this.getCurrentSettings();
+
       // prevent stream retrieval noise until notified that the detection is no longer running.
       if (this.running) {
         const session = await this.objectDetection?.detectObjects(undefined, {
           detectionId: this.detectionId,
           duration: this.getDetectionDuration(),
-          settings: await this.getCurrentSettings(),
+          settings,
         }, this);
         this.running = session.running;
         if (this.running)
@@ -267,12 +269,19 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
       this.running = true;
 
+      let model: ObjectDetectionModel;
+      try {
+        model = await this.objectDetection.getDetectionModel(settings);
+      }
+      catch (e) {
+      }
+
       let stream: MediaObject;
 
       // internal streams must implicitly be available.
       if (!this.internal) {
         stream = await this.cameraDevice.getVideoStream({
-          destination: 'low-resolution',
+          destination: model?.inputStream || 'low-resolution',
           // ask rebroadcast to mute audio, not needed.
           audio: null,
         });
@@ -284,7 +293,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       const session = await this.objectDetection?.detectObjects(stream, {
         detectionId: this.detectionId,
         duration: this.getDetectionDuration(),
-        settings: await this.getCurrentSettings(),
+        settings,
       }, this);
 
       this.running = session.running;

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from lib2to3.pytree import convert
 from typing_extensions import TypedDict
-from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
+from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting, MediaStreamDestination
 import threading
 import io
 from .common import *
@@ -138,7 +138,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
     def requestRestart(self):
         asyncio.ensure_future(scrypted_sdk.deviceManager.requestRestart())
 
-    async def getDetectionModel(self) -> ObjectDetectionModel:
+    async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         with self.mutex:
             _, height, width, channels = self.interpreter.get_input_details()[
                 0]['shape']
@@ -148,6 +148,16 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
             'classes': list(self.labels.values()),
             'inputSize': [int(width), int(height), int(channels)],
         }
+
+        if settings:
+            second_score_threshold = None
+            check = settings.get(
+                'second_score_threshold', None)
+            if check:
+                second_score_threshold = float(check)
+            if second_score_threshold:
+                d['inputStream'] = 'local'
+
         confidence: Setting = {
             'title': 'Minimum Detection Confidence',
             'description': 'Higher values eliminate false positives and low quality recognition candidates.',
