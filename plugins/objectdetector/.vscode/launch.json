@@ -18,6 +18,18 @@
             "localRoot": "${workspaceFolder}/out",
             "remoteRoot": "/plugin/",
             "type": "node"
-        }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Test",
+            "runtimeArgs": [
+                "-r",
+                "ts-node/register"
+            ],
+            "args": [
+                "${workspaceFolder}/test/test.ts"
+            ]
+        },
     ]
 }

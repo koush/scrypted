@@ -6,13 +6,13 @@ interface Test {
 
 let options: DenoisedDetectionOptions<Test> = {
     added(detection) {
-        console.log('added', detection.boundingBox);
+        console.log('added', detection.name, detection.boundingBox);
     },
     removed(detection) {
-        console.log('removed', detection.boundingBox);
+        console.log('removed', detection.name, detection.boundingBox);
     },
     retained(detection) {
-        console.log('retained', detection.boundingBox);
+        console.log('retained', detection.name, detection.boundingBox);
     },
     timeout: 30000,
 }
@@ -69,7 +69,7 @@ denoiseDetections(state, [
 
 
 denoiseDetections(state, [
-   
+
 ], {
     now: 60001,
     ...options

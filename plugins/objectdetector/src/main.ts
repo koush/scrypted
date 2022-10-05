@@ -129,9 +129,10 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     return ret;
   }
 
-  async motionTypeDetection() {
+  async maybeStartMotionDetection() {
     await this.ensureSettings();
-    await this.startVideoDetection();
+    if (this.hasMotionType)
+      await this.startVideoDetection();
   }
 
   async snapshotDetection() {
@@ -173,8 +174,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.running = eventData.running;
     });
 
-    if (this.hasMotionType)
-      this.motionTypeDetection();
+    this.maybeStartMotionDetection();
 
     if (this.detectionModes.includes(DETECT_PERIODIC_SNAPSHOTS))
       this.snapshotDetection();
@@ -273,8 +273,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       if (!this.internal) {
         stream = await this.cameraDevice.getVideoStream({
           destination: 'low-resolution',
-          // request no prebuffer because it will throw off detection timestamps.
-          prebuffer: 0,
           // ask rebroadcast to mute audio, not needed.
           audio: null,
         });

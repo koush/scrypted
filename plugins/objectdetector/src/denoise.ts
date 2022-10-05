@@ -45,41 +45,115 @@ function createBoundingBoxScorer(boundingBox: [number, number, number, number]) 
     }
 }
 
+export function getDetectionAge<T>(d: DenoisedDetectionEntry<T>) {
+    let { firstSeen, lastSeen } = d;
+    firstSeen ||= 0;
+    lastSeen ||= 0;
+    return lastSeen - firstSeen;
+}
+
+type Matched<T> = {
+    r1: DenoisedDetectionEntry<T>;
+    r2: DenoisedDetectionEntry<T>;
+}
+
+export function matchBoxes<T>(da1: DenoisedDetectionEntry<T>[], da2: DenoisedDetectionEntry<T>[], bestScore = Number.MAX_SAFE_INTEGER, currentScore = 0) {
+    if (da1.length === 0 || da2.length === 0) {
+        return {
+            score: 0,
+            matched: [] as Matched<T>[],
+        }
+    }
+
+    let b: Matched<T>[];
+    for (const d1 of da1) {
+        const scorer = createBoundingBoxScorer(d1.boundingBox);
+        let scopedBestScore = Number.MAX_SAFE_INTEGER;
+        for (const d2 of da2) {
+            const s = scorer(d2.boundingBox);
+            if (currentScore + s >= bestScore)
+                continue;
+            const df1 = da1.filter(c => c !== d1);
+            const df2 = da2.filter(c => c !== d2);
+            const m = matchBoxes(df1, df2, bestScore, currentScore + s);
+            if (!m)
+                continue;
+            const { score, matched } = m;
+            bestScore = currentScore + score + s;
+            b = matched;
+            b.push({
+                r1: d1,
+                r2: d2,
+            })
+        }
+    }
+
+    if (!b)
+        return undefined;
+
+    return {
+        score: bestScore,
+        matched: b,
+    }
+}
+
 export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     currentDetections: DenoisedDetectionEntry<T>[],
     options?: DenoisedDetectionOptions<T>
 ) {
+    const now = options?.now || Date.now();
+
     if (!state.previousDetections)
         state.previousDetections = [];
 
     const { previousDetections } = state;
 
-    const now = options?.now || Date.now();
+    // sort by oldest first.
+    previousDetections.sort((a, b) => getDetectionAge(a) - getDetectionAge(b)).reverse();
+
     const newAndExisting: DenoisedDetectionEntry<T>[] = [];
-    for (const cd of currentDetections) {
-        let index = -1;
-        if (cd.id)
-            index = previousDetections.findIndex(d => d.id === cd.id);
-        if (index === -1 && cd.boundingBox) {
-            const scorer = createBoundingBoxScorer(cd.boundingBox);
-            const boxed = previousDetections.filter(d => !!d.boundingBox);
-            if (boxed.length) {
-                boxed.sort((d1, d2) => scorer(d1.boundingBox) - scorer(d2.boundingBox));
-                let best: DenoisedDetectionEntry<T>;
-                for (const check of boxed) {
-                    const reverseScorer = createBoundingBoxScorer(check.boundingBox);
-                    const list = currentDetections.slice().filter(d => !!d.boundingBox);
-                    const reversed = list.sort((d1, d2) => reverseScorer(d1.boundingBox) - reverseScorer(d2.boundingBox));
-                    if (reversed[0] === cd) {
-                        best = check;
-                        break;
-                    }
-                }
+
+    const retain = (pd: DenoisedDetectionEntry<T>, cd: DenoisedDetectionEntry<T>) => {
+        const index = previousDetections.findIndex(c => c === pd);
+        previousDetections.splice(index, 1);
+        currentDetections = currentDetections.filter(c => c !== cd);
+        pd.firstSeen = cd.firstSeen;
+        pd.lastSeen = now;
+        pd.durationGone = 0;
+        if (cd.boundingBox)
+            pd.boundingBox = cd.boundingBox;
+        newAndExisting.push(pd);
+        options?.retained?.(pd, cd);
+    }
+
+    // match previous detections by id
+    for (const pd of previousDetections) {
+        if (pd.id) {
+            const cd = currentDetections.find(d => d.id === pd.id);
+            if (cd) {
+                retain(pd, cd);
+                continue;
             }
         }
-        if (index === -1)
-            index = previousDetections.findIndex(d => d.name === cd.name);
-        if (index === -1) {
+    }
+
+    // match previous detections by class name and bounding box
+    const previousClasses = new Set(previousDetections.map(c => c.name));
+    for (const name of previousClasses) {
+        const previousBoxedDetections = previousDetections.filter(d => !!d.boundingBox && d.name === name);
+        const currentBoxedDetections = currentDetections.filter(d => !!d.boundingBox && d.name === name);
+        const best = matchBoxes(previousBoxedDetections, currentBoxedDetections);
+        if (best) {
+            for (const p of best.matched) {
+                retain(p.r1, p.r2);
+            }
+        }
+    }
+
+    // match/add current detections with whatever is remaining from the previous list.
+    for (const cd of currentDetections) {
+        let pd = previousDetections.find(d => d.name === cd.name);
+        if (!pd) {
             cd.firstSeen = now;
             cd.lastSeen = now;
             cd.durationGone = 0;
@@ -87,12 +161,7 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
             options?.added?.(cd);
         }
         else {
-            const [found] = previousDetections.splice(index, 1);
-            cd.firstSeen = found.firstSeen;
-            cd.lastSeen = now;
-            cd.durationGone = 0;
-            newAndExisting.push(cd);
-            options?.retained?.(cd, found);
+            retain(pd, cd);
         }
     }
 
