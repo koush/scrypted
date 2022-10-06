@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import threading
 import time
+import traceback
 import zipfile
 from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
@@ -339,7 +340,12 @@ class PluginRemote:
         self.mediaManager = MediaManager(await self.api.getMediaManager())
         sdk_init(zip, self, self.systemManager,
                  self.deviceManager, self.mediaManager)
-        from main import create_scrypted_plugin  # type: ignore
+        try:
+            from main import create_scrypted_plugin  # type: ignore
+        except:
+            print('plugin failed to start')
+            traceback.print_exc()
+            raise
         return await rpc.maybe_await(create_scrypted_plugin())
 
     async def setSystemState(self, state):
