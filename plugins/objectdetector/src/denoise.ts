@@ -117,17 +117,16 @@ export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
         const index = previousDetections.findIndex(c => c === pd);
         previousDetections.splice(index, 1);
         currentDetections = currentDetections.filter(c => c !== cd);
-        pd.firstSeen = cd.firstSeen;
-        pd.lastSeen = now;
-        pd.durationGone = 0;
-        if (cd.boundingBox)
-            pd.boundingBox = cd.boundingBox;
-        newAndExisting.push(pd);
-        options?.retained?.(pd, cd);
+        cd.firstSeen = pd.firstSeen;
+        cd.lastSeen = now;
+        cd.durationGone = 0;
+        newAndExisting.push(cd);
+        options?.retained?.(cd, pd);
     }
 
     // match previous detections by id
-    for (const pd of previousDetections) {
+    // currently a no op since ids arent reported by anything
+    for (const pd of previousDetections.slice()) {
         if (pd.id) {
             const cd = currentDetections.find(d => d.id === pd.id);
             if (cd) {
