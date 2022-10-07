@@ -176,7 +176,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 title: 'Inclusion State',
                 key: 'inclusionState',
                 readonly: true,
-                value: InclusionState[this.controller.inclusionState],
+                value: InclusionState[this.controller?.inclusionState],
             },
             {
                 group: 'Inclusion',
@@ -203,7 +203,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 title: 'Healing State',
                 key: 'healingState',
                 readonly: true,
-                value: this.controller.isHealNetworkActive ? 'Healing' : 'Not Healing',
+                value: this.controller?.isHealNetworkActive ? 'Healing' : 'Not Healing',
             },
             {
                 group: 'Network',
