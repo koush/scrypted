@@ -1,6 +1,6 @@
 import axios from 'axios';
 import sdk, { HttpRequest, HttpRequestHandler, HttpResponse, MixinProvider, ScryptedDevice, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from '@scrypted/sdk';
-import { StorageSettings } from '@scrypted/common/src/settings';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { isSupported } from './types';
 import { DiscoveryEndpoint, DiscoverEvent } from 'alexa-smarthome-ts';
@@ -26,6 +26,7 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
 
     handlers = new Map<string, AlexaHandler>();
     accessToken: Promise<string>;
+    validAuths = new Set<string>();
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -335,6 +336,25 @@ class AlexaPlugin extends AutoenableMixinProvider implements HttpRequestHandler,
     }
 
     async onRequest(request: HttpRequest, response: HttpResponse) {
+        const { authorization } = request.headers;
+        if (!this.validAuths.has(authorization)) {
+            try {
+                await axios.get('https://home.scrypted.app/_punch/getcookie', {
+                    headers: {
+                        'Authorization': authorization,
+                    }
+                });
+                this.validAuths.add(authorization);
+            }
+            catch (e) {
+                this.console.error(`request failed due to invalid authorization`, e);
+                response.send(e.message, {
+                    code: 500,
+                });
+                return;
+            }
+        }
+
         try {
             const body = JSON.parse(request.body);
             const { directive } = body;
