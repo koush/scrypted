@@ -1441,7 +1441,7 @@ export interface HttpRequestHandler {
  */
 export interface HttpRequest {
   body?: string;
-  headers?: object;
+  headers?: { [header: string]: string };
   isPublicEndpoint?: boolean;
   method?: string;
   rootPath?: string;

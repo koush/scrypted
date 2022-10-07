@@ -62,6 +62,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
     homegraph = homegraph('v1');
     notificationsState: any = {};
+    validAuths = new Set<string>();
 
     constructor() {
         super();
@@ -505,6 +506,25 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             return;
         }
 
+        const { authorization } = request.headers;
+        if (!this.validAuths.has(authorization)) {
+            try {
+                await axios.get('https://home.scrypted.app/_punch/getcookie', {
+                    headers: {
+                        'Authorization': authorization,
+                    }
+                });
+                this.validAuths.add(authorization);
+            }
+            catch (e) {
+                this.console.error(`request failed due to invalid authorization`, e);
+                response.send(e.message, {
+                    code: 500,
+                });
+                return;
+            }
+        }
+
         this.console.log(request.body);
         const body = JSON.parse(request.body);
         try {
@@ -531,7 +551,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             });
         }
         catch (e) {
-            this.console.error(`request error ${e}`);
+            this.console.error(`request error`, e);
             response.send(e.message, {
                 code: 500,
             });

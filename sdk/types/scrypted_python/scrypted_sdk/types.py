@@ -342,7 +342,7 @@ class FanStatus(TypedDict):
 
 class HttpRequest(TypedDict):
     body: str
-    headers: object
+    headers: Any
     isPublicEndpoint: bool
     method: str
     rootPath: str
