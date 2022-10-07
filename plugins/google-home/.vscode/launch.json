@@ -16,10 +16,10 @@
             "sourceMaps": true,
             "localRoot": "${workspaceFolder}/out",
             "remoteRoot": "/plugin/",
-            "type": "pwa-node"
+            "type": "node"
         },
         {
-            "type": "pwa-node",
+            "type": "node",
             "request": "launch",
             "name": "Serve Local SDK",
             "skipFiles": [
