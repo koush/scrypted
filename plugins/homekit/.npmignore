@@ -9,3 +9,4 @@ dist/*.js
 dist/*.txt
 HAP-NodeJS
 .gitmodules
+tsconfig.json
