@@ -168,7 +168,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         const gatheringPromise = new Promise(resolve => {
             this.pc.onicecandidate = ev => {
                 if (ev.candidate) {
-                    console.log("local candidate", ev.candidate);
+                    // console.log("local candidate", ev.candidate);
                     sendIceCandidate?.(JSON.parse(JSON.stringify(ev.candidate)));
                 }
                 else {
