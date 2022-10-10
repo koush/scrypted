@@ -207,6 +207,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         audio.srtp = undefined;
 
                         inputArguments = [
+                            '-listen_timeout', '300',
                             '-analyzeduration', '0', '-probesize', '512',
                             '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
                             '-f', 'sdp', '-i', 'pipe:3',
