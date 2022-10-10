@@ -1,5 +1,5 @@
 import { RpcPeer } from '../../../../../server/src/rpc';
-import { BrowserSignalingSession, waitPeerIceConnectionClosed } from '../../../../../common/src/rtc-signaling';
+import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from '../../../../../common/src/rtc-signaling';
 
 declare const eio: any;
 declare const cast: any;
@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
         cleanup();
       });
 
-      session.pcDeferred.promise.then(pc => {
+      session.onPeerConnection = async pc => {
         waitPeerIceConnectionClosed(pc).then(cleanup);
 
         const mediaStream = new MediaStream(
@@ -75,7 +75,13 @@ document.addEventListener("DOMContentLoaded", function (event) {
         );
         pc.ontrack = e => mediaStream.addTrack(e.track);
         video.srcObject = mediaStream;
-      });
+
+        waitPeerConnectionIceConnected(pc)
+        .then(() => {
+          socket.removeAllListeners();
+          socket.close();
+        })
+      }
 
       rpcPeer.params['session'] = session;
     });
