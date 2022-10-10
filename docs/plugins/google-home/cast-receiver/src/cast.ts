@@ -79,7 +79,7 @@ document.addEventListener("DOMContentLoaded", function (event) {
         waitPeerConnectionIceConnected(pc)
         .then(() => {
           socket.removeAllListeners();
-          socket.close();
+          // socket.close();
         })
       }
 
