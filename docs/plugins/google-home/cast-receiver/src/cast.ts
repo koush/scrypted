@@ -55,13 +55,17 @@ document.addEventListener("DOMContentLoaded", function (event) {
       const session = new BrowserSignalingSession();
 
       const cleanup = () => {
+        console.log('cleanup');
         socket.close();
         session.pcDeferred.promise.then(pc => pc.close());        
       };
       previousCleanup?.();
       previousCleanup = cleanup;
 
-      socket.on('close', cleanup);
+      socket.on('close', () => {
+        console.log('socket io connection close event');
+        cleanup();
+      });
 
       session.pcDeferred.promise.then(pc => {
         waitPeerIceConnectionClosed(pc).then(cleanup);
