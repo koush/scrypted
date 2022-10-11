@@ -1,3 +1,5 @@
+import { RpcPeer, RpcSerializer } from "../rpc";
+
 interface WebSocketEvent {
     type: string;
     reason?: string;
@@ -60,7 +62,7 @@ export interface WebSocketConnectCallbacks {
 }
 
 export interface WebSocketConnect {
-    (url: string, protocols: string[], callbacks: WebSocketConnectCallbacks): void;
+    (url: string, callbacks: WebSocketConnectCallbacks): void;
 }
 
 export interface WebSocketMethods {
@@ -82,7 +84,7 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
             this._protocols = protocols;
             this.readyState = 0;
 
-            __websocketConnect(url, protocols, {
+            __websocketConnect(url, {
                 connect: (e, ws) => {
                     // connect
                     if (e != null) {
@@ -149,4 +151,29 @@ export function createWebSocketClass(__websocketConnect: WebSocketConnect): any 
     defineEventAttribute(WebSocket.prototype, "open");
 
     return WebSocket;
+}
+
+export class WebSocketConnection {
+    [RpcPeer.PROPERTY_PROXY_PROPERTIES]: any;
+
+    constructor(public url: string) {
+    }
+}
+
+export class WebSocketSerializer implements RpcSerializer {
+    WebSocket: ReturnType<typeof createWebSocketClass>;
+
+    serialize(value: any, serializationContext?: any) {
+        const connection = value as WebSocketConnection;
+        connection[RpcPeer.PROPERTY_PROXY_PROPERTIES] = {
+            url: connection.url,
+        }
+        return connection;
+    }
+
+    deserialize(serialized: any, serializationContext?: any) {
+        if (!this.WebSocket)
+            return undefined;
+        return new this.WebSocket(serialized.url);
+    }
 }

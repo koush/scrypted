@@ -25,6 +25,7 @@ import { PluginDebug } from './plugin/plugin-debug';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { PluginHost } from './plugin/plugin-host';
 import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
+import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { Alerts } from './services/alerts';
@@ -331,7 +332,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             delete pluginHost.ws[id];
         });
 
-        await handler.onConnection(httpRequest, `ws://${id}`);
+        // @ts-expect-error
+        await handler.onConnection(httpRequest, new WebSocketConnection(`ws://${id}`));
     }
 
     async getComponent(componentId: string): Promise<any> {
