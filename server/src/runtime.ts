@@ -707,7 +707,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         pluginDevice.pluginId = pluginId;
         pluginDevice.nativeId = device.nativeId;
         pluginDevice.state = pluginDevice.state || {};
-        const provider = this.findPluginDevice(pluginId, device.providerNativeId);
+
+        if (pluginDevice.state[ScryptedInterfaceProperty.nativeId]?.value !== pluginDevice.nativeId) {
+            setState(pluginDevice, ScryptedInterfaceProperty.nativeId, pluginDevice.nativeId);
+        }
 
         const providedType = device.type;
         const isUsingDefaultType = getDisplayType(pluginDevice) === getProvidedTypeOrDefault(pluginDevice);
@@ -737,6 +740,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             || interfacesChanged;
         if (device.info !== undefined)
             this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.info, device.info);
+        const provider = this.findPluginDevice(pluginId, device.providerNativeId);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providerId, provider?._id);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedName, providedName);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedType, providedType);
@@ -806,6 +810,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             if (!pluginId) {
                 dirty = true;
                 setState(pluginDevice, ScryptedInterfaceProperty.pluginId, pluginDevice.pluginId);
+            }
+
+            if (pluginDevice.state[ScryptedInterfaceProperty.nativeId]?.value !== pluginDevice.nativeId) {
+                dirty = true;
+                setState(pluginDevice, ScryptedInterfaceProperty.nativeId, pluginDevice.nativeId);
             }
 
             if (dirty) {

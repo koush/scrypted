@@ -89,7 +89,7 @@ export abstract class PluginHttp<T> {
 
         const httpRequest: HttpRequest = {
             body,
-            headers: req.headers,
+            headers: req.headers as any,
             method: req.method,
             rootPath,
             url: req.url,

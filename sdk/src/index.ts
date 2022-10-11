@@ -11,7 +11,7 @@ export class ScryptedDeviceBase extends DeviceBase {
   private _console: Console;
   private _deviceState: DeviceState;
 
-  constructor(public nativeId?: string) {
+  constructor(public readonly nativeId?: string) {
     super();
   }
 
@@ -95,6 +95,8 @@ export interface MixinDeviceOptions<T> {
 
   constructor(options: MixinDeviceOptions<T>) {
     super();
+
+    this.nativeId = systemManager.getDeviceById(this.id)?.nativeId;
     this.mixinDevice = options.mixinDevice;
     this.mixinDeviceInterfaces = options.mixinDeviceInterfaces;
     this.mixinStorageSuffix = options.mixinStorageSuffix;
@@ -181,7 +183,9 @@ export interface MixinDeviceOptions<T> {
     };
   }
 
-  for (var field of Object.values(ScryptedInterfaceProperty)) {
+  for (const field of Object.values(ScryptedInterfaceProperty)) {
+    if (field === ScryptedInterfaceProperty.nativeId)
+      continue;
     Object.defineProperty(ScryptedDeviceBase.prototype, field, {
       set: _createSetState(field),
       get: _createGetState(field),

@@ -5,6 +5,8 @@ import { propertyInterfaces } from "./descriptor";
 export function checkProperty(key: string, value: any) {
     if (key === ScryptedInterfaceProperty.id)
         throw new Error("id is read only");
+    if (key === ScryptedInterfaceProperty.nativeId)
+        throw new Error("nativeId is read only");
     if (key === ScryptedInterfaceProperty.mixins)
         throw new Error("mixins is read only");
     if (key === ScryptedInterfaceProperty.interfaces)

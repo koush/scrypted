@@ -23,6 +23,7 @@ export interface ScryptedDevice {
   probe(): Promise<boolean>;
 
   id?: string;
+  nativeId?: ScryptedNativeId;
   pluginId?: string;
   interfaces?: string[];
   mixins?: string[];

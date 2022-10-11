@@ -905,6 +905,7 @@ class ScryptedDevice:
     interfaces: list[str]
     mixins: list[str]
     name: str
+    nativeId: str
     pluginId: str
     providedInterfaces: list[str]
     providedName: ScryptedDeviceType
@@ -1152,6 +1153,7 @@ class ScryptedInterfaceProperty(Enum):
     interfaces = "interfaces"
     mixins = "mixins"
     name = "name"
+    nativeId = "nativeId"
     pluginId = "pluginId"
     providedInterfaces = "providedInterfaces"
     providedName = "providedName"
@@ -1247,6 +1249,13 @@ class DeviceState:
     @name.setter
     def name(self, value: str):
         self.setScryptedProperty("name", value)
+
+    @property
+    def nativeId(self) -> str:
+        return self.getScryptedProperty("nativeId")
+    @nativeId.setter
+    def nativeId(self, value: str):
+        self.setScryptedProperty("nativeId", value)
 
     @property
     def pluginId(self) -> str:
@@ -1642,6 +1651,7 @@ ScryptedInterfaceDescriptors = {
       "interfaces",
       "mixins",
       "name",
+      "nativeId",
       "pluginId",
       "providedInterfaces",
       "providedName",
