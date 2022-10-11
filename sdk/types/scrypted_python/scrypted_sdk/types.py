@@ -1251,13 +1251,6 @@ class DeviceState:
         self.setScryptedProperty("name", value)
 
     @property
-    def nativeId(self) -> str:
-        return self.getScryptedProperty("nativeId")
-    @nativeId.setter
-    def nativeId(self, value: str):
-        self.setScryptedProperty("nativeId", value)
-
-    @property
     def pluginId(self) -> str:
         return self.getScryptedProperty("pluginId")
     @pluginId.setter

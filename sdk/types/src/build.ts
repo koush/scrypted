@@ -191,6 +191,8 @@ class DeviceState:
         pass
 `
 for (const [val, type] of Object.entries(allProperties)) {
+    if (val === 'nativeId')
+        continue;
     python += `
     @property
     def ${val}(self) -> ${toPythonType(type)}:
