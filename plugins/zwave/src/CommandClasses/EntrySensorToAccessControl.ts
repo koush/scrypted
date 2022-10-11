@@ -1,5 +1,5 @@
 import { EntrySensor } from "@scrypted/sdk";
-import { ValueID } from "@zwave-js/core";
+import type { ValueID } from "@zwave-js/core";
 import { ZWaveNode, ZWaveNodeValueUpdatedArgs } from "zwave-js";
 import { Notification } from "./Notification";
 import { containsAny, ZwaveDeviceBase } from "./ZwaveDeviceBase";

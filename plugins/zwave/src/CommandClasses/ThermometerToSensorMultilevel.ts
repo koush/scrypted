@@ -1,5 +1,5 @@
 import {Thermometer, TemperatureUnit} from "@scrypted/sdk";
-import { ValueID } from "@zwave-js/core";
+import type { ValueID } from "@zwave-js/core";
 import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
 
 export class ThermometerToSensorMultilevel extends ZwaveDeviceBase implements Thermometer {

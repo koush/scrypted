@@ -106,6 +106,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
             console.log(driver.cacheDir);
 
             driver.on("error", (e) => {
+                driver.destroy().catch(() => {});
                 console.error('driver error', e);
                 reject(e);
             });
@@ -164,8 +165,8 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         this.driverReady.catch(e => {
             log.a(`Zwave Driver startup error. Verify the Z-Wave USB stick is plugged in and the Serial Port setting is correct.`);
             this.console.error('zwave driver start error', e);
-            this.console.log('This issue may be due to a driver or database lock, and the plugin will restart automatically momentarily.');
-            sdk.deviceManager.requestRestart();
+            this.console.log('This issue may be due to a driver or database lock. Retrying in 60 seconds.');
+            setTimeout(() => this.startDriver(), 60000);
         });
     }
 
