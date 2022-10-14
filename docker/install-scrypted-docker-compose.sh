@@ -18,9 +18,13 @@ mkdir -p $SCRYPTED_HOME
 
 set -e
 cd $SCRYPTED_HOME
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-usermod -aG docker $SERVICE_USER
+
+if [ -z "$SKIP_DOCKER_INSTALL" ]
+then
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+    usermod -aG docker $SERVICE_USER
+fi
 
 WATCHTOWER_HTTP_API_TOKEN=$(echo $RANDOM | md5sum)
 DOCKER_COMPOSE_YML=$SCRYPTED_HOME/docker-compose.yml
