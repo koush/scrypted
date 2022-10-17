@@ -18,7 +18,7 @@ export interface RtpTrack {
     outputArguments?: string[];
     onRtp(rtp: Buffer): void;
     onMSection?: (msection: MSection) => void;
-    firstPacket?: () => void;
+    firstPacket?: (rtp: Buffer) => void;
     payloadType?: number;
     rtcpPort?: number;
     ssrc?: number;
@@ -44,7 +44,7 @@ function createPacketDelivery(track: RtpTrack) {
     return (rtp: Buffer) => {
         if (firstPacket) {
             firstPacket = false;
-            track.firstPacket?.();
+            track.firstPacket?.(rtp);
         }
         track.onRtp(rtp);
     }
@@ -120,6 +120,21 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     rtspMode?: 'udp' | 'tcp' | 'pull',
     onRtspClient?: (rtspClient: RtspClient, optionsResponse: RtspServerResponse) => Promise<boolean>,
 }) {
+    const killDeferred = new Deferred<void>();
+
+    const killGuard = (track: RtpTrack) => {
+        const old = track?.onRtp;
+        if (old) {
+            track.onRtp = rtp => {
+                if (killDeferred.finished)
+                    return;
+                old(rtp);
+            }
+        }
+    }
+    killGuard(rtpTracks.video);
+    killGuard(rtpTracks.audio);
+
     let { inputArguments, videoDecoderArguments } = ffmpegInput;
     let rtspClient: RtspClient;
     let sockets: dgram.Socket[] = [];
@@ -259,7 +274,6 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     const forwarders = await createTrackForwarders(console, rtpTracks);
 
 
-    let killDeferred = new Deferred<void>();
     const kill = () => {
         killDeferred.resolve(undefined);
         for (const socket of sockets) {
@@ -366,14 +380,14 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         if (rtspSample.type === videoSection.codec) {
                             if (firstVideoPacket) {
                                 firstVideoPacket = false;
-                                video.firstPacket?.();
+                                video.firstPacket?.(rtspSample.packet);
                             }
                             video.onRtp(rtspSample.packet);
                         }
                         else if (rtspSample.type === audioSection?.codec) {
                             if (firstAudioPacket) {
                                 firstAudioPacket = false;
-                                rtpTracks.audio.firstPacket?.();
+                                rtpTracks.audio.firstPacket?.(rtspSample.packet);
                             }
                             audio.onRtp(rtspSample.packet);
                         }
