@@ -269,6 +269,7 @@ export class RpcPeer {
         this.killed = new Promise((resolve, reject) => {
             this.killedDeferred = { resolve, reject };
         });
+        this.killed.catch(() => {});
     }
 
     createPendingResult(cb: (id: string, reject: (e: Error) => void) => void): Promise<any> {
