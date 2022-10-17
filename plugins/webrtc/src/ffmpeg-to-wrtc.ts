@@ -1,7 +1,7 @@
 import { MediaStreamTrack, RTCPeerConnection, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCMediaObjectTrackOptions, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from "@scrypted/sdk";
 import type { WebRTCPlugin } from "./main";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
@@ -230,16 +230,23 @@ class WebRTCTrack implements RTCMediaObjectTrack {
     control: ScryptedSessionControl;
     removed = new Deferred<void>();
 
-    constructor(public connectionManagement: WebRTCConnectionManagement, public video: RTCRtpTransceiver, public audio: RTCRtpTransceiver, public intercom: Intercom) {
+    constructor(public connectionManagement: WebRTCConnectionManagement, public video: RTCRtpTransceiver, public audio: RTCRtpTransceiver, intercom: Intercom) {
         this.control = new ScryptedSessionControl(async () => { }, intercom, audio);
     }
 
     async replace(mediaObject: MediaObject): Promise<void> {
-        throw new Error("Method not implemented.");
-        const { atrack, vtrack, createTrackForwarder, intercom } = await this.connectionManagement.createTracks(mediaObject);
+        this.cleanup(true);
 
-        this.video.sender.replaceTrack(vtrack);
-        this.audio.sender.replaceTrack(atrack);
+        const { atrack, vtrack, createTrackForwarder, intercom } = await this.connectionManagement.createTracks(mediaObject);
+        this.removed = new Deferred();
+        this.control = new ScryptedSessionControl(async () => { }, intercom, this.audio);
+
+        const f = await createTrackForwarder(this.video, this.audio)
+        waitClosed(this.connectionManagement.pc).finally(() => f.kill());
+        this.removed.promise.finally(() => f.kill());
+
+        await this.video.sender.replaceTrack(vtrack);
+        await this.audio.sender.replaceTrack(atrack);
     }
 
     cleanup(cleanupTrackOnly: boolean) {
@@ -264,6 +271,10 @@ class WebRTCTrack implements RTCMediaObjectTrack {
 
     setPlayback(options: { audio: boolean; video: boolean; }): Promise<void> {
         return this.control.setPlayback(options);
+    }
+
+    async setOptions(options: RTCMediaObjectTrackOptions): Promise<void> {
+        console.log('updating destination');
     }
 }
 
@@ -303,7 +314,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         this.weriftSignalingSession = new WeriftSignalingSession(console, this.pc);
     }
 
-    async createTracks(mediaObject: MediaObject) {
+    async createTracks(mediaObject: MediaObject, options?: RTCMediaObjectTrackOptions) {
         let requestMediaStream: RequestMediaStream;
 
         try {
@@ -311,6 +322,17 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         }
         catch (e) {
             requestMediaStream = async () => mediaObject;
+        }
+
+        if (options?.destination) {
+            const { destination } = options;
+            const wrapped = requestMediaStream;
+            requestMediaStream = async requestOptions => {
+                return wrapped({
+                    ...requestOptions,
+                    destination,
+                });
+            }
         }
 
         let intercom: Intercom;
@@ -381,11 +403,11 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         }
     }
 
-    async addTrack(mediaObject: MediaObject, options?: {
+    async addTrack(mediaObject: MediaObject, options?: RTCMediaObjectTrackOptions & {
         videoMid?: string,
         audioMid?: string,
     }) {
-        const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject);
+        const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject, options);
 
         const videoTransceiver = this.pc.addTransceiver(vtrack, {
             direction: 'sendonly',

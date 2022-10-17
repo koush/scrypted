@@ -23,11 +23,6 @@ defaultPeerConfig.headerExtensions = {
     audio: [],
 };
 
-const supportedTypes = [
-    ScryptedDeviceType.Camera,
-    ScryptedDeviceType.Doorbell,
-];
-
 mediaManager.addConverter({
     fromMimeType: ScryptedMimeTypes.ScryptedDevice,
     toMimeType: ScryptedMimeTypes.RequestMediaStream,
@@ -252,7 +247,10 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
             return ret;
         }
-        else if (supportedTypes.includes(type) && interfaces.includes(ScryptedInterface.VideoCamera)) {
+        else if ([
+            ScryptedDeviceType.Camera,
+            ScryptedDeviceType.Doorbell,
+        ].includes(type) && interfaces.includes(ScryptedInterface.VideoCamera)) {
             return [
                 ScryptedInterface.RTCSignalingChannel,
                 // ScryptedInterface.Settings,
