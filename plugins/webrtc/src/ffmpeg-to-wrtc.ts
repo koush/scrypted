@@ -436,6 +436,10 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         this.activeTracks.clear();
         this.pc.close();
     }
+
+    async waitClosed() {
+        await waitClosed(this.pc);
+    }
 }
 
 export class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter {

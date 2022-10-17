@@ -52,7 +52,7 @@ export class NodeForkWorker extends ChildProcessWorker {
     send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {
         try {
             if (!this.worker)
-                throw new Error('worked has been killed');
+                throw new Error('fork worker has been killed');
             this.worker.send(message, serializationContext?.sendHandle, e => {
                 if (e && reject)
                     reject(e);

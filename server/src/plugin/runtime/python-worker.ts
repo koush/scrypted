@@ -80,7 +80,7 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
     send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {
         try {
             if (!this.worker)
-                throw new Error('worked has been killed');
+                throw new Error('python worker has been killed');
             this.serializer.sendMessage(message, reject, serializationContext);
         }
         catch (e) {

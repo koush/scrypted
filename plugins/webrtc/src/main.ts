@@ -14,6 +14,7 @@ import { stunServer, turnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
+import {RpcPeer} from '../../../server/src/rpc';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -330,9 +331,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         }
 
         const client = await listenZeroSingleClient();
-        const socket = net.connect(client.port, client.host);
         cleanup.promise.finally(() => {
-            socket.destroy();
             client.clientPromise.then(cp => cp.destroy());
         });
 
@@ -356,11 +355,44 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         try {
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
             const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
-            const connection = new WebRTCConnectionManagement(this.console, session,
+
+            const result = sdk.fork<ReturnType<typeof fork>>();
+            cleanup.promise.finally(() => result.worker.terminate());
+
+            const connection = await (await result.result).createConnection(message, client.port, session,
                 this.storageSettings.values.maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
                 configuration: this.getRTCConfiguration(),
             });
             cleanup.promise.finally(() => connection.close());
+            connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
+
+            await connection.negotiateRTCSignalingSession();
+            // await waitIceConnected(pc);
+            // await sleep(5000);
+            // const [dc] = await dcPromise;
+
+            const cp = await client.clientPromise;
+            cp.on('close', () => cleanup.resolve('socket client closed'));
+            process.send(message, cp);
+        }
+        catch (e) {
+            console.error("error negotiating browser RTCC signaling", e);
+            cleanup.resolve('error');
+            throw e;
+        }
+    }
+}
+
+export async function fork() {
+    return {
+        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, transcodeWidth: number, sessionSupportsH264High: boolean, options?: { disableIntercom?: boolean; configuration?: RTCConfiguration; }) {
+            const cleanup = new Deferred<string>();
+            cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
+            cleanup.promise.finally(() => process.exit());
+
+            const connection = new WebRTCConnectionManagement(console, clientSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, options);
+            const { pc } = connection;
+            waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
 
             const { connectionManagementId, updateSessionId } = message;
             if (connectionManagementId) {
@@ -374,20 +406,10 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 cleanup.promise.finally(() => plugins.setHostParam('@scrypted/webrtc', updateSessionId));
             }
 
-            const { pc } = connection;
-            waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
+            const socket = net.connect(port, '127.0.0.1');
 
             const dc = pc.createDataChannel('rpc');
             dc.message.subscribe(message => socket.write(message));
-
-            await connection.negotiateRTCSignalingSession();
-            // await waitIceConnected(pc);
-            // await sleep(5000);
-            // const [dc] = await dcPromise;
-
-            const cp = await client.clientPromise;
-            cp.on('close', () => cleanup.resolve('socket client closed'));
-            process.send(message, cp);
 
             const debouncer = new DataChannelDebouncer({
                 send: u8 => dc.send(Buffer.from(u8)),
@@ -397,11 +419,9 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             });
             socket.on('data', data => debouncer.send(data));
             socket.on('close', () => cleanup.resolve('socket closed'));
-        }
-        catch (e) {
-            console.error("error negotiating browser RTCC signaling", e);
-            cleanup.resolve('error');
-            throw e;
+            socket.on('error', ()=> cleanup.resolve('socket error'));
+
+            return connection;
         }
     }
 }
