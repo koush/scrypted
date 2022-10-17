@@ -1685,18 +1685,12 @@ export interface RTCSessionControl {
     video: boolean,
   }): Promise<void>;
 }
-
-export interface RTCMediaObjectTrackOptions {
-  destination?: MediaStreamDestination; 
-}
-
 /**
  * @category WebRTC Reference
  */
 export interface RTCMediaObjectTrack {
   replace(mediaObject: MediaObject): Promise<void>;
   stop(): Promise<void>;
-  setOptions(options: RTCMediaObjectTrackOptions): Promise<void>;
   setPlayback(options: {
     audio: boolean,
     video: boolean,
@@ -1708,7 +1702,7 @@ export interface RTCMediaObjectTrack {
  */
 export interface RTCConnectionManagement {
   negotiateRTCSignalingSession(): Promise<void>;
-  addTrack(mediaObject: MediaObject, options?: RTCMediaObjectTrackOptions & {
+  addTrack(mediaObject: MediaObject, options?: {
     videoMid?: string,
     audioMid?: string,
   }): Promise<RTCMediaObjectTrack>;
