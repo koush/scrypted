@@ -3,6 +3,9 @@ name: Publish Scrypted
 on:
   workflow_dispatch:
     inputs:
+      docker_tag:
+        description: 'Docker Tag'
+        required: true
       package_version:
         description: 'Package Version'
         required: false
@@ -64,11 +67,11 @@ jobs:
           tags: |
             koush/scrypted:${{ matrix.node }}${{ matrix.variant }}
             ${{ format('koush/scrypted:v{0}{1}', github.event.inputs.package_version || steps.package-version.outputs.current-version, matrix.variant) || '' }}
-            ${{ matrix.node == '16-bullseye' && matrix.variant == '' && 'koush/scrypted:latest' || '' }}
+            ${{ matrix.node == '16-bullseye' && matrix.variant == '' && format('koush/scrypted:${0}', github.event.inputs.docker_tag) || '' }}
             ${{ matrix.node == '16-bullseye' && matrix.variant == '.lite' && 'koush/scrypted:lite' || '' }}
             ghcr.io/koush/scrypted:${{ matrix.node }}${{ matrix.variant }}
             ${{ format('ghcr.io/koush/scrypted:v{0}{1}', github.event.inputs.package_version || steps.package-version.outputs.current-version, matrix.variant) || '' }}
-            ${{ matrix.node == '16-bullseye' && matrix.variant == '' && 'ghcr.io/koush/scrypted:latest' || '' }}
+            ${{ matrix.node == '16-bullseye' && matrix.variant == '' && format('ghcr.io/koush/scrypted:${0}', github.event.inputs.docker_tag) || '' }}
             ${{ matrix.node == '16-bullseye' && matrix.variant == '.lite' && 'ghcr.io/koush/scrypted:lite' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
