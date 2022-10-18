@@ -68,7 +68,7 @@
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js",
     "prepublishOnly": "npm run build",
-    "postpublish": "scripts/github-workflow-publish-docker.sh"
+    "docker": "scripts/github-workflow-publish-docker.sh"
   },
   "author": "",
   "license": "ISC"
