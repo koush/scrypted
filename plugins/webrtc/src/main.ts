@@ -14,7 +14,7 @@ import { stunServer, turnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
-import {RpcPeer} from '../../../server/src/rpc';
+import { RpcPeer } from '../../../server/src/rpc';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -352,6 +352,20 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             }
         });
 
+        const { connectionManagementId, updateSessionId } = message;
+        if (connectionManagementId) {
+            cleanup.promise.finally(async () => {
+                const plugins = await systemManager.getComponent('plugins');
+                plugins.setHostParam('@scrypted/webrtc', connectionManagementId);
+            });
+        }
+        if (updateSessionId) {
+            cleanup.promise.finally(async () => {
+                const plugins = await systemManager.getComponent('plugins');
+                plugins.setHostParam('@scrypted/webrtc', updateSessionId);
+            });
+        }
+
         try {
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
             const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
@@ -367,9 +381,6 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
 
             await connection.negotiateRTCSignalingSession();
-            // await waitIceConnected(pc);
-            // await sleep(5000);
-            // const [dc] = await dcPromise;
 
             const cp = await client.clientPromise;
             cp.on('close', () => cleanup.resolve('socket client closed'));
@@ -388,7 +399,7 @@ export async function fork() {
         async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, transcodeWidth: number, sessionSupportsH264High: boolean, options?: { disableIntercom?: boolean; configuration?: RTCConfiguration; }) {
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
-            cleanup.promise.finally(() => process.exit());
+            cleanup.promise.finally(() => setTimeout(() => process.exit(), 10000));
 
             const connection = new WebRTCConnectionManagement(console, clientSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, options);
             const { pc } = connection;
@@ -398,15 +409,14 @@ export async function fork() {
             if (connectionManagementId) {
                 const plugins = await systemManager.getComponent('plugins');
                 plugins.setHostParam('@scrypted/webrtc', connectionManagementId, connection);
-                cleanup.promise.finally(() => plugins.setHostParam('@scrypted/webrtc', connectionManagementId));
             }
             if (updateSessionId) {
                 const plugins = await systemManager.getComponent('plugins');
                 await plugins.setHostParam('@scrypted/webrtc', updateSessionId, (session: RTCSignalingSession) => connection.clientSession = session);
-                cleanup.promise.finally(() => plugins.setHostParam('@scrypted/webrtc', updateSessionId));
             }
 
             const socket = net.connect(port, '127.0.0.1');
+            cleanup.promise.finally(() => socket.destroy());
 
             const dc = pc.createDataChannel('rpc');
             dc.message.subscribe(message => socket.write(message));
@@ -419,7 +429,7 @@ export async function fork() {
             });
             socket.on('data', data => debouncer.send(data));
             socket.on('close', () => cleanup.resolve('socket closed'));
-            socket.on('error', ()=> cleanup.resolve('socket error'));
+            socket.on('error', () => cleanup.resolve('socket error'));
 
             return connection;
         }
