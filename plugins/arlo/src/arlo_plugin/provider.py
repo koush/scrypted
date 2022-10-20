@@ -239,19 +239,14 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
 
             device = {
                 "info": {
-                    "model": f"{camera['properties']['modelId']} ({camera['properties']['hwVersion']})",
+                    "model": f"{camera['properties']['modelId']} ({camera['properties'].get('hwVersion', '')})".strip(),
                     "manufacturer": "Arlo",
                     "firmware": camera.get("firmwareVersion"),
                     "serialNumber": camera["deviceId"],
                 },
                 "nativeId": camera["deviceId"],
                 "name": camera["deviceName"],
-                "interfaces": [
-                    ScryptedInterface.VideoCamera.value,
-                    ScryptedInterface.Camera.value,
-                    ScryptedInterface.MotionSensor.value,
-                    ScryptedInterface.Battery.value,
-                ],
+                "interfaces": self.get_interfaces_by_model(camera['properties']['modelId']),
                 "type": ScryptedDeviceType.Camera.value,
                 "providerNativeId": self.nativeId,
             }
@@ -297,3 +292,20 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
             return ArloDoorbell(nativeId, arlo_camera, arlo_basestation, self)
         else:
             return ArloCamera(nativeId, arlo_camera, arlo_basestation, self)
+
+    def get_interfaces_by_model(self, model_id):
+        model_id = model_id.lower()
+
+        if model_id == "avd1001":
+            return [
+                ScryptedInterface.VideoCamera.value,
+                ScryptedInterface.Camera.value,
+                ScryptedInterface.MotionSensor.value,
+            ]
+ 
+        return [
+            ScryptedInterface.VideoCamera.value,
+            ScryptedInterface.Camera.value,
+            ScryptedInterface.MotionSensor.value,
+            ScryptedInterface.Battery.value,
+        ]

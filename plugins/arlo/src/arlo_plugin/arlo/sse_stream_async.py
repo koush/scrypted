@@ -6,6 +6,18 @@ import threading
 from .stream_async import Stream 
 from .logging import logger
 
+
+class SSEClient(sseclient.SSEClient):
+    """Inherits SSEClient with debugging instrumentation."""
+
+    def __next__(self):
+        try:
+            return super().__next__()
+        except Exception as e:
+            logger.error(f"SSEClient iterator failed with {type(e)}: {str(e)}")
+            return sseclient.Event()
+
+
 class EventStream(Stream):
 
     async def start(self):
@@ -36,7 +48,7 @@ class EventStream(Stream):
                     self.initializing = False
                     self.connected = True
 
-        self.event_stream = sseclient.SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization'), session=self.arlo.request.session)
+        self.event_stream = SSEClient('https://myapi.arlo.com/hmsweb/client/subscribe?token='+self.arlo.request.session.headers.get('Authorization'), session=self.arlo.request.session)
         self.event_stream_thread = threading.Thread(name="EventStream", target=thread_main, args=(self, ))
         self.event_stream_thread.setDaemon(True)
         self.event_stream_thread.start()
