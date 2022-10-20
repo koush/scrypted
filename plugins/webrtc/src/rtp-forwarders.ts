@@ -231,14 +231,13 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         const audioSender = await createBindZero();
                         sockets.push(audioSender.server);
 
-                        await rtspClient.setup({
-                            type: 'tcp',
-                            port: channel,
-                            path: audioSection.control,
-                            onRtp: (rtspHeader, rtp) => {
-                                audioSender.server.send(rtp, udpPort);
-                            },
-                        });
+                        // NOTE:
+                        // This code path can fail if the audio is fetched via rtsp/tcp and the payloads are
+                        // larger than the MTU. However, I have only observed larger than MTU video payloads.
+                        // Audio payloads always seem to fit into the MTU even if using rtsp/tcp.
+                        await setupRtspClient(console, rtspClient, channel, audioSection, false, rtp => {
+                            audioSender.server.send(rtp, udpPort);
+                        })
                     }
                 }
             }
