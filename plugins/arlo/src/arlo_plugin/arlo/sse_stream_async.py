@@ -8,14 +8,59 @@ from .logging import logger
 
 
 class SSEClient(sseclient.SSEClient):
-    """Inherits SSEClient with debugging instrumentation."""
+    """Inherits SSEClient with more exceptions captured in the iterator."""
 
+    # This effectively patches the parent iterator of sseclient 0.0.22,
+    # where the only difference is the exception list adds
+    # http.client.IncompleteRead
     def __next__(self):
-        try:
-            return super().__next__()
-        except Exception as e:
-            logger.error(f"SSEClient iterator failed with {type(e)}: {str(e)}")
-            return sseclient.Event()
+        from sseclient import (
+            codecs,
+            re,
+            time,
+            six,
+            requests,
+            end_of_field,
+            Event
+        )
+        from http.client import IncompleteRead as httplib_IncompleteRead
+
+        decoder = codecs.getincrementaldecoder(
+            self.resp.encoding)(errors='replace')
+        while not self._event_complete():
+            try:
+                next_chunk = next(self.resp_iterator)
+                if not next_chunk:
+                    raise EOFError()
+                self.buf += decoder.decode(next_chunk)
+
+            except (StopIteration, requests.RequestException, EOFError, six.moves.http_client.IncompleteRead, httplib_IncompleteRead) as e:
+                print(e)
+                time.sleep(self.retry / 1000.0)
+                self._connect()
+
+                # The SSE spec only supports resuming from a whole message, so
+                # if we have half a message we should throw it out.
+                head, sep, tail = self.buf.rpartition('\n')
+                self.buf = head + sep
+                continue
+
+        # Split the complete event (up to the end_of_field) into event_string,
+        # and retain anything after the current complete event in self.buf
+        # for next time.
+        (event_string, self.buf) = re.split(end_of_field, self.buf, maxsplit=1)
+        msg = Event.parse(event_string)
+
+        # If the server requests a specific retry delay, we need to honor it.
+        if msg.retry:
+            self.retry = msg.retry
+
+        # last_id should only be set if included in the message.  It's not
+        # forgotten if a message omits it.
+        if msg.id:
+            self.last_id = msg.id
+
+        return msg
 
 
 class EventStream(Stream):
