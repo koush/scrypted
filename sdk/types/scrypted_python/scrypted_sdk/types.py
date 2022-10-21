@@ -194,6 +194,7 @@ class H264Info(TypedDict):
     fuab: bool
     mtap16: bool
     mtap32: bool
+    reserved: bool
     sei: bool
     stapb: bool
     pass

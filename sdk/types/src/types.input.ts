@@ -375,6 +375,7 @@ export interface H264Info {
   mtap16?: boolean;
   mtap32?: boolean;
   fuab?: boolean;
+  reserved?: boolean;
 }
 
 export interface VideoStreamOptions {
