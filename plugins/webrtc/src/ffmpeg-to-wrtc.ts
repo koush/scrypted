@@ -130,8 +130,8 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
                 audioTranscodeArguments,
             });
             videoTranscodeArguments.splice(0, videoTranscodeArguments.length);
-            videoCodecCopy = 'input';
-            audioCodecCopy = 'input';
+            videoCodecCopy = 'copy';
+            audioCodecCopy = 'copy';
             needPacketization = true;
         }
         catch (e) {

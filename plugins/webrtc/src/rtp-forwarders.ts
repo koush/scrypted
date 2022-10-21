@@ -12,7 +12,7 @@ const { mediaManager } = sdk;
 
 type StringWithAutocomplete<T> = T | (string & Record<never, never>);
 
-export type RtpCodecCopy = StringWithAutocomplete<"input">;
+export type RtpCodecCopy = StringWithAutocomplete<"copy">;
 
 export interface RtpTrack {
     codecCopy?: RtpCodecCopy;
@@ -113,7 +113,7 @@ export async function createTrackForwarders(console: Console, rtpTracks: RtpTrac
 }
 
 function isCodecCopy(desiredCodec: RtpCodecCopy, checkCodec: string) {
-    return desiredCodec === 'input'
+    return desiredCodec === 'copy'
         || (desiredCodec && desiredCodec === checkCodec);
 }
 
@@ -189,7 +189,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
             const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio' && (msection.codec === audioCodec || audioCodec === 'copy'));
 
-            console.log('a/v', video.codecCopy, audio?.codecCopy, 'found', videoSection.codec, audioSection?.codec);
+            console.log('a/v', videoCodec, audioCodec, 'found', videoSection.codec, audioSection?.codec);
 
             if (audio) {
                 if (audioSection
@@ -259,7 +259,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         }
     }
     else {
-        console.log('video codec/container not matched, transcoding:', rtpTracks.video?.codecCopy);
+        console.log('video codec/container not matched, transcoding:', videoCodec);
     }
 
     const reportTranscodedSections = (sdp: string) => {
