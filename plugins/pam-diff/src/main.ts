@@ -1,6 +1,6 @@
 import { FFmpegInput, MediaObject, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionSession, ObjectsDetected, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
-import { ffmpegLogInitialOutput } from "../../../common/src/media-helpers";
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "../../../common/src/media-helpers";
 
 import child_process, { ChildProcess } from 'child_process';
 
@@ -22,7 +22,7 @@ interface PamDiffSession {
 class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
     sessions = new Map<string, PamDiffSession>();
 
-    endSession(pds: PamDiffSession) {
+    endSession(pds: PamDiffSession, callbacks: ObjectDetectionCallbacks) {
         this.sessions.delete(pds.id);
         const event: ObjectsDetected = {
             timestamp: Date.now(),
@@ -31,12 +31,17 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         }
         clearTimeout(pds.timeout);
         pds.cp.kill('SIGKILL');
-        this.onDeviceEvent(ScryptedInterface.ObjectDetection, event);
+        if (callbacks) {
+            callbacks.onDetectionEnded(event);
+        }
+        else {
+            this.onDeviceEvent(ScryptedInterface.ObjectDetection, event);
+        }
     }
 
-    reschedule(pds: PamDiffSession, duration: number) {
+    reschedule(pds: PamDiffSession, duration: number, callbacks: ObjectDetectionCallbacks) {
         clearTimeout(pds.timeout);
-        pds.timeout = setTimeout(() => this.endSession(pds), duration);
+        pds.timeout = setTimeout(() => this.endSession(pds, callbacks), duration);
     }
 
     async detectObjects(mediaObject: MediaObject, session?: ObjectDetectionSession, callbacks?: ObjectDetectionCallbacks): Promise<ObjectsDetected> {
@@ -47,7 +52,7 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         let pds = this.sessions.get(detectionId);
         if (!session?.duration) {
             if (pds)
-                this.endSession(pds);
+                this.endSession(pds, callbacks);
             return {
                 detectionId,
                 running: false,
@@ -64,7 +69,7 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         }
 
         if (pds) {
-            this.reschedule(pds, session.duration);
+            this.reschedule(pds, session.duration, callbacks);
             pds.pamDiff.setDifference(session.settings?.difference || defaultDifference).setPercent(session.settings?.percent || defaultPercentage);
             return {
                 detectionId,
@@ -82,15 +87,12 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
         pds = {
             id: detectionId,
         }
-        this.reschedule(pds, session.duration);
+        this.reschedule(pds, session.duration, callbacks);
 
         const args = ffmpegInput.inputArguments.slice();
         args.unshift(
             '-hide_banner',
-            '-loglevel',
-            'error',
-            '-hwaccel',
-            'auto',
+            ...ffmpegInput.videoDecoderArguments || [],
         )
         args.push(
             '-an', '-dn',
@@ -125,20 +127,25 @@ class PamDiff extends ScryptedDeviceBase implements ObjectDetection {
                     }
                 ]
             }
-            this.onDeviceEvent(ScryptedInterface.ObjectDetection, event);
+            if (callbacks) {
+                callbacks.onDetection(event);
+            }
+            else {
+                this.onDeviceEvent(ScryptedInterface.ObjectDetection, event);
+            }
         });
 
-        this.console.log(args);
+
+        const console = sdk.deviceManager.getMixinConsole(mediaObject.sourceId, this.nativeId);
 
         pds.pamDiff = pamDiff;
         pds.pamDiff.setDifference(session.settings?.difference || defaultDifference).setPercent(session.settings?.percent || defaultPercentage);
+        safePrintFFmpegArguments(console, args);
         pds.cp = child_process.spawn(ffmpeg, args, {
             stdio:[ 'inherit', 'pipe', 'pipe', 'pipe']
         });
         pds.cp.stdio[3].pipe(p2p as any).pipe(pamDiff as any);
-        pds.cp.on('exit', () => this.console.log('ffmpeg exited'))
-        pds.cp.on('error', e => this.console.error('ffmpeg error', e))
-        ffmpegLogInitialOutput(this.console, pds.cp);
+        ffmpegLogInitialOutput(console, pds.cp);
 
         this.sessions.set(detectionId, pds);
 
