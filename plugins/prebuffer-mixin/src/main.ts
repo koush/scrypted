@@ -3,24 +3,24 @@ import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-p
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, PluginFork, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
 import net, { AddressInfo } from 'net';
+import semver from 'semver';
 import { Duplex } from 'stream';
 import { FileRtspServer } from './file-rtsp-server';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
 import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
-import semver from 'semver';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -57,6 +57,18 @@ type Prebuffers<T extends string> = {
 
 type PrebufferParsers = 'mpegts' | 'mp4' | 'rtsp';
 const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 'rtsp'];
+
+function hasOddities(h264Info: H264Info) {
+  const h264Oddities = h264Info.fuab
+    || h264Info.mtap16
+    || h264Info.mtap32
+    || h264Info.sei
+    || h264Info.stapb
+    || h264Info.reserved0
+    || h264Info.reserved30
+    || h264Info.reserved31;
+  return h264Oddities;
+}
 
 class PrebufferSession {
 
@@ -129,13 +141,7 @@ class PrebufferSession {
   }
 
   getLastH264Oddities() {
-    const lastProbe = this.getLastH264Probe();
-    const h264Oddities = lastProbe.fuab
-      || lastProbe.mtap16
-      || lastProbe.mtap32
-      || lastProbe.sei
-      || lastProbe.stapb;
-    return h264Oddities;
+    return hasOddities(this.getLastH264Probe());
   }
 
   getDetectedIdrInterval() {
@@ -709,7 +715,6 @@ class PrebufferSession {
       if (isDefault
         && this.usingScryptedParser
         && h264Oddities
-        && !this.stopInactive
         && sessionMso.tool !== 'scrypted') {
         this.console.warn('H264 oddities were detected in prebuffered video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
         this.usingScryptedParser = false;
@@ -752,7 +757,10 @@ class PrebufferSession {
         h264Probe.mtap16 ||= types.has(H264_NAL_TYPE_MTAP16);
         h264Probe.mtap32 ||= types.has(H264_NAL_TYPE_MTAP32);
         h264Probe.sei ||= types.has(H264_NAL_TYPE_SEI);
-        const oddity = h264Probe.fuab || h264Probe.stapb || h264Probe.mtap16 || h264Probe.mtap32 || h264Probe.sei;
+        h264Probe.reserved0 ||= types.has(H264_NAL_TYPE_RESERVED0);
+        h264Probe.reserved30 ||= types.has(H264_NAL_TYPE_RESERVED30);
+        h264Probe.reserved31 ||= types.has(H264_NAL_TYPE_RESERVED31);
+        const oddity = hasOddities(h264Probe);
         if (oddity && !reportedOddity) {
           reportedOddity = true;
           let { isDefault } = this.getParser(rtspMode, sessionMso);
@@ -767,6 +775,9 @@ class PrebufferSession {
             return;
           }
 
+          // don't restart the stream if it is not a prebuffered stream.
+          // allow this specific request to continue, and possibly fail.
+          // the next time the stream is requested, ffmpeg will be used.
           if (!this.stopInactive) {
             this.console.warn('Oddity in prebuffered stream. Restarting rebroadcast to use FFmpeg instead.');
             session.kill(new Error('restarting due to H264 oddity detection'));

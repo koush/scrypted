@@ -49,6 +49,10 @@ export async function readMessage(client: Readable): Promise<string[]> {
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 
+export const H264_NAL_TYPE_RESERVED0 = 0;
+export const H264_NAL_TYPE_RESERVED30 = 30;
+export const H264_NAL_TYPE_RESERVED31 = 31;
+
 export const H264_NAL_TYPE_IDR = 5;
 export const H264_NAL_TYPE_SEI = 6;
 export const H264_NAL_TYPE_SPS = 7;

@@ -12,7 +12,8 @@ export class FileRtspServer extends RtspServer {
         super(client, sdp);
 
         this.client.on('close', () => {
-            this.writeConsole?.log('RTSP WRITE client closed.');
+            if (this.writeStream)
+                this.writeConsole?.log('RTSP WRITE client closed.');
             this.cleanup();
         });
 
