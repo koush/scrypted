@@ -12,7 +12,7 @@ import { connectRTCSignalingClients } from "@scrypted/common/src/rtc-signaling";
 import { getSpsPps } from "@scrypted/common/src/sdp-utils";
 import { H264Repacketizer } from "../../homekit/src/types/camera/h264-packetizer";
 import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
-import { RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
+import { RtpCodecCopy, RtpTrack, RtpTracks, startRtpForwarderProcess } from "./rtp-forwarders";
 import { getAudioCodec, getFFmpegRtpAudioOutputArguments } from "./webrtc-required-codecs";
 import { WeriftSignalingSession } from "./werift-signaling-session";
 
@@ -76,7 +76,7 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
         || ffmpegInput.h264EncoderArguments?.length
         || ffmpegInput.h264FilterArguments?.length;
 
-    let videoCodecCopy = transcode ? undefined : 'h264';
+    let videoCodecCopy: RtpCodecCopy = transcode ? undefined : 'h264';
 
     if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
         videoTranscodeArguments.push("-bsf:v", "dump_extra");
@@ -130,8 +130,8 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
                 audioTranscodeArguments,
             });
             videoTranscodeArguments.splice(0, videoTranscodeArguments.length);
-            videoCodecCopy = 'copy';
-            audioCodecCopy = 'copy';
+            videoCodecCopy = 'input';
+            audioCodecCopy = 'input';
             needPacketization = true;
         }
         catch (e) {

@@ -10,8 +10,12 @@ import { Writable } from "stream";
 
 const { mediaManager } = sdk;
 
+type StringWithAutocomplete<T> = T | (string & Record<never, never>);
+
+export type RtpCodecCopy = StringWithAutocomplete<"input">;
+
 export interface RtpTrack {
-    codecCopy?: string;
+    codecCopy?: RtpCodecCopy;
     ffmpegDestination?: string;
     packetSize?: number;
     encoderArguments: string[];
@@ -108,8 +112,8 @@ export async function createTrackForwarders(console: Console, rtpTracks: RtpTrac
     }
 }
 
-function isCodecCopy(desiredCodec: string, checkCodec: string) {
-    return desiredCodec === 'copy'
+function isCodecCopy(desiredCodec: RtpCodecCopy, checkCodec: string) {
+    return desiredCodec === 'input'
         || (desiredCodec && desiredCodec === checkCodec);
 }
 
