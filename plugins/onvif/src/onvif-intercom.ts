@@ -52,7 +52,7 @@ interface CodecMatch {
     channels: string;
 }
 
-const codecRegex = /a=rtpmap:(\d+) (.*?)\/(\d+)/g
+const codecRegex = /a=rtpmap:\s*(\d+) (.*?)\/(\d+)/g
 function* parseCodecs(audioSection: string): Generator<CodecMatch> {
     for (const match of audioSection.matchAll(codecRegex)) {
         const [_, payloadType, sdpName, sampleRate, _skip, channels] = match;
