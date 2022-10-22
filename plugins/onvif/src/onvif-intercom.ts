@@ -110,7 +110,6 @@ export class OnvifIntercom implements Intercom {
             transportDict = parseSemicolonDelimited(response.headers.transport);
             this.intercomClient.session = response.headers.session.split(';')[0];
             ip = this.camera.getIPAddress();
-            this.camera.console.log('backchannel transport', transportDict);
 
             const { server_port } = transportDict;
             const serverPorts = server_port.split('-');
@@ -135,6 +134,7 @@ export class OnvifIntercom implements Intercom {
                 this.intercomClient.send(data, 0);
             });
         }
+        this.camera.console.log('backchannel transport', transportDict);
 
         const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
