@@ -725,6 +725,20 @@ export class RtspClient extends RtspBase {
         return this.writeRequest('PLAY', headers);
     }
 
+    writeRtpPayload(header: Buffer, rtp: Buffer) {
+        this.client.write(header);
+        return this.client.write(Buffer.from(rtp));
+    }
+
+    send(rtp: Buffer, channel: number) {
+        const header = Buffer.alloc(4);
+        header.writeUInt8(RTSP_FRAME_MAGIC, 0);
+        header.writeUInt8(channel, 1);
+        header.writeUInt16BE(rtp.length, 2);
+
+        return this.writeRtpPayload(header, rtp);
+    }
+
     async pause() {
         return this.request('PAUSE');
     }

@@ -4,6 +4,7 @@ import { parseSemicolonDelimited, RtspClient } from "@scrypted/common/src/rtsp-s
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import child_process from 'child_process';
+import { createBindZero } from "@scrypted/common/src/listen-cluster";
 
 const { mediaManager } = sdk;
 
@@ -96,20 +97,44 @@ export class OnvifIntercom implements Intercom {
         const rtp = Math.round(10000 + Math.random() * 30000);
         const rtcp = rtp + 1;
 
-        const headers: any = {
-            Require,
-            Transport: `RTP/AVP;unicast;client_port=${rtp}-${rtcp}`,
-        };
+        let ip: string;
+        let serverRtp: number;
+        let transportDict: ReturnType<typeof parseSemicolonDelimited>;
+        try {
+            const headers: any = {
+                Require,
+                Transport: `RTP/AVP;unicast;client_port=${rtp}-${rtcp}`,
+            };
 
-        const response = await this.intercomClient.request('SETUP', headers, audioBackchannel.control);
-        const transportDict = parseSemicolonDelimited(response.headers.transport);
-        this.intercomClient.session = response.headers.session.split(';')[0];
+            const response = await this.intercomClient.request('SETUP', headers, audioBackchannel.control);
+            transportDict = parseSemicolonDelimited(response.headers.transport);
+            this.intercomClient.session = response.headers.session.split(';')[0];
+            ip = this.camera.getIPAddress();
+            this.camera.console.log('backchannel transport', transportDict);
 
-        this.camera.console.log('backchannel transport', transportDict);
+            const { server_port } = transportDict;
+            const serverPorts = server_port.split('-');
+            serverRtp = parseInt(serverPorts[0]);
+        }
+        catch (e) {
+            this.camera.console.error('onvif udp backchannel failed, falling back to tcp', e);
 
-        const { server_port } = transportDict;
-        const serverPorts = server_port.split('-');
-        const serverRtp = parseInt(serverPorts[0]);
+            const headers: any = {
+                Require,
+                Transport: `RTP/AVP/TCP;unicast;interleaved=0-1`,
+            };
+
+            const response = await this.intercomClient.request('SETUP', headers, audioBackchannel.control);
+            transportDict = parseSemicolonDelimited(response.headers.transport);
+            this.intercomClient.session = response.headers.session.split(';')[0];
+            ip = '127.0.0.1';
+            const server = await createBindZero('udp4');
+            this.intercomClient.client.on('close', () => server.server.close());
+            serverRtp = server.port;
+            server.server.on('message', data => {
+                this.intercomClient.send(data, 0);
+            });
+        }
 
         const ffmpegInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(media, ScryptedMimeTypes.FFmpegInput);
 
@@ -141,7 +166,7 @@ export class OnvifIntercom implements Intercom {
             "-payload_type", match.payloadType,
             "-ssrc", ssrc.toString(),
             '-f', 'rtp',
-            `rtp://${this.camera.getIPAddress()}:${serverRtp}?localrtpport=${rtp}&localrtcpport=${rtcp}`,
+            `rtp://${ip}:${serverRtp}?localrtpport=${rtp}&localrtcpport=${rtcp}`,
         ];
         safePrintFFmpegArguments(this.camera.console, args);
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
