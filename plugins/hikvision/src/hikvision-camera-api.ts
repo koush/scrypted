@@ -115,16 +115,14 @@ export class HikVisionCameraAPI {
     async listenEvents() {
         // support multiple cameras listening to a single single stream 
         if (!this.listenerPromise) {
-            this.listenerPromise = new Promise(async (resolve, reject) => {
-                const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
-                // this.console.log('listener url', url);
+            const url = `http://${this.ip}/ISAPI/Event/notification/alertStream`;
 
-                const response = await this.digestAuth.request({
-                    httpsAgent: hikvisionHttpsAgent,
-                    method: "GET",
-                    url,
-                    responseType: 'stream',
-                });
+            this.listenerPromise = this.digestAuth.request({
+                httpsAgent: hikvisionHttpsAgent,
+                method: "GET",
+                url,
+                responseType: 'stream',
+            }).then(response => {
                 const stream = response.data as IncomingMessage;
                 stream.socket.setKeepAlive(true);
 
@@ -134,12 +132,16 @@ export class HikVisionCameraAPI {
                         if (data.indexOf(event) !== -1) {
                             const cameraNumber = data.match(/<channelID>(.*?)</)?.[1] || data.match(/<dynChannelID>(.*?)</)?.[1];
                             const inactive = data.indexOf('<eventState>inactive</eventState>') !== -1;
-                            stream.emit('event', event, cameraNumber, inactive);
+                            stream.emit('event', event, cameraNumber, inactive, data);
                         }
                     }
                 });
+                return stream;
+            });
+            this.listenerPromise.catch(() => this.listenerPromise = undefined);
+            this.listenerPromise.then(stream => {
                 stream.on('close', () => this.listenerPromise = undefined);
-                resolve(stream);
+                stream.on('end', () => this.listenerPromise = undefined);
             });
         }
 
