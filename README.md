@@ -84,7 +84,7 @@ If you do not want to set up VS Code, you can also run build and install the plu
 
 ```sh
 # currently in the plugins/homekit directory.
-npm run scrypted-webpack && npm run scrypted-deploy 127.0.0.1
+npm run build && npm run scrypted-deploy 127.0.0.1
 ```
 
 ## Plugin Development
