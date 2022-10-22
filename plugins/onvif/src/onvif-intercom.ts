@@ -5,6 +5,7 @@ import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import child_process from 'child_process';
 import { createBindZero } from "@scrypted/common/src/listen-cluster";
+import crypto from 'crypto';
 
 const { mediaManager } = sdk;
 
@@ -152,7 +153,13 @@ export class OnvifIntercom implements Intercom {
         if (!match)
             throw new Error('no supported codec was found for back channel');
 
-        const ssrcBuffer = Buffer.from(transportDict.ssrc, 'hex');
+        let ssrcBuffer: Buffer;
+        if (transportDict.ssrc) {
+            ssrcBuffer = Buffer.from(transportDict.ssrc, 'hex');
+        }
+        else {
+            ssrcBuffer = crypto.randomBytes(4);
+        }
         // ffmpeg expects ssrc as signed int32.
         const ssrc = ssrcBuffer.readInt32BE(0);
 
