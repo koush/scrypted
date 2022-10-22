@@ -400,7 +400,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                             startedIntercom = true;
                             mediaManager.createFFmpegMediaObject(rtpSink.ffmpegInput)
                                 .then(mo => {
-                                    device.startIntercom(mo).catch(e => console.error('intercom faled to start', e));
+                                    device.startIntercom(mo).catch(e => console.error('intercom failed to start', e));
                                     session.audioReturn.once('close', () => {
                                         console.log('Stopping intercom.');
                                         device.stopIntercom();
