@@ -61,9 +61,10 @@ export interface EventListenerOptions {
 export type EventListener = (eventSource: ScryptedDevice | undefined, eventDetails: EventDetails, eventData: any) => void;
 
 export interface EventDetails {
+  eventId: string;
   changed?: boolean;
   eventInterface?: string;
-  eventTime?: number;
+  eventTime: number;
   property?: string;
 }
 /**

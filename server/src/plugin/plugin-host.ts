@@ -228,7 +228,7 @@ export class PluginHost {
                 }
             }
 
-            const fail = 'Plugin failed to load. Console for more information.';
+            const fail = 'Plugin failed to load. View Console for more information.';
             try {
                 const isPython = runtime === 'python';
                 const loadZipOptions: PluginRemoteLoadZipOptions = {

@@ -304,6 +304,7 @@ class DeviceManifest(TypedDict):
 
 class EventDetails(TypedDict):
     changed: bool
+    eventId: str
     eventInterface: str
     eventTime: float
     property: str
