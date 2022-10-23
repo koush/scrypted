@@ -566,7 +566,6 @@ export interface VideoRecorder {
 }
 
 export interface RecordedEvent {
-  id: string;
   details: EventDetails;
   data: any;
 }

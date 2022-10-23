@@ -444,7 +444,6 @@ class Position(TypedDict):
 class RecordedEvent(TypedDict):
     data: Any
     details: EventDetails
-    id: str
     pass
 
 class RecordedEventOptions(TypedDict):
