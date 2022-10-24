@@ -1,4 +1,4 @@
-import { StorageSettings } from "@scrypted/common/src/settings";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { ObjectDetector, Readme, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { HomekitMixin } from "./homekit-mixin";

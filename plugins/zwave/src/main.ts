@@ -106,6 +106,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
             console.log(driver.cacheDir);
 
             driver.on("error", (e) => {
+                driver.destroy().catch(() => {});
                 console.error('driver error', e);
                 reject(e);
             });
@@ -155,6 +156,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 });
 
                 resolve();
+                log.clearAlerts();
             });
 
             driver.start().catch(reject);
@@ -163,6 +165,8 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
         this.driverReady.catch(e => {
             log.a(`Zwave Driver startup error. Verify the Z-Wave USB stick is plugged in and the Serial Port setting is correct.`);
             this.console.error('zwave driver start error', e);
+            this.console.log('This issue may be due to a driver or database lock. Retrying in 60 seconds.');
+            setTimeout(() => this.startDriver(), 60000);
         });
     }
 
@@ -173,7 +177,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 title: 'Inclusion State',
                 key: 'inclusionState',
                 readonly: true,
-                value: InclusionState[this.controller.inclusionState],
+                value: InclusionState[this.controller?.inclusionState],
             },
             {
                 group: 'Inclusion',
@@ -200,7 +204,7 @@ export class ZwaveControllerProvider extends ScryptedDeviceBase implements Devic
                 title: 'Healing State',
                 key: 'healingState',
                 readonly: true,
-                value: this.controller.isHealNetworkActive ? 'Healing' : 'Not Healing',
+                value: this.controller?.isHealNetworkActive ? 'Healing' : 'Not Healing',
             },
             {
                 group: 'Network',

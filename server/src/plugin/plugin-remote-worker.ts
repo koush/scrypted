@@ -371,6 +371,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                     const remote = await setupPluginRemote(threadPeer, forkApi, pluginId, () => systemManager.getSystemState());
                     forks.add(remote);
                     ntw.worker.on('exit', () => {
+                        threadPeer.kill('worker exited');
                         forkApi.removeListeners();
                         forks.delete(remote);
                         allMemoryStats.delete(ntw);
@@ -397,7 +398,7 @@ export function startPluginRemote(pluginId: string, peerSend: (message: RpcMessa
                 peer.evalLocal(script, zipOptions?.filename || '/plugin/main.nodejs.js', params);
 
                 if (zipOptions?.fork) {
-                    pluginConsole?.log('plugin forked');
+                    // pluginConsole?.log('plugin forked');
                     const fork = exports.fork;
                     const forked = await fork();
                     forked[RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION] = true;

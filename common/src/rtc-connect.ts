@@ -1,21 +1,35 @@
 import { RpcPeer } from "@scrypted/server/src/rpc";
+import { createRpcSerializer } from "@scrypted/server/src/rpc-serializer";
 import type { RTCSignalingSession } from "@scrypted/sdk";
 
 export async function createBrowserSignalingSession(ws: WebSocket, localName: string, remoteName: string) {
-    const peer = new RpcPeer(localName, remoteName, (message, reject) => {
-        const json = JSON.stringify(message);
+    const serializer = createRpcSerializer({
+        sendMessageBuffer: buffer => ws.send(buffer),
+        sendMessageFinish: message => ws.send(JSON.stringify(message)),
+    });
+
+    const rpcPeer = new RpcPeer(localName, remoteName, (message, reject, serializationContext) => {
         try {
-            ws.send(json);
+            serializer.sendMessage(message, reject, serializationContext);
         }
         catch (e) {
             reject?.(e);
         }
     });
+    ws.addEventListener('close', () => rpcPeer.kill('WebSocket closed'));
+
     ws.onmessage = message => {
-        const json = JSON.parse(message.data);
-        peer.handleMessage(json);
+        const data = message.data;
+        if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
+            serializer.onMessageBuffer(Buffer.from(data));
+        }
+        else {
+            serializer.onMessageFinish(JSON.parse(data as string));
+        }
     };
 
-    const session: RTCSignalingSession = await peer.getParam('session');
+    serializer.setupRpcPeer(rpcPeer);
+
+    const session: RTCSignalingSession = await rpcPeer.getParam('session');
     return session;
 }

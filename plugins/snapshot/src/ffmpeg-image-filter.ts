@@ -48,8 +48,20 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
 
     if (options.resize) {
         const { resize } = options;
-        let width = !resize.width ? '-2' : (resize.fractional ? `iw*${resize.width}` : resize.width);
-        let height = !resize.height ? '-2' : (resize.fractional ? `ih*${resize.height}` : resize.height);
+        let width: string|number;
+        if (!resize.width) {
+            width = -2;
+        }
+        else {
+            width = resize.fractional ? `iw*${resize.width}` : `'min(${resize.width},iw)'`;
+        }
+        let height: string|number;
+        if (!resize.height) {
+            height = -2;
+        }
+        else {
+            height = resize.fractional ? `ih*${resize.height}` : `'min(${resize.height},ih)'`;
+        }
 
         const filter = `scale=${width}:${height}`;
         addVideoFilterArguments(inputArguments, filter, 'snapshotResize');
@@ -70,7 +82,8 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
             'snapshotText');
     }
 
-    // console.log(inputArguments);
+    // if (options)
+    //     console.log('input arguments', inputArguments);
 }
 
 export async function ffmpegFilterImageBuffer(inputJpeg: Buffer, options: FFmpegImageFilterOptions) {

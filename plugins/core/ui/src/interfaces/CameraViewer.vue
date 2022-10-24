@@ -251,6 +251,7 @@ export default {
         audio: !this.muted,
         video: true,
       });
+      this.sessionControl.session.setMicrophone(true);
     },
     async streamCamera() {
       this.cleanupConnection();

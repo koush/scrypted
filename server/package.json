@@ -1,11 +1,11 @@
 {
   "name": "@scrypted/server",
-  "version": "0.2.2",
+  "version": "0.3.6",
   "description": "",
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@mapbox/node-pre-gyp": "^1.0.8",
-    "@scrypted/types": "^0.0.86",
+    "@scrypted/types": "^0.2.5",
     "adm-zip": "^0.5.3",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
@@ -68,7 +68,7 @@
     "build": "tsc --outDir dist",
     "postbuild": "node test/check-build-output.js",
     "prepublishOnly": "npm run build",
-    "postpublish": "gh workflow run docker.yml"
+    "docker": "scripts/github-workflow-publish-docker.sh"
   },
   "author": "",
   "license": "ISC"

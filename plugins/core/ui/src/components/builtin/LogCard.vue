@@ -25,11 +25,8 @@
     </v-data-table>
     <v-card-text light v-else>
       <div v-for="(item, index) in logs.slice(0, 100)" :key="index">
-        <pre class="caption">{{ item.log }}</pre>
-        <div v-if="item.t">
-          <div>{{ item.t }}</div>
-          <pre class="caption">{{ item.ts }}</pre>
-        </div>
+        <pre class="caption">{{ new Date(item.timestamp || Date.now()).toLocaleTimeString() }}</pre>
+        <pre class="caption">{{ item.message }}</pre>
         <div>{{ item.date }}</div>
       </div>
     </v-card-text>

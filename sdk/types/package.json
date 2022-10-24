@@ -1,15 +1,18 @@
 {
   "name": "@scrypted/types",
-  "version": "0.0.88",
+  "version": "0.2.6",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "author": "",
   "license": "ISC",
   "scripts": {
     "prepublishOnly": "npm run build",
-    "build": "cd .. && typedoc && cd types && ts-node ../gen/build && tsc"
+    "build": "rimraf dist gen && typedoc && ts-node ./src/build.ts && tsc && npm link"
   },
-  "dependencies": {},
-  "devDependencies": {},
-  "types": "index.d.ts"
+  "devDependencies": {
+    "@types/rimraf": "^3.0.2",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.9.1"
+  },
+  "types": "dist/index.d.ts"
 }

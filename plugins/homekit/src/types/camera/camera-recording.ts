@@ -244,7 +244,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
                 metadataPath,
                 mp4Path
             } = await getCameraRecordingFiles(device.id, start);
-            mkdirp.sync(savePath);
+            await mkdirp(savePath);
             if (!recordingFile)
                 recordingFile = fs.createWriteStream(mp4Path);
             recordingFile.write(fragment);
@@ -254,7 +254,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
                 duration,
                 fragments: i + 1,
             };
-            fs.writeFileSync(metadataPath, Buffer.from(JSON.stringify(metadata)));
+            await fs.promises.writeFile(metadataPath, Buffer.from(JSON.stringify(metadata)));
         }
         catch (e) {
             console.error('error saving hksv fragment', e);

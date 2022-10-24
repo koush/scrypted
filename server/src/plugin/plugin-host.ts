@@ -8,7 +8,7 @@ import net from 'net';
 import path from 'path';
 import rimraf from 'rimraf';
 import { Duplex } from 'stream';
-import WebSocket, { once } from 'ws';
+import WebSocket from 'ws';
 import { Plugin } from '../db-types';
 import { IOServer, IOServerSocket } from '../io';
 import { Logger } from '../logger';
@@ -16,7 +16,6 @@ import { RpcPeer } from '../rpc';
 import { createDuplexRpcPeer, createRpcSerializer } from '../rpc-serializer';
 import { ScryptedRuntime } from '../runtime';
 import { sleep } from '../sleep';
-import { SidebandBufferSerializer } from './buffer-serializer';
 import { MediaManagerHostImpl } from './media';
 import { PluginAPIProxy, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
 import { ConsoleServer, createConsoleServer } from './plugin-console';
@@ -24,6 +23,7 @@ import { PluginDebug } from './plugin-debug';
 import { PluginHostAPI } from './plugin-host-api';
 import { LazyRemote } from './plugin-lazy-remote';
 import { setupPluginRemote } from './plugin-remote';
+import { WebSocketConnection, WebSocketSerializer } from './plugin-remote-websocket';
 import { ensurePluginVolume, getScryptedVolume } from './plugin-volume';
 import { NodeForkWorker } from './runtime/node-fork-worker';
 import { NodeThreadWorker } from './runtime/node-thread-worker';
@@ -167,7 +167,8 @@ export class PluginHost {
                     this.remote.ioEvent(id, 'close');
                 });
 
-                await handler.onConnection(endpointRequest, `io://${id}`);
+                // @ts-expect-error
+                await handler.onConnection(endpointRequest, new WebSocketConnection(`io://${id}`));
             }
             catch (e) {
                 console.error('engine.io plugin error', e);
@@ -227,7 +228,7 @@ export class PluginHost {
                 }
             }
 
-            const fail = 'Plugin failed to load. Console for more information.';
+            const fail = 'Plugin failed to load. View Console for more information.';
             try {
                 const isPython = runtime === 'python';
                 const loadZipOptions: PluginRemoteLoadZipOptions = {
@@ -293,9 +294,9 @@ export class PluginHost {
             }
         }
 
-        this.peer = new RpcPeer('host', this.pluginId, (message, reject) => {
+        this.peer = new RpcPeer('host', this.pluginId, (message, reject, serializationContext) => {
             if (connected) {
-                this.worker.send(message, reject);
+                this.worker.send(message, reject, serializationContext);
             }
             else if (reject) {
                 reject(new Error('peer disconnected'));
@@ -303,6 +304,7 @@ export class PluginHost {
         });
 
         this.worker.setupRpcPeer(this.peer);
+        this.peer.addSerializer(WebSocketConnection, WebSocketConnection.name, new WebSocketSerializer());
 
         this.worker.stdout.on('data', data => console.log(data.toString()));
         this.worker.stderr.on('data', data => console.error(data.toString()));
@@ -371,6 +373,7 @@ export class PluginHost {
             }
         });
         serializer.setupRpcPeer(rpcPeer);
+        rpcPeer.addSerializer(WebSocketConnection, WebSocketConnection.name, new WebSocketSerializer());
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const createMediaManager = await this.peer.getParam('createMediaManager');
@@ -387,6 +390,7 @@ export class PluginHost {
 
     async createRpcPeer(duplex: Duplex) {
         const rpcPeer = createDuplexRpcPeer(`api/${this.pluginId}`, 'duplex', duplex, duplex);
+        rpcPeer.addSerializer(WebSocketConnection, WebSocketConnection.name, new WebSocketSerializer());
 
         // wrap the host api with a connection specific api that can be torn down on disconnect
         const createMediaManager = await this.peer.getParam('createMediaManager');

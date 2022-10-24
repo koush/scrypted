@@ -19,6 +19,8 @@ addSupportedType({
         // Set available modes based on plugin
         function systemStates(supportedModes: Array<SecuritySystemMode>): number[] {
             let modes = [Characteristic.SecuritySystemTargetState.DISARM]
+            if (!supportedModes)
+                return modes;
 
             if (supportedModes.includes(SecuritySystemMode.HomeArmed)) modes.push(Characteristic.SecuritySystemTargetState.STAY_ARM);
             if (supportedModes.includes(SecuritySystemMode.AwayArmed)) modes.push(Characteristic.SecuritySystemTargetState.AWAY_ARM);
@@ -27,7 +29,7 @@ addSupportedType({
             return modes;
         }
         service.getCharacteristic(Characteristic.SecuritySystemTargetState)
-        .setProps({validValues: systemStates(device.securitySystemState.supportedModes)});
+        .setProps({validValues: systemStates(device.securitySystemState?.supportedModes)});
 
         function toCurrentState(mode: SecuritySystemMode, triggered: boolean) {
             if (!!triggered)
@@ -70,10 +72,10 @@ addSupportedType({
         }
 
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemCurrentState,
-            () => toCurrentState(device.securitySystemState.mode, device.securitySystemState.triggered));
+            () => toCurrentState(device.securitySystemState?.mode, device.securitySystemState?.triggered));
         
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemTargetState,
-            () => toTargetState(device.securitySystemState.mode));
+            () => toTargetState(device.securitySystemState?.mode));
 
         service.getCharacteristic(Characteristic.SecuritySystemTargetState)
         .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
@@ -86,7 +88,7 @@ addSupportedType({
         })
 
         bindCharacteristic(device, ScryptedInterface.SecuritySystem, service, Characteristic.SecuritySystemAlarmType,
-            () => !!device.securitySystemState.triggered);
+            () => !!device.securitySystemState?.triggered);
 
         return accessory;
     },

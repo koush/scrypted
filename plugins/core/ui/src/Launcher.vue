@@ -13,9 +13,14 @@
                         <v-card-subtitle style="text-align: center;">{{ $store.state.version }}</v-card-subtitle>
                         <v-list class="transparent">
                             <v-list-item v-for="application in applications" :key="application.name"
-                                @click="application.click">
+                                :to="application.to" :href="application.href">
                                 <v-icon small>{{ application.icon }}</v-icon>
                                 <v-list-item-title style="text-align: center;">{{ application.name }}
+                                </v-list-item-title>
+                            </v-list-item>
+                            <v-list-item v-if="loading">
+                                <v-progress-circular :size="16" color="primary" indeterminate></v-progress-circular>
+                                <v-list-item-title style="text-align: center;">Loading...
                                 </v-list-item-title>
                             </v-list-item>
                         </v-list>
@@ -81,7 +86,14 @@ export default {
     },
     data() {
         return {
-            applications: null,
+            loading: true,
+            applications: [
+                {
+                    name: 'Management Console',
+                    icon: 'fa-cog',
+                    to: '/component/plugin',
+                },
+            ],
         }
     },
     mounted() {
@@ -92,20 +104,22 @@ export default {
             axios.get("/logout").then(() => window.location.reload());
         },
         refreshApplications() {
-            console.log('check', this.$store.state.isConnected, this.$store.state.isLoggedIn)
             if (!this.$store.state.isConnected || !this.$store.state.isLoggedIn || this.$route.name !== 'Launcher')
                 return;
 
+            this.loading = false;
+
             const { systemManager } = this.$scrypted;
             const applications = getAllDevices(systemManager).filter(device => device.interfaces.includes(ScryptedInterface.LauncherApplication));
-            this.applications = applications.map(app => ({
-                name: (app.applicationInfo && app.applicationInfo.name) || app.name,
-                icon: app.applicationInfo && app.applicationInfo.icon,
-                click: async () => {
-                    const { endpointManager } = this.$scrypted;
-                    window.location = `/endpoint/${app.id}/public/`;
-                }
-            }));
+            this.applications = applications.map(app => {
+                const appId = app.interfaces.includes(ScryptedInterface.ScryptedPlugin) ? app.pluginId : app.id;
+                const ret = {
+                    name: (app.applicationInfo && app.applicationInfo.name) || app.name,
+                    icon: app.applicationInfo && app.applicationInfo.icon,
+                    href: `/endpoint/${appId}/public/`,
+                };
+                return ret;
+            });
             if (!applications.length) {
                 this.$router.push('/component/plugin');
                 return;
@@ -115,10 +129,8 @@ export default {
                 {
                     name: 'Management Console',
                     icon: 'fa-cog',
-                    click: () => {
-                        this.$router.push('/component/plugin');
-                    }
-                }
+                    to: '/component/plugin',
+                },
             )
         }
     },

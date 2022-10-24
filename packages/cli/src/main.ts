@@ -7,7 +7,8 @@ import readline from 'readline-sync';
 import https from 'https';
 import mkdirp from 'mkdirp';
 import { installServe, serveMain } from './service';
-import { connectScryptedClient, ScryptedMimeTypes, FFmpegInput } from '../../client/src/index';
+import { connectScryptedClient } from '../../client/src/index';
+import { ScryptedMimeTypes, FFMpegInput } from '@scrypted/types';
 import semver from 'semver';
 import child_process from 'child_process';
 
@@ -31,6 +32,15 @@ function toIpAndPort(ip: string) {
     return ip;
 }
 
+interface Login {
+    username: string;
+    token: string;
+}
+
+interface LoginFile {
+    [host: string]: Login;
+}
+
 async function doLogin(host: string) {
     host = toIpAndPort(host);
 
@@ -50,7 +60,7 @@ async function doLogin(host: string) {
     }, axiosConfig));
 
     mkdirp.sync(scryptedHome);
-    let login: any;
+    let login: LoginFile;
     try {
         login = JSON.parse(fs.readFileSync(loginPath).toString());
     }
@@ -63,14 +73,14 @@ async function doLogin(host: string) {
 
     login[host] = response.data;
     fs.writeFileSync(loginPath, JSON.stringify(login));
-    return response.data.token;
+    return login;
 }
 
 async function getOrDoLogin(host: string): Promise<{
     username: string,
     token: string,
 }> {
-    let login: any;
+    let login: LoginFile;
     try {
         login = JSON.parse(fs.readFileSync(loginPath).toString());
         if (typeof login !== 'object')
@@ -125,13 +135,14 @@ async function runCommand() {
 
 async function main() {
     if (process.argv[2] === 'serve') {
-        await serveMain(false);
+        await serveMain();
     }
-    else if (process.argv[2] === 'serve@latest') {
-        await serveMain(true);
+    else if (process.argv[2]?.startsWith('serve@')) {
+        const installVersion = process.argv[2].split('@', 2)[1];
+        await serveMain(installVersion);
     }
     else if (process.argv[2] === 'install-server') {
-        const installDir = await installServe();
+        const installDir = await installServe('latest');
         console.log('server installation successful:', installDir);
     }
     else if (process.argv[2] === 'login') {
@@ -145,7 +156,7 @@ async function main() {
     }
     else if (process.argv[2] === 'ffplay') {
         const { sdk, pendingResult } = await runCommand();
-        const ffinput = await sdk.mediaManager.convertMediaObjectToJSON<FFmpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
+        const ffinput = await sdk.mediaManager.convertMediaObjectToJSON<FFMpegInput>(await pendingResult, ScryptedMimeTypes.FFmpegInput);
         console.log(ffinput);
         child_process.spawn('ffplay', ffinput.inputArguments, {
             stdio: 'inherit',
@@ -198,9 +209,15 @@ async function main() {
         console.log('   npx scrypted login [127.0.0.1[:10443]]');
         console.log('   npx scrypted serve');
         console.log('   npx scrypted serve@latest');
+        console.log('   npx scrypted serve[@version]');
         console.log('   npx scrypted command name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted ffplay name-or-id[@127.0.0.1[:10443]] method-name [...method-arguments]');
         console.log('   npx scrypted create-cert-json /path/to/key.pem /path/to/cert.pem');
+        console.log();
+        console.log('examples:');
+        console.log('   npx scrypted install @scrypted/rtsp');
+        console.log('   npx scrypted install @scrypted/rtsp/0.0.51');
+        console.log('   npx scrypted install @scrypted/rtsp/0.0.51 192.168.2.100');
         process.exit(1);
     }
 }

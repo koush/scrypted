@@ -202,7 +202,9 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
         }
 
         return this.mixinTable[0].entry.then(entry => {
-            this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, PluginDeviceProxyHandler.sortInterfaces(entry.allInterfaces));
+            const changed = this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.interfaces, PluginDeviceProxyHandler.sortInterfaces(entry.allInterfaces));
+            if (changed)
+                this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
             return pluginDevice;
         });
     }
@@ -228,7 +230,8 @@ export class PluginDeviceProxyHandler implements PrimitiveProxyHandler<any>, Scr
                         interfaces,
                     });
                     const mixins: string[] = getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [];
-                    this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId))
+                    this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, mixins.filter(mid => mid !== mixinId));
+                    this.scrypted.notifyPluginDeviceDescriptorChanged(pluginDevice);
                     this.scrypted.datastore.upsert(pluginDevice);
                 }
                 else {

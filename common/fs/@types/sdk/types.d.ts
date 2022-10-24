@@ -1,1 +1,1 @@
-../../../../sdk/types/index.d.ts
+../../../../sdk/types/dist/index.d.ts

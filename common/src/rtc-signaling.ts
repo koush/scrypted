@@ -1,4 +1,4 @@
-import type { RTCSignalingSendIceCandidate, RTCSignalingSession, RTCAVSignalingSetup, RTCSignalingOptions } from "@scrypted/sdk/types";
+import type { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from "@scrypted/sdk/types";
 import { Deferred } from "./deferred";
 
 function getUserAgent() {
@@ -41,10 +41,23 @@ export function isPeerConnectionClosed(pc: RTCPeerConnection) {
         || pc.iceConnectionState === 'closed';
 }
 
+function silence() {
+    let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+    const dest = ctx.createMediaStreamDestination();
+    oscillator.connect(dest);
+    oscillator.start();
+    const ret = dest.stream.getAudioTracks()[0];
+    ret.enabled = false;
+    return ret;
+}
+
 export class BrowserSignalingSession implements RTCSignalingSession {
     private pc: RTCPeerConnection;
     pcDeferred = new Deferred<RTCPeerConnection>();
     dcDeferred = new Deferred<RTCDataChannel>();
+    microphone: RTCRtpSender;
+    micEnabled = false;
+    onPeerConnection: (pc: RTCPeerConnection) => Promise<void>;
     options: RTCSignalingOptions = {
         userAgent: getUserAgent(),
         capabilities: {
@@ -70,6 +83,17 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         return this.options;
     }
 
+    async setMicrophone(enabled: boolean) {
+        if (this.microphone && enabled && !this.micEnabled) {
+            this.micEnabled = true;
+            // doing sendrecv on safari requires a mic be attached, or it fails to connect.
+            const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+            await this.microphone.replaceTrack(mic.getTracks()[0]);
+        }
+
+        this.microphone.track.enabled = enabled;
+    }
+
     close() {
         this.pcDeferred.promise.then(pc => {
             for (const t of pc.getTransceivers() || []) {
@@ -81,7 +105,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
             }
             pc.close();
         })
-        .catch(() => {});
+            .catch(() => { });
         this.pcDeferred.reject(new Error('iceConnectionState ' + this.pc?.iceConnectionState));
     }
 
@@ -98,6 +122,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
         const pc = this.pc = new RTCPeerConnection(setup.configuration);
         this.pcDeferred.resolve(pc);
+        await this.onPeerConnection?.(pc)
 
         // pc.addEventListener('connectionstatechange', checkConn);
         pc.addEventListener('iceconnectionstatechange', checkConn);
@@ -112,27 +137,9 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         }
 
         if (setup.audio) {
+            const audio = pc.addTransceiver('audio', setup.audio);
             if (setup.audio.direction === 'sendrecv' || setup.audio.direction === 'sendonly') {
-                try {
-                    // doing sendrecv on safari requires a mic be attached, or it fails to connect.
-                    const mic = await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-                    for (const track of mic.getTracks()) {
-                        pc.addTrack(track);
-                    }
-                }
-                catch (e) {
-                    let silence = () => {
-                        let ctx = new AudioContext(), oscillator = ctx.createOscillator();
-                        const dest = ctx.createMediaStreamDestination();
-                        oscillator.connect(dest);
-                        oscillator.start();
-                        return Object.assign(dest.stream.getAudioTracks()[0], { enabled: false });
-                    }
-                    pc.addTrack(silence());
-                }
-            }
-            else {
-                pc.addTransceiver('audio', setup.audio);
+                this.microphone = audio.sender;
             }
         }
 
@@ -161,7 +168,7 @@ export class BrowserSignalingSession implements RTCSignalingSession {
         const gatheringPromise = new Promise(resolve => {
             this.pc.onicecandidate = ev => {
                 if (ev.candidate) {
-                    console.log("local candidate", ev.candidate);
+                    // console.log("local candidate", ev.candidate);
                     sendIceCandidate?.(JSON.parse(JSON.stringify(ev.candidate)));
                 }
                 else {
@@ -228,8 +235,14 @@ export class BrowserSignalingSession implements RTCSignalingSession {
 
 function logSendCandidate(console: Console, type: string, session: RTCSignalingSession): RTCSignalingSendIceCandidate {
     return async (candidate) => {
-        // console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
-        return session.addIceCandidate(candidate);
+        try {
+            // console.log(`${type} trickled candidate:`, candidate.sdpMLineIndex, candidate.candidate);
+            await session.addIceCandidate(candidate);
+        }
+        catch (e) {
+            console.error('addIceCandidate error', e);
+            throw e;
+        }
     }
 }
 
@@ -281,12 +294,12 @@ export async function connectRTCSignalingClients(
 
     const offer = await offerClient.createLocalDescription('offer', offerSetup as RTCAVSignalingSetup,
         disableTrickle ? undefined : answerQueue.queueSendCandidate);
-    // console.log('offer sdp', offer.sdp);
+    console.log('offer sdp', offer.sdp);
     await answerClient.setRemoteDescription(offer, answerSetup as RTCAVSignalingSetup);
     answerQueue.flush();
     const answer = await answerClient.createLocalDescription('answer', answerSetup as RTCAVSignalingSetup,
         disableTrickle ? undefined : offerQueue.queueSendCandidate);
-    // console.log('answer sdp', answer.sdp);
+    console.log('answer sdp', answer.sdp);
     await offerClient.setRemoteDescription(answer, offerSetup as RTCAVSignalingSetup);
     offerQueue.flush();
 }

@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/prebuffer-mixin",
-   "version": "0.9.34",
+   "version": "0.9.43",
    "description": "Video Stream Rebroadcast, Prebuffer, and Management Plugin for Scrypted.",
    "author": "Scrypted",
    "license": "Apache-2.0",
@@ -29,14 +29,17 @@
          "DeviceProvider",
          "MixinProvider",
          "BufferConverter"
-      ]
+      ],
+      "realfs": true
    },
    "dependencies": {
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
-      "h264-sps-parser": "^0.2.1"
+      "h264-sps-parser": "^0.2.1",
+      "semver": "^7.3.7"
    },
    "devDependencies": {
-      "@types/node": "^14.17.11"
+      "@types/node": "^14.17.11",
+      "@types/semver": "^7.3.12"
    }
 }

@@ -5,6 +5,7 @@ import { getState } from "../state";
 import axios from 'axios';
 import semver from 'semver';
 import { sleep } from "../sleep";
+import { hasMixinCycle } from "../mixin/mixin-cycle";
 
 export class PluginComponent {
     scrypted: ScryptedRuntime;
@@ -43,8 +44,15 @@ export class PluginComponent {
         this.scrypted.stateManager.notifyInterfaceEvent(pluginDevice, 'Storage', undefined);
     }
     async setMixins(id: string, mixins: string[]) {
+        mixins = mixins || [];
+        if (hasMixinCycle(this.scrypted, id, mixins)) {
+            const message = `setMixins: ${id} has a mixin cycle. Cancelling change.`;
+            console.warn(message);
+            throw new Error(message);
+        }
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
-        this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)] || []);
+        this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)]);
+        this.scrypted.stateManager.updateDescriptor(pluginDevice);
         await this.scrypted.datastore.upsert(pluginDevice);
         // device may not exist, so force creation.
         this.scrypted.rebuildPluginDeviceMixinTable(id);
@@ -155,5 +163,23 @@ export class PluginComponent {
         }
 
         return this.scrypted.plugins[pluginId].remote.getServicePort(name, ...args);
+    }
+
+    async setHostParam(pluginId: string, name: string, param?: any) {
+        const host = this.scrypted.plugins[pluginId];
+        if (!host)
+            return;
+
+        const key = `oob-param-${name}`;
+        if (param === undefined)
+            delete host.peer.params[key];
+        else
+            host.peer.params[key] = param;
+    }
+
+    async getHostParam(pluginId: string, name: string) {
+        const host = this.scrypted.plugins[pluginId];
+        const key = `oob-param-${name}`;
+        return host?.peer?.params?.[key];
     }
 }

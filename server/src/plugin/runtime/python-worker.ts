@@ -5,10 +5,12 @@ import path from 'path';
 import readline from 'readline';
 import { Readable, Writable } from 'stream';
 import { RpcMessage, RpcPeer } from "../../rpc";
+import { createRpcDuplexSerializer } from '../../rpc-serializer';
 import { ChildProcessWorker } from "./child-process-worker";
 import { RuntimeWorkerOptions } from "./runtime-worker";
 
 export class PythonRuntimeWorker extends ChildProcessWorker {
+    serializer: ReturnType<typeof createRpcDuplexSerializer>;
 
     constructor(pluginId: string, options: RuntimeWorkerOptions) {
         super(pluginId, options);
@@ -62,21 +64,24 @@ export class PythonRuntimeWorker extends ChildProcessWorker {
         const peerin = this.worker.stdio[3] as Writable;
         const peerout = this.worker.stdio[4] as Readable;
 
-        peerin.on('error', e => this.emit('error', e));
-        peerout.on('error', e => this.emit('error', e));
-
-        const readInterface = readline.createInterface({
-            input: peerout,
-            terminal: false,
+        const serializer = this.serializer = createRpcDuplexSerializer(peerin);
+        serializer.setupRpcPeer(peer);
+        peerout.on('data', data => serializer.onData(data));
+        peerin.on('error', e => {
+            this.emit('error', e);
+            serializer.onDisconnected();
         });
-        readInterface.on('line', line => peer.handleMessage(JSON.parse(line)));
+        peerout.on('error', e => {
+            this.emit('error', e)
+            serializer.onDisconnected();
+        });
     }
 
-    send(message: RpcMessage, reject?: (e: Error) => void): void {
+    send(message: RpcMessage, reject?: (e: Error) => void, serializationContext?: any): void {
         try {
             if (!this.worker)
-                throw new Error('worked has been killed');
-            (this.worker.stdio[3] as Writable).write(JSON.stringify(message) + '\n', e => e && reject?.(e));
+                throw new Error('python worker has been killed');
+            this.serializer.sendMessage(message, reject, serializationContext);
         }
         catch (e) {
             reject?.(e);

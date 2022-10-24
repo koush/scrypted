@@ -201,7 +201,17 @@ export abstract class MediaManagerBase implements MediaManager {
     getConverters(): IdBufferConverter[] {
         const converters = Object.entries(this.getSystemState())
             .filter(([id, state]) => state[ScryptedInterfaceProperty.interfaces]?.value?.includes(ScryptedInterface.BufferConverter))
-            .map(([id]) => this.getDeviceById<IdBufferConverter>(id));
+            .map(([id]) => {
+                const device = this.getDeviceById<BufferConverter>(id);
+                return {
+                    id,
+                    fromMimeType: device.fromMimeType,
+                    toMimeType: device.toMimeType,
+                    convert(data, fromMimeType, toMimeType, options?) {
+                        return device.convert(data, fromMimeType, toMimeType, options);
+                    },
+                } as IdBufferConverter;
+            });
 
         // builtins should be after system converters. these should not be overriden by system,
         // as it could cause system instability with misconfiguration.
@@ -328,7 +338,7 @@ export abstract class MediaManagerBase implements MediaManager {
             converterMap.set(c.id, c);
         }
 
-        const nodes: any = {};
+        const nodes: { [node: string]: { [edge: string]: number } } = {};
         const mediaNode: any = {};
         nodes['mediaObject'] = mediaNode;
         nodes['output'] = {};
@@ -341,7 +351,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 // const convertedWeight = parseFloat(convertedMime.parameters.get('converter-weight')) || (convertedMime.essence === ScryptedMimeTypes.MediaObject ? 1000 : 1);
                 // const conversionWeight = inputWeight + convertedWeight;
                 const targetId = converter.id;
-                const node: any = nodes[targetId] = {};
+                const node: { [edge: string]: number } = nodes[targetId] = {};
 
                 // edge matches
                 for (const candidate of converters) {

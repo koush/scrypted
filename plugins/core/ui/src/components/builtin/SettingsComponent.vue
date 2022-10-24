@@ -133,7 +133,7 @@ export default {
       const info = await this.$scrypted.systemManager.getComponent("info");
       const env = await info.getScryptedEnv();
       this.showRestart = !!env.SCRYPTED_CAN_RESTART;
-      this.canUpdate = !!env.SCRYPTED_NPM_SERVE;
+      this.canUpdate = !!env.SCRYPTED_NPM_SERVE || !!env.SCRYPTED_WEBHOOK_UPDATE;
     },
     async doRestart() {
       this.restartStatus = "Restarting...";

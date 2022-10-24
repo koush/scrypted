@@ -1,4 +1,4 @@
-import { BrowserSignalingSession } from "@scrypted/common/src/rtc-signaling";
+import { BrowserSignalingSession, waitPeerIceConnectionClosed } from "@scrypted/common/src/rtc-signaling";
 import { MediaManager, MediaObject, RequestMediaStream, RequestRecordingStreamOptions, RTCSessionControl, RTCSignalingChannel, ScryptedDevice, ScryptedMimeTypes, VideoRecorder } from "@scrypted/types";
 
 export async function streamCamera(mediaManager: MediaManager, device: ScryptedDevice & RTCSignalingChannel, getVideo: () => HTMLVideoElement) {
@@ -48,31 +48,23 @@ export async function streamRecorder(mediaManager: MediaManager, device: Scrypte
 
 export async function streamMedia(device: RTCSignalingChannel) {
   const session = new BrowserSignalingSession();
-  const control: RTCSessionControl = await device.startRTCSignalingSession(session);
   const mediaStream = new MediaStream();
-  session.pcDeferred.promise.then(pc => {
-    pc.addEventListener('connectionstatechange', () => {
-      if (pc.iceConnectionState === 'disconnected'
-        || pc.iceConnectionState === 'failed'
-        || pc.iceConnectionState === 'closed') {
-        control.endSession();
-      }
-    });
-    pc.addEventListener('iceconnectionstatechange', () => {
-      console.log('iceConnectionStateChange', pc.connectionState, pc.iceConnectionState);
-      if (pc.iceConnectionState === 'disconnected'
-        || pc.iceConnectionState === 'failed'
-        || pc.iceConnectionState === 'closed') {
-        control.endSession();
-      }
-    });
-
-    // for (const r of pc.getReceivers()) {
-    //   mediaStream.addTrack(r.track);
-    // }
+  session.onPeerConnection = async pc => {
     pc.ontrack = e => {
+      console.log('add track', e.track);
       mediaStream.addTrack(e.track);
     }
+  };
+  const control: RTCSessionControl = await device.startRTCSignalingSession(session);
+  session.pcDeferred.promise.then(pc => {
+    pc.addEventListener('iceconnectionstatechange', () => {
+      console.log('iceConnectionStateChange', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'disconnected'
+        || pc.iceConnectionState === 'failed'
+        || pc.iceConnectionState === 'closed') {
+        control.endSession();
+      }
+    });
   });
 
   const close = () => {

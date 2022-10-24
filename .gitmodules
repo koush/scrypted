@@ -37,3 +37,9 @@
 [submodule "external/push-receiver"]
 	path = external/push-receiver
 	url = ../../koush/push-receiver.git
+[submodule "sdk/developer.scrypted.app"]
+	path = sdk/developer.scrypted.app
+	url = ../../koush/developer.scrypted.app
+[submodule "plugins/sample-cameraprovider"]
+	path = plugins/sample-cameraprovider
+	url = ../../koush/scrypted-sample-cameraprovider

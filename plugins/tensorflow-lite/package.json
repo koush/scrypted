@@ -36,11 +36,12 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
+         "BufferConverter",
          "ObjectDetection"
       ]
    },
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.41"
+   "version": "0.0.46"
 }

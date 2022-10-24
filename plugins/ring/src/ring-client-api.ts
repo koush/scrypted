@@ -1,4 +1,5 @@
 export { RingBaseApi } from '@koush/ring-client-api/api/api';
+export { Location } from '@koush/ring-client-api/api/location';
 export { clientApi, RingRestClient } from '@koush/ring-client-api/api/rest-client';
 export { RingCamera } from '@koush/ring-client-api/api/ring-camera';
 export { CameraData } from '@koush/ring-client-api/api/ring-types';

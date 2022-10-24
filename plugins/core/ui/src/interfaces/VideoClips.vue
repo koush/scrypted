@@ -82,9 +82,10 @@ export default {
   asyncComputed: {
     pageRange: {
       async get() {
-        const start = this.localTime(this.pageClips[0].startTime);
+        const now = Date.now();
+        const start = this.localTime(this.pageClips?.[0]?.startTime || now);
         const end = this.localTime(
-          this.pageClips[this.pageClips.length - 1].startTime
+          this.pageClips?.[this.pageClips.length - 1]?.startTime || now
         );
         return `${start} - ${end}`;
       },

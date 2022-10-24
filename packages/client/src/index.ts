@@ -1,7 +1,8 @@
-import { ScryptedStatic } from "@scrypted/types";
+import { ScryptedStatic, RTCConnectionManagement, RTCSignalingSession } from "@scrypted/types";
 import axios, { AxiosRequestConfig } from 'axios';
 import * as eio from 'engine.io-client';
 import { SocketOptions } from 'engine.io-client';
+import { Deferred } from "../../../common/src/deferred";
 import { timeoutFunction, timeoutPromise } from "../../../common/src/promise-utils";
 import { BrowserSignalingSession, waitPeerConnectionIceConnected, waitPeerIceConnectionClosed } from "../../../common/src/rtc-signaling";
 import { DataChannelDebouncer } from "../../../plugins/webrtc/src/datachannel-debouncer";
@@ -39,6 +40,8 @@ export interface ScryptedClientStatic extends ScryptedStatic {
     userStorage: Storage,
     version: string;
     connectionType: ScryptedClientConnectionType;
+    rtcConnectionManagement?: RTCConnectionManagement;
+    browserSignalingSession?: BrowserSignalingSession;
 }
 
 export interface ScryptedConnectionOptions {
@@ -55,6 +58,7 @@ export interface ScryptedLoginOptions extends ScryptedConnectionOptions {
      */
     password: string;
     change_password: string,
+    maxAge?: number;
 }
 
 export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
@@ -62,13 +66,22 @@ export interface ScryptedClientOptions extends Partial<ScryptedLoginOptions> {
     clientName?: string;
 }
 
+function isRunningStandalone() {
+    return globalThis.matchMedia?.('(display-mode: standalone)').matches;
+}
+
 export async function loginScryptedClient(options: ScryptedLoginOptions) {
-    let { baseUrl, username, password, change_password } = options;
+    let { baseUrl, username, password, change_password, maxAge } = options;
+    // pwa should stay logged in for a year.
+    if (!maxAge && isRunningStandalone())
+        maxAge = 365 * 24 * 60 * 60 * 1000;
+
     const url = `${baseUrl || ''}/login`;
     const response = await axios.post(url, {
         username,
         password,
         change_password,
+        maxAge,
     }, {
         ...options.axiosConfig,
     });
@@ -97,6 +110,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
 
     return {
+        redirect: response.data.redirect as string,
         error: response.data.error as string,
         authorization: response.data.authorization as string,
         username: response.data.username as string,
@@ -113,17 +127,24 @@ export class ScryptedClientLoginError extends Error {
     }
 }
 
-export function redirectScryptedLogin(baseUrl?: string) {
+export function redirectScryptedLogin(options?: {
+    redirect?: string, baseUrl?: string
+}) {
+    let { baseUrl, redirect } = options || {};
     baseUrl = baseUrl || '';
-    window.location.href = `${baseUrl}/endpoint/@scrypted/core/public/?redirect_uri=${encodeURIComponent(window.location.href)}`;
+    redirect = redirect || `${baseUrl}/endpoint/@scrypted/core/public/`
+    const redirect_uri = `${redirect}?redirect_uri=${encodeURIComponent(window.location.href)}`;
+    console.log('redirect_uri', redirect_uri);
+    globalThis.location.href = redirect_uri;
 }
 
 export async function redirectScryptedLogout(baseUrl?: string) {
     baseUrl = baseUrl || '';
-    window.location.href = `${baseUrl}/logout`;
+    globalThis.location.href = `${baseUrl}/logout`;
 }
 
 export async function connectScryptedClient(options: ScryptedClientOptions): Promise<ScryptedClientStatic> {
+    const start = Date.now();
     let { baseUrl, pluginId, clientName, username, password } = options;
 
     const extraHeaders: { [header: string]: string } = {};
@@ -136,15 +157,17 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             extraHeaders['Authorization'] = loginResult.authorization;
         addresses = loginResult.addresses;
         scryptedCloud = loginResult.scryptedCloud;
+        console.log('login result', Date.now() - start, loginResult);
     }
     else {
         const loginCheck = await checkScryptedClientLogin({
             baseUrl,
         });
-        if (loginCheck.error)
+        if (loginCheck.error || loginCheck.redirect)
             throw new ScryptedClientLoginError(loginCheck);
         addresses = loginCheck.addresses;
         scryptedCloud = loginCheck.scryptedCloud;
+        console.log('login checked', Date.now() - start, loginCheck);
     }
 
     let socket: IOClientSocket;
@@ -155,12 +178,14 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         rejectUnauthorized: false,
     };
 
-    const start = Date.now();
-
-    const explicitBaseUrl = baseUrl || `${window.location.protocol}//${window.location.host}`;
+    const explicitBaseUrl = baseUrl || `${globalThis.location.protocol}//${globalThis.location.host}`;
     let connectionType: ScryptedClientConnectionType;
 
     let rpcPeer: RpcPeer;
+    // underlying webrtc rpc transport may queue up messages before its ready to be to be handled.
+    // watch for this flush.
+    const flush = new Deferred<void>();
+
     if (scryptedCloud || options.webrtc) {
         const publicEioOptions: Partial<SocketOptions> = {
             path: `${endpointPath}/public/engine.io/api`,
@@ -234,15 +259,30 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             else {
                 connectionType = 'webrtc';
 
+                const connectionManagementId = `connectionManagement-${Math.random()}`;
+                const updateSessionId = `updateSessionId-${Math.random()}`;
                 ready.send(JSON.stringify({
                     pluginId,
+                    updateSessionId,
+                    connectionManagementId,
                 }));
+                const dcDeferred = new Deferred<RTCDataChannel>();
                 const session = new BrowserSignalingSession();
+                session.onPeerConnection = async pc => {
+                    pc.ondatachannel = e => {
+                        e.channel.onmessage = () => console.log('dropped mesage');
+                        dcDeferred.resolve(e.channel)
+                    };
+                }
                 const pcPromise = session.pcDeferred.promise;
 
-                const upgradingPeer = new RpcPeer(clientName || 'webrtc-upgrade', "api", (message, reject) => {
+                const serializer = createRpcSerializer({
+                    sendMessageBuffer: buffer => ready.send(buffer),
+                    sendMessageFinish: message => ready.send(JSON.stringify(message)),
+                });
+                const upgradingPeer = new RpcPeer(clientName || 'webrtc-upgrade', "api", (message, reject, serializationContext) => {
                     try {
-                        ready.send(JSON.stringify(message));
+                        serializer.sendMessage(message, reject, serializationContext);
                     }
                     catch (e) {
                         reject?.(e);
@@ -250,8 +290,14 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 });
 
                 ready.on('message', data => {
-                    upgradingPeer.handleMessage(JSON.parse(data.toString()));
+                    if (data.constructor === Buffer || data.constructor === ArrayBuffer) {
+                        serializer.onMessageBuffer(Buffer.from(data));
+                    }
+                    else {
+                        serializer.onMessageFinish(JSON.parse(data as string));
+                    }
                 });
+                serializer.setupRpcPeer(upgradingPeer);
 
                 const readyClose = new Promise<RpcPeer>((resolve, reject) => {
                     ready.on('close', () => reject(new Error('closed')))
@@ -259,15 +305,18 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
                 upgradingPeer.params['session'] = session;
 
-                rpcPeer = await Promise.race([readyClose, timeoutFunction(2000, async (isTimedOut) => {
+                rpcPeer = await Promise.race([readyClose, timeoutFunction(options.webrtc ? 10000 : 2000, async (isTimedOut) => {
                     const pc = await pcPromise;
 
                     await waitPeerConnectionIceConnected(pc);
 
-                    const dc = await session.dcDeferred.promise;
-                    console.log('got dc', dc);
+                    const dc = await dcDeferred.promise;
+                    console.log('datachannel received', Date.now() - start);
 
-                    const debouncer = new DataChannelDebouncer(dc);
+                    const debouncer = new DataChannelDebouncer(dc, e => {
+                        console.error('datachannel send error', e);
+                        ret.kill('datachannel send error');
+                    });
                     const serializer = createRpcDuplexSerializer({
                         write: (data) => debouncer.send(data),
                     });
@@ -283,6 +332,9 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                     });
                     serializer.setupRpcPeer(ret);
 
+                    ret.params['connectionManagementId'] = connectionManagementId;
+                    ret.params['updateSessionId'] = updateSessionId;
+                    ret.params['browserSignalingSession'] = session;
 
                     waitPeerIceConnectionClosed(pc).then(() => ready.close());
                     ready.on('close', () => {
@@ -296,7 +348,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                             buffers.push(Buffer.from(message.data));
                             resolve(undefined);
 
-                            setTimeout(() => {
+                            flush.promise.finally(() => {
                                 if (buffers) {
                                     for (const buffer of buffers) {
                                         serializer.onData(Buffer.from(buffer));
@@ -304,12 +356,12 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                                     buffers = undefined;
                                 }
                                 dc.onmessage = message => serializer.onData(Buffer.from(message.data));
-                            }, 0);
+                            });
                         };
                     });
 
                     if (isTimedOut()) {
-                        console.log('peer connection established too late. closing.');
+                        console.log('peer connection established too late. closing.', Date.now() - start);
                         ready.close();
                     }
                     else {
@@ -320,10 +372,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             }
 
             socket = ready;
-            sockets = sockets.filter(s => s !== socket);
+            sockets = sockets.filter(s => s !== ready);
         }
         catch (e) {
-            // console.error('local check failed', e);
+            console.error('peer to peer failed', Date.now() - start, e);
         }
         sockets.forEach(s => {
             try {
@@ -366,6 +418,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             serializer.setupRpcPeer(rpcPeer);
         }
 
+        setTimeout(() => flush.resolve(undefined), 0);
         const scrypted = await attachPluginRemote(rpcPeer, undefined);
         const {
             systemManager,
@@ -373,16 +426,49 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             endpointManager,
             mediaManager,
         } = scrypted;
+        console.log('api attached', Date.now() - start);
 
-        const userStorage = await rpcPeer.getParam('userStorage');
+        const { browserSignalingSession, connectionManagementId, updateSessionId } = rpcPeer.params;
+        if (updateSessionId && browserSignalingSession) {
+            systemManager.getComponent('plugins').then(async plugins => {
+                const updateSession: (session: RTCSignalingSession) => Promise<void> = await plugins.getHostParam('@scrypted/webrtc', updateSessionId);
+                if (!updateSession)
+                    return;
+                await updateSession(browserSignalingSession);
+                console.log('signaling channel upgraded.');
+                socket.removeAllListeners();
+                socket.close();
+            });
+        }
 
-        const info = await systemManager.getComponent('info');
-        let version = 'unknown';
-        try {
-            version = await info.getVersion();
-        }
-        catch (e) {
-        }
+        const [userStorage, version, rtcConnectionManagement] = await Promise.all([
+            rpcPeer.getParam('userStorage'),
+            (async () => {
+                const info = await systemManager.getComponent('info');
+                let version = 'unknown';
+                try {
+                    version = await info.getVersion();
+                }
+                catch (e) {
+                }
+                return version;
+            })(),
+            (async () => {
+                let rtcConnectionManagement: RTCConnectionManagement;
+                if (connectionManagementId) {
+                    try {
+                        const plugins = await systemManager.getComponent('plugins');
+                        rtcConnectionManagement = await plugins.getHostParam('@scrypted/webrtc', connectionManagementId);
+                        return rtcConnectionManagement;
+                    }
+                    catch (e) {
+                    }
+                }
+            })(),
+        ]);
+
+        console.log('api initialized', Date.now() - start);
+        console.log('api queried, version:', version);
 
         const ret: ScryptedClientStatic = {
             pluginRemoteAPI: undefined,
@@ -394,12 +480,21 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             mediaManager,
             userStorage,
             disconnect() {
-                socket.close();
+                rpcPeer.kill('disconnect requested');
             },
             pluginHostAPI: undefined,
+            rtcConnectionManagement,
+            browserSignalingSession,
         }
 
-        socket.on('close', () => ret.onClose?.());
+        socket.on('close', () => {
+            rpcPeer.kill('socket closed');
+        });
+
+        rpcPeer.killed.finally(() => {
+            socket.close();
+            ret.onClose?.();
+        });
 
         return ret;
     }

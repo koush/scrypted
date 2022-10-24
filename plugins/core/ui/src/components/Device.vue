@@ -1,46 +1,23 @@
 <template>
   <v-layout wrap>
     <v-flex xs12 v-if="deviceAlerts.length">
-      <v-alert
-        dark
-        dismissible
-        @input="removeAlert(alert)"
-        v-for="alert in deviceAlerts"
-        :key="alert.id"
-        xs12
-        md6
-        lg6
-        color="primary"
-        icon="mdi-vuetify"
-        border="left"
-      >
+      <v-alert dark dismissible @input="removeAlert(alert)" v-for="alert in deviceAlerts" :key="alert.id" xs12 md6 lg6
+        color="primary" icon="mdi-vuetify" border="left">
         <template v-slot:prepend>
           <v-icon class="white--text mr-3" size="sm" color="#a9afbb">{{
-            getAlertIcon(alert)
+          getAlertIcon(alert)
           }}</v-icon>
         </template>
         <div class="caption">{{ alert.title }}</div>
-        <div
-          v-linkified:options="{ className: 'alert-link' }"
-          v-html="alert.message.replace('origin:', origin)"
-        ></div>
+        <div v-linkified:options="{ className: 'alert-link' }" v-html="alert.message.replace('origin:', origin)"></div>
       </v-alert>
     </v-flex>
 
     <v-flex v-for="iface in aboveInterfaces" :key="iface" xs12>
-      <component
-        v-if="noCardInterfaces.includes(iface)"
-        :value="deviceState"
-        :device="device"
-        :is="iface"
-      ></component>
+      <component v-if="noCardInterfaces.includes(iface)" :value="deviceState" :device="device" :is="iface"></component>
       <v-card v-else>
         <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
-        <component
-          :value="deviceState"
-          :device="device"
-          :is="iface"
-        ></component>
+        <component :value="deviceState" :device="device" :is="iface"></component>
       </v-card>
     </v-flex>
 
@@ -53,45 +30,21 @@
     </v-flex>
     <v-flex xs12 md7>
       <v-layout row wrap>
-        <v-flex
-          xs12
-          v-for="iface in leftAboveInterfaces"
-          :key="iface"
-          class="pb-0"
-        >
-          <component
-            v-if="noCardInterfaces.includes(iface)"
-            :value="deviceState"
-            :device="device"
-            :is="iface"
-          ></component>
+        <v-flex xs12 v-for="iface in leftAboveInterfaces" :key="iface" class="pb-0">
+          <component v-if="noCardInterfaces.includes(iface)" :value="deviceState" :device="device" :is="iface">
+          </component>
           <v-card v-else>
             <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
-            <component
-              :value="deviceState"
-              :device="device"
-              :is="iface"
-            ></component>
+            <component :value="deviceState" :device="device" :is="iface"></component>
           </v-card>
         </v-flex>
         <v-flex xs12 class="pb-0">
           <v-card raised>
             <v-card-title>
-              {{ name || "No Device Name" }}
-              <v-layout
-                mr-1
-                row
-                justify-end
-                align-center
-                v-if="cardHeaderInterfaces.length"
-              >
-                <component
-                  :value="deviceState"
-                  :device="device"
-                  :is="iface"
-                  v-for="iface in cardHeaderInterfaces"
-                  :key="iface"
-                ></component>
+              {{ (device && device.name) || "No Device Name" }}
+              <v-layout mr-1 row justify-end align-center v-if="cardHeaderInterfaces.length">
+                <component :value="deviceState" :device="device" :is="iface" v-for="iface in cardHeaderInterfaces"
+                  :key="iface"></component>
               </v-layout>
             </v-card-title>
 
@@ -103,157 +56,56 @@
 
             <v-flex v-if="cardButtonInterfaces.length">
               <v-layout align-center justify-center>
-                <component
-                  v-for="iface in cardButtonInterfaces"
-                  :key="iface"
-                  :value="deviceState"
-                  :device="device"
-                  :is="iface"
-                ></component>
+                <component v-for="iface in cardButtonInterfaces" :key="iface" :value="deviceState" :device="device"
+                  :is="iface"></component>
               </v-layout>
             </v-flex>
 
-            <v-container v-if="!isPlugin">
-              <v-layout>
-                <v-flex xs12>
-                  <v-text-field
-                    v-if="!isPlugin"
-                    dense
-                    v-model="name"
-                    label="Name"
-                    required
-                    outlined
-                  >
-                    <template v-slot:append-outer>
-                      <v-btn
-                        v-if="name !== device.name"
-                        color="success"
-                        text
-                        class="shift-up"
-                        @click="saveName"
-                      >
-                        <v-icon>send</v-icon>
-                      </v-btn>
-                    </template>
-                  </v-text-field>
-                  <v-select
-                    dense
-                    v-if="inferredTypes.length > 1"
-                    :items="inferredTypes"
-                    label="Type"
-                    outlined
-                    v-model="type"
-                  >
-                    <template v-slot:append-outer>
-                      <v-btn
-                        v-if="type !== device.type"
-                        color="success"
-                        text
-                        class="shift-up"
-                        @click="saveType"
-                      >
-                        <v-icon>send</v-icon>
-                      </v-btn>
-                    </template>
-                  </v-select>
-                  <v-combobox
-                    dense
-                    v-if="
-                      hasFixedPhysicalLocation(type, deviceState.interfaces)
-                    "
-                    :items="existingRooms"
-                    outlined
-                    v-model="room"
-                    label="Room"
-                    required
-                  >
-                    <template v-slot:append-outer>
-                      <v-btn
-                        v-if="room !== device.room"
-                        color="success"
-                        text
-                        class="shift-up"
-                        @click="saveRoom"
-                      >
-                        <v-icon>send</v-icon>
-                      </v-btn>
-                    </template>
-                  </v-combobox>
-                </v-flex>
-              </v-layout>
-            </v-container>
-
             <v-card-actions v-if="!ownerDevice">
               <v-spacer></v-spacer>
-              <v-btn
-                small
-                outlined
-                color="blue"
-                @click="reloadPlugin"
-                class="mr-2"
-                >Reload Plugin</v-btn
-              >
-              <PluginAdvancedUpdate
-                v-if="pluginData"
-                :pluginData="pluginData"
-                @installed="reload"
-              />
+              <v-btn small outlined color="blue" @click="reloadPlugin" class="mr-2">Reload Plugin</v-btn>
+              <PluginAdvancedUpdate v-if="pluginData" :pluginData="pluginData" @installed="reload" />
             </v-card-actions>
 
             <v-card-actions>
-              <component
-                v-for="iface in cardActionInterfaces"
-                :key="iface"
-                :value="deviceState"
-                :device="device"
-                :is="iface"
-              ></component>
+              <component v-for="iface in cardActionInterfaces" :key="iface" :value="deviceState" :device="device"
+                :is="iface"></component>
               <v-spacer></v-spacer>
 
               <v-btn color="info" text @click="openConsole">Console</v-btn>
 
               <v-tooltip bottom v-if="device.info && device.info.managementUrl">
                 <template v-slot:activator="{ on }">
-                  <v-btn
-                    x-small
-                    v-on="on"
-                    color="info"
-                    text
-                    @click="openManagementUrl"
-                    ><v-icon x-small>fa-wrench</v-icon></v-btn
-                  >
+                  <v-btn x-small v-on="on" color="info" text @click="openManagementUrl">
+                    <v-icon x-small>fa-wrench</v-icon>
+                  </v-btn>
                 </template>
                 <span>Open Device Management Url</span>
               </v-tooltip>
 
               <v-tooltip bottom>
                 <template v-slot:activator="{ on }">
-                  <v-btn x-small v-on="on" color="info" text @click="openRepl"
-                    ><v-icon x-small>fa-terminal</v-icon></v-btn
-                  >
+                  <v-btn x-small v-on="on" color="info" text @click="openRepl">
+                    <v-icon x-small>fa-terminal</v-icon>
+                  </v-btn>
                 </template>
                 <span>REPL</span>
               </v-tooltip>
 
               <v-tooltip bottom>
                 <template v-slot:activator="{ on }">
-                  <v-btn x-small v-on="on" color="info" text @click="openLogs"
-                    ><v-icon x-small>fa-history</v-icon></v-btn
-                  >
+                  <v-btn x-small v-on="on" color="info" text @click="openLogs">
+                    <v-icon x-small>fa-history</v-icon>
+                  </v-btn>
                 </template>
                 <span>Events</span>
               </v-tooltip>
 
               <v-tooltip bottom v-if="pluginData">
                 <template v-slot:activator="{ on }">
-                  <v-btn
-                    x-small
-                    v-on="on"
-                    color="info"
-                    text
-                    @click="showStorage = !showStorage"
-                    ><v-icon x-small>fa-hdd</v-icon></v-btn
-                  >
+                  <v-btn x-small v-on="on" color="info" text @click="showStorage = !showStorage">
+                    <v-icon x-small>fa-hdd</v-icon>
+                  </v-btn>
                 </template>
                 <span>Storage</span>
               </v-tooltip>
@@ -262,41 +114,26 @@
                 <template #activator="{ on: dialog }">
                   <v-tooltip bottom>
                     <template #activator="{ on: tooltip }">
-                      <v-btn
-                        x-small
-                        v-on="{ ...tooltip, ...dialog }"
-                        color="error"
-                        text
-                        ><v-icon x-small>fa-trash</v-icon></v-btn
-                      >
+                      <v-btn x-small v-on="{ ...tooltip, ...dialog }" color="error" text>
+                        <v-icon x-small>fa-trash</v-icon>
+                      </v-btn>
                     </template>
                     <span>Delete</span>
                   </v-tooltip>
                 </template>
 
                 <v-card>
-                  <CardTitle
-                    style="margin-bottom: 8px"
-                    class="red white--text"
-                    primary-title
-                    >Delete Device</CardTitle
-                  >
+                  <CardTitle style="margin-bottom: 8px" class="red white--text" primary-title>Delete Device</CardTitle>
 
-                  <v-card-text
-                    >This will permanently delete the device. It can not be
-                    undone.</v-card-text
-                  >
+                  <v-card-text>This will permanently delete the device. It can not be
+                    undone.</v-card-text>
 
                   <v-divider></v-divider>
 
                   <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn color="primary" text @click="showDelete = false"
-                      >Cancel</v-btn
-                    >
-                    <v-btn color="red" text @click="remove"
-                      >Delete Device</v-btn
-                    >
+                    <v-btn color="primary" text @click="showDelete = false">Cancel</v-btn>
+                    <v-btn color="red" text @click="remove">Delete Device</v-btn>
                   </v-card-actions>
                 </v-card>
               </v-dialog>
@@ -305,29 +142,16 @@
         </v-flex>
 
         <v-flex xs12 v-if="deviceComponent && deviceComponent !== 'Script'">
-          <component
-            @save="saveStorage"
-            :is="deviceComponent"
-            v-model="deviceData"
-            :id="id"
-            ref="componentCard"
-          ></component>
+          <component @save="saveStorage" :is="deviceComponent" v-model="deviceData" :id="id" ref="componentCard">
+          </component>
         </v-flex>
 
         <v-flex xs12 v-for="iface in leftInterfaces" :key="iface" class="pb-0">
-          <component
-            v-if="noCardInterfaces.includes(iface)"
-            :value="deviceState"
-            :device="device"
-            :is="iface"
-          ></component>
+          <component v-if="noCardInterfaces.includes(iface)" :value="deviceState" :device="device" :is="iface">
+          </component>
           <v-card v-else>
             <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
-            <component
-              :value="deviceState"
-              :device="device"
-              :is="iface"
-            ></component>
+            <component :value="deviceState" :device="device" :is="iface"></component>
           </v-card>
         </v-flex>
 
@@ -337,11 +161,7 @@
             <v-container>
               <v-layout>
                 <v-flex xs12>
-                  <Storage
-                    v-model="pluginData.storage"
-                    @input="onChange"
-                    @save="saveStorage"
-                  ></Storage>
+                  <Storage v-model="pluginData.storage" @input="onChange" @save="saveStorage"></Storage>
                 </v-flex>
               </v-layout>
             </v-container>
@@ -353,19 +173,11 @@
     <v-flex xs12 md5>
       <v-layout row wrap>
         <v-flex xs12 v-for="iface in rightInterfaces" :key="iface" class="pb-0">
-          <component
-            v-if="noCardInterfaces.includes(iface)"
-            :value="deviceState"
-            :device="device"
-            :is="iface"
-          ></component>
+          <component v-if="noCardInterfaces.includes(iface)" :value="deviceState" :device="device" :is="iface">
+          </component>
           <v-card v-else>
             <CardTitle>{{ getInterfaceFriendlyName(iface) }}</CardTitle>
-            <component
-              :value="deviceState"
-              :device="device"
-              :is="iface"
-            ></component>
+            <component :value="deviceState" :device="device" :is="iface"></component>
           </v-card>
         </v-flex>
 
@@ -373,20 +185,8 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex
-          xs12
-          v-if="
-            availableMixins.length &&
-            !device.interfaces.includes(ScryptedInterface.Settings)
-          "
-        >
-          <v-card raised>
-            <CardTitle icon="fa-puzzle-piece">
-              Integrations and Extensions
-            </CardTitle>
-
-            <AvailableMixins :device="device"></AvailableMixins>
-          </v-card>
+        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || !device.interfaces.includes(ScryptedInterface.ScryptedPlugin))">
+          <Settings :device="device"></Settings>
         </v-flex>
       </v-layout>
     </v-flex>
@@ -400,7 +200,6 @@ import LogCard from "./builtin/LogCard.vue";
 import ConsoleCard from "./ConsoleCard.vue";
 import REPLCard from "./REPLCard.vue";
 import {
-  inferTypesFromInterfaces,
   getComponentWebPath,
   getDeviceViewPath,
   removeAlert,
@@ -512,7 +311,7 @@ const cardButtonInterfaces = [
 
 function filterInterfaces(interfaces) {
   return function () {
-    if (this.name == null) {
+    if (!this.device) {
       return [];
     }
     let ret = interfaces.filter((iface) =>
@@ -624,9 +423,6 @@ export default {
         showRepl: false,
         showDelete: false,
         pluginData: undefined,
-        name: undefined,
-        room: undefined,
-        type: undefined,
         loading: false,
         deviceComponent: undefined,
         deviceData: undefined,
@@ -691,9 +487,6 @@ export default {
       this.pluginData.storage = await plugins.getStorage(this.id);
     },
     async reload() {
-      this.name = this.device.name;
-      this.room = this.device.room;
-      this.type = this.device.type;
       this.loading = true;
       const plugins = await this.$scrypted.systemManager.getComponent(
         "plugins"
@@ -732,15 +525,6 @@ export default {
       this.$router.back();
       this.$scrypted.systemManager.removeDevice(id);
     },
-    async saveName() {
-      await this.device.setName(this.name);
-    },
-    async saveType() {
-      await this.device.setType(this.type);
-    },
-    async saveRoom() {
-      await this.device.setRoom(this.room);
-    },
     async saveStorage() {
       const plugins = await this.$scrypted.systemManager.getComponent(
         "plugins"
@@ -757,9 +541,6 @@ export default {
   computed: {
     ScryptedInterface() {
       return ScryptedInterface;
-    },
-    isPlugin() {
-      return this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin);
     },
     origin() {
       return window.location.origin;
@@ -783,20 +564,6 @@ export default {
     rightInterfaces: filterInterfaces(rightInterfaces),
     cardHeaderInterfaces: filterInterfaces(cardHeaderInterfaces),
     aboveInterfaces: filterInterfaces(aboveInterfaces),
-    inferredTypes() {
-      return inferTypesFromInterfaces(
-        this.device.type,
-        this.device.providedType,
-        this.device.interfaces
-      );
-    },
-    existingRooms() {
-      return this.$store.state.scrypted.devices
-        .map(
-          (device) => this.$scrypted.systemManager.getDeviceById(device).room
-        )
-        .filter((room) => room);
-    },
     deviceAlerts() {
       return this.$store.state.scrypted.alerts.filter((alert) =>
         alert.path.startsWith(getDeviceViewPath(this.id))

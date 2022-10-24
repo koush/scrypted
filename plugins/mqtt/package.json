@@ -41,5 +41,5 @@
       "@scrypted/common": "file:../../common",
       "@types/nunjucks": "^3.2.0"
    },
-   "version": "0.0.54"
+   "version": "0.0.56"
 }

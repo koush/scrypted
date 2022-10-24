@@ -15,6 +15,7 @@ COPY fs /
 # s6 process supervisor
 ARG S6_OVERLAY_VERSION=3.1.1.2
 ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+ENV S6_KEEP_ENV=1
 RUN case "$(uname -m)" in \
     x86_64) S6_ARCH='x86_64';; \
     armv7l) S6_ARCH='armhf';; \
@@ -29,6 +30,11 @@ RUN case "$(uname -m)" in \
   && tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz
 
 ENTRYPOINT ["/init"]
+
+ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_CAN_RESTART="true"
+ENV SCRYPTED_VOLUME="/server/volume"
+ENV SCRYPTED_INSTALL_PATH="/server"
 
 ################################################################
 # End section generated from template/Dockerfile.common.footer

@@ -4,7 +4,7 @@ import vm from "vm";
 import fs from 'fs';
 import { newThread } from '@scrypted/server/src/threading';
 import { ScriptDevice } from "./monaco/script-device";
-import { ScryptedInterfaceDescriptors } from "@scrypted/sdk/types";
+import { ScryptedInterfaceDescriptors } from "@scrypted/sdk";
 import fetch from 'node-fetch-commonjs';
 
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
@@ -71,6 +71,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
     }
 
     const allParams = Object.assign({}, params, {
+        fs: require('realfs'),
         fetch,
         ScryptedDeviceBase,
         MixinDeviceBase,

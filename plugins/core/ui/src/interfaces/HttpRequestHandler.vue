@@ -2,7 +2,7 @@
   <span>
     <v-tooltip bottom>
       <template v-slot:activator="{ on }">
-        <v-btn small text v-on="on" @click="viewPublic">
+        <v-btn small text v-on="on" :href="`/endpoint/${device.id}/public/`">
           <font-awesome-icon size="lg" :icon="['fab', 'chrome']" :color="colors.blue.base" />
         </v-btn>
       </template>
@@ -10,7 +10,7 @@
     </v-tooltip>
     <v-tooltip bottom>
       <template v-slot:activator="{ on }">
-        <v-btn small text v-on="on" @click="viewPrivate">
+        <v-btn small text v-on="on" :href="`/endpoint/${device.id}/`">
           <font-awesome-icon size="lg" icon="user-secret" :color="colors.red.base" />
         </v-btn>
       </template>
@@ -29,13 +29,5 @@ export default {
       colors
     };
   },
-  methods: {
-    async viewPublic() {
-        window.open(`/endpoint/${this.device.id}/public/`, 'endpoint');
-    },
-    async viewPrivate() {
-        window.open(`/endpoint/${this.device.id}/`, 'endpoint');
-    }
-  }
 };
 </script>

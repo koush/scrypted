@@ -49,6 +49,10 @@ export async function readMessage(client: Readable): Promise<string[]> {
 
 // https://yumichan.net/video-processing/video-compression/introduction-to-h264-nal-unit/
 
+export const H264_NAL_TYPE_RESERVED0 = 0;
+export const H264_NAL_TYPE_RESERVED30 = 30;
+export const H264_NAL_TYPE_RESERVED31 = 31;
+
 export const H264_NAL_TYPE_IDR = 5;
 export const H264_NAL_TYPE_SEI = 6;
 export const H264_NAL_TYPE_SPS = 7;
@@ -267,7 +271,7 @@ export interface RtspServerResponse {
 
 export class RtspStatusError extends Error {
     constructor(public status: RtspStatus) {
-        super();
+        super(`RTSP Error: ${status.line}`);
     }
 }
 
@@ -719,6 +723,20 @@ export class RtspClient extends RtspBase {
             Range: `npt=${start}-`,
         };
         return this.writeRequest('PLAY', headers);
+    }
+
+    writeRtpPayload(header: Buffer, rtp: Buffer) {
+        this.client.write(header);
+        return this.client.write(Buffer.from(rtp));
+    }
+
+    send(rtp: Buffer, channel: number) {
+        const header = Buffer.alloc(4);
+        header.writeUInt8(RTSP_FRAME_MAGIC, 0);
+        header.writeUInt8(channel, 1);
+        header.writeUInt16BE(rtp.length, 2);
+
+        return this.writeRtpPayload(header, rtp);
     }
 
     async pause() {

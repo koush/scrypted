@@ -57,7 +57,7 @@ export default {
       if (tag === "installed") return "info";
     },
     openNpm() {
-      window.open(getNpmPath(this.pluginData.packageJson.name), "npm");
+      window.open(getNpmPath(this.pluginData.packageJson.name), "_blank");
     },
     async installVersion(version) {
       await installNpm(

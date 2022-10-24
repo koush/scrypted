@@ -39,6 +39,7 @@ export default {
     },
     add() {
       this.lazyValue.push(cloneDeep(this.empty));
+      this.onInput();
     },
   },
 };

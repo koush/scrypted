@@ -4,12 +4,14 @@ import asyncio
 import base64
 import gc
 import json
+import mimetypes
 import os
 import platform
 import shutil
 import subprocess
 import threading
 import time
+import traceback
 import zipfile
 from asyncio.events import AbstractEventLoop
 from asyncio.futures import Future
@@ -17,12 +19,11 @@ from asyncio.streams import StreamReader, StreamWriter
 from collections.abc import Mapping
 from io import StringIO
 from os import sys
-from typing import Any, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import aiofiles
 import scrypted_python.scrypted_sdk.types
 from scrypted_python.scrypted_sdk.types import (Device, DeviceManifest,
-                                                MediaManager,
                                                 ScryptedInterfaceProperty,
                                                 Storage)
 from typing_extensions import TypedDict
@@ -42,6 +43,50 @@ class SystemManager(scrypted_python.scrypted_sdk.types.SystemManager):
 
     async def getComponent(self, id: str) -> Any:
         return await self.api.getComponent(id)
+
+class MediaObjectRemote(scrypted_python.scrypted_sdk.types.MediaObject):
+    def __init__(self, data, mimeType, sourceId):
+        self.mimeType = mimeType
+        self.data = data
+        setattr(self, '__proxy_props', {
+            'mimeType': mimeType,
+            'sourceId': sourceId,
+        })
+
+    async def getData(self):
+        return self.data
+
+class MediaManager:
+    def __init__(self, mediaManager: scrypted_python.scrypted_sdk.types.MediaManager):
+        self.mediaManager = mediaManager
+
+    async def addConverter(self, converter: scrypted_python.scrypted_sdk.types.BufferConverter) -> None:
+        return await self.mediaManager.addConverter(converter)
+    async def clearConverters(self) -> None:
+        return await self.mediaManager.clearConverters()
+    async def convertMediaObject(self, mediaObject: scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> Any:
+        return await self.mediaManager.convertMediaObject(mediaObject, toMimeType)
+    async def convertMediaObjectToBuffer(self, mediaObject: scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> bytearray:
+        return await self.mediaManager.convertMediaObjectToBuffer(mediaObject, toMimeType)
+    async def convertMediaObjectToInsecureLocalUrl(self, mediaObject: str | scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> str:
+        return await self.mediaManager.convertMediaObjectToInsecureLocalUrl(mediaObject, toMimeType)
+    async def convertMediaObjectToJSON(self, mediaObject: scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> Any:
+        return await self.mediaManager.convertMediaObjectToJSON(mediaObject, toMimeType)
+    async def convertMediaObjectToLocalUrl(self, mediaObject: str | scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> str:
+        return await self.mediaManager.convertMediaObjectToLocalUrl(mediaObject, toMimeType)
+    async def convertMediaObjectToUrl(self, mediaObject: str | scrypted_python.scrypted_sdk.types.MediaObject, toMimeType: str) -> str:
+        return await self.mediaManager.convertMediaObjectToUrl(mediaObject, toMimeType)
+    async def createFFmpegMediaObject(self, ffmpegInput: scrypted_python.scrypted_sdk.types.FFmpegInput, options: scrypted_python.scrypted_sdk.types.MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
+        return await self.mediaManager.createFFmpegMediaObject(ffmpegInput, options)
+    async def createMediaObject(self, data: Any, mimeType: str, options: scrypted_python.scrypted_sdk.types.MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
+        # return await self.createMediaObject(data, mimetypes, options)
+        return MediaObjectRemote(data, mimeType, options.get('sourceId', None) if options else None)
+    async def createMediaObjectFromUrl(self, data: str, options:scrypted_python.scrypted_sdk.types. MediaObjectOptions = None) -> scrypted_python.scrypted_sdk.types.MediaObject:
+        return await self.mediaManager.createMediaObjectFromUrl(data, options)
+    async def getFFmpegPath(self) -> str:
+        return await self.mediaManager.getFFmpegPath()
+    async def getFilesPath(self) -> str:
+        return await self.mediaManager.getFilesPath()
 
 class DeviceState(scrypted_python.scrypted_sdk.types.DeviceState):
     def __init__(self, id: str, nativeId: str, systemManager: SystemManager, deviceManager: scrypted_python.scrypted_sdk.types.DeviceManager) -> None:
@@ -139,12 +184,26 @@ class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
         return self.nativeIds.get(nativeId, None)
 
 class BufferSerializer(rpc.RpcSerializer):
-    def serialize(self, value):
+    def serialize(self, value, serializationContext):
         return base64.b64encode(value).decode('utf8')
 
-    def deserialize(self, value):
+    def deserialize(self, value, serializationContext):
         return base64.b64decode(value)
 
+
+class SidebandBufferSerializer(rpc.RpcSerializer):
+    def serialize(self, value, serializationContext):
+        buffers = serializationContext.get('buffers', None)
+        if not buffers:
+            buffers = []
+            serializationContext['buffers'] = buffers
+        buffers.append(value)
+        return len(buffers) - 1
+
+    def deserialize(self, value, serializationContext):
+        buffers: List = serializationContext.get('buffers', None)
+        buffer = buffers.pop()
+        return buffer
 
 class PluginRemote:
     systemState: Mapping[str, Mapping[str, SystemDeviceState]] = {}
@@ -278,10 +337,15 @@ class PluginRemote:
         from scrypted_sdk import sdk_init  # type: ignore
         self.systemManager = SystemManager(self.api, self.systemState)
         self.deviceManager = DeviceManager(self.nativeIds, self.systemManager)
-        self.mediaManager = await self.api.getMediaManager()
+        self.mediaManager = MediaManager(await self.api.getMediaManager())
         sdk_init(zip, self, self.systemManager,
                  self.deviceManager, self.mediaManager)
-        from main import create_scrypted_plugin  # type: ignore
+        try:
+            from main import create_scrypted_plugin  # type: ignore
+        except:
+            print('plugin failed to start')
+            traceback.print_exc()
+            raise
         return await rpc.maybe_await(create_scrypted_plugin())
 
     async def setSystemState(self, state):
@@ -329,29 +393,72 @@ class PluginRemote:
         pass
 
 
-async def readLoop(loop, peer, reader):
-    async for line in reader:
+async def readLoop(loop, peer: rpc.RpcPeer, reader):
+    deserializationContext = {
+        'buffers': []
+    }
+
+    while True:
         try:
-            message = json.loads(line)
-            asyncio.run_coroutine_threadsafe(peer.handleMessage(message), loop)
+            lengthBytes = await reader.read(4)
+            typeBytes = await reader.read(1)
+            type = typeBytes[0]
+            length = int.from_bytes(lengthBytes, 'big')
+            data = await reader.read(length - 1)
+
+            if type == 1:
+                deserializationContext['buffers'].append(data)
+                continue
+
+            message = json.loads(data)
+            asyncio.run_coroutine_threadsafe(peer.handleMessage(message, deserializationContext), loop)
+
+            deserializationContext = {
+                'buffers': []
+            }
         except Exception as e:
             print('read loop error', e)
             sys.exit()
 
 
 async def async_main(loop: AbstractEventLoop):
-    reader = await aiofiles.open(3, mode='r')
+    reader = await aiofiles.open(3, mode='rb')
 
-    def send(message, reject=None):
-        jsonString = json.dumps(message)
-        try:
-            os.write(4, bytes(jsonString + '\n', 'utf8'))
-        except Exception as e:
-            if reject:
-                reject(e)
+    mutex = threading.Lock()
+
+    def send(message, reject=None, serializationContext = None):
+        with mutex:
+            if serializationContext:
+                buffers = serializationContext.get('buffers', None)
+                if buffers:
+                    for buffer in buffers:
+                        length = len(buffer) + 1
+                        lb = length.to_bytes(4, 'big')
+                        type = 1
+                        try:
+                            os.write(4, lb)
+                            os.write(4, bytes([type]))
+                            os.write(4, buffer)
+                        except Exception as e:
+                            if reject:
+                                reject(e)
+                            return
+
+            jsonString = json.dumps(message)
+            b = bytes(jsonString, 'utf8')
+            length = len(b) + 1
+            lb = length.to_bytes(4, 'big')
+            type = 0
+            try:
+                os.write(4, lb)
+                os.write(4, bytes([type]))
+                os.write(4, b)
+            except Exception as e:
+                if reject:
+                    reject(e)
 
     peer = rpc.RpcPeer(send)
-    peer.nameDeserializerMap['Buffer'] = BufferSerializer()
+    peer.nameDeserializerMap['Buffer'] = SidebandBufferSerializer()
     peer.constructorSerializerMap[bytes] = 'Buffer'
     peer.constructorSerializerMap[bytearray] = 'Buffer'
     peer.params['print'] = print

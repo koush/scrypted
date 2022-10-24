@@ -34,14 +34,14 @@ async function runCommandEatError(command: string, ...args: string[]) {
     }
 }
 
-export async function runServer() {
+export async function runServer(installDir: string) {
     console.log('Starting scrypted main...');
-    await runCommand('npm', 'exec', 'scrypted-serve');
+    await runCommand('npm',  '--prefix', installDir, 'exec', 'scrypted-serve');
 }
 
-async function startServer() {
+async function startServer(installDir: string) {
     try {
-        await runServer();
+        await runServer(installDir);
     }
     catch (e) {
         console.error('scrypted server exited with error', e);
@@ -60,7 +60,7 @@ export function cwdInstallDir(): { volume: string, installDir: string } {
     return { volume, installDir };
 }
 
-export async function installServe() {
+export async function installServe(installVersion: string) {
     const { installDir } = cwdInstallDir();
     const packageLockJson = path.join(installDir, 'package-lock.json');
     // apparently corrupted or old version of package-lock.json prevents upgrades, so
@@ -82,18 +82,21 @@ export async function installServe() {
         version: process.version,
     }));
 
-    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', '@scrypted/server@latest');
+    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', `@scrypted/server@${installVersion}`);
     return installDir;
 }
 
-export async function serveMain(install: boolean) {
+export async function serveMain(installVersion?: string) {
+    let install = !!installVersion;
+
     const { installDir, volume } = cwdInstallDir();
     if (!fs.existsSync('node_modules/@scrypted/server')) {
         install = true;
+        installVersion = 'latest';
         console.log('Package @scrypted/server not found. Installing.');
     }
     if (install) {
-        await installServe();
+        await installServe(installVersion);
     }
 
     process.env.SCRYPTED_NPM_SERVE = 'true';
@@ -106,7 +109,7 @@ export async function serveMain(install: boolean) {
         rimraf.sync(EXIT_FILE);
         rimraf.sync(UPDATE_FILE);
 
-        await startServer();
+        await startServer(installDir);
 
         if (fs.existsSync(EXIT_FILE)) {
             console.log('Exiting.');

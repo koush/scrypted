@@ -1,1 +1,8 @@
 __pycache__
+developer.scrypted.app
+.vscode
+types/gen/schema.json
+types/dist
+types/node_modules
+types/package*
+typedoc.*

@@ -1,10 +1,9 @@
 import sdk, { PasswordStore, ScryptedInterface } from "@scrypted/sdk";
-import { ValueID } from "@zwave-js/core";
+import type { ValueID } from "@zwave-js/core";
 import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
-import { UserIDStatus } from "zwave-js";
-import { UserCode } from "zwave-js/lib/commandclass/UserCodeCC";
-const { deviceManager} = sdk;
-
+import { CommandClass, UserCodeCC, UserIDStatus } from "zwave-js";
+import type { UserCode } from "@zwave-js/cc/UserCodeCC"
+const { deviceManager } = sdk;
 
 function isEmpty(str: string) {
     return !str || !str.length;
@@ -60,11 +59,18 @@ export class PasswordStoreToUserCode extends ZwaveDeviceBase implements Password
         const getting = this.getGetting();
         let get = getting.get(index);
         if (!get) {
-            get = cc.get(index).finally(() => getting.delete(index));
-            get.then(entry => {
-                this.storage.setItem(key, JSON.stringify(entry));
+            get = cc.get(index).then(entry => {
+                const userCode = entry.userCode?.toString().trim();
+                const cleaned: Pick<UserCode, "userIdStatus" | "userCode"> = entry ? {
+                    userIdStatus: entry.userIdStatus,
+                    userCode,
+                } : undefined;
+
+                this.storage.setItem(key, JSON.stringify(cleaned));
                 this.notifyChange();
-            });
+                return cleaned;
+            })
+                .finally(() => getting.delete(index));
             getting.set(index, get);
         }
         return get;
@@ -79,8 +85,9 @@ export class PasswordStoreToUserCode extends ZwaveDeviceBase implements Password
                 this.log.i(`Setting code ${password} on code ${i}`);
                 const key = "password-" + i;
                 this.storage.removeItem(key);
-                await cc.set(i, UserIDStatus.Enabled, password);
+                const result = await cc.set(i, UserIDStatus.Enabled, password);
                 this.log.i(`Set code ${password} on code ${i} complete`);
+                this.console.log('code set', result);
                 this.notifyChange();
                 return;
             }

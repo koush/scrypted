@@ -69,6 +69,9 @@ export async function startRtspSession(console: Console, url: string, mediaStrea
         if (contentBase) {
             const url = new URL(contentBase, rtspClient.url);
             const existing = new URL(rtspClient.url);
+            for (const p of existing.searchParams) {
+                url.searchParams.append(p[0], p[1]);
+            }
             url.username = existing.username;
             url.password = existing.password;
             rtspClient.url = url.toString();

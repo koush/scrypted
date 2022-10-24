@@ -1,5 +1,5 @@
 import { Lock, LockState} from "@scrypted/sdk";
-import { ValueID } from "@zwave-js/core";
+import type { ValueID } from "@zwave-js/core";
 import { DoorLockMode } from "zwave-js";
 import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
 

@@ -208,7 +208,7 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 // by default opus encodes with a packet time of 20. however, homekit may request another value,
                 // which we will respect by simply outputing frames of that duration, rather than packing
                 // 20 ms frames to accomodate.
-                opusFramesPerPacket = 1;
+                // the opus repacketizer will pass through those N frame packets as is.
 
                 audioArgs.push(
                     '-acodec', ...(requestedOpus ?

@@ -2,7 +2,7 @@ import { Device, DeviceManager, DeviceManifest, DeviceState, EndpointManager, Ht
 import { RpcPeer, RPCResultError } from '../rpc';
 import { BufferSerializer } from './buffer-serializer';
 import { PluginAPI, PluginLogger, PluginRemote, PluginRemoteLoadZipOptions } from './plugin-api';
-import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketMethods } from './plugin-remote-websocket';
+import { createWebSocketClass, WebSocketConnectCallbacks, WebSocketConnection, WebSocketMethods, WebSocketSerializer } from './plugin-remote-websocket';
 import { checkProperty } from './plugin-state-check';
 import { SystemManagerImpl } from './system';
 
@@ -361,10 +361,30 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
     if (!peer.constructorSerializerMap.get(Buffer))
         peer.addSerializer(Buffer, 'Buffer', new BufferSerializer());
 
+    const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
+    const websocketSerializer = new WebSocketSerializer();
+    peer.addSerializer(WebSocketConnection, WebSocketConnection.name, websocketSerializer);
+
     let done: (scrypted: ScryptedStatic) => void;
     const retPromise = new Promise<ScryptedStatic>(resolve => done = resolve);
 
     peer.params.getRemote = async (api: PluginAPI, pluginId: string) => {
+        websocketSerializer.WebSocket = createWebSocketClass((url: string, callbacks: WebSocketConnectCallbacks) => {
+            if (url.startsWith('io://') || url.startsWith('ws://')) {
+                const id = url.substring('xx://'.length);
+
+                ioSockets[id] = callbacks;
+
+                callbacks.connect(undefined, {
+                    close: () => api.ioClose(id),
+                    send: (message: string) => api.ioSend(id, message),
+                });
+            }
+            else {
+                throw new Error('unsupported websocket');
+            }
+        });
+
         await options?.onGetRemote?.(api, pluginId);
 
         const systemManager = new SystemManagerImpl();
@@ -376,7 +396,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
         }
         const mediaManager = hostMediaManager || await createMediaManager(systemManager, deviceManager);
         peer.params['mediaManager'] = mediaManager;
-        const ioSockets: { [id: string]: WebSocketConnectCallbacks } = {};
 
         systemManager.api = api;
         deviceManager.api = api;
@@ -480,23 +499,6 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
             },
 
             async loadZip(packageJson: any, zipData: Buffer | string, zipOptions?: PluginRemoteLoadZipOptions) {
-
-                function websocketConnect(url: string, protocols: any, callbacks: WebSocketConnectCallbacks) {
-                    if (url.startsWith('io://') || url.startsWith('ws://')) {
-                        const id = url.substring('xx://'.length);
-
-                        ioSockets[id] = callbacks;
-
-                        callbacks.connect(undefined, {
-                            close: () => api.ioClose(id),
-                            send: (message: string) => api.ioSend(id, message),
-                        });
-                    }
-                    else {
-                        throw new Error('unsupported websocket');
-                    }
-                }
-
                 const params: any = {
                     __filename: undefined,
                     deviceManager,
@@ -506,7 +508,13 @@ export function attachPluginRemote(peer: RpcPeer, options?: PluginRemoteAttachOp
                     log,
                     localStorage,
                     pluginHostAPI: api,
-                    WebSocket: createWebSocketClass(websocketConnect),
+                    // TODO:
+                    // 10/10/2022: remove this shim from all plugins and server.
+                    WebSocket: function (url: any) {
+                        if (typeof url === 'string')
+                            throw new Error('unsupported websocket');
+                        return url;
+                    },
                     pluginRuntimeAPI: ret,
                 };
 

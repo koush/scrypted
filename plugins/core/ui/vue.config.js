@@ -1,7 +1,7 @@
 const path = require('path');
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 
-const scryptedServer = `https://${process.env.SCRYPTED_SERVER || '127.0.0.1'}:10443`;
+const scryptedServer = `https://${process.env.SCRYPTED_SERVER || '127.0.0.1:10443'}`;
 
 const proxyOpts = {
   changeOrigin: true,
@@ -15,11 +15,11 @@ const proxyOpts = {
 };
 
 module.exports = {
-  // pluginOptions: {
-  //   webpackBundleAnalyzer: {
-  //     openAnalyzer: true
-  //   }
-  // },
+  pluginOptions: {
+    webpackBundleAnalyzer: {
+      openAnalyzer: process.env['NODE_ENV'] === 'production'
+    }
+  },
 
   productionSourceMap: false,
   transpileDependencies: [
@@ -112,6 +112,6 @@ module.exports = {
   }
 }
 
-if (process.env['NODE_ENV'] == 'production') {
+if (process.env['NODE_ENV'] === 'production') {
   module.exports.configureWebpack.devtool = 'none';
 }

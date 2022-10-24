@@ -32,7 +32,7 @@ export default {
   },
   methods: {
     createInputValue() {
-      return this.lazyValue.slice().filter(e => e.id != "unassigned");
+      return this.lazyValue.slice();//.filter(e => e.id != "unassigned");
     }
   }
 };

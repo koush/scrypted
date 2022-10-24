@@ -48,6 +48,7 @@ const includeToken = 3;
 class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, MixinProvider {
     linkTracker = localStorage.getItem('linkTracker');
     agentUserId = localStorage.getItem('agentUserId');
+    localAuthorization = localStorage.getItem('localAuthorization');
     reportQueue = new Set<string>();
     reportStateThrottled = throttle(() => this.reportState(), 2000);
     throttleSync = throttle(() => this.requestSync(), 15000, {
@@ -62,6 +63,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
     homegraph = homegraph('v1');
     notificationsState: any = {};
+    validAuths = new Set<string>();
 
     constructor() {
         super();
@@ -80,6 +82,11 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
         if (!this.agentUserId) {
             this.agentUserId = uuidv4();
             localStorage.setItem('agentUserId', this.agentUserId);
+        }
+
+        if (!this.localAuthorization) {
+            this.localAuthorization = uuidv4();
+            localStorage.setItem('localAuthorization', this.localAuthorization);
         }
 
         try {
@@ -246,6 +253,9 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
 
             const probe = await supportedType.getSyncResponse(device);
 
+            probe.customData = {
+                'localAuthorization': this.localAuthorization,
+            };
             probe.roomHint = device.room;
             probe.notificationSupportedByAgent = true;
             ret.payload.devices.push(probe);
@@ -505,6 +515,27 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             return;
         }
 
+        const { authorization } = request.headers;
+        if (authorization !== this.localAuthorization) {
+            if (!this.validAuths.has(authorization)) {
+                try {
+                    await axios.get('https://home.scrypted.app/_punch/getcookie', {
+                        headers: {
+                            'Authorization': authorization,
+                        }
+                    });
+                    this.validAuths.add(authorization);
+                }
+                catch (e) {
+                    this.console.error(`request failed due to invalid authorization`, e);
+                    response.send(e.message, {
+                        code: 500,
+                    });
+                    return;
+                }
+            }
+        }
+
         this.console.log(request.body);
         const body = JSON.parse(request.body);
         try {
@@ -531,7 +562,7 @@ class GoogleHome extends ScryptedDeviceBase implements HttpRequestHandler, Engin
             });
         }
         catch (e) {
-            this.console.error(`request error ${e}`);
+            this.console.error(`request error`, e);
             response.send(e.message, {
                 code: 500,
             });

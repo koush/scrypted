@@ -51,7 +51,7 @@ class DeviceProxyHandler implements PrimitiveProxyHandler<any>, ScryptedDevice {
         if (handled)
             return handled;
 
-        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces.value);
+        const interfaces = new Set<string>(this.systemManager.state[this.id].interfaces?.value || []);
         const prop = p.toString();
         const isValidProperty = this.systemManager.propertyInterfaces?.[prop] || propertyInterfaces[prop];
 

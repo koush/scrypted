@@ -71,6 +71,10 @@ app
 
       command.data = JSON.stringify(request);
 
+      command.additionalHeaders = {
+        'Authorization': (request.inputs?.[0]?.payload?.devices?.[0]?.customData as any)?.localAuthorization,
+      }
+
       try {
         const result = await app.getDeviceManager()
           .send(command);
@@ -108,6 +112,10 @@ app
       delete request.devices;
 
       command.data = JSON.stringify(request);
+
+      command.additionalHeaders = {
+        'Authorization': (request.inputs?.[0]?.payload?.commands?.[0].devices?.[0]?.customData as any)?.localAuthorization,
+      }
 
       try {
         const result = await app.getDeviceManager()

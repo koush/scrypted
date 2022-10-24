@@ -1,7 +1,7 @@
-import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM25Sensor, VOCSensor, CO2Sensor } from '@scrypted/sdk';
+import { Fan, FanMode, HumidityMode, HumiditySensor, HumiditySetting, OnOff, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, TemperatureSetting, TemperatureUnit, Thermometer, ThermostatMode, AirQualitySensor, AirQuality, PM10Sensor, PM25Sensor, VOCSensor, NOXSensor, CO2Sensor } from '@scrypted/sdk';
 import { addSupportedType, bindCharacteristic, DummyDevice,  } from '../common';
 import { Characteristic, CharacteristicEventTypes, CharacteristicSetCallback, CharacteristicValue, Service } from '../hap';
-import { makeAccessory } from './common';
+import { addAirQualitySensor, addCarbonDioxideSensor, addFan, makeAccessory } from './common';
 import type { HomeKitPlugin } from "../main";
 
 addSupportedType({
@@ -11,7 +11,7 @@ addSupportedType({
             return false;
         return true;
     },
-    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting & AirQualitySensor & PM25Sensor & VOCSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
+    getAccessory: async (device: ScryptedDevice & TemperatureSetting & Thermometer & HumiditySensor & OnOff & Fan & HumiditySetting & AirQualitySensor & PM10Sensor & PM25Sensor & VOCSensor & NOXSensor & CO2Sensor, homekitPlugin: HomeKitPlugin) => {
         const accessory = makeAccessory(device, homekitPlugin);
         const service = accessory.addService(Service.Thermostat, device.name);
         service.setPrimaryService();
@@ -207,116 +207,9 @@ addSupportedType({
             });
         }
 
-        if (device.interfaces.includes(ScryptedInterface.Fan)) {
-            const fanService = accessory.addService(Service.Fanv2);
-
-            if (device.fan?.counterClockwise != null) {
-                bindCharacteristic(device, ScryptedInterface.Fan, fanService, Characteristic.RotationDirection,
-                    () => device.fan?.counterClockwise ? Characteristic.RotationDirection.COUNTER_CLOCKWISE : Characteristic.RotationDirection.CLOCKWISE);
-                fanService.getCharacteristic(Characteristic.RotationDirection).on(CharacteristicEventTypes.SET, (value, callback) => {
-                    callback();
-                    device.setFan({
-                        counterClockwise: value === Characteristic.RotationDirection.COUNTER_CLOCKWISE,
-                    });
-                });
-            }
-
-            if (device.fan?.maxSpeed) {
-                bindCharacteristic(device, ScryptedInterface.Fan, fanService, Characteristic.RotationSpeed,
-                    () => {
-                        const speed = device.fan?.speed;
-                        if (!speed)
-                            return 0;
-                        const maxSpeed = device.fan?.maxSpeed;
-                        if (!maxSpeed)
-                            return 100;
-                        const fraction = speed / maxSpeed;
-                        return Math.abs(Math.round(fraction * 100));
-                    });
-                fanService.getCharacteristic(Characteristic.RotationSpeed).on(CharacteristicEventTypes.SET, (value, callback) => {
-                    callback();
-                    const maxSpeed = device.fan?.maxSpeed;
-                    const speed = maxSpeed
-                        ? Math.round((value as number) / 100 * maxSpeed)
-                        : 1;
-                    device.setFan({
-                        speed,
-                    });
-                });
-            }
-
-            if (device.fan?.availableModes) {
-                bindCharacteristic(device, ScryptedInterface.Fan, fanService, Characteristic.TargetFanState,
-                    () => device.fan?.mode === FanMode.Manual
-                        ? Characteristic.TargetFanState.MANUAL
-                        : Characteristic.TargetFanState.AUTO);
-                fanService.getCharacteristic(Characteristic.TargetFanState).on(CharacteristicEventTypes.SET, (value, callback) => {
-                    callback();
-                    device.setFan({
-                        mode: value === Characteristic.TargetFanState.MANUAL ? FanMode.Manual : FanMode.Auto,
-                    });
-                });
-
-                bindCharacteristic(device, ScryptedInterface.Fan, fanService, Characteristic.CurrentFanState,
-                    () => !device.fan?.active
-                        ? Characteristic.CurrentFanState.INACTIVE
-                        : !device.fan.speed
-                            ? Characteristic.CurrentFanState.IDLE
-                            : Characteristic.CurrentFanState.BLOWING_AIR);
-            }
-        }
-        else if (device.interfaces.includes(ScryptedInterface.OnOff)) {
-            const fanService = accessory.addService(Service.Fan);
-            bindCharacteristic(device, ScryptedInterface.OnOff, fanService, Characteristic.On,
-                () => !!device.on);
-
-            fanService.getCharacteristic(Characteristic.On).on(CharacteristicEventTypes.SET, (value, callback) => {
-                callback();
-                if (value)
-                    device.turnOn();
-                else
-                    device.turnOff();
-            });
-        }
-
-        if (device.interfaces.includes(ScryptedInterface.AirQualitySensor)) {
-            function airQualityToHomekit(airQuality: AirQuality) {
-                switch (airQuality) {
-                    case AirQuality.Excellent:
-                        return Characteristic.AirQuality.EXCELLENT;
-                    case AirQuality.Good:
-                        return Characteristic.AirQuality.GOOD;
-                    case AirQuality.Fair:
-                        return Characteristic.AirQuality.FAIR;
-                    case AirQuality.Inferior:
-                        return Characteristic.AirQuality.INFERIOR;
-                    case AirQuality.Poor:
-                        return Characteristic.AirQuality.POOR;
-                }
-                return Characteristic.AirQuality.UNKNOWN;
-            }
-
-            const airQualityService = accessory.addService(Service.AirQualitySensor);
-            bindCharacteristic(device, ScryptedInterface.AirQualitySensor, airQualityService, Characteristic.AirQuality,
-                () => airQualityToHomekit(device.airQuality));
-            
-            if (device.interfaces.includes(ScryptedInterface.PM25Sensor)) {
-                bindCharacteristic(device, ScryptedInterface.PM25Sensor, airQualityService, Characteristic.PM2_5Density,
-                    () => device.pm25Density || 0);
-            }
-            if (device.interfaces.includes(ScryptedInterface.VOCSensor)) {
-                bindCharacteristic(device, ScryptedInterface.VOCSensor, airQualityService, Characteristic.VOCDensity,
-                    () => device.vocDensity || 0);
-            }
-        }
-
-        if (device.interfaces.includes(ScryptedInterface.CO2Sensor)) {
-            const co2Service = accessory.addService(Service.CarbonDioxideSensor, device.name);
-            bindCharacteristic(device, ScryptedInterface.CO2Sensor, co2Service, Characteristic.CarbonDioxideLevel,
-                () => device.co2ppm || 0);
-            bindCharacteristic(device, ScryptedInterface.CO2Sensor, co2Service, Characteristic.CarbonDioxideDetected,
-                () => ((device.co2ppm || 0) > 5000))
-        }
+        addFan(device, accessory);
+        addAirQualitySensor(device, accessory);
+        addCarbonDioxideSensor(device, accessory);
 
         return accessory;
     },

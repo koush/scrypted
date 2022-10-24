@@ -302,7 +302,9 @@ export function getSpsPps(
     }
 ) {
     const spspps = section?.fmtp?.[0]?.parameters?.['sprop-parameter-sets']?.split(',');
-    if (!spspps) {
+    // empty sprop-parameter-sets is apparently a thing:
+    //     a=fmtp:96 profile-level-id=420029; packetization-mode=1; sprop-parameter-sets=
+    if (spspps?.length !== 2) {
         return {
             sps: undefined,
             pps: undefined,

@@ -1,4 +1,5 @@
 import { EventDetails, EventListenerOptions, EventListenerRegister, ScryptedInterface, SystemDeviceState } from "@scrypted/types";
+import crypto from 'crypto';
 
 export class EventListenerRegisterImpl implements EventListenerRegister {
     removeListener: () => void;
@@ -49,7 +50,8 @@ export class EventRegistry {
         if (property && !changed)
             return false;
 
-        const eventDetails = {
+        const eventDetails: EventDetails = {
+            eventId: crypto.randomBytes(8).toString("base64"),
             changed,
             eventInterface,
             eventTime,

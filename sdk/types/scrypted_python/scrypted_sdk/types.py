@@ -105,6 +105,7 @@ class ScryptedInterface(Enum):
     Microphone = "Microphone"
     MixinProvider = "MixinProvider"
     MotionSensor = "MotionSensor"
+    NOXSensor = "NOXSensor"
     Notifier = "Notifier"
     OauthClient = "OauthClient"
     ObjectDetection = "ObjectDetection"
@@ -112,6 +113,7 @@ class ScryptedInterface(Enum):
     OccupancySensor = "OccupancySensor"
     OnOff = "OnOff"
     Online = "Online"
+    PM10Sensor = "PM10Sensor"
     PM25Sensor = "PM25Sensor"
     PanTiltZoom = "PanTiltZoom"
     PasswordStore = "PasswordStore"
@@ -192,6 +194,9 @@ class H264Info(TypedDict):
     fuab: bool
     mtap16: bool
     mtap32: bool
+    reserved0: bool
+    reserved30: bool
+    reserved31: bool
     sei: bool
     stapb: bool
     pass
@@ -206,6 +211,11 @@ class AudioStreamOptions(TypedDict):
     codec: str
     encoder: str
     profile: str
+    pass
+
+class HttpResponseOptions(TypedDict):
+    code: float
+    headers: object
     pass
 
 class ObjectDetectionResult(TypedDict):
@@ -244,11 +254,6 @@ class MediaStreamSource(TypedDict):
     pass
 
 class MediaStreamTool(TypedDict):
-    pass
-
-class BufferConverter(TypedDict):
-    fromMimeType: str
-    toMimeType: str
     pass
 
 class BufferConvertorOptions(TypedDict):
@@ -299,6 +304,7 @@ class DeviceManifest(TypedDict):
 
 class EventDetails(TypedDict):
     changed: bool
+    eventId: str
     eventInterface: str
     eventTime: float
     property: str
@@ -308,9 +314,6 @@ class EventListenerOptions(TypedDict):
     denoise: bool
     event: str
     watch: bool
-    pass
-
-class EventListenerRegister(TypedDict):
     pass
 
 class FFmpegInput(TypedDict):
@@ -328,6 +331,7 @@ class FanState(TypedDict):
     counterClockwise: bool
     mode: FanMode
     speed: float
+    swing: bool
     pass
 
 class FanStatus(TypedDict):
@@ -337,19 +341,17 @@ class FanStatus(TypedDict):
     maxSpeed: float
     mode: FanMode
     speed: float
+    swing: bool
     pass
 
 class HttpRequest(TypedDict):
     body: str
-    headers: object
+    headers: Any
     isPublicEndpoint: bool
     method: str
     rootPath: str
     url: str
     username: str
-    pass
-
-class HttpResponse(TypedDict):
     pass
 
 class HumidityCommand(TypedDict):
@@ -370,9 +372,6 @@ class LauncherApplicationInfo(TypedDict):
     description: str
     icon: str
     name: str
-    pass
-
-class Logger(TypedDict):
     pass
 
 class MediaObjectOptions(TypedDict):
@@ -407,6 +406,7 @@ class MediaStreamOptions(TypedDict):
 class ObjectDetectionModel(TypedDict):
     classes: list[str]
     inputSize: list[float]
+    inputStream: MediaStreamDestination
     name: str
     settings: list[Setting]
     pass
@@ -422,7 +422,7 @@ class ObjectDetectionTypes(TypedDict):
     pass
 
 class ObjectsDetected(TypedDict):
-    detectionId: Any
+    detectionId: str
     detections: list[ObjectDetectionResult]
     eventId: Any
     inputDimensions: tuple[float, float]
@@ -441,16 +441,9 @@ class Position(TypedDict):
     longitude: float
     pass
 
-class RTCSessionControl(TypedDict):
-    pass
-
-class RTCSignalingSession(TypedDict):
-    pass
-
 class RecordedEvent(TypedDict):
     data: Any
     details: EventDetails
-    id: str
     pass
 
 class RecordedEventOptions(TypedDict):
@@ -463,6 +456,7 @@ class RecordedEventOptions(TypedDict):
 
 class RecordingStreamThumbnailOptions(TypedDict):
     crop: Any
+    detectionId: str
     resize: Any
     pass
 
@@ -537,22 +531,6 @@ class ScriptSource(TypedDict):
     monacoEvalDefaults: str
     name: str
     script: str
-    pass
-
-class ScryptedDevice(TypedDict):
-    id: str
-    info: DeviceInformation
-    interfaces: list[str]
-    mixins: list[str]
-    name: str
-    pluginId: str
-    providedInterfaces: list[str]
-    providedName: ScryptedDeviceType
-    providedRoom: str
-    providedType: ScryptedDeviceType
-    providerId: str
-    room: str
-    type: ScryptedDeviceType
     pass
 
 class SecuritySystemState(TypedDict):
@@ -799,6 +777,10 @@ class MotionSensor:
     motionDetected: bool
     pass
 
+class NOXSensor:
+    noxDensity: float
+    pass
+
 class Notifier:
     async def sendNotification(self, title: str, body: str, media: str | MediaObject = None) -> None:
         pass
@@ -812,14 +794,14 @@ class OauthClient:
     pass
 
 class ObjectDetection:
-    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None) -> ObjectsDetected:
+    async def detectObjects(self, mediaObject: MediaObject, session: ObjectDetectionSession = None, callbacks: ObjectDetectionCallbacks = None) -> ObjectsDetected:
         pass
-    async def getDetectionModel(self) -> ObjectDetectionModel:
+    async def getDetectionModel(self, settings: Any = None) -> ObjectDetectionModel:
         pass
     pass
 
 class ObjectDetector:
-    async def getDetectionInput(self, detectionId: Any, eventId: Any = None) -> MediaObject:
+    async def getDetectionInput(self, detectionId: str, eventId: Any = None) -> MediaObject:
         pass
     async def getObjectTypes(self) -> ObjectDetectionTypes:
         pass
@@ -839,6 +821,10 @@ class OnOff:
 
 class Online:
     online: bool
+    pass
+
+class PM10Sensor:
+    pm10Density: float
     pass
 
 class PM25Sensor:
@@ -886,16 +872,6 @@ class PushHandler:
         pass
     pass
 
-class RTCSignalingChannel:
-    async def startRTCSignalingSession(self, session: RTCSignalingSession) -> RTCSessionControl:
-        pass
-    pass
-
-class RTCSignalingClient:
-    async def createRTCSignalingSession(self) -> RTCSignalingSession:
-        pass
-    pass
-
 class Readme:
     async def getReadmeMarkdown(self) -> str:
         pass
@@ -932,6 +908,7 @@ class ScryptedDevice:
     interfaces: list[str]
     mixins: list[str]
     name: str
+    nativeId: str
     pluginId: str
     providedInterfaces: list[str]
     providedName: ScryptedDeviceType
@@ -1179,6 +1156,7 @@ class ScryptedInterfaceProperty(Enum):
     interfaces = "interfaces"
     mixins = "mixins"
     name = "name"
+    nativeId = "nativeId"
     pluginId = "pluginId"
     providedInterfaces = "providedInterfaces"
     providedName = "providedName"
@@ -1224,8 +1202,10 @@ class ScryptedInterfaceProperty(Enum):
     luminance = "luminance"
     position = "position"
     securitySystemState = "securitySystemState"
+    pm10Density = "pm10Density"
     pm25Density = "pm25Density"
     vocDensity = "vocDensity"
+    noxDensity = "noxDensity"
     co2ppm = "co2ppm"
     airQuality = "airQuality"
     humiditySetting = "humiditySetting"
@@ -1589,6 +1569,13 @@ class DeviceState:
         self.setScryptedProperty("securitySystemState", value)
 
     @property
+    def pm10Density(self) -> float:
+        return self.getScryptedProperty("pm10Density")
+    @pm10Density.setter
+    def pm10Density(self, value: float):
+        self.setScryptedProperty("pm10Density", value)
+
+    @property
     def pm25Density(self) -> float:
         return self.getScryptedProperty("pm25Density")
     @pm25Density.setter
@@ -1601,6 +1588,13 @@ class DeviceState:
     @vocDensity.setter
     def vocDensity(self, value: float):
         self.setScryptedProperty("vocDensity", value)
+
+    @property
+    def noxDensity(self) -> float:
+        return self.getScryptedProperty("noxDensity")
+    @noxDensity.setter
+    def noxDensity(self, value: float):
+        self.setScryptedProperty("noxDensity", value)
 
     @property
     def co2ppm(self) -> float:
@@ -1653,6 +1647,7 @@ ScryptedInterfaceDescriptors = {
       "interfaces",
       "mixins",
       "name",
+      "nativeId",
       "pluginId",
       "providedInterfaces",
       "providedName",
@@ -2090,6 +2085,13 @@ ScryptedInterfaceDescriptors = {
       "securitySystemState"
     ]
   },
+  "PM10Sensor": {
+    "name": "PM10Sensor",
+    "methods": [],
+    "properties": [
+      "pm10Density"
+    ]
+  },
   "PM25Sensor": {
     "name": "PM25Sensor",
     "methods": [],
@@ -2102,6 +2104,13 @@ ScryptedInterfaceDescriptors = {
     "methods": [],
     "properties": [
       "vocDensity"
+    ]
+  },
+  "NOXSensor": {
+    "name": "NOXSensor",
+    "methods": [],
+    "properties": [
+      "noxDensity"
     ]
   },
   "CO2Sensor": {
@@ -2235,4 +2244,25 @@ ScryptedInterfaceDescriptors = {
     ]
   }
 }
+
+class EventListenerRegister:
+    def removeListener(self) -> None:
+        pass
+    pass
+
+class HttpResponse:
+    def send(self, body: str) -> None:
+        pass
+    def sendFile(self, path: str) -> None:
+        pass
+    def sendSocket(self, socket: Any, options: HttpResponseOptions) -> None:
+        pass
+    pass
+
+class ObjectDetectionCallbacks:
+    async def onDetection(self, detection: ObjectsDetected, mediaObject: MediaObject = None) -> bool:
+        pass
+    async def onDetectionEnded(self, detection: ObjectsDetected) -> None:
+        pass
+    pass
 

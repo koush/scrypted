@@ -90,7 +90,7 @@ export default {
       );
     },
     openLink(link) {
-      window.open(link, "npm");
+      window.open(link, "_blank");
     },
     avatar(email) {
       return `https://www.gravatar.com/avatar/${md5(email)}?s=28`;

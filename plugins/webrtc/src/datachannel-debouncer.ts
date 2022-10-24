@@ -5,7 +5,7 @@ export class DataChannelDebouncer {
     pending: Buffer;
     maxWait = 10;
 
-    constructor(public dc: { send: (buffer: Buffer) => void }) {
+    constructor(public dc: { send: (buffer: Buffer) => void }, public kill: (e: Error) => void) {
     }
 
     send(data: Buffer) {
@@ -26,14 +26,19 @@ export class DataChannelDebouncer {
     }
 
     flush() {
-        let offset = 0;
-        while (offset < this.pending.length) {
-            this.dc.send(this.pending.slice(offset, offset + maxPacketSize));
-            offset += maxPacketSize;
+        try {
+            let offset = 0;
+            while (offset < this.pending.length) {
+                this.dc.send(this.pending.slice(offset, offset + maxPacketSize));
+                offset += maxPacketSize;
+            }
+    
+            this.pending = undefined;
+            clearTimeout(this.timeout);
+            this.timeout = undefined;
         }
-
-        this.pending = undefined;
-        clearTimeout(this.timeout);
-        this.timeout = undefined;
+        catch (e) {
+            this.kill(e);
+        }
     }
 }

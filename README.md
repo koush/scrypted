@@ -14,8 +14,8 @@ Select the appropriate guide. After installation is finished, remember to visit 
 
  * [Raspberry Pi](https://github.com/koush/scrypted/wiki/Installation:-Raspberry-Pi)
  * Linux
-   * [Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Linux) - This is the recommended method. Local installation may interfere with other software, like Homebridge, Home Assistant, or HOOBS.
-   * [Docker Compose](https://github.com/koush/scrypted/wiki/Installation:-Docker-Compose)
+   * [Docker Compose](https://github.com/koush/scrypted/wiki/Installation:-Docker-Compose-Linux) - This is the recommended method. Local installation may interfere with other server software.
+   * [Docker](https://github.com/koush/scrypted/wiki/Installation:-Docker-Linux) - Use Docker Compose. This is a reference documentation.
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Linux) - Use this if Docker scares you or whatever.
  * Mac
    * [Local Installation](https://github.com/koush/scrypted/wiki/Installation:-Mac)
@@ -84,7 +84,7 @@ If you do not want to set up VS Code, you can also run build and install the plu
 
 ```sh
 # currently in the plugins/homekit directory.
-npm run scrypted-webpack && npm run scrypted-deploy 127.0.0.1
+npm run build && npm run scrypted-deploy 127.0.0.1
 ```
 
 ## Plugin Development

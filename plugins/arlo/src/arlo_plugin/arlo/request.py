@@ -16,6 +16,8 @@
 
 import requests
 from requests.exceptions import HTTPError
+import time
+import uuid
 
 #from requests_toolbelt.utils import dump
 #def print_raw_http(response):
@@ -28,6 +30,12 @@ class Request(object):
     def __init__(self, timeout=5):
         self.session = requests.Session()
         self.timeout = timeout
+
+    def gen_event_id(self):
+        return f'FE!{str(uuid.uuid4())}'
+
+    def get_time(self):
+        return int(time.time_ns() / 1_000_000)
 
     def _request(self, url, method='GET', params={}, headers={}, stream=False, raw=False):
 
@@ -42,6 +50,8 @@ class Request(object):
         req_log.setLevel(logging.DEBUG)
         req_log.propagate = True
         """
+
+        url =  f'{url}?eventId={self.gen_event_id()}&time={self.get_time()}'
 
         if method == 'GET':
             #print('COOKIES: ', self.session.cookies.get_dict())

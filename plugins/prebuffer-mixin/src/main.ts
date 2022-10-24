@@ -3,17 +3,18 @@ import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-p
 import { getDebugModeH264EncoderArgs, getH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { handleRebroadcasterClient, ParserOptions, ParserSession, startParserSession } from '@scrypted/common/src/ffmpeg-rebroadcast';
-import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
+import { closeQuiet, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { readLength } from '@scrypted/common/src/read-stream';
-import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
+import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H264_NAL_TYPE_IDR, H264_NAL_TYPE_MTAP16, H264_NAL_TYPE_MTAP32, H264_NAL_TYPE_RESERVED0, H264_NAL_TYPE_RESERVED30, H264_NAL_TYPE_RESERVED31, H264_NAL_TYPE_SEI, H264_NAL_TYPE_STAP_B, RtspServer, RtspTrack } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
-import { StorageSettings } from '@scrypted/common/src/settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, PluginFork, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
 import net, { AddressInfo } from 'net';
+import semver from 'semver';
 import { Duplex } from 'stream';
 import { FileRtspServer } from './file-rtsp-server';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
@@ -56,6 +57,18 @@ type Prebuffers<T extends string> = {
 
 type PrebufferParsers = 'mpegts' | 'mp4' | 'rtsp';
 const PrebufferParserValues: PrebufferParsers[] = ['mpegts', 'mp4', 'rtsp'];
+
+function hasOddities(h264Info: H264Info) {
+  const h264Oddities = h264Info.fuab
+    || h264Info.mtap16
+    || h264Info.mtap32
+    || h264Info.sei
+    || h264Info.stapb
+    || h264Info.reserved0
+    || h264Info.reserved30
+    || h264Info.reserved31;
+  return h264Oddities;
+}
 
 class PrebufferSession {
 
@@ -128,13 +141,7 @@ class PrebufferSession {
   }
 
   getLastH264Oddities() {
-    const lastProbe = this.getLastH264Probe();
-    const h264Oddities = lastProbe.fuab
-      || lastProbe.mtap16
-      || lastProbe.mtap32
-      || lastProbe.sei
-      || lastProbe.stapb;
-    return h264Oddities;
+    return hasOddities(this.getLastH264Probe());
   }
 
   getDetectedIdrInterval() {
@@ -194,7 +201,7 @@ class PrebufferSession {
   }
 
   get streamName() {
-    return this.advertisedMediaStreamOptions.name;
+    return this.advertisedMediaStreamOptions.name || `Stream ${this.streamId}`;
   }
 
   clearPrebuffers() {
@@ -301,7 +308,7 @@ class PrebufferSession {
     const elapsed = Date.now() - start;
     const bitrate = Math.round(total / elapsed * 8);
 
-    const group = this.streamName ? `Stream: ${this.streamName}` : 'Stream';
+    const group = `Stream: ${this.streamName}`;
 
     settings.push(
       {
@@ -708,7 +715,6 @@ class PrebufferSession {
       if (isDefault
         && this.usingScryptedParser
         && h264Oddities
-        && !this.stopInactive
         && sessionMso.tool !== 'scrypted') {
         this.console.warn('H264 oddities were detected in prebuffered video stream, the Default Scrypted RTSP Parser will not be used. Falling back to FFmpeg. This can be overriden by setting the RTSP Parser to Scrypted.');
         this.usingScryptedParser = false;
@@ -751,7 +757,10 @@ class PrebufferSession {
         h264Probe.mtap16 ||= types.has(H264_NAL_TYPE_MTAP16);
         h264Probe.mtap32 ||= types.has(H264_NAL_TYPE_MTAP32);
         h264Probe.sei ||= types.has(H264_NAL_TYPE_SEI);
-        const oddity = h264Probe.fuab || h264Probe.stapb || h264Probe.mtap16 || h264Probe.mtap32 || h264Probe.sei;
+        h264Probe.reserved0 ||= types.has(H264_NAL_TYPE_RESERVED0);
+        h264Probe.reserved30 ||= types.has(H264_NAL_TYPE_RESERVED30);
+        h264Probe.reserved31 ||= types.has(H264_NAL_TYPE_RESERVED31);
+        const oddity = hasOddities(h264Probe);
         if (oddity && !reportedOddity) {
           reportedOddity = true;
           let { isDefault } = this.getParser(rtspMode, sessionMso);
@@ -766,6 +775,9 @@ class PrebufferSession {
             return;
           }
 
+          // don't restart the stream if it is not a prebuffered stream.
+          // allow this specific request to continue, and possibly fail.
+          // the next time the stream is requested, ffmpeg will be used.
           if (!this.stopInactive) {
             this.console.warn('Oddity in prebuffered stream. Restarting rebroadcast to use FFmpeg instead.');
             session.kill(new Error('restarting due to H264 oddity detection'));
@@ -1017,12 +1029,18 @@ class PrebufferSession {
     if (options?.refresh === false && !this.parserSessionPromise)
       throw new Error('Stream is currently unavailable and will not be started for this request. RequestMediaStreamOptions.refresh === false');
 
+    const startedParserSession = !this.parserSessionPromise;
+
     this.ensurePrebufferSession();
 
     const session = await this.parserSessionPromise;
 
     let requestedPrebuffer = options?.prebuffer;
-    if (requestedPrebuffer == null) {
+    // if no prebuffer was requested, try to find a sync frame in the prebuffer.
+    // also do this if this request initiated the prebuffer: so, an explicit request for 0 prebuffer
+    // will still send the initial sync frame in the stream start. it may otherwise be missed
+    // if some time passes between the initial stream request and the actual pulling of the stream.
+    if (requestedPrebuffer == null || startedParserSession) {
       // prebuffer search for remote streaming should be even more conservative than local network.
       const defaultPrebuffer = options?.destination === 'remote' ? 2000 : 4000;
       // try to gaurantee a sync frame, but don't search too much prebuffer to make it happen.
@@ -1096,6 +1114,7 @@ class PrebufferSession {
       socketPromise = client.clientPromise.then(async (socket) => {
         sdp = addTrackControls(sdp);
         server = new FileRtspServer(socket, sdp);
+        server.writeConsole = this.console;
         if (session.parserSpecific) {
           const parserSpecific = session.parserSpecific as RtspSessionParserSpecific;
           server.resolveInterleaved = msection => {
@@ -1737,7 +1756,16 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     // 8-11-2022
     // old scrypted had a bug where mixin device state was not exposing properties like id correctly
     // across rpc boundaries.
-    if (sdk.fork && typeof mixinDeviceState.id === 'string') {
+    let fork = false;
+    try {
+      const info = await systemManager.getComponent('info');
+      const version = await info.getVersion();
+      fork = semver.gte(version, '0.2.5');
+    }
+    catch (e) {
+    }
+
+    if (fork && sdk.fork && typeof mixinDeviceState.id === 'string') {
       const forked = sdk.fork<RebroadcastPluginFork>();
       const result = await forked.result as RebroadcastPluginFork;
       const ret = result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);

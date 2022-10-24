@@ -5,7 +5,7 @@ import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { getNaluTypesInNalu, RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, Intercom, MediaObject, MediaStreamUrl, ResponseMediaStreamOptions, RTCAVSignalingSetup, RTCSessionControl, RTCSignalingChannel, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession, ScryptedMimeTypes } from "@scrypted/sdk";
-import { waitClosed, waitConnected } from "./peerconnection-util";
+import { logConnectionState, waitClosed, waitConnected, waitIceConnected } from "./peerconnection-util";
 import { startRtpForwarderProcess } from "./rtp-forwarders";
 import { getFFmpegRtpAudioOutputArguments, requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
 import { createRawResponse, getWeriftIceServers, isPeerConnectionAlive } from "./werift-util";
@@ -52,7 +52,7 @@ export async function createRTCPeerConnectionSource(options: {
         const ensurePeerConnection = (setup: RTCAVSignalingSetup) => {
             if (peerConnection.finished)
                 return;
-            peerConnection.resolve(new RTCPeerConnection({
+            const ret = new RTCPeerConnection({
                 bundlePolicy: setup.configuration?.bundlePolicy as BundlePolicy,
                 codecs: {
                     audio: [
@@ -63,7 +63,10 @@ export async function createRTCPeerConnectionSource(options: {
                     ],
                 },
                 iceServers: getWeriftIceServers(setup.configuration),
-            }));
+            });
+
+            logConnectionState(console, ret);
+            peerConnection.resolve(ret);
         }
 
         let audioTrack: string;
@@ -77,8 +80,14 @@ export async function createRTCPeerConnectionSource(options: {
             let gotVideo = false;
 
             const pc = await peerConnection.promise;
+            pc.iceConnectionStateChange.subscribe(() => {
+                console.log('iceConnectionState', pc.iceConnectionState);
+            });
+            pc.connectionStateChange.subscribe(() => {
+                console.log('connectionState', pc.connectionState);
+            });
             audioTransceiver = pc.addTransceiver("audio", setup.audio as any);
-            // audioTransceiver.mid = '0';
+            audioTransceiver.mid = '0';
             audioTransceiver.onTrack.subscribe((track) => {
                 track.onReceiveRtp.subscribe(rtp => {
                     if (!gotAudio) {
@@ -91,8 +100,9 @@ export async function createRTCPeerConnectionSource(options: {
             });
 
             const videoTransceiver = pc.addTransceiver("video", setup.video as any);
-            // videoTransceiver.mid = '1';
+            videoTransceiver.mid = '1';
             videoTransceiver.onTrack.subscribe((track) => {
+                console.log('received video track');
                 track.onReceiveRtp.subscribe(rtp => {
                     if (!gotVideo) {
                         gotVideo = true;
@@ -131,6 +141,8 @@ export async function createRTCPeerConnectionSource(options: {
                     waitClosed(pc).then(() => clearInterval(pictureLossInterval));
                 });
             });
+
+            console.log('peer connection setup complete');
         }
 
         const handleRtspSetup = async (description: RTCSessionDescriptionInit) => {
@@ -154,7 +166,7 @@ export async function createRTCPeerConnectionSource(options: {
 
             async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
                 if (type === 'offer')
-                    doSetup(setup);
+                    await doSetup(setup);
                 const pc = await peerConnection.promise;
                 if (setup.datachannel) {
                     pc.createDataChannel(setup.datachannel.label, setup.datachannel.dict);
@@ -168,7 +180,7 @@ export async function createRTCPeerConnectionSource(options: {
 
                 if (sendIceCandidate) {
                     pc.onicecandidate = ev => {
-                        // console.log('sendIceCandidate', ev.candidate.sdpMLineIndex, ev.candidate.candidate);
+                        console.log('sendIceCandidate', ev.candidate.sdpMLineIndex, ev.candidate.candidate);
                         sendIceCandidate({
                             ...ev.candidate,
                         });
@@ -203,14 +215,14 @@ export async function createRTCPeerConnectionSource(options: {
             async setRemoteDescription(description: RTCSessionDescriptionInit, setup: RTCAVSignalingSetup): Promise<void> {
                 console.log('setRemoteDescription', description.sdp)
                 if (description.type === 'offer')
-                    doSetup(setup);
+                    await doSetup(setup);
                 else
                     await handleRtspSetup(description);
                 const pc = await peerConnection.promise;
                 await pc.setRemoteDescription(description as any);
             }
             async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
-                // console.log('addIceCandidate', candidate.sdpMLineIndex, candidate.candidate)
+                console.log('addIceCandidate', candidate.sdpMLineIndex, candidate.candidate)
                 const pc = await peerConnection.promise;
                 await pc.addIceCandidate(candidate as RTCIceCandidate);
             }
@@ -219,8 +231,10 @@ export async function createRTCPeerConnectionSource(options: {
         const session = new SignalingSession();
         const sc = await channel.startRTCSignalingSession(session);
         sessionControl.resolve(sc);
+        console.log('waiting for peer connection');
         const pc = await peerConnection.promise;
-        await waitConnected(pc);
+        console.log('waiting for ice connected');
+        await waitIceConnected(pc);
 
         let destroyProcess: () => void;
 

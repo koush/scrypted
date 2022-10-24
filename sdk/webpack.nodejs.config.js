@@ -116,5 +116,5 @@ module.exports = {
         ],
     },
 
-    devtool: 'source-map',
+    devtool: process.env.WEBPACK_DEVTOOL || 'source-map',
 };

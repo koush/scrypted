@@ -10,15 +10,19 @@ import { Writable } from "stream";
 
 const { mediaManager } = sdk;
 
+type StringWithAutocomplete<T> = T | (string & Record<never, never>);
+
+export type RtpCodecCopy = StringWithAutocomplete<"copy">;
+
 export interface RtpTrack {
-    codecCopy?: string;
+    codecCopy?: RtpCodecCopy;
     ffmpegDestination?: string;
     packetSize?: number;
     encoderArguments: string[];
     outputArguments?: string[];
     onRtp(rtp: Buffer): void;
     onMSection?: (msection: MSection) => void;
-    firstPacket?: () => void;
+    firstPacket?: (rtp: Buffer) => void;
     payloadType?: number;
     rtcpPort?: number;
     ssrc?: number;
@@ -44,7 +48,7 @@ function createPacketDelivery(track: RtpTrack) {
     return (rtp: Buffer) => {
         if (firstPacket) {
             firstPacket = false;
-            track.firstPacket?.();
+            track.firstPacket?.(rtp);
         }
         track.onRtp(rtp);
     }
@@ -108,7 +112,7 @@ export async function createTrackForwarders(console: Console, rtpTracks: RtpTrac
     }
 }
 
-function isCodecCopy(desiredCodec: string, checkCodec: string) {
+function isCodecCopy(desiredCodec: RtpCodecCopy, checkCodec: string) {
     return desiredCodec === 'copy'
         || (desiredCodec && desiredCodec === checkCodec);
 }
@@ -120,6 +124,21 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     rtspMode?: 'udp' | 'tcp' | 'pull',
     onRtspClient?: (rtspClient: RtspClient, optionsResponse: RtspServerResponse) => Promise<boolean>,
 }) {
+    const killDeferred = new Deferred<void>();
+
+    const killGuard = (track: RtpTrack) => {
+        const old = track?.onRtp;
+        if (old) {
+            track.onRtp = rtp => {
+                if (killDeferred.finished)
+                    return;
+                old(rtp);
+            }
+        }
+    }
+    killGuard(rtpTracks.video);
+    killGuard(rtpTracks.audio);
+
     let { inputArguments, videoDecoderArguments } = ffmpegInput;
     let rtspClient: RtspClient;
     let sockets: dgram.Socket[] = [];
@@ -170,7 +189,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
             const audioSection = parsedSdp.msections.find(msection => msection.type === 'audio' && (msection.codec === audioCodec || audioCodec === 'copy'));
 
-            console.log('a/v', video.codecCopy, audio?.codecCopy, 'found', videoSection.codec, audioSection?.codec);
+            console.log('a/v', videoCodec, audioCodec, 'found', videoSection.codec, audioSection?.codec);
 
             if (audio) {
                 if (audioSection
@@ -194,6 +213,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         audioSection = newSdp.msections.find(msection => msection.type === 'audio');
 
                     if (!audioSection) {
+                        delete rtpTracks.audio;
                         console.warn(`audio section not found in sdp.`);
                         audioSectionDeferred.resolve(undefined);
                     }
@@ -206,6 +226,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         audio.srtp = undefined;
 
                         inputArguments = [
+                            '-listen_timeout', '300',
                             '-analyzeduration', '0', '-probesize', '512',
                             '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
                             '-f', 'sdp', '-i', 'pipe:3',
@@ -214,14 +235,13 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         const audioSender = await createBindZero();
                         sockets.push(audioSender.server);
 
-                        await rtspClient.setup({
-                            type: 'tcp',
-                            port: channel,
-                            path: audioSection.control,
-                            onRtp: (rtspHeader, rtp) => {
-                                audioSender.server.send(rtp, udpPort);
-                            },
-                        });
+                        // NOTE:
+                        // This code path can fail if the audio is fetched via rtsp/tcp and the payloads are
+                        // larger than the MTU. However, I have only observed larger than MTU video payloads.
+                        // Audio payloads always seem to fit into the MTU even if using rtsp/tcp.
+                        await setupRtspClient(console, rtspClient, channel, audioSection, false, rtp => {
+                            audioSender.server.send(rtp, udpPort);
+                        })
                     }
                 }
             }
@@ -239,7 +259,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         }
     }
     else {
-        console.log('video codec/container not matched, transcoding:', rtpTracks.video?.codecCopy);
+        console.log('video codec/container not matched, transcoding:', videoCodec);
     }
 
     const reportTranscodedSections = (sdp: string) => {
@@ -257,7 +277,6 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     const forwarders = await createTrackForwarders(console, rtpTracks);
 
 
-    let killDeferred = new Deferred<void>();
     const kill = () => {
         killDeferred.resolve(undefined);
         for (const socket of sockets) {
@@ -364,14 +383,14 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         if (rtspSample.type === videoSection.codec) {
                             if (firstVideoPacket) {
                                 firstVideoPacket = false;
-                                video.firstPacket?.();
+                                video.firstPacket?.(rtspSample.packet);
                             }
                             video.onRtp(rtspSample.packet);
                         }
                         else if (rtspSample.type === audioSection?.codec) {
                             if (firstAudioPacket) {
                                 firstAudioPacket = false;
-                                rtpTracks.audio.firstPacket?.();
+                                rtpTracks.audio.firstPacket?.(rtspSample.packet);
                             }
                             audio.onRtp(rtspSample.packet);
                         }

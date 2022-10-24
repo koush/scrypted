@@ -1,7 +1,6 @@
 import { RTCIceCandidate, RTCPeerConnection } from "@koush/werift";
 import { RTCAVSignalingSetup, RTCSignalingOptions, RTCSignalingSendIceCandidate, RTCSignalingSession } from '@scrypted/sdk';
-import { waitConnected } from "./peerconnection-util";
-import { createRawResponse, logIsPrivateIceTransport } from "./werift-util";
+import { createRawResponse } from "./werift-util";
 
 export class WeriftSignalingSession implements RTCSignalingSession {
     remoteDescription: Promise<any>;
@@ -14,7 +13,7 @@ export class WeriftSignalingSession implements RTCSignalingSession {
     }
 
     async createLocalDescription(type: "offer" | "answer", setup: RTCAVSignalingSetup, sendIceCandidate: RTCSignalingSendIceCandidate): Promise<RTCSessionDescriptionInit> {
-        // werift turn does not seem to work, but that's fine as only 1 side
+        // werift turn does not seem to work? maybe? sometimes it does? we ignore it here, and that's fine as only 1 side
         // needs turn.
         // stun candidates will come through here, if connection is slow to establish.
         this.pc.onIceCandidate.subscribe(candidate => {

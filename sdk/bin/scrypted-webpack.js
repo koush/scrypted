@@ -36,7 +36,7 @@ if (fs.existsSync(path.resolve(cwd, 'src/main.py'))) {
 
     zip.addLocalFolder(resolved);
 
-    const sdk = path.join(__dirname, '../scrypted_python/scrypted_sdk');
+    const sdk = path.join(__dirname, '../types/scrypted_python/scrypted_sdk');
     zip.addLocalFolder(sdk, 'scrypted_sdk', filename => !filename.endsWith('.pyc'));
 
     const zipfs = path.join(cwd, 'fs');

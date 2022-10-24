@@ -20,10 +20,12 @@ import { getDisplayName, getDisplayRoom, getDisplayType, getProvidedNameOrDefaul
 import { IOServer } from './io';
 import { Level } from './level';
 import { LogEntry, Logger, makeAlertId } from './logger';
+import { hasMixinCycle } from './mixin/mixin-cycle';
 import { PluginDebug } from './plugin/plugin-debug';
 import { PluginDeviceProxyHandler } from './plugin/plugin-device';
 import { PluginHost } from './plugin/plugin-host';
 import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
+import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { Alerts } from './services/alerts';
@@ -330,7 +332,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             delete pluginHost.ws[id];
         });
 
-        await handler.onConnection(httpRequest, `ws://${id}`);
+        // @ts-expect-error
+        await handler.onConnection(httpRequest, new WebSocketConnection(`ws://${id}`));
     }
 
     async getComponent(componentId: string): Promise<any> {
@@ -697,18 +700,19 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         // JSON stringify over rpc turns undefined into null.
         if (device.nativeId === null)
             device.nativeId = undefined;
-        let newDevice = false;
         let pluginDevice = this.findPluginDevice(pluginId, device.nativeId);
         if (!pluginDevice) {
             pluginDevice = new PluginDevice(this.datastore.nextId().toString());
             pluginDevice.stateVersion = PLUGIN_DEVICE_STATE_VERSION;
-            newDevice = true;
         }
         this.pluginDevices[pluginDevice._id] = pluginDevice;
         pluginDevice.pluginId = pluginId;
         pluginDevice.nativeId = device.nativeId;
         pluginDevice.state = pluginDevice.state || {};
-        const provider = this.findPluginDevice(pluginId, device.providerNativeId);
+
+        if (pluginDevice.state[ScryptedInterfaceProperty.nativeId]?.value !== pluginDevice.nativeId) {
+            setState(pluginDevice, ScryptedInterfaceProperty.nativeId, pluginDevice.nativeId);
+        }
 
         const providedType = device.type;
         const isUsingDefaultType = getDisplayType(pluginDevice) === getProvidedTypeOrDefault(pluginDevice);
@@ -738,6 +742,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             || interfacesChanged;
         if (device.info !== undefined)
             this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.info, device.info);
+        const provider = this.findPluginDevice(pluginId, device.providerNativeId);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providerId, provider?._id);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedName, providedName);
         this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.providedType, providedType);
@@ -750,11 +755,6 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             this.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.room, getProvidedRoomOrDefault(pluginDevice));
 
         const ret = this.notifyPluginDeviceDescriptorChanged(pluginDevice);
-
-        if (newDevice) {
-            const logger = this.getDeviceLogger(pluginDevice);
-            logger.log('a', 'New Device Added.');
-        }
 
         return {
             pluginDevicePromise: ret,
@@ -814,8 +814,21 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 setState(pluginDevice, ScryptedInterfaceProperty.pluginId, pluginDevice.pluginId);
             }
 
+            if (pluginDevice.state[ScryptedInterfaceProperty.nativeId]?.value !== pluginDevice.nativeId) {
+                dirty = true;
+                setState(pluginDevice, ScryptedInterfaceProperty.nativeId, pluginDevice.nativeId);
+            }
+
             if (dirty) {
                 this.datastore.upsert(pluginDevice);
+            }
+        }
+
+        for (const id of Object.keys(this.stateManager.getSystemState())) {
+            if (hasMixinCycle(this, id)) {
+                console.warn(`initialize: ${id} has a mixin cycle. Clearing mixins.`);
+                const pluginDevice = this.findPluginDeviceById(id);
+                setState(pluginDevice, ScryptedInterfaceProperty.mixins, []);
             }
         }
 

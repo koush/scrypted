@@ -1,5 +1,5 @@
 import {OnOff} from "@scrypted/sdk";
-import { ValueID } from "@zwave-js/core";
+import type { ValueID } from "@zwave-js/core";
 import { ZwaveDeviceBase } from "./ZwaveDeviceBase";
 
 export class OnOffToSwitch extends ZwaveDeviceBase implements OnOff {
