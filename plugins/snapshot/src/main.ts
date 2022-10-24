@@ -1,7 +1,7 @@
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
 import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
-import { StorageSettings } from "@scrypted/common/src/settings";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import axios, { Axios } from "axios";
