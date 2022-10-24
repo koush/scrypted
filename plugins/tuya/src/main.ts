@@ -192,12 +192,12 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
             let deviceInfo: string[] = [`Creating camera device for: \n- ${camera.name}`];
 
             if (TuyaDevice.isDoorbell(camera)) {
-                deviceInfo.push(`- Doorbell Notification Supported`);
+                deviceInfo.push(`- Detected as a Doorbell`);
                 device.interfaces.push(ScryptedInterface.BinarySensor);
             }
 
             if (TuyaDevice.hasStatusIndicator(camera)) {
-                deviceInfo.push(`- Status Indicator`);
+                deviceInfo.push(`- Has Status Indicator`);
                 device.interfaces.push(ScryptedInterface.OnOff);
             }
 
@@ -206,10 +206,11 @@ export class TuyaController extends ScryptedDeviceBase implements DeviceProvider
                 device.interfaces.push(ScryptedInterface.MotionSensor);
             }
 
-            if (await TuyaDevice.supportsWebRTC(camera, this.cloud)) {
-                deviceInfo.push(`- WebRTC Supported with Intercom`);
-                device.interfaces.push(ScryptedInterface.RTCSignalingChannel);
-            }
+            // TODO: Wait until Tuya implements better security auth
+            // if (await TuyaDevice.supportsWebRTC(camera, this.cloud)) {
+            //     deviceInfo.push(`- WebRTC Supported with Intercom`);
+            //     device.interfaces.push(ScryptedInterface.RTCSignalingChannel);
+            // }
 
             // Device Provider
 
