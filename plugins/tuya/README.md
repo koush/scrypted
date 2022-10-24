@@ -4,6 +4,11 @@ This is a Tuya controller that integrates Tuya devices, specifically cameras, in
 
 The plugin will discover all the cameras within Tuya Cloud IoT project and report them to Scrypted, including motion events, for the ones that are supported.
 
+## Features
+- Supports Tuya Camera Streaming.
+- Supports Tuya Doorbell Cameras with ring notifications.
+- (Once Tuya Upgrades Security) 2-Way communication (for devices that support WebRTC).
+
 ## Requirements
 
 ### Access Id, Access Key, and User Id
