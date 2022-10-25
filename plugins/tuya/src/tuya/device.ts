@@ -47,7 +47,8 @@ export namespace TuyaDevice {
 
     export function getDoorbellRing(camera: TuyaDeviceConfig): TuyaDeviceStatus {
         const ring = [
-            'alarm_message'
+            'alarm_message',
+            'doorbell_pic'
         ];
         return getStatus(camera, ring)
     }
