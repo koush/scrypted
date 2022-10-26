@@ -1,4 +1,4 @@
-import { MediaStreamTrack, RTCPeerConnection, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
+import { MediaStreamTrack, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from "@scrypted/sdk";
@@ -59,12 +59,15 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
     const { mediaStreamOptions } = ffmpegInput;
 
     if (!maximumCompatibilityMode) {
+        let found: RTCRtpCodecParameters;
         if (mediaStreamOptions.audio?.codec === 'pcm_ulaw') {
-            audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
+            found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMU')
         }
         else if (mediaStreamOptions.audio?.codec === 'pcm_alaw') {
-            audioTransceiver.sender.codec = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
+            found = audioTransceiver.codecs.find(codec => codec.mimeType === 'audio/PCMA')
         }
+        if (found)
+            audioTransceiver.sender.codec = found;
     }
 
     const { name: audioCodecName } = getAudioCodec(audioTransceiver.sender.codec);
@@ -76,7 +79,11 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
         || ffmpegInput.h264EncoderArguments?.length
         || ffmpegInput.h264FilterArguments?.length;
 
-    let videoCodecCopy: RtpCodecCopy = transcode ? undefined : 'h264';
+    // let videoCodecCopy: RtpCodecCopy = transcode ? undefined : 'h264';
+    const compatibleH264 = !mediaStreamOptions?.video?.h264Info?.reserved30 && !mediaStreamOptions?.video?.h264Info?.reserved31;
+    let videoCodecCopy: RtpCodecCopy;
+    if (!transcode && compatibleH264)
+        videoCodecCopy = 'h264';
 
     if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
         videoTranscodeArguments.push("-bsf:v", "dump_extra");
@@ -120,7 +127,7 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
 
     const audioTranscodeArguments = getFFmpegRtpAudioOutputArguments(ffmpegInput.mediaStreamOptions?.audio?.codec, audioTransceiver.sender.codec, maximumCompatibilityMode);
 
-    let needPacketization = !transcode;
+    let needPacketization = !!videoCodecCopy;
     if (transcode) {
         try {
             const transcodeStream: FFmpegTranscodeStream = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.FFmpegTranscodeStream);
@@ -132,6 +139,7 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
             videoTranscodeArguments.splice(0, videoTranscodeArguments.length);
             videoCodecCopy = 'copy';
             audioCodecCopy = 'copy';
+            // is this really necessary?
             needPacketization = true;
         }
         catch (e) {
@@ -146,7 +154,7 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
         ],
         firstPacket: rtp => {
             const packet = RtpPacket.deSerialize(rtp);
-            audioTransceiver.sender.replaceRTP(packet.header);
+            audioTransceiver.sender.replaceRTP(packet.header, true);
         },
     };
 
@@ -180,7 +188,7 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
         firstPacket: rtp => {
             console.log('first video packet', Date.now() - timeStart);
             const packet = RtpPacket.deSerialize(rtp);
-            videoTransceiver.sender.replaceRTP(packet.header);
+            videoTransceiver.sender.replaceRTP(packet.header, true);
         },
     };
 
