@@ -496,10 +496,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         const parse = new (tar.Parse as any)();
         const files: { [name: string]: Buffer } = {};
 
-        parse.on('entry', async (entry: tar.ReadEntry) => {
+        parse.on('entry', async (entry: any) => {
             console.log('parsing entry', entry.path)
             const chunks: Buffer[] = [];
-            entry.on('data', data => chunks.push(data));
+            entry.on('data', (data: Buffer) => chunks.push(data));
 
             entry.on('end', () => {
                 const buffer = Buffer.concat(chunks);

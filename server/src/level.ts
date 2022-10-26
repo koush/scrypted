@@ -176,7 +176,7 @@ const wrapped = (location: string, options?: LevelOptions) => {
             const iterator = ret.iterator();
             try {
                 while (true) {
-                    const { key, value } = await new Promise((resolve, reject) => {
+                    const { key, value } = await new Promise<{ key: any, value: any }>((resolve, reject) => {
                         iterator.next((err, key, value) => {
                             if (err) {
                                 reject(err);
