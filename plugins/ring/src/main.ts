@@ -393,6 +393,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
                     mtap16: true,
                     mtap32: true,
                     fuab: true,
+                    reserved0: true,
+                    reserved30: true,
+                    reserved31: true,
                 }
             },
             audio: {
