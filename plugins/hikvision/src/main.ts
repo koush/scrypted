@@ -1,17 +1,18 @@
 import { ffmpegLogInitialOutput } from '@scrypted/common/src/media-helpers';
 import { readLength } from '@scrypted/common/src/read-stream';
-import sdk, { Camera, FFmpegInput, Intercom, MediaObject, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting } from "@scrypted/sdk";
+import sdk, { Camera, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, VideoStreamOptions } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import { PassThrough, Readable } from "stream";
 import { sleep } from "../../../common/src/sleep";
 import { OnvifIntercom } from "../../onvif/src/onvif-intercom";
 import { RtspProvider, RtspSmartCamera, UrlMediaStreamOptions } from "../../rtsp/src/rtsp";
 import { getChannel, HikVisionCameraAPI, HikVisionCameraEvent, hikvisionHttpsAgent } from "./hikvision-camera-api";
+import xml2js from 'xml2js';
 
 const { mediaManager } = sdk;
 
 class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
-    channelIds: Promise<string[]>;
+    detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     client: HikVisionCameraAPI;
     onvifIntercom = new OnvifIntercom(this);
     cp: ChildProcess;
@@ -60,8 +61,8 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                     // could add a setting to have the user explicitly denote nvr usage
                     // but that is error prone.
                     const userCameraNumber = this.getCameraNumber();
-                    if (ignoreCameraNumber === undefined && this.channelIds) {
-                        const channelIds = await this.channelIds;
+                    if (ignoreCameraNumber === undefined && this.detectedChannels) {
+                        const channelIds = (await this.detectedChannels).keys();
                         ignoreCameraNumber = true;
                         for (const id of channelIds) {
                             if (id.startsWith(userCameraNumber)) {
@@ -163,15 +164,19 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 
     async getConstructedVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
-        if (!this.channelIds) {
+        if (!this.detectedChannels) {
             const client = this.getClient();
-            this.channelIds = new Promise(async (resolve, reject) => {
+            this.detectedChannels = (async () => {
                 const isOld = await this.isOld();
+
+                const defaultMap = new Map<string, MediaStreamOptions>();
+                const camNumber = this.getCameraNumber() || '1';
+                defaultMap.set(camNumber + '01', undefined);
+                defaultMap.set(camNumber + '02', undefined);
 
                 if (isOld) {
                     this.console.error('Old NVR. Defaulting to two camera configuration');
-                    const camNumber = this.getCameraNumber() || '1';
-                    resolve([camNumber + '01', camNumber + '02']);
+                    return defaultMap;
                 } else try {
                     const response = await client.digestAuth.request({
                         httpsAgent: hikvisionHttpsAgent,
@@ -179,32 +184,43 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                         responseType: 'text',
                     });
                     const xml: string = response.data;
-                    const matches = xml.matchAll(/<id>(.*?)<\/id>/g);
-                    const ids = [];
-                    for (const m of matches) {
-                        ids.push(m[1]);
+                    const parsedXml = await xml2js.parseStringPromise(xml);
+
+                    const ret = new Map<string, MediaStreamOptions>();
+                    for (const streamingChannel of parsedXml.StreamingChannelList.StreamingChannel) {
+                        const [id] = streamingChannel.id;
+                        const width = parseInt(streamingChannel?.Video?.[0]?.videoResolutionWidth?.[0]) || undefined;
+                        const height = parseInt(streamingChannel?.Video?.[0]?.videoResolutionHeight?.[0]) || undefined;
+                        const vso: MediaStreamOptions = {
+                            id,
+                            video: {
+                                width,
+                                height,
+                            }
+                        }
+                        ret.set(id, vso);
                     }
-                    resolve(ids);
+
+                    return ret;
                 }
                 catch (e) {
-                    const cameraNumber = this.getCameraNumber() || '1';
                     this.console.error('error retrieving channel ids', e);
-                    resolve([cameraNumber + '01', cameraNumber + '02']);
-                    this.channelIds = undefined;
+                    this.detectedChannels = undefined;
+                    return defaultMap;
                 }
-            })
+            })();
         }
-        const channelIds = await this.channelIds;
+        const detectedChannels = await this.detectedChannels;
         const params = this.getRtspUrlParams() || '?transportmode=unicast';
 
         // due to being able to override the channel number, and NVR providing per channel port access,
         // do not actually use these channel ids, and just use it to determine the number of channels
         // available for a camera.
         const ret = [];
-        const cameraNumber = this.getCameraNumber() || '1';
-        for (let index = 0; index < channelIds.length; index++) {
-            const channel = (index + 1).toString().padStart(2, '0');
-            const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${cameraNumber}${channel}/${params}`, index);
+        let index = 0;
+        for (const [id, channel] of detectedChannels.entries()) {
+            const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${id}/${params}`, index++);
+            Object.assign(mso.video, channel?.video)
             ret.push(mso);
         }
 
@@ -217,7 +233,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
 
     async putSetting(key: string, value: string) {
         this.client = undefined;
-        this.channelIds = undefined;
+        this.detectedChannels = undefined;
         super.putSetting(key, value);
 
         const doorbellType = this.storage.getItem('doorbellType');
@@ -296,6 +312,48 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
             return this.onvifIntercom.startIntercom(media);
         }
 
+        const channel = this.getRtspChannel() || '1';
+        let codec: string;
+        let format: string;
+
+        try {
+            const parameters = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels`;
+            const { data: parametersData } = await this.getClient().digestAuth.request({
+                httpsAgent: hikvisionHttpsAgent,
+                url: parameters,
+            });
+
+            const parsedXml = await xml2js.parseStringPromise(parametersData);
+            for (const twoWayChannel of parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel){
+                const [id] = twoWayChannel.id;
+                if (id !== channel)
+                    continue;
+                codec = twoWayChannel?.audioCompressionType?.[0];
+            }
+        }
+        catch (e) {
+            this.console.error('Fialure while determining two way audio codec', e);
+        }
+
+        if (codec === 'G.711ulaw') {
+            codec = 'pcm_mulaw';
+            format = 'mulaw'
+        }
+        else if (codec === 'G.711alaw') {
+            codec = 'pcm_alaw';
+            format = 'alaw'
+        }
+        else {
+            if (codec) {
+                this.console.warn('Unknown codec', codec);
+                this.console.warn('Set your audio codec to G.711ulaw.');
+            }
+            this.console.warn('Using fallback codec pcm_mulaw. This may not be correct.');
+            // seems to ship with this as defaults.
+            codec = 'pcm_mulaw';
+            format = 'mulaw'
+        }
+
         const buffer = await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput);
         const ffmpegInput = JSON.parse(buffer.toString()) as FFmpegInput;
 
@@ -306,8 +364,8 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
             "-vn",
             '-ar', '8000',
             '-ac', '1',
-            '-acodec', 'pcm_mulaw',
-            '-f', 'mulaw',
+            '-acodec', codec,
+            '-f', format,
             'pipe:3',
         );
 
@@ -325,17 +383,17 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
             const passthrough = new PassThrough();
 
             try {
-                const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/open`;
-                const {data} = await this.getClient().digestAuth.request({
+                const open = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/open`;
+                const { data } = await this.getClient().digestAuth.request({
                     httpsAgent: hikvisionHttpsAgent,
                     method: 'PUT',
                     url: open,
                 });
                 this.console.log('two way audio opened', data);
 
-                const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${this.getRtspChannel() || '1'}/audioData`;
+                const url = `http://${this.getHttpAddress()}/ISAPI/System/TwoWayAudio/channels/${channel}/audioData`;
                 this.console.log('posting audio data to', url);
-    
+
                 // seems the dahua doorbells preferred 1024 chunks. should investigate adts
                 // parsing and sending multipart chunks instead.
                 this.getClient().digestAuth.request({
@@ -372,7 +430,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
         if (this.storage.getItem('twoWayAudio') === 'ONVIF') {
             return this.onvifIntercom.stopIntercom();
         }
-        
+
         const client = this.getClient();
         await client.digestAuth.request({
             httpsAgent: hikvisionHttpsAgent,
