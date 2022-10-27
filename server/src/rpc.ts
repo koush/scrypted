@@ -479,6 +479,9 @@ export class RpcPeer {
     }
 
     async handleMessage(message: RpcMessage, deserializationContext?: any) {
+        if (Object.isFrozen(this.pendingResults))
+            return;
+
         try {
             switch (message.type) {
                 case 'param': {

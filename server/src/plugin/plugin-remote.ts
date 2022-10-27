@@ -324,10 +324,10 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
             }
 
             if (eventDetails.property) {
-                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, getSystemState()[id]?.[eventDetails.property], eventDetails.changed);
+                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, getSystemState()[id]?.[eventDetails.property], eventDetails.changed).catch(() => {});
             }
             else {
-                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed);
+                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed).catch(() => {});
             }
         });
 
