@@ -220,7 +220,8 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
         let index = 0;
         for (const [id, channel] of detectedChannels.entries()) {
             const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${id}/${params}`, index++);
-            Object.assign(mso.video, channel?.video)
+            Object.assign(mso.video, channel?.video);
+            mso.tool = 'scrypted';
             ret.push(mso);
         }
 
