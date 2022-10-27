@@ -73,7 +73,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         if (this.mixinDeviceInterfaces.includes(ScryptedInterface.RTCSignalingChannel) && !options?.proxy)
             return this.mixinDevice.startRTCSignalingSession(session);
 
-        const device = systemManager.getDeviceById<VideoCamera>(this.id);
+        const device = systemManager.getDeviceById<VideoCamera & Intercom>(this.id);
         const hasIntercom = this.mixinDeviceInterfaces.includes(ScryptedInterface.Intercom);
 
         const mo = await sdk.mediaManager.createMediaObject(device, ScryptedMimeTypes.ScryptedDevice);
@@ -81,7 +81,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
         return createRTCPeerConnectionSink(
             session,
             this.console,
-            !hasIntercom,
+            hasIntercom ? device : undefined,
             mo,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
             this.plugin.getRTCConfiguration(),
@@ -144,8 +144,19 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             type: 'boolean',
             defaultValue: true,
         },
+        activeConnections: {
+            readonly: true,
+            title: "Current Open Connections",
+            description: "The WebRTC connections that are currently open.",
+            onGet: async () => {
+                return {
+                    defaultValue: this.activeConnections,
+                }
+            },
+        }
     });
     bridge: WebRTCBridge;
+    activeConnections = 0;
 
     constructor() {
         super();
@@ -186,7 +197,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             class OnDemandSignalingChannel implements RTCSignalingChannel {
                 async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
                     return createRTCPeerConnectionSink(session, console,
-                        true,
+                        undefined,
                         mo,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
@@ -202,7 +213,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             class OnDemandSignalingChannel implements RTCSignalingChannel {
                 async startRTCSignalingSession(session: RTCSignalingSession): Promise<RTCSessionControl> {
                     return createRTCPeerConnectionSink(session, console,
-                        true,
+                        undefined,
                         mo,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
@@ -371,13 +382,20 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
 
             const result = sdk.fork<ReturnType<typeof fork>>();
-            cleanup.promise.finally(() => result.worker.terminate());
+            this.activeConnections++;
+            result.worker.on('exit', () => {
+                this.activeConnections--;
+                cleanup.resolve('worker exited');
+            });
+            cleanup.promise.finally(() => {
+                result.worker.terminate()
+            });
 
             const connection = await (await result.result).createConnection(message, client.port, session,
                 this.storageSettings.values.maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
                 configuration: this.getRTCConfiguration(),
             });
-            cleanup.promise.finally(() => connection.close());
+            cleanup.promise.finally(() => connection.close().catch(() => {}));
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
 
             await connection.negotiateRTCSignalingSession();

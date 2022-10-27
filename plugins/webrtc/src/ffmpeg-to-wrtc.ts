@@ -1,7 +1,7 @@
 import { MediaStreamTrack, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import type { WebRTCPlugin } from "./main";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
@@ -247,7 +247,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
     removed = new Deferred<void>();
 
     constructor(public connectionManagement: WebRTCConnectionManagement, public video: RTCRtpTransceiver, public audio: RTCRtpTransceiver, intercom: Intercom) {
-        this.control = new ScryptedSessionControl(async () => { }, intercom, audio);
+        this.control = new ScryptedSessionControl(intercom, audio);
     }
 
     async replace(mediaObject: MediaObject): Promise<void> {
@@ -256,7 +256,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         this.cleanup(true);
 
         this.removed = new Deferred();
-        this.control = new ScryptedSessionControl(async () => { }, intercom, this.audio);
+        this.control = new ScryptedSessionControl(intercom, this.audio);
 
         const f = await createTrackForwarder(this.video, this.audio);
         waitClosed(this.connectionManagement.pc).finally(() => f.kill());
@@ -267,7 +267,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
         if (this.removed.finished)
             return;
         this.removed.resolve(undefined);
-        this.control.cleanup();
+        this.control.killed.resolve(undefined);
 
         if (cleanupTrackOnly)
             return;
@@ -298,7 +298,6 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     constructor(public console: Console, public clientSession: RTCSignalingSession, public maximumCompatibilityMode: boolean, public transcodeWidth: number,
         public sessionSupportsH264High: boolean,
         public options?: {
-            disableIntercom?: boolean,
             configuration?: RTCConfiguration,
         }) {
 
@@ -324,7 +323,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         this.weriftSignalingSession = new WeriftSignalingSession(console, this.pc);
     }
 
-    async createTracks(mediaObject: MediaObject) {
+    async createTracks(mediaObject: MediaObject, intercomId?: string) {
         let requestMediaStream: RequestMediaStream;
 
         try {
@@ -334,14 +333,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             requestMediaStream = async () => mediaObject;
         }
 
-        let intercom: Intercom;
-        try {
-            const device = await sdk.mediaManager.convertMediaObject<ScryptedDevice & Intercom>(mediaObject, ScryptedMimeTypes.ScryptedDevice);
-            if (device.interfaces.includes(ScryptedInterface.Intercom))
-                intercom = device;
-        }
-        catch (e) {
-        }
+        const intercom = sdk.systemManager.getDeviceById<Intercom>(intercomId);
 
         const vtrack = new MediaStreamTrack({
             kind: "video", codec: requiredVideoCodec,
@@ -367,30 +359,21 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         return this.negotiationDeferred.promise;
     }
 
-    createSetup(audioDirection: RTCRtpTransceiverDirection, videoDirection: RTCRtpTransceiverDirection): Partial<RTCAVSignalingSetup> {
-        return {
-            audio: {
-                direction: audioDirection,
-            },
-            video: {
-                direction: videoDirection,
-            },
-            configuration: this.options?.configuration,
-        }
-    };
+    async negotiateRTCSignalingSession() {
+        return this.negotiateRTCSignalingSessionInternal({});
+    }
 
-    async negotiateRTCSignalingSession(clientOffer?: boolean): Promise<void> {
+    async negotiateRTCSignalingSessionInternal(clientSetup: Partial<RTCAVSignalingSetup>, clientOffer?: boolean): Promise<void> {
         try {
             if (clientOffer) {
                 await connectRTCSignalingClients(this.console,
-                    this.clientSession, this.createSetup(this.options?.disableIntercom ? 'recvonly' : 'sendrecv', 'recvonly'),
-                    this.weriftSignalingSession, this.createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
-                );
+                    this.clientSession, clientSetup,
+                    this.weriftSignalingSession, {});
             }
             else {
                 await connectRTCSignalingClients(this.console,
-                    this.weriftSignalingSession, this.createSetup(this.options?.disableIntercom ? 'sendonly' : 'sendrecv', 'sendonly'),
-                    this.clientSession, this.createSetup(this.options?.disableIntercom ? 'recvonly' : 'sendrecv', 'recvonly'),
+                    this.weriftSignalingSession, {},
+                    this.clientSession, clientSetup,
                 );
             }
             this.negotiationDeferred.resolve(undefined);
@@ -405,8 +388,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     async addTrack(mediaObject: MediaObject, options?: {
         videoMid?: string,
         audioMid?: string,
+        intercomId?: string,
     }) {
-        const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject);
+        const { atrack, vtrack, createTrackForwarder, intercom } = await this.createTracks(mediaObject, options?.intercomId);
 
         const videoTransceiver = this.pc.addTransceiver(vtrack, {
             direction: 'sendonly',
@@ -414,11 +398,11 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         videoTransceiver.mid = options?.videoMid;
 
         const audioTransceiver = this.pc.addTransceiver(atrack, {
-            direction: this.options?.disableIntercom ? 'sendonly' : 'sendrecv',
+            direction: intercom ? 'sendrecv' : 'sendonly',
         });
         audioTransceiver.mid = options?.audioMid;
 
-        const ret = new WebRTCTrack(this, videoTransceiver, audioTransceiver, this.options?.disableIntercom ? undefined : intercom);
+        const ret = new WebRTCTrack(this, videoTransceiver, audioTransceiver, intercom);
 
         this.negotiation.then(async () => {
             this.console.log('waiting ice connected');
@@ -478,7 +462,7 @@ export class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter 
 export async function createRTCPeerConnectionSink(
     clientSignalingSession: RTCSignalingSession,
     console: Console,
-    disableIntercom: boolean,
+    intercom: ScryptedDevice & Intercom,
     mo: MediaObject,
     maximumCompatibilityMode: boolean,
     configuration: RTCConfiguration,
@@ -486,18 +470,29 @@ export async function createRTCPeerConnectionSink(
     const { transcodeWidth, sessionSupportsH264High } = parseOptions(await clientSignalingSession.getOptions());
 
     const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
-        disableIntercom,
         configuration,
     });
 
-    const track = await connection.addTrack(mo);
+    const track = await connection.addTrack(mo, {
+        intercomId: intercom?.id,
+    });
 
-    track.control.cleanup = async () => {
+    track.control.killed.promise.then(() => {
         track.cleanup(true);
         connection.pc.close();
-    }
+    });
 
-    connection.negotiateRTCSignalingSession(true);
+    const setup: Partial<RTCAVSignalingSetup>  = {
+            audio: {
+                direction: intercom ? 'sendrecv' : 'recvonly',
+            },
+            video: {
+                direction: 'recvonly',
+            },
+            configuration,
+        };
+
+    connection.negotiateRTCSignalingSessionInternal(setup, true);
 
     return track.control;
 }

@@ -1,4 +1,5 @@
 import { RTCRtpTransceiver } from "@koush/werift";
+import { Deferred } from "@scrypted/common/src/deferred";
 import { listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
 import { RtspServer } from "@scrypted/common/src/rtsp-server";
 import { createSdpInput, parseSdp } from "@scrypted/common/src/sdp-utils";
@@ -8,8 +9,9 @@ const { mediaManager } = sdk;
 
 export class ScryptedSessionControl implements RTCSessionControl {
     rtspServer: RtspServer;
+    killed = new Deferred<void>();
 
-    constructor(public cleanup: () => Promise<void>, public intercom: Intercom, public audioTransceiver: RTCRtpTransceiver) {
+    constructor(public intercom: Intercom, public audioTransceiver: RTCRtpTransceiver) {
     }
 
     async setPlayback(options: { audio: boolean; video: boolean; }) {
@@ -77,8 +79,9 @@ export class ScryptedSessionControl implements RTCSessionControl {
     }
     async extendSession() {
     }
+
     async endSession() {
         this.rtspServer?.client.destroy();
-        await this.cleanup();
+        this.killed.resolve(undefined);
     }
 }

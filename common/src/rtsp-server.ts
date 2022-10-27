@@ -348,6 +348,9 @@ export class RtspClient extends RtspBase {
         else {
             this.client = net.connect(port, u.hostname);
         }
+        this.client.on('error', e => {
+            this.console?.log('client error', e);
+        });
     }
 
     async safeTeardown() {
