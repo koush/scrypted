@@ -1,3 +1,5 @@
+import type { Worker as NodeWorker } from 'worker_threads';
+
 export type ScryptedNativeId = string | undefined;
 
 /**
@@ -1775,9 +1777,7 @@ export type FFmpegTranscodeStream = (options: FFmpegTranscode) => Promise<void>;
 
 export interface PluginFork<T> {
   result: Promise<T>;
-  worker: {
-    terminate(): Promise<number>;
-  };
+  worker: NodeWorker;
 }
 
 export interface ScryptedStatic {
