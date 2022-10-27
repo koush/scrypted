@@ -1708,6 +1708,7 @@ export interface RTCConnectionManagement {
   addTrack(mediaObject: MediaObject, options?: {
     videoMid?: string,
     audioMid?: string,
+    intercomId?: string,
   }): Promise<RTCMediaObjectTrack>;
   close(): Promise<void>;
 }
