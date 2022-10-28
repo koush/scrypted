@@ -4,7 +4,7 @@ import { parseSemicolonDelimited, RtspClient } from "@scrypted/common/src/rtsp-s
 import { parseSdp } from "@scrypted/common/src/sdp-utils";
 import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import child_process from 'child_process';
-import { createBindZero } from "@scrypted/common/src/listen-cluster";
+import { createBindZero, reserveUdpPort } from "@scrypted/common/src/listen-cluster";
 import crypto from 'crypto';
 
 const { mediaManager } = sdk;
@@ -95,7 +95,7 @@ export class OnvifIntercom implements Intercom {
         if (!audioBackchannel)
             throw new Error('ONVIF audio backchannel not found');
 
-        const rtp = Math.round(10000 + Math.random() * 30000);
+        const rtp = await reserveUdpPort();
         const rtcp = rtp + 1;
 
         let ip: string;
