@@ -360,7 +360,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
     }
 
     async negotiateRTCSignalingSession() {
-        return this.negotiateRTCSignalingSessionInternal({});
+        return this.negotiateRTCSignalingSessionInternal({
+            configuration: this.options?.configuration,
+        });
     }
 
     async negotiateRTCSignalingSessionInternal(clientSetup: Partial<RTCAVSignalingSetup>, clientOffer?: boolean): Promise<void> {
