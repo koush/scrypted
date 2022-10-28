@@ -3,9 +3,9 @@ import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-p
 import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
 import { createBrowserSignalingSession } from "@scrypted/common/src/rtc-connect";
-import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from '@scrypted/common/src/settings-mixin';
 import sdk, { BufferConverter, BufferConvertorOptions, DeviceCreator, DeviceCreatorSettings, DeviceProvider, FFmpegInput, HttpRequest, Intercom, MediaObject, MixinProvider, RequestMediaStream, RequestMediaStreamOptions, ResponseMediaStreamOptions, RTCSessionControl, RTCSignalingChannel, RTCSignalingSession, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import net from 'net';
 import { DataChannelDebouncer } from './datachannel-debouncer';
@@ -14,7 +14,7 @@ import { stunServer, turnServer } from './ice-servers';
 import { waitClosed } from './peerconnection-util';
 import { WebRTCCamera } from "./webrtc-camera";
 import { createRTCPeerConnectionSource, getRTCMediaStreamOptions } from './wrtc-to-rtsp';
-import { RpcPeer } from '../../../server/src/rpc';
+import { createZygote } from './zygote';
 
 const { mediaManager, systemManager, deviceManager } = sdk;
 
@@ -33,6 +33,8 @@ mediaManager.addConverter({
         return requestMediaStream;
     }
 });
+
+const zygote = createZygote<ReturnType<typeof fork>>();
 
 class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChannel & Intercom> implements RTCSignalingChannel, VideoCamera, Intercom {
     storageSettings = new StorageSettings(this, {});
@@ -381,7 +383,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
             const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
 
-            const result = sdk.fork<ReturnType<typeof fork>>();
+            const result = zygote!.next().value!;
             this.activeConnections++;
             result.worker.on('exit', () => {
                 this.activeConnections--;
@@ -391,7 +393,8 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 result.worker.terminate()
             });
 
-            const connection = await (await result.result).createConnection(message, client.port, session,
+            const { createConnection} = await result.result;
+            const connection = await createConnection(message, client.port, session,
                 this.storageSettings.values.maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
                 configuration: this.getRTCConfiguration(),
             });
@@ -424,13 +427,14 @@ export async function fork() {
             waitClosed(pc).then(() => cleanup.resolve('peer connection closed'));
 
             const { connectionManagementId, updateSessionId } = message;
-            if (connectionManagementId) {
+            if (connectionManagementId || updateSessionId) {
                 const plugins = await systemManager.getComponent('plugins');
-                plugins.setHostParam('@scrypted/webrtc', connectionManagementId, connection);
-            }
-            if (updateSessionId) {
-                const plugins = await systemManager.getComponent('plugins');
-                await plugins.setHostParam('@scrypted/webrtc', updateSessionId, (session: RTCSignalingSession) => connection.clientSession = session);
+                if (connectionManagementId) {
+                    plugins.setHostParam('@scrypted/webrtc', connectionManagementId, connection);
+                }
+                if (updateSessionId) {
+                    await plugins.setHostParam('@scrypted/webrtc', updateSessionId, (session: RTCSignalingSession) => connection.clientSession = session);
+                }
             }
 
             const socket = net.connect(port, '127.0.0.1');

@@ -1,5 +1,5 @@
 import { Deferred } from "@scrypted/common/src/deferred";
-import { closeQuiet, createBindZero, listenZeroSingleClient } from "@scrypted/common/src/listen-cluster";
+import { closeQuiet, createBindZero, listenZeroSingleClient, reserveUdpPort } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import { RtspClient, RtspServer, RtspServerResponse, RtspStatusError } from "@scrypted/common/src/rtsp-server";
 import { addTrackControls, MSection, parseSdp, replaceSectionPort } from "@scrypted/common/src/sdp-utils";
@@ -219,7 +219,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     }
                     else {
                         newSdp.msections = newSdp.msections.filter(msection => msection === audioSection);
-                        const udpPort = Math.floor(Math.random() * 10000 + 30000);
+                        const udpPort = await reserveUdpPort();
+                        console.log({ udpPort });
                         pipeSdp = addTrackControls(replaceSectionPort(newSdp.toSdp(), 'audio', udpPort));
 
                         audio.ffmpegDestination = '127.0.0.1';
