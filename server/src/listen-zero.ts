@@ -22,7 +22,9 @@ export async function listenZeroSingleClient() {
 
             resolve(client);
         });
-    })
+    });
+
+    clientPromise.catch(() => {});
 
     return {
         server,
