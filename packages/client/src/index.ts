@@ -10,6 +10,7 @@ import type { IOSocket } from '../../../server/src/io';
 import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
+import type { MediaObjectRemote } from '../../../server/src/plugin/plugin-api'
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -427,6 +428,25 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             mediaManager,
         } = scrypted;
         console.log('api attached', Date.now() - start);
+
+        mediaManager.createMediaObject = async (data, mimeType, options) => {
+            const mo: MediaObjectRemote & { 
+                [RpcPeer.PROPERTY_PROXY_PROPERTIES]: any,
+                [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
+             } = {
+                [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
+                [RpcPeer.PROPERTY_PROXY_PROPERTIES]: {
+                    mimeType,
+                    sourceId: options?.sourceId,
+                },
+                mimeType,
+                sourceId: options?.sourceId,
+                async getData() {
+                    return data;
+                },
+            };
+            return mo;
+        }
 
         const { browserSignalingSession, connectionManagementId, updateSessionId } = rpcPeer.params;
         if (updateSessionId && browserSignalingSession) {
