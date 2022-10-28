@@ -109,8 +109,14 @@ class RpcProxy implements PrimitiveProxyHandler<any> {
     }
 
     set(target: any, p: string | symbol, value: any, receiver: any): boolean {
-        if (p === RpcPeer.finalizerIdSymbol)
+        if (p === RpcPeer.finalizerIdSymbol) {
             this.entry.finalizerId = value;
+        }
+        else {
+            this.proxyProps ||= {};
+            this.proxyProps[p] = value;
+        }
+        
         return true;
     }
 
