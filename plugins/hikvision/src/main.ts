@@ -177,36 +177,47 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                 if (isOld) {
                     this.console.error('Old NVR. Defaulting to two camera configuration');
                     return defaultMap;
-                } else try {
-                    const response = await client.digestAuth.request({
-                        httpsAgent: hikvisionHttpsAgent,
-                        url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
-                        responseType: 'text',
-                    });
-                    const xml: string = response.data;
-                    const parsedXml = await xml2js.parseStringPromise(xml);
-
-                    const ret = new Map<string, MediaStreamOptions>();
-                    for (const streamingChannel of parsedXml.StreamingChannelList.StreamingChannel) {
-                        const [id] = streamingChannel.id;
-                        const width = parseInt(streamingChannel?.Video?.[0]?.videoResolutionWidth?.[0]) || undefined;
-                        const height = parseInt(streamingChannel?.Video?.[0]?.videoResolutionHeight?.[0]) || undefined;
-                        const vso: MediaStreamOptions = {
-                            id,
-                            video: {
-                                width,
-                                height,
-                            }
+                } else {
+                    try {
+                        let xml: string;
+                        try {
+                            const response = await client.digestAuth.request({
+                                httpsAgent: hikvisionHttpsAgent,
+                                url: `http://${this.getHttpAddress()}/ISAPI/Streaming/channels`,
+                                responseType: 'text',
+                            });
+                            xml = response.data;
+                            this.storage.setItem('channels', xml);
                         }
-                        ret.set(id, vso);
-                    }
+                        catch (e) {
+                            xml = this.storage.getItem('channels');
+                            if (!xml)
+                                throw e;
+                        }
+                        const parsedXml = await xml2js.parseStringPromise(xml);
 
-                    return ret;
-                }
-                catch (e) {
-                    this.console.error('error retrieving channel ids', e);
-                    this.detectedChannels = undefined;
-                    return defaultMap;
+                        const ret = new Map<string, MediaStreamOptions>();
+                        for (const streamingChannel of parsedXml.StreamingChannelList.StreamingChannel) {
+                            const [id] = streamingChannel.id;
+                            const width = parseInt(streamingChannel?.Video?.[0]?.videoResolutionWidth?.[0]) || undefined;
+                            const height = parseInt(streamingChannel?.Video?.[0]?.videoResolutionHeight?.[0]) || undefined;
+                            const vso: MediaStreamOptions = {
+                                id,
+                                video: {
+                                    width,
+                                    height,
+                                }
+                            }
+                            ret.set(id, vso);
+                        }
+
+                        return ret;
+                    }
+                    catch (e) {
+                        this.console.error('error retrieving channel ids', e);
+                        this.detectedChannels = undefined;
+                        return defaultMap;
+                    }
                 }
             })();
         }
@@ -215,10 +226,13 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
 
         // due to being able to override the channel number, and NVR providing per channel port access,
         // do not actually use these channel ids, and just use it to determine the number of channels
-        // available for a camera.
+        // available for a camera.q
         const ret = [];
         let index = 0;
+        const cameraNumber = this.getCameraNumber();
         for (const [id, channel] of detectedChannels.entries()) {
+            if (cameraNumber && !id.startsWith(cameraNumber))
+                continue;
             const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${id}/${params}`, index++);
             Object.assign(mso.video, channel?.video);
             mso.tool = 'scrypted';
@@ -325,7 +339,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
             });
 
             const parsedXml = await xml2js.parseStringPromise(parametersData);
-            for (const twoWayChannel of parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel){
+            for (const twoWayChannel of parsedXml.TwoWayAudioChannelList.TwoWayAudioChannel) {
                 const [id] = twoWayChannel.id;
                 if (id !== channel)
                     continue;

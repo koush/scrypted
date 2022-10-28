@@ -135,10 +135,6 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
 
         let pulseTimeout: NodeJS.Timeout;
 
-        events.on('data', (data: Buffer) => {
-            if (this.storage.getItem('debug'))
-                this.console.log('event', data.toString());
-        });
         events.on('event', (event: AmcrestEvent, index: string, payload: string) => {
             const channelNumber = this.getRtspChannel();
             if (channelNumber) {
