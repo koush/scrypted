@@ -30,6 +30,12 @@ export async function createBindZero(socketType?: SocketType) {
     return createBindUdp(0, socketType);
 }
 
+export async function reserveUdpPort() {
+    const udp = await createBindZero();
+    await new Promise(resolve => udp.server.close(() => resolve(undefined)));
+    return udp.port;
+}
+
 export async function createBindUdp(usePort: number, socketType?: SocketType) {
     const server = dgram.createSocket(socketType || 'udp4');
     const { port, url } = await bindUdp(server, usePort);
