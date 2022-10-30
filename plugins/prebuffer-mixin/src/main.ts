@@ -9,7 +9,7 @@ import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, DeviceState, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
@@ -208,6 +208,15 @@ class PrebufferSession {
     for (const prebuffer of PrebufferParserValues) {
       this.prebuffers[prebuffer] = [];
     }
+  }
+
+  release() {
+    this.clearPrebuffers();
+    this.parserSessionPromise?.then(parserSession => {
+      this.console.log('prebuffer session released');
+      parserSession.kill(new Error('rebroadcast disabled'));
+      this.clearPrebuffers();
+    });
   }
 
   ensurePrebufferSession() {
@@ -1221,9 +1230,9 @@ class PrebufferSession {
 class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraConfiguration> implements VideoCamera, Settings, VideoCameraConfiguration {
   released = false;
   sessions = new Map<string, PrebufferSession>();
-
   streamSettings = createStreamSettings(this);
   rtspServer: net.Server;
+  settingsListener: EventListenerRegister;
 
   constructor(public getTranscodeStorageSettings: () => Promise<any>, options: SettingsMixinDeviceOptions<VideoCamera & VideoCameraConfiguration>) {
     super(options);
@@ -1231,6 +1240,8 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     this.delayStart();
 
     this.startRtspServer();
+
+    this.settingsListener = systemManager.listenDevice(this.id, ScryptedInterface.Settings, () => this.ensurePrebufferSessions());
   }
 
   startRtspServer() {
@@ -1436,7 +1447,16 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       this.online = true;
 
     let active = 0;
+    
+    // figure out the default stream and streams that may have been removed due to
+    // a config change.
+    const toRemove = new Set(this.sessions.keys());
+    toRemove.delete(undefined);
+    this.sessions.delete(undefined);
+
     for (const id of ids) {
+      toRemove.delete(id);
+
       let session = this.sessions.get(id);
 
       if (session)
@@ -1502,11 +1522,20 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
 
       if (defaultSession) {
         this.sessions.set(undefined, defaultSession);
-        this.console.log('Default Stream:', defaultSession.advertisedMediaStreamOptions.id, defaultSession.advertisedMediaStreamOptions.name);
+        // this.console.log('Default Stream:', defaultSession.advertisedMediaStreamOptions.id, defaultSession.advertisedMediaStreamOptions.name);
       }
       else {
         this.console.warn('Unable to find Default Stream?');
       }
+    }
+
+    if (toRemove.size) {
+      this.console.log('Removing sessions due to config change', [...toRemove]);
+      for (const id of toRemove) {
+        const session = this.sessions.get(id);
+        this.sessions.delete(id);
+        session.release();
+      }      
     }
   }
 
@@ -1582,19 +1611,13 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
   }
 
   async release() {
+    this.settingsListener.removeListener();
     this.online = true;
     super.release();
     this.console.log('prebuffer session releasing if started');
     this.released = true;
     for (const session of this.sessions.values()) {
-      if (!session)
-        continue;
-      session.clearPrebuffers();
-      session.parserSessionPromise?.then(parserSession => {
-        this.console.log('prebuffer session released');
-        parserSession.kill(new Error('rebroadcast disabled'));
-        session.clearPrebuffers();
-      });
+      session?.release();
     }
   }
 }
