@@ -65,7 +65,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                         const channelIds = (await this.detectedChannels).keys();
                         ignoreCameraNumber = true;
                         for (const id of channelIds) {
-                            if (id.startsWith(userCameraNumber)) {
+                            if (id === userCameraNumber) {
                                 ignoreCameraNumber = false;
                                 break;
                             }
