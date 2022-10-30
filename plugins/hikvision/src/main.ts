@@ -11,6 +11,12 @@ import xml2js from 'xml2js';
 
 const { mediaManager } = sdk;
 
+function channelToCameraNumber(channel: string) {
+    if (!channel)
+        return;
+    return channel.substring(0, channel.length - 2);
+}
+
 class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     detectedChannels: Promise<Map<string, MediaStreamOptions>>;
     client: HikVisionCameraAPI;
@@ -65,7 +71,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                         const channelIds = (await this.detectedChannels).keys();
                         ignoreCameraNumber = true;
                         for (const id of channelIds) {
-                            if (id === userCameraNumber) {
+                            if (channelToCameraNumber(id) === userCameraNumber) {
                                 ignoreCameraNumber = false;
                                 break;
                             }
@@ -138,12 +144,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
     }
 
     getCameraNumber() {
-        const channel = this.getRtspChannel();
-        // have users with more than 10 cameras. unsure if it is possible
-        // to have more than 10 substreams...
-        if (channel?.length > 3)
-            return channel.substring(0, channel.length - 2);
-        return channel?.substring(0, 1) || '1';
+        return channelToCameraNumber(this.getRtspChannel());
     }
 
     getRtspUrlParams() {
@@ -231,7 +232,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
         let index = 0;
         const cameraNumber = this.getCameraNumber();
         for (const [id, channel] of detectedChannels.entries()) {
-            if (cameraNumber && id !== cameraNumber)
+            if (cameraNumber && channelToCameraNumber(id) !== cameraNumber)
                 continue;
             const mso = this.createRtspMediaStreamOptions(`rtsp://${this.getRtspAddress()}/ISAPI/Streaming/channels/${id}/${params}`, index++);
             Object.assign(mso.video, channel?.video);
