@@ -242,7 +242,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
             }
 
             const any = Promise.any(promises);
-            const { ready, id, webrtc, address } = await timeoutPromise(1000, any);
+            const { ready, id, webrtc, address } = await timeoutPromise(10000, any);
 
             if (!webrtc) {
                 connectionType = 'http-local';
