@@ -68,9 +68,14 @@ export function createRpcSerializer(options: {
         const messageSerializationContext = pendingSerializationContext;
         pendingSerializationContext = undefined;
         rpcPeer.handleMessage(message, messageSerializationContext);
-    }
+    };
+
+    const kill = (message: string) => {
+        rpcPeer.kill(message);
+    };
 
     return {
+        kill,
         sendMessage,
         setupRpcPeer,
         onMessageBuffer,
@@ -140,8 +145,13 @@ export function createRpcDuplexSerializer(writable: {
             header = undefined;
 
             if (type === 0) {
-                const message = JSON.parse(payload.toString());
-                serializer.onMessageFinish(message);
+                try {
+                    const message = JSON.parse(payload.toString());
+                    serializer.onMessageFinish(message);
+                }
+                catch (e) {
+                    serializer.kill('message parse failure ' + e.message);
+                }
             }
             else {
                 serializer.onMessageBuffer(payload);
