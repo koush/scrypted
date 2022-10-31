@@ -306,7 +306,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
                 upgradingPeer.params['session'] = session;
 
-                rpcPeer = await Promise.race([readyClose, timeoutFunction(options.webrtc ? 10000 : 2000, async (isTimedOut) => {
+                rpcPeer = await Promise.race([readyClose, timeoutFunction(10000, async (isTimedOut) => {
                     const pc = await pcPromise;
 
                     await waitPeerConnectionIceConnected(pc);
