@@ -86,6 +86,8 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
         exports: {} as any,
         ScryptedInterface,
         ScryptedDeviceType,
+        // @ts-expect-error
+        require: __non_webpack_require__,
     });
 
     const asyncWrappedCompiled = `return (async function() {\n${compiled}\n})`;
