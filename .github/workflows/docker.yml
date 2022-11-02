@@ -73,5 +73,5 @@ jobs:
             ${{ format('ghcr.io/koush/scrypted:v{0}{1}', github.event.inputs.package_version || steps.package-version.outputs.current-version, matrix.variant) || '' }}
             ${{ matrix.node == '16-bullseye' && matrix.variant == '' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.docker_tag) || '' }}
             ${{ matrix.node == '16-bullseye' && matrix.variant == '.lite' && 'ghcr.io/koush/scrypted:lite' || '' }}
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
