@@ -430,10 +430,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
         console.log('api attached', Date.now() - start);
 
         mediaManager.createMediaObject = async (data, mimeType, options) => {
-            const mo: MediaObjectRemote & { 
+            const mo: MediaObjectRemote & {
                 [RpcPeer.PROPERTY_PROXY_PROPERTIES]: any,
                 [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
-             } = {
+            } = {
                 [RpcPeer.PROPERTY_JSON_DISABLE_SERIALIZATION]: true,
                 [RpcPeer.PROPERTY_PROXY_PROPERTIES]: {
                     mimeType,
