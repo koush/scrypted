@@ -83,15 +83,14 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
     console.log('rtsp/tcp', section.codec);
 }
 
-export async function createTrackForwarders(console: Console, rtpTracks: RtpTracks) {
-    const sockets: RtpSockets = {};
+async function createTrackForwarders(console: Console, killDeferred: Deferred<void>, rtpTracks: RtpTracks) {
 
     for (const key of Object.keys(rtpTracks)) {
         const track: RtpTrack = rtpTracks[key];
         track.bind = await createBindZero();
         track.bind.server.setRecvBufferSize(1024 * 1024);
         const { server, port } = track.bind;
-        sockets[key] = server;
+        killDeferred.promise.finally(() => closeQuiet(server));
         const outputArguments = track.outputArguments = [];
         if (track.payloadType)
             outputArguments.push('-payload_type', track.payloadType.toString());
@@ -99,16 +98,6 @@ export async function createTrackForwarders(console: Console, rtpTracks: RtpTrac
             outputArguments.push('-ssrc', track.ssrc.toString());
 
         attachTrackDgram(track, server);
-    }
-
-    return {
-        rtpTracks,
-        close() {
-            for (const key of Object.keys(rtpTracks)) {
-                const socket: dgram.Socket = sockets[key];
-                closeQuiet(socket);
-            }
-        }
     }
 }
 
@@ -141,7 +130,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     let { inputArguments, videoDecoderArguments } = ffmpegInput;
     let rtspClient: RtspClient;
-    let sockets: dgram.Socket[] = [];
+    killDeferred.promise.finally(() => rtspClient?.safeTeardown());
     let pipeSdp: string;
 
     let rtspClientHooked = false;
@@ -234,7 +223,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         ];
 
                         const audioSender = await createBindZero();
-                        sockets.push(audioSender.server);
+                        killDeferred.promise.finally(() => closeQuiet(audioSender.server));
 
                         // NOTE:
                         // This code path can fail if the audio is fetched via rtsp/tcp and the payloads are
@@ -275,19 +264,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         return { videoSection, audioSection };
     }
 
-    const forwarders = await createTrackForwarders(console, rtpTracks);
+    await createTrackForwarders(console, killDeferred, rtpTracks);
 
-
-    const kill = () => {
-        killDeferred.resolve(undefined);
-        for (const socket of sockets) {
-            closeQuiet(socket);
-        }
-        sockets = [];
-        forwarders.close();
-        rtspClient?.safeTeardown();
-    };
-    rtspClient?.client.on('close', kill);
+    rtspClient?.client.on('close', () => killDeferred.resolve(undefined));
 
     const useRtp = !rtspMode;
     const rtspServerDeferred = new Deferred<RtspServer>();
@@ -362,7 +341,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             );
 
             serverPort.clientPromise.then(async (client) => {
-                client.on('close', kill);
+                client.on('close', () => killDeferred.resolve(undefined));
                 killDeferred.promise.finally(() => client.destroy());
 
                 const rtspServer = new RtspServer(client, undefined, useUdp);
@@ -408,7 +387,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
         });
-        cp.on('exit', kill);
+        killDeferred.promise.finally(() => safeKillFFmpeg(cp));
+        cp.on('exit', () => killDeferred.resolve(undefined));
         killDeferred.promise.finally(() => safeKillFFmpeg(cp));
         if (pipeSdp) {
             const pipe = cp.stdio[3] as Writable;
@@ -416,7 +396,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             pipe.end();
         }
         ffmpegLogInitialOutput(console, cp);
-        cp.on('exit', () => forwarders.close());
+        killDeferred.promise.finally(() => safeKillFFmpeg(cp));
 
         if (useRtp) {
             cp.stdio[4].on('data', data => {
@@ -431,7 +411,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     if (!rtspClientHooked) {
         process.nextTick(() => {
-            rtspClient?.readLoop().catch(() => { }).finally(kill);
+            rtspClient?.readLoop().catch(() => { }).finally(() => killDeferred.resolve(undefined));
         });
     }
 
@@ -440,11 +420,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         sdpContents: sdpDeferred.promise,
         videoSection: videoSectionDeferred.promise,
         audioSection: audioSectionDeferred.promise,
-        kill,
+        kill: () => killDeferred.resolve(undefined),
         killPromise: killDeferred.promise,
         get killed() {
             return killDeferred.finished;
         },
-        ...forwarders,
     }
 }
