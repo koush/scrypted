@@ -1,5 +1,5 @@
 winget install -h OpenJS.NodeJS
-winget install -h Python.Python.3
+winget install -h "Python 3.10"
 
 py -m pip install --upgrade pip
 py -m pip install aiofiles debugpy typing_extensions typing opencv-python
