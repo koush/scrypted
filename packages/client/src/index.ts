@@ -11,6 +11,7 @@ import { attachPluginRemote } from '../../../server/src/plugin/plugin-remote';
 import { RpcPeer } from '../../../server/src/rpc';
 import { createRpcDuplexSerializer, createRpcSerializer } from '../../../server/src/rpc-serializer';
 import type { MediaObjectRemote } from '../../../server/src/plugin/plugin-api'
+import packageJson from '../package.json';
 
 type IOClientSocket = eio.Socket & IOSocket;
 
@@ -151,6 +152,8 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const extraHeaders: { [header: string]: string } = {};
     let addresses: string[];
     let scryptedCloud: boolean;
+
+    console.log('@scrypted/client', packageJson.version);
 
     if (username && password) {
         const loginResult = await loginScryptedClient(options as ScryptedLoginOptions);
@@ -308,8 +311,10 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
 
                 rpcPeer = await Promise.race([readyClose, timeoutFunction(10000, async (isTimedOut) => {
                     const pc = await pcPromise;
+                    console.log('peer connection received');
 
                     await waitPeerConnectionIceConnected(pc);
+                    console.log('waiting for data channel');
 
                     const dc = await dcDeferred.promise;
                     console.log('datachannel received', Date.now() - start);
