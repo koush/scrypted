@@ -100,6 +100,7 @@ class PrebufferSession {
   rtspParserKey: string;
   maxBitrateKey: string;
   rtspServerPath: string;
+  rtspServerMutedPath: string;
   needBitrateReset = false;
 
   constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: ResponseMediaStreamOptions, public stopInactive: boolean) {
@@ -113,12 +114,19 @@ class PrebufferSession {
     this.lastH264ProbeKey = 'lastH264Probe-' + this.streamId;
     this.rtspParserKey = 'rtspParser-' + this.streamId;
     const rtspServerPathKey = 'rtspServerPathKey-' + this.streamId;
+    const rtspServerMutedPathKey = 'rtspServerMutedPathKey-' + this.streamId;
     this.maxBitrateKey = 'maxBitrate-' + this.streamId;
 
     this.rtspServerPath = this.storage.getItem(rtspServerPathKey);
     if (!this.rtspServerPath) {
       this.rtspServerPath = crypto.randomBytes(8).toString('hex');
       this.storage.setItem(rtspServerPathKey, this.rtspServerPath);
+    }
+
+    this.rtspServerMutedPath = this.storage.getItem(rtspServerMutedPathKey);
+    if (!this.rtspServerMutedPath) {
+      this.rtspServerMutedPath = crypto.randomBytes(8).toString('hex');
+      this.storage.setItem(rtspServerMutedPathKey, this.rtspServerMutedPath);
     }
   }
 
@@ -484,6 +492,14 @@ class PrebufferSession {
         description: 'The RTSP URL of the rebroadcast stream. Substitute localhost as appropriate.',
         readonly: true,
         value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerPath}`,
+      });
+      settings.push({
+        group,
+        key: 'rtspRebroadcastMutedUrl',
+        title: 'RTSP Rebroadcast Url (Muted)',
+        description: 'The RTSP URL of the muted rebroadcast stream. Substitute localhost as appropriate.',
+        readonly: true,
+        value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerMutedPath}`,
       });
     }
 
@@ -1264,6 +1280,16 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
             server.sdp = await prebufferSession.sdp;
             return true;
           }
+          if (u.pathname.endsWith(session.rtspServerMutedPath)) {
+            server.console = session.console;
+            prebufferSession = session;
+            prebufferSession.ensurePrebufferSession();
+            await prebufferSession.parserSessionPromise;
+            const sdp = parseSdp(await prebufferSession.sdp);
+            sdp.msections = sdp.msections.filter(msection => msection.type === 'video');
+            server.sdp = sdp.toSdp();
+            return true;
+          }
         }
 
         return false;
@@ -1447,7 +1473,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
       this.online = true;
 
     let active = 0;
-    
+
     // figure out the default stream and streams that may have been removed due to
     // a config change.
     const toRemove = new Set(this.sessions.keys());
@@ -1535,7 +1561,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
         const session = this.sessions.get(id);
         this.sessions.delete(id);
         session.release();
-      }      
+      }
     }
   }
 
