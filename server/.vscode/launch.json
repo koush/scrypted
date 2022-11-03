@@ -29,7 +29,7 @@
             ],
             "env": {
                 // "SCRYPTED_SHARED_WORKER": "true",
-                "SCRYPTED_DISABLE_AUTHENTICATION": "true",
+                // "SCRYPTED_DISABLE_AUTHENTICATION": "true",
                 "DEBUG": "/scrypted/*",
             }
         },
