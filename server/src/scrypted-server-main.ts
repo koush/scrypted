@@ -179,6 +179,12 @@ async function start() {
     }
 
     app.use(async (req, res, next) => {
+        if (process.env.SCRYPTED_DISABLE_AUTHENTICATION === 'true') {
+            res.locals.username = 'anonymous';
+            next();
+            return;
+        }
+
         // this is a trap for all auth.
         // only basic auth will fail with 401. it is up to the endpoints to manage
         // lack of login from cookie auth.
@@ -535,6 +541,15 @@ async function start() {
                 username,
                 token: user.token,
             });
+            return;
+        }
+
+        if (process.env.SCRYPTED_DISABLE_AUTHENTICATION === 'true') {
+            res.send({
+                expiration: ONE_DAY_MILLISECONDS,
+                username: 'anonymous',
+                addresses,
+            })
             return;
         }
 
