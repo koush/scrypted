@@ -16,6 +16,7 @@ import type { HomeKitPlugin } from "../../main";
 import { getCameraRecordingFiles, HksvVideoClip, VIDEO_CLIPS_NATIVE_ID } from './camera-recording-files';
 import { checkCompatibleCodec, FORCE_OPUS, transcodingDebugModeWarning } from './camera-utils';
 import { NAL_TYPE_DELIMITER, NAL_TYPE_FU_A, NAL_TYPE_IDR, NAL_TYPE_PPS, NAL_TYPE_SEI, NAL_TYPE_SPS, NAL_TYPE_STAP_A } from "./h264-packetizer";
+import path from 'path';
 
 const { log, mediaManager, deviceManager } = sdk;
 
@@ -162,15 +163,13 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
 
         if (noAudio) {
             console.log(device.name, 'adding dummy audio track');
-            // create a dummy audio track if none actually exists.
-            // this track will only be used if no audio track is available.
-            // https://stackoverflow.com/questions/37862432/ffmpeg-output-silent-audio-track-if-source-has-no-audio-or-audio-is-shorter-th
-            inputArguments.push('-f', 'lavfi', '-i', 'anullsrc=cl=1', '-shortest');
+            const silence = path.resolve(process.env.SCRYPTED_PLUGIN_VOLUME, 'zip/unzipped/fs/silence.mp4');
+            inputArguments.push('-stream_loop', '-1', '-i', silence);
         }
 
         let audioArgs: string[];
-        if (noAudio || transcodeRecording || isDefinitelyNotAAC || transcodingDebugMode) {
-            if (!(noAudio || transcodeRecording || transcodingDebugMode))
+        if (transcodeRecording || isDefinitelyNotAAC || transcodingDebugMode) {
+            if (!(transcodeRecording || transcodingDebugMode))
                 console.warn('Recording audio is not explicitly AAC, forcing transcoding. Setting audio output to AAC is recommended.', audioCodec);
 
             let aacLowEncoder = 'aac';
@@ -335,7 +334,7 @@ export async function* handleFragmentsRequests(connection: DataStreamConnection,
         console.log(`motion recording finished`);
     }
     catch (e) {
-        console.log(`motion recording completed with error ${e}`);
+        console.log(`motion recording completed ${e}`);
     }
     finally {
         clearTimeout(videoTimeout);
