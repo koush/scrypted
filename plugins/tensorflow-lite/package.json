@@ -36,6 +36,7 @@
       "runtime": "python",
       "type": "API",
       "interfaces": [
+         "Settings",
          "BufferConverter",
          "ObjectDetection"
       ]
@@ -43,5 +44,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.46"
+   "version": "0.0.47"
 }

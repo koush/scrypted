@@ -62,7 +62,7 @@ class RawImage:
 
 MIME_TYPE = 'x-scrypted-tensorflow-lite/x-raw-image'
 
-class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
+class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     def __init__(self, nativeId: str | None = None):
         super().__init__(nativeId=nativeId)
 
@@ -96,6 +96,20 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
         loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+
+    async def getSettings(self) -> list[Setting]:
+        coral: Setting = {
+            'title': 'Detected Edge TPU',
+            'description': 'The device paths of the Coral Edge TPUs that will be used for detections.',
+            'value': self.edge_tpu_found,
+            'readonly': True,
+            'key': 'coral',
+        }
+
+        return [coral]
+    
+    async def putSetting(self, key: str, value: scrypted_sdk.SettingValue) -> None:
+        pass
 
     async def createMedia(sekf, data: RawImage) -> scrypted_sdk.MediaObject:
         mo = await scrypted_sdk.mediaManager.createMediaObject(data, MIME_TYPE)
@@ -203,15 +217,8 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter):
                 'motorcycle',
             ],
         }
-        coral: Setting = {
-            'title': 'Detected Edge TPU',
-            'description': 'The device paths of the Coral Edge TPUs that will be used for detections.',
-            'value': self.edge_tpu_found,
-            'readonly': True,
-            'key': 'coral',
-        }
 
-        d['settings'] = [coral, confidence, secondConfidence, decoderSetting, allowList]
+        d['settings'] = [confidence, secondConfidence, decoderSetting, allowList]
         return d
 
     def create_detection_result(self, objs, size, allowList, convert_to_src_size=None) -> ObjectsDetected:
