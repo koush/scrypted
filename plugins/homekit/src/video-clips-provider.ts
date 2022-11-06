@@ -24,9 +24,7 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
         }
     });
 
-    pruneInterval = setInterval(() => {
-        this.prune();
-    }, 60 * 60 * 1000);
+    pruneInterval: NodeJS.Timeout;
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -35,6 +33,13 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
         this.toMimeType = ScryptedMimeTypes.MediaObject;
 
         this.prune();
+    }
+
+    resetPruneInterval() {
+        clearTimeout(this.pruneInterval);
+        this.pruneInterval = setInterval(() => {
+            this.prune();
+        }, 60 * 60 * 1000);
     }
 
     async getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]> {
@@ -75,7 +80,6 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
             pruneAge = 1 * 24 * 60 * 60 * 1000;
             this.console.warn(`Low Disk space: ${savePath}`);
             this.console.warn("Pruning videos older than 1 day to recover space.");
-            this.log.a('Low disk space.');
         }
 
         pruneClips(pruneAge, this.console);
@@ -107,7 +111,8 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
             mixinDeviceInterfaces,
             mixinDeviceState,
             mixinProviderNativeId: this.nativeId,
-        })
+        });
+        this.resetPruneInterval();
         return ret;
     }
 
