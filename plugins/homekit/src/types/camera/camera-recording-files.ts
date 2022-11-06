@@ -80,7 +80,7 @@ export async function getVideoClips(options?: VideoClipOptions, id?: string): Pr
     for (const jsonFile of idJsonFiles) {
         try {
             const jsonFilePath = path.join(savePath, jsonFile);
-            const json: HksvVideoClip = JSON.parse(fs.readFileSync(jsonFilePath).toString());
+            const json: HksvVideoClip = JSON.parse((await fs.promises.readFile(jsonFilePath)).toString());
             ret.push(json);
         }
         catch (e) {
@@ -173,10 +173,13 @@ export async function getVideoClipThumbnail(videoClipId: string): Promise<MediaO
     const { id, startTime } = parseHksvId(videoClipId);
     const { mp4Path, thumbnailPath } = await getCameraRecordingFiles(id, startTime);
     let jpeg: Buffer;
-    if (fs.existsSync(thumbnailPath)) {
-        jpeg = fs.readFileSync(thumbnailPath);
+    try {
+        jpeg = await fs.promises.readFile(thumbnailPath);
     }
-    else {
+    catch (e) {
+
+    }
+    if (!jpeg) {
         const ffmpegInput: FFmpegInput = {
             url: undefined,
             inputArguments: [
@@ -186,7 +189,7 @@ export async function getVideoClipThumbnail(videoClipId: string): Promise<MediaO
         };
         const input = await mediaManager.createFFmpegMediaObject(ffmpegInput);
         jpeg = await mediaManager.convertMediaObjectToBuffer(input, 'image/jpeg');
-        fs.writeFileSync(thumbnailPath, jpeg);
+        await fs.promises.writeFile(thumbnailPath, jpeg);
     }
     const url = `file:${thumbnailPath}`;
     return mediaManager.createMediaObjectFromUrl(url);
