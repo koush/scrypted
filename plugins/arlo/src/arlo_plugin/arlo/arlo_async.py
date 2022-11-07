@@ -252,6 +252,7 @@ class Arlo(object):
                     f"d/{x_cloud_id}/out/audioPlayback/#",
                     f"d/{x_cloud_id}/out/modes/#",
                     f"d/{x_cloud_id}/out/basestation/#",
+                    f"d/{x_cloud_id}/out/doorbells/#",
                     f"d/{x_cloud_id}/out/siren/#",
                     f"d/{x_cloud_id}/out/devices/#",
                     f"d/{x_cloud_id}/out/storage/#",
@@ -383,7 +384,7 @@ class Arlo(object):
         that has a big switch statement in it to handle all the various events Arlo produces.
         """
 
-        resource = f"siren/{doorbell.get('deviceId')}"
+        resource = f"doorbells/{doorbell.get('deviceId')}"
 
         async def unpress_doorbell(callback):
             # It's unclear what events correspond to arlo doorbell presses
@@ -395,8 +396,8 @@ class Arlo(object):
         def callbackwrapper(self, event):
             properties = event.get('properties', {})
             stop = None
-            if 'pattern' in properties and 'sirenType' in properties:
-                stop = callback(True)
+            if 'buttonPressed' in properties:
+                stop = callback(properties.get('buttonPressed'))
                 asyncio.get_event_loop().create_task(unpress_doorbell(callback))
             if not stop:
                 return None

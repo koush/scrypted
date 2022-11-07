@@ -6,6 +6,7 @@ import threading
 from .stream_async import Stream 
 from .logging import logger
 
+
 class EventStream(Stream):
 
     async def start(self):
