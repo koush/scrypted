@@ -51,7 +51,11 @@ More details can be found [here](https://github.com/koush/scrypted/blob/main/plu
         readme += `
 ## HomeKit Codec Settings
 
-The recommended codec settings for cameras in HomeKit can be viewed in the [HomeKit plugin](#/device/${id}).`
+The recommended codec settings for cameras in HomeKit can be viewed in the [HomeKit plugin](#/device/${id}).
+
+## Troubleshooting
+
+The latest troubleshooting guide for all known streaming or recording issues can be viewed in the [HomeKit plugin](#/device/${id}).`;
 
         return readme;
     }
