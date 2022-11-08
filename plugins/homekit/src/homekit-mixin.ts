@@ -16,7 +16,10 @@ export class HomekitMixin<T> extends SettingsMixinDeviceBase<T> {
                     ? ' Cameras running in accessory mode with Rebroadcast Prebuffers will send a notification when the stream becomes unavailable.'
                     : ''),
             type: 'boolean',
-            onPut: () => this.alertReload(),
+            onPut: (oldValue, newValue) => {
+                if (oldValue !== undefined)
+                    this.alertReload()
+            },
             // todo: change this at some point.
             persistedDefaultValue: false,
         },

@@ -28,6 +28,8 @@ export class CameraMixin extends HomekitMixin<Readme & VideoCamera> implements R
             this.cameraStorageSettings.values.hasWarnedBridgedCamera = true;
             log.a(`${this.name} is paired in Bridge Mode. Using Accessory Mode is recommended for cameras for optimal performance.`)
         }
+
+        this.storageSettings.settings.standalone.persistedDefaultValue = true;
     }
 
     async getReadmeMarkdown(): Promise<string> {
