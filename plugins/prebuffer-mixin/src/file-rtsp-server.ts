@@ -22,7 +22,7 @@ export class FileRtspServer extends RtspServer {
 
     cleanup() {
         const ws = this.writeStream;
-        if (ws)
+        if (!ws)
             return;
         this.writeStream = undefined;
         ws?.end(() => ws?.destroy());
