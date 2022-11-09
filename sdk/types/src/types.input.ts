@@ -389,6 +389,7 @@ export interface VideoStreamOptions {
   width?: number;
   height?: number;
   bitrate?: number;
+  bitrateControl?: 'variable' | 'constant';
   minBitrate?: number;
   maxBitrate?: number;
   fps?: number;

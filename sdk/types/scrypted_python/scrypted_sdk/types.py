@@ -235,6 +235,7 @@ class PictureDimensions(TypedDict):
 
 class VideoStreamOptions(TypedDict):
     bitrate: float
+    bitrateControl: Any | Any
     codec: str
     fps: float
     h264Info: H264Info
