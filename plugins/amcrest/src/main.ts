@@ -109,15 +109,44 @@ class AmcrestCamera extends RtspSmartCamera implements VideoCameraConfiguration,
     }
 
     async setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
-        let bitrate = options?.video?.bitrate;
-        if (!bitrate)
-            return;
-        bitrate = Math.round(bitrate / 1000);
-        // what is Encode[0]? Is that the camera number?
+        if (!options.id?.startsWith('channel'))
+        throw new Error('invalid id');
         const channel = parseInt(this.getRtspChannel()) || 1;
+        const formatNumber = parseInt(options.id?.substring('channel'.length)) - 1;
         const format = options.id === 'channel0' ? 'MainFormat' : 'ExtraFormat';
+        const encode = `Encode[${channel - 1}].${format}[${formatNumber}]`;
+        const params = new URLSearchParams();
+        if (options.video?.bitrate) {
+            let bitrate = options?.video?.bitrate;
+            if (!bitrate)
+                return;
+            bitrate = Math.round(bitrate / 1000);
+            params.set(`${encode}.Video.BitRate`, bitrate.toString());
+        }
+        if (options.video?.codec === 'h264') {
+            params.set(`${encode}.Video.Compression`, 'H.264');
+        }
+        if (options.video?.codec === 'h265') {
+            params.set(`${encode}.Video.Compression`, 'H.265');
+        }
+        if (options.video?.width && options.video?.height) {
+            params.set(`${encode}.Video.resolution`, `${options.video.width}x${options.video.height}`);
+        }
+        if (options.video?.fps) {
+            params.set(`${encode}.Video.FPS`, options.video.fps.toString());
+            if (options.video?.idrIntervalMillis) {
+                params.set(`${encode}.Video.GOP`, (options.video.fps * options.video?.idrIntervalMillis / 1000).toString());
+            }
+        }
+        if (options.video?.bitrateControl) {
+            params.set(`${encode}.Video.BitRateControl`, options.video.bitrateControl === 'variable' ? 'VBR' : 'CBR');
+        }
+
+        if (![...params.keys()].length)
+            return;
+
         const response = await this.getClient().digestAuth.request({
-            url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&Encode[${channel - 1}].${format}[0].Video.BitRate=${bitrate}`
+            url: `http://${this.getHttpAddress()}/cgi-bin/configManager.cgi?action=setConfig&${params}`
         });
         this.console.log('reconfigure result', response.data);
     }
