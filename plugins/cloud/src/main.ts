@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BufferConverter, DeviceProvider, HttpRequest, HttpRequestHandler, HttpResponse, OauthClient, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings } from '@scrypted/sdk';
-import { StorageSettings } from "@scrypted/common/src/settings"
+import { StorageSettings } from "@scrypted/sdk/storage-settings"
 import qs from 'query-string';
 import { Duplex } from 'stream';
 import net from 'net';
