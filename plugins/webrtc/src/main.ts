@@ -383,7 +383,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const session = await createBrowserSignalingSession(ws, '@scrypted/webrtc', 'remote');
             const { transcodeWidth, sessionSupportsH264High } = parseOptions(await session.getOptions());
 
-            const result = zygote!.next().value!;
+            const result = zygote();
             this.activeConnections++;
             result.worker.on('exit', () => {
                 this.activeConnections--;
@@ -393,12 +393,12 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                 result.worker.terminate()
             });
 
-            const { createConnection} = await result.result;
+            const { createConnection } = await result.result;
             const connection = await createConnection(message, client.port, session,
                 this.storageSettings.values.maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
                 configuration: this.getRTCConfiguration(),
             });
-            cleanup.promise.finally(() => connection.close().catch(() => {}));
+            cleanup.promise.finally(() => connection.close().catch(() => { }));
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
 
             await connection.negotiateRTCSignalingSession();

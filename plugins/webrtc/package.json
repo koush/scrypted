@@ -1,6 +1,6 @@
 {
    "name": "@scrypted/webrtc",
-   "version": "0.0.90",
+   "version": "0.0.91",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",

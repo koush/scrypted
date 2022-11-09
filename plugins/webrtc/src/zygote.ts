@@ -1,7 +1,9 @@
 import sdk, { PluginFork } from '@scrypted/sdk';
 import worker_threads from 'worker_threads';
 
-export function createZygote<T>(): Generator<PluginFork<T>> {
+export type Zygote<T> = () => PluginFork<T>;
+
+export function createZygote<T>(): Zygote<T> {
     if (!worker_threads.isMainThread)
         return;
 
@@ -15,5 +17,5 @@ export function createZygote<T>(): Generator<PluginFork<T>> {
     }
 
     const gen = next();
-    return gen;
+    return () => gen.next().value as PluginFork<T>;
 }

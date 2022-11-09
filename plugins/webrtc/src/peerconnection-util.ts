@@ -56,7 +56,7 @@ export function waitIceConnected(pc: RTCPeerConnection) {
 
 export function waitClosed(pc: RTCPeerConnection) {
     return statePromise(pc.connectionStateChange, () => {
-        return isPeerConnectionClosed(pc);
+        return isPeerConnectionClosed(pc) || isPeerIceConnectionClosed(pc);
     })
 }
 
