@@ -1,13 +1,13 @@
-import sdk, { ScryptedDeviceBase, DeviceProvider, Settings, Setting, VideoCamera, MediaObject, MotionSensor, ScryptedInterface, Camera, MediaStreamOptions, Intercom, ScryptedMimeTypes, FFmpegInput, ObjectDetector, PictureOptions, ObjectDetectionTypes, ObjectsDetected, Notifier, VideoCameraConfiguration, OnOff, MediaStreamUrl, ResponseMediaStreamOptions } from "@scrypted/sdk";
-import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
-import child_process, { ChildProcess } from 'child_process';
 import { ffmpegLogInitialOutput, safeKillFFmpeg } from '@scrypted/common/src/media-helpers';
 import { fitHeightToWidth } from "@scrypted/common/src/resolution-utils";
-import WS from 'ws';
+import sdk, { Camera, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamOptions, MediaStreamUrl, MotionSensor, Notifier, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, OnOff, PictureOptions, ResponseMediaStreamOptions, ResponsePictureOptions, ScryptedDeviceBase, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, VideoCamera, VideoCameraConfiguration } from "@scrypted/sdk";
+import child_process, { ChildProcess } from 'child_process';
 import { once } from "events";
-import { FeatureFlagsShim } from "./shim";
-import { UnifiProtect } from "./main";
 import { Readable } from "stream";
+import WS from 'ws';
+import { UnifiProtect } from "./main";
+import { FeatureFlagsShim } from "./shim";
+import { ProtectCameraChannelConfig, ProtectCameraConfigInterface, ProtectCameraLcdMessagePayload } from "./unifi-protect";
 
 const { log, deviceManager, mediaManager } = sdk;
 
@@ -21,8 +21,12 @@ export class UnifiPackageCamera extends ScryptedDeviceBase implements Camera, Vi
         const buffer = await this.camera.getSnapshot(options, 'package-snapshot?');
         return this.createMediaObject(buffer, 'image/jpeg');
     }
-    async getPictureOptions(): Promise<PictureOptions[]> {
-        return;
+    async getPictureOptions(): Promise<ResponsePictureOptions[]> {
+        return [
+            {
+                canResize: true,
+            }
+        ];
     }
     async getVideoStream(options?: MediaStreamOptions): Promise<MediaObject> {
         const o = (await this.getVideoStreamOptions())[0];
@@ -349,8 +353,12 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         }
     }
 
-    async getPictureOptions(): Promise<PictureOptions[]> {
-        return;
+    async getPictureOptions(): Promise<ResponsePictureOptions[]> {
+        return [
+            {
+                canResize: true,
+            }
+        ];
     }
 
     setMotionDetected(motionDetected: boolean) {

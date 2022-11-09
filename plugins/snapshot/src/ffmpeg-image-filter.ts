@@ -46,20 +46,18 @@ function ffmpegCreateOutputArguments(inputArguments: string[], options: FFmpegIm
         addVideoFilterArguments(inputArguments, filter, 'snapshotCrop');
     }
 
-    if (options.resize) {
+    // favor height, and always respect aspect ratio.
+    if (options.resize?.width || options.resize?.height) {
         const { resize } = options;
         let width: string|number;
-        if (!resize.width) {
-            width = -2;
-        }
-        else {
-            width = resize.fractional ? `iw*${resize.width}` : `'min(${resize.width},iw)'`;
-        }
         let height: string|number;
+
         if (!resize.height) {
             height = -2;
+            width = resize.fractional ? `iw*${resize.width}` : `'min(${resize.width},iw)'`;
         }
         else {
+            width = -2;
             height = resize.fractional ? `ih*${resize.height}` : `'min(${resize.height},ih)'`;
         }
 

@@ -124,7 +124,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
 
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
         const eventSnapshot = options?.reason === 'event';
-        let needResize = !!options?.picture?.width || options?.picture?.height;
+        let needSoftwareResize = !!(options?.picture?.width || options?.picture?.height);
 
         let takePicture: (options?: RequestPictureOptions) => Promise<Buffer>;
         if (this.storageSettings.values.snapshotsFromPrebuffer) {
@@ -155,48 +155,60 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             if (!this.storageSettings.values.snapshotUrl) {
                 if (this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera)) {
                     takePicture = async (options?: RequestPictureOptions) => {
-                        // if operating in full resolution mode, nuke any picture options containing
-                        // the requested dimensions that are sent.
-                        let psos: ResponsePictureOptions[];
-                        if (options
-                            && (this.storageSettings.values.snapshotResolution === 'Full Resolution'
-                                || (this.storageSettings.values.snapshotResolution === 'Requested Resolution'
-                                    || this.storageSettings.values.snapshotResolution === 'Default'
-                                    && (options.picture?.width || options.picture?.height)))
-                        ) {
-                            // only use the hardware resize if this image is not cropping.
-                            // resize should be applied after crop.
-                            if (this.storageSettings.values.snapshotResolution === 'Default'
-                                && !this.storageSettings.values.snapshotCropScale?.length) {
+                        const internalTakePicture = async () => {
+                            if (!options?.id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
                                 try {
                                     if (!psos)
                                         psos = await this.mixinDevice.getPictureOptions();
-                                    if (!psos?.[0]?.canResize) {
-                                        needResize = true;
-                                    }
+                                    const pso = psos.find(pso => pso.name === this.storageSettings.values.defaultSnapshotChannel);
+                                    if (!options)
+                                        options = {};
+                                    options.id = pso.id;
                                 }
                                 catch (e) {
                                 }
                             }
-                            else {
-                                needResize = true;
-                                options.picture = undefined;
-                            }
+                            return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
                         }
 
-                        if (!options?.id && this.storageSettings.values.defaultSnapshotChannel !== 'Camera Default') {
-                            try {
-                                if (!psos)
-                                    psos = await this.mixinDevice.getPictureOptions();
-                                const pso = psos.find(pso => pso.name === this.storageSettings.values.defaultSnapshotChannel);
-                                if (!options)
-                                    options = {};
-                                options.id = pso.id;
-                            }
-                            catch (e) {
+                        // full resolution setging ignores resize.
+                        if (this.storageSettings.values.snapshotResolution === 'Full Resolution') {
+                            if (options)
+                                options.picture = undefined;
+                            return internalTakePicture();
+                        }
+
+                        // if resize wasn't requested, continue as normal.
+                        const resizeRequested = !!options?.picture;
+                        if (!resizeRequested)
+                            return internalTakePicture();
+
+                        // resize was requested
+
+                        // crop and scale needs to operate on the full resolution image.
+                        if (this.storageSettings.values.snapshotCropScale?.length) {
+                            options.picture = undefined;
+                            // resize after the cop and scale.
+                            needSoftwareResize = resizeRequested;
+                            return internalTakePicture();
+                        }
+
+                        //  determine see if that can be handled by camera hardware
+                        let psos: ResponsePictureOptions[];
+                        try {
+                            if (!psos)
+                                psos = await this.mixinDevice.getPictureOptions();
+                            if (!psos?.[0]?.canResize) {
+                                needSoftwareResize = true;
                             }
                         }
-                        return this.mixinDevice.takePicture(options).then(mo => mediaManager.convertMediaObjectToBuffer(mo, 'image/jpeg'))
+                        catch (e) {
+                        }
+
+                        if (needSoftwareResize)
+                            options.picture = undefined;
+
+                        return internalTakePicture();
                     };
                 }
                 else if (this.storageSettings.values.snapshotsFromPrebuffer) {
@@ -241,15 +253,17 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
 
-        const isFullImage = !needResize;
+        const isFullImage = !needSoftwareResize;
         let pendingPicture = this.pendingPicture;
         if (!pendingPicture || !isFullImage) {
             pendingPicture = (async () => {
                 let picture: Buffer;
                 try {
-                    picture = await takePicture(options);
+                    picture = await takePicture(options ? {
+                        ...options,
+                    } : undefined);
                     picture = await this.cropAndScale(picture);
-                    if (needResize) {
+                    if (needSoftwareResize) {
                         picture = await ffmpegFilterImageBuffer(picture, {
                             ffmpegPath: await mediaManager.getFFmpegPath(),
                             resize: options?.picture,
