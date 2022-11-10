@@ -24,6 +24,7 @@ services:
         environment:
             - WATCHTOWER_HTTP_API_TOKEN=SET_THIS_TO_SOME_RANDOM_TEXT
             - WATCHTOWER_HTTP_API_UPDATE=true
+            - WATCHTOWER_SCOPE=scrypted
             # remove the following line to never allow docker to auto update.
             # this is not recommended.
             - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
