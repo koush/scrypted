@@ -470,6 +470,8 @@ export interface ResponseMediaStreamOptions extends MediaStreamOptions {
    * and are available out of band via another mechanism such as the SDP.
    */
   oobCodecParameters?: boolean;
+
+  destinations?: MediaStreamDestination[];
 }
 
 export type MediaStreamDestination = "local" | "remote" | "medium-resolution" | "low-resolution" | "local-recorder" | "remote-recorder";

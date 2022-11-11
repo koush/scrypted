@@ -511,6 +511,7 @@ class RequestRecordingStreamOptions(TypedDict):
 class ResponseMediaStreamOptions(TypedDict):
     audio: AudioStreamOptions
     container: str
+    destinations: list[MediaStreamDestination]
     id: str
     metadata: Any
     name: str
