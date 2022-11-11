@@ -71,6 +71,7 @@ export async function scryptedEval(device: ScryptedDeviceBase, script: string, e
     }
 
     const allParams = Object.assign({}, params, {
+        sdk,
         fs: require('realfs'),
         fetch,
         ScryptedDeviceBase,
