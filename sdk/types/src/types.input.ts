@@ -497,6 +497,25 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
    * is explicitly provided.
    */
   destination?: MediaStreamDestination;
+
+  /**
+   * The destination id for this media stream. This should generally be
+   * the IP address of the destination, if known. May be used by to
+   * determine stream selection and track dynamic bitrate history.
+   */
+  destinationId?: string;
+
+  /**
+   * Request an adaptive bitrate stream, if available. The destination
+   * will need to report packet loss indication.
+   */
+   adaptive?: boolean;
+}
+
+export interface MediaStreamFeedback {
+  reportPacketLoss(report: {
+    packetsLost: number;
+  }): Promise<void>;
 }
 
 /**
@@ -1756,6 +1775,7 @@ export enum ScryptedMimeTypes {
   MediaStreamUrl = 'text/x-media-url',
   MediaObject = 'x-scrypted/x-scrypted-media-object',
   RequestMediaStream = 'x-scrypted/x-scrypted-request-stream',
+  MediaStreamFeedback = 'x-scrypted/x-media-stream-feedback',
   ScryptedDevice = 'x-scrypted/x-scrypted-device',
   ScryptedDeviceId = 'x-scrypted/x-scrypted-device-id',
 

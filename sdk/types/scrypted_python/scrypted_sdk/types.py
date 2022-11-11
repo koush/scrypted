@@ -150,6 +150,7 @@ class ScryptedMimeTypes(Enum):
     InsecureLocalUrl = "text/x-insecure-local-uri"
     LocalUrl = "text/x-local-uri"
     MediaObject = "x-scrypted/x-scrypted-media-object"
+    MediaStreamFeedback = "x-scrypted/x-media-stream-feedback"
     MediaStreamUrl = "text/x-media-url"
     PushEndpoint = "text/x-push-endpoint"
     RTCConnectionManagement = "x-scrypted/x-scrypted-rtc-connection-management"
@@ -462,9 +463,11 @@ class RecordingStreamThumbnailOptions(TypedDict):
     pass
 
 class RequestMediaStreamOptions(TypedDict):
+    adaptive: bool
     audio: AudioStreamOptions
     container: str
     destination: MediaStreamDestination
+    destinationId: str
     directMediaStream: bool
     id: str
     metadata: Any
@@ -485,9 +488,11 @@ class RequestPictureOptions(TypedDict):
     pass
 
 class RequestRecordingStreamOptions(TypedDict):
+    adaptive: bool
     audio: AudioStreamOptions
     container: str
     destination: MediaStreamDestination
+    destinationId: str
     directMediaStream: bool
     duration: float
     id: str
