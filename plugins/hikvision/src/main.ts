@@ -87,7 +87,8 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                 // this.console.error('### Detected motion, camera: ', cameraNumber);
                 this.motionDetected = true;
                 clearTimeout(motionTimeout);
-                motionTimeout = setTimeout(() => this.motionDetected = false, inactive ? 5000 : 30000);
+                // motion seems to be on a 1 second pulse
+                motionTimeout = setTimeout(() => this.motionDetected = false, inactive ? 5000 : 10000);
             }
         })
 
