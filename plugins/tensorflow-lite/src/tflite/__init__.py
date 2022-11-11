@@ -5,7 +5,7 @@ from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, Obje
 import threading
 import io
 from .common import *
-from PIL import Image
+from PIL import Image, ImageOps
 from pycoral.adapters import detect
 from pycoral.adapters.common import input_size
 loaded_py_coral = False
@@ -283,26 +283,48 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
 
         (w, h) = input_size(self.interpreter)
         if not second_pass_crop:
-            (iw, ih) = image.size
-            ws = w / iw
-            hs = h / ih
-            s = max(ws, hs)
-            scaled = image.resize((round(s * iw), round(s * ih)), Image.ANTIALIAS)
-            ow = round((scaled.width - w) / 2)
-            oh = round((scaled.height - h) / 2)
-            input = scaled.crop((ow, oh, ow + w, oh + h))
+            if not second_score_threshold:
+                (iw, ih) = image.size
+                ws = w / iw
+                hs = h / ih
+                s = max(ws, hs)
+                scaled = image.resize((round(s * iw), round(s * ih)), Image.Resampling.NEAREST)
+                ow = round((scaled.width - w) / 2)
+                oh = round((scaled.height - h) / 2)
+                input = scaled.crop((ow, oh, ow + w, oh + h))
 
-            if convert_to_src_size:
-                def cvss(point, normalize=False):
-                    converted = convert_to_src_size(point, normalize)
-                    return ((converted[0] + ow) / s, (converted[1] + oh) / s, converted[2])
+                if convert_to_src_size:
+                    def cvss(point, normalize=False):
+                        converted = convert_to_src_size(point, normalize)
+                        return ((converted[0] + ow) / s, (converted[1] + oh) / s, converted[2])
+                else:
+                    cvss = None
             else:
-                cvss = None
+                (iw, ih) = image.size
+                ws = w / iw
+                hs = h / ih
+                s = min(ws, hs)
+                input = ImageOps.pad(image, (w, h), Image.Resampling.NEAREST, centering = (0, 0))
+                if convert_to_src_size:
+                    def cvss(point, normalize=False):
+                        converted = convert_to_src_size(point, normalize)
+                        rx = converted[0] / s
+                        ry = converted[1] / s
+                        valid = converted[2] and rx < iw and ry < ih
+                        return (rx, ry, valid)
+                else:
+                    def cvss(point, normalize=False):
+                        # third value is valid, should check if its in unpadded region
+                        rx = point[0] / s
+                        ry = point[1] / s
+                        valid = rx < iw and ry < ih
+                        return (rx, ry, valid)
+                pass
         else:
             (l, t, r, b) = second_pass_crop
             cropped = image.crop(second_pass_crop)
             (cw, ch) = cropped.size
-            input = cropped.resize((w, h), Image.ANTIALIAS)
+            input = cropped.resize((w, h), Image.Resampling.NEAREST)
 
             if convert_to_src_size:
                 def cvss(point, normalize=False):
