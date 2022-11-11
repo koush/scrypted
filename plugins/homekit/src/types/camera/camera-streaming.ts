@@ -70,6 +70,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             const { socket: videoReturn, port: videoPort } = await getPort(socketType, addressOverride);
             const { socket: audioReturn, port: audioPort } = await getPort(socketType, addressOverride);
+            videoReturn.setSendBufferSize(1024 * 1024);
+            audioReturn.setSendBufferSize(1024 * 1024);
 
             killPromise.finally(() => {
                 closeQuiet(videoReturn);
