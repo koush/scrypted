@@ -47,6 +47,7 @@ class TensorFlowLiteSession(DetectionSession):
     def __init__(self) -> None:
         super().__init__()
         self.image = None
+        self.previousDetections = None
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -394,11 +395,14 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
      
         ret1 = self.detect_once(first, score_threshold, settings, src_size, cvss1)
         ret2 = self.detect_once(second, score_threshold, settings, src_size, cvss2)
+        r1Detections = list(ret1['detections'])
+        r2Detections = list(ret2['detections'])
 
         ret = ret1
         ret['detections'] = ret1['detections'] + ret2['detections']
 
         if not len(ret['detections']):
+            detection_session.previousDetections = []
             return ret, RawImage(image)
         
 
@@ -428,11 +432,15 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
                 continue
 
             if detection_session.previousDetections:
+                found = False
                 for pd in detection_session.previousDetections:
                     if is_same_detection(detection, pd):
                         detection['score'] = max(detection['score'], pd['score'])
                         ret['detections'].append(detection)
-                        continue
+                        found = True
+                        break
+                if found:
+                    continue
 
             (x, y, w, h) = detection['boundingBox']
             cx = x + w / 2
@@ -451,7 +459,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             ret['detections'].extend(filtered[:1])
 
         detection_session.previousDetections = ret['detections']
-
+        print(ret['detections'])
         return ret, RawImage(image)
 
     def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
