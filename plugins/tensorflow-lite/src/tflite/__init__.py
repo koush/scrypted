@@ -42,6 +42,7 @@ class QueuedSample(TypedDict):
 
 class TensorFlowLiteSession(DetectionSession):
     image: Image.Image
+    previousDetections: List[ObjectDetectionResult]
 
     def __init__(self) -> None:
         super().__init__()
@@ -300,7 +301,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         stream = io.BytesIO(image_bytes)
         image = Image.open(stream)
 
-        detections, _ = self.run_detection_image(image, settings, image.size)
+        detections, _ = self.run_detection_image(detection_session, image, settings, image.size)
         return detections
 
     def get_detection_input_size(self, src_size):
@@ -323,7 +324,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         ret = self.create_detection_result(objs, src_size, allowList, cvss)
         return ret
 
-    def run_detection_image(self, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, second_pass_crop: Tuple[float, float, float, float] = None):
+    def run_detection_image(self, detection_session: TensorFlowLiteSession, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, second_pass_crop: Tuple[float, float, float, float] = None):
         score_threshold = defaultThreshold
         second_score_threshold = None
         if settings:
@@ -425,6 +426,14 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             if detection['score'] >= second_score_threshold:
                 ret['detections'].append(detection)
                 continue
+
+            if detection_session.previousDetections:
+                for pd in detection_session.previousDetections:
+                    if is_same_detection(detection, pd):
+                        detection['score'] = max(detection['score'], pd['score'])
+                        ret['detections'].append(detection)
+                        continue
+
             (x, y, w, h) = detection['boundingBox']
             cx = x + w / 2
             cy = y + h / 2
@@ -436,10 +445,12 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             x2 = x + d
             y2 = y + d
 
-            secondPassResult, _ = self.run_detection_image(image, settings, src_size, convert_to_src_size, (x, y, x2, y2))
+            secondPassResult, _ = self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size, (x, y, x2, y2))
             filtered = list(filter(lambda d: d['className'] == detection['className'], secondPassResult['detections']))
             filtered.sort(key = lambda c: c['score'], reverse = True)
             ret['detections'].extend(filtered[:1])
+
+        detection_session.previousDetections = ret['detections']
 
         return ret, RawImage(image)
 
@@ -474,7 +485,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             finally:
                 gst_buffer.unmap(info)
 
-        return self.run_detection_image(image, settings, src_size, convert_to_src_size)
+        return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
 
     def create_detection_session(self):
         return TensorFlowLiteSession()
