@@ -26,6 +26,15 @@ from gi.repository import Gst
 import asyncio
 
 from detect import DetectionSession, DetectPlugin
+from collections import namedtuple
+
+Rectangle = namedtuple('Rectangle', 'xmin ymin xmax ymax')
+
+def intersect_area(a: Rectangle, b: Rectangle):  # returns None if rectangles don't intersect
+    dx = min(a.xmax, b.xmax) - max(a.xmin, b.xmin)
+    dy = min(a.ymax, b.ymax) - max(a.ymin, b.ymin)
+    if (dx>=0) and (dy>=0):
+        return dx*dy
 
 class QueuedSample(TypedDict):
     gst_buffer: Any
@@ -61,6 +70,38 @@ class RawImage:
         self.jpegMediaObject = None
 
 MIME_TYPE = 'x-scrypted-tensorflow-lite/x-raw-image'
+
+def is_same_detection(d1: ObjectDetectionResult, d2: ObjectDetectionResult):
+    if d1['className'] != d2['className']:
+        return False, None
+    
+    bb1 = d1['boundingBox']
+    bb2 = d2['boundingBox']
+
+    r1 = Rectangle(bb1[0], bb1[1], bb1[0] + bb1[2], bb1[1] + bb1[3])
+    r2 = Rectangle(bb2[0], bb2[1], bb2[0] + bb2[2], bb2[1] + bb2[3])
+    ia = intersect_area(r1, r2)
+
+    if not ia:
+        return False, None
+
+    a1 = bb1[2] * bb1[3]
+    a2 = bb2[2] * bb2[3]
+
+    # if area intersect area is too small, these are different boxes
+    if ia / a1 < .4 and ia / a2 < .4:
+        return False, None
+
+    l = min(bb1[0], bb2[0])
+    t = min(bb1[1], bb2[1])
+    r = max(bb1[0] + bb1[2], bb2[0] + bb2[2])
+    b = max(bb1[1] + bb1[3], bb2[1] + bb2[3])
+
+    w = r - l
+    h = b - t
+
+    return True, (l, t, w, h)
+
 
 class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_sdk.Settings):
     def __init__(self, nativeId: str | None = None):
@@ -267,6 +308,21 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         with self.mutex:
             return input_size(self.interpreter)
 
+    def detect_once(self, input: Image.Image, score_threshold: float, settings: Any, src_size, cvss):
+        with self.mutex:
+            common.set_input(
+                self.interpreter, input)
+            scale = (1, 1)
+            # _, scale = common.set_resized_input(
+            #     self.interpreter, cropped.size, lambda size: cropped.resize(size, Image.ANTIALIAS))
+            self.interpreter.invoke()
+            objs = detect.get_objects(
+                self.interpreter, score_threshold=score_threshold, image_scale=scale)
+
+        allowList = settings.get('allowList', None) if settings else None
+        ret = self.create_detection_result(objs, src_size, allowList, cvss)
+        return ret
+
     def run_detection_image(self, image: Image.Image, settings: Any, src_size, convert_to_src_size: Any = None, second_pass_crop: Tuple[float, float, float, float] = None):
         score_threshold = defaultThreshold
         second_score_threshold = None
@@ -282,76 +338,89 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             score_threshold = second_score_threshold
 
         (w, h) = input_size(self.interpreter)
-        if not second_pass_crop:
-            if not second_score_threshold:
+
+        # this a single pass or the second pass. detect once and return results.
+        if second_pass_crop or not second_score_threshold:
+            if second_pass_crop:
+                (l, t, r, b) = second_pass_crop
+                cropped = image.crop(second_pass_crop)
+                (cw, ch) = cropped.size
+                input = cropped.resize((w, h), Image.ANTIALIAS)
+
+                def cvss(point, normalize=False):
+                    unscaled = ((point[0] / w) * cw + l, (point[1] / h) * ch + t)
+                    converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
+                    return converted
+            else:
                 (iw, ih) = image.size
                 ws = w / iw
                 hs = h / ih
                 s = max(ws, hs)
-                scaled = image.resize((round(s * iw), round(s * ih)), Image.Resampling.NEAREST)
+                scaled = image.resize((round(s * iw), round(s * ih)), Image.ANTIALIAS)
                 ow = round((scaled.width - w) / 2)
                 oh = round((scaled.height - h) / 2)
                 input = scaled.crop((ow, oh, ow + w, oh + h))
 
-                if convert_to_src_size:
-                    def cvss(point, normalize=False):
-                        converted = convert_to_src_size(point, normalize)
-                        return ((converted[0] + ow) / s, (converted[1] + oh) / s, converted[2])
-                else:
-                    cvss = None
-            else:
-                (iw, ih) = image.size
-                ws = w / iw
-                hs = h / ih
-                s = min(ws, hs)
-                input = ImageOps.pad(image, (w, h), Image.Resampling.NEAREST, centering = (0, 0))
-                if convert_to_src_size:
-                    def cvss(point, normalize=False):
-                        converted = convert_to_src_size(point, normalize)
-                        rx = converted[0] / s
-                        ry = converted[1] / s
-                        valid = converted[2] and rx < iw and ry < ih
-                        return (rx, ry, valid)
-                else:
-                    def cvss(point, normalize=False):
-                        # third value is valid, should check if its in unpadded region
-                        rx = point[0] / s
-                        ry = point[1] / s
-                        valid = rx < iw and ry < ih
-                        return (rx, ry, valid)
-                pass
-        else:
-            (l, t, r, b) = second_pass_crop
-            cropped = image.crop(second_pass_crop)
-            (cw, ch) = cropped.size
-            input = cropped.resize((w, h), Image.Resampling.NEAREST)
-
-            if convert_to_src_size:
                 def cvss(point, normalize=False):
-                    converted = convert_to_src_size(point, normalize)
-                    return ((converted[0] / w) * cw + l, (converted[1] / h) * ch + t, converted[2])
-            else:
-                cvss = None
-                
-        with self.mutex:
-            common.set_input(
-                self.interpreter, input)
-            scale = (1, 1)
-            # _, scale = common.set_resized_input(
-            #     self.interpreter, cropped.size, lambda size: cropped.resize(size, Image.ANTIALIAS))
-            self.interpreter.invoke()
-            objs = detect.get_objects(
-                self.interpreter, score_threshold=score_threshold, image_scale=scale)
+                    unscaled = ((point[0] + ow) / s, (point[1] + oh) / s)
+                    converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
+                    return converted
 
-        
-        allowList = settings.get('allowList', None) if settings else None
-        ret = self.create_detection_result(objs, src_size, allowList, cvss)
-
-        if second_pass_crop or not second_score_threshold or not len(ret['detections']):
+            ret = self.detect_once(input, score_threshold, settings, src_size, cvss)
             return ret, RawImage(image)
         
-        detections = ret['detections']
-        ret['detections'] = []
+        (iw, ih) = image.size
+
+        ws = w / iw
+        hs = h / ih
+        s = max(ws, hs)
+        scaled = image.resize((round(s * iw), round(s * ih)), Image.ANTIALIAS)
+
+        first = scaled.crop((0, 0, w, h))
+        (sx, sy) = scaled.size
+        ow = sx - w
+        oh = sy - h
+        second = scaled.crop((ow, oh, ow + w, oh + h))
+
+        def cvss1(point, normalize=False):
+            unscaled = (point[0] / s, point[1] / s)
+            converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
+            return converted
+        def cvss2(point, normalize=False):
+            unscaled = ((point[0] + ow) / s, (point[1] + oh) / s)
+            converted = convert_to_src_size(unscaled, normalize) if convert_to_src_size else (unscaled[0], unscaled[1], True)
+            return converted
+     
+        ret1 = self.detect_once(first, score_threshold, settings, src_size, cvss1)
+        ret2 = self.detect_once(second, score_threshold, settings, src_size, cvss2)
+
+        ret = ret1
+        ret['detections'] = ret1['detections'] + ret2['detections']
+
+        if not len(ret['detections']):
+            return ret, RawImage(image)
+        
+
+        detections: List[ObjectDetectionResult] = []
+        while len(ret['detections']):
+            d = ret['detections'].pop()
+            found = False
+            for c in detections:
+                same, box = is_same_detection(d, c)
+                if same:
+                    # encompass this box and score
+                    d['boundingBox'] = box
+                    d['score'] = max(d['score'], c['score'])
+                    # remove from current detections list
+                    detections = list(filter(lambda r: r != c, detections))
+                    # run dedupe again with this new larger item
+                    ret['detections'].append(d)
+                    found = True
+                    break
+
+            if not found:
+                detections.append(d)
+
         for detection in detections:
             if detection['score'] >= second_score_threshold:
                 ret['detections'].append(detection)
