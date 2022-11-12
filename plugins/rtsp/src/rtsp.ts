@@ -112,7 +112,19 @@ export class RtspCamera extends CameraBase<UrlMediaStreamOptions> {
     }
 
     async getOtherSettings(): Promise<Setting[]> {
-        return [];
+        const ret: Setting[] = [];
+
+        ret.push(
+            {
+                group: 'Advanced',
+                key: 'debug',
+                title: 'Debug Events',
+                description: "Log all events to the console. This will be very noisy and should not be left enabled.",
+                value: this.storage.getItem('debug') === 'true',
+                type: 'boolean',
+            }
+        )
+        return ret;
     }
 
     async getUrlSettings(): Promise<Setting[]> {
@@ -263,17 +275,6 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 ... await this.getRtspUrlSettings(),
             );
         }
-
-        ret.push(
-            {
-                group: 'Advanced',
-                key: 'debug',
-                title: 'Debug Events',
-                description: "Log all events to the console. This will be very noisy and should not be left enabled.",
-                value: this.storage.getItem('debug') === 'true',
-                type: 'boolean',
-            }
-        )
 
         return ret;
     }
