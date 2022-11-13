@@ -1,7 +1,6 @@
 from __future__ import annotations
-from lib2to3.pytree import convert
 from typing_extensions import TypedDict
-from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting, MediaStreamDestination
+from scrypted_sdk.types import ObjectDetectionModel, ObjectDetectionResult, ObjectsDetected, Setting
 import threading
 import io
 from .common import *
@@ -406,25 +405,31 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             return ret, RawImage(image)
         
 
-        detections: List[ObjectDetectionResult] = []
-        while len(ret['detections']):
-            d = ret['detections'].pop()
-            found = False
-            for c in detections:
-                same, box = is_same_detection(d, c)
-                if same:
-                    # encompass this box and score
-                    d['boundingBox'] = box
-                    d['score'] = max(d['score'], c['score'])
-                    # remove from current detections list
-                    detections = list(filter(lambda r: r != c, detections))
-                    # run dedupe again with this new larger item
-                    ret['detections'].append(d)
-                    found = True
-                    break
+        detections: List[ObjectDetectionResult]
 
-            if not found:
-                detections.append(d)
+        def dedupe_detections():
+            nonlocal detections
+            detections = []
+            while len(ret['detections']):
+                d = ret['detections'].pop()
+                found = False
+                for c in detections:
+                    same, box = is_same_detection(d, c)
+                    if same:
+                        # encompass this box and score
+                        d['boundingBox'] = box
+                        d['score'] = max(d['score'], c['score'])
+                        # remove from current detections list
+                        detections = list(filter(lambda r: r != c, detections))
+                        # run dedupe again with this new larger item
+                        ret['detections'].append(d)
+                        found = True
+                        break
+
+                if not found:
+                    detections.append(d)
+
+        dedupe_detections()
 
         for detection in detections:
             if detection['score'] >= second_score_threshold:
@@ -459,7 +464,8 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             ret['detections'].extend(filtered[:1])
 
         detection_session.previousDetections = ret['detections']
-        print(ret['detections'])
+        dedupe_detections()
+        ret['detections'] = detections
         return ret, RawImage(image)
 
     def run_detection_gstsample(self, detection_session: TensorFlowLiteSession, gstsample, settings: Any, src_size, convert_to_src_size) -> Tuple[ObjectsDetected, Image.Image]:
