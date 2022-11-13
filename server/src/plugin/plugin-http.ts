@@ -71,13 +71,13 @@ export abstract class PluginHttp<T> {
             endpoint = `@${owner}/${endpoint}`;
 
         if (isUpgrade && req.headers.upgrade?.toLowerCase() !== 'websocket') {
-            end(404, 'Not Found');
+            end(404, 'Not Found (unknown upgrade protocol)');
             return;
         }
 
         const pluginData = await this.getEndpointPluginData(req, endpoint, isUpgrade, isEngineIOEndpoint);
         if (!pluginData) {
-            end(404, 'Not Found');
+            end(404, `Not Found (plugin or device "${endpoint}" not found)`);
             return;
         }
 
