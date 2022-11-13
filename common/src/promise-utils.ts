@@ -29,8 +29,6 @@ export class TimeoutError extends Error {
 
 export function timeoutPromise<T>(timeout: number, promise: Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-        setTimeout(() => reject(new TimeoutError(promise)), timeout);
-
         const t = setTimeout(() => reject(new TimeoutError(promise)), timeout);
 
         promise.then(v => {

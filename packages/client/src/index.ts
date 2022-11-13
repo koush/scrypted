@@ -261,6 +261,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 ready.send('/api/start');
             }
             else {
+                console.log('using peer to peer', Date.now() - start);
                 connectionType = 'webrtc';
 
                 const connectionManagementId = `connectionManagement-${Math.random()}`;
