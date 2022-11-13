@@ -9,7 +9,7 @@ import { createRtspParser, findH264NaluType, getNaluTypes, H264_NAL_TYPE_FU_B, H
 import { addTrackControls, parseSdp } from '@scrypted/common/src/sdp-utils';
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import { createFragmentedMp4Parser, createMpegTsParser, StreamChunk, StreamParser } from '@scrypted/common/src/stream-parser';
-import sdk, { BufferConverter, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { BufferConverter, DeviceProvider, DeviceState, EventListenerRegister, FFmpegInput, H264Info, MediaObject, MediaStreamDestination, MediaStreamOptions, MixinProvider, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import crypto from 'crypto';
 import { once } from 'events';
@@ -1612,12 +1612,27 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     const ret: ResponseMediaStreamOptions[] = await this.mixinDevice.getVideoStreamOptions() || [];
     let enabledStreams = this.getPrebufferedStreams(ret);
 
+    const map = new Map<MediaStreamDestination, string>();
+    map.set('local', this.streamSettings.getDefaultStream(ret)?.stream?.id);
+    map.set('remote', this.streamSettings.getRemoteStream(ret)?.stream?.id);
+    map.set('medium-resolution', this.streamSettings.getRemoteRecordingStream(ret)?.stream?.id);
+    map.set('remote-recorder', this.streamSettings.getRemoteRecordingStream(ret)?.stream?.id);
+    map.set('local-recorder', this.streamSettings.getRecordingStream(ret)?.stream?.id);
+    map.set('low-resolution', this.streamSettings.getLowResolutionStream(ret)?.stream?.id);
+
     for (const mso of ret) {
       const session = this.sessions.get(mso.id);
       if (session?.parserSession || enabledStreams.includes(mso))
         mso.prebuffer = prebufferDurationMs;
       if (session && !mso.video?.h264Info)
         mso.video.h264Info = session.getLastH264Probe();
+      if (!mso.destinations) {
+        mso.destinations = [];
+        for (const [k, v] of map.entries()) {
+          if (v === mso.id)
+            mso.destinations.push(k);
+        }
+      }
     }
 
     return ret;
