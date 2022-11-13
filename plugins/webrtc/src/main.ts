@@ -328,10 +328,13 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
     }
 
     getRTCConfiguration(): RTCConfiguration {
-        try {
-            return JSON.parse(this.storageSettings.values.rtcConfiguration);
-        }
-        catch (e) {
+        if (this.storageSettings.values.rtcConfiguration) {
+            try {
+                return JSON.parse(this.storageSettings.values.rtcConfiguration);
+            }
+            catch (e) {
+                this.console.error('Custom RTC configuration failed. Invalid JSON?', e);
+            }
         }
         // google seems to be throttling requests on their open stun server... using a hosted one seems faster.
         const iceServers = this.storageSettings.values.useTurnServer ? [turnServer] : [stunServer];
