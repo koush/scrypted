@@ -1,4 +1,4 @@
-# Scrypted Home Automation
+# Scrypted
 
 Scrypted is a high performance home video integration and automation platform.
  * Video load instantly, everywhere: [Demo](https://www.reddit.com/r/homebridge/comments/r34k6b/if_youre_using_homebridge_for_cameras_ditch_it/)
