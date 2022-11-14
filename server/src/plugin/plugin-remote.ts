@@ -67,6 +67,8 @@ class EndpointManagerImpl implements EndpointManager {
         const id = this.deviceManager.nativeIds.get(nativeId)?.id;
         if (!id)
             throw new Error('invalid nativeId ' + nativeId);
+        if (!nativeId)
+            return this.pluginId;
         return id;
     }
 
