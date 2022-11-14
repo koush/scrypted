@@ -575,7 +575,7 @@ class SnapshotPlugin extends AutoenableMixinProvider implements MixinProvider, B
         const { type, interfaces } = device;
         // auto enable this on VideoCameras that do not have snapshot capability.
         if ((type === ScryptedDeviceType.Camera || type === ScryptedDeviceType.Doorbell)
-            && interfaces.includes(ScryptedInterface.VideoCamera) && !interfaces.includes(ScryptedInterface.Camera))
+            && interfaces.includes(ScryptedInterface.VideoCamera))
             return true;
         return false;
     }
