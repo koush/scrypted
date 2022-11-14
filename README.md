@@ -1,6 +1,6 @@
 # Scrypted Home Automation
 
-Scrypted is a high performance home video integration and automation platform for HomeKit, Google Home, Alexa, and more.
+Scrypted is a high performance home video integration and automation platform.
  * Video load instantly, everywhere: [Demo](https://www.reddit.com/r/homebridge/comments/r34k6b/if_youre_using_homebridge_for_cameras_ditch_it/)
  * [HomeKit Secure Video Support](https://github.com/koush/scrypted/wiki/HomeKit-Secure-Video-Setup)
  * Google Home support: "Ok Google, Stream Backyard"
