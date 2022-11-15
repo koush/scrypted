@@ -2,6 +2,7 @@ import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
+import { getSpsPps } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from '../../../../webrtc/src/rtp-forwarders';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
@@ -249,15 +250,17 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
 
     await waitForFirstVideoRtcp(console, session);
 
+    const videoOptions = {
+        maxPacketSize: videomtu,
+        sps: undefined,
+        pps: undefined,
+    };
+
     const videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
         session.videossrc, session.startRequest.video.pt,
         session.prepareRequest.video.port, session.prepareRequest.targetAddress,
         session.startRequest.video.rtcp_interval,
-        {
-            maxPacketSize: videomtu,
-            sps: undefined,
-            pps: undefined,
-        }
+        videoOptions,
     );
 
     const rtpTracks: RtpTracks = {
@@ -273,6 +276,11 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                 crytoSuite: session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
                     "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
                 key: videoKey,
+            },
+            onMSection: (videoSection) => {
+                const spsPps = getSpsPps(videoSection);
+                videoOptions.sps = spsPps?.sps;
+                videoOptions.pps = spsPps?.pps;
             },
             firstPacket() {
                 videoSender.sendRtcp();

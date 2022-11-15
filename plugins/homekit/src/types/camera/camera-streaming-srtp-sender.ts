@@ -150,7 +150,7 @@ export function createCameraStreamSender(console: Console, config: Config, sende
         for (const packet of packets) {
             if (analyzeVideo) {
                 const naluTypes = getNaluTypesInNalu(packet.payload, true);
-                // console.log('scanning for idr start found:', ...[...naluTypes]);
+                console.log('scanning for idr start found:', ...[...naluTypes]);
                 analyzeVideo = !naluTypes.has(H264_NAL_TYPE_IDR);
             }
             sendPacket(packet);
