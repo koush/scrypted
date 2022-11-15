@@ -48,7 +48,7 @@ export interface ScryptedClientStatic extends ScryptedStatic {
 
 export interface ScryptedConnectionOptions {
     webrtc?: boolean;
-    baseUrl: string;
+    baseUrl?: string;
     axiosConfig?: AxiosRequestConfig;
 }
 
@@ -59,7 +59,7 @@ export interface ScryptedLoginOptions extends ScryptedConnectionOptions {
      * The login token can be retrieved with "npx scrypted login".
      */
     password: string;
-    change_password: string,
+    change_password?: string,
     maxAge?: number;
 }
 
@@ -85,6 +85,7 @@ export async function loginScryptedClient(options: ScryptedLoginOptions) {
         change_password,
         maxAge,
     }, {
+        withCredentials: true,
         ...options.axiosConfig,
     });
 
@@ -107,6 +108,7 @@ export async function checkScryptedClientLogin(options?: ScryptedConnectionOptio
     let { baseUrl } = options || {};
     const url = `${baseUrl || ''}/login`;
     const response = await axios.get(url, {
+        withCredentials: true,
         ...options?.axiosConfig,
     });
     const scryptedCloud = response.headers['x-scrypted-cloud'] === 'true';
@@ -133,8 +135,9 @@ export function redirectScryptedLogin(options?: {
     redirect?: string, baseUrl?: string
 }) {
     let { baseUrl, redirect } = options || {};
-    baseUrl = baseUrl || '';
-    redirect = redirect || `${baseUrl}/endpoint/@scrypted/core/public/`
+    redirect = redirect || `/endpoint/@scrypted/core/public/`
+    if (baseUrl)
+        redirect = new URL(redirect, baseUrl).toString();
     const redirect_uri = `${redirect}?redirect_uri=${encodeURIComponent(window.location.href)}`;
     console.log('redirect_uri', redirect_uri);
     globalThis.location.href = redirect_uri;
@@ -178,6 +181,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     const endpointPath = `/endpoint/${pluginId}`;
     const eioOptions: Partial<SocketOptions> = {
         path: `${endpointPath}/engine.io/api`,
+        withCredentials: true,
         extraHeaders,
         rejectUnauthorized: false,
     };
@@ -193,6 +197,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
     if (scryptedCloud || options.webrtc) {
         const publicEioOptions: Partial<SocketOptions> = {
             path: `${endpointPath}/public/engine.io/api`,
+            withCredentials: true,
             extraHeaders,
             rejectUnauthorized: false,
         };
@@ -230,6 +235,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 promises.push((async () => {
                     const webrtcEioOptions: Partial<SocketOptions> = {
                         path: '/endpoint/@scrypted/webrtc/engine.io/',
+                        withCredentials: true,
                         extraHeaders,
                         rejectUnauthorized: false,
                     };
@@ -255,6 +261,7 @@ export async function connectScryptedClient(options: ScryptedClientOptions): Pro
                 await axios.post(url, {
                     id,
                 }, {
+                    withCredentials: true,
                     ...options.axiosConfig,
                 });
 
