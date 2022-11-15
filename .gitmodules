@@ -43,3 +43,6 @@
 [submodule "plugins/sample-cameraprovider"]
 	path = plugins/sample-cameraprovider
 	url = ../../koush/scrypted-sample-cameraprovider
+[submodule "plugins/objectdetector/node-moving-things-tracker"]
+	path = plugins/objectdetector/node-moving-things-tracker
+	url = ../../koush/node-moving-things-tracker.git

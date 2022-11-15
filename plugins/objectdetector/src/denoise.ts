@@ -3,6 +3,7 @@ export class DenoisedDetectionEntry<T> {
     id?: string;
     boundingBox?: [number, number, number, number];
     name: string;
+    score: number;
     detection: T;
 
     firstSeen?: number;
@@ -18,8 +19,28 @@ export interface DenoisedDetectionOptions<T> {
     now?: number;
 }
 
+export interface TrackerItem<T> {
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    confidence: number,
+    name: string,
+
+    detection: DenoisedDetectionEntry<T>;
+};
+
+export interface TrackedItem<T> extends TrackerItem<T> {
+    id: string;
+    isZombie: boolean;
+    bearing: number;
+}
+
 export interface DenoisedDetectionState<T> {
     previousDetections?: DenoisedDetectionEntry<T>[];
+    tracker?: any;
+    tracked?: TrackedItem<T>[];
+    frameCount?: number;
     lastDetection?: number;
 }
 

@@ -6,3 +6,6 @@ fs
 src
 .vscode
 dist/*.js
+node-moving-things-tracker
+test
+tsconfig.json

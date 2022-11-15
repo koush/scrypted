@@ -6,6 +6,7 @@ import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } fro
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider"
 import { safeParseJson } from './util';
 import crypto from 'crypto';
+import { denoiseDetections2 } from './denoise2';
 
 const polygonOverlap = require('polygon-overlap');
 
@@ -387,9 +388,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     let newOrBetterDetection = false;
 
     const found: DenoisedDetectionEntry<TrackedDetection>[] = [];
-    denoiseDetections<TrackedDetection>(this.detectionState, detections.map(detection => ({
-      id: detection.id,
+    denoiseDetections2<TrackedDetection>(this.detectionState, detections.map(detection => ({
+      get id() {
+        return detection.id;
+      },
+      set id(id) {
+        detection.id = id;
+      },
       name: detection.className,
+      score: detection.score,
       detection,
       get firstSeen() {
         return detection.history?.firstSeen
