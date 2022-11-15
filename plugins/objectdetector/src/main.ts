@@ -14,7 +14,7 @@ const { mediaManager, systemManager, log } = sdk;
 
 const defaultDetectionDuration = 60;
 const defaultDetectionInterval = 60;
-const defaultDetectionTimeout = 10;
+const defaultDetectionTimeout = 60;
 const defaultMotionDuration = 10;
 
 const DETECT_PERIODIC_SNAPSHOTS = "Periodic Snapshots";
