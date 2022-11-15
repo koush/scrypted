@@ -376,7 +376,7 @@ class DetectPlugin(scrypted_sdk.ScryptedDeviceBase, ObjectDetection):
                             retain = await self.detection_event(detection_session, detection_result, mo)
                         t = asyncio.ensure_future(report(), loop = self.loop)
                         try:
-                            await asyncio.wait_for(asyncio.shield(t), 2)
+                            await asyncio.wait_for(asyncio.shield(t), 10)
                             maybeInvalidate()
                         except:
                             self.invalidateMedia(detection_session, data)
