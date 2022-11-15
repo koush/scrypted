@@ -280,8 +280,9 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             for (const key of Object.keys(rtpTracks)) {
                 const track: RtpTrack = rtpTracks[key];
 
-                const { port } = track.bind;
-                const destination = track.ffmpegDestination || `127.0.0.1:${port}`;
+                let destination = track.ffmpegDestination || '127.0.0.1';
+                if (destination === '127.0.0.1')
+                    destination = `${destination}:${track.bind.port}`;
                 const params = new URLSearchParams();
                 let url = `rtp://${destination}`;
                 if (track.rtcpPort)
