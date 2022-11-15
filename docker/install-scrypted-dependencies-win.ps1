@@ -9,9 +9,16 @@ npx -y scrypted@latest install-server
 $USER_HOME_ESCAPED = $env:USERPROFILE.replace('\', '\\')
 $SCRYPTED_HOME = $env:USERPROFILE + '\.scrypted'
 $SCRYPTED_HOME_ESCAPED_PATH = $SCRYPTED_HOME.replace('\', '\\')
-npm install --prefix $SCRYPTED_HOME node-windows@1.0.0-beta.6 --save
+npm install --prefix $SCRYPTED_HOME node-windows@1.0.0-beta.8 --save
 
 $SERVICE_JS = @"
+const fs = require('fs');
+try {
+  fs.mkdirSync('C:\\WINDOWS\\system32\\config\\systemprofile\\AppData\\Roaming\\npm');
+}
+catch (e) {
+}
+
 const child_process = require('child_process');
 child_process.spawn('npx.cmd', ['-y', 'scrypted', 'serve'], {
     stdio: 'inherit',
