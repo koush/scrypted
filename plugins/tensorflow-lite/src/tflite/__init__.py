@@ -432,10 +432,6 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         dedupe_detections()
 
         for detection in detections:
-            if detection['score'] >= second_score_threshold:
-                ret['detections'].append(detection)
-                continue
-
             if detection_session.previousDetections:
                 found = False
                 for pd in detection_session.previousDetections:
@@ -446,6 +442,10 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
                         break
                 if found:
                     continue
+
+            if detection['score'] >= second_score_threshold:
+                ret['detections'].append(detection)
+                continue
 
             (x, y, w, h) = detection['boundingBox']
             cx = x + w / 2
