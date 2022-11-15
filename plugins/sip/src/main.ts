@@ -3,32 +3,18 @@ import { RefreshPromise } from "@scrypted/common/src/promise-utils";
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceManager, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, MotionSensor, OnOff, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceManager, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { ProtectionProfileAes128CmHmacSha1_80 } from '../../../external/werift/packages/rtp/src/srtp/const';
-import { SrtcpSession } from '../../../external/werift/packages/rtp/src/srtp/srtcp';
 import { isStunMessage, RtpDescription, SipSession, clientApi, generateUuid } from './ring-client-api';
-import { encodeSrtpOptions, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
+import { getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
 
 const STREAM_TIMEOUT = 120000;
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-class RingCameraLight extends ScryptedDeviceBase implements OnOff {
-    constructor(public camera: RingCameraDevice) {
-        super(camera.nativeId + '-light');
-    }
-    async turnOff(): Promise<void> {
-        //await this.camera.findCamera().setLight(false);
-    }
-    async turnOn(): Promise<void> {
-        //await this.camera.findCamera().setLight(true);
-    }
-}
-
-class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Camera, MotionSensor, BinarySensor {
+class SipCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Camera, MotionSensor, BinarySensor {
     buttonTimeout: NodeJS.Timeout;
     session: SipSession;
     rtpDescription: RtpDescription;
@@ -39,7 +25,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
     refreshTimeout: NodeJS.Timeout;
     picturePromise: RefreshPromise<Buffer>;
 
-    constructor(public plugin: RingPlugin, nativeId: string) {
+    constructor(public plugin: SipPlugin, nativeId: string) {
         super(nativeId);
         this.motionDetected = false;
         this.binaryState = false;
@@ -76,9 +62,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
             '-ac', '1',
             '-ar', '8k',
             '-f', 'rtp',
-            '-srtp_out_suite', 'AES_CM_128_HMAC_SHA1_80',
-            '-srtp_out_params', encodeSrtpOptions(this.session.rtpOptions.audio),
-            `srtp://127.0.0.1:${audioOutForwarder.port}?pkt_size=188`,
+            `rtp://127.0.0.1:${audioOutForwarder.port}?pkt_size=188`,
         );
 
         const cp = child_process.spawn(await mediaManager.getFFmpegPath(), args);
@@ -406,18 +390,11 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
         const location = this.location.findLocation();
         return location.cameras?.find(camera => camera.id.toString() === this.nativeId);
     }
-
-    // updateState(data: CameraData) {
-    //     if (this.findCamera().hasLight && data.led_status) {
-    //         const light = this.getDevice(undefined);
-    //         light.on = data.led_status === 'on';
-    //     }
-    // }
 }
 
-class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
+class SipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
 
-    devices = new Map<string, RingCameraDevice>();
+    devices = new Map<string, SipCameraDevice>();
 
     settingsStorage = new StorageSettings(this, {
         systemId: {
@@ -497,26 +474,6 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         //     if (scryptedDevice)
         //         scryptedDevice.motionDetected = motionDetected;
         // });
-        // camera.onData.subscribe(data => {
-        //     const locationDevice = this.devices.get(location.id);
-        //     const scryptedDevice = locationDevice?.devices.get(nativeId);
-        //     scryptedDevice?.updateState(data)
-        // });
-
-        const deviceLight: Device = {
-            info: {
-                model: 'SIP Cam',
-                manufacturer: 'Sample Camera Manufacturer',
-                firmware: "Firmware",
-                serialNumber: "SerialNumber"
-    },
-            nativeId: "SIPCam001-light",
-            name: "SIPCamName Light",
-            type: ScryptedDeviceType.Light,
-            interfaces: [ScryptedInterface.OnOff]
-        };
-
-        devices.push(deviceLight);
 
         await deviceManager.onDevicesChanged({
             devices: devices
@@ -526,11 +483,11 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
 
     async getDevice(nativeId: string) {
         if (!this.devices.has(nativeId)) {
-            const camera = new RingCameraDevice(this, nativeId);
+            const camera = new SipCameraDevice(this, nativeId);
             this.devices.set(nativeId, camera);
         }
         return this.devices.get(nativeId);
     }
 }
 
-export default new RingPlugin();
+export default new SipPlugin();
