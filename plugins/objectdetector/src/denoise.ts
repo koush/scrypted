@@ -68,8 +68,15 @@ export function matchBoxes<T>(da1: DenoisedDetectionEntry<T>[], da2: DenoisedDet
     let b: Matched<T>[];
     for (const d1 of da1) {
         const scorer = createBoundingBoxScorer(d1.boundingBox);
-        let scopedBestScore = Number.MAX_SAFE_INTEGER;
-        for (const d2 of da2) {
+        // score all the boxes and sort by best match
+        const scored = da2.map(entry => {
+            return {
+                entry,
+                score: scorer(entry.boundingBox),
+            }
+        }).sort((e1, e2) => e1.score - e2.score);
+
+        for (const { entry: d2 } of scored) {
             const s = scorer(d2.boundingBox);
             if (currentScore + s >= bestScore)
                 continue;
@@ -84,7 +91,7 @@ export function matchBoxes<T>(da1: DenoisedDetectionEntry<T>[], da2: DenoisedDet
             b.push({
                 r1: d1,
                 r2: d2,
-            })
+            });
         }
     }
 
