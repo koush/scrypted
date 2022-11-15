@@ -88,7 +88,7 @@ class HikVisionCamera extends RtspSmartCamera implements Camera, Intercom {
                 }
                 
                 motionPings++;
-                this.console.log(this.name, 'motion pings', motionPings);
+                // this.console.log(this.name, 'motion pings', motionPings);
 
                 // this.console.error('### Detected motion, camera: ', cameraNumber);
                 this.motionDetected = motionPings >= motionPingsNeeded;
