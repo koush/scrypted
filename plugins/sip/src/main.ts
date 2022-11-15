@@ -1,20 +1,19 @@
 import { closeQuiet, createBindZero, listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
-import { RefreshPromise } from "@scrypted/common/src/promise-utils";
 import { RtspServer } from '@scrypted/common/src/rtsp-server';
 import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceManager, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { isStunMessage, RtpDescription, SipSession, clientApi, generateUuid } from './ring-client-api';
-import { getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './srtp-utils';
+import { isStunMessage, RtpDescription, SipSession, generateUuid } from './ring-client-api';
+import { getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './rtp-utils';
 
 const STREAM_TIMEOUT = 120000;
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-class SipCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Camera, MotionSensor, BinarySensor {
+class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
     buttonTimeout: NodeJS.Timeout;
     session: SipSession;
     rtpDescription: RtpDescription;
@@ -23,7 +22,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Came
     currentMedia: FFmpegInput | MediaStreamUrl;
     currentMediaMimeType: string;
     refreshTimeout: NodeJS.Timeout;
-    picturePromise: RefreshPromise<Buffer>;
 
     constructor(public plugin: SipPlugin, nativeId: string) {
         super(nativeId);
@@ -208,7 +206,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Came
                         report.highestSequence = vseq;
                         report.packetsLost = vlost;
                         report.fractionLost = Math.round(vlost * 100 / vseen);
-                        const packet = srtcp.encrypt(rr.serialize());
+                        const packet = rr.serialize();
                         sip.videoSplitter.send(packet, this.rtpDescription.video.rtcpPort, this.rtpDescription.address)
                     }, 500);
                     sip.videoSplitter.on('close', () => clearInterval(interval))
@@ -320,10 +318,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Came
         ]
     }
 
-    getDevice(nativeId: string) {
-        return new RingCameraLight(this);
-    }
-
     async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
         // if this stream is prebuffered, its safe to use the prebuffer to generate an image
         const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
@@ -346,32 +340,30 @@ class SipCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Came
         if (!camera)
             throw new Error('camera unavailable');
 
-        // watch for snapshot being blocked due to live stream
-        if (!camera.snapshotsAreBlocked) {
-            try {
-                buffer = await this.plugin.api.restClient.request({
-                    url: `https://app-snaps.ring.com/snapshots/next/${camera.id}`,
-                    responseType: 'buffer',
-                    searchParams: {
-                        extras: 'force',
-                    },
-                    headers: {
-                        accept: 'image/jpeg',
-                    },
-                    allowNoResponse: true,
-                });
-            }
-            catch (e) {
-                this.console.error('snapshot failed, falling back to cache');
-            }
-        }
-        if (!buffer) {
-            buffer = await this.plugin.api.restClient.request({
-                url: clientApi(`snapshots/image/${camera.id}`),
-                responseType: 'buffer',
-                allowNoResponse: true,
-            });
-        }
+        // try {
+        //     buffer = await this.plugin.api.restClient.request({
+        //         url: `https://app-snaps.ring.com/snapshots/next/${camera.id}`,
+        //         responseType: 'buffer',
+        //         searchParams: {
+        //             extras: 'force',
+        //         },
+        //         headers: {
+        //             accept: 'image/jpeg',
+        //         },
+        //         allowNoResponse: true,
+        //     });
+        // }
+        // catch (e) {
+        //     this.console.error('snapshot failed, falling back to cache');
+        // }
+
+        // if (!buffer) {
+        //     buffer = await this.plugin.api.restClient.request({
+        //         url: clientApi(`snapshots/image/${camera.id}`),
+        //         responseType: 'buffer',
+        //         allowNoResponse: true,
+        //     });
+        // }
 
         return mediaManager.createMediaObject(buffer, 'image/jpeg');
     }
@@ -387,8 +379,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Came
     }
 
     findCamera() {
-        const location = this.location.findLocation();
-        return location.cameras?.find(camera => camera.id.toString() === this.nativeId);
+        return null
     }
 }
 
@@ -439,12 +430,11 @@ class SipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDisc
         const devices: Device[] = [];
 
         const interfaces = [
-            ScryptedInterface.Camera,
-            ScryptedInterface.MotionSensor,
-            ScryptedInterface.VideoCamera,
             ScryptedInterface.Intercom,
+            ScryptedInterface.Camera,
+            ScryptedInterface.VideoCamera,
+            ScryptedInterface.MotionSensor,
             ScryptedInterface.BinarySensor,
-            ScryptedInterface.DeviceProvider
         ];
 
         const device: Device = {
