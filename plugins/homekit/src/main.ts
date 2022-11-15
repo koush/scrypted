@@ -179,7 +179,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
                 }
 
                 const mixinStorage = deviceManager.getMixinStorage(device.id, this.nativeId);
-                const standalone = device.type === ScryptedDeviceType.Camera || ScryptedDeviceType.Doorbell ? mixinStorage.getItem('standalone') !== 'false' : mixinStorage.getItem('standalone') === 'true';
+                const standalone = device.type === ScryptedDeviceType.Camera || device.type === ScryptedDeviceType.Doorbell ? mixinStorage.getItem('standalone') !== 'false' : mixinStorage.getItem('standalone') === 'true';
                 if (!mixinStorage.getItem('standalone'))
                     mixinStorage.setItem('standalone', standalone.toString());
                 const standaloneCategory = typeToCategory(device.type);
