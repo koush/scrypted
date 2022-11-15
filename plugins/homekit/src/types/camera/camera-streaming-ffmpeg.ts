@@ -2,15 +2,10 @@ import { RtpPacket } from '@koush/werift-src/packages/rtp/src/rtp/rtp';
 import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardware-acceleration';
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
-import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from '@scrypted/common/src/media-helpers';
-import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
 import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
-import child_process from 'child_process';
-import { Writable } from 'stream';
+import { RtpTrack, RtpTracks, startRtpForwarderProcess } from '../../../../webrtc/src/rtp-forwarders';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
-import { pickPort } from '../../hap-utils';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
-import { startCameraStreamSrtp } from './camera-streaming-srtp';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
 
@@ -28,22 +23,12 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // unless ffmpeg is buffering packets. Opus supports a packet time argument,
     // which in turn limits the packet size. I'm not sure if AAC-ELD has a similar
     // option, but not sure it matters since AAC-ELD is no longer in use.
-    let audiomtu = 400;
-
-    // test code path that allows using two ffmpeg processes. did not see
-    // any notable benefit with a prebuffer, which allows the ffmpeg analysis for key frame
-    // to immediately finish. ffmpeg will only start sending on a key frame.
-    // const audioInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(await device.getVideoStream(selectedStream), ScryptedMimeTypes.FFmpegInput)).toString()) as FFmpegInput;
-    let audioInput = ffmpegInput;
+    const audiomtu = 400;
 
     const videoKey = Buffer.concat([session.prepareRequest.video.srtp_key, session.prepareRequest.video.srtp_salt]);
     const audioKey = Buffer.concat([session.prepareRequest.audio.srtp_key, session.prepareRequest.audio.srtp_salt]);
 
     const mso = ffmpegInput.mediaStreamOptions;
-    const noAudio = mso?.audio === null;
-    const hideBanner = [
-        '-hide_banner',
-    ];
     const videoArgs = ffmpegInput.h264FilterArguments?.slice() || [];
     const audioArgs: string[] = [];
 
@@ -57,10 +42,6 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     const needsFFmpeg = transcodingDebugMode
         || transcodeStreaming
         || ffmpegInput.container !== 'rtsp';
-
-    videoArgs.push(
-        "-an", '-sn', '-dn',
-    );
 
     if (ffmpegInput.mediaStreamOptions?.oobCodecParameters)
         videoArgs.push("-bsf:v", "dump_extra");
@@ -93,18 +74,20 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
         );
     }
 
-    let videoOutput = `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.video.port}?rtcpport=${session.prepareRequest.video.port}&pkt_size=${videomtu}`;
-    let useSrtp = true;
-
     // this test path is to force forwarding of packets through the correct port expected by HAP
     // or alternatively used to inspect ffmpeg packets to compare vs what scrypted sends.
+    let videoAddress = session.prepareRequest.targetAddress;
+    let videoRtpPort = session.prepareRequest.video.port;
+    let videoRtcpPort = videoRtpPort;
     if (false) {
         const useRtpSender = true;
         const videoForwarder = await createBindZero();
+        videoRtpPort = videoForwarder.port;
+        videoRtcpPort = videoRtpPort;
+        videoAddress = '127.0.0.1';
         videoForwarder.server.once('message', () => console.log('first forwarded h264 packet received.'));
         session.videoReturn.on('close', () => videoForwarder.server.close());
         if (useRtpSender) {
-            useSrtp = false;
             const videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
                 session.videossrc, session.startRequest.video.pt,
                 session.prepareRequest.video.port, session.prepareRequest.targetAddress,
@@ -122,30 +105,13 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
                     return;
                 videoSender.sendRtp(rtp);
             });
-            videoOutput = `rtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
         }
         else {
             videoForwarder.server.on('message', data => {
                 session.videoReturn.send(data, session.prepareRequest.video.port, session.prepareRequest.targetAddress);
             });
-            videoOutput = `srtp://127.0.0.1:${videoForwarder.port}?rtcpport=${videoForwarder.port}&pkt_size=${videomtu}`;
         }
     }
-
-    if (useSrtp) {
-        videoArgs.push(
-            "-srtp_out_suite", session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
-            "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
-            "-srtp_out_params", videoKey.toString('base64'),
-        );
-    }
-
-    videoArgs.push(
-        "-payload_type", request.video.pt.toString(),
-        "-ssrc", session.videossrc.toString(),
-        "-f", "rtp",
-        videoOutput,
-    );
 
     let rtpSender = storage.getItem('rtpSender') || 'Default';
     console.log({
@@ -170,122 +136,95 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     const audioCodec = request.audio.codec;
     const requestedOpus = audioCodec === AudioStreamingCodecType.OPUS;
 
-    if (noAudio) {
-        if (videoIsSrtpSenderCompatible) {
-            console.log('camera has perfect codecs (no audio), using srtp only fast path.');
-            await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session);
-            return;
+    let audio: RtpTrack;
+    // homekit live streaming is extremely picky about audio audio packet time.
+    // not sending packets of the correct duration will result in mute or choppy audio.
+    // the packet time parameter is different between LAN and LTE.
+    let opusFramesPerPacket = request.audio.packet_time / 20;
+
+    if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
+        // by default opus encodes with a packet time of 20. however, homekit may request another value,
+        // which we will respect by simply outputing frames of that duration, rather than packing
+        // 20 ms frames to accomodate.
+        // the opus repacketizer will pass through those N frame packets as is.
+
+        audioArgs.push(
+            '-acodec', ...(requestedOpus ?
+                [
+                    'libopus',
+                    '-application', 'lowdelay',
+                    '-frame_duration', request.audio.packet_time.toString(),
+                ] :
+                ['libfdk_aac', '-profile:a', 'aac_eld']),
+            '-flags', '+global_header',
+            '-ar', `${request.audio.sample_rate}k`,
+            '-b:a', `${request.audio.max_bit_rate}k`,
+            "-bufsize", `${request.audio.max_bit_rate * 4}k`,
+            '-ac', `${request.audio.channel}`,
+        );
+
+        type OnRtp = RtpTrack['onRtp'];
+        let onRtp: OnRtp;
+        let firstPacket: OnRtp;
+        let audioRtcpPort: number;
+        let ffmpegDestination: string;
+
+        if (requestedOpus) {
+            // opus requires timestamp mangling.
+            const audioSender = createCameraStreamSender(console, session.aconfig, session.audioReturn,
+                session.audiossrc, session.startRequest.audio.pt,
+                session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
+                session.startRequest.audio.rtcp_interval, undefined,
+                {
+                    audioPacketTime: session.startRequest.audio.packet_time,
+                    audioSampleRate: session.startRequest.audio.sample_rate,
+                    framesPerPacket: opusFramesPerPacket,
+                }
+            );
+
+            firstPacket = function () {
+                audioSender.sendRtcp();
+            };
+
+            onRtp = function (rtp) {
+                audioSender.sendRtp(RtpPacket.deSerialize(rtp));
+            };
+        }
+        else {
+            // can send aac-eld directly.
+            ffmpegDestination = `${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}`;
+        }
+
+        audio = {
+            codecCopy: !transcodingDebugMode && requestedOpus ? 'opus' : 'transcode',
+            encoderArguments: audioArgs,
+            ffmpegDestination,
+            packetSize: audiomtu,
+            rtcpPort: audioRtcpPort,
+            payloadType: request.audio.pt,
+            ssrc: session.audiossrc,
+            srtp: !ffmpegDestination ? undefined : {
+                crytoSuite: session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
+                    "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
+                key: audioKey,
+            },
+            firstPacket,
+            onRtp,
         }
     }
     else {
-        // audio encoding
-        audioArgs.push(
-            "-vn", '-sn', '-dn',
-        );
-
-        // homekit live streaming is extremely picky about audio audio packet time.
-        // not sending packets of the correct duration will result in mute or choppy audio.
-        // the packet time parameter is different between LAN and LTE.
-        let opusFramesPerPacket = request.audio.packet_time / 20;
-
-        const perfectOpus = requestedOpus
-            && mso?.audio?.codec === 'opus'
-            // sanity check this
-            && opusFramesPerPacket && opusFramesPerPacket === Math.round(opusFramesPerPacket);
-
-        if (videoIsSrtpSenderCompatible && perfectOpus) {
-            console.log('camera has perfect codecs, using srtp only fast path.');
-            await startCameraStreamSrtp(ffmpegInput, console, { mute: false }, session);
-            return;
-        }
-        else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
-            if (!transcodingDebugMode && perfectOpus) {
-                audioArgs.push(
-                    "-acodec", "copy",
-                );
-            }
-            else {
-                // by default opus encodes with a packet time of 20. however, homekit may request another value,
-                // which we will respect by simply outputing frames of that duration, rather than packing
-                // 20 ms frames to accomodate.
-                // the opus repacketizer will pass through those N frame packets as is.
-
-                audioArgs.push(
-                    '-acodec', ...(requestedOpus ?
-                        [
-                            'libopus',
-                            '-application', 'lowdelay',
-                            '-frame_duration', request.audio.packet_time.toString(),
-                        ] :
-                        ['libfdk_aac', '-profile:a', 'aac_eld']),
-                    '-flags', '+global_header',
-                    '-ar', `${request.audio.sample_rate}k`,
-                    '-b:a', `${request.audio.max_bit_rate}k`,
-                    "-bufsize", `${request.audio.max_bit_rate * 4}k`,
-                    '-ac', `${request.audio.channel}`,
-                )
-            }
-            audioArgs.push(
-                "-payload_type", request.audio.pt.toString(),
-                "-ssrc", session.audiossrc.toString(),
-                "-f", "rtp",
-            );
-
-            if (requestedOpus) {
-                // opus requires timestamp mangling.
-                const audioForwarder = await createBindZero();
-                audioForwarder.server.once('message', () => console.log('first forwarded opus packet received.'));
-                session.audioReturn.on('close', () => audioForwarder.server.close());
-
-                const audioSender = createCameraStreamSender(console, session.aconfig, session.audioReturn,
-                    session.audiossrc, session.startRequest.audio.pt,
-                    session.prepareRequest.audio.port, session.prepareRequest.targetAddress,
-                    session.startRequest.audio.rtcp_interval, undefined,
-                    {
-                        audioPacketTime: session.startRequest.audio.packet_time,
-                        audioSampleRate: session.startRequest.audio.sample_rate,
-                        framesPerPacket: opusFramesPerPacket,
-                    }
-                );
-                audioSender.sendRtcp();
-                audioForwarder.server.on('message', data => {
-                    const packet = RtpPacket.deSerialize(data);
-                    audioSender.sendRtp(packet);
-                });
-                audioArgs.push(
-                    `rtp://127.0.0.1:${audioForwarder.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
-                )
-            }
-            else {
-                audioArgs.push(
-                    "-srtp_out_suite",
-                    session.prepareRequest.audio.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80
-                        ? "AES_CM_128_HMAC_SHA1_80"
-                        : "AES_CM_256_HMAC_SHA1_80",
-                    "-srtp_out_params", audioKey.toString('base64'),
-                    `srtp://${session.prepareRequest.targetAddress}:${session.prepareRequest.audio.port}?rtcpport=${session.prepareRequest.audio.port}&pkt_size=${audiomtu}`
-                )
-            }
-        }
-        else {
-            console.warn(device.name, 'homekit requested unknown audio codec, audio will not be streamed.', request);
-
-            if (videoIsSrtpSenderCompatible) {
-                console.log('camera has perfect codecs (unknown audio), using srtp only fast path.');
-                await startCameraStreamSrtp(ffmpegInput, console, { mute: true }, session);
-                return;
-            }
-        }
+        console.warn(device.name, 'homekit requested unknown audio codec, audio will not be streamed.', request);
     }
 
-    const ffmpegPath = await mediaManager.getFFmpegPath();
 
     if (session.killed) {
         console.log('session ended before streaming could start. bailing.');
         return;
     }
 
-    const videoDecoderArguments = ffmpegInput.videoDecoderArguments || [];
+    // 11/15/2022
+    // legacy comment below left for posterity during the transition to rtp-forwarders.ts
+    // code.
 
     // From my naive observations, ffmpeg seems to drop the first few packets if it is
     // performing encoder/decoder initialization. Thiss is particularly problematic if
@@ -302,90 +241,47 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // via the srtp sender (opus will be forwarded repacketized after transcoding).
     // It is unclear if this will work reliably with ffmpeg/aac-eld which uses it's own
     // ntp timestamp algorithm. aac-eld is deprecated in any case.
-    if (videoIsSrtpSenderCompatible && requestedOpus) {
-        console.log('camera has perfect codecs (demuxed audio), using srtp fast path.');
-
-        const udpPort = await pickPort();
-
-        const fullSdp = await startCameraStreamSrtp(ffmpegInput, console, { mute: false, udpPort }, session);
-
-        const audioSdp = parseSdp(fullSdp);
-        const audioSection = audioSdp.msections.find(msection => msection.type === 'audio');
-        if (audioSection) {
-            const ffmpegAudioTranscodeArguments = [
-                ...hideBanner,
-                '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
-                '-f', 'sdp', '-i', 'pipe:3',
-                ...audioArgs,
-            ];
-            safePrintFFmpegArguments(console, ffmpegAudioTranscodeArguments);
-            const ap = child_process.spawn(ffmpegPath, ffmpegAudioTranscodeArguments, {
-                stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-            });
-            session.killPromise.finally(() => safeKillFFmpeg(ap));
-
-            ffmpegLogInitialOutput(console, ap);
-            ap.on('exit', () => session.kill());
-            audioSdp.msections = [audioSection];
-            audioSdp.header.lines = [
-                'v=0',
-                'o=- 0 0 IN IP4 127.0.0.1',
-                's=Scrypted HomeKit Audio Demuxer',
-                'c=IN IP4 127.0.0.1',
-                't=0 0',
-            ];
-            const ffmpegSdp = addTrackControls(replacePorts(audioSdp.toSdp(), udpPort, 0));
-            console.log('demuxed audio sdp', ffmpegSdp);
-
-            const pipe = ap.stdio[3] as Writable;
-            pipe.write(ffmpegSdp);
-            pipe.end();
-        }
-        else {
-            console.warn('sdp is missing audio. audio will be muted.');
-        }
-
-        return;
-    }
 
     await waitForFirstVideoRtcp(console, session);
 
-    if (audioInput !== ffmpegInput) {
-        safePrintFFmpegArguments(console, videoArgs);
-        safePrintFFmpegArguments(console, audioArgs);
+    const videoSender = createCameraStreamSender(console, session.vconfig, session.videoReturn,
+        session.videossrc, session.startRequest.video.pt,
+        session.prepareRequest.video.port, session.prepareRequest.targetAddress,
+        session.startRequest.video.rtcp_interval,
+        {
+            maxPacketSize: videomtu,
+            sps: undefined,
+            pps: undefined,
+        }
+    );
 
-        const vp = child_process.spawn(ffmpegPath, [
-            ...hideBanner,
-            ...videoDecoderArguments,
-            ...ffmpegInput.inputArguments,
-            ...videoArgs,
-        ]);
-        session.killPromise.finally(() => safeKillFFmpeg(vp));
-        ffmpegLogInitialOutput(console, vp);
-        vp.on('exit', () => session.kill());
-
-        const ap = child_process.spawn(ffmpegPath, [
-            ...hideBanner,
-            ...audioInput.inputArguments,
-            ...audioArgs,
-        ]);
-        session.killPromise.finally(() => safeKillFFmpeg(ap));
-        ffmpegLogInitialOutput(console, ap);
-        ap.on('exit', () => session.kill());
+    const rtpTracks: RtpTracks = {
+        video: {
+            codecCopy: videoIsSrtpSenderCompatible ? 'h264' : 'transcode',
+            encoderArguments: videoArgs,
+            ffmpegDestination: `${videoAddress}:${videoRtpPort}`,
+            packetSize: videomtu,
+            rtcpPort: videoRtcpPort,
+            payloadType: request.video.pt,
+            ssrc: session.videossrc,
+            srtp: {
+                crytoSuite: session.prepareRequest.video.srtpCryptoSuite === SRTPCryptoSuites.AES_CM_128_HMAC_SHA1_80 ?
+                    "AES_CM_128_HMAC_SHA1_80" : "AES_CM_256_HMAC_SHA1_80",
+                key: videoKey,
+            },
+            firstPacket() {
+                videoSender.sendRtcp();
+            },
+            onRtp(rtp) {
+                videoSender.sendRtp(RtpPacket.deSerialize(rtp));
+            },
+        },
     }
-    else {
-        const args = [
-            ...hideBanner,
-            ...videoDecoderArguments,
-            ...ffmpegInput.inputArguments,
-            ...videoArgs,
-            ...audioArgs,
-        ];
-        safePrintFFmpegArguments(console, args);
+    if (audio)
+        rtpTracks.audio = audio;
 
-        const cp = child_process.spawn(ffmpegPath, args);
-        session.killPromise.finally(() => safeKillFFmpeg(cp));
-        ffmpegLogInitialOutput(console, cp);
-        cp.on('exit', () => session.kill());
-    }
+    const process = await startRtpForwarderProcess(console, ffmpegInput, rtpTracks);
+
+    session.killPromise.finally(() => process.kill());
+    process.killPromise.finally(() => session.kill());
 }
