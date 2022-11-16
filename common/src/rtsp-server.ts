@@ -56,6 +56,7 @@ export const H264_NAL_TYPE_RESERVED31 = 31;
 export const H264_NAL_TYPE_IDR = 5;
 export const H264_NAL_TYPE_SEI = 6;
 export const H264_NAL_TYPE_SPS = 7;
+export const H264_NAL_TYPE_PPS = 8;
 // aggregate NAL Unit
 export const H264_NAL_TYPE_STAP_A = 24;
 export const H264_NAL_TYPE_STAP_B = 25;

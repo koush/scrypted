@@ -147,6 +147,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
     const isRtsp = ffmpegInput.container?.startsWith('rtsp');
 
+    let rtspSdp: string;
     const sdpDeferred = new Deferred<string>();
     const videoSectionDeferred = new Deferred<MSection>();
     const audioSectionDeferred = new Deferred<MSection>();
@@ -167,8 +168,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
         try {
             const optionsResponse = await rtspClient.options();
             const describe = await rtspClient.describe();
-            const sdp = describe.body.toString();
-            const parsedSdp = parseSdp(sdp);
+            rtspSdp = describe.body.toString();
+            const parsedSdp = parseSdp(rtspSdp);
 
             const videoSection = parsedSdp.msections.find(msection => msection.type === 'video' && (msection.codec === videoCodec || videoCodec === 'copy'));
             // maybe fallback to udp forwarding/transcoding?
@@ -201,7 +202,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                 else {
                     // console.log('audio codec transcoding:', audio.codecCopy);
 
-                    const newSdp = parseSdp(sdp);
+                    const newSdp = parseSdp(rtspSdp);
                     let audioSection = newSdp.msections.find(msection => msection.type === 'audio' && msection.codec === audioCodec)
                     if (!audioSection)
                         audioSection = newSdp.msections.find(msection => msection.type === 'audio');
@@ -415,6 +416,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     }
     else {
         console.log('bypassing ffmpeg, perfect codecs');
+        sdpDeferred.resolve(rtspSdp);
     }
 
     if (!rtspClientHooked) {

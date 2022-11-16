@@ -38,6 +38,7 @@
     "raw-loader": "^4.0.2",
     "rimraf": "^3.0.2",
     "tmp": "^0.2.1",
+    "typescript": "^4.9.3",
     "webpack": "^5.74.0",
     "webpack-bundle-analyzer": "^4.5.0"
   },
