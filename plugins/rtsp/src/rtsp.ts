@@ -2,6 +2,7 @@ import sdk, { Setting, MediaObject, ScryptedInterface, FFmpegInput, PictureOptio
 import { EventEmitter } from "stream";
 import { CameraProviderBase, CameraBase, UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 import url from 'url';
+import { timeoutFunction, timeoutPromise } from '@scrypted/common/src/promise-utils';
 
 export { UrlMediaStreamOptions } from "../../ffmpeg-camera/src/common";
 
@@ -350,6 +351,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
         return `${this.getIPAddress()}:${this.storage.getItem('rtspPort') || 554}`;
     }
 
+    constructedVideoStreamOptions: Promise<UrlMediaStreamOptions[]>;
     async getVideoStreamOptions(): Promise<UrlMediaStreamOptions[]> {
         if (this.showRtspUrlOverride()) {
             const vsos = await super.getVideoStreamOptions();
@@ -357,8 +359,17 @@ export abstract class RtspSmartCamera extends RtspCamera {
                 return vsos;
         }
 
-        const vsos = await this.getConstructedVideoStreamOptions();
-        return vsos;
+        if (this.constructedVideoStreamOptions)
+            return this.constructedVideoStreamOptions;
+
+        this.constructedVideoStreamOptions = timeoutPromise(5000, this.getConstructedVideoStreamOptions()).finally(() => {
+            this.constructedVideoStreamOptions = undefined;
+        });
+    }
+
+    putSettingBase(key: string, value: SettingValue): Promise<void> {
+        this.constructedVideoStreamOptions = undefined;
+        return super.putSettingBase(key, value);
     }
 }
 

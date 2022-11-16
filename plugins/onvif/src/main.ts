@@ -422,7 +422,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
                 description: 'Autodiscover ONVIF devices on the network',
                 key: 'autodiscovery',
                 type: 'boolean',
-                value: this.storage.getItem('autodiscovery') !== 'false',
+                value: this.storage.getItem('autodiscovery') === 'true',
             }
         ]
     }
@@ -440,7 +440,7 @@ class OnvifProvider extends RtspProvider implements DeviceDiscovery, Settings {
     }
 
     async discoverDevices(duration: number) {
-        const autodiscovery = this.storage.getItem('autodiscovery') !== "false";
+        const autodiscovery = this.storage.getItem('autodiscovery') === "true";
         if (!autodiscovery)
             return;
 
