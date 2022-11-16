@@ -79,12 +79,9 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
                 ? 'medium-resolution'
                 : 'local';
 
-    const canDynamicBitrate = device.interfaces.includes(ScryptedInterface.VideoCameraConfiguration);
-
     // watch will/should also be a low bandwidth device.
     if (isWatch) {
         return {
-            dynamicBitrate: canDynamicBitrate && adaptiveBitrate.includes('Apple Watch'),
             destination,
             isWatch,
             isLowBandwidth,
@@ -93,7 +90,6 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
 
     if (isLowBandwidth) {
         return {
-            dynamicBitrate: canDynamicBitrate && adaptiveBitrate.includes('Remote Stream'),
             destination,
             isWatch,
             isLowBandwidth,
@@ -101,7 +97,6 @@ export async function getStreamingConfiguration(device: ScryptedDevice & VideoCa
     }
 
     return {
-        dynamicBitrate: canDynamicBitrate && adaptiveBitrate.includes('Local Stream'),
         destination,
         isWatch,
         isLowBandwidth,

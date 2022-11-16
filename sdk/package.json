@@ -43,11 +43,11 @@
     "webpack-bundle-analyzer": "^4.5.0"
   },
   "devDependencies": {
-    "@types/node": "^16.11.1",
+    "@types/node": "^18.11.9",
     "@types/stringify-object": "^4.0.0",
     "stringify-object": "^3.3.0",
     "ts-node": "^10.4.0",
-    "typedoc": "^0.23.15"
+    "typedoc": "^0.23.21"
   },
   "types": "dist/src/index.d.ts"
 }

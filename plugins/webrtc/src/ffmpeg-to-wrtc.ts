@@ -1,7 +1,7 @@
-import { MediaStreamTrack, RTCPeerConnection, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
+import { MediaStreamTrack, RTCPeerConnection, RtcpRrPacket, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
-import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
+import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import type { WebRTCPlugin } from "./main";
 import { ScryptedSessionControl } from "./session-control";
 import { requiredAudioCodecs, requiredVideoCodec } from "./webrtc-required-codecs";
@@ -61,6 +61,23 @@ export async function createTrackForwarder(options: {
         destinationId,
         tool: transcodeBaseline ? 'ffmpeg' : 'scrypted',
     });
+
+    let mediaStreamFeedback: MediaStreamFeedback;
+    try {
+        mediaStreamFeedback = await sdk.mediaManager.convertMediaObject(mo, ScryptedMimeTypes.MediaStreamFeedback);
+    }
+    catch (e) {
+    }
+    videoTransceiver.sender.onRtcp.subscribe(rtcp => {
+        if (rtcp.type !== RtcpRrPacket.type)
+            return;
+        for (const rr of rtcp.reports) {
+            mediaStreamFeedback.reportPacketLoss({
+                packetsLost: rr.packetsLost,
+            });
+        }
+    })
+
     const console = sdk.deviceManager.getMixinConsole(mo.sourceId, RTC_BRIDGE_NATIVE_ID);
     if (transcodeBaseline) {
         console.log('Requesting medium-resolution stream', {
@@ -281,6 +298,7 @@ class WebRTCTrack implements RTCMediaObjectTrack {
             return;
         this.removed.resolve(undefined);
         this.control.killed.resolve(undefined);
+        this.video.sender.onRtcp.allUnsubscribe();
 
         if (cleanupTrackOnly)
             return;
@@ -417,6 +435,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         const videoTransceiver = this.pc.addTransceiver(vtrack, {
             direction: 'sendonly',
         });
+
         videoTransceiver.mid = options?.videoMid;
 
         const audioTransceiver = this.pc.addTransceiver(atrack, {

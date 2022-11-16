@@ -515,6 +515,7 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
 }
 
 export interface MediaStreamFeedback {
+  requestBitrate(bitrate: number): Promise<void>;
   reportPacketLoss(report: {
     packetsLost: number;
   }): Promise<void>;

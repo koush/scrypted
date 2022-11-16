@@ -5,7 +5,7 @@ import { ProtectionProfileAes128CmHmacSha1_80 } from '@koush/werift-src/packages
 import { SrtcpSession } from '@koush/werift-src/packages/rtp/src/srtp/srtcp';
 import { bindUdp, closeQuiet } from '@scrypted/common/src/listen-cluster';
 import { timeoutPromise } from '@scrypted/common/src/promise-utils';
-import sdk, { Camera, FFmpegInput, Intercom, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
+import sdk, { Camera, FFmpegInput, Intercom, MediaStreamFeedback, MediaStreamOptions, RequestMediaStreamOptions, ScryptedDevice, ScryptedInterface, ScryptedMimeTypes, VideoCamera, VideoCameraConfiguration } from '@scrypted/sdk';
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
@@ -13,7 +13,6 @@ import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, Pre
 import type { HomeKitPlugin } from "../../main";
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
 import { createSnapshotHandler } from '../camera/camera-snapshot';
-import { DynamicBitrateSession } from './camera-dynamic-bitrate';
 import { startCameraStreamFfmpeg } from './camera-streaming-ffmpeg';
 import { CameraStreamingSession } from './camera-streaming-session';
 import { getStreamingConfiguration } from './camera-utils';
@@ -233,7 +232,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             const {
                 destination,
-                dynamicBitrate,
                 isLowBandwidth,
                 isWatch,
             } = await getStreamingConfiguration(device, forceSlowConnection, storage, request)
@@ -256,7 +254,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             session.videoReturnRtcpReady = videoReturnRtcpReady;
 
             console.log({
-                dynamicBitrate,
                 isLowBandwidth,
                 isWatch,
                 destination,
@@ -302,6 +299,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 adaptive: true,
                 video: {
                     codec: 'h264',
+                    bitrate: request.video.max_bit_rate * 1000,
                 },
                 audio: {
                     // opus is the preferred/default codec, and can be repacketized to fit any request if in use.
@@ -312,58 +310,35 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 tool: transcodingDebugMode ? 'ffmpeg' : 'scrypted',
             };
 
-            const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(await device.getVideoStream(mediaOptions), ScryptedMimeTypes.FFmpegInput);
+            const mediaObject = await device.getVideoStream(mediaOptions);
+            const videoInput = await mediaManager.convertMediaObjectToJSON<FFmpegInput>(mediaObject, ScryptedMimeTypes.FFmpegInput);
+            let mediaStreamFeedback: MediaStreamFeedback;
+            try {
+                mediaStreamFeedback = await sdk.mediaManager.convertMediaObject(mediaObject, ScryptedMimeTypes.MediaStreamFeedback);
+            }
+            catch (e) {
+            }
+
             session.mediaStreamOptions = videoInput.mediaStreamOptions;
-            const minBitrate = session.mediaStreamOptions?.video?.minBitrate;
-            const maxBitrate = session.mediaStreamOptions?.video?.maxBitrate;
 
-            if (dynamicBitrate && maxBitrate && minBitrate) {
-                const initialBitrate = request.video.max_bit_rate * 1000;
-                let dynamicBitrateSession = new DynamicBitrateSession(initialBitrate, minBitrate, maxBitrate, console);
+            session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
+                mediaStreamFeedback.requestBitrate(bitrate);
+            }
 
-                session.tryReconfigureBitrate = (reason: string, bitrate: number) => {
-                    dynamicBitrateSession.onBitrateReconfigured(bitrate);
-                    const reconfigured: MediaStreamOptions = Object.assign({
-                        id: session.mediaStreamOptions?.id,
-                        video: {
-                        },
-                    }, session.mediaStreamOptions || {});
-                    reconfigured.video.bitrate = bitrate;
-
-                    console.log(`reconfigure bitrate (${reason}) ${bitrate}`);
-                    device.setVideoStreamOptions(reconfigured);
+            session.videoReturn.on('message', data => {
+                resetIdleTimeout();
+                const d = vrtcp.decrypt(data);
+                const rtcp = RtcpPacketConverter.deSerialize(d);
+                const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
+                if (!rr)
+                    return;
+                logPacketLoss(rr);
+                for (const report of rr.reports) {
+                    mediaStreamFeedback?.reportPacketLoss({
+                        packetsLost: report.packetsLost,
+                    });
                 }
-
-                session.tryReconfigureBitrate('start', initialBitrate);
-
-                session.videoReturn.on('message', data => {
-                    resetIdleTimeout();
-                    const d = vrtcp.decrypt(data);
-                    const rtcp = RtcpPacketConverter.deSerialize(d);
-                    const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
-                    if (!rr)
-                        return;
-                    logPacketLoss(rr);
-                    if (dynamicBitrateSession.shouldReconfigureBitrate(rr))
-                        session.tryReconfigureBitrate('rtcp', dynamicBitrateSession.currentBitrate)
-                });
-
-                // reset the video bitrate to max after a dynanic bitrate session ends.
-                session.videoReturn.on('close', async () => {
-                    session.tryReconfigureBitrate('stop', session.mediaStreamOptions?.video?.maxBitrate);
-                });
-            }
-            else {
-                session.videoReturn.on('message', data => {
-                    resetIdleTimeout();
-                    const d = vrtcp.decrypt(data);
-                    const rtcp = RtcpPacketConverter.deSerialize(d);
-                    const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
-                    if (!rr)
-                        return;
-                    logPacketLoss(rr);
-                });
-            }
+            });
 
             resetIdleTimeout();
 

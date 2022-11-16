@@ -85,28 +85,6 @@ The latest troubleshooting guide for all known streaming or recording issues can
         //     type: 'boolean',
         // });
 
-        if (this.interfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
-            let adaptiveBitrate: string[] = [];
-            try {
-                adaptiveBitrate = JSON.parse(this.storage.getItem('adaptiveBitrate'));
-            }
-            catch (e) {
-            }
-
-            settings.push({
-                key: 'adaptiveBitrate',
-                title: 'Adaptive Bitrate Streaming',
-                description: 'Adaptive Bitrate adjusts the bitrate of the native camera stream on demand to accomodate available bandwidth. If the camera\'s primary stream is being recorded by an NVR, Adaptive Bitrate should be used on a secondary stream (sub stream), as it will reduce the recording quality.',
-                choices: [
-                    'Local Stream',
-                    'Remote Stream',
-                    'Apple Watch',
-                ],
-                multiple: true,
-                value: adaptiveBitrate,
-            })
-        }
-
         settings.push({
             title: 'RTP Sender',
             key: 'rtpSender',
