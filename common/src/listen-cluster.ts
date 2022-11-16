@@ -6,7 +6,14 @@ export async function closeQuiet(socket: dgram.Socket | net.Server) {
     if (!socket)
         return;
     try {
-        await new Promise(resolve => socket.close(resolve));
+        await new Promise((r, f) => {
+            try {
+                socket.close(r);
+            }
+            catch (e) {
+                f(e);
+            }
+        });
     }
     catch (e) {
     }

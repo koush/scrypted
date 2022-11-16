@@ -943,8 +943,8 @@ export class RtspServer {
 
             const rtpServer = await createBindZero();
             const rtcpServer = await createBindUdp(rtpServer.port + 1);
-            this.client.on('close', () => rtpServer.server.close())
-            this.client.on('close', () => rtcpServer.server.close())
+            this.client.on('close', () => closeQuiet(rtpServer.server));
+            this.client.on('close', () => closeQuiet(rtcpServer.server));
             this.setupTracks[msection.control] = {
                 control: msection.control,
                 protocol: 'udp',
