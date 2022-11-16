@@ -3,14 +3,12 @@ import { getDebugModeH264EncoderArgs } from '@scrypted/common/src/ffmpeg-hardwar
 import { addVideoFilterArguments } from '@scrypted/common/src/ffmpeg-helpers';
 import { createBindZero } from '@scrypted/common/src/listen-cluster';
 import { getSpsPps } from '@scrypted/common/src/sdp-utils';
-import sdk, { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
+import { FFmpegInput, MediaStreamDestination, ScryptedDevice, VideoCamera } from '@scrypted/sdk';
 import { RtpTrack, RtpTracks, startRtpForwarderProcess } from '../../../../webrtc/src/rtp-forwarders';
 import { AudioStreamingCodecType, SRTPCryptoSuites } from '../../hap';
 import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streaming-session';
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
-
-const { mediaManager, log } = sdk;
 
 export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, destination: MediaStreamDestination, ffmpegInput: FFmpegInput, session: CameraStreamingSession) {
     const request = session.startRequest;
