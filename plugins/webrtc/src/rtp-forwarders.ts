@@ -208,29 +208,34 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                     }
                     else {
                         newSdp.msections = newSdp.msections.filter(msection => msection === audioSection);
-                        const udpPort = await reserveUdpPort();
-                        console.log({ udpPort });
-                        pipeSdp = addTrackControls(replaceSectionPort(newSdp.toSdp(), 'audio', udpPort));
+                        const audioSdp = addTrackControls(replaceSectionPort(newSdp.toSdp(), 'audio', 0));
+                        const parsedAudioSdp = parseSdp(audioSdp);
+                        const audioControl = parsedAudioSdp.msections.find(msection => msection.type === 'audio').control;
+                        const audioClient = await listenZeroSingleClient();
+                        killDeferred.promise.finally(() => audioClient.clientPromise.then(client => client.destroy()));
+                        let rtspServer: RtspServer;
+                        audioClient.clientPromise.then(async client => {
+                            const r = new RtspServer(client, audioSdp, true);
+                            killDeferred.promise.finally(() => rtspServer.destroy());
+                            await r.handlePlayback();
+                            rtspServer = r;
+                        });
 
                         audio.ffmpegDestination = '127.0.0.1';
                         audio.srtp = undefined;
 
                         inputArguments = [
-                            '-listen_timeout', '300',
-                            '-analyzeduration', '0', '-probesize', '512',
-                            '-protocol_whitelist', 'pipe,udp,rtp,file,crypto,tcp',
-                            '-f', 'sdp', '-i', 'pipe:3',
+                            // '-listen_timeout', '300',
+                            //  '-analyzeduration', '0', '-probesize', '512',
+                            '-i', `rtsp://${audioClient.host}:${audioClient.port}`,
                         ];
-
-                        const audioSender = await createBindZero();
-                        killDeferred.promise.finally(() => closeQuiet(audioSender.server));
 
                         // NOTE:
                         // This code path can fail if the audio is fetched via rtsp/tcp and the payloads are
                         // larger than the MTU. However, I have only observed larger than MTU video payloads.
                         // Audio payloads always seem to fit into the MTU even if using rtsp/tcp.
                         await setupRtspClient(console, rtspClient, channel, audioSection, false, rtp => {
-                            audioSender.server.send(rtp, udpPort);
+                            rtspServer?.sendTrack(audioControl, rtp, false);
                         })
                     }
                 }
