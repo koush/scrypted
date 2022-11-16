@@ -32,10 +32,21 @@ function getDebugModeH264EncoderArgs() {
     ];
 }
 
-export async function createTrackForwarder(timeStart: number, isPrivate: boolean,
+export async function createTrackForwarder(options: {
+    timeStart: number,
+    isPrivate: boolean, destinationId: string,
     requestMediaStream: RequestMediaStream,
     videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver,
-    sessionSupportsH264High: boolean, maximumCompatibilityMode: boolean, transcodeWidth: number) {
+    sessionSupportsH264High: boolean, maximumCompatibilityMode: boolean, transcodeWidth: number,
+}) {
+    const {
+        timeStart,
+        isPrivate, destinationId,
+        requestMediaStream,
+        videoTransceiver, audioTransceiver,
+        sessionSupportsH264High, maximumCompatibilityMode, transcodeWidth
+    } = options;
+
     const transcodeBaseline = !sessionSupportsH264High || maximumCompatibilityMode;
     const requestDestination: MediaStreamDestination = transcodeBaseline ? 'medium-resolution' : 'local';
     const mo = await requestMediaStream({
@@ -45,7 +56,9 @@ export async function createTrackForwarder(timeStart: number, isPrivate: boolean
         audio: {
             codec: 'opus',
         },
+        adaptive: !transcodeBaseline,
         destination: isPrivate ? requestDestination : 'remote',
+        destinationId,
         tool: transcodeBaseline ? 'ffmpeg' : 'scrypted',
     });
     const console = sdk.deviceManager.getMixinConsole(mo.sourceId, RTC_BRIDGE_NATIVE_ID);
@@ -347,9 +360,16 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             atrack,
             intercom,
             createTrackForwarder: (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) =>
-                createTrackForwarder(timeStart, logIsPrivateIceTransport(this.console, this.pc), requestMediaStream,
-                    videoTransceiver, audioTransceiver,
-                    this.sessionSupportsH264High, this.maximumCompatibilityMode, this.transcodeWidth),
+                createTrackForwarder({
+                    timeStart,
+                    ...logIsPrivateIceTransport(this.console, this.pc),
+                    requestMediaStream,
+                    videoTransceiver,
+                    audioTransceiver,
+                    sessionSupportsH264High: this.sessionSupportsH264High,
+                    maximumCompatibilityMode: this.maximumCompatibilityMode,
+                    transcodeWidth: this.transcodeWidth,
+                }),
         }
     }
 
@@ -484,15 +504,15 @@ export async function createRTCPeerConnectionSink(
         connection.pc.close();
     });
 
-    const setup: Partial<RTCAVSignalingSetup>  = {
-            audio: {
-                direction: intercom ? 'sendrecv' : 'recvonly',
-            },
-            video: {
-                direction: 'recvonly',
-            },
-            configuration,
-        };
+    const setup: Partial<RTCAVSignalingSetup> = {
+        audio: {
+            direction: intercom ? 'sendrecv' : 'recvonly',
+        },
+        video: {
+            direction: 'recvonly',
+        },
+        configuration,
+    };
 
     connection.negotiateRTCSignalingSessionInternal(setup, true);
 

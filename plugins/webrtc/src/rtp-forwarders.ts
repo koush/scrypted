@@ -113,6 +113,11 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     rtspMode?: 'udp' | 'tcp' | 'pull',
     onRtspClient?: (rtspClient: RtspClient, optionsResponse: RtspServerResponse) => Promise<boolean>,
 }) {
+    if (!rtpTracks.audio)
+        delete rtpTracks.audio;
+    if (!rtpTracks.video)
+        delete rtpTracks.video;
+
     const killDeferred = new Deferred<void>();
 
     const killGuard = (track: RtpTrack) => {
