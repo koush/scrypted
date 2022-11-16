@@ -298,6 +298,8 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             const transcodingDebugMode = storage.getItem('transcodingDebugMode') === 'true';
             const mediaOptions: RequestMediaStreamOptions = {
                 destination,
+                destinationId: session.prepareRequest.targetAddress,
+                adaptive: true,
                 video: {
                     codec: 'h264',
                 },
@@ -369,7 +371,6 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
                 await startCameraStreamFfmpeg(device,
                     console,
                     storage,
-                    destination,
                     videoInput,
                     session);
             }

@@ -10,7 +10,7 @@ import { CameraStreamingSession, waitForFirstVideoRtcp } from './camera-streamin
 import { createCameraStreamSender } from './camera-streaming-srtp-sender';
 import { checkCompatibleCodec, transcodingDebugModeWarning } from './camera-utils';
 
-export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, destination: MediaStreamDestination, ffmpegInput: FFmpegInput, session: CameraStreamingSession) {
+export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCamera, console: Console, storage: Storage, ffmpegInput: FFmpegInput, session: CameraStreamingSession) {
     const request = session.startRequest;
 
     const videomtu = session.startRequest.video.mtu;
