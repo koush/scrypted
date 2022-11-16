@@ -67,7 +67,6 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
                 onRtp: (rtspHeader, rtp) => deliver(rtp),
             });
             console.log('rtsp/udp', section.codec, result);
-            return;
         }
     }
     catch (e) {
@@ -81,6 +80,7 @@ async function setupRtspClient(console: Console, rtspClient: RtspClient, channel
         onRtp: (rtspHeader, rtp) => deliver(rtp),
     });
     console.log('rtsp/tcp', section.codec);
+    return true;
 }
 
 async function createTrackForwarders(console: Console, killDeferred: Deferred<void>, rtpTracks: RtpTracks) {
@@ -211,11 +211,18 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         const audioSdp = addTrackControls(replaceSectionPort(newSdp.toSdp(), 'audio', 0));
                         const parsedAudioSdp = parseSdp(audioSdp);
                         const audioControl = parsedAudioSdp.msections.find(msection => msection.type === 'audio').control;
+
+                        // if the rtsp client is over tcp, then the restream server must also be tcp, as
+                        // the rtp packets (which can be a max of 64k) may be too large for udp.
+                        const clientIsTcp = await setupRtspClient(console, rtspClient, channel, audioSection, false, rtp => {
+                            rtspServer?.sendTrack(audioControl, rtp, false);
+                        });
+
                         const audioClient = await listenZeroSingleClient();
                         killDeferred.promise.finally(() => audioClient.clientPromise.then(client => client.destroy()));
                         let rtspServer: RtspServer;
                         audioClient.clientPromise.then(async client => {
-                            const r = new RtspServer(client, audioSdp, true);
+                            const r = new RtspServer(client, audioSdp, !clientIsTcp);
                             killDeferred.promise.finally(() => rtspServer.destroy());
                             await r.handlePlayback();
                             rtspServer = r;
@@ -225,18 +232,8 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         audio.srtp = undefined;
 
                         inputArguments = [
-                            // '-listen_timeout', '300',
-                            //  '-analyzeduration', '0', '-probesize', '512',
                             '-i', `rtsp://${audioClient.host}:${audioClient.port}`,
                         ];
-
-                        // NOTE:
-                        // This code path can fail if the audio is fetched via rtsp/tcp and the payloads are
-                        // larger than the MTU. However, I have only observed larger than MTU video payloads.
-                        // Audio payloads always seem to fit into the MTU even if using rtsp/tcp.
-                        await setupRtspClient(console, rtspClient, channel, audioSection, false, rtp => {
-                            rtspServer?.sendTrack(audioControl, rtp, false);
-                        })
                     }
                 }
             }
