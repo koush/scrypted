@@ -31,15 +31,22 @@
       ]
    },
    "dependencies": {
-      "@koush/ring-client-api": "file:../../external/ring-client-api",
+      "@homebridge/camera-utils": "^2.0.4",
       "@scrypted/common": "file:../../common",
       "@scrypted/sdk": "file:../../sdk",
       "@types/node": "^16.6.1",
-      "axios": "^0.24.0"
+      "rxjs": "^7.5.5",
+      "sdp": "^3.0.3",
+      "sip": "0.0.6",
+      "stun": "^2.1.0",
+      "uuid": "^8.3.2"
    },
    "optionalDependencies": {
       "got": "11.8.2",
       "socket.io-client": "^2.4.0"
    },
-   "version": "0.0.1"
+   "version": "0.0.1",
+   "devDependencies": {
+      "@types/uuid": "^8.3.4"
+   }
 }

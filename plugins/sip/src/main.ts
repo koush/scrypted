@@ -7,8 +7,9 @@ import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
 import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { RtpDescription, SipSession, generateUuid } from './ring-client-api';
+import { RtpDescription, SipSession, SipOptions } from './sip-session';
 import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './rtp-utils';
+import { v4 as generateRandomUuid } from 'uuid';
 
 const STREAM_TIMEOUT = 120000;
 const { deviceManager, mediaManager, systemManager } = sdk;
@@ -38,15 +39,9 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
         const ringRtpOptions = this.rtpDescription;
-        let cameraSpeakerActive = false;
         const audioOutForwarder = await createBindZero();
         this.audioOutForwarder = audioOutForwarder.server;
         audioOutForwarder.server.on('message', message => {
-            if (!cameraSpeakerActive) {
-                cameraSpeakerActive = true;
-                this.session.activateCameraSpeaker().catch(e => this.console.error('camera speaker activation error', e))
-            }
-
             this.session.audioSplitter.send(message, ringRtpOptions.audio.port, ringRtpOptions.address);
             return null;
         });
@@ -135,8 +130,10 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
                 client.on('close', cleanup);
                 client.on('error', cleanup);
-                const camera = this.findCamera();
-                sip = await camera.createSipSession(undefined);
+
+                let sipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22" };
+
+                sip = await new SipSession(this.console, this.name, sipOptions);
                 sip.onCallEnded.subscribe(cleanup);
                 this.rtpDescription = await sip.start();
                 this.console.log('sip sdp', this.rtpDescription.sdp)
@@ -414,7 +411,7 @@ class SipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDisc
             .catch(e => this.console.error('discovery failure', e));
 
         if (!this.settingsStorage.values.systemId)
-            this.settingsStorage.values.systemId = generateUuid();
+            this.settingsStorage.values.systemId = generateRandomUuid();
     }
 
     getSettings(): Promise<Setting[]> {
