@@ -1,9 +1,38 @@
 import { ReplaySubject, timer } from 'rxjs'
+import { once } from 'events'
 import { createStunResponder, RtpDescription, RtpOptions, sendStunBindingRequest } from './rtp-utils'
 import { reservePorts } from '@homebridge/camera-utils';
 import { SipCall, SipOptions } from './sip-call'
 import { Subscribed } from './subscribed'
 import dgram from 'dgram'
+
+export async function bindUdp(server: dgram.Socket, usePort: number) {
+  server.bind({
+    port: usePort,
+    // exclusive: false,
+    // address: '0.0.0.0',
+  })
+  await once(server, 'listening')
+  server.setRecvBufferSize(1024 * 1024)
+  const port = server.address().port
+  return {
+    port,
+    url: `udp://'0.0.0.0':${port}`,
+  }
+}
+
+export async function createBindUdp(usePort: number) {
+  const server = dgram.createSocket({
+      type: 'udp4',
+      // reuseAddr: true,
+    }),
+    { port, url } = await bindUdp(server, usePort)
+  return {
+    server,
+    port,
+    url,
+  }
+}
 
 export class SipSession extends Subscribed {
   private hasStarted = false
@@ -23,6 +52,27 @@ export class SipSession extends Subscribed {
     super()
 
     this.sipCall = this.createSipCall(this.sipOptions)
+  }
+
+  static async createSipSession(console: any, cameraName: string, sipOptions: SipOptions) {
+    const audioPort = 0,
+      audioSplitter = await createBindUdp(audioPort),
+      audioRtcpSplitter = await createBindUdp(audioSplitter.port + 1),
+      rtpOptions = {
+        audio: {
+          port: audioSplitter.port,
+          rtcpPort: audioRtcpSplitter.port
+        }
+      }
+
+    return new SipSession(
+      console,
+      sipOptions,
+      rtpOptions,
+      audioSplitter.server,
+      audioRtcpSplitter.server,
+      cameraName
+    )
   }
 
   createSipCall(sipOptions: SipOptions) {

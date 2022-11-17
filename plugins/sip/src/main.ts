@@ -5,10 +5,9 @@ import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
-import { RtcpReceiverInfo, RtcpRrPacket } from '../../../external/werift/packages/rtp/src/rtcp/rr';
-import { RtpPacket } from '../../../external/werift/packages/rtp/src/rtp/rtp';
-import { RtpDescription, SipSession, SipOptions } from './sip-session';
-import { isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './rtp-utils';
+import { SipSession } from './sip-session';
+import { SipOptions } from './sip-call';
+import { RtpDescription, isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './rtp-utils';
 import { v4 as generateRandomUuid } from 'uuid';
 
 const STREAM_TIMEOUT = 120000;
@@ -131,83 +130,30 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
                 client.on('close', cleanup);
                 client.on('error', cleanup);
 
-                let sipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22" };
+                let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22", localIp: "10.10.10.70", localPort: 5060 };
 
-                sip = await new SipSession(this.console, this.name, sipOptions);
+                sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
                 sip.onCallEnded.subscribe(cleanup);
                 this.rtpDescription = await sip.start();
                 this.console.log('sip sdp', this.rtpDescription.sdp)
 
-                const videoPort = true ? 0 : sip.videoSplitter.address().port;
-                const audioPort = true ? 0 : sip.audioSplitter.address().port;
+                const audioPort = 0
 
-                let sdp = replacePorts(this.rtpDescription.sdp, audioPort, videoPort);
+                let sdp = replacePorts(this.rtpDescription.sdp, audioPort, 0);
                 sdp = addTrackControls(sdp);
                 sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
                 this.console.log('proposed sdp', sdp);
 
-                let vseq = 0;
-                let vseen = 0;
-                let vlost = 0;
                 let aseq = 0;
                 let aseen = 0;
                 let alost = 0;
 
                 rtsp = new RtspServer(client, sdp, true);
                 const parsedSdp = parseSdp(rtsp.sdp);
-                const videoTrack = parsedSdp.msections.find(msection => msection.type === 'video').control;
                 const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
                 rtsp.console = this.console;
 
                 await rtsp.handlePlayback();
-
-                sip.videoSplitter.on('message', message => {
-                    if (!isStunMessage(message)) {
-                        const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-                        if (!isRtpMessage)
-                            return;
-                        vseen++;
-                        rtsp.sendTrack(videoTrack, message, !isRtpMessage);
-                        const seq = getSequenceNumber(message);
-                        if (seq !== (vseq + 1) % 0x0FFFF)
-                            vlost++;
-                        vseq = seq;
-                    }
-                });
-
-                sip.videoRtcpSplitter.on('message', message => {
-                    rtsp.sendTrack(videoTrack, message, true);
-                });
-
-                sip.videoSplitter.once('message', message => {
-                    const rtp = RtpPacket.deSerialize(message);
-
-                    const report = new RtcpReceiverInfo({
-                        ssrc: rtp.header.ssrc,
-                        fractionLost: 0,
-                        packetsLost: 0,
-                        highestSequence: rtp.header.sequenceNumber,
-                        jitter: 0,
-                        lsr: 0,
-                        dlsr: 0,
-                    })
-
-                    const rr = new RtcpRrPacket({
-                        ssrc: rtp.header.ssrc,
-                        reports: [
-                            report,
-                        ],
-                    });
-
-                    const interval = setInterval(() => {
-                        report.highestSequence = vseq;
-                        report.packetsLost = vlost;
-                        report.fractionLost = Math.round(vlost * 100 / vseen);
-                        const packet = rr.serialize();
-                        sip.videoSplitter.send(packet, this.rtpDescription.video.rtcpPort, this.rtpDescription.address)
-                    }, 500);
-                    sip.videoSplitter.on('close', () => clearInterval(interval))
-                });
 
                 sip.audioSplitter.on('message', message => {
                     if (!isStunMessage(message)) {
