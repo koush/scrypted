@@ -82,6 +82,8 @@ import {
   faShieldAlt,
   faWrench,
   faVideoCamera,
+  faTimeline,
+  faMobile,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -170,6 +172,8 @@ const icons: IconDefinition[] =[
   faShieldAlt,
   faWrench,
   faVideoCamera,
+  faTimeline,
+  faMobile,
 ];
 
 for (var icon in icons) {

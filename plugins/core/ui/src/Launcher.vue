@@ -51,6 +51,47 @@
                             </v-tooltip>
                         </div>
                     </v-card>
+                    <v-card width="300px" class="elevation-24 mt-4" v-if="showNvr" dark>
+                        <v-card-title style="justify-content: center;" class="headline text-uppercase">Support Scrypted
+                        </v-card-title>
+                        <v-card-subtitle style="justify-content: center; text-align: center;"
+                            class="headline text-uppercase">Get Scrypted NVR</v-card-subtitle>
+                        <v-list>
+
+                            <v-list-item>
+                                <v-list-item-icon>
+                                    <v-icon>fa fa-timeline</v-icon>
+                                </v-list-item-icon>
+                                24/7 recording with smart detections.
+                            </v-list-item>
+
+                            <v-list-item>
+                                <v-list-item-icon>
+                                    <v-icon>fa-solid fa-video-camera</v-icon>
+                                </v-list-item-icon>
+                                4K and adaptive bitrate streaming.
+                            </v-list-item>
+
+                            <v-list-item>
+                                <v-list-item-icon>
+                                    <v-icon>fa fa-dashboard</v-icon>
+                                </v-list-item-icon>
+
+                                Dashboard of all your cameras.
+                            </v-list-item>
+
+                            <v-list-item>
+                                <v-list-item-icon>
+                                    <v-icon>fa fa-mobile</v-icon>
+                                </v-list-item-icon>
+                                Mobile App.
+                            </v-list-item>
+                        </v-list>
+                        <div style="width: 100%; display: flex; justify-content: center;">
+                            <v-btn style="justify-self: center;" href="https://demo.scrypted.app/#/demo">View Demo
+                            </v-btn>
+                        </div>
+                    </v-card>
                 </div>
             </div>
         </v-app>
@@ -87,6 +128,7 @@ export default {
     data() {
         return {
             loading: true,
+            showNvr: false,
             applications: [
                 {
                     name: 'Management Console',
@@ -116,14 +158,14 @@ export default {
                 const ret = {
                     name: (app.applicationInfo && app.applicationInfo.name) || app.name,
                     icon: app.applicationInfo && app.applicationInfo.icon,
-                    href: `/endpoint/${appId}/public/`,
+                    href: (app.applicationInfo && app.applicationInfo.href) || `/endpoint/${appId}/public/`,
                 };
                 return ret;
             });
-            if (!applications.length) {
-                this.$router.push('/component/plugin');
-                return;
-            }
+            // if (!applications.length) {
+            //     this.$router.push('/component/plugin');
+            //     return;
+            // }
 
             this.applications.unshift(
                 {
@@ -132,6 +174,8 @@ export default {
                     to: '/component/plugin',
                 },
             )
+
+            this.showNvr = !systemManager.getDeviceByName('@scrypted/nvr');
         }
     },
     watch: {

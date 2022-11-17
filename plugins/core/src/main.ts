@@ -13,6 +13,7 @@ import net from 'net';
 import { updatePluginsData } from './update-plugins';
 import { MediaCore } from './media-core';
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
+import { LauncherMixin } from './launcher-mixin';
 
 const { pluginHostAPI, systemManager, deviceManager, mediaManager, endpointManager } = sdk;
 
@@ -47,6 +48,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     router: any = Router();
     publicRouter: any = Router();
     mediaCore: MediaCore;
+    launcher: LauncherMixin;
     scriptCore: ScriptCore;
     automations = new Map<string, Automation>();
     aggregate = new Map<string, AggregateDevice>();
@@ -76,6 +78,16 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             );
             this.scriptCore = new ScriptCore(ScriptCoreNativeId);
         })();
+
+        deviceManager.onDeviceDiscovered({
+            name: 'Add to Launcher',
+            nativeId: 'launcher',
+            interfaces: [
+                '@scrypted/launcher-ignore',
+                ScryptedInterface.MixinProvider,
+            ],
+            type: ScryptedDeviceType.Builtin,
+        });
 
         for (const nativeId of deviceManager.getNativeIds()) {
             if (nativeId?.startsWith('automation:')) {
@@ -141,6 +153,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     }
 
     async getDevice(nativeId: string) {
+        if (nativeId === 'launcher')
+            return new LauncherMixin('launcher');
         if (nativeId === 'mediacore')
             return this.mediaCore;
         if (nativeId === ScriptCoreNativeId)
