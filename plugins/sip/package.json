@@ -1,5 +1,6 @@
 {
    "name": "@scrypted/sip",
+   "version": "0.0.1",
    "scripts": {
       "scrypted-setup-project": "scrypted-setup-project",
       "prescrypted-setup-project": "scrypted-package-json",
@@ -41,11 +42,6 @@
       "stun": "^2.1.0",
       "uuid": "^8.3.2"
    },
-   "optionalDependencies": {
-      "got": "11.8.2",
-      "socket.io-client": "^2.4.0"
-   },
-   "version": "0.0.1",
    "devDependencies": {
       "@types/uuid": "^8.3.4"
    }
