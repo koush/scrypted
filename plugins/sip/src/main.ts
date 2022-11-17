@@ -27,6 +27,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         super(nativeId);
         this.motionDetected = false;
         this.binaryState = false;
+        this.console.log('SipCameraDevice ctor()');
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
@@ -104,10 +105,13 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
         this.stopSession();
 
+        this.console.log('SipCameraDevice getVideoStream()');
 
         const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient();
 
         const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
+        
+        this.console.log(`getVideoStream() ${playbackUrl}`);
 
         playbackPromise.then(async (client) => {
             client.setKeepAlive(true, 10000);
@@ -134,6 +138,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
                 sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
                 sip.onCallEnded.subscribe(cleanup);
+                this.console.log(`SipCameraDevice before start()`);
                 this.rtpDescription = await sip.start();
                 this.console.log('sip sdp', this.rtpDescription.sdp)
 
@@ -197,6 +202,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         const mediaStreamOptions = Object.assign(this.getSipMediaStreamOptions(), {
             refreshAt: Date.now() + STREAM_TIMEOUT,
         });
+
         // if (useRtsp) {
         //     const mediaStreamUrl: MediaStreamUrl = {
         //         url: playbackUrl,
@@ -210,12 +216,11 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
         const ffmpegInput: FFmpegInput = {
             url: undefined,
-            container: 'sdp',
             mediaStreamOptions,
             inputArguments: [
                 '-f', 'rtsp',
                 '-i', 'rtsp://10.10.10.10:8554/hauseingang',
-                '-f', 'sdp',
+                '-f', 'rtsp',
                 '-i', playbackUrl,
             ],
         };
@@ -232,19 +237,19 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
             name: 'SIP',
             // this stream is NOT scrypted blessed due to wackiness in the h264 stream.
             // tool: "scrypted",
-            container: true ? 'rtsp' : 'sdp',
+            container: 'rtsp',
             video: {
                 codec: 'h264',
-                h264Info: {
-                    sei: true,
-                    stapb: true,
-                    mtap16: true,
-                    mtap32: true,
-                    fuab: true,
-                    reserved0: true,
-                    reserved30: true,
-                    reserved31: true,
-                }
+                // h264Info: {
+                //     sei: true,
+                //     stapb: true,
+                //     mtap16: true,
+                //     mtap32: true,
+                //     fuab: true,
+                //     reserved0: true,
+                //     reserved30: true,
+                //     reserved31: true,
+                // }
             },
             audio: {
                 // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
@@ -278,10 +283,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         }
 
         let buffer: Buffer;
-
-        const camera = this.findCamera();
-        if (!camera)
-            throw new Error('camera unavailable');
 
         // try {
         //     buffer = await this.plugin.api.restClient.request({

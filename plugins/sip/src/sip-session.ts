@@ -94,6 +94,8 @@ export class SipSession extends Subscribed {
   }
 
   async start(): Promise<RtpDescription> {
+    this.console.log(`SipSession::start()`);
+
     if (this.hasStarted) {
       throw new Error('SIP Session has already been started')
     }
