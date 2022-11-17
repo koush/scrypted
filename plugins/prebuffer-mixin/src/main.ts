@@ -86,7 +86,7 @@ class PrebufferSession {
 
   audioDisabled = false;
 
-  mixinDevice: VideoCamera & VideoCameraConfiguration;
+  mixinDevice: VideoCamera;
   console: Console;
   storage: Storage;
 
@@ -98,10 +98,8 @@ class PrebufferSession {
   lastH264ProbeKey: string;
   rebroadcastModeKey: string;
   rtspParserKey: string;
-  maxBitrateKey: string;
   rtspServerPath: string;
   rtspServerMutedPath: string;
-  needBitrateReset = false;
 
   constructor(public mixin: PrebufferMixin, public advertisedMediaStreamOptions: ResponseMediaStreamOptions, public stopInactive: boolean) {
     this.storage = mixin.storage;
@@ -115,7 +113,6 @@ class PrebufferSession {
     this.rtspParserKey = 'rtspParser-' + this.streamId;
     const rtspServerPathKey = 'rtspServerPathKey-' + this.streamId;
     const rtspServerMutedPathKey = 'rtspServerMutedPathKey-' + this.streamId;
-    this.maxBitrateKey = 'maxBitrate-' + this.streamId;
 
     this.rtspServerPath = this.storage.getItem(rtspServerPathKey);
     if (!this.rtspServerPath) {
@@ -182,26 +179,6 @@ class PrebufferSession {
 
     const total = durations.reduce((prev, current) => prev + current, 0);
     return total / durations.length;
-  }
-
-  get maxBitrate() {
-    let ret = parseInt(this.storage.getItem(this.maxBitrateKey));
-    if (!ret) {
-      ret = this.advertisedMediaStreamOptions?.video?.maxBitrate;
-      this.storage.setItem(this.maxBitrateKey, ret?.toString());
-    }
-    return ret || undefined;
-  }
-
-  async resetBitrate() {
-    this.console.log('Resetting bitrate after adaptive streaming session', this.maxBitrate);
-    this.needBitrateReset = false;
-    this.mixinDevice.setVideoStreamOptions({
-      id: this.streamId,
-      video: {
-        bitrate: this.maxBitrate,
-      }
-    });
   }
 
   get streamId() {
@@ -500,17 +477,6 @@ class PrebufferSession {
         description: 'The RTSP URL of the muted rebroadcast stream. Substitute localhost as appropriate.',
         readonly: true,
         value: `rtsp://localhost:${this.mixin.streamSettings.storageSettings.values.rebroadcastPort}/${this.rtspServerMutedPath}`,
-      });
-    }
-
-    if (this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
-      settings.push({
-        group,
-        key: this.maxBitrateKey,
-        title: 'Max Bitrate',
-        description: 'This camera supports Adaptive Bitrate. Set the maximum bitrate to be allowed while using adaptive bitrate streaming. This will also serve as the default bitrate.',
-        type: 'number',
-        value: this.maxBitrate?.toString(),
       });
     }
 
@@ -932,11 +898,6 @@ class PrebufferSession {
     if (this.activeClients)
       return;
 
-    // should bitrate be reset immediately once the stream goes inactive?
-    if (this.needBitrateReset && this.mixin.mixinDeviceInterfaces.includes(ScryptedInterface.VideoCameraConfiguration)) {
-      this.resetBitrate();
-    }
-
     if (!this.stopInactive) {
       return;
     }
@@ -1243,7 +1204,7 @@ class PrebufferSession {
   }
 }
 
-class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraConfiguration> implements VideoCamera, Settings, VideoCameraConfiguration {
+class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements VideoCamera, Settings {
   released = false;
   sessions = new Map<string, PrebufferSession>();
   streamSettings = createStreamSettings(this);
@@ -1638,19 +1599,6 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera & VideoCameraCo
     return ret;
   }
 
-  setVideoStreamOptions(options: MediaStreamOptions): Promise<void> {
-    const session = this.sessions.get(options.id);
-    if (session && options?.video?.bitrate) {
-      session.needBitrateReset = true;
-      const maxBitrate = session.maxBitrate;
-      if (maxBitrate && options?.video?.bitrate > maxBitrate) {
-        this.console.log('clamping max bitrate request', options.video.bitrate, maxBitrate);
-        options.video.bitrate = maxBitrate;
-      }
-    }
-    return this.mixinDevice.setVideoStreamOptions(options);
-  }
-
   async release() {
     this.settingsListener.removeListener();
     this.online = true;
@@ -1810,8 +1758,6 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     if (!interfaces.includes(ScryptedInterface.VideoCamera))
       return null;
     const ret = [ScryptedInterface.VideoCamera, ScryptedInterface.Settings, ScryptedInterface.Online, REBROADCAST_MIXIN_INTERFACE_TOKEN];
-    if (interfaces.includes(ScryptedInterface.VideoCameraConfiguration))
-      ret.push(ScryptedInterface.VideoCameraConfiguration);
     return ret;
   }
 
