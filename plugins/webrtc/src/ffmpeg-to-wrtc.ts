@@ -68,15 +68,11 @@ export async function createTrackForwarder(options: {
     }
     catch (e) {
     }
-    videoTransceiver.sender.onRtcp.subscribe(rtcp => {
-        if (rtcp.type !== RtcpRrPacket.type)
-            return;
-        for (const rr of rtcp.reports) {
-            mediaStreamFeedback.reportPacketLoss({
-                packetsLost: rr.packetsLost,
-            });
-        }
-    })
+    if (mediaStreamFeedback) {
+        videoTransceiver.sender.onRtcp.subscribe(rtcp => {
+            mediaStreamFeedback.onRtcp(rtcp.serialize());
+        });
+    }
 
     const console = sdk.deviceManager.getMixinConsole(mo.sourceId, RTC_BRIDGE_NATIVE_ID);
     if (transcodeBaseline) {

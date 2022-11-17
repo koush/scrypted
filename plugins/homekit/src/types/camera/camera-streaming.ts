@@ -327,17 +327,15 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             session.videoReturn.on('message', data => {
                 resetIdleTimeout();
-                const d = vrtcp.decrypt(data);
-                const rtcp = RtcpPacketConverter.deSerialize(d);
-                const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
-                if (!rr)
+                const rtcpBuffer = vrtcp.decrypt(data);
+                if (mediaStreamFeedback) {
+                    mediaStreamFeedback.onRtcp(rtcpBuffer);
                     return;
-                logPacketLoss(rr);
-                for (const report of rr.reports) {
-                    mediaStreamFeedback?.reportPacketLoss({
-                        packetsLost: report.packetsLost,
-                    });
                 }
+
+                const rtcp = RtcpPacketConverter.deSerialize(rtcpBuffer);
+                const rr = rtcp.find(packet => packet.type === 201) as RtcpRrPacket;
+                logPacketLoss(rr);
             });
 
             resetIdleTimeout();
