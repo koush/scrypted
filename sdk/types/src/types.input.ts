@@ -514,11 +514,19 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
    adaptive?: boolean;
 }
 
+export interface MediaStreamPacketLoss {
+  ssrc: number;
+  highestSequence: number;
+  packetsLost: number;
+}
+
 export interface MediaStreamFeedback {
+  onRtcp(buffer: Buffer): Promise<void>;
   requestBitrate(bitrate: number): Promise<void>;
-  reportPacketLoss(report: {
-    packetsLost: number;
-  }): Promise<void>;
+  requestKeyframe(): Promise<void>;
+  reportPacketLoss(report: MediaStreamPacketLoss): Promise<void>;
+  reportPictureLoss(): Promise<void>;
+  reportEstimatedMaxBitrate(bitrate: number): Promise<void>;
 }
 
 /**
