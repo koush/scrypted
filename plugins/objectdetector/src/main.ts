@@ -1,7 +1,6 @@
 import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState, ObjectDetectionCallbacks, ObjectDetectionModel } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import { alertRecommendedPlugins } from '@scrypted/common/src/alert-recommended-plugins';
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
 import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider"
 import { safeParseJson } from './util';
@@ -746,12 +745,6 @@ class ObjectDetectorMixin extends MixinDeviceBase<ObjectDetection> implements Mi
 class ObjectDetectionPlugin extends AutoenableMixinProvider {
   constructor(nativeId?: ScryptedNativeId) {
     super(nativeId);
-
-    alertRecommendedPlugins({
-      '@scrypted/opencv': "OpenCV Motion Detection Plugin",
-      // '@scrypted/tensorflow': 'TensorFlow Face Recognition Plugin',
-      // '@scrypted/tensorflow-lite': 'TensorFlow Lite Object Detection Plugin',
-    });
   }
 
   async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {

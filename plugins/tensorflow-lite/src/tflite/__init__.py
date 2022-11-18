@@ -375,7 +375,10 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         ws = w / iw
         hs = h / ih
         s = max(ws, hs)
-        scaled = image.resize((round(s * iw), round(s * ih)), Image.ANTIALIAS)
+        if ws == 1 and hs == 1:
+            scaled = image
+        else:
+            scaled = image.resize((round(s * iw), round(s * ih)), Image.ANTIALIAS)
 
         first = scaled.crop((0, 0, w, h))
         (sx, sy) = scaled.size
@@ -447,10 +450,10 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
                 ret['detections'].append(detection)
                 continue
 
-            (x, y, w, h) = detection['boundingBox']
-            cx = x + w / 2
-            cy = y + h / 2
-            d = round(max(w, h) * 1.5)
+            (x, y, dw, dh) = detection['boundingBox']
+            cx = x + dw / 2
+            cy = y + dh / 2
+            d = round(max(dw, dh) * 1.5)
             x = round(cx - d / 2)
             y = round(cy - d / 2)
             x = max(0, x)

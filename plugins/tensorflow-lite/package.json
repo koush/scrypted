@@ -29,7 +29,7 @@
       "scrypted-package-json": "scrypted-package-json"
    },
    "scrypted": {
-      "name": "TensorFlow Lite (and Coral) Object Detection",
+      "name": "Object Detection Plugin",
       "pluginDependencies": [
          "@scrypted/objectdetector"
       ],
@@ -44,5 +44,5 @@
    "devDependencies": {
       "@scrypted/sdk": "file:../../sdk"
    },
-   "version": "0.0.59"
+   "version": "0.0.61"
 }
