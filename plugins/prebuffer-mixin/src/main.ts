@@ -1685,7 +1685,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
     });
   }
 
-  getDevice(nativeId: string) {
+  async getDevice(nativeId: string) {
     if (nativeId === TRANSCODE_MIXIN_PROVIDER_NATIVE_ID)
       return new TranscodeMixinProvider(this);
   }
