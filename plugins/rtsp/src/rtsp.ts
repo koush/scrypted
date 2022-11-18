@@ -365,6 +365,8 @@ export abstract class RtspSmartCamera extends RtspCamera {
         this.constructedVideoStreamOptions = timeoutPromise(5000, this.getConstructedVideoStreamOptions()).finally(() => {
             this.constructedVideoStreamOptions = undefined;
         });
+
+        return this.constructedVideoStreamOptions;
     }
 
     putSettingBase(key: string, value: SettingValue): Promise<void> {
