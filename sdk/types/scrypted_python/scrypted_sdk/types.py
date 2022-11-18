@@ -667,7 +667,7 @@ class DeviceDiscovery:
     pass
 
 class DeviceProvider:
-    def getDevice(self, nativeId: str) -> Any:
+    async def getDevice(self, nativeId: str) -> Any:
         pass
     pass
 

@@ -812,7 +812,7 @@ export interface DeviceProvider {
   /**
    * Get an instance of a previously discovered device that was reported to the device manager.
    */
-  getDevice(nativeId: ScryptedNativeId): any;
+  getDevice(nativeId: ScryptedNativeId): Promise<any>;
 
 }
 /**
