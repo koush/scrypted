@@ -84,6 +84,7 @@ import {
   faVideoCamera,
   faTimeline,
   faMobile,
+  faBoltLightning,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -174,6 +175,7 @@ const icons: IconDefinition[] =[
   faVideoCamera,
   faTimeline,
   faMobile,
+  faBoltLightning,
 ];
 
 for (var icon in icons) {
