@@ -146,7 +146,11 @@ export async function startCameraStreamFfmpeg(device: ScryptedDevice & VideoCame
     // the packet time parameter is different between LAN and LTE.
     let opusFramesPerPacket = request.audio.packet_time / 20;
 
-    if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
+    const noAudio = mso?.audio === null;
+    if (noAudio) {
+        // no op...
+    }
+    else if (audioCodec === AudioStreamingCodecType.OPUS || audioCodec === AudioStreamingCodecType.AAC_ELD) {
         // by default opus encodes with a packet time of 20. however, homekit may request another value,
         // which we will respect by simply outputing frames of that duration, rather than packing
         // 20 ms frames to accomodate.
