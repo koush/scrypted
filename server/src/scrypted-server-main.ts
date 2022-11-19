@@ -24,6 +24,7 @@ import { createSelfSignedCertificate, CURRENT_SELF_SIGNED_CERTIFICATE_VERSION } 
 import { PluginError } from './plugin/plugin-error';
 import { getScryptedVolume } from './plugin/plugin-volume';
 import { ONE_DAY_MILLISECONDS, UserToken } from './usertoken';
+import os from 'os';
 
 if (!semver.gte(process.version, '16.0.0')) {
     throw new Error('"node" version out of date. Please update node to v16 or higher.')
@@ -520,6 +521,7 @@ async function start() {
 
     app.get('/login', async (req, res) => {
         scrypted.addAccessControlHeaders(req, res);
+        const hostname = os.hostname()?.split('.')?.[0];
 
         const addresses = getHostAddresses(true, true).map(address => `https://${address}:${SCRYPTED_SECURE_PORT}`);
         if (req.protocol === 'https' && req.headers.authorization) {
@@ -540,6 +542,8 @@ async function start() {
             res.send({
                 username,
                 token: user.token,
+                addresses,
+                hostname,
             });
             return;
         }
@@ -549,6 +553,7 @@ async function start() {
                 expiration: ONE_DAY_MILLISECONDS,
                 username: 'anonymous',
                 addresses,
+                hostname,
             })
             return;
         }
@@ -564,12 +569,15 @@ async function start() {
                 expiration: (userToken.timestamp + userToken.duration) - Date.now(),
                 username: userToken.username,
                 addresses,
+                hostname,
             })
         }
         catch (e) {
             res.send({
                 error: e?.message || 'Unknown Error.',
                 hasLogin,
+                addresses,
+                hostname,
             })
         }
     });
