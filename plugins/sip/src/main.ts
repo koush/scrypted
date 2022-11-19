@@ -32,10 +32,13 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         this.binaryState = false;
         this.console.log('SipCameraDevice ctor()');
 
-        this.sipSdpPromise = this.testCall();
+        //this.sipSdpPromise = this.testCall();
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
+
+        await this.callDoorbell();
+
         if (!this.session)
             throw new Error("not in call");
 
@@ -93,10 +96,10 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         }
     }
 
-    async testCall(): Promise<string> {
+    async callDoorbell(): Promise<void> {
         let sip: SipSession;
 
-        this.console.log('starting testcall sip session.');
+        this.console.log('calling doorbell');
 
         const cleanup = () => {
             if (this.session === sip)
@@ -114,21 +117,69 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
         sip.onCallEnded.subscribe(cleanup);
         this.rtpDescription = await sip.start();
-        this.console.log('sip sdp', this.rtpDescription.sdp)
+        this.console.log('sip remote sdp', this.rtpDescription.sdp)
 
-        const audioPort = 0
+        let aseq = 0;
+        let aseen = 0;
+        let alost = 0;
 
-        let sdp = replacePorts(this.rtpDescription.sdp, audioPort, 0);
-        sdp = addTrackControls(sdp);
-        sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
-        this.console.log('proposed sdp', sdp);
+        sip.audioSplitter.on('message', message => {
+                if (!isStunMessage(message)) {
+                    const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                    if (!isRtpMessage)
+                        return;
+                    aseen++;
+                    sip.audioSplitter.send(message, 5004, "127.0.0.1");
+                    const seq = getSequenceNumber(message);
+                    if (seq !== (aseq + 1) % 0x0FFFF)
+                        alost++;
+                    aseq = seq;
+                }
+            });
 
-        sip.stop();
+            sip.audioRtcpSplitter.on('message', message => {
+                //sip.audioRtcpSplitter.send(message, 5005, "127.0.0.1");
+            });
 
-        this.console.log('stopped testcall sip session.');
-
-        return sdp;        
+            this.session = sip;
     }
+
+    // async testCall(): Promise<string> {
+    //     let sip: SipSession;
+
+    //     this.console.log('starting testcall sip session.');
+
+    //     const cleanup = () => {
+    //         if (this.session === sip)
+    //             this.session = undefined;
+    //         try {
+    //             this.console.log('stopping sip session.');
+    //             sip.stop();
+    //         }
+    //         catch (e) {
+    //         }
+    //     }
+
+    //     let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22", localIp: "10.10.10.70", localPort: 5060 };
+
+    //     sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
+    //     sip.onCallEnded.subscribe(cleanup);
+    //     this.rtpDescription = await sip.start();
+    //     this.console.log('sip sdp', this.rtpDescription.sdp)
+
+    //     const audioPort = 0
+
+    //     let sdp = replacePorts(this.rtpDescription.sdp, audioPort, 0);
+    //     sdp = addTrackControls(sdp);
+    //     sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
+    //     this.console.log('proposed sdp', sdp);
+
+    //     sip.stop();
+
+    //     this.console.log('stopped testcall sip session.');
+
+    //     return sdp;        
+    // }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
 
@@ -137,7 +188,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
             'udpsrc', 'port=5004', 'caps=application/x-rtp', '!',
             'rtppcmudepay',  '!', 'mulawdec', '!', 'queue' ,'!', 'amix.',
             'audiotestsrc', 'wave=silence', '!', 'queue', '!', 'amix.',
-            'amix.', '!', 'opusenc'
+            'amix.', '!', 'audio/x-raw,format=(string)S16LE,layout=(string)interleaved,rate=(int)8000,channels=(int)1', '!', 'opusenc'
         ];
 
         const mediaStreamOptions = Object.assign(this.getSipMediaStreamOptions(), {
@@ -158,13 +209,13 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
                 gstreamerServer.close();
             }, 30000);
             const gstreamerPort = await listenZero(gstreamerServer);
-            args.push('!', 'mpegtsmux', '!', 'tcpclientsink', `port=${gstreamerPort}`, 'sync=true');
+            args.push('!', 'mpegtsmux', '!', 'tcpclientsink', `port=${gstreamerPort}`, 'sync=false');
             this.console.log(args.join(' '));
             if (this.currentProcess) {
                 this.currentProcess.kill();
                 this.currentProcess = undefined;
             }
-            const cp = child_process.spawn('gst-launch-1.0', args);
+            const cp = child_process.spawn('gst-launch-1.0', args,  { env: { GST_DEBUG: '3' } });
             this.currentProcess = cp;
 
             cp.stdout.on('data', data => this.console.log(data.toString()));

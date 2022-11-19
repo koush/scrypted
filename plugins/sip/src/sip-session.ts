@@ -169,6 +169,7 @@ export class SipSession extends Subscribed {
     this.onCallEndedSubject.next(null)
     this.sipCall.destroy()
     this.audioSplitter.close()
+    this.audioRtcpSplitter.close()   
     this.unsubscribe()
   }
 
