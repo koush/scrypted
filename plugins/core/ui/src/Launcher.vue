@@ -52,7 +52,8 @@
                         </div>
                     </v-card>
                     <v-card width="300px" class="elevation-24 mt-4" v-if="showNvr" dark>
-                        <v-card-title style="justify-content: center;" class="headline text-uppercase">Support Scrypted</v-card-title>
+                        <v-card-title style="justify-content: center;" class="headline text-uppercase">Support Scrypted
+                        </v-card-title>
                         <v-card-subtitle style="justify-content: center; text-align: center;"
                             class="headline text-uppercase">Get Scrypted NVR</v-card-subtitle>
                         <v-list>
@@ -70,12 +71,19 @@
                                 </v-list-item-icon>
                                 Adaptive bitrate streaming for HomeKit, Google Home, Alexa, and Chromecast.
                             </v-list-item>
-                            
+
                             <v-list-item>
                                 <v-list-item-icon>
                                     <v-icon>fa-solid fa-video-camera</v-icon>
                                 </v-list-item-icon>
                                 Camera Dashboard and live view grid. 4K camera support.
+                            </v-list-item>
+
+                            <v-list-item>
+                                <v-list-item-icon>
+                                    <v-icon>fa fa-cloud</v-icon>
+                                </v-list-item-icon>
+                                Cloud access from desktop browsers and apps.
                             </v-list-item>
                         </v-list>
                         <div style="width: 100%; display: flex; justify-content: center;">
