@@ -559,7 +559,7 @@ class Setting(TypedDict):
     range: tuple[float, float]
     readonly: bool
     title: str
-    type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
+    type: Any | Any | Any | Any | Any | Any | Any | Any | Any | Any | Any
     value: SettingValue
     pass
 

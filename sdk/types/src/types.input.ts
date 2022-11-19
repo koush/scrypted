@@ -1557,7 +1557,7 @@ export interface Setting {
   group?: string;
   description?: string;
   placeholder?: string;
-  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface' | 'qrcode';
+  type?: 'string' | 'password' | 'number' | 'boolean' | 'device' | 'integer' | 'button' | 'clippath' | 'interface' | 'qrcode' | 'textarea';
   /**
    * The range of allowed numbers, if any, when the type is 'number'.
    */
