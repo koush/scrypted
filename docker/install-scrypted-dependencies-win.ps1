@@ -9,6 +9,7 @@ npx -y scrypted@latest install-server
 $USER_HOME_ESCAPED = $env:USERPROFILE.replace('\', '\\')
 $SCRYPTED_HOME = $env:USERPROFILE + '\.scrypted'
 $SCRYPTED_HOME_ESCAPED_PATH = $SCRYPTED_HOME.replace('\', '\\')
+npm install --global --production windows-build-tools
 npm install --prefix $SCRYPTED_HOME node-windows@1.0.0-beta.8 --save
 
 $SERVICE_JS = @"
