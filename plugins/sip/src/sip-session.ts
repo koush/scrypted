@@ -155,14 +155,14 @@ export class SipSession extends Subscribed {
     return ports[0]
   }
 
-  private callEnded(sendBye: boolean) {
+  private async callEnded(sendBye: boolean) {
     if (this.hasCallEnded) {
       return
     }
     this.hasCallEnded = true
 
     if (sendBye) {
-      this.sipCall.sendBye().catch(this.console.log)
+      await this.sipCall.sendBye().catch(this.console.log)
     }
 
     // clean up
@@ -173,7 +173,7 @@ export class SipSession extends Subscribed {
     this.unsubscribe()
   }
 
-  stop() {
-    this.callEnded(true)
+  async stop() {
+    await this.callEnded(true)
   }
 }

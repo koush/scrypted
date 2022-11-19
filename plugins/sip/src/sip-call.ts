@@ -291,6 +291,7 @@ export class SipCall {
   }
 
   async sendBye() {
+    this.console.log('Sending BYE...')
     return this.request({ method: 'BYE' }).catch(() => {
       // Don't care if we get an exception here.
     })

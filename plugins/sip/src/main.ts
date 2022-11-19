@@ -42,7 +42,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         if (!this.session)
             throw new Error("not in call");
 
-        this.stopIntercom();
+        this.stopAudioOut();
 
         const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
@@ -76,6 +76,11 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
     }
 
     async stopIntercom(): Promise<void> {
+        this.stopAudioOut();
+        this.stopSession();
+    }
+
+    async stopAudioOut(): Promise<void> {
         closeQuiet(this.audioOutForwarder);
         this.audioOutProcess?.kill('SIGKILL');
         this.audioOutProcess = undefined;
@@ -113,6 +118,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         }
 
         let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22", localIp: "10.10.10.70", localPort: 5060 };
+        //let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.80", localIp: "10.10.10.70", localPort: 5060 };
 
         sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
         sip.onCallEnded.subscribe(cleanup);
