@@ -56,34 +56,34 @@
                         </v-card-title>
                         <v-card-subtitle style="justify-content: center; text-align: center;"
                             class="headline text-uppercase">Get Scrypted NVR</v-card-subtitle>
-                        <v-list>
+                        <v-list style="font-size: .85rem">
 
                             <v-list-item>
-                                <v-list-item-icon>
-                                    <v-icon>fa fa-timeline</v-icon>
+                                <v-list-item-icon class="mr-2">
+                                    <v-icon small>fa fa-timeline</v-icon>
                                 </v-list-item-icon>
                                 24/7 recording with smart detections.
                             </v-list-item>
 
                             <v-list-item>
-                                <v-list-item-icon>
-                                    <v-icon>fa-solid fa-bolt-lightning</v-icon>
+                                <v-list-item-icon class="mr-2">
+                                    <v-icon small>fa-solid fa-bolt-lightning</v-icon>
                                 </v-list-item-icon>
                                 Adaptive bitrate streaming for HomeKit, Google Home, Alexa, and Chromecast.
                             </v-list-item>
 
                             <v-list-item>
-                                <v-list-item-icon>
-                                    <v-icon>fa-solid fa-video-camera</v-icon>
+                                <v-list-item-icon class="mr-2">
+                                    <v-icon small>fa-solid fa-video-camera</v-icon>
                                 </v-list-item-icon>
                                 Camera Dashboard and live view grid. 4K camera support.
                             </v-list-item>
 
                             <v-list-item>
-                                <v-list-item-icon>
-                                    <v-icon>fa fa-cloud</v-icon>
+                                <v-list-item-icon class="mr-2">
+                                    <v-icon small>fa fa-cloud</v-icon>
                                 </v-list-item-icon>
-                                Cloud access from desktop browsers and apps.
+                                Cloud access from browsers or apps.
                             </v-list-item>
                         </v-list>
                         <div style="width: 100%; display: flex; justify-content: center;">
@@ -179,7 +179,7 @@ export default {
                 },
             )
 
-            this.showNvr = !systemManager.getDeviceByName('@scrypted/nvr');
+            this.showNvr = true;//!systemManager.getDeviceByName('@scrypted/nvr');
         }
     },
     watch: {
