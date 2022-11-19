@@ -6,7 +6,7 @@ import { once } from 'events';
 import express, { Request, Response } from 'express';
 import http, { ServerResponse } from 'http';
 import https from 'https';
-import { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
+import type { spawn as ptySpawn } from 'node-pty-prebuilt-multiarch';
 import path from 'path';
 import rimraf from 'rimraf';
 import semver from 'semver';
@@ -87,14 +87,20 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         app.all('/engine.io/shell', (req, res) => {
             this.shellHandler(req, res);
         });
-        this.shellio.on('connection', connection => {
-            const cp = ptySpawn(process.env.SHELL, [], {
 
-            });
-            cp.onData(data => connection.send(data));
-            connection.on('message', message => cp.write(message.toString()));
-            connection.on('close', () => cp.kill());
-        })
+        this.shellio.on('connection', connection => {
+            try {
+                const spawn = require('node-pty-prebuilt-multiarch').spawn as typeof ptySpawn;
+                const cp = spawn(process.env.SHELL, [], {
+                });
+                cp.onData(data => connection.send(data));
+                connection.on('message', message => cp.write(message.toString()));
+                connection.on('close', () => cp.kill());
+            }
+            catch (e) {
+                connection.close();
+            }
+        });
 
         insecure.on('upgrade', (req, socket, upgradeHead) => {
             (req as any).upgradeHead = upgradeHead;
@@ -102,7 +108,7 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
                 socket,
                 upgradeHead
             })
-        })
+        });
 
         secure.on('upgrade', (req, socket, upgradeHead) => {
             (req as any).upgradeHead = upgradeHead;
