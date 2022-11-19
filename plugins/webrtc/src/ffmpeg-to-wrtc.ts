@@ -1,4 +1,4 @@
-import { MediaStreamTrack, RTCPeerConnection, RtcpRrPacket, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
+import { MediaStreamTrack, PeerConfig, RTCPeerConnection, RtcpRrPacket, RTCRtpCodecParameters, RTCRtpTransceiver, RtpPacket } from "@koush/werift";
 
 import { Deferred } from "@scrypted/common/src/deferred";
 import sdk, { BufferConverter, BufferConvertorOptions, FFmpegInput, FFmpegTranscodeStream, Intercom, MediaObject, MediaStreamDestination, MediaStreamFeedback, RequestMediaStream, RTCAVSignalingSetup, RTCConnectionManagement, RTCMediaObjectTrack, RTCSignalingOptions, RTCSignalingSession, ScryptedDevice, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
@@ -324,8 +324,9 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
 
     constructor(public console: Console, public clientSession: RTCSignalingSession, public maximumCompatibilityMode: boolean, public transcodeWidth: number,
         public sessionSupportsH264High: boolean,
-        public options?: {
-            configuration?: RTCConfiguration,
+        public options: {
+            configuration: RTCConfiguration,
+            weriftConfiguration: PeerConfig,
         }) {
 
         this.pc = new RTCPeerConnection({
@@ -339,7 +340,8 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
                 video: [
                     requiredVideoCodec,
                 ],
-            }
+            },
+            ...options.weriftConfiguration,
         });
         logConnectionState(console, this.pc);
 
@@ -487,6 +489,7 @@ export class WebRTCBridge extends ScryptedDeviceBase implements BufferConverter 
         const console = sdk.deviceManager.getMixinConsole(options?.sourceId, this.nativeId);
         const ret = new WebRTCConnectionManagement(console, session, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
             configuration: this.plugin.getRTCConfiguration(),
+            weriftConfiguration: this.plugin.getWeriftConfiguration(),
         });
         // todo: move this into api, provide a client stream.
         ret.pc.createDataChannel('dummy');
@@ -503,11 +506,13 @@ export async function createRTCPeerConnectionSink(
     mo: MediaObject,
     maximumCompatibilityMode: boolean,
     configuration: RTCConfiguration,
+    weriftConfiguration: PeerConfig,
 ) {
     const { transcodeWidth, sessionSupportsH264High } = parseOptions(await clientSignalingSession.getOptions());
 
     const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
         configuration,
+        weriftConfiguration,
     });
 
     const track = await connection.addTrack(mo, {

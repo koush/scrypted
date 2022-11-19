@@ -1,17 +1,8 @@
 <template>
   <div>
-    <v-checkbox
-      v-if="lazyValue.type === 'boolean'"
-      dense
-      :readonly="lazyValue.readonly"
-      v-model="booleanValue"
-      :label="lazyValue.title"
-      :hint="lazyValue.description"
-      :placeholder="lazyValue.placeholder"
-      persistent-hint
-      @change="save"
-      :class="lazyValue.description ? 'mb-2' : ''"
-    ></v-checkbox>
+    <v-checkbox v-if="lazyValue.type === 'boolean'" dense :readonly="lazyValue.readonly" v-model="booleanValue"
+      :label="lazyValue.title" :hint="lazyValue.description" :placeholder="lazyValue.placeholder" persistent-hint
+      @change="save" :class="lazyValue.description ? 'mb-2' : ''"></v-checkbox>
     <div v-else-if="lazyValue.type === 'qrcode'">
       <div class="subtitle-2"> {{ lazyValue.title }}</div>
       <v-img :src="qrcode"></v-img>
@@ -19,133 +10,59 @@
     <div v-else-if="lazyValue.type === 'button'" @click="save">
       <v-btn small block> {{ lazyValue.title }} </v-btn>
       <span v-if="lazyValue.description" class="caption pl-1">{{
-        lazyValue.description
+          lazyValue.description
       }}</span>
     </div>
-    <v-combobox
-      v-else-if="lazyValue.choices && lazyValue.combobox"
-      dense
-      :readonly="lazyValue.readonly"
-      :items="lazyValue.choices"
-      :multiple="lazyValue.multiple"
-      :small-chips="lazyValue.multiple"
-      v-model="lazyValue.value"
-      outlined
-      :label="lazyValue.title"
-      :hint="lazyValue.description"
-      persistent-hint
-      :placeholder="lazyValue.placeholder"
-    >
+    <v-combobox v-else-if="lazyValue.choices && lazyValue.combobox" dense :readonly="lazyValue.readonly"
+      :items="lazyValue.choices" :multiple="lazyValue.multiple" :small-chips="lazyValue.multiple"
+      v-model="lazyValue.value" outlined :label="lazyValue.title" :hint="lazyValue.description" persistent-hint
+      :placeholder="lazyValue.placeholder">
       <template v-slot:append-outer>
-        <v-btn
-          v-if="dirty && device"
-          color="success"
-          @click="save"
-          class="shift-up"
-        >
+        <v-btn v-if="dirty && device" color="success" @click="save" class="shift-up">
           <v-icon>send</v-icon>
         </v-btn>
       </template>
     </v-combobox>
-    <v-select
-      v-else-if="lazyValue.choices"
-      dense
-      :readonly="lazyValue.readonly"
-      :items="lazyValue.choices"
-      :multiple="lazyValue.multiple"
-      :small-chips="lazyValue.multiple"
-      v-model="lazyValue.value"
-      outlined
-      :label="lazyValue.title"
-      :hint="lazyValue.description"
-      persistent-hint
-      :placeholder="lazyValue.placeholder"
-    >
+    <v-select v-else-if="lazyValue.choices" dense :readonly="lazyValue.readonly" :items="lazyValue.choices"
+      :multiple="lazyValue.multiple" :small-chips="lazyValue.multiple" v-model="lazyValue.value" outlined
+      :label="lazyValue.title" :hint="lazyValue.description" persistent-hint :placeholder="lazyValue.placeholder">
       <template v-slot:append-outer>
-        <v-btn
-          v-if="dirty && device"
-          color="success"
-          @click="save"
-          class="shift-up"
-        >
+        <v-btn v-if="dirty && device" color="success" @click="save" class="shift-up">
           <v-icon>send</v-icon>
         </v-btn>
       </template>
     </v-select>
-    <DevicePicker
-      v-else-if="lazyValue.type === 'device'"
-      v-model="lazyValue.value"
-      :multiple="lazyValue.multiple"
-      :devices="devices"
-      :title="lazyValue.title"
-      :description="lazyValue.description"
-    >
+    <DevicePicker v-else-if="lazyValue.type === 'device'" v-model="lazyValue.value" :multiple="lazyValue.multiple"
+      :devices="devices" :title="lazyValue.title" :description="lazyValue.description">
       <template v-slot:append-outer>
-        <v-btn
-          v-if="dirty && device"
-          color="success"
-          @click="save"
-          class="shift-up"
-        >
+        <v-btn v-if="dirty && device" color="success" @click="save" class="shift-up">
           <v-icon>send</v-icon>
         </v-btn>
       </template>
     </DevicePicker>
-    <DevicePicker
-      v-else-if="lazyValue.type === 'interface'"
-      v-model="lazyValue.value"
-      :multiple="lazyValue.multiple"
-      :devices="interfaces"
-      :title="lazyValue.title"
-      :description="lazyValue.description"
-    >
+    <DevicePicker v-else-if="lazyValue.type === 'interface'" v-model="lazyValue.value" :multiple="lazyValue.multiple"
+      :devices="interfaces" :title="lazyValue.title" :description="lazyValue.description">
       <template v-slot:append-outer>
-        <v-btn
-          v-if="dirty && device"
-          color="success"
-          @click="save"
-          class="shift-up"
-        >
+        <v-btn v-if="dirty && device" color="success" @click="save" class="shift-up">
           <v-icon>send</v-icon>
         </v-btn>
       </template>
     </DevicePicker>
     <div v-else-if="lazyValue.type === 'clippath'" class="mb-2">
       <v-btn small block @click="editZone">{{ lazyValue.title }} </v-btn>
-      <Camera
-        :value="device"
-        :device="device"
-        :clipPathValue="sanitizedClipPathValue"
-        :showDialog="editingZone"
-        :hidePreview="true"
-        @dialog="editingZoneChanged"
-        @clipPath="lazyValue.value = $event"
-      ></Camera>
+      <Camera :value="device" :device="device" :clipPathValue="sanitizedClipPathValue" :showDialog="editingZone"
+        :hidePreview="true" @dialog="editingZoneChanged" @clipPath="lazyValue.value = $event"></Camera>
     </div>
-    <v-text-field
-      autocomplete="off"
-      autocorrect="off"
-      autocapitalize="off"
-      spellcheck="false"
-      v-else
-      dense
-      :readonly="lazyValue.readonly"
-      outlined
-      v-model="lazyValue.value"
-      :placeholder="lazyValue.placeholder"
-      :label="lazyValue.title"
-      :hint="lazyValue.description"
-      persistent-hint
-      :type="lazyValue.type === 'password' ? 'password' : undefined"
-    >
+    <v-textarea v-else-if="lazyValue.type === 'textarea'" v-model="lazyValue.value" outlined persistent-hint
+      :hint="lazyValue.description" :label="lazyValue.title">
+
+    </v-textarea>
+    <v-text-field v-else autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" dense
+      :readonly="lazyValue.readonly" outlined v-model="lazyValue.value" :placeholder="lazyValue.placeholder"
+      :label="lazyValue.title" :hint="lazyValue.description" persistent-hint
+      :type="lazyValue.type === 'password' ? 'password' : undefined">
       <template v-slot:append-outer>
-        <v-btn
-          v-if="dirty && device"
-          color="success"
-          text
-          @click="save"
-          class="shift-up"
-        >
+        <v-btn v-if="dirty && device" color="success" text @click="save" class="shift-up">
           <v-icon>send</v-icon>
         </v-btn>
       </template>
@@ -288,8 +205,7 @@ export default {
             return eval(
               `(function() { var interfaces = ${JSON.stringify(
                 device.interfaces
-              )}; var deviceInterface = '${deviceInterface}'}; var type='${
-                device.type
+              )}; var deviceInterface = '${deviceInterface}'}; var type='${device.type
               }'; return ${expression} })`
             )();
           } catch (e) {
@@ -310,7 +226,7 @@ export default {
     },
   },
   methods: {
-    onChange() {},
+    onChange() { },
     editingZoneChanged(value) {
       this.editingZone = value;
       if (!value) {

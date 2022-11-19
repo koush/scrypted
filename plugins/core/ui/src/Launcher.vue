@@ -179,7 +179,7 @@ export default {
                 },
             )
 
-            this.showNvr = true;//!systemManager.getDeviceByName('@scrypted/nvr');
+            this.showNvr = !systemManager.getDeviceByName('@scrypted/nvr');
         }
     },
     watch: {

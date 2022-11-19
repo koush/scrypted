@@ -1,4 +1,4 @@
-import { defaultPeerConfig } from '@koush/werift';
+import { defaultPeerConfig, PeerConfig } from '@koush/werift';
 import { AutoenableMixinProvider } from '@scrypted/common/src/autoenable-mixin-provider';
 import { Deferred } from '@scrypted/common/src/deferred';
 import { listenZeroSingleClient } from '@scrypted/common/src/listen-cluster';
@@ -87,6 +87,7 @@ class WebRTCMixin extends SettingsMixinDeviceBase<VideoCamera & RTCSignalingChan
             mo,
             this.plugin.storageSettings.values.maximumCompatibilityMode,
             this.plugin.getRTCConfiguration(),
+            this.plugin.getWeriftConfiguration(),
         );
     }
 
@@ -157,9 +158,15 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             },
         },
         rtcConfiguration: {
-            title: "Custom RTC Configuration",
+            title: "Custom Client RTC Configuration",
+            type: 'textarea',
             description: "RTCConfiguration that can be used to specify custom TURN and STUN servers. https://gist.github.com/koush/f7dafec7dbca04982a76db8243abc57e",
-        }
+        },
+        weriftConfiguration: {
+            title: "Custom Server RTC Configuration",
+            type: 'textarea',
+            description: "RTCConfiguration that can be used to specify custom TURN and STUN servers. https://gist.github.com/koush/631d38ac8647a86baaac7b22d863f010",
+        },
     });
     bridge: WebRTCBridge;
     activeConnections = 0;
@@ -207,6 +214,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                         mo,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
+                        plugin.getWeriftConfiguration(),
                     );
                 }
             }
@@ -223,6 +231,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
                         mo,
                         plugin.storageSettings.values.maximumCompatibilityMode,
                         plugin.getRTCConfiguration(),
+                        plugin.getWeriftConfiguration(),
                     );
                 }
             }
@@ -321,7 +330,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return nativeId;
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         if (nativeId === RTC_BRIDGE_NATIVE_ID)
             return this.bridge;
         return new WebRTCCamera(this, nativeId);
@@ -341,6 +350,17 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return {
             iceServers,
         };
+    }
+
+    getWeriftConfiguration(): PeerConfig {
+        if (this.storageSettings.values.weriftConfiguration) {
+            try {
+                return JSON.parse(this.storageSettings.values.weriftConfiguration);
+            }
+            catch (e) {
+                this.console.error('Custom Werift configuration failed. Invalid JSON?', e);
+            }
+        }
     }
 
     async onConnection(request: HttpRequest, webSocketUrl: string) {
@@ -409,6 +429,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
             const connection = await createConnection(message, client.port, session,
                 this.storageSettings.values.maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
                 configuration: this.getRTCConfiguration(),
+                weriftConfiguration: this.getWeriftConfiguration(),
             });
             cleanup.promise.finally(() => connection.close().catch(() => { }));
             connection.waitClosed().finally(() => cleanup.resolve('peer connection closed'));
@@ -429,7 +450,7 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
 
 export async function fork() {
     return {
-        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, transcodeWidth: number, sessionSupportsH264High: boolean, options?: { disableIntercom?: boolean; configuration?: RTCConfiguration; }) {
+        async createConnection(message: any, port: number, clientSession: RTCSignalingSession, maximumCompatibilityMode: boolean, transcodeWidth: number, sessionSupportsH264High: boolean, options: { disableIntercom?: boolean; configuration: RTCConfiguration, weriftConfiguration: PeerConfig; }) {
             const cleanup = new Deferred<string>();
             cleanup.promise.catch(e => this.console.log('cleaning up rtc connection:', e.message));
             cleanup.promise.finally(() => setTimeout(() => process.exit(), 10000));
