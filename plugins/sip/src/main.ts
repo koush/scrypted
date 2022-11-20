@@ -1,6 +1,4 @@
-import { closeQuiet, createBindZero, listenZeroSingleClient, listenZero } from '@scrypted/common/src/listen-cluster';
-import { RtspServer } from '@scrypted/common/src/rtsp-server';
-import { addTrackControls, parseSdp, replacePorts } from '@scrypted/common/src/sdp-utils';
+import { closeQuiet, createBindZero, listenZero } from '@scrypted/common/src/listen-cluster';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
@@ -11,13 +9,12 @@ import { SipOptions } from './sip-call';
 import { RtpDescription, isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './rtp-utils';
 import { v4 as generateRandomUuid } from 'uuid';
 
-const STREAM_TIMEOUT = 120000;
 const { deviceManager, mediaManager, systemManager } = sdk;
 
 class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
     buttonTimeout: NodeJS.Timeout;
     session: SipSession;
-    rtpDescription: RtpDescription;
+    remoteRtpDescription: RtpDescription;
     audioOutForwarder: dgram.Socket;
     audioOutProcess: ChildProcess;
     currentMedia: FFmpegInput | MediaStreamUrl;
@@ -31,8 +28,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         this.motionDetected = false;
         this.binaryState = false;
         this.console.log('SipCameraDevice ctor()');
-
-        //this.sipSdpPromise = this.testCall();
     }
 
     async startIntercom(media: MediaObject): Promise<void> {
@@ -46,14 +41,13 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
         const ffmpegInput: FFmpegInput = JSON.parse((await mediaManager.convertMediaObjectToBuffer(media, ScryptedMimeTypes.FFmpegInput)).toString());
 
-        const ringRtpOptions = this.rtpDescription;
+        const remoteRtpDescription = this.remoteRtpDescription;
         const audioOutForwarder = await createBindZero();
         this.audioOutForwarder = audioOutForwarder.server;
         audioOutForwarder.server.on('message', message => {
-            this.session.audioSplitter.send(message, ringRtpOptions.audio.port, ringRtpOptions.address);
+            this.session.audioSplitter.send(message, remoteRtpDescription.audio.port, remoteRtpDescription.address);
             return null;
         });
-
 
         const args = ffmpegInput.inputArguments.slice();
         args.push(
@@ -87,12 +81,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         this.audioOutForwarder = undefined;
     }
 
-    resetStreamTimeout() {
-        this.console.log('starting/refreshing stream');
-        clearTimeout(this.refreshTimeout);
-        this.refreshTimeout = setTimeout(() => this.stopSession(), STREAM_TIMEOUT);
-    }
-
     stopSession() {
         if (this.session) {
             this.console.log('ending sip session');
@@ -122,8 +110,8 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
         sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
         sip.onCallEnded.subscribe(cleanup);
-        this.rtpDescription = await sip.start();
-        this.console.log('sip remote sdp', this.rtpDescription.sdp)
+        this.remoteRtpDescription = await sip.start();
+        this.console.log('sip remote sdp', this.remoteRtpDescription.sdp)
 
         let aseq = 0;
         let aseen = 0;
@@ -149,43 +137,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
             this.session = sip;
     }
-
-    // async testCall(): Promise<string> {
-    //     let sip: SipSession;
-
-    //     this.console.log('starting testcall sip session.');
-
-    //     const cleanup = () => {
-    //         if (this.session === sip)
-    //             this.session = undefined;
-    //         try {
-    //             this.console.log('stopping sip session.');
-    //             sip.stop();
-    //         }
-    //         catch (e) {
-    //         }
-    //     }
-
-    //     let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22", localIp: "10.10.10.70", localPort: 5060 };
-
-    //     sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
-    //     sip.onCallEnded.subscribe(cleanup);
-    //     this.rtpDescription = await sip.start();
-    //     this.console.log('sip sdp', this.rtpDescription.sdp)
-
-    //     const audioPort = 0
-
-    //     let sdp = replacePorts(this.rtpDescription.sdp, audioPort, 0);
-    //     sdp = addTrackControls(sdp);
-    //     sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
-    //     this.console.log('proposed sdp', sdp);
-
-    //     sip.stop();
-
-    //     this.console.log('stopped testcall sip session.');
-
-    //     return sdp;        
-    // }
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
 
@@ -252,280 +203,18 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
     }
 
-    // gst-launch-1.0 audiomixer name=amix udpsrc port=rx_port caps=application/x-rtp ! rtppcmudepay ! mulawdec ! queue ! amix. audiotestsrc wave=sine ! queue ! amix. amix. ! mulawenc ! rtppcmupay ! udpsink host="127.0.0.1" port=tx_port
-    // async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-
-    //     const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient();
-
-    //     const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
-        
-    //     this.console.log(`getVideoStream() ${playbackUrl}`);
-
-    //     playbackPromise.then(async (client) => {
-    //         client.setKeepAlive(true, 10000);
-    //         try {
-    //             let rtsp: RtspServer;
-    //             const cleanup = () => {
-    //                 client.destroy();
-    //                 rtsp?.destroy();
-    //             }
-
-    //             client.on('close', cleanup);
-    //             client.on('error', cleanup);
-
-    //             let sdp = await this.sipSdpPromise;
-
-    //             this.console.log('using sdp from test call', sdp);
-
-    //             let aseq = 0;
-    //             let aseen = 0;
-    //             let alost = 0;
-
-    //             rtsp = new RtspServer(client, sdp, true);
-    //             const parsedSdp = parseSdp(rtsp.sdp);
-    //             const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
-    //             rtsp.console = this.console;
-
-    //             await rtsp.handlePlayback();
-
-    //             // sip.audioSplitter.on('message', message => {
-    //             //     if (!isStunMessage(message)) {
-    //             //         const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-    //             //         if (!isRtpMessage)
-    //             //             return;
-    //             //         aseen++;
-    //             //         rtsp.sendTrack(audioTrack, message, !isRtpMessage);
-    //             //         const seq = getSequenceNumber(message);
-    //             //         if (seq !== (aseq + 1) % 0x0FFFF)
-    //             //             alost++;
-    //             //         aseq = seq;
-    //             //     }
-    //             // });
-
-    //             // sip.audioRtcpSplitter.on('message', message => {
-    //             //     rtsp.sendTrack(audioTrack, message, true);
-    //             // });
-
-    //             // this.session = sip;
-
-    //             try {
-    //                 await rtsp.handleTeardown();
-    //                 this.console.log('rtsp client ended');
-    //             }
-    //             catch (e) {
-    //                 this.console.log('rtsp client ended ungracefully', e);
-    //             }
-    //             finally {
-    //                 cleanup();
-    //             }
-    //         }
-    //         catch (e) {
-    //             // sip?.stop();
-    //             throw e;
-    //         }
-    //     });
-
-    //     // this.resetStreamTimeout();
-
-    //     const mediaStreamOptions = Object.assign(this.getSipMediaStreamOptions(), {
-    //         // refreshAt: Date.now() + STREAM_TIMEOUT,
-    //     });
-
-    //     // if (useRtsp) {
-    //     //     const mediaStreamUrl: MediaStreamUrl = {
-    //     //         url: playbackUrl,
-    //     //         mediaStreamOptions,
-    //     //     };
-    //     //     this.currentMedia = mediaStreamUrl;
-    //     //     this.currentMediaMimeType = ScryptedMimeTypes.MediaStreamUrl;
-
-    //     //     return mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
-    //     // }
-
-    //     const ffmpegInput: FFmpegInput = {
-    //         url: undefined,
-    //         mediaStreamOptions,
-    //         inputArguments: [
-    //             '-f', 'rtsp',
-    //             '-i', 'rtsp://10.10.10.10:8554/hauseingang',
-    //             '-f', 'rtsp',
-    //             '-i', playbackUrl,
-    //             //'-f',  'lavfi',
-    //             //'-i', 'anullsrc=channel_layout=mono:sample_rate=8000'
-    //         ],
-    //     };
-    //     this.currentMedia = ffmpegInput;
-    //     this.currentMediaMimeType = ScryptedMimeTypes.FFmpegInput;
-
-    //     return mediaManager.createFFmpegMediaObject(ffmpegInput);
-    // }
-
-    // async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
-
-    //     if (options?.metadata?.refreshAt) {
-    //         if (!this.currentMedia?.mediaStreamOptions)
-    //             throw new Error("no stream to refresh");
-
-    //         const currentMedia = this.currentMedia;
-    //         currentMedia.mediaStreamOptions.refreshAt = Date.now() + STREAM_TIMEOUT;
-    //         currentMedia.mediaStreamOptions.metadata = {
-    //             refreshAt: currentMedia.mediaStreamOptions.refreshAt
-    //         };
-    //         this.resetStreamTimeout();
-    //         return mediaManager.createMediaObject(currentMedia, this.currentMediaMimeType);
-    //     }
-
-    //     this.stopSession();
-
-    //     this.console.log('SipCameraDevice getVideoStream()');
-
-    //     const { clientPromise: playbackPromise, port: playbackPort } = await listenZeroSingleClient();
-
-    //     const playbackUrl = `rtsp://127.0.0.1:${playbackPort}`;
-        
-    //     this.console.log(`getVideoStream() ${playbackUrl}`);
-
-    //     playbackPromise.then(async (client) => {
-    //         client.setKeepAlive(true, 10000);
-    //         let sip: SipSession;
-    //         try {
-    //             let rtsp: RtspServer;
-    //             const cleanup = () => {
-    //                 client.destroy();
-    //                 if (this.session === sip)
-    //                     this.session = undefined;
-    //                 try {
-    //                     this.console.log('stopping sip session.');
-    //                     sip.stop();
-    //                 }
-    //                 catch (e) {
-    //                 }
-    //                 rtsp?.destroy();
-    //             }
-
-    //             client.on('close', cleanup);
-    //             client.on('error', cleanup);
-
-    //             let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22", localIp: "10.10.10.70", localPort: 5060 };
-
-    //             sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
-    //             sip.onCallEnded.subscribe(cleanup);
-    //             this.console.log(`SipCameraDevice before start()`);
-    //             this.rtpDescription = await sip.start();
-    //             this.console.log('sip sdp', this.rtpDescription.sdp)
-
-    //             const audioPort = 0
-
-    //             let sdp = replacePorts(this.rtpDescription.sdp, audioPort, 0);
-    //             sdp = addTrackControls(sdp);
-    //             sdp = sdp.split('\n').filter(line => !line.includes('a=rtcp-mux')).join('\n');
-    //             this.console.log('proposed sdp', sdp);
-
-    //             let aseq = 0;
-    //             let aseen = 0;
-    //             let alost = 0;
-
-    //             rtsp = new RtspServer(client, sdp, true);
-    //             const parsedSdp = parseSdp(rtsp.sdp);
-    //             const audioTrack = parsedSdp.msections.find(msection => msection.type === 'audio').control;
-    //             rtsp.console = this.console;
-
-    //             await rtsp.handlePlayback();
-
-    //             sip.audioSplitter.on('message', message => {
-    //                 if (!isStunMessage(message)) {
-    //                     const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-    //                     if (!isRtpMessage)
-    //                         return;
-    //                     aseen++;
-    //                     rtsp.sendTrack(audioTrack, message, !isRtpMessage);
-    //                     const seq = getSequenceNumber(message);
-    //                     if (seq !== (aseq + 1) % 0x0FFFF)
-    //                         alost++;
-    //                     aseq = seq;
-    //                 }
-    //             });
-
-    //             sip.audioRtcpSplitter.on('message', message => {
-    //                 rtsp.sendTrack(audioTrack, message, true);
-    //             });
-
-    //             this.session = sip;
-
-    //             try {
-    //                 await rtsp.handleTeardown();
-    //                 this.console.log('rtsp client ended');
-    //             }
-    //             catch (e) {
-    //                 this.console.log('rtsp client ended ungracefully', e);
-    //             }
-    //             finally {
-    //                 cleanup();
-    //             }
-    //         }
-    //         catch (e) {
-    //             sip?.stop();
-    //             throw e;
-    //         }
-    //     });
-
-    //     this.resetStreamTimeout();
-
-    //     const mediaStreamOptions = Object.assign(this.getSipMediaStreamOptions(), {
-    //         refreshAt: Date.now() + STREAM_TIMEOUT,
-    //     });
-
-    //     // if (useRtsp) {
-    //     //     const mediaStreamUrl: MediaStreamUrl = {
-    //     //         url: playbackUrl,
-    //     //         mediaStreamOptions,
-    //     //     };
-    //     //     this.currentMedia = mediaStreamUrl;
-    //     //     this.currentMediaMimeType = ScryptedMimeTypes.MediaStreamUrl;
-
-    //     //     return mediaManager.createMediaObject(mediaStreamUrl, ScryptedMimeTypes.MediaStreamUrl);
-    //     // }
-
-    //     const ffmpegInput: FFmpegInput = {
-    //         url: undefined,
-    //         mediaStreamOptions,
-    //         inputArguments: [
-    //             '-f', 'rtsp',
-    //             '-i', 'rtsp://10.10.10.10:8554/hauseingang',
-    //             '-f', 'rtsp',
-    //             '-i', playbackUrl,
-    //         ],
-    //     };
-    //     this.currentMedia = ffmpegInput;
-    //     this.currentMediaMimeType = ScryptedMimeTypes.FFmpegInput;
-
-    //     return mediaManager.createFFmpegMediaObject(ffmpegInput);
-    // }
-
     getSipMediaStreamOptions(): ResponseMediaStreamOptions {
 
         return {
             id: 'sip',
             name: 'SIP',
-            // this stream is NOT scrypted blessed due to wackiness in the h264 stream.
-            // tool: "scrypted",
             container: '', // must be empty to support prebuffering
             video: {
-                codec: 'h264',
-                // h264Info: {
-                //     sei: true,
-                //     stapb: true,
-                //     mtap16: true,
-                //     mtap32: true,
-                //     fuab: true,
-                //     reserved0: true,
-                //     reserved30: true,
-                //     reserved31: true,
-                // }
+                codec: 'h264'
             },
             audio: {
-                // this is a hint to let homekit, et al, know that it's PCM audio and needs transcoding.
-                codec: 'pcm_mulaw',
+                // this is a hint to let homekit, et al, know that it's OPUS audio and does not need transcoding.
+                codec: 'opus',
             },
             source: 'local',
             userConfigurable: false,
