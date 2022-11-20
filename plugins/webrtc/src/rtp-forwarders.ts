@@ -236,6 +236,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                                 if (audioSection.codec === 'aac') {
                                     const packet = RtpPacket.deSerialize(rtp);
                                     const buf = packet.payload;
+                                    // adts header is 12 bits of 1s
                                     if (buf[0] == 0xff && (buf[1] & 0xf0) == 0xf0) {
                                         adts = true;
                                         allowAudioTranscoderExit = true;
