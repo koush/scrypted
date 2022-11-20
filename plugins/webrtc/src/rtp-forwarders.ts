@@ -1,3 +1,4 @@
+import { RtpPacket } from "@koush/werift";
 import { Deferred } from "@scrypted/common/src/deferred";
 import { closeQuiet, createBindZero, listenZeroSingleClient, reserveUdpPort } from "@scrypted/common/src/listen-cluster";
 import { ffmpegLogInitialOutput, safeKillFFmpeg, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
@@ -6,6 +7,7 @@ import { addTrackControls, MSection, parseSdp, replaceSectionPort } from "@scryp
 import sdk, { FFmpegInput } from "@scrypted/sdk";
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
+import { Socket } from "net";
 import { Writable } from "stream";
 
 const { mediaManager } = sdk;
@@ -153,6 +155,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     const audioSectionDeferred = new Deferred<MSection>();
     videoSectionDeferred.promise.then(s => video?.onMSection?.(s));
     audioSectionDeferred.promise.then(s => audio?.onMSection?.(s));
+    let allowAudioTranscoderExit = false;
 
     if (ffmpegInput.url
         && isRtsp
@@ -218,13 +221,58 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                         const parsedAudioSdp = parseSdp(audioSdp);
                         const audioControl = parsedAudioSdp.msections.find(msection => msection.type === 'audio').control;
 
+                        let firstPacket = true;
+                        let adts = false;
+
                         // if the rtsp client is over tcp, then the restream server must also be tcp, as
                         // the rtp packets (which can be a max of 64k) may be too large for udp.
                         const clientIsTcp = await setupRtspClient(console, rtspClient, channel, audioSection, false, rtp => {
-                            rtspServer?.sendTrack(audioControl, rtp, false);
+                            // live555 sends rtp aac packets without AU header followed by ADTS packets (which contain codec info)
+                            // which ffmpeg can not handle.
+                            // the solution is to demux the adts and send that to ffmpeg raw.
+                            // https://github.com/mpv-player/mpv/issues/5669#issuecomment-932519409
+                            if (firstPacket) {
+                                firstPacket = false;
+                                if (audioSection.codec === 'aac') {
+                                    const packet = RtpPacket.deSerialize(rtp);
+                                    const buf = packet.payload;
+                                    if (buf[0] == 0xff && (buf[1] & 0xf0) == 0xf0) {
+                                        adts = true;
+                                        allowAudioTranscoderExit = true;
+                                        listenZeroSingleClient().then(async aacServer => {
+                                            const ffmpegArgs = [
+                                                '-hide_banner',
+                                                '-f', 'aac',
+                                                '-i', aacServer.url,
+                                                ...audio.encoderArguments,
+                                                ...audio.outputArguments,
+                                            ];
+
+                                            safePrintFFmpegArguments(console, ffmpegArgs);
+                                            const cp = child_process.spawn(await mediaManager.getFFmpegPath(), ffmpegArgs, {
+                                                stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+                                            });
+                                            ffmpegLogInitialOutput(console, cp);
+                                            killDeferred.promise.finally(() => safeKillFFmpeg(cp));
+                                            cp.on('exit', () => killDeferred.resolve(undefined));
+
+                                            audioClientSocket = await aacServer.clientPromise;
+                                        });
+                                    }
+                                }
+                            }
+
+                            if (!adts) {
+                                rtspServer?.sendTrack(audioControl, rtp, false);
+                            }
+                            else {
+                                const packet = RtpPacket.deSerialize(rtp);
+                                audioClientSocket?.write(packet.payload);
+                            }
                         });
 
                         const audioClient = await listenZeroSingleClient();
+                        let audioClientSocket: Socket;
                         killDeferred.promise.finally(() => audioClient.clientPromise.then(client => client.destroy()));
                         let rtspServer: RtspServer;
                         audioClient.clientPromise.then(async client => {
@@ -397,7 +445,10 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
         });
         killDeferred.promise.finally(() => safeKillFFmpeg(cp));
-        cp.on('exit', () => killDeferred.resolve(undefined));
+        cp.on('exit', () => {
+            if (!allowAudioTranscoderExit)
+                killDeferred.resolve(undefined);
+        });
         killDeferred.promise.finally(() => safeKillFFmpeg(cp));
         if (pipeSdp) {
             const pipe = cp.stdio[3] as Writable;
