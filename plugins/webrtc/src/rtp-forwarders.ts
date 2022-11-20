@@ -146,6 +146,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     rtpTracks = Object.assign({}, rtpTracks);
     const videoCodec = video.codecCopy;
     const audioCodec = audio?.codecCopy;
+    const ffmpegPath = await mediaManager.getFFmpegPath();
 
     const isRtsp = ffmpegInput.container?.startsWith('rtsp');
 
@@ -240,25 +241,23 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                                     if (buf[0] == 0xff && (buf[1] & 0xf0) == 0xf0) {
                                         adts = true;
                                         allowAudioTranscoderExit = true;
-                                        listenZeroSingleClient().then(async aacServer => {
-                                            const ffmpegArgs = [
-                                                '-hide_banner',
-                                                '-f', 'aac',
-                                                '-i', aacServer.url,
-                                                ...audio.encoderArguments,
-                                                ...audio.outputArguments,
-                                            ];
+                                        const ffmpegArgs = [
+                                            '-hide_banner',
+                                            '-f', 'aac',
+                                            '-i', 'pipe:3',
+                                            ...audio.encoderArguments,
+                                            ...audio.outputArguments,
+                                        ];
 
-                                            safePrintFFmpegArguments(console, ffmpegArgs);
-                                            const cp = child_process.spawn(await mediaManager.getFFmpegPath(), ffmpegArgs, {
-                                                stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
-                                            });
-                                            ffmpegLogInitialOutput(console, cp);
-                                            killDeferred.promise.finally(() => safeKillFFmpeg(cp));
-                                            cp.on('exit', () => killDeferred.resolve(undefined));
-
-                                            audioClientSocket = await aacServer.clientPromise;
+                                        safePrintFFmpegArguments(console, ffmpegArgs);
+                                        const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
+                                            stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
                                         });
+                                        ffmpegLogInitialOutput(console, cp);
+                                        killDeferred.promise.finally(() => safeKillFFmpeg(cp));
+                                        cp.on('exit', () => killDeferred.resolve(undefined));
+
+                                        audioPipe = cp.stdio[3] as Writable;
                                     }
                                 }
                             }
@@ -268,12 +267,12 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
                             }
                             else {
                                 const packet = RtpPacket.deSerialize(rtp);
-                                audioClientSocket?.write(packet.payload);
+                                audioPipe?.write(packet.payload);
                             }
                         });
 
                         const audioClient = await listenZeroSingleClient();
-                        let audioClientSocket: Socket;
+                        let audioPipe: Writable;
                         killDeferred.promise.finally(() => audioClient.clientPromise.then(client => client.destroy()));
                         let rtspServer: RtspServer;
                         audioClient.clientPromise.then(async client => {
@@ -442,7 +441,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
 
         safePrintFFmpegArguments(console, args);
 
-        cp = child_process.spawn(await mediaManager.getFFmpegPath(), args, {
+        cp = child_process.spawn(ffmpegPath, args, {
             stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
         });
         killDeferred.promise.finally(() => safeKillFFmpeg(cp));
