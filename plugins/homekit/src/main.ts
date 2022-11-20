@@ -100,7 +100,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         })();
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         if (nativeId === VIDEO_CLIPS_NATIVE_ID)
             return this.videoClips;
         throw new Error('unknown device: ' + nativeId);

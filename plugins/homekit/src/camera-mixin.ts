@@ -1,4 +1,4 @@
-import { StorageSettings } from "@scrypted/sdk/storage-settings";
+import { StorageSettings, StorageSettingsDevice } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { ObjectDetector, Readme, ScryptedDeviceType, ScryptedInterface, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
 import { HomekitMixin } from "./homekit-mixin";
@@ -12,19 +12,31 @@ export function canCameraMixin(type: ScryptedDeviceType, interfaces: string[]) {
         && interfaces.includes(ScryptedInterface.VideoCamera);
 }
 
-export class CameraMixin extends HomekitMixin<Readme & VideoCamera> implements Readme {
-    cameraStorageSettings = new StorageSettings(this, {
+export function createCameraStorageSettings(device: StorageSettingsDevice) {
+    return new StorageSettings(device, {
         hasWarnedBridgedCamera: {
             description: 'Setting to warn user that bridged cameras are bad.',
             type: 'boolean',
             hide: true,
         },
+        doorbellAutomationButton: {
+            title: 'Doorbell Automation Button',
+            type: 'boolean',
+            description: 'Add an unconfigured doorbell button to HomeKit that can be used to create automations.',
+            persistedDefaultValue: false,
+            hide: true,
+        },
     });
+}
+
+export class CameraMixin extends HomekitMixin<Readme & VideoCamera> implements Readme {
+    cameraStorageSettings = createCameraStorageSettings(this);
 
     constructor(options: SettingsMixinDeviceOptions<Readme & VideoCamera>) {
         super(options);
 
         this.storageSettings.settings.standalone.persistedDefaultValue = true;
+        this.cameraStorageSettings.settings.doorbellAutomationButton.hide = this.type !== ScryptedDeviceType.Doorbell;
 
         if (!this.cameraStorageSettings.values.hasWarnedBridgedCamera && !this.storageSettings.values.standalone) {
             this.cameraStorageSettings.values.hasWarnedBridgedCamera = true;
@@ -161,7 +173,7 @@ The latest troubleshooting guide for all known streaming or recording issues can
             });
         }
 
-        return [...settings, ...await super.getMixinSettings()];
+        return [...settings, ...await this.cameraStorageSettings.getSettings(), ...await super.getMixinSettings()];
     }
 
     async putMixinSetting(key: string, value: SettingValue) {
