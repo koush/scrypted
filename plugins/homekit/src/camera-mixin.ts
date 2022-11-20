@@ -23,7 +23,6 @@ export function createCameraStorageSettings(device: StorageSettingsDevice) {
             title: 'Doorbell Automation Button',
             type: 'boolean',
             description: 'Add an unconfigured doorbell button to HomeKit that can be used to create automations.',
-            persistedDefaultValue: false,
             hide: true,
         },
     });
