@@ -59,7 +59,7 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
         slowConnections: {
             group: 'Network',
             title: 'Slow Mode Addresses',
-            description: 'The addressesses of Home Hubs and iOS clients that will always be served remote/medium streams.',
+            description: 'The addressess of Home Hubs and iOS clients that will always be served remote/medium streams.',
             type: 'string',
             multiple: true,
             combobox: true,
