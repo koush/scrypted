@@ -14,7 +14,6 @@ You can use the admin page provided by your camera manufacturer to set the optim
   * Cameras are typically configured in `Frame Interval` rather than `Keyframe Interval`. The formula for `Frame Interval` value is: `Frame Interval = 4 * FPS`. So if `FPS` is `30` as specified, `Frame Interval` should be set to `120`.
 * Audio codecs, in order of preference:
   * Opus (used for live streaming to HomeKit or web)
-  * AAC (used for recordings)
   * PCM-ulaw/G711u (raw format suitable for web)
 
 ## Troubleshooting
