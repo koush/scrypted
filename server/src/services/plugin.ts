@@ -51,13 +51,22 @@ export class PluginComponent {
             throw new Error(message);
         }
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
+        // immediately remove the mixin and save this state,
+        // but hold off on generating the new descriptor until 
+        // the new table is finished.
         this.scrypted.stateManager.setPluginDeviceState(pluginDevice, ScryptedInterfaceProperty.mixins, [...new Set(mixins)]);
-        this.scrypted.stateManager.updateDescriptor(pluginDevice);
         await this.scrypted.datastore.upsert(pluginDevice);
+
         // device may not exist, so force creation.
         this.scrypted.rebuildPluginDeviceMixinTable(id);
         this.scrypted.getDevice(id);
         await this.scrypted.devices[id]?.handler?.ensureProxy();
+
+        // after the mixin table is generated, report/persist the final device descriptor
+        const promises = this.scrypted.devices[id]?.handler?.mixinTable?.map(e => e.entry);
+        await Promise.allSettled(promises);
+        this.scrypted.stateManager.updateDescriptor(pluginDevice);
+        await this.scrypted.datastore.upsert(pluginDevice);
     }
     async getIdForPluginId(pluginId: string) {
         return this.scrypted.findPluginDevice(pluginId)?._id;
