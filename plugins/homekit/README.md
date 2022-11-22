@@ -15,6 +15,7 @@ You can use the admin page provided by your camera manufacturer to set the optim
 * Audio codecs, in order of preference:
   * Opus (used for live streaming to HomeKit or web)
   * PCM-ulaw/G711u (raw format suitable for web)
+  * AAC (used by HomeKit Secure Video, but often causes issue with live streaming quality and two way audio)
 
 ## Troubleshooting
 
