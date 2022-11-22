@@ -23,25 +23,26 @@ addSupportedType({
 
         const storage = sdk.deviceManager.getMixinStorage(device.id, homekitPlugin.nativeId);
         const cameraStorage = createCameraStorageSettings({ storage, onDeviceEvent: undefined });
-        if (cameraStorage.values.doorbellAutomationButton) {
-            const stateless = new StatelessProgrammableSwitch(device.name, undefined);
+
+        const stateless = cameraStorage.values.doorbellAutomationButton ? new StatelessProgrammableSwitch(device.name, undefined) : undefined;
+        if (stateless) {
             stateless.getCharacteristic(Characteristic.ProgrammableSwitchEvent)
                 .setProps({
                     maxValue: Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS,
                 });
-    
+
             accessory.addService(stateless);
-    
-            device.listen({
-                event: ScryptedInterface.BinarySensor,
-                watch: false,
-            }, () => {
-                if (device.binaryState) {
-                    service.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
-                    stateless.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
-                }
-            });
         }
+
+        device.listen({
+            event: ScryptedInterface.BinarySensor,
+            watch: false,
+        }, () => {
+            if (device.binaryState) {
+                service.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
+                stateless?.updateCharacteristic(Characteristic.ProgrammableSwitchEvent, Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
+            }
+        });
 
         service
             .getCharacteristic(Characteristic.ProgrammableSwitchEvent)
