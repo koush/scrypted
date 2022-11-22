@@ -72,7 +72,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         },
         snapshotsFromPrebuffer: {
             title: 'Snapshots from Prebuffer',
-            description: 'Prefer snapshots from the Rebroadcast Plugin prebuffer when available.',
+            description: 'Prefer snapshots from the Rebroadcast Plugin prebuffer when available. This setting uses considerable CPU to convert a video stream into a snapshot.',
             type: 'boolean',
             defaultValue: !this.mixinDeviceInterfaces.includes(ScryptedInterface.Camera),
         },
