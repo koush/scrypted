@@ -16,7 +16,7 @@ These codec settings are the optimal settings for streaming destinations within 
     * 1280x720, 1 Mbit, variable bitrate (remote/low streaming)
     * 640x480p, 500 Kbit variable bitrate (low streaming, if a third stream is available)
   * 2K Cameras:
-    * 2560x1440, 3 Mbit variable bitrate (local streaming)
+    * 2560x1440, 3.5 Mbit variable bitrate (local streaming)
     * 1280x720, 1 Mbit, variable bitrate (remote/low streaming)
     * 640x480p, 500 Kbit variable bitrate (low streaming, if a third stream is available)
   * 4K Cameras:
