@@ -270,7 +270,12 @@ export class UnifiCamera extends ScryptedDeviceBase implements Notifier, Interco
         }
         const url = `https://${this.protect.getSetting('ip')}/proxy/protect/api/cameras/${this.nativeId}/${suffix}?ts=${Date.now()}${size}`
 
-        const response = await this.protect.loginFetch(url);
+        const abort = new AbortController();
+        const timeout = setTimeout(() => abort.abort('Unifi Protect Snapshot timed out after 10 seconds. Aborted.'), 10000);
+        const response = await this.protect.loginFetch(url, {
+            signal: abort.signal,
+        });
+        clearTimeout(timeout);
         if (!response)
             throw new Error('login failed');
         const data = await response.arrayBuffer();
