@@ -1,4 +1,4 @@
-import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
+import { BufferConverter, DeviceManager, FFmpegInput, MediaManager, MediaObject, MediaObjectOptions, MediaStreamUrl, ScryptedDevice, ScryptedInterface, ScryptedInterfaceProperty, ScryptedMimeTypes, ScryptedNativeId, SystemDeviceState, SystemManager } from "@scrypted/types";
 import axios from 'axios';
 import pathToFfmpeg from 'ffmpeg-static';
 import fs from 'fs';
@@ -28,6 +28,7 @@ const httpsAgent = new https.Agent({
 
 type IdBufferConverter = BufferConverter & {
     id: string;
+    name: string;
 };
 
 function getBuiltinId(n: number) {
@@ -46,6 +47,7 @@ export abstract class MediaManagerBase implements MediaManager {
         for (const h of ['http', 'https']) {
             this.builtinConverters.push({
                 id: getBuiltinId(this.builtinConverters.length),
+                name: 'HTTP Converter',
                 fromMimeType: ScryptedMimeTypes.SchemePrefix + h,
                 toMimeType: ScryptedMimeTypes.MediaObject,
                 convert: async (data, fromMimeType, toMimeType) => {
@@ -62,6 +64,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
         this.builtinConverters.push({
             id: getBuiltinId(this.builtinConverters.length),
+            name: 'File Converter',
             fromMimeType: ScryptedMimeTypes.SchemePrefix + 'file',
             toMimeType: ScryptedMimeTypes.MediaObject,
             convert: async (data, fromMimeType, toMimeType) => {
@@ -87,6 +90,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
         this.builtinConverters.push({
             id: getBuiltinId(this.builtinConverters.length),
+            name: 'Url to FFmpegInput Converter',
             fromMimeType: ScryptedMimeTypes.Url,
             toMimeType: ScryptedMimeTypes.FFmpegInput,
             async convert(data, fromMimeType): Promise<Buffer> {
@@ -104,6 +108,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
         this.builtinConverters.push({
             id: getBuiltinId(this.builtinConverters.length),
+            name: 'FFmpegInput to MediaStreamUrl Converter',
             fromMimeType: ScryptedMimeTypes.FFmpegInput,
             toMimeType: ScryptedMimeTypes.MediaStreamUrl,
             async convert(data: Buffer, fromMimeType: string): Promise<Buffer> {
@@ -113,6 +118,7 @@ export abstract class MediaManagerBase implements MediaManager {
 
         this.builtinConverters.push({
             id: getBuiltinId(this.builtinConverters.length),
+            name: 'MediaStreamUrl to FFmpegInput Converter',
             fromMimeType: ScryptedMimeTypes.MediaStreamUrl,
             toMimeType: ScryptedMimeTypes.FFmpegInput,
             async convert(data, fromMimeType: string): Promise<Buffer> {
@@ -140,6 +146,7 @@ export abstract class MediaManagerBase implements MediaManager {
         // todo: move this to snapshot plugin
         this.builtinConverters.push({
             id: getBuiltinId(this.builtinConverters.length),
+            name: 'Image Converter',
             fromMimeType: 'image/*',
             toMimeType: 'image/*',
             convert: async (data, fromMimeType: string): Promise<Buffer> => {
@@ -163,7 +170,7 @@ export abstract class MediaManagerBase implements MediaManager {
     }
 
     abstract getSystemState(): { [id: string]: { [property: string]: SystemDeviceState } };
-    abstract getDeviceById<T>(id: string): T;
+    abstract getDeviceById<T>(id: string): T & ScryptedDevice;
     abstract getPluginDeviceId(): string;
     abstract getMixinConsole(mixinId: string, nativeId: ScryptedNativeId): Console;
 
@@ -205,6 +212,7 @@ export abstract class MediaManagerBase implements MediaManager {
                 const device = this.getDeviceById<BufferConverter>(id);
                 return {
                     id,
+                    name: device.name,
                     fromMimeType: device.fromMimeType,
                     toMimeType: device.toMimeType,
                     convert(data, fromMimeType, toMimeType, options?) {
@@ -364,7 +372,7 @@ export abstract class MediaManagerBase implements MediaManager {
                         node[candidateId] = inputWeight + outputWeight;
                     }
                     catch (e) {
-                        console.warn('skipping converter due to error', e)
+                        console.warn(converter.name, 'skipping converter due to error', e)
                     }
                 }
 
@@ -440,6 +448,7 @@ export class MediaManagerImpl extends MediaManagerBase {
 
         this.builtinConverters.push({
             id: getBuiltinId(this.builtinConverters.length),
+            name: 'ScryptedDeviceId to ScryptedDevice Converter',
             fromMimeType: ScryptedMimeTypes.ScryptedDeviceId,
             toMimeType: ScryptedMimeTypes.ScryptedDevice,
             convert: async (data, fromMimeType, toMimeType) => {
