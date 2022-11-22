@@ -1,11 +1,13 @@
 # Scrypted Codec Settings
 
 These codec settings are the optimal settings for streaming destinations within Scrypted. Streaming destinations include:
-  * HomeKit
-  * Google Home
-  * Alexa
-  * Chromecast
-  * Web
+* HomeKit
+* Google Home
+* Alexa
+* Chromecast
+* Web
+
+# Settings
 
 * h264 video. Do **NOT** use H.264+, "Super" H.264, H.264B, or any other fancy variant. **TURN IT OFF**. Sometimes this unsupported variant setting is called "Smart Code(c)" and it should be set to "Close" or "Off".
 * Configure all available camera substreams. Not all cameras may have a third stream.
