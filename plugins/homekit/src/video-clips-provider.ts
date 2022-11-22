@@ -98,6 +98,9 @@ export class VideoClipsMixinProvider extends ScryptedDeviceBase implements Mixin
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
+        // prevent this from interfering with anything that provides native video clips, like nvr.
+        if (interfaces.includes(ScryptedInterface.VideoClips))
+            return;
         if (canCameraMixin(type, interfaces) && interfaces.includes(HOMEKIT_MIXIN)) {
             return [
                 ScryptedInterface.VideoClips,

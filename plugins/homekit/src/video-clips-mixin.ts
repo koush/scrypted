@@ -1,8 +1,6 @@
 import sdk, { MediaObject, MixinDeviceBase, MixinDeviceOptions, ScryptedInterface, VideoCamera, VideoClip, VideoClipOptions, VideoClips } from "@scrypted/sdk";
 import { getVideoClip, getVideoClips, getVideoClipThumbnail, removeVideoClip } from "./types/camera/camera-recording-files";
 
-const { mediaManager } = sdk;
-
 export class ClipsMixin extends MixinDeviceBase<VideoCamera> implements VideoClips {
     constructor(options: MixinDeviceOptions<VideoCamera>) {
         super(options);
