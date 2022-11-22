@@ -570,6 +570,8 @@ class VideoClip(TypedDict):
     event: str
     id: str
     startTime: float
+    thumbnailId: str
+    videoId: str
     pass
 
 class VideoClipOptions(TypedDict):
@@ -1021,9 +1023,9 @@ class VideoCameraConfiguration:
     pass
 
 class VideoClips:
-    async def getVideoClip(self, videoClipId: str) -> MediaObject:
+    async def getVideoClip(self, videoId: str) -> MediaObject:
         pass
-    async def getVideoClipThumbnail(self, videoClipId: str) -> MediaObject:
+    async def getVideoClipThumbnail(self, thumbnailId: str) -> MediaObject:
         pass
     async def getVideoClips(self, options: VideoClipOptions = None) -> list[VideoClip]:
         pass

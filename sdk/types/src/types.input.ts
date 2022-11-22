@@ -622,6 +622,8 @@ export interface VideoClip {
   event?: string;
   description?: string;
   detectionClasses?: ObjectDetectionClass[];
+  thumbnailId?: string;
+  videoId?: string;
 }
 
 export interface VideoClipOptions {
@@ -634,8 +636,8 @@ export interface VideoClipOptions {
 
 export interface VideoClips {
   getVideoClips(options?: VideoClipOptions): Promise<VideoClip[]>;
-  getVideoClip(videoClipId: string): Promise<MediaObject>;
-  getVideoClipThumbnail(videoClipId: string): Promise<MediaObject>;
+  getVideoClip(videoId: string): Promise<MediaObject>;
+  getVideoClipThumbnail(thumbnailId: string): Promise<MediaObject>;
   removeVideoClips(...videoClipIds: string[]): Promise<void>;
 }
 
