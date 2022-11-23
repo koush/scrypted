@@ -6,7 +6,7 @@
 # This common file will be used by both Docker and the linux
 # install script.
 ################################################################
-FROM buildpack-deps:bullseye as common
+FROM buildpack-deps:bullseye as header
 
 # switch to nvm?
 ARG NODE_VERSION=18
@@ -69,35 +69,7 @@ RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 ################################################################
 # Begin section generated from template/Dockerfile.common.footer
 ################################################################
-FROM common
-
-# avahi advertiser support
-RUN apt-get -y install \
-    libnss-mdns \
-    avahi-discover \
-    libavahi-compat-libdnssd-dev
-
-# copy configurations and scripts
-COPY fs /
-
-# s6 process supervisor
-ARG S6_OVERLAY_VERSION=3.1.1.2
-ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
-ENV S6_KEEP_ENV=1
-RUN case "$(uname -m)" in \
-    x86_64) S6_ARCH='x86_64';; \
-    armv7l) S6_ARCH='armhf';; \
-    aarch64) S6_ARCH='aarch64';; \
-    *) echo "Your system architecture isn't supported."; exit 1 ;; \
-    esac \
-  && cd /tmp \
-  && set -x \
-  && curl -SLOf https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
-  && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
-  && curl -SLOf  https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz \
-  && tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz
-
-ENTRYPOINT ["/init"]
+FROM common as base
 
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"

@@ -3,7 +3,7 @@
 # This common file will be used by both Docker and the linux
 # install script.
 ################################################################
-FROM buildpack-deps:bullseye as common
+FROM buildpack-deps:bullseye as header
 
 # switch to nvm?
 ARG NODE_VERSION=18

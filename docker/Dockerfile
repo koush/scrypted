@@ -1,4 +1,4 @@
-ARG BASE="16-bullseye"
+ARG BASE="16-bullseye-s6"
 FROM koush/scrypted-common:${BASE}
 
 WORKDIR /
