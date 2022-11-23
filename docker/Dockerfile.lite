@@ -1,7 +1,11 @@
+ARG BUILDPACK_DEPS_BASE="bullseye"
+FROM buildpack-deps:${BUILDPACK_DEPS_BASE} as header
+
+# switch to nvm?
 ARG NODE_VERSION=18
-ARG BUILDPACK_DEPS_BASE=bullseye
-ARG BASE=node:${NODE_VERSION}-${BUILDPACK_DEPS_BASE}
-FROM ${BASE}
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+RUN apt-get update
+RUN apt-get install -y nodejs
 
 RUN apt-get -y update
 RUN apt-get -y upgrade
