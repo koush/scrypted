@@ -11,11 +11,10 @@ services:
         network_mode: host
         volumes:
             - ~/.scrypted/volume:/server/volume
+        # logging is noisy and will unnecessarily wear on flash storage.
+        # scrypted has per device in memory logging that is preferred.
         logging:
-            driver: "json-file"
-            options:
-                max-size: "10m"
-                max-file: "10"
+            driver: "none"
         labels:
             - "com.centurylinklabs.watchtower.scope=scrypted"
 
