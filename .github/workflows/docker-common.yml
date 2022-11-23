@@ -1,4 +1,4 @@
-name: Publish Scrypted Base OS
+name: Publish Scrypted Common
 
 on:
   workflow_dispatch:
@@ -16,6 +16,7 @@ jobs:
       matrix:
         NODE_VERSION: ["18"]
         SUPERVISOR: ['', '.s6']
+        BUILDPACK_DEPS_BASE: ['bullseye']
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -48,7 +49,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            koush/scrypted-common:${{ matrix.NODE_VERSION }}${{ matrix.SUPERVISOR }}
+            koush/scrypted-common:${{ matrix.BUILDPACK_DEPS_BASE }}-${{ matrix.NODE_VERSION }}${{ matrix.SUPERVISOR }}
 #            ${{ matrix.NODE_VERSION == '16-bullseye' && 'koush/scrypted-common:latest' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
