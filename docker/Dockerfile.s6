@@ -28,3 +28,10 @@ RUN case "$(uname -m)" in \
   && tar -C / -Jxpf /tmp/s6-overlay-${S6_ARCH}.tar.xz
 
 ENTRYPOINT ["/init"]
+
+WORKDIR /
+# cache bust
+# ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+RUN npx -y scrypted install-server
+WORKDIR /server
+CMD npm --prefix /server exec scrypted-serve

@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        BASE: ["18-bullseye", "18-bullseye.s6"]
+        BASE: ["18-bullseye.full", "18-bullseye.lite"]
         VARIANT: ["", ".lite"]
     steps:
       - name: Check out the repo
