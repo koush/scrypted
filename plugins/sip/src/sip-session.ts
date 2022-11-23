@@ -150,9 +150,9 @@ export class SipSession extends Subscribed {
     }
   }
 
-  async reservePort(bufferPorts = 0) {
-    const ports = await reservePorts({ count: bufferPorts + 1 })
-    return ports[0]
+  static async reserveRtpRtcpPorts() {
+    const ports = await reservePorts({ count: 2, type: 'udp' })
+    return ports
   }
 
   private async callEnded(sendBye: boolean) {

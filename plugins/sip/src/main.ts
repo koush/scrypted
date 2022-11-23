@@ -2,6 +2,7 @@ import { closeQuiet, createBindZero, listenZero } from '@scrypted/common/src/lis
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
+import { ffmpegLogInitialOutput, safePrintFFmpegArguments } from "@scrypted/common/src/media-helpers";
 import dgram from 'dgram';
 import net from 'net';
 import { SipSession } from './sip-session';
@@ -9,7 +10,7 @@ import { SipOptions } from './sip-call';
 import { RtpDescription, isStunMessage, getPayloadType, getSequenceNumber, isRtpMessagePayloadType } from './rtp-utils';
 import { v4 as generateRandomUuid } from 'uuid';
 
-const { deviceManager, mediaManager, systemManager } = sdk;
+const { deviceManager, mediaManager } = sdk;
 
 class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, BinarySensor {
     buttonTimeout: NodeJS.Timeout;
@@ -21,11 +22,14 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
     currentMediaMimeType: string;
     refreshTimeout: NodeJS.Timeout;
     sipSdpPromise: Promise<string>;
-    currentProcess: ChildProcess;
+    doorbellAudioActive: boolean;
+    audioInProcess: ChildProcess;
+    clientSocket: net.Socket;
 
     constructor(public plugin: SipPlugin, nativeId: string) {
         super(nativeId);
         this.binaryState = false;
+        this.doorbellAudioActive = false;
         this.console.log('SipCameraDevice ctor()');
     }
 
@@ -81,6 +85,8 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
     }
 
     stopSession() {
+        this.doorbellAudioActive = false;
+        this.audioInProcess?.kill('SIGKILL');
         if (this.session) {
             this.console.log('ending sip session');
             this.session.stop();
@@ -112,6 +118,38 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         this.remoteRtpDescription = await sip.start();
         this.console.log('sip remote sdp', this.remoteRtpDescription.sdp)
 
+        let [rtpPort, rtcpPort] = await SipSession.reserveRtpRtcpPorts()
+        this.console.log(`Reserved RTP port ${rtpPort} and RTCP port ${rtcpPort} for incoming SIP audio`);
+
+        const ffmpegPath = await mediaManager.getFFmpegPath();
+
+        const ffmpegArgs = [
+            '-hide_banner',
+            '-nostats',
+            '-f', 'rtp',
+            '-i', `rtp://127.0.0.1:${rtpPort}?listen&localrtcpport=${rtcpPort}`,
+            '-acodec', 'copy',
+            '-f', 'mulaw',
+            'pipe:3'
+        ];
+
+        safePrintFFmpegArguments(console, ffmpegArgs);
+        const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+        this.audioInProcess = cp;
+        ffmpegLogInitialOutput(console, cp);
+
+        cp.stdout.on('data', data => this.console.log(data.toString()));
+        cp.stderr.on('data', data => this.console.log(data.toString()));
+
+        this.doorbellAudioActive = true;
+        cp.stdio[3].on('data', data => {
+            if (this.doorbellAudioActive && this.clientSocket) {
+                this.clientSocket.write(data);
+            }
+        });
+
         let aseq = 0;
         let aseen = 0;
         let alost = 0;
@@ -122,7 +160,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
                     if (!isRtpMessage)
                         return;
                     aseen++;
-                    sip.audioSplitter.send(message, 5004, "127.0.0.1");
+                    sip.audioSplitter.send(message, rtpPort, "127.0.0.1");
                     const seq = getSequenceNumber(message);
                     if (seq !== (aseq + 1) % 0x0FFFF)
                         alost++;
@@ -131,7 +169,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
             });
 
             sip.audioRtcpSplitter.on('message', message => {
-                //sip.audioRtcpSplitter.send(message, 5005, "127.0.0.1");
+                sip.audioRtcpSplitter.send(message, rtcpPort, "127.0.0.1");
             });
 
             this.session = sip;
@@ -139,45 +177,47 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
     async getVideoStream(options?: RequestMediaStreamOptions): Promise<MediaObject> {
 
-        const args=[
-            'audiomixer', 'name=amix',
-            'udpsrc', 'port=5004', 'caps=application/x-rtp', '!',
-            'rtppcmudepay',  '!', 'mulawdec', '!', 'queue' ,'!', 'amix.',
-            'audiotestsrc', 'wave=silence', '!', 'queue', '!', 'amix.',
-            'amix.', '!', 'audio/x-raw,format=(string)S16LE,layout=(string)interleaved,rate=(int)8000,channels=(int)1', '!', 'opusenc'
-        ];
 
         const mediaStreamOptions = Object.assign(this.getSipMediaStreamOptions(), {
             // refreshAt: Date.now() + STREAM_TIMEOUT,
         });
 
+        const ffmpegPath = await mediaManager.getFFmpegPath();
+
         const server = net.createServer(async (clientSocket) => {
             clearTimeout(serverTimeout);
-            server.close();
 
-            const gstreamerServer = net.createServer(gstreamerSocket => {
-                clearTimeout(gstreamerTimeout);
-                gstreamerServer.close();
-                clientSocket.pipe(gstreamerSocket).pipe(clientSocket);
+            this.clientSocket = clientSocket;
+
+            const ffmpegArgs = [
+                '-hide_banner',
+                '-nostats',
+                '-re',
+                '-f', 'lavfi',
+                '-i', 'anullsrc=r=8000:cl=mono',
+                '-f', 'mulaw',
+                'pipe:3'
+            ];
+
+            safePrintFFmpegArguments(console, ffmpegArgs);
+            const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
+                stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
             });
-            const gstreamerTimeout = setTimeout(() => {
-                this.console.log('timed out waiting for gstreamer');
-                gstreamerServer.close();
-            }, 30000);
-            const gstreamerPort = await listenZero(gstreamerServer);
-            args.push('!', 'mpegtsmux', '!', 'tcpclientsink', `port=${gstreamerPort}`, 'sync=false');
-            this.console.log(args.join(' '));
-            if (this.currentProcess) {
-                this.currentProcess.kill();
-                this.currentProcess = undefined;
-            }
-            const cp = child_process.spawn('gst-launch-1.0', args/*,  { env: { GST_DEBUG: '3' } }*/);
-            this.currentProcess = cp;
+            ffmpegLogInitialOutput(console, cp);
 
             cp.stdout.on('data', data => this.console.log(data.toString()));
             cp.stderr.on('data', data => this.console.log(data.toString()));
 
-            clientSocket.on('close', () => cp.kill());
+            cp.stdio[3].on('data', data => {
+                if (!this.doorbellAudioActive) {
+                clientSocket.write(data);
+                }
+            });
+
+            clientSocket.on('close', () => {
+                cp.kill();
+                this.clientSocket = null;
+            });
         });
         const serverTimeout = setTimeout(() => {
             this.console.log('timed out waiting for client');
@@ -191,7 +231,9 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
             inputArguments: [
                 '-f', 'rtsp',
                 '-i', 'rtsp://10.10.10.10:8554/hauseingang',
-                '-f', 'mpegts',
+                '-f', 'mulaw',
+                '-ac', '1',
+                '-ar', '8000',
                 '-i', `tcp://127.0.0.1:${port}`
             ],
         };
@@ -213,7 +255,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
             },
             audio: {
                 // this is a hint to let homekit, et al, know that it's OPUS audio and does not need transcoding.
-                codec: 'opus',
+                codec: 'pcm_mulaw',
             },
             source: 'local',
             userConfigurable: false,
