@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ["16-bullseye", "18-bullseye"]
-        variant: ["", ".lite"]
+        BASE: ["bullseye-18", "bullseye-18.s6"]
+        VARIANT: ["", ".lite"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -59,19 +59,22 @@ jobs:
       - name: Build and push Docker image (scrypted)
         uses: docker/build-push-action@v2
         with:
-          build-args: BASE=${{ matrix.node }}
+          build-args: BASE=${{ matrix.BASE }}
           context: .
-          file: docker/Dockerfile${{ matrix.variant }}
+          file: docker/Dockerfile${{ matrix.VARIANT }}
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
-            koush/scrypted:${{ matrix.node }}${{ matrix.variant }}
+            koush/scrypted:${{ matrix.BASE }}${{ matrix.VARIANT }}
             ${{ format('koush/scrypted:v{0}{1}', github.event.inputs.package_version || steps.package-version.outputs.current-version, matrix.variant) || '' }}
-            ${{ matrix.node == '18-bullseye' && matrix.variant == '' && format('koush/scrypted:{0}', github.event.inputs.docker_tag) || '' }}
-            ${{ matrix.node == '18-bullseye' && matrix.variant == '.lite' && 'koush/scrypted:lite' || '' }}
-            ghcr.io/koush/scrypted:${{ matrix.node }}${{ matrix.variant }}
+
+            ghcr.io/koush/scrypted:${{ matrix.BASE }}${{ matrix.VARIANT }}
             ${{ format('ghcr.io/koush/scrypted:v{0}{1}', github.event.inputs.package_version || steps.package-version.outputs.current-version, matrix.variant) || '' }}
-            ${{ matrix.node == '18-bullseye' && matrix.variant == '' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.docker_tag) || '' }}
-            ${{ matrix.node == '18-bullseye' && matrix.variant == '.lite' && 'ghcr.io/koush/scrypted:lite' || '' }}
+
+#            ${{ matrix.BASE == 'bullseye-18.s6' && matrix.VARIANT == '' && format('koush/scrypted:{0}', github.event.inputs.docker_tag) || '' }}
+#            ${{ matrix.BASE == 'bullseye-18.s6' && matrix.VARIANT == '.lite' && 'koush/scrypted:lite' || '' }}
+
+#            ${{ matrix.BASE == 'bullseye-18' && matrix.VARIANT == '' && format('ghcr.io/koush/scrypted:{0}', github.event.inputs.docker_tag) || '' }}
+#            ${{ matrix.BASE == 'bullseye-18' && matrix.VARIANT == '.lite' && 'ghcr.io/koush/scrypted:lite' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
