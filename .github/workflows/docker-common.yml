@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         FLAVOR: [".full", ".lite"]
-        NODE_VERSION: ["18"]
+        NODE_VERSION: ["16", "18"]
 #        SUPERVISOR: ["", ".s6"]
         BUILDPACK_DEPS_BASE: ["bullseye"]
     steps:
