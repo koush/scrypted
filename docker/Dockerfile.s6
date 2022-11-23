@@ -1,5 +1,5 @@
-ARG COMMON_BASE="koush/scrypted-common:18-bullseye"
-FROM ${COMMON_BASE}
+ARG BASE="18-bullseye"
+FROM koush/scrypted-common:${BASE}
 
 # avahi advertiser support
 RUN apt-get -y install \
