@@ -2,10 +2,11 @@
 
 BUILDPACK_DEPS_BASE=bullseye
 NODE_VERSION=18
+FLAVOR=.full
 BASE=$BUILDPACK_DEPS_BASE-$NODE_VERSION
 S6_BASE=$BASE.s6
 
-docker build -t koush/scrypted-common:$BASE -f Dockerfile.full \
+docker build -t koush/scrypted-common:$BASE -f Dockerfile$FLAVOR \
     --build-arg NODE_VERSION=$NODE_VERSION --build-arg BUILDPACK_DEPS_BASE=$BUILDPACK_DEPS_BASE . && \
 \
 docker build -t koush/scrypted-common:$S6_BASE -f Dockerfile.full.s6 \
