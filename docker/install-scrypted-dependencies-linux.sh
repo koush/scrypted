@@ -21,10 +21,8 @@ RUN() {
     fi
 }
 
-# The Dockefile.common contains an S6 overlay that should not be installed.
-# Do not run anything until the ENTRYPOINT directive is sent.
 ENTRYPOINT() {
-    ALLOW_RUN=1
+    echo "ignoring ENTRYPOINT $1"
 }
 
 COPY() {
@@ -44,7 +42,7 @@ ENV() {
     echo "ignoring ENV $1"
 }
 
-source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/template/Dockerfile.common.header)
+source <(curl -s https://raw.githubusercontent.com/koush/scrypted/main/docker/template/Dockerfile.full.header)
 
 if [ -z "$SERVICE_USER" ]
 then

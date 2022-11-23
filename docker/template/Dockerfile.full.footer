@@ -1,5 +1,5 @@
 ################################################################
-# Begin section generated from template/Dockerfile.common.footer
+# Begin section generated from template/Dockerfile.full.footer
 ################################################################
 FROM header as base
 
@@ -9,5 +9,5 @@ ENV SCRYPTED_VOLUME="/server/volume"
 ENV SCRYPTED_INSTALL_PATH="/server"
 
 ################################################################
-# End section generated from template/Dockerfile.common.footer
+# End section generated from template/Dockerfile.full.footer
 ################################################################

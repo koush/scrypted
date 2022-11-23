@@ -1,5 +1,5 @@
 ################################################################
-# Begin section generated from template/Dockerfile.common.header
+# Begin section generated from template/Dockerfile.full.header
 # This common file will be used by both Docker and the linux
 # install script.
 ################################################################
@@ -62,5 +62,5 @@ RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 
 ################################################################
-# End section generated from template/Dockerfile.common.header
+# End section generated from template/Dockerfile.full.header
 ################################################################
