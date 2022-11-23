@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        FLAVOR: ["", ".lite"]
+        FLAVOR: [".full", ".lite"]
         NODE_VERSION: ["18"]
 #        SUPERVISOR: ["", ".s6"]
         BUILDPACK_DEPS_BASE: ["bullseye"]
@@ -46,7 +46,7 @@ jobs:
         with:
           build-args: NODE_VERSION=${{ matrix.NODE_VERSION }}
           context: docker/
-          file: docker/Dockerfile.common${{ matrix.FLAVOR }}
+          file: docker/Dockerfile${{ matrix.FLAVOR }}
           platforms: linux/amd64,linux/arm64,linux/armhf
           push: true
           tags: |
