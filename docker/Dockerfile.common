@@ -69,7 +69,7 @@ RUN python3 -m pip install aiofiles debugpy typing_extensions typing
 ################################################################
 # Begin section generated from template/Dockerfile.common.footer
 ################################################################
-FROM common as base
+FROM header as base
 
 ENV SCRYPTED_DOCKER_SERVE="true"
 ENV SCRYPTED_CAN_RESTART="true"
