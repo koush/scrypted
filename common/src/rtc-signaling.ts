@@ -296,10 +296,10 @@ export async function connectRTCSignalingClients(
         disableTrickle ? undefined : answerQueue.queueSendCandidate);
     console.log('offer sdp', offer.sdp);
     await answerClient.setRemoteDescription(offer, answerSetup as RTCAVSignalingSetup);
-    answerQueue.flush();
     const answer = await answerClient.createLocalDescription('answer', answerSetup as RTCAVSignalingSetup,
         disableTrickle ? undefined : offerQueue.queueSendCandidate);
     console.log('answer sdp', answer.sdp);
     await offerClient.setRemoteDescription(answer, offerSetup as RTCAVSignalingSetup);
     offerQueue.flush();
+    answerQueue.flush();
 }
