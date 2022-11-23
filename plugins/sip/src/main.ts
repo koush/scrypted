@@ -1,6 +1,6 @@
 import { closeQuiet, createBindZero, listenZero } from '@scrypted/common/src/listen-cluster';
 import { StorageSettings } from '@scrypted/sdk/storage-settings';
-import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, MotionSensor, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
+import sdk, { BinarySensor, Camera, Device, DeviceDiscovery, DeviceProvider, FFmpegInput, Intercom, MediaObject, MediaStreamUrl, PictureOptions, RequestMediaStreamOptions, RequestPictureOptions, ResponseMediaStreamOptions, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from '@scrypted/sdk';
 import child_process, { ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import net from 'net';
@@ -11,7 +11,7 @@ import { v4 as generateRandomUuid } from 'uuid';
 
 const { deviceManager, mediaManager, systemManager } = sdk;
 
-class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, MotionSensor, BinarySensor {
+class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, VideoCamera, BinarySensor {
     buttonTimeout: NodeJS.Timeout;
     session: SipSession;
     remoteRtpDescription: RtpDescription;
@@ -25,7 +25,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
 
     constructor(public plugin: SipPlugin, nativeId: string) {
         super(nativeId);
-        this.motionDetected = false;
         this.binaryState = false;
         this.console.log('SipCameraDevice ctor()');
     }
@@ -172,7 +171,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
                 this.currentProcess.kill();
                 this.currentProcess = undefined;
             }
-            const cp = child_process.spawn('gst-launch-1.0', args,  { env: { GST_DEBUG: '3' } });
+            const cp = child_process.spawn('gst-launch-1.0', args/*,  { env: { GST_DEBUG: '3' } }*/);
             this.currentProcess = cp;
 
             cp.stdout.on('data', data => this.console.log(data.toString()));
@@ -282,10 +281,6 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         clearTimeout(this.buttonTimeout);
         this.buttonTimeout = setTimeout(() => this.binaryState = false, 10000);
     }
-
-    findCamera() {
-        return null
-    }
 }
 
 class SipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDiscovery, Settings {
@@ -338,7 +333,6 @@ class SipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDisc
             ScryptedInterface.Intercom,
             ScryptedInterface.Camera,
             ScryptedInterface.VideoCamera,
-            ScryptedInterface.MotionSensor,
             ScryptedInterface.BinarySensor,
         ];
 
@@ -357,17 +351,12 @@ class SipPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDisc
 
         devices.push(device);
 
+        // TODO: triggerBinaryState on SIP RINGING event 
         // camera.onDoorbellPressed?.subscribe(async e => {
         //     this.console.log(camera.name, 'onDoorbellPressed', e);
         //     const locationDevice = this.devices.get(location.id);
         //     const scryptedDevice = locationDevice?.devices.get(nativeId);
         //     scryptedDevice?.triggerBinaryState();
-        // });
-        // camera.onMotionDetected?.subscribe((motionDetected) => {
-        //     this.console.log(camera.name, 'onMotionDetected');
-        //     const scryptedDevice = this.devices.get(nativeId);
-        //     if (scryptedDevice)
-        //         scryptedDevice.motionDetected = motionDetected;
         // });
 
         await deviceManager.onDevicesChanged({
