@@ -16,6 +16,7 @@ jobs:
       matrix:
         NODE_VERSION: ["18"]
         SUPERVISOR: ['', '.s6']
+        BUILDPACK_DEPS_BASE: ['bullseye']
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
