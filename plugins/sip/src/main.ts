@@ -226,50 +226,8 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
         ]
     }
 
-    async takePicture(options?: RequestPictureOptions): Promise<MediaObject> {
-        // if this stream is prebuffered, its safe to use the prebuffer to generate an image
-        const realDevice = systemManager.getDeviceById<VideoCamera>(this.id);
-        try {
-            if (realDevice.interfaces.includes(ScryptedInterface.VideoCamera)) {
-                const msos = await realDevice.getVideoStreamOptions();
-                const prebuffered: RequestMediaStreamOptions = msos.find(mso => mso.prebuffer);
-                if (prebuffered) {
-                    prebuffered.refresh = false;
-                    return realDevice.getVideoStream(prebuffered);
-                }
-            }
-        }
-        catch (e) {
-        }
-
-        let buffer: Buffer;
-
-        // try {
-        //     buffer = await this.plugin.api.restClient.request({
-        //         url: `https://app-snaps.ring.com/snapshots/next/${camera.id}`,
-        //         responseType: 'buffer',
-        //         searchParams: {
-        //             extras: 'force',
-        //         },
-        //         headers: {
-        //             accept: 'image/jpeg',
-        //         },
-        //         allowNoResponse: true,
-        //     });
-        // }
-        // catch (e) {
-        //     this.console.error('snapshot failed, falling back to cache');
-        // }
-
-        // if (!buffer) {
-        //     buffer = await this.plugin.api.restClient.request({
-        //         url: clientApi(`snapshots/image/${camera.id}`),
-        //         responseType: 'buffer',
-        //         allowNoResponse: true,
-        //     });
-        // }
-
-        return mediaManager.createMediaObject(buffer, 'image/jpeg');
+    async takePicture(option?: PictureOptions): Promise<MediaObject> {
+        throw new Error("The SIP Camera does not provide snapshots. Install the Snapshot Plugin if snapshots are available via an URL.");
     }
 
     async getPictureOptions(): Promise<PictureOptions[]> {
