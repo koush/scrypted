@@ -1,5 +1,7 @@
-ARG BASE="16-bullseye"
-FROM node:${BASE}
+ARG NODE_VERSION=18
+ARG BUILDPACK_DEPS_BASE=bullseye
+ARG BASE=node:${NODE_VERSION}-${BUILDPACK_DEPS_BASE}
+FROM ${BASE}
 
 RUN apt-get -y update
 RUN apt-get -y upgrade
