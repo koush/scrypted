@@ -17,7 +17,6 @@ jobs:
         NODE_VERSION: ["16", "18"]
         BUILDPACK_DEPS_BASE: ["bullseye"]
         FLAVOR: ["full", "lite"]
-#        SUPERVISOR: ["", ".s6"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
