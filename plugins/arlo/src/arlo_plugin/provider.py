@@ -225,7 +225,7 @@ class ArloProvider(ScryptedDeviceBase, Settings, DeviceProvider, DeviceDiscovery
         self.arlo_basestations = {}
         self.scrypted_devices = {}
 
-        basestations = self.arlo.GetDevices('basestation')
+        basestations = self.arlo.GetDevices(['basestation', 'siren'])
         for basestation in basestations:
             self.arlo_basestations[basestation["deviceId"]] = basestation
         self.logger.info(f"Discovered {len(basestations)} basestations")

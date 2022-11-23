@@ -228,7 +228,7 @@ class Arlo(object):
             # for now, keep doorbells in the list so they get pings
             proper_basestations = {}
             for basestation in basestations.values():
-                if basestation['deviceId'] == basestation.get('parentId') and basestation['deviceType'] != 'doorbell':
+                if basestation['deviceId'] == basestation.get('parentId') and basestation['deviceType'] not in ['doorbell', 'siren']:
                     continue
                 proper_basestations[basestation['deviceId']] = basestation
 
