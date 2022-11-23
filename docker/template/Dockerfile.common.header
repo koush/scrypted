@@ -6,7 +6,7 @@
 FROM buildpack-deps:bullseye as common
 
 # switch to nvm?
-ARG NODE_VERSION=16
+ARG NODE_VERSION=18
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
 RUN apt-get update
 RUN apt-get install -y nodejs
