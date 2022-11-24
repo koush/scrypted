@@ -252,7 +252,17 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
             name: 'SIP',
             container: '', // must be empty to support prebuffering
             video: {
-                codec: 'h264'
+                codec: 'h264',
+                h264Info: {
+                    sei: false,
+                    stapb: false,
+                    mtap16: false,
+                    mtap32: false,
+                    fuab: false,
+                    reserved0: false,
+                    reserved30: false,
+                    reserved31: false,
+                }
             },
             audio: {
                 // this is a hint to let homekit, et al, know that it's OPUS audio and does not need transcoding.
