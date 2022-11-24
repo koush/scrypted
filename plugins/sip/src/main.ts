@@ -230,6 +230,7 @@ class SipCameraDevice extends ScryptedDeviceBase implements Intercom, Camera, Vi
             mediaStreamOptions,
             inputArguments: [
                 '-f', 'rtsp',
+                '-rtsp_transport', 'tcp',
                 '-i', 'rtsp://10.10.10.10:8554/hauseingang',
                 '-f', 'mulaw',
                 '-ac', '1',
