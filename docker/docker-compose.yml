@@ -14,7 +14,10 @@ services:
         # logging is noisy and will unnecessarily wear on flash storage.
         # scrypted has per device in memory logging that is preferred.
         logging:
-            driver: "none"
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "10"
         labels:
             - "com.centurylinklabs.watchtower.scope=scrypted"
 
