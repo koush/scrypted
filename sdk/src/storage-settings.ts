@@ -92,12 +92,19 @@ export class StorageSettings<T extends string> implements Settings {
                     }
                 };
             }
-            Object.defineProperty(this.values, key, {
-                get,
-                set: value => this.putSetting(key, value),
+            const self = this;
+            Object.assign(this.values, {
+                get [key]() {
+                    return get();
+                },
+                set [key](value: any) {
+                    self.putSetting(key, value);
+                },
             });
-            Object.defineProperty(this.hasValue, key, {
-                get: () => this.device.storage.getItem(key) != null,
+            Object.assign(this.hasValue, {
+                get() {
+                    return self.device.storage.getItem(key) != null;
+                },
             });
         }
     }
