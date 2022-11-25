@@ -20,11 +20,14 @@ The optimal/reliable codec settings can be found in the documentation for the [H
 * `Password` (see below)
 * `Doorbell Type` is `Amcrest Doorbell` 
  
-The `admin` user account credentials is required to (1) add doorbell to Scrypted or (2) change codec settings with `IP Config Software` or `Amcrest Surveillance Pro` applications. 
+The `admin` user account credential is required to (1) add doorbell to Scrypted or (2) change codec settings with `IP Config Software` or `Amcrest Surveillance Pro` applications. 
 
 The password for `admin` username was set when first configuring device (see 2m49s mark of [Amcrest setup video](https://youtu.be/8RDgBMfIhgo)).  
 The `admin` username credential is **not** your Amcrest Smart Home (cloud) account that uses an email address for user/login.
-(Unless you happened used the same password for both.)
+(Unless you happened to use the same password for both.)
+
+If you experience doorbell restarts/crashes when beginning a two-way talk (whether ONVIF or Amcrest selected) then use the Amcrest Smart Home app, navigate to Device Information, and disable/toggle off the option [Record Audio](https://user-images.githubusercontent.com/38480370/204055791-87f82a44-518d-46b3-8444-5c47d1e7f66a.png).
+Note that this will disable audio recordings to SD card (if present in doorbell), but now two-way talk over Homekit should work.
 
 ## Amcrest NVR
 Cameras attached or recording through an Amcrest NVR (IP-based) can be used in Amcrest Plugin for Scrypted. 
@@ -39,10 +42,12 @@ Each 'Channel' or (camera) Device attached to the NVR must be configured as sepa
 
 # Troubleshooting
 ## General
+* Are your Amcrest streams properly enabled and configured?  (in Amcrest admin page (Main Stream or Sub Stream(s)).
+* Are the correct Amcrest streams specified in camera's Stream Management (in Scrypted) per source of stream (i.e., local, remote, low resolution, etc.)?
 * Is the URL attempting to use HTTPS?  Try disabling HTTPS on the device to see if that resolves issue (do not use self-signed certs).
 * Does your account (`Username`) have proper permissions ("Authority" in Amcrest speak)?  Try granting all Authority for testing.  See below `User Account Authority (Camera or NVR)`.
 * Amcrest Doorbell: `Username` is **admin** and `Password` is the device/camera password -- not Amcrest Smart Home (Cloud) account password.
-* Check that you have configured the correct Stream number's codec settings (in Amcrest admin page (Main Stream or Sub Stream(s)).
+* Amcrest Doorbell: Two-way talk crashing doorbell? Disable [Record Audio](https://user-images.githubusercontent.com/38480370/204055791-87f82a44-518d-46b3-8444-5c47d1e7f66a.png) using `Amcrest Smart Home` mobile app.
 
 ## User Account Authority (Camera or NVR)
 If you have a non-admin user account setup on your cameras and/or Amcrest NVR, then the account's access permissions must be sufficient to expose motion events and playback.
