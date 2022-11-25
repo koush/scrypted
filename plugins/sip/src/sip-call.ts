@@ -1,5 +1,5 @@
 import { noop, Subject } from 'rxjs'
-import { randomInteger,  randomString } from './util'
+import { randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
 
 const sip = require('sip'),
