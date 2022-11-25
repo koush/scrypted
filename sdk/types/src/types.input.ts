@@ -511,7 +511,7 @@ export interface RequestMediaStreamOptions extends MediaStreamOptions {
    * Request an adaptive bitrate stream, if available. The destination
    * will need to report packet loss indication.
    */
-   adaptive?: boolean;
+  adaptive?: boolean;
 }
 
 export interface MediaStreamPacketLoss {
@@ -1329,60 +1329,87 @@ export interface Device {
  */
 export interface EndpointManager {
   /**
-   * Get an URL pathname that can be accessed on your local network or cloud while authenticated. This is an absolute path that requires cookie authentication, and generally used only in browser contexts.
-   */
-  getAuthenticatedPath(): Promise<string>;
-
-  /**
-   * Get an URL pathname that can be accessed on your local network or cloud while authenticated. This is an absolute path that requires cookie authentication, and generally used only in browser contexts.
+   * Get an URL pathname for a device that can be accessed with authentication. This is a relative path that can be used in browser sessions.
+   * @deprecated
    */
   getAuthenticatedPath(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
-   * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are without any encryption. Plugin implementation is responsible for authentication.
-   */
-  getInsecurePublicLocalEndpoint(): Promise<string>;
-
-  /**
-   * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are without any encryption. Plugin implementation is responsible for authentication.
-   */
+  * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are without any encryption. Plugin implementation is responsible for authentication.
+  * @deprecated
+  */
   getInsecurePublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
-   * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
-   */
-  getPublicCloudEndpoint(): Promise<string>;
-
-  /**
-   * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
-   */
-  getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
-
-  /**
    * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are over SSL with a self signed certificate. Plugin implementation is responsible for authentication.
-   */
-  getPublicLocalEndpoint(): Promise<string>;
-
-  /**
-   * Get an URL that can only be accessed on your local network by anyone with the link. HTTP requests and responses are over SSL with a self signed certificate. Plugin implementation is responsible for authentication.
+   * @deprecated
    */
   getPublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
    * Get an URL that can be used to send a push message to the client. This differs from a cloud endpoint, in that, the Plugin does not send a response back. Plugin implementation is responsible for authentication.
-   */
-  getPublicPushEndpoint(): Promise<string>;
-
-  /**
-   * Get an URL that can be used to send a push message to the client. This differs from a cloud endpoint, in that, the Plugin does not send a response back. Plugin implementation is responsible for authentication.
+   * @deprecated
    */
   getPublicPushEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
   /**
-   * Deliver a push notification to the system.
+   * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
+   * @deprecated
    */
-  deliverPush(endpoint: string, request: HttpRequest): Promise<void>;
+  getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
 
+  /**
+   * Get an URL pathname for a device that can be accessed without authentication. This is a relative path that can be used in browser sessions.
+   */
+  getPath(nativeId?: ScryptedNativeId, options?: {
+    public?: boolean,
+  }): Promise<string>;
+
+  /**
+   * Get an URL that can only be accessed on your local network by anyone with the link.
+   */
+  getLocalEndpoint(nativeId?: string, options?: {
+    /**
+     * A public endpoint that does not require authentication with the local Scrypted server.
+     */
+    public?: boolean,
+    /**
+     * An insecure endpoint served by http, not https.
+     */
+    insecure?: boolean,
+  }): Promise<string>;
+
+  /**
+   * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
+   * @deprecated
+   */
+  getCloudEndpoint(nativeId?: ScryptedNativeId, options?: {
+    /**
+     * A public endpoint that does not require authentication with the local Scrypted server.
+     */
+    public?: boolean,
+  }): Promise<string>;
+
+  /**
+   * Get an URL that can be used to send a push message to the client. This differs from a cloud endpoint, in that, the Plugin does not send a response back.
+   */
+  getCloudPushEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
+
+  /**
+   * Deliver a push notification to a device. Used by push providers.
+   */
+  deliverPush(id: string, request: HttpRequest): Promise<void>;
+
+  /**
+   * Set the recommended local addresses used by Scrypted plugins that listen for incoming connections.
+   * @param addresses
+   */
+  setLocalAddresses(...addresses: string[]): Promise<void>;
+
+  /**
+   * Get the recommended local addresess used by Scrypted plugins that listen for incoming connections.
+   */
+  getLocalAddresses(): Promise<string>[];
 }
 /**
  * SystemManager is used by scripts to query device state and access devices.

@@ -1145,17 +1145,29 @@ class MediaManager:
     pass
 
 class EndpointManager:
-    async def deliverPush(self, endpoint: str, request: HttpRequest) -> None:
+    async def deliverPush(self, id: str, request: HttpRequest) -> None:
         pass
-    async def getAuthenticatedPath(self) -> str:
+    async def getAuthenticatedPath(self, nativeId: str = None) -> str:
         pass
-    async def getInsecurePublicLocalEndpoint(self) -> str:
+    async def getCloudEndpoint(self, nativeId: str = None, options: Any = None) -> str:
         pass
-    async def getPublicCloudEndpoint(self) -> str:
+    async def getCloudPushEndpoint(self, nativeId: str = None) -> str:
         pass
-    async def getPublicLocalEndpoint(self) -> str:
+    async def getInsecurePublicLocalEndpoint(self, nativeId: str = None) -> str:
         pass
-    async def getPublicPushEndpoint(self) -> str:
+    def getLocalAddresses(self) -> list[str]:
+        pass
+    async def getLocalEndpoint(self, nativeId: str = None, options: Any = None) -> str:
+        pass
+    async def getPath(self, nativeId: str = None, options: Any = None) -> str:
+        pass
+    async def getPublicCloudEndpoint(self, nativeId: str = None) -> str:
+        pass
+    async def getPublicLocalEndpoint(self, nativeId: str = None) -> str:
+        pass
+    async def getPublicPushEndpoint(self, nativeId: str = None) -> str:
+        pass
+    async def setLocalAddresses(self, addresses: list[str]) -> None:
         pass
     pass
 
