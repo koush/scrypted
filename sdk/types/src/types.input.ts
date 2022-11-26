@@ -1404,12 +1404,12 @@ export interface EndpointManager {
    * Set the recommended local addresses used by Scrypted plugins that listen for incoming connections.
    * @param addresses
    */
-  setLocalAddresses(...addresses: string[]): Promise<void>;
+  setLocalAddresses(addresses: string[]): Promise<void>;
 
   /**
    * Get the recommended local addresess used by Scrypted plugins that listen for incoming connections.
    */
-  getLocalAddresses(): Promise<string>[];
+  getLocalAddresses(): Promise<string[]>;
 }
 /**
  * SystemManager is used by scripts to query device state and access devices.

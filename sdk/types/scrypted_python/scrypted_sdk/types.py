@@ -1155,7 +1155,7 @@ class EndpointManager:
         pass
     async def getInsecurePublicLocalEndpoint(self, nativeId: str = None) -> str:
         pass
-    def getLocalAddresses(self) -> list[str]:
+    async def getLocalAddresses(self) -> list[str]:
         pass
     async def getLocalEndpoint(self, nativeId: str = None, options: Any = None) -> str:
         pass
