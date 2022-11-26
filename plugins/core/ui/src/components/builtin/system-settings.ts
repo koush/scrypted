@@ -57,7 +57,7 @@ export function createSystemSettingsDevice(systemManager: SystemManager): Scrypt
                 await core.putSetting(key.substring(5), value);
             }
             else if (key.startsWith('transcode:')) {
-                await core.putSetting(key.substring(10), value);
+                await transcode.putSetting(key.substring(10), value);
             }
         },
     }
