@@ -126,7 +126,7 @@ class EndpointManagerImpl implements EndpointManager {
     }
 
     async getPath(nativeId?: string, options?: { public?: boolean; }): Promise<string> {
-        return `/endpoint/${this.getEndpoint(nativeId)}/${options?.public ? '' : 'public/'}`
+        return `/endpoint/${this.getEndpoint(nativeId)}/${options?.public ? 'public/' : ''}`
     }
 
     async getLocalEndpoint(nativeId?: string, options?: { public?: boolean; insecure?: boolean; }): Promise<string> {

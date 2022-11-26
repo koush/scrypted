@@ -14,6 +14,8 @@ export class AddressSettigns {
 
     async getLocalAddresses(): Promise<string[]> {
         const settings = await this.scrypted.datastore.tryGet(Settings, 'localAddresses');
+        if (!settings.value?.[0])
+            return;
         return settings.value as string[];
     }
 }
