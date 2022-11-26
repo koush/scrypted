@@ -1383,7 +1383,12 @@ export interface EndpointManager {
    * Get an URL that can be externally accessed by anyone with the link. Plugin implementation is responsible for authentication.
    * @deprecated
    */
-  getCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string>;
+  getCloudEndpoint(nativeId?: ScryptedNativeId, options?: {
+    /**
+     * A public endpoint that does not require authentication with the local Scrypted server.
+     */
+    public?: boolean,
+  }): Promise<string>;
 
   /**
    * Get an URL that can be used to send a push message to the client. This differs from a cloud endpoint, in that, the Plugin does not send a response back.
