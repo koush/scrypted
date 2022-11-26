@@ -60,7 +60,7 @@ export class AutomationCore extends ScryptedDeviceBase implements DeviceProvider
     }
 
     async createDevice(settings: DeviceCreatorSettings): Promise<string> {
-        const { name, template } = settings;
+        const { name } = settings;
         const nativeId = 'automation:' + randomBytes(8).toString('hex');
         await this.reportAutomation(nativeId, name?.toString());
         const automation = new Automation(nativeId);

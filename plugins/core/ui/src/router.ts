@@ -2,9 +2,9 @@ import VueRouter from "vue-router";
 
 import Device from "./components/Device.vue";
 import Devices from "./components/Devices.vue";
-import AggregateComponent from "./components/aggregate/AggregateComponent.vue";
+import AggregateComponent from "./components/AggregateComponent.vue";
 import AutomationComponent from "./components/automation/AutomationComponent.vue";
-import ScriptComponent from "./components/script/ScriptComponent.vue";
+import ScriptComponent from "./components/ScriptComponent.vue";
 import PluginComponent from "./components/plugin/PluginComponent.vue";
 import InstallPlugin from "./components/plugin/InstallPlugin.vue";
 import LogComponent from "./components/builtin/LogComponent.vue";

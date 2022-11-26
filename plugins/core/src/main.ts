@@ -1,15 +1,14 @@
-import sdk, { Device, DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import sdk, { DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import fs from 'fs';
 import net from 'net';
+import os from 'os';
 import Router from 'router';
-import { AggregateDevice, createAggregateDevice } from './aggregate';
+import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
 import { AutomationCore, AutomationCoreNativeId } from './automations-core';
-import { sendJSON } from './http-helpers';
 import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
-import os from 'os';
 
 const { systemManager, deviceManager, endpointManager } = sdk;
 
@@ -24,15 +23,6 @@ interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
 }
 
-async function reportAggregate(nativeId: string, interfaces: string[]) {
-    const device: Device = {
-        name: undefined,
-        nativeId,
-        type: ScryptedDeviceType.Unknown,
-        interfaces,
-    }
-    await deviceManager.onDeviceDiscovered(device);
-}
 
 class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider, Settings {
     router: any = Router();
@@ -40,8 +30,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     mediaCore: MediaCore;
     launcher: LauncherMixin;
     scriptCore: ScriptCore;
+    aggregateCore: AggregateCore;
     automationCore: AutomationCore;
-    aggregate = new Map<string, AggregateDevice>();
     localAddresses: string[];
     storageSettings = new StorageSettings(this, {
         localAddresses: {
@@ -79,7 +69,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'Scripting Core',
+                    name: 'Scripts',
                     nativeId: ScriptCoreNativeId,
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
                     type: ScryptedDeviceType.Builtin,
@@ -91,7 +81,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'Automation Core',
+                    name: 'Automations',
                     nativeId: AutomationCoreNativeId,
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
                     type: ScryptedDeviceType.Builtin,
@@ -100,47 +90,17 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             this.automationCore = new AutomationCore();
         })();
 
-        deviceManager.onDeviceDiscovered({
-            name: 'Add to Launcher',
-            nativeId: 'launcher',
-            interfaces: [
-                '@scrypted/launcher-ignore',
-                ScryptedInterface.MixinProvider,
-                ScryptedInterface.Readme,
-            ],
-            type: ScryptedDeviceType.Builtin,
-        });
-
-        for (const nativeId of deviceManager.getNativeIds()) {
-            if (nativeId?.startsWith('aggregate:')) {
-                const aggregate = createAggregateDevice(nativeId);
-                this.aggregate.set(nativeId, aggregate);
-                reportAggregate(nativeId, aggregate.computeInterfaces());
-            }
-        }
-
-
-        this.router.post('/api/new/aggregate', async (req: RoutedHttpRequest, res: HttpResponse) => {
-            const nativeId = `aggregate:${Math.random()}`;
-            await reportAggregate(nativeId, []);
-            const aggregate = createAggregateDevice(nativeId);
-            this.aggregate.set(nativeId, aggregate);
-            const { id } = aggregate;
-            sendJSON(res, {
-                id,
-            });
-        });
-
-        // update the automations and grouped devices on storage change.
-        systemManager.listen((eventSource, eventDetails, eventData) => {
-            if (eventDetails.eventInterface === 'Storage') {
-                const ids = [...this.aggregate.values()].map(a => a.id);
-                if (ids.includes(eventSource.id)) {
-                    const aggregate = [...this.aggregate.values()].find(a => a.id === eventSource.id);
-                    reportAggregate(aggregate.nativeId, aggregate.computeInterfaces());
-                }
-            }
-        });
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Device Groups',
+                    nativeId: AggregateCoreNativeId,
+                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+            this.aggregateCore = new AggregateCore();
+        })();
     }
 
     async getSettings(): Promise<Setting[]> {
@@ -165,8 +125,8 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.scriptCore;
         if (nativeId === AutomationCoreNativeId)
             return this.automationCore;
-        if (nativeId?.startsWith('aggregate:'))
-            return this.aggregate.get(nativeId);
+        if (nativeId === AggregateCoreNativeId)
+            return this.aggregateCore;
     }
 
     checkEngineIoEndpoint(request: HttpRequest, name: string) {
@@ -256,4 +216,4 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     }
 }
 
-export default new ScryptedCore();
+export default ScryptedCore;

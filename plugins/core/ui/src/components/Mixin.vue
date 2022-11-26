@@ -19,7 +19,7 @@ export default {
   asyncComputed: {
     availableMixins: {
       async get() {
-        const mixins = this.device.mixins || [];
+        const mixins = this.device?.mixins || [];
         const availableMixins = (
           await getDeviceAvailableMixins(
             this.$scrypted.systemManager,

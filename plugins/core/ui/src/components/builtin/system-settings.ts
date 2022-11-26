@@ -1,15 +1,10 @@
 import { ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Settings, SystemManager } from "@scrypted/types";
+import { findPluginDevice } from "../helpers";
 
 export function createSystemSettingsDevice(systemManager: SystemManager): ScryptedDevice & Settings {
     const core = systemManager.getDeviceByName<Settings>('@scrypted/core');
-    let transcode: ScryptedDevice & Settings;
-    for (const id of Object.keys(systemManager.getSystemState())) {
-        const device = systemManager.getDeviceById<Settings>(id);
-        if (device.nativeId === 'transcode' && device.pluginId === '@scrypted/prebuffer-mixin') {
-            transcode = device;
-            break;
-        }
-    }
+    const transcode = findPluginDevice<Settings>(systemManager, '@scrypted/prebuffer-mixin', 'transcode');
+
     return {
         name: 'Settings',
         type: ScryptedDeviceType.Builtin,
