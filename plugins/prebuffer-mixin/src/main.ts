@@ -1629,6 +1629,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       type: 'number',
       defaultValue: 1000000,
       description: 'The bitrate to use when remote streaming. This setting will only be used when transcoding or adaptive bitrate is enabled on a camera.',
+      onPut() {
+        sdk.deviceManager.onDeviceEvent('transcode', ScryptedInterface.Settings, undefined);
+      },
     },
     h264EncoderArguments: {
       title: 'H264 Encoder Arguments',
@@ -1637,6 +1640,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       defaultValue: getDebugModeH264EncoderArgs().join(' '),
       combobox: true,
       mapPut: (oldValue, newValue) => getH264EncoderArgs()[newValue]?.join(' ') || newValue || getDebugModeH264EncoderArgs().join(' '),
+      onPut() {
+        sdk.deviceManager.onDeviceEvent('transcode', ScryptedInterface.Settings, undefined);
+      },
     }
   });
   currentMixins = new Map<string, {
