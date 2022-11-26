@@ -1,3 +1,4 @@
+import { TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import sdk, { AudioSensor, Camera, Intercom, Logger, MotionSensor, ScryptedDevice, ScryptedInterface, VideoCamera } from "@scrypted/sdk";
 import throttle from 'lodash/throttle';
 import { SnapshotRequest, SnapshotRequestCallback } from "../../hap";
@@ -14,49 +15,39 @@ function recommendSnapshotPlugin(console: Console, log: Logger, message: string)
 
 export function createSnapshotHandler(device: ScryptedDevice & VideoCamera & Camera & MotionSensor & AudioSensor & Intercom, storage: Storage, homekitPlugin: HomeKitPlugin, console: Console) {
     let pendingPicture: Promise<Buffer>;
+    let pileup = 0;
 
-    const takePicture = async (request: SnapshotRequest) => {
+    const takePicture = (request: SnapshotRequest) => {
         if (pendingPicture)
             return pendingPicture;
 
+        if (pileup > 200)
+            console.warn('Snapshot requests are piling up', pileup);
+
         if (device.interfaces.includes(ScryptedInterface.Camera)) {
-            const media = await device.takePicture({
+            pileup++;
+            pendingPicture = device.takePicture({
                 picture: {
                     width: request.width,
                     height: request.height,
                 }
-            });
-            pendingPicture = mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg');
+            })
+                .then(media => mediaManager.convertMediaObjectToBuffer(media, 'image/jpeg'));
         }
         else {
             pendingPicture = Promise.reject(new Error('Camera does not provide native snapshots. Please install the Snapshot Plugin.'));
         }
 
-        const wrapped = pendingPicture;
-        pendingPicture = new Promise((resolve, reject) => {
-            let timedOut = false;
-            const timeout = setTimeout(() => {
-                timedOut = true;
-                pendingPicture = undefined;
-                recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} is offline or has slow snapshots. This will cause HomeKit to hang. Consider installing the Snapshot Plugin to keep HomeKit responsive. origin:/#/component/plugin/install/@scrypted/snapshot}`);
-                reject(new Error('snapshot timed out'));
-            }, 3000);
-
-            wrapped.then(picture => {
-                if (!timedOut) {
-                    pendingPicture = undefined;
-                    clearTimeout(timeout);
-                    resolve(picture)
-                }
+        pendingPicture = timeoutPromise(3000, pendingPicture)
+            .catch(e => {
+                if (e instanceof TimeoutError)
+                    recommendSnapshotPlugin(console, homekitPlugin.log, `${device.name} is offline or has slow snapshots. This will cause HomeKit to hang. Consider installing the Snapshot Plugin to keep HomeKit responsive. origin:/#/component/plugin/install/@scrypted/snapshot}`);
+                throw e;
             })
-                .catch(e => {
-                    if (!timedOut) {
-                        pendingPicture = undefined;
-                        clearTimeout(timeout);
-                        reject(e);
-                    }
-                })
-        });
+            .finally(() => {
+                pileup--;
+                pendingPicture = undefined;
+            });
 
         return pendingPicture;
     }
