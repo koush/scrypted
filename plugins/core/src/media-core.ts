@@ -115,7 +115,7 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         }
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         if (nativeId === 'http')
             return this.httpHost;
         if (nativeId === 'https')

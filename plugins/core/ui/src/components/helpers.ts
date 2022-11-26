@@ -1,4 +1,15 @@
-import { ScryptedDeviceType, ScryptedInterface } from "@scrypted/types";
+import { ScryptedDevice, ScryptedDeviceType, ScryptedInterface } from "@scrypted/types";
+
+export function deviceIsEditable(device: ScryptedDevice) {
+    if (!device)
+        return;
+    if (device.interfaces.includes(ScryptedInterface.ScryptedPlugin))
+        return;
+    if (device.type === ScryptedDeviceType.Builtin || device.type === ScryptedDeviceType.API)
+        return;
+
+    return true;
+}
 
 export function typeToIcon(type) {
     switch (type) {
@@ -30,6 +41,7 @@ export function typeToIcon(type) {
         case ScryptedDeviceType.Irrigation: return "fa-faucet";
         case ScryptedDeviceType.Person: return "fa-user";
         case ScryptedDeviceType.SecuritySystem: return "fa-shield-alt";
+        case ScryptedDeviceType.Builtin: return "fa-server";
 
     }
     return "fa-toggle-on";

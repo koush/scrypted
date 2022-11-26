@@ -1606,6 +1606,7 @@ export interface LauncherApplicationInfo {
    */
   icon?: string;
   description?: string;
+  href?: string;
 }
 
 export interface LauncherApplication {

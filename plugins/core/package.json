@@ -29,7 +29,8 @@
          "@scrypted/launcher-ignore",
          "HttpRequestHandler",
          "EngineIOHandler",
-         "DeviceProvider"
+         "DeviceProvider",
+         "Settings"
       ],
       "pluginDependencies": [
          "@scrypted/webrtc"

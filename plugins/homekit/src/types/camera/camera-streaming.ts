@@ -9,6 +9,7 @@ import sdk, { Camera, FFmpegInput, Intercom, MediaStreamFeedback, MediaStreamOpt
 import dgram, { SocketType } from 'dgram';
 import { once } from 'events';
 import os from 'os';
+import { getAddressOverride } from '../../address-override';
 import { AudioStreamingCodecType, CameraController, CameraStreamingDelegate, PrepareStreamCallback, PrepareStreamRequest, PrepareStreamResponse, StartStreamRequest, StreamingRequest, StreamRequestCallback, StreamRequestTypes } from '../../hap';
 import type { HomeKitPlugin } from "../../main";
 import { startRtpSink } from '../../rtp/rtp-ffmpeg-input';
@@ -57,12 +58,14 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
             });
 
             const socketType = request.addressVersion === 'ipv6' ? 'udp6' : 'udp4';
-            let addressOverride = homekitPlugin.storageSettings.values.addressOverride || undefined;
+            let addressOverride = await getAddressOverride(homekitPlugin.storageSettings.values.addressOverride || undefined);
 
             if (addressOverride) {
                 const infos = Object.values(os.networkInterfaces()).flat().map(i => i?.address);
                 if (!infos.find(address => address === addressOverride)) {
-                    console.error('The provided Scrypted Server Address was not found in the list of network addresses and may be invalid and will not be used (DHCP assignment change?): ' + addressOverride);
+                    const error = 'The provided Scrypted Server Address was not found in the list of network addresses and may be invalid and will not be used (DHCP assignment change?): ' + addressOverride;
+                    console.error(error);
+                    sdk.log.a(error);
                     addressOverride = undefined;
                 }
             }

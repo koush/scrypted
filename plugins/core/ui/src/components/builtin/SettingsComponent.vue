@@ -1,6 +1,7 @@
 <template>
-  <v-layout>
+  <v-layout row wrap>
     <v-flex xs12 md6 lg4>
+      <Settings :device="coreDevice" class="mb-2"></Settings>
       <v-card v-if="updateAvailable">
         <v-toolbar>
           <v-toolbar-title>Update Available </v-toolbar-title>
@@ -101,10 +102,16 @@
 </template>
 <script>
 import { checkUpdate } from "../plugin/plugin";
+import Settings from "../../interfaces/Settings.vue"
+import {createSystemSettingsDevice} from './system-settings';
 
 export default {
+  components: {
+    Settings,
+  },
   data() {
     return {
+      coreDevice: createSystemSettingsDevice(this.$scrypted.systemManager),
       currentVersion: null,
       updateAvailable: null,
       canUpdate: false,

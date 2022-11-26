@@ -185,7 +185,7 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || !device.interfaces.includes(ScryptedInterface.ScryptedPlugin))">
+        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || deviceIsEditable(device))">
           <Settings :device="device"></Settings>
         </v-flex>
       </v-layout>
@@ -206,6 +206,7 @@ import {
   getAlertIcon,
   hasFixedPhysicalLocation,
   getInterfaceFriendlyName,
+  deviceIsEditable,
 } from "./helpers";
 import { ScryptedInterface } from "@scrypted/types";
 import RTCSignalingClient from "../interfaces/RTCSignalingClient.vue";
@@ -410,6 +411,7 @@ export default {
     },
   },
   methods: {
+    deviceIsEditable,
     getInterfaceFriendlyName,
     hasFixedPhysicalLocation,
     getComponentWebPath,

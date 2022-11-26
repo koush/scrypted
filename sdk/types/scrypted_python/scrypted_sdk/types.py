@@ -372,6 +372,7 @@ class HumiditySettingStatus(TypedDict):
 
 class LauncherApplicationInfo(TypedDict):
     description: str
+    href: str
     icon: str
     name: str
     pass
