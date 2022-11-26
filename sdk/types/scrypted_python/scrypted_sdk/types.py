@@ -1149,7 +1149,7 @@ class EndpointManager:
         pass
     async def getAuthenticatedPath(self, nativeId: str = None) -> str:
         pass
-    async def getCloudEndpoint(self, nativeId: str = None, options: Any = None) -> str:
+    async def getCloudEndpoint(self, nativeId: str = None) -> str:
         pass
     async def getCloudPushEndpoint(self, nativeId: str = None) -> str:
         pass
