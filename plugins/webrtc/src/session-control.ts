@@ -18,6 +18,8 @@ export class ScryptedSessionControl implements RTCSessionControl {
         if (!this.intercom)
             return;
 
+        if (!this.audioTransceiver.receiver.track)
+            await this.audioTransceiver.onTrack.asPromise()
         const track = this.audioTransceiver.receiver.track;
 
         track.onReceiveRtp.allUnsubscribe();

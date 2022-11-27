@@ -131,7 +131,11 @@ export class AlexaSignalingSession implements RTCSignalingSession {
 rtcHandlers.set('InitiateSessionWithOffer', async (request, response, directive: any,
     device: ScryptedDevice & RTCSignalingChannel) => {
     const session = new AlexaSignalingSession(response, directive);
-    device.startRTCSignalingSession(session);
+    const control = await device.startRTCSignalingSession(session);
+    control.setPlayback({
+        audio: true,
+        video: false,
+    })
 });
 
 capabilityHandlers.set('Alexa.RTCSessionController', async (request, response, directive: any, device: ScryptedDevice & VideoCamera) => {
