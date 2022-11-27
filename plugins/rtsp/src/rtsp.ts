@@ -198,7 +198,7 @@ export abstract class RtspSmartCamera extends RtspCamera {
             listener = await this.listener;
         }
         catch (e) {
-            this.console.error('listen loop connection failed, restarting listener.');
+            this.console.error('listen loop connection failed, restarting listener.', e.message);
             restartListener();
             return;
         }
