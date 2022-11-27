@@ -257,6 +257,7 @@ class MqttPublisherMixin extends SettingsMixinDeviceBase<any> {
         urlWithoutPath.pathname = '';
 
         const client = this.client = connect(urlWithoutPath.toString(), {
+            rejectUnauthorized: false,
             username,
             password,
         });
