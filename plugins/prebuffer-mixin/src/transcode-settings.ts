@@ -1,9 +1,9 @@
 import sdk, { MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from "@scrypted/sdk";
 import { RebroadcastPlugin } from "./main";
+import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from "./rebroadcast-mixin-token";
 const { deviceManager } = sdk;
 
 export const TRANSCODE_MIXIN_PROVIDER_NATIVE_ID = 'transcode';
-export const REBROADCAST_MIXIN_INTERFACE_TOKEN = 'mixin:@scrypted/prebuffer-mixin';
 
 export function getTranscodeMixinProviderId() {
     if (!deviceManager.getNativeIds().includes(TRANSCODE_MIXIN_PROVIDER_NATIVE_ID))

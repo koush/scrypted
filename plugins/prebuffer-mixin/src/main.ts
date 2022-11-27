@@ -17,10 +17,11 @@ import net, { AddressInfo } from 'net';
 import semver from 'semver';
 import { Duplex } from 'stream';
 import { FileRtspServer } from './file-rtsp-server';
+import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
-import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
+import { getTranscodeMixinProviderId, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
