@@ -131,8 +131,10 @@ class EndpointManagerImpl implements EndpointManager {
 
     async getLocalEndpoint(nativeId?: string, options?: { public?: boolean; insecure?: boolean; }): Promise<string> {
         const protocol = options?.insecure ? 'http' : 'https';
-        const port = await this.api.getComponent(options?.insecure ? 'SCRYPTED_INSECURE_PORT' : 'SCRYPTED_INSECURE_PORT');
-        return `${protocol}://${await this.getUrlSafeIp()}:${port}${this.getPath(nativeId, options)}`;
+        const port = await this.api.getComponent(options?.insecure ? 'SCRYPTED_INSECURE_PORT' : 'SCRYPTED_SECURE_PORT');
+        const path = await this.getPath(nativeId, options);
+        const url =  `${protocol}://${await this.getUrlSafeIp()}:${port}${path}`;
+        return url;
     }
 
     async getCloudEndpoint(nativeId?: string, options?: { public?: boolean; }): Promise<string> {
