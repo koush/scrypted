@@ -181,7 +181,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         const from = this.storage.getItem('sipfrom');
         const to = this.storage.getItem('sipto');
         const localIp = from.split(':')[0].split('@')[1];
-        const localPort = from.split(':')[1] ?? 5060;
+        const localPort = parseInt(from.split(':')[1]) || 5060;
 
         if (!from || !to || !localIp || !localPort) {
             this.console.error('SIP From: and To: URIs not specified!');
@@ -191,7 +191,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         this.console.log(`SIP: Calling doorbell: From: ${from}, To: ${to}`);
         this.console.log(`SIP: localIp: ${localIp}, localPort: ${localPort}`);
 
-        let sipOptions: SipOptions = { from: "sip:" + from, to: "sip:" + to, localIp: "10.10.10.70", localPort: 5060 };
+        let sipOptions: SipOptions = { from: "sip:" + from, to: "sip:" + to, localIp, localPort };
 
         sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
         sip.onCallEnded.subscribe(cleanup);
