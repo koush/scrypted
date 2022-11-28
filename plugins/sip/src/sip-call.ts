@@ -1,5 +1,5 @@
 import { noop, Subject } from 'rxjs'
-import { randomString } from './util'
+import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
 
 const sip = require('sip'),
@@ -134,7 +134,8 @@ export class SipCall {
     const { audio } = rtpOptions,
       { from } = this.sipOptions,
       host = this.sipOptions.localIp,
-      port = this.sipOptions.localPort
+      port = this.sipOptions.localPort,
+      ssrc = randomInteger();
 
     this.sipStack = {
       makeResponse: sip.makeResponse, 
@@ -166,18 +167,17 @@ export class SipCall {
     this.sdp = ([
       'v=0',
       `o=${from.split(':')[1].split('@')[0]} 3747 461 IN IP4 ${host}`,
-      's=Talk',
+      's=ScryptedSipPlugin',
       `c=IN IP4 ${host}`,
       't=0 0',
       `m=audio ${audio.port} RTP/AVP 0`,
-      //'a=rtpmap:0 PCMU/8000',
-      //`a=rtcp:${audio.rtcpPort}`,
-      //'a=ssrc:2315747900',
-      //'a=sendrecv'
+      'a=rtpmap:0 PCMU/8000',
+      `a=rtcp:${audio.rtcpPort}`,
+      `a=ssrc:${ssrc}`,
+      'a=sendrecv'
     ]
       .filter((l) => l)
       .join('\r\n')) + '\r\n';
-
   }
 
   request({
@@ -205,7 +205,7 @@ export class SipCall {
           uri: this.sipOptions.to,
           headers: {
             to: {
-              name: '"SIP doorbell client"',
+              name: '"Scrypted SIP Plugin Client"',
               uri: this.sipOptions.to,
               params: this.toParams,
             },

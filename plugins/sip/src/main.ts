@@ -28,7 +28,6 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         this.binaryState = false;
         this.doorbellAudioActive = false;
         this.audioSilenceProcess = null;
-        this.console.log('SipCamera ctor() ' + JSON.stringify(this.providedInterfaces));
     }
 
     async takePicture(option?: PictureOptions): Promise<MediaObject> {
@@ -44,6 +43,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
             title: 'RTSP Stream URL',
             description: 'An RTSP Stream URL provided by the camera.',
             placeholder: 'rtsp://192.168.1.100[:554]/channel/101',
+            // TODO: Support different streams to support different resolutions
             multiple: true,
         },
     })
@@ -83,7 +83,23 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
                 type: 'password',
                 description: 'Optional: Password for snapshot http requests.',
             },
-            ...await this.getFFmpegInputSettings()
+            ...await this.getFFmpegInputSettings(),
+            {
+                key: 'sipfrom',
+                title: 'SIP From: URI',
+                value: this.storage.getItem('sipfrom'),
+                description: 'SIP URI From: field. Host part is the local IP to listen on. Optional local UDP port for SIP signaling can be specified.',
+                placeholder: '1234@192.168.0.111[:5060]',
+                multiple: false,
+            },
+            {
+                key: 'sipto',
+                title: 'SIP To: URI',
+                value: this.storage.getItem('sipto'),
+                description: 'SIP URI To: field.',
+                placeholder: '11@192.168.0.22',
+                multiple: false,
+            },
         ];
     }
 
@@ -151,8 +167,6 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
     async callDoorbell(): Promise<void> {
         let sip: SipSession;
 
-        this.console.log('calling doorbell');
-
         const cleanup = () => {
             if (this.session === sip)
                 this.session = undefined;
@@ -164,13 +178,25 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
             }
         }
 
-        let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.22", localIp: "10.10.10.70", localPort: 5060 };
-        //let sipOptions: SipOptions = { from: "sip:user1@10.10.10.70", to: "sip:11@10.10.10.80", localIp: "10.10.10.70", localPort: 5060 };
+        const from = this.storage.getItem('sipfrom');
+        const to = this.storage.getItem('sipto');
+        const localIp = from.split(':')[0].split('@')[1];
+        const localPort = from.split(':')[1] ?? 5060;
+
+        if (!from || !to || !localIp || !localPort) {
+            this.console.error('SIP From: and To: URIs not specified!');
+            return;
+        }
+
+        this.console.log(`SIP: Calling doorbell: From: ${from}, To: ${to}`);
+        this.console.log(`SIP: localIp: ${localIp}, localPort: ${localPort}`);
+
+        let sipOptions: SipOptions = { from: "sip:" + from, to: "sip:" + to, localIp: "10.10.10.70", localPort: 5060 };
 
         sip = await SipSession.createSipSession(this.console, this.name, sipOptions);
         sip.onCallEnded.subscribe(cleanup);
         this.remoteRtpDescription = await sip.start();
-        this.console.log('sip remote sdp', this.remoteRtpDescription.sdp)
+        this.console.log('SIP: Received remote SDP:\n', this.remoteRtpDescription.sdp)
 
         let [rtpPort, rtcpPort] = await SipSession.reserveRtpRtcpPorts()
         this.console.log(`Reserved RTP port ${rtpPort} and RTCP port ${rtcpPort} for incoming SIP audio`);
@@ -350,33 +376,6 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         return port;
     }
 
-    // async startAudioServerUdp(): Promise<number> {
-    //     const ffmpegPath = await mediaManager.getFFmpegPath();
-
-    //         const ffmpegArgs = [
-    //             '-hide_banner',
-    //             '-nostats',
-    //             '-re',
-    //             '-f', 'lavfi',
-    //             '-i', 'anullsrc=r=8000:cl=mono',
-    //             '-f', 'mulaw',
-    //             '-channel_layout', 'mono',
-    //             '-f', 'rtp',
-    //             'rtp://127.0.0.1:12345'
-    //         ];
-
-    //         safePrintFFmpegArguments(console, ffmpegArgs);
-    //         const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
-    //             stdio: ['pipe', 'pipe', 'pipe'],
-    //         });
-    //         ffmpegLogInitialOutput(console, cp);
-
-    //         cp.stdout.on('data', data => this.console.log(data.toString()));
-    //         cp.stderr.on('data', data => this.console.log(data.toString()));
-
-    //     return 12345;
-    // }
-
     async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
         const index = this.getRawVideoStreamOptions()?.findIndex(vso => vso.id === options.id);
         const ffmpegInputs = this.storageSettings.values.ffmpegInputs as string[];
@@ -386,14 +385,11 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
             throw new Error('video streams not set up or no longer exists.');
 
         const port = await this.startAudioServer();
-        //const port = await this.startAudioServerUdp();
 
         const ret: FFmpegInput = {
             url: undefined,
             inputArguments: [
-                //'-vsync', 'passthrough',
                 '-analyzeduration', '0',
-                //'-probesize', '500000',
                 '-probesize', '32',
                 '-fflags', 'nobuffer',
                 '-flags', 'low_delay',
@@ -406,20 +402,6 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
                 '-channel_layout', 'mono',
                 '-use_wallclock_as_timestamps', 'true',
                 '-i', `tcp://127.0.0.1:${port}?tcp_nodelay=1`,
-                //'-af', 'aresample=async=1',
-
-                // '-f', 'rtp',
-                // '-channel_layout', 'mono',
-                // '-i', `rtp://127.0.0.1:${port}`,
-                // '-ac', '1',
-                // '-f', 'mulaw',
-                // '-ar', '8000',
-
-                // '-re',
-                // '-thread_queue_size', '0',
-                // '-async', '1',
-                // '-f', 'lavfi',
-                // '-i', 'anullsrc=r=8000:cl=mono',
             ],
             mediaStreamOptions: options,
         };
