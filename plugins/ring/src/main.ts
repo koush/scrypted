@@ -917,34 +917,38 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 };
                 devices.push(device);
 
+                const getScryptedDevice = async () => {
+                    const locationDevice = await this.getDevice(location.id);
+                    const scryptedDevice = await locationDevice?.getDevice(nativeId);
+                    return scryptedDevice;
+                }
+
                 camera.onDoorbellPressed?.subscribe(async e => {
                     this.console.log(camera.name, 'onDoorbellPressed', e);
-                    const locationDevice = this.devices.get(location.id);
-                    const scryptedDevice = locationDevice?.devices.get(nativeId);
+                    const scryptedDevice = await getScryptedDevice();
                     scryptedDevice?.triggerBinaryState();
                 });
-                camera.onMotionDetected?.subscribe((motionDetected) => {
+                camera.onMotionDetected?.subscribe(async motionDetected => {
                     if (motionDetected)
                         this.console.log(camera.name, 'onMotionDetected');
-                    const scryptedDevice = this.devices.get(nativeId);
+                    const scryptedDevice = await getScryptedDevice();
                     if (scryptedDevice)
                         scryptedDevice.motionDetected = motionDetected;
                 });
-                camera.onMotionDetectedPolling?.subscribe((motionDetected) => {
+                camera.onMotionDetectedPolling?.subscribe(async motionDetected => {
                     if (motionDetected)
                         this.console.log(camera.name, 'onMotionDetected');
-                    const scryptedDevice = this.devices.get(nativeId);
+                    const scryptedDevice = await getScryptedDevice();
                     if (scryptedDevice)
                         scryptedDevice.motionDetected = motionDetected;
                 });
-                camera.onBatteryLevel?.subscribe(() => {
-                    const scryptedDevice = this.devices.get(nativeId);
+                camera.onBatteryLevel?.subscribe(async () => {
+                    const scryptedDevice = await getScryptedDevice();
                     if (scryptedDevice)
                         scryptedDevice.batteryLevel = camera.batteryLevel;
                 });
-                camera.onData.subscribe(data => {
-                    const locationDevice = this.devices.get(location.id);
-                    const scryptedDevice = locationDevice?.devices.get(nativeId);
+                camera.onData.subscribe(async data => {
+                    const scryptedDevice = await getScryptedDevice();
                     scryptedDevice?.updateState(data)
                 });
             }
