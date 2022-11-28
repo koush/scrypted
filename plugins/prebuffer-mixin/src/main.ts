@@ -1804,12 +1804,16 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
   }
 
   async releaseMixin(id: string, mixinDevice: PrebufferMixin) {
-    const current = this.currentMixins.get(id);
-    this.currentMixins.delete(id);
     try {
       await mixinDevice.release();
     }
-    finally {
+    catch (e) {
+    }
+
+    const current = this.currentMixins.get(id);
+    const currentMixin = await current?.mixin;
+    if (currentMixin === mixinDevice && this.currentMixins.get(id) === current) {
+      this.currentMixins.delete(id);
       current?.terminate?.();
     }
   }
