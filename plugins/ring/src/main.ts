@@ -563,7 +563,7 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
         return sessionControl;
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         return new RingCameraLight(this);
     }
 
@@ -634,9 +634,9 @@ class RingCameraDevice extends ScryptedDeviceBase implements DeviceProvider, Cam
         return location.cameras?.find(camera => camera.id.toString() === this.nativeId);
     }
 
-    updateState(data: CameraData) {
+    async updateState(data: CameraData) {
         if (this.findCamera().hasLight && data.led_status) {
-            const light = this.getDevice(undefined);
+            const light = await this.getDevice(undefined);
             light.on = data.led_status === 'on';
         }
     }
@@ -789,6 +789,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 ffmpegPath: await mediaManager.getFFmpegPath(),
                 locationIds,
                 cameraStatusPollingSeconds,
+                cameraDingsPollingSeconds: this.settingsStorage.values.cameraDingsPollingSeconds,
                 systemId: this.settingsStorage.values.systemId,
             }, {
                 createPeerConnection: () => {
@@ -923,7 +924,15 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                     scryptedDevice?.triggerBinaryState();
                 });
                 camera.onMotionDetected?.subscribe((motionDetected) => {
-                    this.console.log(camera.name, 'onMotionDetected');
+                    if (motionDetected)
+                        this.console.log(camera.name, 'onMotionDetected');
+                    const scryptedDevice = this.devices.get(nativeId);
+                    if (scryptedDevice)
+                        scryptedDevice.motionDetected = motionDetected;
+                });
+                camera.onMotionDetectedPolling?.subscribe((motionDetected) => {
+                    if (motionDetected)
+                        this.console.log(camera.name, 'onMotionDetected');
                     const scryptedDevice = this.devices.get(nativeId);
                     if (scryptedDevice)
                         scryptedDevice.motionDetected = motionDetected;
@@ -968,7 +977,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
                 });
             }
 
-            const locationDevice = this.getDevice(location.id);
+            const locationDevice = await this.getDevice(location.id);
             for (const camera of cameras) {
                 locationDevice.getDevice(camera.id.toString());
             }
@@ -980,7 +989,7 @@ class RingPlugin extends ScryptedDeviceBase implements DeviceProvider, DeviceDis
         });
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         if (!this.devices.has(nativeId)) {
             const location = new RingLocationDevice(this, nativeId);
             this.devices.set(nativeId, location);

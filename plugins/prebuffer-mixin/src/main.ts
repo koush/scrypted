@@ -17,10 +17,11 @@ import net, { AddressInfo } from 'net';
 import semver from 'semver';
 import { Duplex } from 'stream';
 import { FileRtspServer } from './file-rtsp-server';
+import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
 import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
-import { getTranscodeMixinProviderId, REBROADCAST_MIXIN_INTERFACE_TOKEN, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
+import { getTranscodeMixinProviderId, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
 
@@ -1629,6 +1630,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       type: 'number',
       defaultValue: 1000000,
       description: 'The bitrate to use when remote streaming. This setting will only be used when transcoding or adaptive bitrate is enabled on a camera.',
+      onPut() {
+        sdk.deviceManager.onDeviceEvent('transcode', ScryptedInterface.Settings, undefined);
+      },
     },
     h264EncoderArguments: {
       title: 'H264 Encoder Arguments',
@@ -1637,6 +1641,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       defaultValue: getDebugModeH264EncoderArgs().join(' '),
       combobox: true,
       mapPut: (oldValue, newValue) => getH264EncoderArgs()[newValue]?.join(' ') || newValue || getDebugModeH264EncoderArgs().join(' '),
+      onPut() {
+        sdk.deviceManager.onDeviceEvent('transcode', ScryptedInterface.Settings, undefined);
+      },
     }
   });
   currentMixins = new Map<string, {

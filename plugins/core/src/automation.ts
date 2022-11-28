@@ -212,7 +212,7 @@ export class Automation extends ScryptedDeviceBase implements OnOff, Settings {
             }
         }
         catch (e) {
-            console.error('automation load error', e);
+            // console.error('automation load error', e);
         }
     }
 }

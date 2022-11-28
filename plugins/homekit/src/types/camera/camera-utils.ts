@@ -53,13 +53,6 @@ export const ntpTime = () => {
 };
 
 export async function getStreamingConfiguration(device: ScryptedDevice & VideoCamera, isHomeHub: boolean, storage: Storage, request: StartStreamRequest) {
-    let adaptiveBitrate: string[] = [];
-    try {
-        adaptiveBitrate = JSON.parse(storage.getItem('adaptiveBitrate'));
-    }
-    catch (e) {
-    }
-
     // Observed packet times:
     // Opus (Local): 20
     // Opus (Remote): 60

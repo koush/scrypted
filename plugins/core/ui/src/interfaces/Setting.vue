@@ -165,7 +165,7 @@ export default {
             return eval(
               `(function() { var interfaces = ${JSON.stringify(
                 device.interfaces
-              )}; var type='${device.type}'; return ${expression} })`
+              )}; var type='${device.type}'; var id = '${device.id}'; return ${expression} })`
             )();
           } catch (e) {
             return true;

@@ -78,26 +78,84 @@ class EndpointManagerImpl implements EndpointManager {
         return ip?.includes(':') ? `[${ip}]` : ip;
     }
 
+    /**
+     * @deprecated
+     */
     async getAuthenticatedPath(nativeId?: ScryptedNativeId): Promise<string> {
-        return `/endpoint/${this.getEndpoint(nativeId)}/`;
+        return this.getPath(nativeId);
     }
+
+    /**
+     * @deprecated
+     */
     async getInsecurePublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
-        return `http://${await this.getUrlSafeIp()}:${await this.api.getComponent('SCRYPTED_INSECURE_PORT')}/endpoint/${this.getEndpoint(nativeId)}/public/`;
+        return this.getLocalEndpoint(nativeId, {
+            insecure: true,
+            public: true,
+        })
     }
+
+    /**
+     * @deprecated
+     */
     async getPublicCloudEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
-        const local = await this.getPublicLocalEndpoint(nativeId);
-        const mo = await this.mediaManager.createMediaObject(Buffer.from(local), ScryptedMimeTypes.LocalUrl);
-        return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
+        return this.getCloudEndpoint(nativeId, {
+            public: true,
+        });
     }
+
+    /**
+     * @deprecated
+     */
     async getPublicLocalEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
-        return `https://${await this.getUrlSafeIp()}:${await this.api.getComponent('SCRYPTED_SECURE_PORT')}/endpoint/${this.getEndpoint(nativeId)}/public/`;
+        return this.getLocalEndpoint(nativeId, {
+            public: true,
+        })
     }
+
+    /**
+     * @deprecated
+     */
     async getPublicPushEndpoint(nativeId?: ScryptedNativeId): Promise<string> {
         const mo = await this.mediaManager.createMediaObject(Buffer.from(this.getEndpoint(nativeId)), ScryptedMimeTypes.PushEndpoint);
         return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.PushEndpoint);
     }
-    async deliverPush(endpoint: string, request: HttpRequest) {
-        return this.api.deliverPush(endpoint, request);
+
+    async deliverPush(id: string, request: HttpRequest) {
+        return this.api.deliverPush(id, request);
+    }
+
+    async getPath(nativeId?: string, options?: { public?: boolean; }): Promise<string> {
+        return `/endpoint/${this.getEndpoint(nativeId)}/${options?.public ? 'public/' : ''}`
+    }
+
+    async getLocalEndpoint(nativeId?: string, options?: { public?: boolean; insecure?: boolean; }): Promise<string> {
+        const protocol = options?.insecure ? 'http' : 'https';
+        const port = await this.api.getComponent(options?.insecure ? 'SCRYPTED_INSECURE_PORT' : 'SCRYPTED_SECURE_PORT');
+        const path = await this.getPath(nativeId, options);
+        const url =  `${protocol}://${await this.getUrlSafeIp()}:${port}${path}`;
+        return url;
+    }
+
+    async getCloudEndpoint(nativeId?: string, options?: { public?: boolean; }): Promise<string> {
+        const local = await this.getLocalEndpoint(nativeId, options);
+        const mo = await this.mediaManager.createMediaObject(Buffer.from(local), ScryptedMimeTypes.LocalUrl);
+        return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.LocalUrl);
+    }
+
+    async getCloudPushEndpoint(nativeId?: string): Promise<string> {
+        const mo = await this.mediaManager.createMediaObject(Buffer.from(this.getEndpoint(nativeId)), ScryptedMimeTypes.PushEndpoint);
+        return this.mediaManager.convertMediaObjectToUrl(mo, ScryptedMimeTypes.PushEndpoint);
+    }
+
+    async setLocalAddresses(addresses: string[]): Promise<void> {
+        const addressSettings = await this.api.getComponent('addresses');
+        return addressSettings.setLocalAddresses(addresses);
+    }
+
+    async getLocalAddresses(): Promise<string[]> {
+        const addressSettings = await this.api.getComponent('addresses');
+        return await addressSettings.getLocalAddresses() as string[];
     }
 }
 
@@ -326,10 +384,10 @@ export async function setupPluginRemote(peer: RpcPeer, api: PluginAPI, pluginId:
             }
 
             if (eventDetails.property) {
-                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, getSystemState()[id]?.[eventDetails.property], eventDetails.changed).catch(() => {});
+                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, getSystemState()[id]?.[eventDetails.property], eventDetails.changed).catch(() => { });
             }
             else {
-                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed).catch(() => {});
+                remote.notify(id, eventDetails.eventTime, eventDetails.eventInterface, eventDetails.property, eventData, eventDetails.changed).catch(() => { });
             }
         });
 

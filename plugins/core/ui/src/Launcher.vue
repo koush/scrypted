@@ -24,7 +24,23 @@
                                 </v-list-item-title>
                             </v-list-item>
                         </v-list>
-                        <div style="justify-content: center; display: flex;">
+                        <v-card-actions>
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon href="https://twitter.com/scryptedapp/">
+                                        <v-icon small>fab fa-twitter</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>Twitter</span>
+                            </v-tooltip>
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on }">
+                                    <v-btn v-on="on" icon href="https://www.reddit.com/r/Scrypted/">
+                                        <v-icon small>fab fa-reddit</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>Reddit</span>
+                            </v-tooltip>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
                                     <v-btn v-on="on" icon href="https://github.com/koush/scrypted">
@@ -41,6 +57,7 @@
                                 </template>
                                 <span>Discord</span>
                             </v-tooltip>
+                            <v-spacer></v-spacer>
                             <v-tooltip bottom>
                                 <template v-slot:activator="{ on }">
                                     <v-btn v-on="on" icon @click="logout">
@@ -49,7 +66,7 @@
                                 </template>
                                 <span>Log Out</span>
                             </v-tooltip>
-                        </div>
+                        </v-card-actions>
                     </v-card>
                     <v-card width="300px" class="elevation-24 mt-4" v-if="showNvr" dark>
                         <v-card-title style="justify-content: center;" class="headline text-uppercase">Support Scrypted

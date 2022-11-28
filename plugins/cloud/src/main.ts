@@ -210,7 +210,7 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         }
     }
 
-    getDevice(nativeId: string) {
+    async getDevice(nativeId: string) {
         return this.push;
     }
 

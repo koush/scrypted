@@ -1,4 +1,5 @@
-import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaStreamDestination, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, VideoCamera } from "@scrypted/sdk";
+import sdk, { EventListener, EventListenerRegister, FFmpegInput, LockState, MediaStreamDestination, RequestMediaStreamOptions, ResponseMediaStreamOptions, ScryptedDevice, ScryptedDeviceBase, ScryptedInterface, ScryptedInterfaceDescriptors, ScryptedMimeTypes, Setting, Settings, SettingValue, VideoCamera } from "@scrypted/sdk";
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 const { systemManager, mediaManager, deviceManager } = sdk;
 
 export interface AggregateDevice extends ScryptedDeviceBase {
@@ -140,11 +141,38 @@ function createVideoCamera(devices: VideoCamera[], console: Console): VideoCamer
 }
 
 export function createAggregateDevice(nativeId: string): AggregateDevice {
-    class AggregateDeviceImpl extends ScryptedDeviceBase {
+    class AggregateDeviceImpl extends ScryptedDeviceBase implements Settings {
         listeners: EventListenerRegister[] = [];
+        storageSettings = new StorageSettings(this, {
+            deviceInterfaces: {
+                title: 'Selected Device Interfaces',
+                description: 'The components of other devices to combine into this device group.',
+                type: 'interface',
+                multiple: true,
+                deviceFilter: `id !== ${this.id} && interface !== ${ScryptedInterface.Settings}`,
+            }
+        })
 
         constructor() {
             super(nativeId);
+
+            try {
+                const data = this.storage.getItem('data');
+                if (data) {
+                    const { deviceInterfaces } = JSON.parse(data);
+                    this.storageSettings.values.deviceInterfaces = deviceInterfaces;
+                }
+            }
+            catch (e) {
+            }
+           this.storage.removeItem('data');
+        }
+
+        getSettings(): Promise<Setting[]> {
+            return this.storageSettings.getSettings();
+        }
+        putSetting(key: string, value: SettingValue): Promise<void> {
+            return this.storageSettings.putSetting(key, value);
         }
 
         makeListener(iface: string, devices: ScryptedDevice[]) {
@@ -194,10 +222,8 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
             this.listeners = [];
 
             try {
-                const data = JSON.parse(this.storage.getItem('data'));
-
                 const interfaces = new Map<string, string[]>();
-                for (const deviceInterface of data.deviceInterfaces) {
+                for (const deviceInterface of this.storageSettings.values.deviceInterfaces as string[]) {
                     const parts = deviceInterface.split('#');
                     const id = parts[0];
                     const iface = parts[1];
@@ -244,7 +270,7 @@ export function createAggregateDevice(nativeId: string): AggregateDevice {
                 return [...interfaces.keys()];
             }
             catch (e) {
-                this.console.error('error loading aggregate device', e);
+                // this.console.error('error loading aggregate device', e);
                 return [];
             }
         }

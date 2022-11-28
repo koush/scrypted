@@ -144,7 +144,7 @@ export async function startRtpForwarderProcess(console: Console, ffmpegInput: FF
     const { rtspMode, onRtspClient, rtspClientForceTcp } = options || {};
     const { video, audio } = rtpTracks;
     rtpTracks = Object.assign({}, rtpTracks);
-    const videoCodec = video.codecCopy;
+    const videoCodec = video?.codecCopy;
     const audioCodec = audio?.codecCopy;
     const ffmpegPath = await mediaManager.getFFmpegPath();
 

@@ -34,6 +34,22 @@
         <v-card-actions>
           <v-tooltip bottom>
             <template v-slot:activator="{ on }">
+              <v-btn v-on="on" icon href="https://twitter.com/scryptedapp/">
+                <v-icon small>fab fa-twitter</v-icon>
+              </v-btn>
+            </template>
+            <span>Twitter</span>
+          </v-tooltip>
+          <v-tooltip bottom>
+            <template v-slot:activator="{ on }">
+              <v-btn v-on="on" icon href="https://www.reddit.com/r/Scrypted/">
+                <v-icon small>fab fa-reddit</v-icon>
+              </v-btn>
+            </template>
+            <span>Reddit</span>
+          </v-tooltip>
+          <v-tooltip bottom>
+            <template v-slot:activator="{ on }">
               <v-btn v-on="on" icon href="https://github.com/koush/scrypted">
                 <v-icon small>fab fa-github</v-icon>
               </v-btn>
@@ -94,7 +110,7 @@ export default {
           return;
         }
         try {
-          const redirect_uri = new URL(window.location).searchParams.get('redirect_uri'); 
+          const redirect_uri = new URL(window.location).searchParams.get('redirect_uri');
           if (redirect_uri) {
             window.location = redirect_uri;
             return;

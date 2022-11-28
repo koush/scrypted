@@ -85,6 +85,8 @@ export class PluginComponent {
     }
     async getDeviceInfo(id: string) {
         const pluginDevice = this.scrypted.findPluginDeviceById(id);
+        if (!pluginDevice)
+            throw new Error(`device ${id} does not exist`);
         return {
             mixins: getState(pluginDevice, ScryptedInterfaceProperty.mixins) || [],
             pluginId: pluginDevice.pluginId,

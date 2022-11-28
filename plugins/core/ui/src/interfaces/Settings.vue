@@ -41,15 +41,15 @@
   </v-card>
 </template>
 <script>
+import { ScryptedInterface } from "@scrypted/types";
+import Vue from 'vue';
+import AvailableMixins from "../components/AvailableMixins.vue";
+import CardTitle from "../components/CardTitle.vue";
+import { deviceIsEditable, hasFixedPhysicalLocation, inferTypesFromInterfaces } from "../components/helpers";
+import Mixin from "../components/Mixin.vue";
 import RPCInterface from "./RPCInterface.vue";
 import Setting from "./Setting.vue";
 import SettingMultiple from "./SettingMultiple.vue";
-import CardTitle from "../components/CardTitle.vue";
-import AvailableMixins from "../components/AvailableMixins.vue";
-import Mixin from "../components/Mixin.vue";
-import { ScryptedInterface } from "@scrypted/types";
-import { hasFixedPhysicalLocation, inferTypesFromInterfaces } from "../components/helpers";
-import Vue from 'vue';
 
 export default {
   components: {
@@ -93,7 +93,7 @@ export default {
 
       let addAt = 0;
 
-      if (this.device && !this.device.interfaces.includes(ScryptedInterface.ScryptedPlugin)) {
+      if (deviceIsEditable(this.device)) {
         const inferredTypes = inferTypesFromInterfaces(
           this.device.type,
           this.device.providedType,

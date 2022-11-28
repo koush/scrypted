@@ -11,8 +11,8 @@ export const ScriptCoreNativeId = 'scriptcore';
 export class ScriptCore extends ScryptedDeviceBase implements DeviceProvider, DeviceCreator, Readme {
     scripts = new Map<string, Promise<Script>>();
 
-    constructor(nativeId: string) {
-        super(nativeId);
+    constructor() {
+        super(ScriptCoreNativeId);
 
         for (const nativeId of deviceManager.getNativeIds()) {
             if (nativeId?.startsWith('script:')) {

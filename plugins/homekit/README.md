@@ -4,7 +4,7 @@ The HomeKit Plugin bridges compatible devices in Scrypted to HomeKit.
 
 ## Camera Codec Settings
 
-You can use the admin page provided by your camera manufacturer to set the optimal codec settings as required by HomeKit. It is highly recommended to use the codec settings detailed in the [Scrypted Codec Settings guide](https://github.com/koush/scrypted/wiki/Codec-Settings).
+You can use the admin page provided by your camera manufacturer to configure codec settings as required by HomeKit. It is highly recommended to configure the codec settings for *all* the camera substreams by using the [Scrypted Codec Settings guide](https://github.com/koush/scrypted/wiki/Codec-Settings). This will yield optimal local and remote streaming reliability.
 
 ## Troubleshooting
 

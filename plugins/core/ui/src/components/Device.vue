@@ -185,7 +185,7 @@
           <LogCard :rows="15" :logRoute="`/device/${id}/`"></LogCard>
         </v-flex>
 
-        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || !device.interfaces.includes(ScryptedInterface.ScryptedPlugin))">
+        <v-flex xs12 v-if="!device.interfaces.includes(ScryptedInterface.Settings) && (availableMixins.length || deviceIsEditable(device))">
           <Settings :device="device"></Settings>
         </v-flex>
       </v-layout>
@@ -206,6 +206,7 @@ import {
   getAlertIcon,
   hasFixedPhysicalLocation,
   getInterfaceFriendlyName,
+  deviceIsEditable,
 } from "./helpers";
 import { ScryptedInterface } from "@scrypted/types";
 import RTCSignalingClient from "../interfaces/RTCSignalingClient.vue";
@@ -244,7 +245,6 @@ import Readme from "../interfaces/Readme.vue";
 import Scriptable from "../interfaces/automation/Scriptable.vue";
 import Storage from "../common/Storage.vue";
 import { checkUpdate } from "./plugin/plugin";
-import AggregateDevice from "./aggregate/AggregateDevice.vue";
 import Automation from "./automation/Automation.vue";
 import PluginAdvancedUpdate from "./plugin/PluginAdvancedUpdate.vue";
 import Vue from "vue";
@@ -376,7 +376,6 @@ export default {
 
     Storage,
 
-    AggregateDevice,
     Automation,
     Program,
     Scriptable,
@@ -410,6 +409,7 @@ export default {
     },
   },
   methods: {
+    deviceIsEditable,
     getInterfaceFriendlyName,
     hasFixedPhysicalLocation,
     getComponentWebPath,
@@ -510,8 +510,6 @@ export default {
         this.deviceData = storage["data"];
         if (pluginData.nativeId?.startsWith("automation:")) {
           this.deviceComponent = "Automation";
-        } else if (pluginData.nativeId?.startsWith("aggregate:")) {
-          this.deviceComponent = "AggregateDevice";
         } else if (pluginData.nativeId?.startsWith("script:")) {
           this.deviceComponent = "Script";
           this.showConsole = true;

@@ -107,6 +107,19 @@ export class HomeKitPlugin extends ScryptedDeviceBase implements MixinProvider, 
     }
 
     async getSettings(): Promise<Setting[]> {
+        try {
+            this.storageSettings.settings.addressOverride.hide = false;
+            const service = await sdk.systemManager.getComponent('addresses');
+            if (service) {
+                if (this.storageSettings.values.addressOverride) {
+                    await service.setLocalAddresses([this.storageSettings.values.addressOverride]);
+                    this.storageSettings.values.addressOverride = undefined;
+                }
+                this.storageSettings.settings.addressOverride.hide = true;;
+            }
+        }
+        catch (e) {
+        }
         return this.storageSettings.getSettings();
     }
 

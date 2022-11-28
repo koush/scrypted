@@ -1,9 +1,15 @@
-import { DeviceState, MixinProvider, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
+import { DeviceState, MixinProvider, Readme, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface } from "@scrypted/sdk";
 import { typeToIcon } from "../ui/src/components/helpers";
 
-export class LauncherMixin extends ScryptedDeviceBase implements MixinProvider {
+export class LauncherMixin extends ScryptedDeviceBase implements MixinProvider, Readme {
+    async getReadmeMarkdown(): Promise<string> {
+        return 'Add Scrypted Plugins or Devices to the Scrypted launch screen for quick access.';
+    }
+
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
         if (interfaces.includes("@scrypted/launcher-ignore"))
+            return;
+        if (type === ScryptedDeviceType.Builtin || type === ScryptedDeviceType.API)
             return;
         return [
             ScryptedInterface.LauncherApplication,

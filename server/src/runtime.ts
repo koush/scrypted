@@ -28,6 +28,7 @@ import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
 import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import { AddressSettigns as AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
 import { CORSControl, CORSServer } from './services/cors';
 import { Info } from './services/info';
@@ -70,6 +71,11 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         },
     });
     cors: CORSServer[] = [];
+    pluginComponent = new PluginComponent(this);
+    servieControl = new ServiceControl(this);
+    alerts = new Alerts(this);
+    corsControl = new CORSControl(this);
+    addressSettings = new AddressSettings(this);
 
     constructor(datastore: Level, insecure: http.Server, secure: https.Server, app: express.Application) {
         super(app);
@@ -353,15 +359,17 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
             case 'info':
                 return new Info();
             case 'plugins':
-                return new PluginComponent(this);
+                return this.pluginComponent;
             case 'service-control':
-                return new ServiceControl(this);
+                return this.servieControl;
             case 'logger':
                 return this.logger;
             case 'alerts':
-                return new Alerts(this);
+                return this.alerts;
             case 'cors':
-                return new CORSControl(this);
+                return this.corsControl;
+            case 'addresses':
+                return this.addressSettings;
         }
     }
 

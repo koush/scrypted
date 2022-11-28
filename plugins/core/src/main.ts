@@ -1,57 +1,56 @@
-import { ScryptedDeviceBase, HttpRequestHandler, HttpRequest, HttpResponse, EngineIOHandler, Device, DeviceProvider, ScryptedInterface, ScryptedDeviceType, RTCSignalingChannel, VideoCamera, VideoRecorder } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
-import Router from 'router';
-import { UserStorage } from './userStorage';
-import { RpcPeer } from '../../../server/src/rpc';
-import { setupPluginRemote } from '../../../server/src/plugin/plugin-remote';
-import { PluginAPIProxy } from '../../../server/src/plugin/plugin-api';
+import sdk, { DeviceProvider, EngineIOHandler, HttpRequest, HttpRequestHandler, HttpResponse, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue } from '@scrypted/sdk';
+import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import fs from 'fs';
-import { sendJSON } from './http-helpers';
-import { Automation } from './automation';
-import { AggregateDevice, createAggregateDevice } from './aggregate';
 import net from 'net';
-import { updatePluginsData } from './update-plugins';
+import os from 'os';
+import Router from 'router';
+import { AggregateCore, AggregateCoreNativeId } from './aggregate-core';
+import { AutomationCore, AutomationCoreNativeId } from './automations-core';
+import { LauncherMixin } from './launcher-mixin';
 import { MediaCore } from './media-core';
 import { ScriptCore, ScriptCoreNativeId } from './script-core';
-import { LauncherMixin } from './launcher-mixin';
 
-const { pluginHostAPI, systemManager, deviceManager, mediaManager, endpointManager } = sdk;
+const { systemManager, deviceManager, endpointManager } = sdk;
 
 const indexHtml = fs.readFileSync('dist/index.html').toString();
+
+export function getAddresses() {
+    const addresses = Object.entries(os.networkInterfaces()).filter(([iface]) => iface.startsWith('en') || iface.startsWith('eth') || iface.startsWith('wlan')).map(([_, addr]) => addr).flat().map(info => info.address).filter(address => address);
+    return addresses;
+}
 
 interface RoutedHttpRequest extends HttpRequest {
     params: { [key: string]: string };
 }
 
-async function reportAutomation(nativeId: string, name?: string) {
-    const device: Device = {
-        name,
-        nativeId,
-        type: ScryptedDeviceType.Automation,
-        interfaces: [ScryptedInterface.OnOff, ScryptedInterface.Settings]
-    }
-    await deviceManager.onDeviceDiscovered(device);
-}
 
-
-async function reportAggregate(nativeId: string, interfaces: string[]) {
-    const device: Device = {
-        name: undefined,
-        nativeId,
-        type: ScryptedDeviceType.Unknown,
-        interfaces,
-    }
-    await deviceManager.onDeviceDiscovered(device);
-}
-
-class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider {
+class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, EngineIOHandler, DeviceProvider, Settings {
     router: any = Router();
     publicRouter: any = Router();
     mediaCore: MediaCore;
     launcher: LauncherMixin;
     scriptCore: ScriptCore;
-    automations = new Map<string, Automation>();
-    aggregate = new Map<string, AggregateDevice>();
+    aggregateCore: AggregateCore;
+    automationCore: AutomationCore;
+    localAddresses: string[];
+    storageSettings = new StorageSettings(this, {
+        localAddresses: {
+            title: 'Scrypted Server Address',
+            description: 'The IP address used by the Scrypted server. Set this to the wired IP address to prevent usage of a wireless address.',
+            combobox: true,
+            async onGet() {
+                return {
+                    choices: getAddresses(),
+                };
+            },
+            mapGet: () => this.localAddresses?.[0],
+            onPut: async (oldValue, newValue) => {
+                this.localAddresses = newValue ? [newValue] : undefined;
+                const service = await sdk.systemManager.getComponent('addresses');
+                service.setLocalAddresses(this.localAddresses);
+            },
+        }
+    });
 
     constructor() {
         super();
@@ -62,7 +61,7 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
                     name: 'Media Core',
                     nativeId: 'mediacore',
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
-                    type: ScryptedDeviceType.API,
+                    type: ScryptedDeviceType.Builtin,
                 },
             );
             this.mediaCore = new MediaCore('mediacore');
@@ -70,86 +69,51 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
         (async () => {
             await deviceManager.onDeviceDiscovered(
                 {
-                    name: 'Scripting Core',
+                    name: 'Scripts',
                     nativeId: ScriptCoreNativeId,
                     interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
-                    type: ScryptedDeviceType.API,
+                    type: ScryptedDeviceType.Builtin,
                 },
             );
-            this.scriptCore = new ScriptCore(ScriptCoreNativeId);
+            this.scriptCore = new ScriptCore();
         })();
-
-        deviceManager.onDeviceDiscovered({
-            name: 'Add to Launcher',
-            nativeId: 'launcher',
-            interfaces: [
-                '@scrypted/launcher-ignore',
-                ScryptedInterface.MixinProvider,
-            ],
-            type: ScryptedDeviceType.Builtin,
-        });
-
-        for (const nativeId of deviceManager.getNativeIds()) {
-            if (nativeId?.startsWith('automation:')) {
-                const automation = new Automation(nativeId);
-                this.automations.set(nativeId, automation);
-                reportAutomation(nativeId, automation.providedName);
-            }
-            else if (nativeId?.startsWith('aggregate:')) {
-                const aggregate = createAggregateDevice(nativeId);
-                this.aggregate.set(nativeId, aggregate);
-                reportAggregate(nativeId, aggregate.computeInterfaces());
-            }
-        }
 
         (async () => {
-            const updatePluginsNativeId = 'automation:update-plugins'
-            let updatePlugins = this.automations.get(updatePluginsNativeId);
-            if (!updatePlugins) {
-                await reportAutomation(updatePluginsNativeId, 'Autoupdate Plugins');
-                updatePlugins = new Automation(updatePluginsNativeId);
-                updatePlugins.storage.setItem('data', JSON.stringify(updatePluginsData));
-                this.automations.set(updatePluginsNativeId, updatePlugins);
-            }
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Automations',
+                    nativeId: AutomationCoreNativeId,
+                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+            this.automationCore = new AutomationCore();
         })();
 
-        this.router.post('/api/new/automation', async (req: RoutedHttpRequest, res: HttpResponse) => {
-            const nativeId = `automation:${Math.random()}`;
-            await reportAutomation(nativeId);
-            const automation = new Automation(nativeId);
-            this.automations.set(nativeId, automation);
-            const { id } = automation;
-            sendJSON(res, {
-                id,
-            });
-        });
+        (async () => {
+            await deviceManager.onDeviceDiscovered(
+                {
+                    name: 'Device Groups',
+                    nativeId: AggregateCoreNativeId,
+                    interfaces: [ScryptedInterface.DeviceProvider, ScryptedInterface.DeviceCreator, ScryptedInterface.Readme],
+                    type: ScryptedDeviceType.Builtin,
+                },
+            );
+            this.aggregateCore = new AggregateCore();
+        })();
+    }
 
-        this.router.post('/api/new/aggregate', async (req: RoutedHttpRequest, res: HttpResponse) => {
-            const nativeId = `aggregate:${Math.random()}`;
-            await reportAggregate(nativeId, []);
-            const aggregate = createAggregateDevice(nativeId);
-            this.aggregate.set(nativeId, aggregate);
-            const { id } = aggregate;
-            sendJSON(res, {
-                id,
-            });
-        });
-
-        // update the automations and grouped devices on storage change.
-        systemManager.listen((eventSource, eventDetails, eventData) => {
-            if (eventDetails.eventInterface === 'Storage') {
-                let ids = [...this.automations.values()].map(a => a.id);
-                if (ids.includes(eventSource.id)) {
-                    const automation = [...this.automations.values()].find(a => a.id === eventSource.id);
-                    automation.bind();
-                }
-                ids = [...this.aggregate.values()].map(a => a.id);
-                if (ids.includes(eventSource.id)) {
-                    const aggregate = [...this.aggregate.values()].find(a => a.id === eventSource.id);
-                    reportAggregate(aggregate.nativeId, aggregate.computeInterfaces());
-                }
-            }
-        });
+    async getSettings(): Promise<Setting[]> {
+        try {
+            const service = await sdk.systemManager.getComponent('addresses');
+            this.localAddresses = await service.getLocalAddresses();
+        }
+        catch (e) {
+        }
+        return this.storageSettings.getSettings();
+    }
+    async putSetting(key: string, value: SettingValue): Promise<void> {
+        await this.storageSettings.putSetting(key, value);
     }
 
     async getDevice(nativeId: string) {
@@ -159,10 +123,10 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
             return this.mediaCore;
         if (nativeId === ScriptCoreNativeId)
             return this.scriptCore;
-        if (nativeId?.startsWith('automation:'))
-            return this.automations.get(nativeId);
-        if (nativeId?.startsWith('aggregate:'))
-            return this.aggregate.get(nativeId);
+        if (nativeId === AutomationCoreNativeId)
+            return this.automationCore;
+        if (nativeId === AggregateCoreNativeId)
+            return this.aggregateCore;
     }
 
     checkEngineIoEndpoint(request: HttpRequest, name: string) {
@@ -252,4 +216,4 @@ class ScryptedCore extends ScryptedDeviceBase implements HttpRequestHandler, Eng
     }
 }
 
-export default new ScryptedCore();
+export default ScryptedCore;
