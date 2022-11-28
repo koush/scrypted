@@ -20,12 +20,14 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
     audioOutProcess: ChildProcess;
     doorbellAudioActive: boolean;
     audioInProcess: ChildProcess;
+    audioSilenceProcess: ChildProcess;
     clientSocket: net.Socket;
 
     constructor(nativeId: string, public provider: SipCamProvider) {
         super(nativeId);
         this.binaryState = false;
         this.doorbellAudioActive = false;
+        this.audioSilenceProcess = null;
         this.console.log('SipCamera ctor() ' + JSON.stringify(this.providedInterfaces));
     }
 
@@ -288,41 +290,54 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         };
     }
 
-    async runAudioServer(): Promise<number> {
+    async startSilenceGenerator() {
+
+        if (this.audioSilenceProcess)
+            return;
+
         const ffmpegPath = await mediaManager.getFFmpegPath();
+        const ffmpegArgs = [
+            '-hide_banner',
+            '-nostats',
+            '-re',
+            '-f', 'lavfi',
+            '-i', 'anullsrc=r=8000:cl=mono',
+            '-f', 'mulaw',
+            'pipe:3'
+        ];
+
+        safePrintFFmpegArguments(console, ffmpegArgs);
+        const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
+            stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+        });
+        this.audioSilenceProcess = cp;
+        ffmpegLogInitialOutput(console, cp);
+
+        cp.stdout.on('data', data => this.console.log(data.toString()));
+        cp.stderr.on('data', data => this.console.log(data.toString()));
+        cp.stdio[3].on('data', data => {
+            if (!this.doorbellAudioActive && this.clientSocket) {
+                this.clientSocket.write(data);
+            }
+        });
+    }
+
+    stopSilenceGenerator() {
+        this.audioSilenceProcess?.kill();
+        this.audioSilenceProcess = null;
+    }
+
+    async startAudioServer(): Promise<number> {
 
         const server = net.createServer(async (clientSocket) => {
             clearTimeout(serverTimeout);
 
             this.clientSocket = clientSocket;
 
-            const ffmpegArgs = [
-                '-hide_banner',
-                '-nostats',
-                '-re',
-                '-f', 'lavfi',
-                '-i', 'anullsrc=r=8000:cl=mono',
-                '-f', 'mulaw',
-                'pipe:3'
-            ];
+            this.startSilenceGenerator();
 
-            safePrintFFmpegArguments(console, ffmpegArgs);
-            const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
-                stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-            });
-            ffmpegLogInitialOutput(console, cp);
-
-            cp.stdout.on('data', data => this.console.log(data.toString()));
-            cp.stderr.on('data', data => this.console.log(data.toString()));
-
-            cp.stdio[3].on('data', data => {
-                if (!this.doorbellAudioActive) {
-                clientSocket.write(data);
-                }
-            });
-
-            clientSocket.on('close', () => {
-                cp.kill();
+            this.clientSocket.on('close', () => {
+                this.stopSilenceGenerator();
                 this.clientSocket = null;
             });
         });
@@ -335,6 +350,33 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         return port;
     }
 
+    // async startAudioServerUdp(): Promise<number> {
+    //     const ffmpegPath = await mediaManager.getFFmpegPath();
+
+    //         const ffmpegArgs = [
+    //             '-hide_banner',
+    //             '-nostats',
+    //             '-re',
+    //             '-f', 'lavfi',
+    //             '-i', 'anullsrc=r=8000:cl=mono',
+    //             '-f', 'mulaw',
+    //             '-channel_layout', 'mono',
+    //             '-f', 'rtp',
+    //             'rtp://127.0.0.1:12345'
+    //         ];
+
+    //         safePrintFFmpegArguments(console, ffmpegArgs);
+    //         const cp = child_process.spawn(ffmpegPath, ffmpegArgs, {
+    //             stdio: ['pipe', 'pipe', 'pipe'],
+    //         });
+    //         ffmpegLogInitialOutput(console, cp);
+
+    //         cp.stdout.on('data', data => this.console.log(data.toString()));
+    //         cp.stderr.on('data', data => this.console.log(data.toString()));
+
+    //     return 12345;
+    // }
+
     async createVideoStream(options?: ResponseMediaStreamOptions): Promise<MediaObject> {
         const index = this.getRawVideoStreamOptions()?.findIndex(vso => vso.id === options.id);
         const ffmpegInputs = this.storageSettings.values.ffmpegInputs as string[];
@@ -343,28 +385,41 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         if (!ffmpegInput)
             throw new Error('video streams not set up or no longer exists.');
 
-        const port = await this.runAudioServer();
+        const port = await this.startAudioServer();
+        //const port = await this.startAudioServerUdp();
 
         const ret: FFmpegInput = {
             url: undefined,
             inputArguments: [
-                // '-r', '15',
-                // '-i', 'http://10.10.10.10:54321/stream',
-                // '-avoid_negative_ts', 'make_zero',
-                 '-fflags', 'nobuffer',
-                 '-flags', 'low_delay',
-                 '-strict', 'experimental',
-                // '-fflags', '+genpts+discardcorrupt',
-                // '-use_wallclock_as_timestamps', '1'
+                //'-vsync', 'passthrough',
                 '-analyzeduration', '0',
-                '-probesize', '500000',
+                //'-probesize', '500000',
+                '-probesize', '32',
+                '-fflags', 'nobuffer',
+                '-flags', 'low_delay',
                 '-f', 'rtsp',
                 '-rtsp_transport', 'tcp',
                 '-i', ffmpegInput, //'rtsp://10.10.10.10:8554/hauseingang',
                 '-f', 'mulaw',
                 '-ac', '1',
                 '-ar', '8000',
-                '-i', `tcp://127.0.0.1:${port}`
+                '-channel_layout', 'mono',
+                '-use_wallclock_as_timestamps', 'true',
+                '-i', `tcp://127.0.0.1:${port}?tcp_nodelay=1`,
+                //'-af', 'aresample=async=1',
+
+                // '-f', 'rtp',
+                // '-channel_layout', 'mono',
+                // '-i', `rtp://127.0.0.1:${port}`,
+                // '-ac', '1',
+                // '-f', 'mulaw',
+                // '-ar', '8000',
+
+                // '-re',
+                // '-thread_queue_size', '0',
+                // '-async', '1',
+                // '-f', 'lavfi',
+                // '-i', 'anullsrc=r=8000:cl=mono',
             ],
             mediaStreamOptions: options,
         };
