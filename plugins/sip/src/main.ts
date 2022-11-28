@@ -235,24 +235,24 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
         let alost = 0;
 
         sip.audioSplitter.on('message', message => {
-                if (!isStunMessage(message)) {
-                    const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
-                    if (!isRtpMessage)
-                        return;
-                    aseen++;
-                    sip.audioSplitter.send(message, rtpPort, "127.0.0.1");
-                    const seq = getSequenceNumber(message);
-                    if (seq !== (aseq + 1) % 0x0FFFF)
-                        alost++;
-                    aseq = seq;
-                }
-            });
+            if (!isStunMessage(message)) {
+                const isRtpMessage = isRtpMessagePayloadType(getPayloadType(message));
+                if (!isRtpMessage)
+                    return;
+                aseen++;
+                sip.audioSplitter.send(message, rtpPort, "127.0.0.1");
+                const seq = getSequenceNumber(message);
+                if (seq !== (aseq + 1) % 0x0FFFF)
+                    alost++;
+                aseq = seq;
+            }
+        });
 
-            sip.audioRtcpSplitter.on('message', message => {
-                sip.audioRtcpSplitter.send(message, rtcpPort, "127.0.0.1");
-            });
+        sip.audioRtcpSplitter.on('message', message => {
+            sip.audioRtcpSplitter.send(message, rtcpPort, "127.0.0.1");
+        });
 
-            this.session = sip;
+        this.session = sip;
     }
 
     getRawVideoStreamOptions(): ResponseMediaStreamOptions[] {
@@ -285,7 +285,7 @@ class SipCamera extends ScryptedDeviceBase implements Intercom, Camera, VideoCam
     }
 
 
-    createFFmpegMediaStreamOptions(ffmpegInput: string, index: number){
+    createFFmpegMediaStreamOptions(ffmpegInput: string, index: number) {
         try {
         }
         catch (e) {

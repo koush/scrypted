@@ -1,38 +1,10 @@
-import { ReplaySubject, timer } from 'rxjs'
-import { once } from 'events'
-import { createStunResponder, RtpDescription, RtpOptions, sendStunBindingRequest } from './rtp-utils'
 import { reservePorts } from '@homebridge/camera-utils';
-import { SipCall, SipOptions } from './sip-call'
-import { Subscribed } from './subscribed'
-import dgram from 'dgram'
-
-export async function bindUdp(server: dgram.Socket, usePort: number) {
-  server.bind({
-    port: usePort,
-    // exclusive: false,
-    // address: '0.0.0.0',
-  })
-  await once(server, 'listening')
-  server.setRecvBufferSize(1024 * 1024)
-  const port = server.address().port
-  return {
-    port,
-    url: `udp://'0.0.0.0':${port}`,
-  }
-}
-
-export async function createBindUdp(usePort: number) {
-  const server = dgram.createSocket({
-      type: 'udp4',
-      // reuseAddr: true,
-    }),
-    { port, url } = await bindUdp(server, usePort)
-  return {
-    server,
-    port,
-    url,
-  }
-}
+import { createBindUdp } from '@scrypted/common/src/listen-cluster';
+import dgram from 'dgram';
+import { ReplaySubject, timer } from 'rxjs';
+import { createStunResponder, RtpDescription, RtpOptions, sendStunBindingRequest } from './rtp-utils';
+import { SipCall, SipOptions } from './sip-call';
+import { Subscribed } from './subscribed';
 
 export class SipSession extends Subscribed {
   private hasStarted = false
@@ -107,15 +79,15 @@ export class SipSession extends Subscribed {
 
     try {
       const rtpDescription = await this.sipCall.invite(),
-      sendStunRequests = () => {
-        sendStunBindingRequest({
-          rtpSplitter: this.audioSplitter,
-          rtcpSplitter: this.audioRtcpSplitter,
-          rtpDescription,
-          localUfrag: this.sipCall.audioUfrag,
-          type: 'audio',
-        })
-      }
+        sendStunRequests = () => {
+          sendStunBindingRequest({
+            rtpSplitter: this.audioSplitter,
+            rtcpSplitter: this.audioRtcpSplitter,
+            rtpDescription,
+            localUfrag: this.sipCall.audioUfrag,
+            type: 'audio',
+          })
+        }
 
       // if rtcp-mux is supported, rtp splitter will be used for both rtp and rtcp
       if (rtpDescription.audio.port === rtpDescription.audio.rtcpPort) {
@@ -169,7 +141,7 @@ export class SipSession extends Subscribed {
     this.onCallEndedSubject.next(null)
     this.sipCall.destroy()
     this.audioSplitter.close()
-    this.audioRtcpSplitter.close()   
+    this.audioRtcpSplitter.close()
     this.unsubscribe()
   }
 

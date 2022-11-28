@@ -3,7 +3,7 @@ import { randomInteger, randomString } from './util'
 import { RtpDescription, RtpOptions, RtpStreamDescription } from './rtp-utils'
 
 const sip = require('sip'),
-      sdp = require('sdp')
+  sdp = require('sdp')
 
 export interface SipOptions {
   to: string
@@ -65,13 +65,13 @@ function getRtpDescription(
 ): RtpStreamDescription {
   try {
     const section = sections.find((s) => s.startsWith('m=' + mediaType)),
-    { port } = sdp.parseMLine(section),
-    lines: string[] = sdp.splitLines(section),
-    rtcpLine = lines.find((l: string) => l.startsWith('a=rtcp:')),
-    rtcpMuxLine = lines.find((l: string) => l.startsWith('a=rtcp-mux')),
-    ssrcLine = lines.find((l: string) => l.startsWith('a=ssrc')),
-    iceUFragLine = lines.find((l: string) => l.startsWith('a=ice-ufrag')),
-    icePwdLine = lines.find((l: string) => l.startsWith('a=ice-pwd'))
+      { port } = sdp.parseMLine(section),
+      lines: string[] = sdp.splitLines(section),
+      rtcpLine = lines.find((l: string) => l.startsWith('a=rtcp:')),
+      rtcpMuxLine = lines.find((l: string) => l.startsWith('a=rtcp-mux')),
+      ssrcLine = lines.find((l: string) => l.startsWith('a=ssrc')),
+      iceUFragLine = lines.find((l: string) => l.startsWith('a=ice-ufrag')),
+      icePwdLine = lines.find((l: string) => l.startsWith('a=ice-pwd'))
 
     let rtcpPort: number;
     if (rtcpMuxLine) {
@@ -84,9 +84,9 @@ function getRtpDescription(
     return {
       port,
       rtcpPort,
-      ssrc:     (ssrcLine && Number(ssrcLine.match(/ssrc:(\S*)/)?.[1])) || undefined,
+      ssrc: (ssrcLine && Number(ssrcLine.match(/ssrc:(\S*)/)?.[1])) || undefined,
       iceUFrag: (iceUFragLine && iceUFragLine.match(/ice-ufrag:(\S*)/)?.[1]) || undefined,
-      icePwd:   (icePwdLine && icePwdLine.match(/ice-pwd:(\S*)/)?.[1]) || undefined,      
+      icePwd: (icePwdLine && icePwdLine.match(/ice-pwd:(\S*)/)?.[1]) || undefined,
     }
   } catch (e) {
     console.error('Failed to parse SDP from remote end')
@@ -138,7 +138,7 @@ export class SipCall {
       ssrc = randomInteger();
 
     this.sipStack = {
-      makeResponse: sip.makeResponse, 
+      makeResponse: sip.makeResponse,
       ...sip.create({
         host,
         hostname: host,
@@ -152,17 +152,18 @@ export class SipCall {
         // },        
         ws: false
       },
-      (request: SipRequest) => {
-        if (request.method === 'BYE') {
-          this.console.info('received BYE from remote end')
-          this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
+        (request: SipRequest) => {
+          if (request.method === 'BYE') {
+            this.console.info('received BYE from remote end')
+            this.sipStack.send(this.sipStack.makeResponse(request, 200, 'Ok'))
 
-          if (this.destroyed) {
-            this.onEndedByRemote.next(null)
+            if (this.destroyed) {
+              this.onEndedByRemote.next(null)
+            }
           }
-        } 
-      }
-    )}
+        }
+      )
+    }
 
     this.sdp = ([
       'v=0',
