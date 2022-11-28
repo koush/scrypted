@@ -16,6 +16,7 @@ import { once } from 'events';
 import net, { AddressInfo } from 'net';
 import semver from 'semver';
 import { Duplex } from 'stream';
+import { Worker } from 'worker_threads';
 import { FileRtspServer } from './file-rtsp-server';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
@@ -1787,6 +1788,17 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
       const forked = sdk.fork<RebroadcastPluginFork>();
       const result = await forked.result as RebroadcastPluginFork;
       const ret = result.newPrebufferMixin(async () => this.transcodeStorageSettings.values, mixinDevice, mixinDeviceInterfaces, mixinDeviceState);
+      // scrypted should call release on the mixin, but just in case...
+      const previous = this.currentMixins.get(mixinDeviceState.id);
+      previous?.mixin?.then(async mixinDevice => {
+        try {
+          await mixinDevice.release();
+        }
+        catch (e) {
+        }
+        previous.terminate();
+      });
+      previous?.terminate();
       this.currentMixins.set(mixinDeviceState.id, {
         terminate: () => forked.worker.terminate(),
         mixin: ret,
