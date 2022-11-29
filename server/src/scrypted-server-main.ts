@@ -108,10 +108,6 @@ async function start() {
     const db = level(dbPath);
     await db.open();
 
-    if (process.env.SCRYPTED_RESET_ALL_USERS === 'true') {
-        await db.removeAll(ScryptedUser);
-    }
-
     let certSetting = await db.tryGet(Settings, 'certificate') as Settings;
 
     if (certSetting?.value?.version !== CURRENT_SELF_SIGNED_CERTIFICATE_VERSION) {
@@ -429,7 +425,22 @@ async function start() {
         res.send(200);
     });
 
+    const resetLogin = path.join(getScryptedVolume(), 'reset-login');
+    async function checkResetLogin() {
+        try {
+            if (fs.existsSync(resetLogin)) {
+                fs.rmSync(resetLogin);
+                await db.removeAll(ScryptedUser);
+                hasLogin = false;
+            }
+        }
+        catch (e) {
+        }
+    }
+
     app.post('/login', async (req, res) => {
+        await checkResetLogin();
+
         const { username, password, change_password, maxAge: maxAgeRequested } = req.body;
         const timestamp = Date.now();
         const maxAge = parseInt(maxAgeRequested) || ONE_DAY_MILLISECONDS;
