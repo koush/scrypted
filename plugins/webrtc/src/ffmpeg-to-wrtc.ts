@@ -234,6 +234,15 @@ export async function createTrackForwarder(options: {
     return startRtpForwarderProcess(console, ffmpegInput, tracks);
 }
 
+// https://en.wikipedia.org/wiki/Advanced_Video_Coding#Profiles
+const highProfiles = [
+    100,
+    110,
+    122,
+    244,
+];
+const highProfilesHex = highProfiles.map(p => p.toString(16));
+
 export function parseOptions(options: RTCSignalingOptions) {
     // should really inspect the session description here.
     // we assume that the camera doesn't output h264 baseline, because
@@ -253,8 +262,11 @@ export function parseOptions(options: RTCSignalingOptions) {
         // to make a rough guess as to the decoding capability of the client.
         ?.find(codec => {
             let sdpFmtpLine = codec.sdpFmtpLine.toLowerCase();
-            return sdpFmtpLine.includes('profile-level-id=64001f')
-                || sdpFmtpLine.includes('profile-level-id=640c1f');
+            for (const hex of highProfilesHex) {
+                if (sdpFmtpLine.includes(`profile-level-id=${hex}`))
+                    return true;
+            }
+            return false;
         });
     const transcodeWidth = Math.max(640, Math.min(options?.screen?.width || 960, 1280));
 
