@@ -1,8 +1,8 @@
-import { MixinProvider, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
-import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
-import smtp, { SMTPServer } from 'smtp-server';
+import sdk, { MixinProvider, OnOff, ScryptedDeviceBase, ScryptedDeviceType, ScryptedInterface, Setting, Settings, SettingValue, StartStop } from '@scrypted/sdk';
+import { StorageSettings } from '@scrypted/sdk/storage-settings';
 import { ParsedMail, simpleParser } from 'mailparser';
+import smtp, { SMTPServer } from 'smtp-server';
+import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 
 const { systemManager } = sdk;
 
@@ -74,6 +74,20 @@ class SmtpMixin extends SettingsMixinDeviceBase<Settings> {
 class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
     createdMixins = new Map<string, SmtpMixin>();
     server: SMTPServer;
+    storageSettings = new StorageSettings(this, {
+        smtpPort: {
+            title: "SMTP Port (No Authentication)",
+            defaultValue: 25,
+            type: 'number',
+            onPut: () => this.createServer(),
+
+        },
+        disableTls: {
+            title: 'Disable TLS',
+            type: 'boolean',
+            onPut: () => this.createServer(),
+        }
+    })
 
     constructor(nativeId?: string) {
         super(nativeId);
@@ -83,7 +97,7 @@ class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
         for (const id of Object.keys(systemManager.getSystemState())) {
             const realDevice = systemManager.getDeviceById(id);
             if (realDevice.mixins?.includes(this.id))
-                realDevice.probe().catch(e => {});
+                realDevice.probe().catch(e => { });
         }
     }
 
@@ -94,6 +108,7 @@ class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
             allowInsecureAuth: true,
             authOptional: true,
             logger: true,
+            disabledCommands: this.storageSettings.values.disableTls ? ['STARTTLS'] : undefined,
 
             onConnect: (session, callback) => {
                 callback();
@@ -124,7 +139,7 @@ class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
         this.server.on("error", e => {
             this.console.error("SMTP Error %s", e);
         });
-        const port = this.getPort();
+        const port = this.storageSettings.values.smtpPort as number;
         this.server.listen(port, '0.0.0.0');
         this.console.log('created SMTP server');
     }
@@ -145,23 +160,11 @@ class MailPlugin extends ScryptedDeviceBase implements Settings, MixinProvider {
     }
 
     async getSettings(): Promise<Setting[]> {
-        return [
-            {
-                title: "SMTP Port (No Authentication)",
-                key: 'smtpPort',
-                value: this.getPort().toString(),
-            }
-        ]
-    }
-
-    getPort() {
-        return parseInt(this.storage.getItem('smtpPort')) || 25;
+       return this.storageSettings.getSettings();
     }
 
     async putSetting(key: string, value: SettingValue): Promise<void> {
-        this.storage.setItem(key, value.toString());
-
-        this.server.close();
+        return this.storageSettings.putSetting(key, value);
     }
 
     async canMixin(type: ScryptedDeviceType, interfaces: string[]): Promise<string[]> {
