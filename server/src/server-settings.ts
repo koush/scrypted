@@ -1,6 +1,7 @@
 import os from 'os';
 import * as nodeIp from 'ip';
 
+export const SCRYPTED_HOSTNAME = process.env.SCRYPTED_HOSTNAME;
 export const SCRYPTED_INSECURE_PORT = parseInt(process.env.SCRYPTED_INSECURE_PORT) || 11080;
 export const SCRYPTED_SECURE_PORT = parseInt(process.env.SCRYPTED_SECURE_PORT) || 10443;
 export const SCRYPTED_DEBUG_PORT = parseInt(process.env.SCRYPTED_DEBUG_PORT) || 10081;

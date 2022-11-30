@@ -72,9 +72,13 @@ class EndpointManagerImpl implements EndpointManager {
         return id;
     }
 
-    async getUrlSafeIp() {
+    async getUrlSafeHost() {
+        const hostname: string = await this.api.getComponent('SCRYPTED_HOSTNAME');
+        if (hostname) {
+            return hostname;
+        }
         // ipv6 addresses have colons and need to be bracketed for url safety
-        const ip: string = await this.api.getComponent('SCRYPTED_IP_ADDRESS')
+        const ip: string = await this.api.getComponent('SCRYPTED_IP_ADDRESS');
         return ip?.includes(':') ? `[${ip}]` : ip;
     }
 
@@ -133,7 +137,7 @@ class EndpointManagerImpl implements EndpointManager {
         const protocol = options?.insecure ? 'http' : 'https';
         const port = await this.api.getComponent(options?.insecure ? 'SCRYPTED_INSECURE_PORT' : 'SCRYPTED_SECURE_PORT');
         const path = await this.getPath(nativeId, options);
-        const url =  `${protocol}://${await this.getUrlSafeIp()}:${port}${path}`;
+        const url = `${protocol}://${await this.getUrlSafeHost()}:${port}${path}`;
         return url;
     }
 

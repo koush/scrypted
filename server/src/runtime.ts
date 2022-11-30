@@ -27,7 +27,7 @@ import { PluginHost } from './plugin/plugin-host';
 import { isConnectionUpgrade, PluginHttp } from './plugin/plugin-http';
 import { WebSocketConnection } from './plugin/plugin-remote-websocket';
 import { getPluginVolume } from './plugin/plugin-volume';
-import { getIpAddress, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
+import { getIpAddress, SCRYPTED_HOSTNAME, SCRYPTED_INSECURE_PORT, SCRYPTED_SECURE_PORT } from './server-settings';
 import { AddressSettigns as AddressSettings } from './services/addresses';
 import { Alerts } from './services/alerts';
 import { CORSControl, CORSServer } from './services/cors';
@@ -352,6 +352,8 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         switch (componentId) {
             case 'SCRYPTED_IP_ADDRESS':
                 return getIpAddress();
+            case 'SCRYPTED_HOSTNAME':
+                return SCRYPTED_HOSTNAME;
             case 'SCRYPTED_INSECURE_PORT':
                 return SCRYPTED_INSECURE_PORT;
             case 'SCRYPTED_SECURE_PORT':
