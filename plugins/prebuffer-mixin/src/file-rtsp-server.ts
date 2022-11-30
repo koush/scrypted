@@ -37,7 +37,7 @@ export class FileRtspServer extends RtspServer {
         if (!file)
             return this.respond(400, 'Bad Request', requestHeaders, {});
 
-        this.writeConsole?.log('RTSP WRITE file', file);
+        // this.writeConsole?.log('RTSP WRITE file', file);
         this.writeStream = fs.createWriteStream(file);
         this.writeStream.on('error', e => {
             this.writeConsole?.error('RTSP WRITE error', e);

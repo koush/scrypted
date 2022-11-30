@@ -1685,6 +1685,7 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         nativeId: TRANSCODE_MIXIN_PROVIDER_NATIVE_ID,
         name: 'Transcoding',
         interfaces: [
+          "SystemSettings",
           ScryptedInterface.Settings,
           ScryptedInterface.MixinProvider,
         ],

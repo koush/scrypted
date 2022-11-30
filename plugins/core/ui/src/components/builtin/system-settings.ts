@@ -2,8 +2,9 @@ import { ScryptedDevice, ScryptedDeviceType, ScryptedInterface, Settings, System
 import { findPluginDevice } from "../helpers";
 
 export function createSystemSettingsDevice(systemManager: SystemManager): ScryptedDevice & Settings {
-    const core = systemManager.getDeviceByName<Settings>('@scrypted/core');
-    const transcode = findPluginDevice<Settings>(systemManager, '@scrypted/prebuffer-mixin', 'transcode');
+    const systemSettings = Object.keys(systemManager.getSystemState())
+        .map(id => systemManager.getDeviceById<Settings>(id))
+        .filter(d => d.interfaces?.includes("SystemSettings"));
 
     return {
         name: 'Settings',
@@ -24,36 +25,34 @@ export function createSystemSettingsDevice(systemManager: SystemManager): Scrypt
             return true;
         },
         listen(event, callback) {
-            const cl = core.listen(event, callback);
-            const tl = transcode?.listen(event, callback);
+            let listeners = systemSettings.map(d => d.listen(event, callback));
             return {
                 removeListener() {
-                    cl.removeListener();
-                    tl?.removeListener();
+                    for (const l of listeners) {
+                        l.removeListener();
+                    }
+                    listeners = [];
                 },
             }
         },
         async getSettings() {
-            return [
-                ...(await core.getSettings()).map(s => ({
-                    ...s,
-                    key: 'core:' + s.key,
-                    group: 'Network Settings',
-                })),
-                ...(await transcode?.getSettings() || []).map(s => ({
-                    ...s,
-                    key: 'transcode:' + s.key,
-                    group: 'Transcoding',
-                })),
-            ];
+            const results = systemSettings.map(async d => {
+                const settings = await d.getSettings();
+                for (const setting of settings) {
+                    if (d.pluginId === '@scrypted/core')
+                        setting.group = 'General';
+                    else
+                        setting.group = d.name;
+                    setting.key = d.id + ':' + setting.key;
+                }
+                return settings;
+            });
+            return (await Promise.all(results)).flat();
         },
         async putSetting(key, value) {
-            if (key.startsWith('core:')) {
-                await core.putSetting(key.substring(5), value);
-            }
-            else if (key.startsWith('transcode:')) {
-                await transcode.putSetting(key.substring(10), value);
-            }
+            const [id, realKey] = key.split(':');
+            const device = systemSettings.find(d => d.id === id);
+            return device?.putSetting(realKey, value);
         },
     }
 }
