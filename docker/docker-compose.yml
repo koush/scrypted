@@ -9,6 +9,14 @@ services:
         container_name: scrypted
         restart: unless-stopped
         network_mode: host
+
+        # uncomment this and a line below as needed.
+        # devices:
+        # zwave usb serial device
+        #   - /dev/ttyACM0:/dev/ttyACM0
+        # all usb devices, such as coral tpu
+        #   - /dev/bus/usb:/dev/bus/usb
+
         volumes:
             - ~/.scrypted/volume:/server/volume
         # logging is noisy and will unnecessarily wear on flash storage.
