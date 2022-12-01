@@ -1579,7 +1579,7 @@ export enum MediaPlayerState {
   Paused = "Paused",
   Buffering = "Buffering",
 }
-export type SettingValue = string | number | boolean | string[] | number[];
+export type SettingValue = undefined | null | string | number | boolean | string[] | number[];
 export interface Setting {
   key?: string;
   title?: string;
@@ -1815,6 +1815,7 @@ export enum ScryptedMimeTypes {
 
   MediaStreamUrl = 'text/x-media-url',
   MediaObject = 'x-scrypted/x-scrypted-media-object',
+  RequestMediaObject = 'x-scrypted/x-scrypted-request-media-object',
   RequestMediaStream = 'x-scrypted/x-scrypted-request-stream',
   MediaStreamFeedback = 'x-scrypted/x-media-stream-feedback',
   ScryptedDevice = 'x-scrypted/x-scrypted-device',
@@ -1828,6 +1829,7 @@ export enum ScryptedMimeTypes {
   RTCConnectionManagement = 'x-scrypted/x-scrypted-rtc-connection-management',
 }
 
+export type RequestMediaObject = () => Promise<MediaObject>;
 export type RequestMediaStream = (options?: RequestMediaStreamOptions) => Promise<MediaObject>;
 
 export interface FFmpegTranscode {

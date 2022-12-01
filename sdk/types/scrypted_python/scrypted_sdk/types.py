@@ -156,6 +156,7 @@ class ScryptedMimeTypes(Enum):
     RTCConnectionManagement = "x-scrypted/x-scrypted-rtc-connection-management"
     RTCSignalingChannel = "x-scrypted/x-scrypted-rtc-signaling-channel"
     RTCSignalingSession = "x-scrypted/x-scrypted-rtc-signaling-session"
+    RequestMediaObject = "x-scrypted/x-scrypted-request-media-object"
     RequestMediaStream = "x-scrypted/x-scrypted-request-stream"
     SchemePrefix = "x-scrypted/x-scrypted-scheme-"
     ScryptedDevice = "x-scrypted/x-scrypted-device"
