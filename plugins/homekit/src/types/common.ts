@@ -131,6 +131,9 @@ export function addFan(device: ScryptedDevice & Fan & OnOff, accessory: Accessor
                 speed,
             });
         });
+        service.getCharacteristic(Characteristic.RotationSpeed).setProps({
+            minStep: 100 / device.fan?.maxSpeed,
+        });
     }
 
     if (device.fan?.availableModes !== undefined) {
