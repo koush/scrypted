@@ -96,6 +96,12 @@ addSupportedType({
 
         bindCharacteristic(device, ScryptedInterface.TemperatureSetting, service, Characteristic.TargetHeatingCoolingState,
             () => toTargetMode(device.thermostatMode));
+        
+        if (!device.thermostatAvailableModes.includes(ThermostatMode.Auto)) {
+            service.getCharacteristic(Characteristic.TargetHeatingCoolingState).setProps({
+                maxValue: Characteristic.TargetHeatingCoolingState.COOL // Disable 'Auto' mode
+            });
+        }
 
         service.getCharacteristic(Characteristic.TargetTemperature)
             .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
