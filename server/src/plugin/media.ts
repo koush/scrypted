@@ -424,10 +424,10 @@ export abstract class MediaManagerBase implements MediaManager {
 
             if (converter.toMimeType === ScryptedMimeTypes.MediaObject) {
                 const mo = await converter.convert(value, valueMime.essence, toMimeType, { sourceId }) as MediaObject;
-                const found = await this.convertMediaObjectToBuffer(mo, toMimeType);
+                const found = await this.convertMediaObject(mo, toMimeType);
                 return {
                     data: found,
-                    mimeType: mo.mimeType,
+                    mimeType: toMimeType,
                 };
             }
 
