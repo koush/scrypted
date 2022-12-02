@@ -1,0 +1,25 @@
+ARG BUILDPACK_DEPS_BASE="bullseye"
+FROM buildpack-deps:${BUILDPACK_DEPS_BASE} as header
+
+# switch to nvm?
+ARG NODE_VERSION=18
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+RUN apt-get update
+RUN apt-get install -y nodejs
+
+RUN apt-get -y update
+RUN apt-get -y upgrade
+RUN apt-get -y install software-properties-common apt-utils
+RUN apt-get -y update
+
+# base development stuff
+RUN apt-get -y install \
+    build-essential \
+    gcc \
+    libglib2.0-dev \
+    pkg-config
+
+ENV SCRYPTED_DOCKER_SERVE="true"
+ENV SCRYPTED_CAN_RESTART="true"
+ENV SCRYPTED_VOLUME="/server/volume"
+ENV SCRYPTED_INSTALL_PATH="/server"

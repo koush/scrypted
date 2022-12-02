@@ -16,7 +16,7 @@ jobs:
       matrix:
         NODE_VERSION: ["16", "18"]
         BUILDPACK_DEPS_BASE: ["bullseye"]
-        FLAVOR: ["full", "lite"]
+        FLAVOR: ["full", "lite", "thin"]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
