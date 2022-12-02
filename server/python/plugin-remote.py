@@ -178,7 +178,7 @@ class DeviceManager(scrypted_python.scrypted_sdk.types.DeviceManager):
         return await self.systemManager.api.onMixinEvent(id, mixinDevice, eventInterface, eventData)
 
     async def requestRestart(self) -> None:
-        return await self.systemManager.api.onMixinEvent(id)
+        return await self.systemManager.api.requestRestart()
 
     def getDeviceStorage(self, nativeId: str = None) -> Storage:
         return self.nativeIds.get(nativeId, None)
