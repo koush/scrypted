@@ -627,6 +627,10 @@ export class ScryptedRuntime extends PluginHttp<HttpPluginData> {
         this.setupPluginHostAutoRestart(pluginHost);
         this.plugins[pluginId] = pluginHost;
 
+        for (const pluginDevice of pluginDevices) {
+            this.getDevice(pluginDevice._id)?.probe().catch(() => {});
+        }
+
         return pluginHost;
     }
 
