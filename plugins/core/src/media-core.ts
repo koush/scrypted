@@ -1,12 +1,13 @@
 import path from 'path';
-import { ScryptedDeviceBase, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions, HttpRequestHandler, HttpRequest, HttpResponse } from '@scrypted/sdk';
+import { ScryptedDeviceBase, DeviceProvider, ScryptedInterface, ScryptedDeviceType, BufferConverter, MediaObject, VideoCamera, Camera, ScryptedMimeTypes, RequestMediaStreamOptions, HttpRequestHandler, HttpRequest, HttpResponse, RequestMediaObject } from '@scrypted/sdk';
 import sdk from '@scrypted/sdk';
 const { systemManager, deviceManager, mediaManager, endpointManager } = sdk;
-import { BufferHost, FileHost } from './converters';
+import { RequestMediaObjectHost, FileHost, BufferHost } from './converters';
 
 export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, BufferConverter, HttpRequestHandler {
     httpHost: BufferHost;
     httpsHost: BufferHost;
+    rmoHost: RequestMediaObjectHost;
     fileHost: FileHost;
     filesHost: FileHost;
 
@@ -34,6 +35,12 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
                         type: ScryptedDeviceType.API,
                     },
                     {
+                        name: 'RequestMediaObject Host',
+                        nativeId: 'rmo-host',
+                        interfaces: [ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
+                        type: ScryptedDeviceType.API,
+                    },
+                    {
                         name: 'HTTP File Host',
                         nativeId: 'file',
                         interfaces: [ScryptedInterface.BufferConverter, ScryptedInterface.HttpRequestHandler],
@@ -50,6 +57,7 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
             })
             this.httpHost = new BufferHost(false);
             this.httpsHost = new BufferHost(true);
+            this.rmoHost = new RequestMediaObjectHost();
             this.fileHost = new FileHost(false);
             this.filesHost = new FileHost(true);
         })();
@@ -105,10 +113,12 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
         if (path === ScryptedInterface.Camera) {
             if (toMimeType === ScryptedMimeTypes.LocalUrl)
                 return this.getLocalSnapshot(id, path, url.search);
-            return await systemManager.getDeviceById<Camera>(id).takePicture() as any;
+            const rmo: RequestMediaObject = async () => systemManager.getDeviceById<Camera>(id).takePicture();
+            return mediaManager.createMediaObject(rmo, ScryptedMimeTypes.RequestMediaObject);
         }
         if (path === ScryptedInterface.VideoCamera) {
-            return await systemManager.getDeviceById<VideoCamera>(id).getVideoStream() as any;
+            const rmo: RequestMediaObject = async () => systemManager.getDeviceById<VideoCamera>(id).getVideoStream();
+            return mediaManager.createMediaObject(rmo, ScryptedMimeTypes.RequestMediaObject);
         }
         else {
             throw new Error('Unrecognized Scrypted Media interface.')
@@ -120,6 +130,8 @@ export class MediaCore extends ScryptedDeviceBase implements DeviceProvider, Buf
             return this.httpHost;
         if (nativeId === 'https')
             return this.httpsHost;
+        if (nativeId === 'rmo-host')
+            return this.rmoHost;
         if (nativeId === 'file')
             return this.fileHost;
         if (nativeId === 'files')

@@ -1,4 +1,4 @@
-import { BufferConverter, HttpRequest, HttpRequestHandler, HttpResponse, HttpResponseOptions, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
+import { BufferConverter, BufferConvertorOptions, HttpRequest, HttpRequestHandler, HttpResponse, HttpResponseOptions, MediaObject, RequestMediaObject, ScryptedDeviceBase, ScryptedMimeTypes } from "@scrypted/sdk";
 import sdk from "@scrypted/sdk";
 import mime from "mime/lite";
 import path from 'path';
@@ -62,6 +62,87 @@ export class BufferHost extends ScryptedDeviceBase implements HttpRequestHandler
         this.hosted.set(`/${filename}`, { data: buffer, fromMimeType, toMimeType });
 
         return Buffer.from(`${endpoint}${filename}`);
+    }
+}
+
+export class RequestMediaObjectHost extends ScryptedDeviceBase implements HttpRequestHandler, BufferConverter {
+    secureHosted = new Map<string, { request: RequestMediaObject, fromMimeType: string, toMimeType: string }>()
+    insecureHosted = new Map<string, { request: RequestMediaObject, fromMimeType: string, toMimeType: string }>()
+
+    constructor() {
+        super('rmo-host');
+        this.fromMimeType = ScryptedMimeTypes.RequestMediaObject;
+        this.toMimeType = ScryptedMimeTypes.MediaObject;
+        // this.toMimeType = secure ? ScryptedMimeTypes.LocalUrl : ScryptedMimeTypes.InsecureLocalUrl;
+    }
+
+    async onRequest(request: HttpRequest, response: HttpResponse) {
+        const normalizedRequest = Object.assign({}, request);
+        normalizedRequest.url = normalizedRequest.url.replace(normalizedRequest.rootPath, '');
+        const pathOnly = normalizedRequest.url.split('?')[0];
+        const file = this.secureHosted.get(pathOnly) || this.insecureHosted.get(pathOnly);;
+
+        if (!file) {
+            response.send('Not Found', {
+                code: 404,
+            });
+            return;
+        }
+
+
+        let options: HttpResponseOptions = {
+            headers: {
+                'Content-Type': file.fromMimeType,
+            }
+        };
+
+        const q = new URLSearchParams(request.url.split('?')[1]);
+        if (q.has('attachment')) {
+            options.headers['Content-Disposition'] = 'attachment';
+        }
+
+        try {
+            const mo = await file.request();
+            const data = await sdk.mediaManager.convertMediaObjectToBuffer(mo, mo.mimeType);
+
+            response.send(data);
+        }
+        catch (e) {
+            this.secureHosted.delete(pathOnly);
+            this.insecureHosted.delete(pathOnly);
+            throw e;
+        }
+    }
+
+    async convert(request: RequestMediaObject, fromMimeType: string, toMimeType: string): Promise<MediaObject> {
+        let hosted: typeof this.secureHosted;
+        if (toMimeType === ScryptedMimeTypes.Url || toMimeType === ScryptedMimeTypes.LocalUrl) {
+            hosted = this.secureHosted;
+            toMimeType = ScryptedMimeTypes.LocalUrl;
+        }
+        else if (toMimeType === ScryptedMimeTypes.InsecureLocalUrl) {
+            hosted = this.insecureHosted;
+        }
+        else {
+            return request();
+        }
+
+        const uuid = uuidv4();
+
+        const endpoint = await (toMimeType === ScryptedMimeTypes.LocalUrl ? endpointManager.getPublicLocalEndpoint(this.nativeId) : endpointManager.getInsecurePublicLocalEndpoint(this.nativeId));
+        const data = await request();
+        fromMimeType = data.mimeType;
+        const extension = mime.getExtension(fromMimeType);
+
+        const filename = uuid + (extension ? `.${extension}` : '');
+
+        const pathOnly = `/${filename}`;
+        hosted.set(pathOnly, { request, fromMimeType, toMimeType });
+        // free this resource after an hour.
+        setTimeout(() => hosted.delete(pathOnly), 1 * 60 * 60 * 1000);
+
+        const url = Buffer.from(`${endpoint}${filename}`);
+        return sdk.mediaManager.createMediaObject(url, toMimeType);
     }
 }
 

@@ -3,37 +3,12 @@
     <v-container>
       <v-layout>
         <v-flex xs12>
-          <v-text-field
-            dense
-            label="Notification Title"
-            outlined
-            v-model="lazyValue.notificationTitle"
-            @input="onChange"
-          ></v-text-field>
-          <v-text-field
-            dense
-            label="Notification Body"
-            outlined
-            v-model="lazyValue.notificationBody"
-            @input="onChange"
-          ></v-text-field>
-          <v-combobox
-            dense
-            @select="onSelect"
-            :items="mediaInterfaces"
-            label="Notification Media URL"
-            outlined
-            v-model="lazyValue.notificationMediaUrl"
-            @input="onChange"
-            :return-object="false"
-          ></v-combobox>
-          <v-text-field
-            dense
-            label="Notification Media Mime Type"
-            outlined
-            v-model="lazyValue.notificationMediaMime"
-            @input="onChange"
-          ></v-text-field>
+          <v-text-field dense label="Notification Title" outlined v-model="lazyValue.notificationTitle"
+            @input="onChange"></v-text-field>
+          <v-text-field dense label="Notification Body" outlined v-model="lazyValue.notificationBody"
+            @input="onChange"></v-text-field>
+          <v-combobox dense :items="mediaInterfaces" label="Notification Media URL" outlined
+            v-model="lazyValue.notificationMediaUrl" @input="onChange" :return-object="false"></v-combobox>
         </v-flex>
       </v-layout>
     </v-container>
@@ -64,14 +39,17 @@ export default {
       if (this.lazyValue.notificationMediaUrl.length) {
         this.rpc().sendNotification(
           this.lazyValue.notificationTitle,
-          this.lazyValue.notificationBody,
+          {
+            body: this.lazyValue.notificationBody,
+          },
           this.lazyValue.notificationMediaUrl,
-          this.lazyValue.notificationMediaMime
         );
       } else {
         this.rpc().sendNotification(
           this.lazyValue.notificationTitle,
-          this.lazyValue.notificationBody
+          {
+            body: this.lazyValue.notificationBody,
+          },
         );
       }
     },
@@ -89,10 +67,6 @@ export default {
         ret.notificationMediaUrl,
         "https://home.scrypted.app/_punch/web_hi_res_512.png"
       );
-      ret.notificationMediaMime = this.ensureString(
-        ret.notificationMediaMime,
-        "image/png"
-      );
       return ret;
     },
     onChange: function () {
@@ -103,9 +77,6 @@ export default {
     },
     send() {
       this.update();
-    },
-    onSelect() {
-      this.lazyValue.notificationMediaMime = "";
     },
   },
   computed: {
