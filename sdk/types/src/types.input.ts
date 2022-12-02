@@ -215,7 +215,7 @@ export interface NotifierOptions {
  * Notifier can be any endpoint that can receive messages, such as speakers, phone numbers, messaging clients, etc. The messages may optionally contain media.
  */
 export interface Notifier {
-  sendNotification(title: string, options?: NotifierOptions, media?: MediaObject|string, icon?: MediaObject|string): Promise<void>;
+  sendNotification(title: string, options?: NotifierOptions, media?: MediaObject | string, icon?: MediaObject | string): Promise<void>;
 }
 /**
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.
@@ -829,9 +829,15 @@ export interface DeviceManager {
 export interface DeviceProvider {
   /**
    * Get an instance of a previously discovered device that was reported to the device manager.
+   * This method will be called every time onDeviceDiscovered or onDevicesChanged is invoked
+   * by the plugin. A previously returned instance may be returned again. If a different
+   * instance is returned, the plugin is responsible for cleaning up the old instance.
    */
   getDevice(nativeId: ScryptedNativeId): Promise<any>;
-
+  /**
+   * Called when a previously returned device from getDevice was deleted from Scrypted.
+   */
+  releaseDevice(id: string, nativeId: ScryptedNativeId, device: any): Promise<void>;
 }
 /**
  * DeviceManifest is passed to DeviceManager.onDevicesChanged to sync a full list of devices from the controller/hub (Hue, SmartThings, etc)

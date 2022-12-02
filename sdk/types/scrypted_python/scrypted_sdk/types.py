@@ -688,6 +688,8 @@ class DeviceDiscovery:
 class DeviceProvider:
     async def getDevice(self, nativeId: str) -> Any:
         pass
+    async def releaseDevice(self, id: str, nativeId: str, device: Any) -> None:
+        pass
     pass
 
 class Display:
@@ -1956,7 +1958,8 @@ ScryptedInterfaceDescriptors = {
   "DeviceProvider": {
     "name": "DeviceProvider",
     "methods": [
-      "getDevice"
+      "getDevice",
+      "releaseDevice"
     ],
     "properties": []
   },
