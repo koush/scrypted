@@ -145,7 +145,7 @@ export class StorageSettings<T extends string> implements Settings {
 
     putSettingInternal(setting: StorageSetting, oldValue: any, key: string, value: SettingValue) {
         if (!setting?.noStore) {
-            if (setting.mapPut)
+            if (setting?.mapPut)
                 value = setting.mapPut(oldValue, value);
             if (typeof value === 'object')
                 this.device.storage.setItem(key, JSON.stringify(value));
