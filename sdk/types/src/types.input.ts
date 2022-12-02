@@ -195,11 +195,27 @@ export interface ColorHsv {
    */
   v?: number;
 }
+
+export interface NotifierOptions {
+  actions?: NotificationAction[];
+  badge?: string;
+  body?: string;
+  data?: any;
+  dir?: NotificationDirection;
+  lang?: string;
+  renotify?: boolean;
+  requireInteraction?: boolean;
+  silent?: boolean;
+  tag?: string;
+  timestamp?: EpochTimeStamp;
+  vibrate?: VibratePattern;
+}
+
 /**
  * Notifier can be any endpoint that can receive messages, such as speakers, phone numbers, messaging clients, etc. The messages may optionally contain media.
  */
 export interface Notifier {
-  sendNotification(title: string, body: string, media?: string | MediaObject): Promise<void>;
+  sendNotification(title: string, options?: NotifierOptions, media?: MediaObject|string, icon?: MediaObject|string): Promise<void>;
 }
 /**
  * MediaObject is an intermediate object within Scrypted to represent all media objects. Plugins should use the MediaConverter to convert the Scrypted MediaObject into a desired type, whether it is a externally accessible URL, a Buffer, etc.

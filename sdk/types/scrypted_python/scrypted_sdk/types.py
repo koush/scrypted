@@ -407,6 +407,21 @@ class MediaStreamOptions(TypedDict):
     video: VideoStreamOptions
     pass
 
+class NotifierOptions(TypedDict):
+    actions: list[NotificationAction]
+    badge: str
+    body: str
+    data: Any
+    dir: NotificationDirection
+    lang: str
+    renotify: bool
+    requireInteraction: bool
+    silent: bool
+    tag: str
+    timestamp: float
+    vibrate: VibratePattern
+    pass
+
 class ObjectDetectionModel(TypedDict):
     classes: list[str]
     inputSize: list[float]
@@ -793,7 +808,7 @@ class NOXSensor:
     pass
 
 class Notifier:
-    async def sendNotification(self, title: str, body: str, media: str | MediaObject = None) -> None:
+    async def sendNotification(self, title: str, options: NotifierOptions = None, media: str | MediaObject = None, icon: str | MediaObject = None) -> None:
         pass
     pass
 
