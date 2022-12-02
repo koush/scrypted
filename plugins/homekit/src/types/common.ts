@@ -69,6 +69,9 @@ export function addCarbonDioxideSensor(device: ScryptedDevice & CO2Sensor, acces
 }
 
 export function addFan(device: ScryptedDevice & Fan & OnOff, accessory: Accessory): Service {
+    if (!device.interfaces.includes(ScryptedInterface.OnOff) && !device.interfaces.includes(ScryptedInterface.Fan))
+        return undefined;
+
     const service = accessory.addService(Service.Fanv2, device.name);
 
     if (device.interfaces.includes(ScryptedInterface.OnOff)) {
@@ -127,6 +130,9 @@ export function addFan(device: ScryptedDevice & Fan & OnOff, accessory: Accessor
             device.setFan({
                 speed,
             });
+        });
+        service.getCharacteristic(Characteristic.RotationSpeed).setProps({
+            minStep: 100 / device.fan?.maxSpeed,
         });
     }
 
