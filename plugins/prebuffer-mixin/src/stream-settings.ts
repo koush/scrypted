@@ -3,26 +3,6 @@ import { StorageSetting, StorageSettings } from "@scrypted/sdk/storage-settings"
 import { MixinDeviceBase, ResponseMediaStreamOptions, VideoCamera } from "@scrypted/sdk";
 import { getTranscodeMixinProviderId } from "./transcode-settings";
 
-
-export function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[]) {
-    if (!msos)
-        return;
-
-    // do not enable rebroadcast on cloud streams or rawvideo by default.
-    const firstNonCloudStream = msos.find(mso => mso.source !== 'cloud' && mso.container !== 'rawvideo');
-    return firstNonCloudStream ? [firstNonCloudStream] : [];
-}
-
-export function getPrebufferedStreams(storageSettings: StorageSettings<'enabledStreams'>, msos: ResponseMediaStreamOptions[]) {
-    if (!msos)
-        return;
-
-    if (!storageSettings.hasValue.enabledStreams)
-        return getDefaultPrebufferedStreams(msos);
-
-    return msos.filter(mso => storageSettings.values.enabledStreams.includes(mso.name));
-}
-
 export type StreamStorageSetting = StorageSetting & {
     prefersPrebuffer: boolean,
     preferredResolution: number,
@@ -78,9 +58,10 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         },
         recordingStream: {
             title: 'Local Recording Stream',
-            description: 'The media stream to use when recording to local storage such as an NVR. This stream should be prebuffered. Recommended resolution: 1920x1080 to 4K.',
+            description: 'The media stream to use when recording to local storage such as an NVR. Recommended resolution: 1920x1080 to 4K.',
             hide: true,
-            prefersPrebuffer: true,
+            // will be automatically prebuferred when in use, but doesn't really need it.
+            prefersPrebuffer: false,
             preferredResolution: 3840 * 2160,
         },
         remoteRecordingStream: {
@@ -147,10 +128,34 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
         },
     });
 
+    function getDefaultPrebufferedStreams(msos: ResponseMediaStreamOptions[]) {
+        if (!msos)
+            return;
+
+        const local = getMediaStream(storageSettings.keys.defaultStream, msos);
+        const remoteRecording = getMediaStream(storageSettings.keys.remoteRecordingStream, msos);
+
+        if (local.stream.source === 'cloud')
+            return [];
+
+        if (local.stream.id === remoteRecording.stream.id)
+            return [local.stream];
+        return [local.stream, remoteRecording.stream];
+    }
+
+    function getPrebufferedStreams(msos: ResponseMediaStreamOptions[]) {
+        if (!msos)
+            return;
+
+        if (!storageSettings.hasValue.enabledStreams)
+            return getDefaultPrebufferedStreams(msos);
+
+        return msos.filter(mso => storageSettings.values.enabledStreams.includes(mso.name));
+    }
+
+
     function getDefaultMediaStream(v: StreamStorageSetting, msos: ResponseMediaStreamOptions[]) {
-        const enabledStreams = getPrebufferedStreams(storageSettings, msos);
-        const prebufferPreferenceStreams = v.prefersPrebuffer && enabledStreams?.length > 0 ? enabledStreams : msos;
-        return pickBestStream(prebufferPreferenceStreams, v.preferredResolution);
+        return pickBestStream(msos, v.preferredResolution);
     }
 
     function getMediaStream(key: string, msos: ResponseMediaStreamOptions[]) {
@@ -237,6 +242,8 @@ export function createStreamSettings(device: MixinDeviceBase<VideoCamera>) {
     }
 
     return {
+        getDefaultPrebufferedStreams,
+        getPrebufferedStreams,
         getDefaultStream: (msos: ResponseMediaStreamOptions[]) => getMediaStream(storageSettings.keys.defaultStream, msos),
         getRemoteStream: (msos: ResponseMediaStreamOptions[]) => getMediaStream(storageSettings.keys.remoteStream, msos),
         getLowResolutionStream: (msos: ResponseMediaStreamOptions[]) => getMediaStream(storageSettings.keys.lowResolutionStream, msos),

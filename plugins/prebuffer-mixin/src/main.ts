@@ -21,7 +21,7 @@ import { FileRtspServer } from './file-rtsp-server';
 import { REBROADCAST_MIXIN_INTERFACE_TOKEN } from './rebroadcast-mixin-token';
 import { connectRFC4571Parser, startRFC4571Parser } from './rfc4571';
 import { RtspSessionParserSpecific, startRtspSession } from './rtsp-session';
-import { createStreamSettings, getPrebufferedStreams } from './stream-settings';
+import { createStreamSettings } from './stream-settings';
 import { getTranscodeMixinProviderId, TranscodeMixinProvider, TRANSCODE_MIXIN_PROVIDER_NATIVE_ID } from './transcode-settings';
 
 const { mediaManager, log, systemManager, deviceManager } = sdk;
@@ -1568,7 +1568,7 @@ class PrebufferMixin extends SettingsMixinDeviceBase<VideoCamera> implements Vid
   }
 
   getPrebufferedStreams(msos?: ResponseMediaStreamOptions[]) {
-    return getPrebufferedStreams(this.streamSettings.storageSettings, msos);
+    return this.streamSettings.getPrebufferedStreams(msos);
   }
 
   async getVideoStreamOptions(): Promise<ResponseMediaStreamOptions[]> {
@@ -1692,6 +1692,9 @@ export class RebroadcastPlugin extends AutoenableMixinProvider implements MixinP
         type: ScryptedDeviceType.API,
       });
     });
+  }
+
+  async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
   }
 
   async getDevice(nativeId: string) {
