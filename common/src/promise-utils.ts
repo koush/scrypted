@@ -64,3 +64,27 @@ export function timeoutFunction<T>(timeout: number, f: (isTimedOut: () => boolea
         });
     })
 }
+
+export function createPromiseDebouncer<T>() {
+    let current: Promise<T>;
+
+    return (func: () => Promise<T>): Promise<T> => {
+        if (!current)
+            current = func().finally(() => current = undefined);
+        return current;
+    }
+}
+
+export function createMapPromiseDebouncer<T>() {
+    const map = new Map<string, Promise<T>>();
+
+    return (key: any, func: () => Promise<T>): Promise<T> => {
+        const keyStr = JSON.stringify(key);
+        let value = map.get(keyStr);
+        if (!value) {
+            value = func().finally(() => map.delete(keyStr));
+            map.set(keyStr, value);
+        }
+        return value;
+    }
+}
