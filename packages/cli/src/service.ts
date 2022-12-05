@@ -36,7 +36,7 @@ async function runCommandEatError(command: string, ...args: string[]) {
 
 export async function runServer(installDir: string) {
     console.log('Starting scrypted main...');
-    await runCommand('npm',  '--prefix', installDir, 'exec', 'scrypted-serve');
+    await runCommand('npm', '--prefix', installDir, 'exec', 'scrypted-serve');
 }
 
 async function startServer(installDir: string) {
@@ -60,7 +60,7 @@ export function cwdInstallDir(): { volume: string, installDir: string } {
     return { volume, installDir };
 }
 
-export async function installServe(installVersion: string) {
+export async function installServe(installVersion: string, ignoreError?: boolean) {
     const { installDir } = cwdInstallDir();
     const packageLockJson = path.join(installDir, 'package-lock.json');
     // apparently corrupted or old version of package-lock.json prevents upgrades, so
@@ -82,7 +82,11 @@ export async function installServe(installVersion: string) {
         version: process.version,
     }));
 
-    await runCommandEatError('npm', '--prefix', installDir, 'install', '--production', `@scrypted/server@${installVersion}`);
+    const args = ['--prefix', installDir, 'install', '--production', `@scrypted/server@${installVersion}`]
+    if (ignoreError)
+        await runCommandEatError('npm', ...args);
+    else
+        await runCommand('npm', ...args);
     return installDir;
 }
 
@@ -96,7 +100,7 @@ export async function serveMain(installVersion?: string) {
         console.log('Package @scrypted/server not found. Installing.');
     }
     if (install) {
-        await installServe(installVersion);
+        await installServe(installVersion, true);
     }
 
     process.env.SCRYPTED_NPM_SERVE = 'true';
