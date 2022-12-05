@@ -336,6 +336,9 @@ export class WebRTCPlugin extends AutoenableMixinProvider implements DeviceCreat
         return new WebRTCCamera(this, nativeId);
     }
 
+    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    }
+
     getRTCConfiguration(): RTCConfiguration {
         if (this.storageSettings.values.rtcConfiguration) {
             try {

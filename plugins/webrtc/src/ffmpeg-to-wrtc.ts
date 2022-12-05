@@ -381,6 +381,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
         });
 
         const atrack = new MediaStreamTrack({ kind: "audio" });
+        const console = sdk.deviceManager.getMixinConsole(mediaObject.sourceId);
 
         const timeStart = Date.now();
         return {
@@ -390,7 +391,7 @@ export class WebRTCConnectionManagement implements RTCConnectionManagement {
             createTrackForwarder: (videoTransceiver: RTCRtpTransceiver, audioTransceiver: RTCRtpTransceiver) =>
                 createTrackForwarder({
                     timeStart,
-                    ...logIsPrivateIceTransport(this.console, this.pc),
+                    ...logIsPrivateIceTransport(console, this.pc),
                     requestMediaStream,
                     videoTransceiver,
                     audioTransceiver,
@@ -520,7 +521,9 @@ export async function createRTCPeerConnectionSink(
     configuration: RTCConfiguration,
     weriftConfiguration: PeerConfig,
 ) {
-    const { transcodeWidth, sessionSupportsH264High } = parseOptions(await clientSignalingSession.getOptions());
+    const clientOptions = await clientSignalingSession.getOptions();
+    console.log('remote options', clientOptions);
+    const { transcodeWidth, sessionSupportsH264High } = parseOptions(clientOptions);
 
     const connection = new WebRTCConnectionManagement(console, clientSignalingSession, maximumCompatibilityMode, transcodeWidth, sessionSupportsH264High, {
         configuration,
