@@ -1,14 +1,15 @@
 {
   "compilerOptions": {
-      "module": "commonjs",
-      "target": "ESNext",
-      "noImplicitAny": true,
-      "outDir": "./dist",
-      "esModuleInterop": true,
-      "sourceMap": true,
-      "declaration": true
+    "resolveJsonModule": true,
+    "module": "commonjs",
+    "target": "ESNext",
+    "noImplicitAny": true,
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "declaration": true
   },
   "include": [
-      "src/**/*"
+    "src/**/*"
   ],
 }

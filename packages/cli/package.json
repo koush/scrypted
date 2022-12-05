@@ -1,6 +1,6 @@
 {
   "name": "scrypted",
-  "version": "1.0.50",
+  "version": "1.0.53",
   "description": "",
   "main": "./dist/packages/cli/src/main.js",
   "bin": {

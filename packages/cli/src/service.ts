@@ -92,7 +92,7 @@ export async function serveMain(installVersion?: string) {
     const { installDir, volume } = cwdInstallDir();
     if (!fs.existsSync('node_modules/@scrypted/server')) {
         install = true;
-        installVersion = 'latest';
+        installVersion ||= 'latest';
         console.log('Package @scrypted/server not found. Installing.');
     }
     if (install) {
