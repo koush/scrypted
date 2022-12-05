@@ -59,7 +59,9 @@ jobs:
       - name: Build and push Docker image (scrypted)
         uses: docker/build-push-action@v2
         with:
-          build-args: BASE=${{ matrix.BASE }}
+          build-args: |
+            BASE=${{ matrix.BASE }}
+            SCRYPTED_INSTALL_VERSION=${{ github.event.inputs.package_version || '' }}
           context: docker/
           file: docker/Dockerfile${{ matrix.SUPERVISOR }}
           platforms: linux/amd64,linux/arm64,linux/armhf
