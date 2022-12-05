@@ -1,6 +1,6 @@
 import AxiosDigestAuth from '@koush/axios-digest-auth';
 import { AutoenableMixinProvider } from "@scrypted/common/src/autoenable-mixin-provider";
-import { RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
+import { createMapPromiseDebouncer, RefreshPromise, singletonPromise, TimeoutError, timeoutPromise } from "@scrypted/common/src/promise-utils";
 import { StorageSettings } from "@scrypted/sdk/storage-settings";
 import { SettingsMixinDeviceBase, SettingsMixinDeviceOptions } from "@scrypted/common/src/settings-mixin";
 import sdk, { BufferConverter, BufferConvertorOptions, Camera, FFmpegInput, MediaObject, MixinProvider, RequestMediaStreamOptions, RequestPictureOptions, ResponsePictureOptions, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedMimeTypes, Setting, SettingValue, VideoCamera } from "@scrypted/sdk";
@@ -108,7 +108,7 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
         },
     });
     axiosClient: Axios | AxiosDigestAuth;
-    pendingPicture: Promise<Buffer>;
+    snapshotDebouncer = createMapPromiseDebouncer<Buffer>();
     errorPicture: RefreshPromise<Buffer>;
     timeoutPicture: RefreshPromise<Buffer>;
     progressPicture: RefreshPromise<Buffer>;
@@ -253,59 +253,38 @@ class SnapshotMixin extends SettingsMixinDeviceBase<Camera> implements Camera {
             }
         }
 
-        const isFullImage = !needSoftwareResize;
-        let pendingPicture = this.pendingPicture;
-        if (!pendingPicture || !isFullImage) {
-            pendingPicture = (async () => {
-                let picture: Buffer;
-                try {
-                    picture = await takePicture(options ? {
-                        ...options,
-                    } : undefined);
-                    picture = await this.cropAndScale(picture);
-                    if (needSoftwareResize) {
-                        picture = await ffmpegFilterImageBuffer(picture, {
-                            ffmpegPath: await mediaManager.getFFmpegPath(),
-                            resize: options?.picture,
-                            timeout: 10000,
-                        });
+        const pendingPicture = this.snapshotDebouncer(options, async () => {
+            let picture: Buffer;
+            try {
+                picture = await takePicture(options ? {
+                    ...options,
+                } : undefined);
+                picture = await this.cropAndScale(picture);
+                if (needSoftwareResize) {
+                    picture = await ffmpegFilterImageBuffer(picture, {
+                        ffmpegPath: await mediaManager.getFFmpegPath(),
+                        resize: options?.picture,
+                        timeout: 10000,
+                    });
+                }
+                this.clearCachedPictures();
+                this.currentPicture = picture;
+                this.lastAvailablePicture = picture;
+                setTimeout(() => {
+                    if (this.currentPicture === picture) {
+                        // only clear the current picture after it times out,
+                        // the plugin shouldn't invalidate error, timeout, progress
+                        // images unless the current picture is updated.
+                        this.currentPicture = undefined;
                     }
-                    this.clearCachedPictures();
-                    this.currentPicture = picture;
-                    this.lastAvailablePicture = picture;
-                    setTimeout(() => {
-                        if (this.currentPicture === picture) {
-                            // only clear the current picture after it times out,
-                            // the plugin shouldn't invalidate error, timeout, progress
-                            // images unless the current picture is updated.
-                            this.currentPicture = undefined;
-                        }
-                    }, 60000);
-                }
-                catch (e) {
-                    // allow reusing the current picture to mask errors
-                    picture = await this.createErrorImage(e);
-                }
-                return picture;
-            })();
-
-            if (isFullImage)
-                this.pendingPicture = pendingPicture;
-
-            // don't allow a snapshot to take longer than 1 minute.
-            const failureTimeout = setTimeout(() => {
-                if (this.pendingPicture === pendingPicture)
-                    this.pendingPicture = undefined;
-            }, 60000);
-            // prevent infinite loop from onDeviceEvent triggering picture updates.
-            // retain this promise for a bit while everything settles.
-            // this also has a side effect of only allowing snapshots every 5 seconds.
-            pendingPicture.finally(() => {
-                clearTimeout(failureTimeout);
-                if (this.pendingPicture === pendingPicture)
-                    this.pendingPicture = undefined;
-            });
-        }
+                }, 60000);
+            }
+            catch (e) {
+                // allow reusing the current picture to mask errors
+                picture = await this.createErrorImage(e);
+            }
+            return picture;
+        });
 
         let { snapshotMode } = this.storageSettings.values;
         if (eventSnapshot) {
