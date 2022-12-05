@@ -142,6 +142,7 @@ async function main() {
         await serveMain(installVersion);
     }
     else if (process.argv[2] === 'install-server') {
+        console.log('install-server version:', process.argv[3]);
         const installDir = await installServe(process.argv[3] || 'latest');
         console.log('server installation successful:', installDir);
     }
