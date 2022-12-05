@@ -61,7 +61,7 @@ jobs:
         with:
           build-args: |
             BASE=${{ matrix.BASE }}
-            SCRYPTED_INSTALL_VERSION=${{ github.event.inputs.package_version || '' }}
+            SCRYPTED_INSTALL_VERSION=${{ github.event.inputs.package_version }}
           context: docker/
           file: docker/Dockerfile${{ matrix.SUPERVISOR }}
           platforms: linux/amd64,linux/arm64,linux/armhf
