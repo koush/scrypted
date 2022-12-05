@@ -417,6 +417,7 @@ class NotifierOptions(TypedDict):
     renotify: bool
     requireInteraction: bool
     silent: bool
+    subtitle: str
     tag: str
     timestamp: float
     vibrate: VibratePattern

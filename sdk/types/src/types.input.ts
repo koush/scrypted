@@ -197,6 +197,7 @@ export interface ColorHsv {
 }
 
 export interface NotifierOptions {
+  subtitle: string;
   actions?: NotificationAction[];
   badge?: string;
   body?: string;
