@@ -1,5 +1,5 @@
 ARG BASE="18-bullseye-full"
-ARG SCRYPTED_INSTALL_VERSION=latest
+ARG SCRYPTED_INSTALL_VERSION="latest"
 FROM koush/scrypted-common:${BASE}
 
 # avahi advertiser support
