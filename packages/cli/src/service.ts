@@ -23,6 +23,8 @@ async function runCommand(command: string, ...args: string[]) {
         stdio: 'inherit'
     });
     await once(cp, 'exit');
+    if (cp.exitCode)
+        throw new Error(`${command} exited with non zero result ${cp.exitCode}`);
 }
 
 async function runCommandEatError(command: string, ...args: string[]) {
