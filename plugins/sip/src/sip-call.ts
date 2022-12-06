@@ -201,7 +201,7 @@ export class SipCall {
       `a=rtpmap:97 speex/8000`,
       `m=video ${video.port} RTP/AVP 97`,
       `a=rtpmap:97 H264/90000`,
-      `a=fmtp:10 profile-level-id=42801F`,
+      `a=fmtp:97 profile-level-id=42801F`,
       `a=ssrc:${ssrc}`,
       'a=recvonly'
     ]
