@@ -23,6 +23,7 @@ import scrypted_sdk
 from typing import Any, List, Tuple
 from gi.repository import Gst
 import asyncio
+import time
 
 from detect import DetectionSession, DetectPlugin
 from collections import namedtuple
@@ -43,10 +44,12 @@ class TensorFlowLiteSession(DetectionSession):
     image: Image.Image
     previousDetections: List[ObjectDetectionResult]
 
-    def __init__(self) -> None:
+    def __init__(self, start_time: float) -> None:
         super().__init__()
         self.image = None
         self.previousDetections = None
+        self.processed = 0
+        self.start_time = start_time
 
 def parse_label_contents(contents: str):
     lines = contents.splitlines()
@@ -138,7 +141,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
 
         # periodic restart because there seems to be leaks in tflite or coral API.
         loop = asyncio.get_event_loop()
-        loop.call_later(4 * 60 * 60, lambda: self.requestRestart())
+        loop.call_later(60 * 60, lambda: self.requestRestart())
 
     async def getSettings(self) -> list[Setting]:
         coral: Setting = {
@@ -164,6 +167,8 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             detection_session.image = None
             image.close()
 
+        dps = detection_session.processed / (time.time() - detection_session.start_time)
+        print("Detections per second %s" % dps)
         return super().end_session(detection_session)
 
     def invalidateMedia(self, detection_session: TensorFlowLiteSession, data: RawImage):
@@ -369,6 +374,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
                     return converted
 
             ret = self.detect_once(input, score_threshold, settings, src_size, cvss)
+            detection_session.processed = detection_session.processed + 1
             return ret, RawImage(image)
         
         (iw, ih) = image.size
@@ -397,7 +403,9 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             return converted
      
         ret1 = self.detect_once(first, score_threshold, settings, src_size, cvss1)
+        detection_session.processed = detection_session.processed + 1
         ret2 = self.detect_once(second, score_threshold, settings, src_size, cvss2)
+        detection_session.processed = detection_session.processed + 1
         r1Detections = list(ret1['detections'])
         r2Detections = list(ret2['detections'])
 
@@ -506,4 +514,4 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         return self.run_detection_image(detection_session, image, settings, src_size, convert_to_src_size)
 
     def create_detection_session(self):
-        return TensorFlowLiteSession()
+        return TensorFlowLiteSession(start_time=time.time())
