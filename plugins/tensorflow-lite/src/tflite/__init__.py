@@ -117,6 +117,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             'fs/coco_labels.txt').read().decode('utf8')
         self.labels = parse_label_contents(labels_contents)
         try:
+            raise Exception()
             edge_tpus = list_edge_tpus()
             print('edge tpus', edge_tpus)
             if not len(edge_tpus):
@@ -378,7 +379,7 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
         if ws == 1 and hs == 1:
             scaled = image
         else:
-            scaled = image.resize((round(s * iw), round(s * ih)), Image.ANTIALIAS)
+            scaled = image.resize((int(round(s * iw)), int(round(s * ih))), Image.ANTIALIAS)
 
         first = scaled.crop((0, 0, w, h))
         (sx, sy) = scaled.size
