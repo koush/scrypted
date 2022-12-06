@@ -496,9 +496,9 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
                     image.close()
                     image = None
                 if image:
-                    image.frombytes(info.data.tobytes())
+                    image.frombytes(bytes(info.data))
                 else:
-                    image = Image.frombuffer('RGB', (width, height), info.data.tobytes())
+                    image = Image.frombuffer('RGB', (width, height), bytes(info.data))
             finally:
                 gst_buffer.unmap(info)
 
