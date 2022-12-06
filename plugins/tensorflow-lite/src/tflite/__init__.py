@@ -120,7 +120,6 @@ class TensorFlowLitePlugin(DetectPlugin, scrypted_sdk.BufferConverter, scrypted_
             'fs/coco_labels.txt').read().decode('utf8')
         self.labels = parse_label_contents(labels_contents)
         try:
-            raise Exception()
             edge_tpus = list_edge_tpus()
             print('edge tpus', edge_tpus)
             if not len(edge_tpus):
