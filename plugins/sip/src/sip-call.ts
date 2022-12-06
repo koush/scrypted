@@ -10,6 +10,8 @@ export interface SipOptions {
   from: string
   localIp: string
   localPort: number
+  udp: boolean
+  tcp: boolean
 }
 
 interface UriOptions {
@@ -61,17 +63,24 @@ function getRandomId() {
 function getRtpDescription(
   console: any,
   sections: string[],
-  mediaType: 'audio'
+  mediaType: 'audio' | 'video'
 ): RtpStreamDescription {
   try {
-    const section = sections.find((s) => s.startsWith('m=' + mediaType)),
-      { port } = sdp.parseMLine(section),
-      lines: string[] = sdp.splitLines(section),
-      rtcpLine = lines.find((l: string) => l.startsWith('a=rtcp:')),
-      rtcpMuxLine = lines.find((l: string) => l.startsWith('a=rtcp-mux')),
-      ssrcLine = lines.find((l: string) => l.startsWith('a=ssrc')),
-      iceUFragLine = lines.find((l: string) => l.startsWith('a=ice-ufrag')),
-      icePwdLine = lines.find((l: string) => l.startsWith('a=ice-pwd'))
+    const section = sections.find((s) => s.startsWith('m=' + mediaType));
+    if( section === undefined ) {
+      return {
+        port: 0,
+        rtcpPort: 0
+      };
+    }
+
+    const { port } = sdp.parseMLine(section),
+    lines: string[] = sdp.splitLines(section),
+    rtcpLine = lines.find((l: string) => l.startsWith('a=rtcp:')),
+    rtcpMuxLine = lines.find((l: string) => l.startsWith('a=rtcp-mux')),
+    ssrcLine = lines.find((l: string) => l.startsWith('a=ssrc')),
+    iceUFragLine = lines.find((l: string) => l.startsWith('a=ice-ufrag')),
+    icePwdLine = lines.find((l: string) => l.startsWith('a=ice-pwd'))
 
     let rtcpPort: number;
     if (rtcpMuxLine) {
@@ -105,7 +114,8 @@ function parseRtpDescription(console: any, inviteResponse: {
   return {
     sdp: inviteResponse.content,
     address: cLine.match(/c=IN IP4 (\S*)/)![1],
-    audio: getRtpDescription(console, sections, 'audio')
+    audio: getRtpDescription(console, sections, 'audio'),
+    video: getRtpDescription(console, sections, 'video')
   }
 }
 
@@ -131,7 +141,7 @@ export class SipCall {
   ) {
     this.console = console;
 
-    const { audio } = rtpOptions,
+    const { audio, video } = rtpOptions,
       { from } = this.sipOptions,
       host = this.sipOptions.localIp,
       port = this.sipOptions.localPort,
@@ -143,13 +153,13 @@ export class SipCall {
         host,
         hostname: host,
         port: port,
-        udp: true,
-        tcp: false,
+        udp: this.sipOptions.udp,
+        tcp: this.sipOptions.tcp,
         tls: false,
         // tls_port: tlsPort,
         // tls: {
         //   rejectUnauthorized: false,
-        // },        
+        // },
         ws: false
       },
         (request: SipRequest) => {
@@ -179,6 +189,25 @@ export class SipCall {
     ]
       .filter((l) => l)
       .join('\r\n')) + '\r\n';
+
+      /* Example SDP for audio and video
+    this.sdp = ([
+      'v=0',
+      `o=${from.split(':')[1].split('@')[0]} 3747 461 IN IP4 ${host}`,
+      's=ScryptedSipPlugin',
+      `c=IN IP4 ${host}`,
+      't=0 0',
+      `m=audio ${audio.port} RTP/AVP 97`,
+      `a=rtpmap:97 speex/8000`,
+      `m=video ${video.port} RTP/AVP 97`,
+      `a=rtpmap:97 H264/90000`,
+      `a=fmtp:10 profile-level-id=42801F`,
+      `a=ssrc:${ssrc}`,
+      'a=recvonly'
+    ]
+      .filter((l) => l)
+      .join('\r\n')) + '\r\n';
+      */
   }
 
   request({
@@ -299,7 +328,9 @@ export class SipCall {
   }
 
   destroy() {
+    this.console.debug("detroying sip-call")
     this.destroyed = true
     this.sipStack.destroy()
+    this.console.debug("detroying sip-call: done")
   }
 }

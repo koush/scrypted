@@ -1,5 +1,5 @@
 import { reservePorts } from '@homebridge/camera-utils';
-import { createBindUdp } from '@scrypted/common/src/listen-cluster';
+import { createBindUdp, createBindZero } from '@scrypted/common/src/listen-cluster';
 import dgram from 'dgram';
 import { ReplaySubject, timer } from 'rxjs';
 import { createStunResponder, RtpDescription, RtpOptions, sendStunBindingRequest } from './rtp-utils';
@@ -19,6 +19,8 @@ export class SipSession extends Subscribed {
     public readonly rtpOptions: RtpOptions,
     public readonly audioSplitter: dgram.Socket,
     public audioRtcpSplitter: dgram.Socket,
+    public readonly videoSplitter: dgram.Socket,
+    public videoRtcpSplitter: dgram.Socket,
     public readonly cameraName: string
   ) {
     super()
@@ -27,13 +29,18 @@ export class SipSession extends Subscribed {
   }
 
   static async createSipSession(console: any, cameraName: string, sipOptions: SipOptions) {
-    const audioPort = 0,
-      audioSplitter = await createBindUdp(audioPort),
+      const audioSplitter = await createBindZero(),
       audioRtcpSplitter = await createBindUdp(audioSplitter.port + 1),
+      videoSplitter = await createBindZero(),
+      videoRtcpSplitter = await createBindUdp(videoSplitter.port + 1),
       rtpOptions = {
         audio: {
           port: audioSplitter.port,
           rtcpPort: audioRtcpSplitter.port
+        },
+        video: {
+          port: videoSplitter.port,
+          rtcpPort: videoRtcpSplitter.port
         }
       }
 
@@ -43,6 +50,8 @@ export class SipSession extends Subscribed {
       rtpOptions,
       audioSplitter.server,
       audioRtcpSplitter.server,
+      videoSplitter.server,
+      videoRtcpSplitter.server,
       cameraName
     )
   }
@@ -87,18 +96,35 @@ export class SipSession extends Subscribed {
             localUfrag: this.sipCall.audioUfrag,
             type: 'audio',
           })
+          sendStunBindingRequest({
+            rtpSplitter: this.videoSplitter,
+            rtcpSplitter: this.videoRtcpSplitter,
+            rtpDescription,
+            localUfrag: this.sipCall.videoUfrag,
+            type: 'video',
+          })
         }
 
       // if rtcp-mux is supported, rtp splitter will be used for both rtp and rtcp
-      if (rtpDescription.audio.port === rtpDescription.audio.rtcpPort) {
+      if ( rtpDescription.audio.port > 0 && rtpDescription.audio.port === rtpDescription.audio.rtcpPort) {
         this.audioRtcpSplitter.close()
         this.audioRtcpSplitter = this.audioSplitter
       }
 
-      if (rtpDescription.audio.iceUFrag) {
+      if ( rtpDescription.video.port > 0 && rtpDescription.video.port === rtpDescription.video.rtcpPort) {
+        this.videoRtcpSplitter.close()
+        this.videoRtcpSplitter = this.videoSplitter
+      }
+
+      if ( (rtpDescription.audio.port > 0 && rtpDescription.audio.iceUFrag)|| (rtpDescription.video.port > 0 && rtpDescription.video.iceUFrag ) ) {
         // ICE is supported
         this.console.log(`Connecting to ${this.cameraName} using ICE`)
-        createStunResponder(this.audioSplitter)
+        if( rtpDescription.audio.port > 0 ) {
+          createStunResponder(this.audioSplitter)
+        }
+        if( rtpDescription.video.port > 0 ) {
+          createStunResponder(this.videoSplitter)
+        }
 
         sendStunRequests()
       } else {
@@ -111,7 +137,11 @@ export class SipSession extends Subscribed {
       }
 
       this.audioSplitter.once('message', () => {
-        this.console.log(`Audio stream latched for ${this.cameraName}`)
+        this.console.log(`Audio stream latched for ${this.cameraName}, port: ${this.rtpOptions.audio.port}`)
+      })
+
+      this.videoSplitter.once('message', () => {
+        this.console.log(`Video stream latched for ${this.cameraName}, port: ${this.rtpOptions.video.port}`)
       })
 
       return rtpDescription
@@ -123,7 +153,7 @@ export class SipSession extends Subscribed {
   }
 
   static async reserveRtpRtcpPorts() {
-    const ports = await reservePorts({ count: 2, type: 'udp' })
+    const ports = await reservePorts({ count: 4, type: 'udp' })
     return ports
   }
 
@@ -134,15 +164,19 @@ export class SipSession extends Subscribed {
     this.hasCallEnded = true
 
     if (sendBye) {
-      await this.sipCall.sendBye().catch(this.console.log)
+      await this.sipCall.sendBye().catch(this.console.error)
     }
 
     // clean up
+    this.console.log("sip-session callEnded")
     this.onCallEndedSubject.next(null)
     this.sipCall.destroy()
     this.audioSplitter.close()
     this.audioRtcpSplitter.close()
+    this.videoSplitter.close()
+    this.videoRtcpSplitter.close()
     this.unsubscribe()
+    this.console.log("sip-session callEnded: done")
   }
 
   async stop() {
