@@ -1,6 +1,6 @@
 {
   "name": "@scrypted/client",
-  "version": "1.1.15",
+  "version": "1.1.17",
   "description": "",
   "main": "dist/packages/client/src/index.js",
   "scripts": {

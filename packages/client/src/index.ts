@@ -72,6 +72,14 @@ function isRunningStandalone() {
     return globalThis.matchMedia?.('(display-mode: standalone)').matches;
 }
 
+export async function logoutScryptedClient(baseUrl?: string) {
+    const url = baseUrl ? new URL('/logout', baseUrl).toString() : '/logout';
+    const response = await axios(url, {
+        withCredentials: true,
+    });
+    return response.data;
+}
+
 export async function loginScryptedClient(options: ScryptedLoginOptions) {
     let { baseUrl, username, password, change_password, maxAge } = options;
     // pwa should stay logged in for a year.
