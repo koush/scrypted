@@ -5,9 +5,9 @@ import { VideoClip } from "@scrypted/types";
 
 export async function fetchClipThumbnail(mediaManager: MediaManager, device: VideoClips, clip: VideoClip) {
     const mo = await device.getVideoClipThumbnail(clip.thumbnailId || clip.id);
-    const url = await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.LocalUrl);
+    const url = (await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.LocalUrl)).toString();
     try {
-        const u = new URL(url.toString());
+        const u = new URL(url);
         return u.pathname + '?' + u.search;
     }
     catch (e) {
@@ -17,9 +17,9 @@ export async function fetchClipThumbnail(mediaManager: MediaManager, device: Vid
 
 export async function fetchClipUrl(mediaManager: MediaManager, device: VideoClips, clip: VideoClip) {
     const mo = await device.getVideoClip(clip.videoId || clip.id);
-    const url = await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.LocalUrl);
+    const url = (await mediaManager.convertMediaObject(mo, ScryptedMimeTypes.LocalUrl)).toString();
     try {
-        const u = new URL(url.toString());
+        const u = new URL(url);
         return u.pathname + '?' + u.search;
     }
     catch (e) {
