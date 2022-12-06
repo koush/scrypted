@@ -571,7 +571,7 @@ export default {
       return this.$store.state.scrypted.devices;
     },
     id() {
-      return this.$route.params.id;
+      return this.$route.params.id || this.$props.id;
     },
     canLoad() {
       return this.devices.includes(this.id);
@@ -583,6 +583,7 @@ export default {
       return this.$scrypted.systemManager.getDeviceById(this.id);
     },
   },
+  props: ['id'],
 };
 </script>
 <style>

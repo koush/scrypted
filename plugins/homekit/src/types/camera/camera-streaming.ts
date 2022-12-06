@@ -176,7 +176,7 @@ export function createCameraStreamingDelegate(device: ScryptedDevice & VideoCame
 
             if (!response.addressOverride) {
                 console.warn('===========================================================================');
-                console.warn('The Scrypted Server Address is not set in the HomeKit plugin.');
+                console.warn('The Scrypted Server Address is not set in the Scrypted settings.');
                 console.warn('If there are issues streaming, set this address to your wired IP address manually.');
                 console.warn('More information can be found in the HomeKit Plugin README.');
                 console.warn('===========================================================================');
