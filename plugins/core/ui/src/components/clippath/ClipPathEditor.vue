@@ -1,6 +1,6 @@
 <template>
   <div id="playground_container" class="playground-container flex">
-    <v-btn-toggle mandatory v-model="pointMode">
+    <v-btn-toggle mandatory v-model="pointMode" style="position: absolute; left: 0; top: 0; z-index: 3000">
       <v-btn @click="customizing = false" width="100px">
         {{ "Drag Points" }}
       </v-btn>
@@ -11,9 +11,9 @@
         {{ "Clear Points" }}
       </v-btn>
     </v-btn-toggle>
-    <section
+    <div
       @click="addHandle"
-      class="playground"
+      class="playground pa-0"
       style="width: 100%; height: 100%"
       :class="{ customizing: customizing, start: !lazyValue.length }"
     >
@@ -42,7 +42,7 @@
           :customizing="customizing"
         ></ClipPathEditorHandles>
       </div>
-    </section>
+    </div>
   </div>
 </template>
 

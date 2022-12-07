@@ -1,6 +1,6 @@
 <template>
   <div
-    style="position: relative; overflow: hidden; width: 100%; height: 100%"
+    style="position: relative; overflow: hidden; width: 100%; height: 100%; display: flex;"
     @wheel="doTimeScroll"
   >
     <video
