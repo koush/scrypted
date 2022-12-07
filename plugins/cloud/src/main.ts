@@ -214,6 +214,9 @@ class ScryptedCloud extends ScryptedDeviceBase implements OauthClient, Settings,
         return this.push;
     }
 
+    async releaseDevice(id: string, nativeId: string, device: any): Promise<void> {
+    }
+
     getHostname() {
         const hostname = this.storageSettings.values.hostname || SCRYPTED_SERVER;
         return hostname;
