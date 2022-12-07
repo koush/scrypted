@@ -33,6 +33,7 @@ export interface TrackedItem<T> extends TrackerItem<T> {
     id: string;
     isZombie: boolean;
     bearing: number;
+    frameUnmatchedLeftBeforeDying: number;
 }
 
 export interface DenoisedDetectionState<T> {

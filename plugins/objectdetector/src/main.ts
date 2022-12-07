@@ -230,10 +230,6 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (newOrBetterDetection)
       this.setDetection(detection, mediaObject);
 
-    const bad = detection.detections?.find(d => !d.history);
-    if (bad)
-      this.console.warn('unprocessed detection?', bad);
-
     this.reportObjectDetections(detection);
     // if (newOrBetterDetection) {
     //   mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')
@@ -455,6 +451,9 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     if (found.length || showAll) {
       this.console.log('current detections:', this.detectionState.previousDetections.map(d => `${d.detection.className} (${d.detection.score}, ${d.detection.boundingBox?.join(', ')})`).join(', '));
     }
+
+    // removes items that is not tracked yet (may require more present frames)
+    detectionResult.detections = detectionResult.detections.filter(d => d.id);
 
     return newOrBetterDetection;
   }

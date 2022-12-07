@@ -11,7 +11,7 @@ export function denoiseDetections2<T>(state: DenoisedDetectionState<T>,
         tracker.reset();
         tracker.setParams({
             fastDelete: true,
-            unMatchedFramesTolerance: (options.timeout / 1000) || 30,
+            unMatchedFramesTolerance: Number.MAX_SAFE_INTEGER,
             iouLimit: 0.05
         });
         state.tracker = tracker;
@@ -74,15 +74,20 @@ export function denoiseDetections2<T>(state: DenoisedDetectionState<T>,
         }
         else if (previous) {
             previous.durationGone += sinceLastDetection;
-            options.expiring?.(previous);
-
-            previousDetections.push(previous);
+            if (previous.durationGone >= options.timeout) {
+                a.frameUnmatchedLeftBeforeDying = -1;
+            }   
+            else {
+                options.expiring?.(previous);
+                previousDetections.push(previous);
+            }
         }
         else {
             console.warn('unprocessed denoised detection?', a);
         }
     }
 
+    // should never reach here?
     for (const r of map.values()) {
         options.removed?.(r)
     }
