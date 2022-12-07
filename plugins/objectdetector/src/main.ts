@@ -1,11 +1,9 @@
-import { MixinProvider, ScryptedDeviceType, ScryptedInterface, MediaObject, VideoCamera, Settings, Setting, Camera, EventListenerRegister, ObjectDetector, ObjectDetection, ScryptedDevice, ObjectDetectionResult, ObjectDetectionTypes, ObjectsDetected, MotionSensor, MediaStreamOptions, MixinDeviceBase, ScryptedNativeId, DeviceState, ObjectDetectionCallbacks, ObjectDetectionModel } from '@scrypted/sdk';
-import sdk from '@scrypted/sdk';
+import sdk, { Camera, DeviceState, EventListenerRegister, MediaObject, MediaStreamOptions, MixinDeviceBase, MixinProvider, MotionSensor, ObjectDetection, ObjectDetectionCallbacks, ObjectDetectionModel, ObjectDetectionResult, ObjectDetectionTypes, ObjectDetector, ObjectsDetected, ScryptedDevice, ScryptedDeviceType, ScryptedInterface, ScryptedNativeId, Setting, Settings, VideoCamera } from '@scrypted/sdk';
+import crypto from 'crypto';
+import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider";
 import { SettingsMixinDeviceBase } from "../../../common/src/settings-mixin";
 import { DenoisedDetectionEntry, DenoisedDetectionState, denoiseDetections } from './denoise';
-import { AutoenableMixinProvider } from "../../../common/src/autoenable-mixin-provider"
 import { safeParseJson } from './util';
-import crypto from 'crypto';
-import { denoiseDetections2 } from './denoise2';
 
 const polygonOverlap = require('polygon-overlap');
 
@@ -41,6 +39,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
   motionTimeout: NodeJS.Timeout;
   detectionInterval = parseInt(this.storage.getItem('detectionInterval')) || defaultDetectionInterval;
   zones = this.getZones();
+  exclusionZones = this.getExclusionZones();
   detectionIntervalTimeout: NodeJS.Timeout;
   detectionState: DenoisedDetectionState<TrackedDetection> = {};
   detectionId: string;
@@ -313,7 +312,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
   reportObjectDetections(detection: ObjectsDetected) {
     // determine zones of the objects, if configured.
-    if (detection.detections && Object.keys(this.zones).length) {
+    if (detection.detections && (Object.keys(this.zones).length || Object.keys(this.exclusionZones).length)) {
+      let copy = detection.detections.slice();
       for (const o of detection.detections) {
         if (!o.boundingBox)
           continue;
@@ -327,13 +327,28 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         x2 = x2 * 100 / detection.inputDimensions[0];
         y2 = y2 * 100 / detection.inputDimensions[1];
         const box = [[x, y], [x2, y], [x2, y2], [x, y2]];
+
+        let excluded = false;
+        for (const [zone, zoneValue] of Object.entries(this.exclusionZones)) {
+          if (polygonOverlap(box, zoneValue)) {
+            excluded = true;
+            copy = copy.filter(c => c !== o);
+            break;
+          }
+        }
+
+        if (excluded)
+          continue;
+
         for (const [zone, zoneValue] of Object.entries(this.zones)) {
           if (polygonOverlap(box, zoneValue)) {
-            this.console.log(o.className, 'inside', zone);
+            // this.console.log(o.className, 'inside', zone);
             o.zones.push(zone);
           }
         }
       }
+
+      detection.detections = copy;
     }
 
     // if this detector supports bounding boxes, and there are zones configured,
@@ -388,7 +403,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     let newOrBetterDetection = false;
 
     const found: DenoisedDetectionEntry<TrackedDetection>[] = [];
-    denoiseDetections2<TrackedDetection>(this.detectionState, detections.map(detection => ({
+    denoiseDetections<TrackedDetection>(this.detectionState, detections.map(detection => ({
       get id() {
         return detection.id;
       },
@@ -603,7 +618,7 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
 
     settings.push({
       key: 'zones',
-      title: 'Zones',
+      title: 'Inclusion Zones',
       type: 'string',
       multiple: true,
       value: Object.keys(this.zones),
@@ -611,7 +626,26 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       combobox: true,
     });
 
+    settings.push({
+      key: 'exclusionZones',
+      title: 'Exclusion Zones',
+      type: 'string',
+      multiple: true,
+      value: Object.keys(this.exclusionZones),
+      choices: Object.keys(this.exclusionZones),
+      combobox: true,
+    });
+
     for (const [name, value] of Object.entries(this.zones)) {
+      settings.push({
+        key: `zone-${name}`,
+        title: `Edit Zone: ${name}`,
+        type: 'clippath',
+        value: JSON.stringify(value),
+      });
+    }
+
+    for (const [name, value] of Object.entries(this.exclusionZones)) {
       settings.push({
         key: `zone-${name}`,
         title: `Edit Zone: ${name}`,
@@ -632,6 +666,15 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     }
   }
 
+  getExclusionZones(): Zones {
+    try {
+      return JSON.parse(this.storage.getItem('exclusionZones'));
+    }
+    catch (e) {
+      return {};
+    }
+  }
+
   async putMixinSetting(key: string, value: string | number | boolean | string[] | number[]): Promise<void> {
     let vs = value?.toString();
 
@@ -644,8 +687,21 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
       this.storage.setItem('zones', JSON.stringify(newZones));
       return;
     }
+    if (key === 'exclusionZones') {
+      const newZones: Zones = {};
+      for (const name of value as string[]) {
+        newZones[name] = this.exclusionZones[name] || [];
+      }
+      this.exclusionZones = newZones;
+      this.storage.setItem('exclusionZones', JSON.stringify(newZones));
+      return;
+    }
     if (key.startsWith('zone-')) {
-      this.zones[key.substring(5)] = JSON.parse(vs);
+      const zoneName = key.substring(5);
+      if (this.zones[zoneName])
+        this.zones[zoneName] = JSON.parse(vs);
+      if (this.exclusionZones[zoneName])
+        this.exclusionZones[zoneName] = JSON.parse(vs);
       this.storage.setItem('zones', JSON.stringify(this.zones));
       return;
     }

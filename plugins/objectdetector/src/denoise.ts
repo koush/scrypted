@@ -1,3 +1,4 @@
+const Tracker = require('node-moving-things-tracker').Tracker;
 
 export class DenoisedDetectionEntry<T> {
     id?: string;
@@ -44,175 +45,140 @@ export interface DenoisedDetectionState<T> {
     lastDetection?: number;
 }
 
-function getCenterAndAndArea(boundingBox: [number, number, number, number]) {
-    const area = boundingBox[2] * boundingBox[3];
-    const cx = boundingBox[0] + boundingBox[2] / 2;
-    const cy = boundingBox[1] + boundingBox[3] / 2;
+type Rectangle = {
+    xmin: number;
+    xmax: number;
+    ymin: number;
+    ymax: number;
+};
+
+function intersect_area(a: Rectangle, b: Rectangle) {
+    const dx = Math.min(a.xmax, b.xmax) - Math.max(a.xmin, b.xmin)
+    const dy = Math.min(a.ymax, b.ymax) - Math.max(a.ymin, b.ymin)
+    if (dx >= 0 && dy >= 0)
+        return dx * dy
+}
+
+function trackedItemToRectangle(item: TrackedItem<any>): Rectangle {
     return {
-        area,
-        center: [cx, cy],
-    }
-}
-
-function createBoundingBoxScorer(boundingBox: [number, number, number, number]) {
-    const { center, area } = getCenterAndAndArea(boundingBox);
-
-    return (other: [number, number, number, number]) => {
-        const { center: otherCenter, area: otherArea } = getCenterAndAndArea(other);
-        const ad = Math.min(otherArea / area, area / otherArea) || 0;
-        const d = Math.sqrt(Math.pow(otherCenter[0] - center[0], 2) + Math.pow(otherCenter[1] - center[1], 2)) / Math.sqrt(2);
-        // return d + ad;
-        return d;
-    }
-}
-
-export function getDetectionAge<T>(d: DenoisedDetectionEntry<T>) {
-    let { firstSeen, lastSeen } = d;
-    firstSeen ||= 0;
-    lastSeen ||= 0;
-    return lastSeen - firstSeen;
-}
-
-type Matched<T> = {
-    r1: DenoisedDetectionEntry<T>;
-    r2: DenoisedDetectionEntry<T>;
-}
-
-export function matchBoxes<T>(da1: DenoisedDetectionEntry<T>[], da2: DenoisedDetectionEntry<T>[], bestScore = Number.MAX_SAFE_INTEGER, currentScore = 0) {
-    if (da1.length === 0 || da2.length === 0) {
-        return {
-            score: 0,
-            matched: [] as Matched<T>[],
-        }
-    }
-
-    let b: Matched<T>[];
-    for (const d1 of da1) {
-        const scorer = createBoundingBoxScorer(d1.boundingBox);
-        // score all the boxes and sort by best match
-        const scored = da2.map(entry => {
-            return {
-                entry,
-                score: scorer(entry.boundingBox),
-            }
-        }).sort((e1, e2) => e1.score - e2.score);
-
-        for (const { entry: d2 } of scored) {
-            const s = scorer(d2.boundingBox);
-            if (currentScore + s >= bestScore)
-                continue;
-            const df1 = da1.filter(c => c !== d1);
-            const df2 = da2.filter(c => c !== d2);
-            const m = matchBoxes(df1, df2, bestScore, currentScore + s);
-            if (!m)
-                continue;
-            const { score, matched } = m;
-            bestScore = currentScore + score + s;
-            b = matched;
-            b.push({
-                r1: d1,
-                r2: d2,
-            });
-        }
-    }
-
-    if (!b)
-        return undefined;
-
-    return {
-        score: bestScore,
-        matched: b,
-    }
+        xmin: item.x,
+        xmax: item.x + item.w,
+        ymin: item.y,
+        ymax: item.y + item.h,
+    };
 }
 
 export function denoiseDetections<T>(state: DenoisedDetectionState<T>,
     currentDetections: DenoisedDetectionEntry<T>[],
     options?: DenoisedDetectionOptions<T>
 ) {
-    const now = options?.now || Date.now();
+    if (!state.tracker) {
+        state.frameCount = 0;
+        const tracker = Tracker.newTracker();
+        tracker.reset();
+        tracker.setParams({
+            fastDelete: true,
+            unMatchedFramesTolerance: Number.MAX_SAFE_INTEGER,
+            iouLimit: 0.05
+        });
+        state.tracker = tracker;
+    }
 
     if (!state.previousDetections)
         state.previousDetections = [];
 
-    const { previousDetections } = state;
+    const { tracker, previousDetections } = state;
 
-    // sort by oldest first.
-    previousDetections.sort((a, b) => getDetectionAge(a) - getDetectionAge(b)).reverse();
-
-    const newAndExisting: DenoisedDetectionEntry<T>[] = [];
-
-    const retain = (pd: DenoisedDetectionEntry<T>, cd: DenoisedDetectionEntry<T>) => {
-        const index = previousDetections.findIndex(c => c === pd);
-        previousDetections.splice(index, 1);
-        currentDetections = currentDetections.filter(c => c !== cd);
-        cd.firstSeen = pd.firstSeen;
-        cd.lastSeen = now;
-        cd.durationGone = 0;
-        newAndExisting.push(cd);
-        options?.retained?.(cd, pd);
-    }
-
-    // match previous detections by id
-    // currently a no op since ids arent reported by anything
-    for (const pd of previousDetections.slice()) {
-        if (pd.id) {
-            const cd = currentDetections.find(d => d.id === pd.id);
-            if (cd) {
-                retain(pd, cd);
-                continue;
-            }
+    const items: TrackerItem<T>[] = currentDetections.filter(cd => cd.boundingBox).map(cd => {
+        const [x, y, w, h] = cd.boundingBox;
+        return {
+            x, y, w, h,
+            confidence: cd.score,
+            name: cd.name,
         }
-    }
+    });
 
-    // match previous detections by class name and bounding box
-    const previousClasses = new Set(previousDetections.map(c => c.name));
-    for (const name of previousClasses) {
-        const previousBoxedDetections = previousDetections.filter(d => !!d.boundingBox && d.name === name);
-        const currentBoxedDetections = currentDetections.filter(d => !!d.boundingBox && d.name === name);
-        const best = matchBoxes(previousBoxedDetections, currentBoxedDetections);
-        if (best) {
-            for (const p of best.matched) {
-                retain(p.r1, p.r2);
-            }
-        }
-    }
+    tracker.updateTrackedItemsWithNewFrame(items, state.frameCount);
+    // console.log(tracker.getAllTrackedItems());
+    const trackedObjects: TrackedItem<T>[] = [...tracker.getTrackedItems().values()];
 
-    // match/add current detections with whatever is remaining from the previous list.
-    for (const cd of currentDetections) {
-        let pd = previousDetections.find(d => d.name === cd.name);
-        if (!pd) {
-            cd.firstSeen = now;
-            cd.lastSeen = now;
-            cd.durationGone = 0;
-            newAndExisting.push(cd);
-            options?.added?.(cd);
-        }
-        else {
-            retain(pd, cd);
-        }
-    }
+    const now = options.now || Date.now();
 
     const lastDetection = state.lastDetection || now;
     const sinceLastDetection = now - lastDetection;
-    const purgeTime = options?.timeout || 10000;
-    // anything remaining in previousDetections at this point has possibly left the scene.
-    for (const cd of previousDetections.slice()) {
-        cd.durationGone += sinceLastDetection;
-        if (cd.durationGone < purgeTime)
-            continue;
-        const index = previousDetections.findIndex(check => check === cd);
-        if (index !== -1)
-            previousDetections.splice(index, 1);
-        options?.removed?.(cd);
+    const previousCopy = previousDetections.slice();
+    previousDetections.splice(0, previousDetections.length);
+    const map = new Map<string, DenoisedDetectionEntry<T>>();
+    for (const pd of previousCopy) {
+        map.set(pd.id, pd);
     }
 
-    // add all the detections that are pending removal
-    newAndExisting.push(...previousDetections);
+    for (const trackedObject of trackedObjects) {
+        map.delete(trackedObject.id);
 
-    // clear it out
-    previousDetections.splice(0, previousDetections.length);
+        const previous = previousCopy.find(d => d.id === trackedObject.id);
+        const current = currentDetections.find(d => {
+            const [x, y, w, h] = d.boundingBox;
+            return !d.id && x === trackedObject.x && y === trackedObject.y && w === trackedObject.w && h === trackedObject.h;
+        });
 
-    previousDetections.push(...newAndExisting);
+        if (current) {
+            current.id = trackedObject.id;
+            current.lastSeen = now;
+            current.durationGone = 0;
+            if (previous) {
+                current.firstSeen = previous.lastSeen;
+                previous.lastSeen = now;
+                previous.durationGone = 0;
+                options.retained?.(current, previous);
+            }
+            else {
+                current.firstSeen = now;
+                options.added?.(current);
+            }
 
+            previousDetections.push(current);
+        }
+        else if (previous) {
+            previous.durationGone += sinceLastDetection;
+            if (previous.durationGone >= options.timeout) {
+                let foundContainer = false;
+                // the detector may combine multiple detections into one.
+                // handle that scenario by not expiring the individual detections that
+                // are globbed into a larger one.
+                for (const other of trackedObjects) {
+                    if (other === trackedObject || other.isZombie)
+                        continue;
+                    const area = intersect_area(trackedItemToRectangle(trackedObject), trackedItemToRectangle(other));
+                    if (area) {
+                        const trackedObjectArea = trackedObject.w * trackedObject.h;
+                        if (area / trackedObjectArea > .5) {
+                            foundContainer = true;
+                            break;
+                        }
+                    }
+                }
+                if (!foundContainer)
+                    trackedObject.frameUnmatchedLeftBeforeDying = -1;
+                // else
+                //     console.log('globbed!');
+            }
+            else {
+                options.expiring?.(previous);
+                previousDetections.push(previous);
+            }
+        }
+        else {
+            // console.warn('unprocessed denoised detection?', trackedObject);
+        }
+    }
+
+    // should never reach here?
+    for (const r of map.values()) {
+        options.removed?.(r)
+    }
+
+    state.tracked = trackedObjects;
     state.lastDetection = now;
+    state.frameCount++;
 }
