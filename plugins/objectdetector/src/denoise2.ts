@@ -28,7 +28,6 @@ export function denoiseDetections2<T>(state: DenoisedDetectionState<T>,
             x, y, w, h,
             confidence: cd.score,
             name: cd.name,
-            detection: cd,
         }
     });
 
@@ -37,53 +36,58 @@ export function denoiseDetections2<T>(state: DenoisedDetectionState<T>,
     const afterItems: TrackedItem<T>[] = [...tracker.getTrackedItems().values()];
 
     const now = options.now || Date.now();
-    const beforeItems: TrackedItem<T>[] = state.tracked || [];
 
     const lastDetection = state.lastDetection || now;
     const sinceLastDetection = now - lastDetection;
-
-    const map = new Map<string, TrackedItem<T>>();
-    for (const b of beforeItems) {
-        map.set(b.id, b);
+    const previousCopy = previousDetections.slice();
+    previousDetections.splice(0, previousDetections.length);
+    const map = new Map<string, DenoisedDetectionEntry<T>>();
+    for (const pd of previousCopy) {
+        map.set(pd.id, pd);
     }
+
     for (const a of afterItems) {
-        a.detection.id = a.id;
+        map.delete(a.id);
 
-        if (!map.has(a.id)) {
-            a.detection.id = a.id;
-            a.detection.firstSeen = now;
-            a.detection.lastSeen = now;
-            a.detection.durationGone = 0;
+        const previous = previousCopy.find(d => d.id === a.id);
+        const current = currentDetections.find(d => {
+            const [x, y, w, h] = d.boundingBox;
+            return !d.id && x === a.x && y === a.y && w === a.w && h === a.h;
+        });
 
-            options.added?.(a.detection);
-        }
-        else {
-            const b = map.get(a.id);
-            map.delete(a.id);
-
-            if (!a.isZombie) {
-                a.detection.firstSeen = b.detection.firstSeen;
-                a.detection.lastSeen = now;
-                a.detection.durationGone = 0;
-
-                options.retained?.(a.detection, b.detection)
+        if (current) {
+            current.id = a.id;
+            current.lastSeen = now;
+            current.durationGone = 0;
+            if (previous) {
+                current.firstSeen = previous.lastSeen;
+                previous.lastSeen = now;
+                previous.durationGone = 0;
+                options.retained?.(current, previous);
             }
             else {
-                a.detection.durationGone += sinceLastDetection;
+                current.firstSeen = now;
+                options.added?.(current);
             }
+
+            previousDetections.push(current);
+        }
+        else if (previous) {
+            previous.durationGone += sinceLastDetection;
+            options.expiring?.(previous);
+
+            previousDetections.push(previous);
+        }
+        else {
+            console.warn('unprocessed denoised detection?', a);
         }
     }
 
     for (const r of map.values()) {
-        options.removed?.(r.detection)
+        options.removed?.(r)
     }
 
     state.tracked = afterItems;
     state.lastDetection = now;
     state.frameCount++;
-
-    // clear it out
-    previousDetections.splice(0, previousDetections.length);
-    const newAndExisting = afterItems.map(a => a.detection);
-    previousDetections.push(...newAndExisting);
 }

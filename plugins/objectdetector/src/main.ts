@@ -229,6 +229,11 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
     const newOrBetterDetection = this.objectsDetected(detection);
     if (newOrBetterDetection)
       this.setDetection(detection, mediaObject);
+
+    const bad = detection.detections?.find(d => !d.history);
+    if (bad)
+      this.console.warn('unprocessed detection?', bad);
+
     this.reportObjectDetections(detection);
     // if (newOrBetterDetection) {
     //   mediaManager.convertMediaObjectToBuffer(mediaObject, 'image/jpeg')
@@ -438,6 +443,8 @@ class ObjectDetectionMixin extends SettingsMixinDeviceBase<VideoCamera & Camera 
         else {
           d.detection.bestScore = o.detection.bestScore;
         }
+      },
+      expiring: (d) => {
       },
     });
     if (found.length) {

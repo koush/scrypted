@@ -15,6 +15,7 @@ export interface DenoisedDetectionOptions<T> {
     added?: (detection: DenoisedDetectionEntry<T>) => void;
     removed?: (detection: DenoisedDetectionEntry<T>) => void;
     retained?: (detection: DenoisedDetectionEntry<T>, previous: DenoisedDetectionEntry<T>) => void;
+    expiring?: (previous: DenoisedDetectionEntry<T>) => void;
     timeout?: number;
     now?: number;
 }
@@ -26,8 +27,6 @@ export interface TrackerItem<T> {
     h: number,
     confidence: number,
     name: string,
-
-    detection: DenoisedDetectionEntry<T>;
 };
 
 export interface TrackedItem<T> extends TrackerItem<T> {
